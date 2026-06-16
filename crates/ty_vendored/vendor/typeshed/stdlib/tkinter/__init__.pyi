@@ -370,6 +370,10 @@ class Event(Generic[_W_co]):
     type - type of the event as a number
     widget - widget in which the event occurred
     delta - delta of wheel movement (MouseWheel)
+    detail - certain fixed strings (see Tcl/Tk documentation)
+             (Enter, Leave, FocusIn, FocusOut, ConfigureRequest)
+    user_data - data string which was passed to event_generate() or empty
+                string (VirtualEvent)
     """
 
     serial: int
@@ -428,6 +432,7 @@ class Variable:
 
     def set(self, value) -> None:
         """Set the variable to VALUE."""
+
     initialize = set
     def get(self):
         """Return value of variable."""
@@ -504,6 +509,7 @@ class Variable:
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None:
         """Unset the variable in Tcl."""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class StringVar(Variable):
@@ -522,6 +528,7 @@ class StringVar(Variable):
 
     def set(self, value: str) -> None:
         """Set the variable to VALUE."""
+
     initialize = set
     def get(self) -> str:
         """Return value of variable as string."""
@@ -542,6 +549,7 @@ class IntVar(Variable):
 
     def set(self, value: int) -> None:
         """Set the variable to VALUE."""
+
     initialize = set
     def get(self) -> int:
         """Return the value of the variable as an integer."""
@@ -562,6 +570,7 @@ class DoubleVar(Variable):
 
     def set(self, value: float) -> None:
         """Set the variable to VALUE."""
+
     initialize = set
     def get(self) -> float:
         """Return the value of the variable as a float."""
@@ -582,6 +591,7 @@ class BooleanVar(Variable):
 
     def set(self, value: bool) -> None:
         """Set the variable to VALUE."""
+
     initialize = set
     def get(self) -> bool:
         """Return the value of the variable as a bool."""
@@ -662,6 +672,7 @@ class Misc:
         A parameter of type IntVar, StringVar, DoubleVar or
         BooleanVar must be given.
         """
+
     waitvar = wait_variable
     def wait_window(self, window: Misc | None = None) -> None:
         """Wait until a WIDGET is destroyed.
@@ -694,6 +705,7 @@ class Misc:
         this widget will get the focus if the application gets
         the focus through the window manager.
         """
+
     focus = focus_set
     def focus_force(self) -> None:
         """Direct input focus to this widget even if the
@@ -740,6 +752,7 @@ class Misc:
 
     def tk_focusPrev(self) -> Misc | None:
         """Return previous widget in the focus order. See tk_focusNext for details."""
+
     if sys.version_info >= (3, 14):
         # .after() can be called without the "func" argument, but it is basically never what you want.
         # It behaves like time.sleep() and freezes the GUI app.
@@ -751,6 +764,7 @@ class Misc:
             are given as parameters to the function call.  Return
             identifier to cancel scheduling with after_cancel.
             """
+
         # after_idle is essentially partialmethod(after, "idle")
         def after_idle(self, func: Callable[_P, object], *args: _P.args, **kwargs: _P.kwargs) -> str:
             """Call FUNC once if the Tcl main loop has no event to
@@ -759,6 +773,7 @@ class Misc:
             Return an identifier to cancel the scheduling with
             after_cancel.
             """
+
     else:
         # .after() can be called without the "func" argument, but it is basically never what you want.
         # It behaves like time.sleep() and freezes the GUI app.
@@ -770,6 +785,7 @@ class Misc:
             are given as parameters to the function call.  Return
             identifier to cancel scheduling with after_cancel.
             """
+
         # after_idle is essentially partialmethod(after, "idle")
         def after_idle(self, func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str:
             """Call FUNC once if the Tcl main loop has no event to
@@ -785,6 +801,7 @@ class Misc:
         Identifier returned by after or after_idle must be
         given as first parameter.
         """
+
     if sys.version_info >= (3, 13):
         def after_info(self, id: str | None = None) -> tuple[str, ...]:
             """Return information about existing event handlers.
@@ -802,6 +819,7 @@ class Misc:
 
     def bell(self, displayof: Literal[0] | Misc | None = 0) -> None:
         """Ring a display's bell."""
+
     if sys.version_info >= (3, 13):
         # Supports options from `_BusyInfo``
         def tk_busy_cget(self, option: Literal["cursor"]) -> _Cursor:
@@ -811,6 +829,7 @@ class Misc:
             tk_busy_hold().  Option may have any of the values accepted by
             tk_busy_hold().
             """
+
         busy_cget = tk_busy_cget
         def tk_busy_configure(self, cnf: Any = None, **kw: Any) -> Any:
             """Query or modify the busy configuration options.
@@ -827,6 +846,7 @@ class Misc:
                 w.option_add('*frame.busyCursor', 'gumby')
                 w.option_add('*Frame.BusyCursor', 'gumby')
             """
+
         tk_busy_config = tk_busy_configure
         busy_configure = tk_busy_configure
         busy_config = tk_busy_configure
@@ -836,12 +856,14 @@ class Misc:
             If a pattern is given, only busy widgets whose path names match
             a pattern are returned.
             """
+
         busy_current = tk_busy_current
         def tk_busy_forget(self) -> None:
             """Make this widget no longer busy.
 
             User events will again be received by the widget.
             """
+
         busy_forget = tk_busy_forget
         def tk_busy_hold(self, **kw: Unpack[_BusyInfo]) -> None:
             """Make this widget appear busy.
@@ -856,11 +878,13 @@ class Misc:
                 cursor: the cursor to be displayed when the widget is made
                         busy.
             """
+
         tk_busy = tk_busy_hold
         busy_hold = tk_busy_hold
         busy = tk_busy_hold
         def tk_busy_status(self) -> bool:
             """Return True if the widget is busy, False otherwise."""
+
         busy_status = tk_busy_status
 
     def clipboard_get(self, *, displayof: Misc = ..., type: str = ...) -> str:
@@ -1004,6 +1028,7 @@ class Misc:
 
     def tkraise(self, aboveThis=None) -> None:
         """Raise this widget in the stacking order."""
+
     lift = tkraise
     if sys.version_info >= (3, 11):
         def info_patchlevel(self) -> _VersionInfoType:
@@ -1251,7 +1276,7 @@ class Misc:
         <Alt-A> for pressing A and the Alt key (KeyPress can be omitted).
         An event pattern can also be a virtual event of the form
         <<AString>> where AString can be arbitrary. This
-        event can be generated by event_generate.
+        event can be generated by event_generate().
         If events are concatenated they must appear shortly
         after each other.
 
@@ -1376,6 +1401,7 @@ class Misc:
 
         The default anchor is nw.
         """
+
     anchor = grid_anchor
 
     @overload
@@ -1432,6 +1458,7 @@ class Misc:
         weight (how much does additional space propagate to this row)
         and pad (how much space to let additionally).
         """
+
     columnconfigure = grid_columnconfigure
     rowconfigure = grid_rowconfigure
     def grid_location(self, x: float | str, y: float | str) -> tuple[int, int]:
@@ -1453,31 +1480,39 @@ class Misc:
 
     def grid_size(self) -> tuple[int, int]:
         """Return a tuple of the number of column and rows in the grid."""
+
     size = grid_size
     # Widget because Toplevel or Tk is never a slave
     def pack_slaves(self) -> list[Widget]:
-        """Returns a list of all of the content widgets in the packing order
-        for this container.
-        """
+        """Synonym for pack_content()."""
 
     def grid_slaves(self, row: int | None = None, column: int | None = None) -> list[Widget]:
-        """Returns a list of the content widgets.
-
-        If no arguments are supplied, a list of all of the content in this
-        container widget is returned, most recently managed first.
-        If ROW or COLUMN is specified, only the content in the row or
-        column is returned.
-        """
+        """Synonym for grid_content()."""
 
     def place_slaves(self) -> list[Widget]:
-        """Returns a list of all the content widgets for which this widget is
-        the container.
-        """
+        """Synonym for place_content()."""
+
     slaves = pack_slaves
     if sys.version_info >= (3, 15):
-        def pack_content(self) -> list[Widget]: ...
-        def grid_content(self, row: int | None = None, column: int | None = None) -> list[Widget]: ...
-        def place_content(self) -> list[Widget]: ...
+        def pack_content(self) -> list[Widget]:
+            """Returns a list of all of the content widgets in the packing order
+            for this container.
+            """
+
+        def grid_content(self, row: int | None = None, column: int | None = None) -> list[Widget]:
+            """Returns a list of the content widgets.
+
+            If no arguments are supplied, a list of all of the content in this
+            container widget is returned, most recently managed first.
+            If ROW or COLUMN is specified, only the content in the row or
+            column is returned.
+            """
+
+        def place_content(self) -> list[Widget]:
+            """Returns a list of all the content widgets for which this widget is
+            the container.
+            """
+
         content = pack_content
 
     def event_add(self, virtual: str, *sequences: str) -> None:
@@ -1536,6 +1571,7 @@ class Misc:
 
     def image_types(self) -> tuple[str, ...]:
         """Return a list of all available image types (e.g. photo bitmap)."""
+
     # See #4363 and #4891
     def __setitem__(self, key: str, value: Any) -> None: ...
     def __getitem__(self, key: str) -> Any:
@@ -1557,6 +1593,7 @@ class Misc:
         is specified, then modify the widget option(s) to have the given
         value(s).
         """
+
     config = configure
 
 class CallWrapper:
@@ -1668,6 +1705,8 @@ class Wm:
     ) -> tuple[int, int, int, int] | None: ...
 
     aspect = wm_aspect
+
+    # wm_attributes: Get all attributes
     if sys.version_info >= (3, 13):
         @overload
         def wm_attributes(self, *, return_python_dict: Literal[False] = False) -> tuple[Any, ...]:
@@ -1706,6 +1745,7 @@ class Wm:
             On Unix, there are currently no special attribute values.
             """
 
+    # wm_attributes: Get one attribute (old variant using string that starts with "-")
     @overload
     def wm_attributes(self, option: Literal["-alpha"], /) -> float:
         """Return or sets platform specific attributes.
@@ -1727,22 +1767,17 @@ class Wm:
     if sys.platform == "darwin":
         @overload
         def wm_attributes(self, option: Literal["-modified"], /) -> bool:
-            """This subcommand returns or sets platform specific attributes
+            """Return or sets platform specific attributes.
 
-            The first form returns a list of the platform specific flags and
-            their values. The second form returns the value for the specific
-            option. The third form sets one or more of the values. The values
-            are as follows:
+            When called with a single argument return_python_dict=True,
+            return a dict of the platform specific attributes and their values.
+            When called without arguments or with a single argument
+            return_python_dict=False, return a tuple containing intermixed
+            attribute names with the minus prefix and their values.
 
-            On Windows, -disabled gets or sets whether the window is in a
-            disabled state. -toolwindow gets or sets the style of the window
-            to toolwindow (as defined in the MSDN). -topmost gets or sets
-            whether this is a topmost window (displays above all other
-            windows).
-
-            On Macintosh, XXXXX
-
-            On Unix, there are currently no special attribute values.
+            When called with a single string value, return the value for the
+            specific option.  When called with keyword arguments, set the
+            corresponding attributes.
             """
         @overload
         def wm_attributes(self, option: Literal["-notify"], /) -> bool: ...
@@ -1790,6 +1825,7 @@ class Wm:
         @overload
         def wm_attributes(self, option: Literal["-type"], /) -> str: ...
     if sys.version_info >= (3, 13):
+        # wm_attributes: Get one attribute (new variant without "-")
         @overload
         def wm_attributes(self, option: Literal["alpha"], /) -> float:
             """Return or sets platform specific attributes.
@@ -1810,7 +1846,19 @@ class Wm:
         def wm_attributes(self, option: Literal["topmost"], /) -> bool: ...
         if sys.platform == "darwin":
             @overload
-            def wm_attributes(self, option: Literal["modified"], /) -> bool: ...
+            def wm_attributes(self, option: Literal["modified"], /) -> bool:
+                """Return or sets platform specific attributes.
+
+                When called with a single argument return_python_dict=True,
+                return a dict of the platform specific attributes and their values.
+                When called without arguments or with a single argument
+                return_python_dict=False, return a tuple containing intermixed
+                attribute names with the minus prefix and their values.
+
+                When called with a single string value, return the value for the
+                specific option.  When called with keyword arguments, set the
+                corresponding attributes.
+                """
             @overload
             def wm_attributes(self, option: Literal["notify"], /) -> bool: ...
             @overload
@@ -1857,6 +1905,7 @@ class Wm:
             @overload
             def wm_attributes(self, option: Literal["type"], /) -> str: ...
 
+    # wm_attributes: Set an attribute (old variant using string that starts with "-")
     @overload
     def wm_attributes(self, option: str, /): ...
     @overload
@@ -1868,22 +1917,17 @@ class Wm:
     if sys.platform == "darwin":
         @overload
         def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]:
-            """This subcommand returns or sets platform specific attributes
+            """Return or sets platform specific attributes.
 
-            The first form returns a list of the platform specific flags and
-            their values. The second form returns the value for the specific
-            option. The third form sets one or more of the values. The values
-            are as follows:
+            When called with a single argument return_python_dict=True,
+            return a dict of the platform specific attributes and their values.
+            When called without arguments or with a single argument
+            return_python_dict=False, return a tuple containing intermixed
+            attribute names with the minus prefix and their values.
 
-            On Windows, -disabled gets or sets whether the window is in a
-            disabled state. -toolwindow gets or sets the style of the window
-            to toolwindow (as defined in the MSDN). -topmost gets or sets
-            whether this is a topmost window (displays above all other
-            windows).
-
-            On Macintosh, XXXXX
-
-            On Unix, there are currently no special attribute values.
+            When called with a single string value, return the value for the
+            specific option.  When called with keyword arguments, set the
+            corresponding attributes.
             """
         @overload
         def wm_attributes(self, option: Literal["-notify"], value: bool, /) -> Literal[""]: ...
@@ -1929,9 +1973,11 @@ class Wm:
         @overload
         def wm_attributes(self, option: Literal["-type"], value: str, /) -> Literal[""]: ...
 
+    # wm_attributes: Set multiple attributes (old variant using strings that start with "-")
     @overload
     def wm_attributes(self, option: str, value, /, *__other_option_value_pairs: Any) -> Literal[""]: ...
 
+    # wm_attributes: Set an attribute (new variant with kwarg instead of string)
     if sys.version_info >= (3, 13):
         if sys.platform == "darwin":
             @overload
@@ -1945,7 +1991,19 @@ class Wm:
                 titlepath: str = ...,
                 topmost: bool = ...,
                 transparent: bool = ...,
-            ) -> None: ...
+            ) -> None:
+                """Return or sets platform specific attributes.
+
+                When called with a single argument return_python_dict=True,
+                return a dict of the platform specific attributes and their values.
+                When called without arguments or with a single argument
+                return_python_dict=False, return a tuple containing intermixed
+                attribute names with the minus prefix and their values.
+
+                When called with a single string value, return the value for the
+                specific option.  When called with keyword arguments, set the
+                corresponding attributes.
+                """
         elif sys.platform == "win32":
             @overload
             def wm_attributes(
@@ -1994,6 +2052,7 @@ class Wm:
         """Store NAME in WM_CLIENT_MACHINE property of this widget. Return
         current value.
         """
+
     client = wm_client
 
     @overload
@@ -2013,18 +2072,21 @@ class Wm:
         which shall be used to invoke the application. Return current
         command if VALUE is None.
         """
+
     command = wm_command
     # Some of these always return empty string, but return type is set to None to prevent accidentally using it
     def wm_deiconify(self) -> None:
         """Deiconify this widget. If it was never mapped it will not be mapped.
         On Windows it will raise this widget and give it the focus.
         """
+
     deiconify = wm_deiconify
     def wm_focusmodel(self, model: Literal["active", "passive"] | None = None) -> Literal["active", "passive", ""]:
         """Set focus model to MODEL. "active" means that this widget will claim
         the focus itself, "passive" means that the window manager shall give
         the focus. Return current focus model if MODEL is None.
         """
+
     focusmodel = wm_focusmodel
     def wm_forget(self, window: Wm) -> None:
         """The window will be unmapped from the screen and will no longer
@@ -2033,9 +2095,11 @@ class Wm:
         option configuration will be remembered and the menus will return
         once the widget is managed again.
         """
+
     forget = wm_forget
     def wm_frame(self) -> str:
         """Return identifier for decorative frame of this widget if present."""
+
     frame = wm_frame
 
     @overload
@@ -2053,11 +2117,13 @@ class Wm:
         height of a grid unit in pixels. BASEWIDTH and BASEHEIGHT are the
         number of grid units requested in Tk_GeometryRequest.
         """
+
     grid = wm_grid
     def wm_group(self, pathName=None):
         """Set the group leader widgets for related widgets to PATHNAME. Return
         the group leader of this widget if None is given.
         """
+
     group = wm_group
     def wm_iconbitmap(self, bitmap=None, default=None):
         """Set bitmap for the iconified widget to BITMAP. Return
@@ -2069,19 +2135,23 @@ class Wm:
         (example: root.iconbitmap(default='myicon.ico') ).  See Tk
         documentation for more information.
         """
+
     iconbitmap = wm_iconbitmap
     def wm_iconify(self) -> None:
         """Display widget as icon."""
+
     iconify = wm_iconify
     def wm_iconmask(self, bitmap=None):
         """Set mask for the icon bitmap of this widget. Return the
         mask if None is given.
         """
+
     iconmask = wm_iconmask
     def wm_iconname(self, newName=None) -> str:
         """Set the name of the icon for this widget. Return the name if
         None is given.
         """
+
     iconname = wm_iconname
     def wm_iconphoto(self, default: bool, image1: _PhotoImageLike | str, /, *args: _PhotoImageLike | str) -> None:
         """Sets the titlebar icon for this window based on the named photo
@@ -2104,22 +2174,26 @@ class Wm:
 
         On Macintosh, this currently does nothing.
         """
+
     iconphoto = wm_iconphoto
     def wm_iconposition(self, x: int | None = None, y: int | None = None) -> tuple[int, int] | None:
         """Set the position of the icon of this widget to X and Y. Return
         a tuple of the current values of X and X if None is given.
         """
+
     iconposition = wm_iconposition
     def wm_iconwindow(self, pathName=None):
         """Set widget PATHNAME to be displayed instead of icon. Return the current
         value if None is given.
         """
+
     iconwindow = wm_iconwindow
     def wm_manage(self, widget) -> None:
         """The widget specified will become a stand alone top-level window.
         The window will be decorated with the window managers title bar,
         etc.
         """
+
     manage = wm_manage
 
     @overload
@@ -2159,6 +2233,7 @@ class Wm:
         be defined by the user if WHO is "user", and by its own policy if WHO is
         "program".
         """
+
     positionfrom = wm_positionfrom
 
     @overload
@@ -2188,6 +2263,7 @@ class Wm:
         be defined by the user if WHO is "user", and by its own policy if WHO is
         "program".
         """
+
     sizefrom = wm_sizefrom
 
     @overload
@@ -2221,6 +2297,7 @@ class Wm:
         """Withdraw this widget from the screen such that it is unmapped
         and forgotten by the window manager. Re-draw it with wm_deiconify.
         """
+
     withdraw = wm_withdraw
 
 class Tk(Misc, Wm):
@@ -2297,6 +2374,7 @@ class Tk(Misc, Wm):
         the Tcl Interpreter and calls exec on the contents of .BASENAME.py and
         .CLASSNAME.py if such a file exists in the home directory.
         """
+
     report_callback_exception: Callable[[type[BaseException], BaseException, TracebackType | None], object]
     # Tk has __getattr__ so that tk_instance.foo falls back to tk_instance.tk.foo
     # Please keep in sync with _tkinter.TkappType.
@@ -2411,6 +2489,7 @@ class Pack:
         """Return information about the packing options
         for this widget.
         """
+
     pack = pack_configure
     forget = pack_forget
     propagate = Misc.pack_propagate
@@ -2487,6 +2566,7 @@ class Place:
         """Return information about the placing options
         for this widget.
         """
+
     place = place_configure
     info = place_info
 
@@ -2551,6 +2631,7 @@ class Grid:
         """Return information about the options
         for positioning this widget in a grid.
         """
+
     grid = grid_configure
     location = Misc.grid_location
     size = Misc.grid_size
@@ -2606,7 +2687,7 @@ class Widget(BaseWidget, Pack, Place, Grid):
         <Alt-A> for pressing A and the Alt key (KeyPress can be omitted).
         An event pattern can also be a virtual event of the form
         <<AString>> where AString can be arbitrary. This
-        event can be generated by event_generate.
+        event can be generated by event_generate().
         If events are concatenated they must appear shortly
         after each other.
 
@@ -3032,6 +3113,7 @@ class Canvas(Widget, XView, YView):
 
     def find_withtag(self, tagOrId: str | int) -> tuple[int, ...]:
         """Return all items with TAGORID."""
+
     # Incompatible with Misc.bbox(), tkinter violates LSP
     def bbox(self, *args: str | int) -> tuple[int, int, int, int]:  # type: ignore[override]
         """Return a tuple of X1,Y1,X2,Y2 coordinates for a rectangle
@@ -3064,12 +3146,12 @@ class Canvas(Widget, XView, YView):
         function identified with FUNCID.
         """
 
-    def canvasx(self, screenx, gridspacing=None):
+    def canvasx(self, screenx: float | str, gridspacing: float | str | None = None) -> float:
         """Return the canvas x coordinate of pixel position SCREENX rounded
         to nearest multiple of GRIDSPACING units.
         """
 
-    def canvasy(self, screeny, gridspacing=None):
+    def canvasy(self, screeny: float | str, gridspacing: float | str | None = None) -> float:
         """Return the canvas y coordinate of pixel position SCREENY rounded
         to nearest multiple of GRIDSPACING units.
         """
@@ -3625,6 +3707,7 @@ class Canvas(Widget, XView, YView):
 
     def itemcget(self, tagOrId, option):
         """Return the value of OPTION for item TAGORID."""
+
     # itemconfigure kwargs depend on item type, which is not known when type checking
     def itemconfigure(
         self, tagOrId: str | int, cnf: dict[str, Any] | None = None, **kw: Any
@@ -3633,6 +3716,7 @@ class Canvas(Widget, XView, YView):
 
         Similar to configure() except that it applies to the specified item.
         """
+
     itemconfig = itemconfigure
     def move(self, *args) -> None:
         """Move an item TAGORID given in ARGS."""
@@ -3652,6 +3736,7 @@ class Canvas(Widget, XView, YView):
         height, pageanchor, pageheight, pagewidth, pagex, pagey,
         rotate, width, x, y.
         """
+
     # tkinter does:
     #    lower = tag_lower
     #    lift = tkraise = tag_raise
@@ -4025,6 +4110,7 @@ class Entry(Widget, XView):
 
     def selection_to(self, index: str | int) -> None:
         """Set the variable end of a selection to INDEX."""
+
     select_adjust = selection_adjust
     select_clear = selection_clear
     select_from = selection_from
@@ -4373,17 +4459,21 @@ class Listbox(Widget, XView, YView):
 
     def selection_anchor(self, index: str | int) -> None:
         """Set the fixed end oft the selection to INDEX."""
+
     select_anchor = selection_anchor
     def selection_clear(self, first: str | int, last: str | int | None = None) -> None:  # type: ignore[override]
         """Clear the selection from FIRST to LAST (included)."""
+
     select_clear = selection_clear
     def selection_includes(self, index: str | int):
         """Return True if INDEX is part of the selection."""
+
     select_includes = selection_includes
     def selection_set(self, first: str | int, last: str | int | None = None) -> None:
         """Set the selection from FIRST to LAST (included) without
         changing the currently selected elements.
         """
+
     select_set = selection_set
     def size(self) -> int:  # type: ignore[override]
         """Return the number of elements in the listbox."""
@@ -4396,6 +4486,7 @@ class Listbox(Widget, XView, YView):
 
         Similar to configure() except that it applies to the specified item.
         """
+
     itemconfig = itemconfigure
 
 class Menu(Widget):
@@ -4719,6 +4810,7 @@ class Menu(Widget):
         Similar to configure() except that it applies to the specified
         menu item.
         """
+
     entryconfig = entryconfigure
     def index(self, index: str | int) -> int | None:
         """Return the index of a menu item identified by INDEX."""
@@ -5480,6 +5572,7 @@ class Text(Widget, XView, YView):
         """Return whether between index INDEX1 and index INDEX2 the
         relation OP is satisfied. OP is one of <, <=, ==, >=, >, or !=.
         """
+
     if sys.version_info >= (3, 13):
         @overload
         def count(
@@ -5901,6 +5994,7 @@ class Text(Widget, XView, YView):
 
     def mark_previous(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str | None:
         """Return the name of the previous mark before INDEX."""
+
     # **kw of peer_create is same as the kwargs of Text.__init__
     def peer_create(self, newPathName: str | Text, cnf: dict[str, Any] = {}, **kw) -> None:
         """Creates a peer text widget with the given newPathName, and any
@@ -5936,6 +6030,7 @@ class Text(Widget, XView, YView):
         difference between X and Y and the coordinates given in
         scan_mark.
         """
+
     if sys.version_info >= (3, 15):
         def search(
             self,
@@ -5952,7 +6047,12 @@ class Text(Widget, XView, YView):
             *,
             nolinestop: bool | None = None,
             strictlimits: bool | None = None,
-        ) -> str: ...  # returns empty string for not found
+        ) -> str:  # returns empty string for not found
+            """Search PATTERN beginning from INDEX until STOPINDEX.
+            Return the index of the first character of a match or an
+            empty string.
+            """
+
         def search_all(
             self,
             pattern: str,
@@ -5969,7 +6069,11 @@ class Text(Widget, XView, YView):
             nolinestop: bool | None = None,
             overlap: bool | None = None,
             strictlimits: bool | None = None,
-        ) -> tuple[_tkinter.Tcl_Obj, ...]: ...
+        ) -> tuple[_tkinter.Tcl_Obj, ...]:
+            """Search all occurrences of PATTERN from INDEX to STOPINDEX.
+            Return a tuple of indices where matches begin.
+            """
+
     else:
         def search(
             self,
@@ -6021,6 +6125,7 @@ class Text(Widget, XView, YView):
         """Unbind for all characters with TAGNAME for event SEQUENCE  the
         function identified with FUNCID.
         """
+
     # allowing any string for cget instead of just Literals because there's no other way to look up tag options
     def tag_cget(self, tagName: str, option: str):
         """Return the value of OPTION for tag TAGNAME."""
@@ -6108,6 +6213,7 @@ class Text(Widget, XView, YView):
 
     def tag_ranges(self, tagName: str) -> tuple[_tkinter.Tcl_Obj, ...]:
         """Return a list of ranges of text which have tag TAGNAME."""
+
     # tag_remove and tag_delete are different
     def tag_remove(
         self,
@@ -6202,6 +6308,7 @@ class OptionMenu(Menubutton):
             value VALUE, the other menu values VALUES and an additional
             keyword argument command.
             """
+
     else:
         def __init__(
             # differs from other widgets
@@ -6217,6 +6324,7 @@ class OptionMenu(Menubutton):
             value VALUE, the other menu values VALUES and an additional
             keyword argument command.
             """
+
     # configure, config, cget are inherited from Menubutton
     # destroy and __getitem__ are overridden, signature does not change
 
@@ -6289,6 +6397,7 @@ class PhotoImage(Image, _PhotoImageLike):
         width: int = ...,
     ) -> None:
         """Configure the image."""
+
     config = configure
     def blank(self) -> None:
         """Display a transparent image."""
@@ -6322,7 +6431,7 @@ class PhotoImage(Image, _PhotoImageLike):
             integer or a pair of integers.
             """
 
-        def subsample(self, x: int, y: Literal[""] = "", *, from_coords: Iterable[int] | None = None) -> PhotoImage:
+        def subsample(self, x: int, y: int | Literal[""] = "", *, from_coords: Iterable[int] | None = None) -> PhotoImage:
             """Return a new PhotoImage based on the same image as this widget
             but use only every Xth or Yth pixel.  If Y is not given, the
             default value is the same as X.
@@ -6331,7 +6440,7 @@ class PhotoImage(Image, _PhotoImageLike):
             source image to be copied, as in the copy() method.
             """
 
-        def zoom(self, x: int, y: Literal[""] = "", *, from_coords: Iterable[int] | None = None) -> PhotoImage:
+        def zoom(self, x: int, y: int | Literal[""] = "", *, from_coords: Iterable[int] | None = None) -> PhotoImage:
             """Return a new PhotoImage with the same image as this widget
             but zoom it with a factor of X in the X direction and Y in the Y
             direction.  If Y is not given, the default value is the same as X.
@@ -6393,6 +6502,7 @@ class PhotoImage(Image, _PhotoImageLike):
             contents of the destination image are discarded and the source image
             is used as-is.  The default compositing rule is 'overlay'.
             """
+
     else:
         def copy(self) -> PhotoImage:
             """Return a new PhotoImage with the same image as this widget."""
@@ -6429,6 +6539,7 @@ class PhotoImage(Image, _PhotoImageLike):
         """Put row formatted colors to image starting from
         position TO, e.g. image.put("{red green} {blue yellow}", to=(4,6))
         """
+
     if sys.version_info >= (3, 13):
         def read(
             self,
@@ -6775,6 +6886,7 @@ class Spinbox(Widget, XView):
 
         Returns an empty string.
         """
+
     # spinbox.invoke("asdf") gives error mentioning .invoke("none"), but it's not documented
     def invoke(self, element: Literal["none", "buttonup", "buttondown"]) -> Literal[""]:
         """Causes the specified element to be invoked
@@ -7047,6 +7159,7 @@ class PanedWindow(Widget):
 
         All geometry management options for child will be forgotten.
         """
+
     forget = remove  # type: ignore[assignment]
     def identify(self, x: int, y: int):
         """Identify the panedwindow component at point x, y
@@ -7161,6 +7274,7 @@ class PanedWindow(Widget):
             Tk_GetPixels.
 
         """
+
     paneconfig = paneconfigure
     def panes(self):
         """Returns an ordered list of the child panes."""

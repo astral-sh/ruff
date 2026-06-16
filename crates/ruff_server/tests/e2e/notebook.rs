@@ -2,12 +2,15 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use insta::assert_json_snapshot;
-use lsp_types::notification::{DidChangeNotebookDocument, DidOpenNotebookDocument};
 use lsp_types::{
-    DidChangeNotebookDocumentParams, DidOpenNotebookDocumentParams, LSPObject, NotebookDocument,
-    NotebookDocumentCellChange, NotebookDocumentChangeEvent, NotebookDocumentChangeTextContent,
-    Position, Range, TextDocumentContentChangeEvent, TextDocumentItem,
-    VersionedNotebookDocumentIdentifier, VersionedTextDocumentIdentifier,
+    DidChangeNotebookDocumentNotification, DidOpenNotebookDocumentNotification,
+    NotebookDocumentCellContentChanges, TextDocumentContentChangePartial, TextDocumentIdentifier,
+};
+use lsp_types::{
+    DidChangeNotebookDocumentParams, DidOpenNotebookDocumentParams, LspObject, NotebookDocument,
+    NotebookDocumentCellChanges, NotebookDocumentChangeEvent, Position, Range,
+    TextDocumentContentChangeEvent, TextDocumentItem, VersionedNotebookDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
 };
 use ruff_notebook::SourceValue;
 
@@ -17,8 +20,8 @@ const NOTEBOOK_FIXTURE_PATH: &str = "resources/test/fixtures/tensorflow_test_not
 
 struct NotebookChange {
     version: i32,
-    metadata: Option<LSPObject>,
-    updated_cells: NotebookDocumentCellChange,
+    metadata: Option<LspObject>,
+    updated_cells: NotebookDocumentCellChanges,
 }
 
 #[test]
@@ -37,114 +40,130 @@ fn super_resolution_overview() -> Result<()> {
     let notebook_uri = notebook_document.uri.clone();
     let cell_count = cell_text_documents.len();
 
-    server.send_notification::<DidOpenNotebookDocument>(DidOpenNotebookDocumentParams {
-        notebook_document,
-        cell_text_documents,
-    });
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document,
+            cell_text_documents,
+        },
+    );
 
     let diagnostics = server.collect_publish_diagnostic_notifications(cell_count);
     assert_json_snapshot!("super_resolution_overview_open", diagnostics);
 
-    let changes = [NotebookChange {
-        version: 0,
-        metadata: None,
-        updated_cells: NotebookDocumentCellChange {
-            structure: None,
-            data: None,
-            text_content: Some(vec![NotebookDocumentChangeTextContent {
-                document: VersionedTextDocumentIdentifier {
-                    uri: make_cell_uri(&fixture_path, 5),
-                    version: 2,
-                },
-                changes: vec![
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 18,
-                                character: 61,
-                            },
-                            end: Position {
-                                line: 18,
-                                character: 62,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 18,
-                                character: 55,
-                            },
-                            end: Position {
-                                line: 18,
-                                character: 56,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 14,
-                                character: 46,
-                            },
-                            end: Position {
-                                line: 14,
-                                character: 47,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 14,
-                                character: 40,
-                            },
-                            end: Position {
-                                line: 14,
-                                character: 41,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                ],
-            }]),
-        },
-    },
-    NotebookChange {
-        version: 1,
-        metadata: None,
-        updated_cells: NotebookDocumentCellChange {
-            structure: None,
-            data: None,
-            text_content: Some(vec![NotebookDocumentChangeTextContent {
-                document: VersionedTextDocumentIdentifier {
-                    uri: make_cell_uri(&fixture_path, 4),
-                    version: 2,
-                },
-                changes: vec![TextDocumentContentChangeEvent {
-                    range: Some(Range {
-                        start: Position {
-                            line: 0,
-                            character: 0,
+    let changes = [
+        NotebookChange {
+            version: 0,
+            metadata: None,
+            updated_cells: NotebookDocumentCellChanges {
+                structure: None,
+                data: None,
+                text_content: Some(vec![NotebookDocumentCellContentChanges {
+                    document: VersionedTextDocumentIdentifier {
+                        text_document_identifier: TextDocumentIdentifier {
+                            uri: make_cell_uri(&fixture_path, 5),
                         },
-                        end: Position {
-                            line: 0,
-                            character: 181,
-                        },
-                    }),
-                    range_length: Some(181),
-                    text: "test_img_path = tf.keras.utils.get_file(\n    \"lr.jpg\",\n    \"https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg\",\n)".to_string(),
-                }],
-            }]),
+                        version: 2,
+                    },
+                    changes: vec![
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 18,
+                                        character: 61,
+                                    },
+                                    end: Position {
+                                        line: 18,
+                                        character: 62,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 18,
+                                        character: 55,
+                                    },
+                                    end: Position {
+                                        line: 18,
+                                        character: 56,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 14,
+                                        character: 46,
+                                    },
+                                    end: Position {
+                                        line: 14,
+                                        character: 47,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 14,
+                                        character: 40,
+                                    },
+                                    end: Position {
+                                        line: 14,
+                                        character: 41,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                    ],
+                }]),
+            },
         },
-    }];
+        NotebookChange {
+            version: 1,
+            metadata: None,
+            updated_cells: NotebookDocumentCellChanges {
+                structure: None,
+                data: None,
+                text_content: Some(vec![NotebookDocumentCellContentChanges {
+                    document: VersionedTextDocumentIdentifier {
+                        text_document_identifier: TextDocumentIdentifier {
+                            uri: make_cell_uri(&fixture_path, 4),
+                        },
+                        version: 2,
+                    },
+                    changes: vec![TextDocumentContentChangeEvent::TextDocumentContentChangePartial(TextDocumentContentChangePartial {
+                        range: Range {
+                            start: Position {
+                                line: 0,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: 0,
+                                character: 181,
+                            },
+                        },
+                        text: "test_img_path = tf.keras.utils.get_file(\n    \"lr.jpg\",\n    \"https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg\",\n)".to_string(),
+                        ..Default::default()
+                    })],
+                }]),
+            },
+        },
+    ];
 
     let mut final_diagnostics = None;
 
@@ -154,16 +173,18 @@ fn super_resolution_overview() -> Result<()> {
         updated_cells,
     } in changes
     {
-        server.send_notification::<DidChangeNotebookDocument>(DidChangeNotebookDocumentParams {
-            notebook_document: VersionedNotebookDocumentIdentifier {
-                uri: notebook_uri.clone(),
-                version,
+        server.send_notification::<DidChangeNotebookDocumentNotification>(
+            DidChangeNotebookDocumentParams {
+                notebook_document: VersionedNotebookDocumentIdentifier {
+                    uri: notebook_uri.clone(),
+                    version,
+                },
+                change: NotebookDocumentChangeEvent {
+                    metadata,
+                    cells: Some(updated_cells),
+                },
             },
-            change: NotebookDocumentChangeEvent {
-                metadata,
-                cells: Some(updated_cells),
-            },
-        });
+        );
 
         final_diagnostics = Some(server.collect_publish_diagnostic_notifications(cell_count));
     }
@@ -191,10 +212,12 @@ fn notebook_without_ipynb_extension() -> Result<()> {
         create_lsp_notebook(&fixture_path, workspace_dir.join("notebook.py"))?;
     let cell_count = cell_text_documents.len();
 
-    server.send_notification::<DidOpenNotebookDocument>(DidOpenNotebookDocumentParams {
-        notebook_document,
-        cell_text_documents,
-    });
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document,
+            cell_text_documents,
+        },
+    );
 
     let diagnostics = server.collect_publish_diagnostic_notifications(cell_count);
     assert_json_snapshot!("notebook_without_ipynb_extension_open", diagnostics);
@@ -213,7 +236,7 @@ fn create_lsp_notebook(
     open_uri_path: PathBuf,
 ) -> Result<(NotebookDocument, Vec<TextDocumentItem>)> {
     let notebook = ruff_notebook::Notebook::from_path(file_path)?;
-    let notebook_uri = lsp_types::Url::from_file_path(open_uri_path).unwrap();
+    let notebook_uri = lsp_types::Uri::from_file_path(open_uri_path).unwrap();
 
     let mut cells = Vec::new();
     let mut cell_text_documents = Vec::new();
@@ -242,8 +265,8 @@ fn create_lsp_notebook(
     ))
 }
 
-fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Url {
-    lsp_types::Url::parse(&format!(
+fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Uri {
+    lsp_types::Uri::parse(&format!(
         "notebook-cell:///Users/test/notebooks/{}.ipynb?cell={index}",
         path.file_name().unwrap().to_string_lossy()
     ))
@@ -252,7 +275,7 @@ fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Url {
 
 fn cell_to_lsp_cell(
     cell: &ruff_notebook::Cell,
-    cell_uri: lsp_types::Url,
+    cell_uri: lsp_types::Uri,
 ) -> Result<(lsp_types::NotebookCell, TextDocumentItem)> {
     let contents = match cell.source() {
         SourceValue::String(string) => string.clone(),
@@ -260,7 +283,7 @@ fn cell_to_lsp_cell(
     };
     let metadata = match serde_json::to_value(cell.metadata())? {
         serde_json::Value::Null => None,
-        serde_json::Value::Object(metadata) => Some(metadata),
+        metadata @ serde_json::Value::Object(_) => Some(serde_json::from_value(metadata)?),
         _ => anyhow::bail!("Notebook cell metadata was not an object"),
     };
     Ok((
@@ -274,6 +297,6 @@ fn cell_to_lsp_cell(
             metadata,
             execution_summary: None,
         },
-        TextDocumentItem::new(cell_uri, "python".to_string(), 0, contents),
+        TextDocumentItem::new(cell_uri, lsp_types::LanguageKind::Python, 0, contents),
     ))
 }

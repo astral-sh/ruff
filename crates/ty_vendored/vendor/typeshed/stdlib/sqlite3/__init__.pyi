@@ -371,6 +371,7 @@ class Connection:
 
         Any pending transaction is not committed implicitly.
         """
+
     if sys.version_info >= (3, 11):
         def blobopen(self, table: str, column: str, row: int, /, *, readonly: bool = False, name: str = "main") -> Blob:
             """Open and return a BLOB object.
@@ -392,8 +393,11 @@ class Connection:
 
         If there is no open transaction, this method is a no-op.
         """
+
     if sys.version_info >= (3, 15):
-        def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol], /) -> None: ...
+        def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol], /) -> None:
+            """Creates a new aggregate."""
+
     else:
         def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol]) -> None:
             """Creates a new aggregate.
@@ -403,6 +407,7 @@ class Connection:
             'name', 'n_arg' and 'aggregate_class' will become positional-only in
             Python 3.15.
             """
+
     if sys.version_info >= (3, 11):
         # num_params determines how many params will be passed to the aggregate class. We provide an overload
         # for the case where num_params = 1, which is expected to be the common case.
@@ -433,10 +438,13 @@ class Connection:
 
     def create_collation(self, name: str, callback: Callable[[str, str], SupportsIndex] | None, /) -> None:
         """Creates a collation function."""
+
     if sys.version_info >= (3, 15):
         def create_function(
             self, name: str, narg: int, func: Callable[..., _SqliteData] | None, /, *, deterministic: bool = False
-        ) -> None: ...
+        ) -> None:
+            """Creates a new function."""
+
     else:
         def create_function(
             self, name: str, narg: int, func: Callable[..., _SqliteData] | None, *, deterministic: bool = False
@@ -465,6 +473,7 @@ class Connection:
 
     def interrupt(self) -> None:
         """Abort any pending database operation."""
+
     if sys.version_info >= (3, 13):
         def iterdump(self, *, filter: str | None = None) -> Generator[str]:
             """Returns iterator to the dump of the database in an SQL text format.
@@ -472,6 +481,7 @@ class Connection:
             filter
               An optional LIKE pattern for database objects to dump
             """
+
     else:
         def iterdump(self) -> Generator[str]:
             """Returns iterator to the dump of the database in an SQL text format."""
@@ -481,12 +491,31 @@ class Connection:
 
         If there is no open transaction, this method is a no-op.
         """
+
     if sys.version_info >= (3, 15):
         def set_authorizer(
             self, authorizer_callback: Callable[[int, str | None, str | None, str | None, str | None], int] | None, /
-        ) -> None: ...
-        def set_progress_handler(self, progress_handler: Callable[[], int | None] | None, /, n: int) -> None: ...
-        def set_trace_callback(self, trace_callback: Callable[[str], object] | None, /) -> None: ...
+        ) -> None:
+            """Set authorizer callback."""
+
+        def set_progress_handler(self, progress_handler: Callable[[], int | None] | None, /, n: int) -> None:
+            """Set progress handler callback.
+
+              progress_handler
+                A callable that takes no arguments.
+                If the callable returns non-zero, the current query is
+                terminated, and an exception is raised.
+              n
+                The number of SQLite virtual machine instructions that are
+                executed between invocations of 'progress_handler'.
+
+            If 'progress_handler' is None or 'n' is 0, the progress handler is
+            disabled.
+            """
+
+        def set_trace_callback(self, trace_callback: Callable[[str], object] | None, /) -> None:
+            """Set a trace callback called for each SQL statement (passed as unicode)."""
+
     else:
         def set_authorizer(
             self, authorizer_callback: Callable[[int, str | None, str | None, str | None, str | None], int] | None
@@ -523,13 +552,16 @@ class Connection:
             _sqlite3.Connection.set_trace_callback() is deprecated. Parameter
             'trace_callback' will become positional-only in Python 3.15.
             """
+
     # enable_load_extension and load_extension is not available on python distributions compiled
     # without sqlite3 loadable extension support. see footnotes https://docs.python.org/3/library/sqlite3.html#f1
     def enable_load_extension(self, enable: bool, /) -> None:
         """Enable dynamic loading of SQLite extension modules."""
+
     if sys.version_info >= (3, 12):
         def load_extension(self, name: str, /, *, entrypoint: str | None = None) -> None:
             """Load SQLite extension module."""
+
     else:
         def load_extension(self, name: str, /) -> None:
             """Load SQLite extension module."""
@@ -544,6 +576,7 @@ class Connection:
         sleep: float = 0.25,
     ) -> None:
         """Makes a backup of the database."""
+
     if sys.version_info >= (3, 11):
         def setlimit(self, category: int, limit: int, /) -> int:
             """Set connection run-time limits.
@@ -551,12 +584,12 @@ class Connection:
               category
                 The limit category to be set.
               limit
-                The new limit. If the new limit is a negative number, the limit is
-                unchanged.
+                The new limit. If the new limit is a negative number, the limit
+                is unchanged.
 
-            Attempts to increase a limit above its hard upper bound are silently truncated
-            to the hard upper bound. Regardless of whether or not the limit was changed,
-            the prior value of the limit is returned.
+            Attempts to increase a limit above its hard upper bound are silently
+            truncated to the hard upper bound. Regardless of whether or not the
+            limit was changed, the prior value of the limit is returned.
             """
 
         def getlimit(self, category: int, /) -> int:
@@ -572,10 +605,10 @@ class Connection:
               name
                 Which database to serialize.
 
-            For an ordinary on-disk database file, the serialization is just a copy of the
-            disk file. For an in-memory database or a "temp" database, the serialization is
-            the same sequence of bytes which would be written to disk if that database
-            were backed up to disk.
+            For an ordinary on-disk database file, the serialization is just
+            a copy of the disk file.  For an in-memory database or a "temp"
+            database, the serialization is the same sequence of bytes which
+            would be written to disk if that database were backed up to disk.
             """
 
         def deserialize(self, data: ReadableBuffer, /, *, name: str = "main") -> None:
@@ -586,13 +619,15 @@ class Connection:
               name
                 Which database to reopen with the deserialization.
 
-            The deserialize interface causes the database connection to disconnect from the
-            target database, and then reopen it as an in-memory database based on the given
-            serialized data.
+            The deserialize interface causes the database connection to
+            disconnect from the target database, and then reopen it as
+            an in-memory database based on the given serialized data.
 
-            The deserialize interface will fail with SQLITE_BUSY if the database is
-            currently in a read transaction or is involved in a backup operation.
+            The deserialize interface will fail with SQLITE_BUSY if the database
+            is currently in a read transaction or is involved in a backup
+            operation.
             """
+
     if sys.version_info >= (3, 12):
         def getconfig(self, op: int, /) -> bool:
             """Query a boolean connection configuration option.
@@ -622,7 +657,8 @@ class Connection:
     ) -> Literal[False]:
         """Called when the connection is used as a context manager.
 
-        If there was any exception, a rollback takes place; otherwise we commit.
+        If there was any exception, a rollback takes place; otherwise we
+        commit.
         """
 
 @disjoint_base
@@ -662,6 +698,7 @@ class Cursor:
         size
           The default value is set by the Cursor.arraysize attribute.
         """
+
     # Returns either a row (as created by the row_factory) or None, but
     # putting None in the return annotation causes annoying false positives.
     def fetchone(self) -> Any:
@@ -703,6 +740,7 @@ class Row(Sequence[Any]):
 
     def __len__(self) -> int:
         """Return len(self)."""
+
     # These return NotImplemented for anything that is not a Row.
     def __eq__(self, value: object, /) -> bool: ...
     def __ge__(self, value: object, /) -> bool: ...
@@ -728,27 +766,29 @@ if sys.version_info >= (3, 11):
               length
                 Read length in bytes.
 
-            If the end of the blob is reached, the data up to end of file will be returned.
-            When length is not specified, or is negative, Blob.read() will read until the
-            end of the blob.
+            If the end of the blob is reached, the data up to end of file will
+            be returned.  When length is not specified, or is negative,
+            Blob.read() will read until the end of the blob.
             """
 
         def write(self, data: ReadableBuffer, /) -> None:
             """Write data at the current offset.
 
-            This function cannot change the blob length.  Writing beyond the end of the
-            blob will result in an exception being raised.
+            This function cannot change the blob length.  Writing beyond the end
+            of the blob will result in an exception being raised.
             """
 
         def tell(self) -> int:
             """Return the current access position for the blob."""
+
         # whence must be one of os.SEEK_SET, os.SEEK_CUR, os.SEEK_END
         def seek(self, offset: int, origin: int = 0, /) -> None:
             """Set the current access position to offset.
 
-            The origin argument defaults to os.SEEK_SET (absolute blob positioning).
-            Other values for origin are os.SEEK_CUR (seek relative to the current position)
-            and os.SEEK_END (seek relative to the blob's end).
+            The origin argument defaults to os.SEEK_SET (absolute blob
+            positioning).  Other values for origin are os.SEEK_CUR (seek
+            relative to the current position) and os.SEEK_END (seek relative to
+            the blob's end).
             """
 
         def __len__(self) -> int:

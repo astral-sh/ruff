@@ -5,82 +5,18 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..3,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\",
-        ),
-        3..4,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
-        ),
-    ),
-    (
-        Lbrace,
-        4..5,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        5..6,
-    ),
-    (
-        Colon,
-        6..7,
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\\"\\",
-        ),
-        7..10,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
-        ),
-    ),
-    (
-        Lbrace,
-        10..11,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        11..12,
-    ),
-    (
-        Rbrace,
-        12..13,
-    ),
-    (
-        Rbrace,
-        13..14,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " \\\"\\\"\\\n end",
-        ),
-        14..25,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
-        ),
-    ),
-    (
-        FStringEnd,
-        25..26,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
-        ),
-    ),
-    (
-        Newline,
-        26..26,
-    ),
+    FStringStart 0..3 (flags = DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE),
+    FStringMiddle 3..4 (flags = DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE),
+    Lbrace 4..5,
+    Name 5..6,
+    Colon 6..7,
+    FStringMiddle 7..10 (flags = DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE),
+    Lbrace 10..11,
+    Name 11..12,
+    Rbrace 12..13,
+    Rbrace 13..14,
+    FStringMiddle 14..25 (flags = DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE),
+    FStringEnd 25..26 (flags = DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE),
+    Newline 26..26,
 ]
 ```

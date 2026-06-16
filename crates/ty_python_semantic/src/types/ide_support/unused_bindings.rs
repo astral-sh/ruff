@@ -40,6 +40,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::ParamSpec(_)
         | DefinitionKind::TypeVarTuple(_)
         | DefinitionKind::LoopHeader(_) => false,
+        DefinitionKind::NestedBindings(_) => false,
     }
 }
 

@@ -51,9 +51,9 @@ if sys.version_info >= (3, 14):
     def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], /, initial: _T) -> _T:
         """Apply a function of two arguments cumulatively to the items of an iterable, from left to right.
 
-        This effectively reduces the iterable to a single value.  If initial is present,
-        it is placed before the items of the iterable in the calculation, and serves as
-        a default when the iterable is empty.
+        This effectively reduces the iterable to a single value.  If initial is
+        present, it is placed before the items of the iterable in the
+        calculation, and serves as a default when the iterable is empty.
 
         For example, reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])
         calculates ((((1 + 2) + 3) + 4) + 5).
@@ -77,9 +77,9 @@ else:
 def reduce(function: Callable[[_T, _T], _T], iterable: Iterable[_T], /) -> _T:
     """Apply a function of two arguments cumulatively to the items of an iterable, from left to right.
 
-    This effectively reduces the iterable to a single value.  If initial is present,
-    it is placed before the items of the iterable in the calculation, and serves as
-    a default when the iterable is empty.
+    This effectively reduces the iterable to a single value.  If initial is
+    present, it is placed before the items of the iterable in the
+    calculation, and serves as a default when the iterable is empty.
 
     For example, reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])
     calculates ((((1 + 2) + 3) + 4) + 5).
@@ -140,16 +140,16 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
     If *maxsize* is set to None, the LRU features are disabled and the cache
     can grow without bound.
 
-    If *typed* is True, arguments of different types will be cached separately.
-    For example, f(decimal.Decimal("3.0")) and f(3.0) will be treated as
-    distinct calls with distinct results. Some types such as str and int may
-    be cached separately even when typed is false.
+    If *typed* is True, arguments of different types will be cached
+    separately.  For example, f(decimal.Decimal("3.0")) and f(3.0) will be
+    treated as distinct calls with distinct results.  Some types such as
+    str and int may be cached separately even when typed is false.
 
     Arguments to the cached function must be hashable.
 
     View the cache statistics named tuple (hits, misses, maxsize, currsize)
-    with f.cache_info().  Clear the cache and statistics with f.cache_clear().
-    Access the underlying function with f.__wrapped__.
+    with f.cache_info().  Clear the cache and statistics with
+    f.cache_clear().  Access the underlying function with f.__wrapped__.
 
     See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
 
@@ -404,7 +404,8 @@ def singledispatch(func: Callable[..., _T]) -> _SingleDispatchCallable[_T]:
 class singledispatchmethod(Generic[_T]):
     """Single-dispatch generic method descriptor.
 
-    Supports wrapping existing descriptors.
+    Supports wrapping existing descriptors and handles non-descriptor
+    callables as instance methods.
     """
 
     dispatcher: _SingleDispatchCallable[_T]

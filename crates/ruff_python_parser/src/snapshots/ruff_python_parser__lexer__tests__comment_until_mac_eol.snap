@@ -5,29 +5,10 @@ expression: comment_until_eol(MAC_EOL)
 ## Tokens
 ```
 [
-    (
-        Int(
-            123,
-        ),
-        0..3,
-    ),
-    (
-        Comment,
-        5..10,
-    ),
-    (
-        Newline,
-        10..11,
-    ),
-    (
-        Int(
-            456,
-        ),
-        11..14,
-    ),
-    (
-        Newline,
-        14..14,
-    ),
+    Int 0..3,
+    Comment 5..10,
+    Newline 10..11,
+    Int 11..14,
+    Newline 14..14,
 ]
 ```

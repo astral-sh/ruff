@@ -51,6 +51,7 @@ class TaskGroup:
 
             Similar to `asyncio.create_task`.
             """
+
     else:
         def create_task(self, coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
             """Create a new task in this group and return it.
@@ -60,4 +61,19 @@ class TaskGroup:
 
     def _on_task_done(self, task: Task[object]) -> None: ...
     if sys.version_info >= (3, 15):
-        def cancel(self) -> None: ...
+        def cancel(self) -> None:
+            """Cancel the task group
+
+            `cancel()` will be called on any tasks in the group that aren't yet
+            done, as well as the parent (body) of the group.  This will cause the
+            task group context manager to exit *without* `asyncio.CancelledError`
+            being raised.
+
+            If `cancel()` is called before entering the task group, the group will be
+            cancelled upon entry.  This is useful for patterns where one piece of
+            code passes an unused TaskGroup instance to another in order to have
+            the ability to cancel anything run within the group.
+
+            `cancel()` is idempotent and may be called after the task group has
+            already exited.
+            """

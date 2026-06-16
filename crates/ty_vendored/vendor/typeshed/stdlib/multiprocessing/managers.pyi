@@ -385,6 +385,7 @@ class BaseManager:
         """
         Spawn a server process for this manager object
         """
+
     shutdown: _Finalize  # only available after start() was called
     def join(self, timeout: float | None = None) -> None:  # undocumented
         """

@@ -340,6 +340,7 @@ class deque(MutableSequence[_T]):
 
     def __len__(self) -> int:
         """Return len(self)."""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     # These methods of deque don't take slices, unlike MutableSequence, hence the type: ignores
     def __getitem__(self, key: SupportsIndex, /) -> _T:  # type: ignore[override]
@@ -580,8 +581,23 @@ class Counter(dict[_T, int], Generic[_T]):
         Counter({'b': 3, 'c': 2, 'a': 1})
 
         """
+
     if sys.version_info >= (3, 15):
-        def __xor__(self, other: Counter[_S]) -> Counter[_T | _S]: ...  # type: ignore[override]
+        def __xor__(self, other: Counter[_S]) -> Counter[_T | _S]:  # type: ignore[override]
+            """Symmetric difference. Absolute value of count differences.
+
+            The symmetric difference p ^ q is equivalent to:
+
+                (p - q) | (q - p).
+
+            For each element, symmetric difference gives the same result as:
+
+                max(p[elem], q[elem]) - min(p[elem], q[elem])
+
+            >>> Counter(a=5, b=3, c=2, d=2) ^ Counter(a=1, b=3, c=5, e=1)
+            Counter({'a': 4, 'c': 3, 'd': 2, 'e': 1})
+
+            """
 
     def __pos__(self) -> Counter[_T]:
         """Adds an empty counter, effectively stripping negative and zero counts"""
@@ -591,6 +607,7 @@ class Counter(dict[_T, int], Generic[_T]):
         and flips the sign on negative counts.
 
         """
+
     # several type: ignores because __iadd__ is supposedly incompatible with __add__, etc.
     def __iadd__(self, other: SupportsItems[_T, int]) -> Self:  # type: ignore[misc]
         """Inplace add from another counter, keeping only positive counts.
@@ -631,8 +648,17 @@ class Counter(dict[_T, int], Generic[_T]):
         Counter({'b': 3, 'c': 2, 'a': 1})
 
         """
+
     if sys.version_info >= (3, 15):
-        def __ixor__(self, other: Counter[_T]) -> Self: ...  # type: ignore[misc]
+        def __ixor__(self, other: Counter[_T]) -> Self:  # type: ignore[misc]
+            """Inplace symmetric difference. Absolute value of count differences.
+
+            >>> c = Counter(a=5, b=3, c=2, d=2)
+            >>> c ^= Counter(a=1, b=3, c=5, e=1)
+            >>> c
+            Counter({'a': 4, 'c': 3, 'd': 2, 'e': 1})
+
+            """
 
 # The pure-Python implementations of the "views" classes
 # These are exposed at runtime in `collections/__init__.py`
@@ -671,7 +697,8 @@ class OrderedDict(dict[_KT, _VT]):
     def popitem(self, last: bool = True) -> tuple[_KT, _VT]:
         """Remove and return a (key, value) pair from the dictionary.
 
-        Pairs are returned in LIFO order if last is true or FIFO order if false.
+        Pairs are returned in LIFO order if last is true or FIFO order if
+        false.
         """
 
     def move_to_end(self, key: _KT, last: bool = True) -> None:
@@ -728,12 +755,14 @@ class OrderedDict(dict[_KT, _VT]):
 
     if sys.version_info >= (3, 15):
         @overload
-        def __or__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self: ...
+        def __or__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self:
+            """Return self|value."""
         @overload
         def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...
 
         @overload  # type: ignore[override]
-        def __ror__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self: ...  # type: ignore[override,misc]
+        def __ror__(self, value: dict[_KT, _VT] | frozendict[_KT, _VT], /) -> Self:  # type: ignore[override,misc]
+            """Return value|self."""
         @overload
         def __ror__(  # type: ignore[misc]
             self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /
@@ -891,6 +920,7 @@ class ChainMap(MutableMapping[_KT, _VT]):
 
     def copy(self) -> Self:
         """New ChainMap or subclass with a new copy of maps[0] and refs to maps[1:]"""
+
     __copy__ = copy
     # All arguments to `fromkeys` are passed to `dict.fromkeys` at runtime,
     # so the signature should be kept in line with `dict.fromkeys`.

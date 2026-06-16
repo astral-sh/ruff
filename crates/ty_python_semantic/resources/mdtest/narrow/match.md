@@ -67,6 +67,26 @@ match x:
         pass
 
 reveal_type(x)  # revealed: object
+
+def mixed_guarded_and_unguarded_patterns(x: A | B, first_flag: bool, second_flag: bool) -> None:
+    match x:
+        case A():
+            pass
+        case B() if first_flag:
+            pass
+        case B() if second_flag:
+            pass
+        case B():
+            # The guarded `B` patterns are not exclusions, but the earlier
+            # unguarded `A` pattern is still excluded.
+            reveal_type(x)  # revealed: B & ~A
+
+def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
+    match x:
+        case A() if flag:
+            pass
+        case _:
+            reveal_type(x)  # revealed: A
 ```
 
 ## Class patterns with generic classes
@@ -122,39 +142,41 @@ def f(x: Covariant[int]):
 
 ```py
 from collections.abc import Mapping
+from typing import Any
 
-def test_isinstance(x: dict | int) -> None:
+def test_isinstance(x: dict[Any, Any] | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
     else:
         reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
-def test_match(x: dict | int) -> None:
+def test_match(x: dict[Any, Any] | int) -> None:
     match x:
         case {}:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
         case _:
             reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
-def test_match_double_star(x: dict | int) -> None:
+def test_match_double_star(x: dict[Any, Any] | int) -> None:
     match x:
         case {**rest}:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
         case _:
             reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
-def test_match_refutable(x: dict | int) -> None:
+def test_match_refutable(x: dict[Any, Any] | int) -> None:
     match x:
         case {"k": _}:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
         case _:
-            reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
+            reveal_type(x)  # revealed: dict[Any, Any] | int
 ```
 
 ## Sequence patterns
 
 ```py
 from collections.abc import Sequence
+from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
@@ -175,6 +197,338 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
             reveal_type(x)  # revealed: list[int]
         case _:
             reveal_type(x)  # revealed: str | bytes | bytearray
+
+def test_match_exact_sequence_excludes_str(x: str | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: str
+
+def test_match_exact_sequence_excludes_bytes(x: bytes | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: bytes
+
+def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: bytearray
+
+def test_match_exact_object_sequence(value: object) -> None:
+    match value:
+        case int(), str():
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+
+def test_match_empty_object_sequence(value: object) -> None:
+    match value:
+        case []:
+            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[0]
+
+def test_match_singleton_object_sequence(value: object) -> None:
+    match value:
+        case [int()]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[1]
+            reveal_type(value[0])  # revealed: int
+
+def test_match_prefix_star_object_sequence(value: object) -> None:
+    match value:
+        case [int(), *rest]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: object
+
+def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
+    match value:
+        case [int(), *rest, str()]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[-1])  # revealed: str
+            reveal_type(value[1])  # revealed: object
+
+def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
+    match value:
+        case [int(), *rest]:
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: int | str
+
+def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
+    match subj:
+        case x, str():
+            # TODO: This should simplify to `tuple[int | str, str]`.
+            # revealed: tuple[int | str, int | str] & <Protocol with members '__getitem__', '__len__'>
+            reveal_type(subj)
+            reveal_type(subj[0])  # revealed: int | str
+            reveal_type(subj[1])  # revealed: str
+            first, second = subj
+            reveal_type(first)  # revealed: int | str
+            # TODO: This should reveal `str`.
+            reveal_type(second)  # revealed: int | str
+        case y:
+            # TODO: This should simplify to `tuple[int | str, int]`.
+            # revealed: tuple[int | str, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(subj)
+            reveal_type(subj[0])  # revealed: int | str
+            # TODO: This should reveal `int` once we simplify the negative
+            # intersection above.
+            reveal_type(subj[1])  # revealed: int | str
+
+def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
+    match value:
+        case int(value):
+            return value
+        case (left, right):
+            return left + right
+        case _:
+            assert_never(value)
+
+def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:  # error: [invalid-return-type]
+    match x:
+        case [int()]:
+            return 42
+        case [str()]:
+            return 42
+        case _:
+            # TODO: The previous cases are exhaustive, so this should simplify
+            # to `tuple[Never]`, and therefore `Never`.
+            # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+
+def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
+    match value:
+        case [int()]:
+            pass
+        case _:
+            # revealed: list[int] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+
+def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
+    match value:
+        case [None, [int()], {}]:
+            ret = value[0], value[1][0], len(value[2])
+            reveal_type(ret)  # revealed: tuple[None, int, int]
+            return ret
+    return None
+
+def unwrap_number_or_label(value: object) -> int | str | None:
+    match value:
+        case [(int() | str()) as item]:
+            reveal_type(value[0])  # revealed: int | str
+            return value[0]
+    return None
+
+def test_match_value_sequence(value: object) -> None:
+    match value:
+        case [1]:
+            # Value patterns use equality, so matching `1` does not prove that
+            # the element is an `int`.
+            reveal_type(value[0])  # revealed: object
+```
+
+## Sequence display subjects
+
+A tuple or list display has no place of its own to narrow. A successful sequence pattern instead
+narrows the corresponding narrowable elements. If a multi-element pattern fails, we do not know
+which element failed to match.
+
+```py
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+
+def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+        case _:
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+    reveal_type(a)  # revealed: TupleSubjectA
+    reveal_type(b)  # revealed: TupleSubjectB
+
+def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match [a, b]:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+```
+
+## Nested sequence display subjects
+
+Element narrowing recurses through nested tuple and list displays. Attributes and subscripts are
+narrowed when they occupy a fixed position. Dictionary displays and starred subject elements do not
+yet have a fixed element-to-pattern correspondence.
+
+```py
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+
+class SequenceSubjectContainer:
+    a: TupleSubjectA
+
+def match_nested_sequence_expression_subject(
+    container: SequenceSubjectContainer,
+    values: list[TupleSubjectB],
+) -> None:
+    match [[container.a], values[0], object()]:
+        case [[TupleSubjectA1()], TupleSubjectB1(), _]:
+            reveal_type(container.a)  # revealed: TupleSubjectA1
+            reveal_type(values[0])  # revealed: TupleSubjectB1
+
+def match_mapping_expression_subject(value: object) -> None:
+    match [{"value": value}]:
+        case [{"value": int()}]:
+            reveal_type(value)  # revealed: object
+
+def match_starred_list_expression_subject(
+    a: TupleSubjectA,
+    values: list[object],
+) -> None:
+    match [a, *values]:
+        case [TupleSubjectA1()]:
+            reveal_type(a)  # revealed: TupleSubjectA
+```
+
+## Sequence pattern forms for display subjects
+
+Element narrowing respects later cases, OR patterns, impossible alternatives, repeated subject
+expressions, and starred sequence patterns.
+
+```py
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectA2(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+class TupleSubjectB2(TupleSubjectB): ...
+
+def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA2(), TupleSubjectB2()]:
+            pass
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_or_pattern(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [*_]:
+            # The second alternative does not constrain either tuple element.
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+def match_tuple_expression_constrained_or_pattern(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [TupleSubjectA2(), TupleSubjectB2()]:
+            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1 | TupleSubjectB2
+
+def match_tuple_expression_or_impossible_alternative(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1()] | [TupleSubjectA2(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
+    match a, a:
+        case [TupleSubjectA1(), TupleSubjectA()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+
+def match_tuple_expression_starred_pattern(
+    a: TupleSubjectA,
+    middle: object,
+    b: TupleSubjectB,
+) -> None:
+    match a, middle, b:
+        case [TupleSubjectA1(), *_, TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(middle)  # revealed: object
+            reveal_type(b)  # revealed: TupleSubjectB1
+```
+
+## Subject-time bindings in display subjects
+
+Each element constraint applies to the binding read while that subject element was evaluated. It
+does not constrain a binding introduced by a later subject element, pattern capture, or guard.
+
+```py
+from typing import final
+
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectA2(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+class ReboundTupleSubject: ...
+
+@final
+class ReboundTupleSubject1(ReboundTupleSubject): ...
+
+@final
+class ReboundTupleSubject2(ReboundTupleSubject): ...
+
+def match_tuple_expression_rebound_subject(a: ReboundTupleSubject) -> None:
+    match a, (a := ReboundTupleSubject2()), a:
+        case [ReboundTupleSubject1(), ReboundTupleSubject2(), ReboundTupleSubject2()]:
+            reveal_type(a)  # revealed: ReboundTupleSubject2
+            1 + "x"  # error: [unsupported-operator]
+
+def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> None:
+    if flag:
+        a: TupleSubjectA = TupleSubjectA1()
+    else:
+        a = TupleSubjectA2()
+
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_subject_capture(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), a]:
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+
+def match_tuple_expression_guard_rebinding(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+    flag: bool,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] if (a := TupleSubjectA2()) and flag:
+            pass
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
 ## Value patterns
@@ -447,7 +801,7 @@ def _(x: A | B | C):
         case _:
             raise ValueError()
 
-    reveal_type(x)  # revealed: B | (A & ~B)
+    reveal_type(x)  # revealed: B | A
 ```
 
 Reassignment in non-terminal branches is also preserved when the default branch is terminal:
@@ -551,4 +905,51 @@ def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
             # Since the previous case could match any string, this case can
             # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
             reveal_type(u)  # revealed: tuple[Literal["bar"], str]
+```
+
+## Narrowing tagged unions of nominal classes by attribute
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+    field_a: int
+
+class B:
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A
+            reveal_type(x.field_a)  # revealed: int
+        case "b":
+            reveal_type(x)  # revealed: B
+            reveal_type(x.field_b)  # revealed: str
+        case _:
+            reveal_type(x)  # revealed: Never
+```
+
+Non-literal tag arms are preserved during positive narrowing:
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: str
+
+class C:
+    tag: Literal["c"]
+
+def _(x: A | B | C):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A | B
+        case _:
+            reveal_type(x)  # revealed: B | C
 ```

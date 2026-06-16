@@ -257,7 +257,7 @@ mod tests {
 
     use crate::ProjectMetadata;
     use crate::db::Db;
-    use crate::db::tests::TestDb;
+    use crate::db::testing::TestDb;
     use crate::files::Index;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};

@@ -69,7 +69,7 @@ impl Violation for UnnecessaryRegularExpressionCompile {
     }
 }
 
-/// RUF076: inline form, e.g. `re.compile(pattern).match(string)`.
+/// RUF077: inline form, e.g. `re.compile(pattern).match(string)`.
 pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {
@@ -96,7 +96,7 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &E
     );
 }
 
-/// RUF076: bound form, e.g. `pattern = re.compile(...)` read exactly once as `pattern.match(...)`.
+/// RUF077: bound form, e.g. `pattern = re.compile(...)` read exactly once as `pattern.match(...)`.
 pub(crate) fn unnecessary_regular_expression_compile_binding(checker: &Checker, binding: &Binding) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {

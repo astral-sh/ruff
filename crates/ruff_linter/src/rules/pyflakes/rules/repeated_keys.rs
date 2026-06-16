@@ -170,15 +170,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
             Entry::Occupied(mut entry) => {
                 let (seen_key, seen_values) = entry.get_mut();
                 match key {
-                    Expr::StringLiteral(_)
-                    | Expr::BytesLiteral(_)
-                    | Expr::NumberLiteral(_)
-                    | Expr::BooleanLiteral(_)
-                    | Expr::NoneLiteral(_)
-                    | Expr::EllipsisLiteral(_)
-                    | Expr::Tuple(_)
-                    | Expr::FString(_)
-                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
+                    key if is_literal_key(key)
+                        && checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
                     {
                         let mut diagnostic = checker.report_diagnostic(
                             MultiValueRepeatedKeyLiteral {
@@ -241,5 +234,52 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                 }
             }
         }
+    }
+}
+
+fn is_literal_key(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::Tuple(_)
+        | Expr::FString(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => signed_number_literal(operand).is_some(),
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: ast::Operator::Add | ast::Operator::Sub,
+            right,
+            ..
+        }) => {
+            signed_number_literal(left).is_some_and(|number| {
+                matches!(number.value, ast::Number::Int(_) | ast::Number::Float(_))
+            }) && matches!(
+                right.as_ref(),
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Complex { .. },
+                    ..
+                })
+            )
+        }
+        _ => false,
+    }
+}
+
+fn signed_number_literal(expr: &Expr) -> Option<&ast::ExprNumberLiteral> {
+    match expr {
+        Expr::NumberLiteral(number) => Some(number),
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => signed_number_literal(operand),
+        _ => None,
     }
 }

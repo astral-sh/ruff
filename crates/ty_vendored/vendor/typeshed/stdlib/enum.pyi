@@ -96,6 +96,7 @@ class _EnumDict(dict[str, Any]):
 
         Single underscore (sunder) names are reserved.
         """
+
     if sys.version_info >= (3, 11):
         # See comment above `typing.MutableMapping.update`
         # for why overloads are preferable to a Union here
@@ -147,6 +148,7 @@ class EnumMeta(type):
         """
         Return members in reverse definition order.
         """
+
     if sys.version_info >= (3, 12):
         def __contains__(self: type[Any], value: object) -> bool:
             """Return True if `value` is in `cls`.
@@ -156,6 +158,7 @@ class EnumMeta(type):
             2) `value` is the value of one of the `cls`'s members.
             3) `value` is a pseudo-member (flags)
             """
+
     elif sys.version_info >= (3, 11):
         def __contains__(self: type[Any], member: object) -> bool:
             """
@@ -165,6 +168,7 @@ class EnumMeta(type):
             note: in 3.12 TypeError will no longer be raised, and True will also be
             returned if member is the value of a member in this enum
             """
+
     else:
         def __contains__(self: type[Any], obj: object) -> bool: ...
 
@@ -178,8 +182,8 @@ class EnumMeta(type):
         """
         Returns a mapping of member name->value.
 
-        This mapping lists all enum members, including aliases. Note that this
-        is a read-only view of the internal mapping.
+        This mapping lists all enum members, including aliases.  Note that
+        this is a read-only view of the internal mapping.
         """
 
     def __len__(self) -> int:
@@ -200,9 +204,9 @@ class EnumMeta(type):
         """
         Either returns an existing member, or creates a new enum class.
 
-        This method is used both when an enum class is given a value to match
-        to an enumeration member (i.e. Color(3)) and for the functional API
-        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+        This method is used both when an enum class is given a value to
+        match to an enumeration member (i.e. Color(3)) and for the
+        functional API (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
 
         The value lookup branch is chosen if the enum is final.
 
@@ -210,16 +214,17 @@ class EnumMeta(type):
 
         `value` will be the name of the new class.
 
-        `names` should be either a string of white-space/comma delimited names
-        (values will start at `start`), or an iterator/mapping of name, value pairs.
+        `names` should be either a string of white-space/comma delimited
+        names (values will start at `start`), or an iterator/mapping of
+        name, value pairs.
 
         `module` should be set to the module this class is being created in;
-        if it is not set, an attempt to find that module will be made, but if
-        it fails the class will not be picklable.
+        if it is not set, an attempt to find that module will be made, but
+        if it fails the class will not be picklable.
 
-        `qualname` should be set to the actual location this class can be found
-        at in its module; by default it is set to the global scope.  If this is
-        not correct, unpickling will fail in some circumstances.
+        `qualname` should be set to the actual location this class can be
+        found at in its module; by default it is set to the global scope.
+        If this is not correct, unpickling will fail in some circumstances.
 
         `type`, if set, will be mixed in as the first base class.
         """
@@ -241,9 +246,9 @@ class EnumMeta(type):
             """
             Either returns an existing member, or creates a new enum class.
 
-            This method is used both when an enum class is given a value to match
-            to an enumeration member (i.e. Color(3)) and for the functional API
-            (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+            This method is used both when an enum class is given a value to
+            match to an enumeration member (i.e. Color(3)) and for the
+            functional API (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
 
             The value lookup branch is chosen if the enum is final.
 
@@ -251,16 +256,17 @@ class EnumMeta(type):
 
             `value` will be the name of the new class.
 
-            `names` should be either a string of white-space/comma delimited names
-            (values will start at `start`), or an iterator/mapping of name, value pairs.
+            `names` should be either a string of white-space/comma delimited
+            names (values will start at `start`), or an iterator/mapping of
+            name, value pairs.
 
             `module` should be set to the module this class is being created in;
-            if it is not set, an attempt to find that module will be made, but if
-            it fails the class will not be picklable.
+            if it is not set, an attempt to find that module will be made, but
+            if it fails the class will not be picklable.
 
-            `qualname` should be set to the actual location this class can be found
-            at in its module; by default it is set to the global scope.  If this is
-            not correct, unpickling will fail in some circumstances.
+            `qualname` should be set to the actual location this class can be
+            found at in its module; by default it is set to the global scope.
+            If this is not correct, unpickling will fail in some circumstances.
 
             `type`, if set, will be mixed in as the first base class.
             """
@@ -300,6 +306,7 @@ class EnumMeta(type):
 
             `type`, if set, will be mixed in as the first base class.
             """
+
     # Overload 3 (py312+ only): Value lookup on an already existing enum class (complex case)
     #
     # >>> class Foo(enum.Enum):
@@ -313,9 +320,9 @@ class EnumMeta(type):
             """
             Either returns an existing member, or creates a new enum class.
 
-            This method is used both when an enum class is given a value to match
-            to an enumeration member (i.e. Color(3)) and for the functional API
-            (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+            This method is used both when an enum class is given a value to
+            match to an enumeration member (i.e. Color(3)) and for the
+            functional API (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
 
             The value lookup branch is chosen if the enum is final.
 
@@ -323,19 +330,21 @@ class EnumMeta(type):
 
             `value` will be the name of the new class.
 
-            `names` should be either a string of white-space/comma delimited names
-            (values will start at `start`), or an iterator/mapping of name, value pairs.
+            `names` should be either a string of white-space/comma delimited
+            names (values will start at `start`), or an iterator/mapping of
+            name, value pairs.
 
             `module` should be set to the module this class is being created in;
-            if it is not set, an attempt to find that module will be made, but if
-            it fails the class will not be picklable.
+            if it is not set, an attempt to find that module will be made, but
+            if it fails the class will not be picklable.
 
-            `qualname` should be set to the actual location this class can be found
-            at in its module; by default it is set to the global scope.  If this is
-            not correct, unpickling will fail in some circumstances.
+            `qualname` should be set to the actual location this class can be
+            found at in its module; by default it is set to the global scope.
+            If this is not correct, unpickling will fail in some circumstances.
 
             `type`, if set, will be mixed in as the first base class.
             """
+
     if sys.version_info >= (3, 14):
         @property
         def __signature__(cls) -> _Signature: ...
@@ -413,6 +422,7 @@ class Enum(metaclass=EnumMeta):
     @_magic_enum_attr
     def value(self) -> Any:
         """The value of the Enum member."""
+
     _name_: str
     _value_: Any
     _ignore_: str | list[str]
@@ -430,6 +440,7 @@ class Enum(metaclass=EnumMeta):
         count: the number of existing members
         last_values: the list of values assigned
         """
+
     # It's not true that `__new__` will accept any argument type,
     # so ideally we'd use `Any` to indicate that the argument type is inexpressible.
     # However, using `Any` causes too many false-positives for those using mypy's `--disallow-any-expr`

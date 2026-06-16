@@ -34,15 +34,15 @@ if sys.platform != "win32":
         ) -> int:
             """Spawn a fresh new child process.
 
-            Fork a child process, close parent file descriptors as appropriate in the
-            child and duplicate the few that are needed before calling exec() in the
-            child process.
+            Fork a child process, close parent file descriptors as appropriate in
+            the child and duplicate the few that are needed before calling exec() in
+            the child process.
 
-            If close_fds is True, close file descriptors 3 and higher, except those listed
-            in the sorted tuple pass_fds.
+            If close_fds is True, close file descriptors 3 and higher, except those
+            listed in the sorted tuple pass_fds.
 
-            The preexec_fn, if supplied, will be called immediately before closing file
-            descriptors and exec.
+            The preexec_fn, if supplied, will be called immediately before closing
+            file descriptors and exec.
 
             WARNING: preexec_fn is NOT SAFE if your application uses threads.
                      It may trigger infrequent, difficult to debug deadlocks.
@@ -54,6 +54,7 @@ if sys.platform != "win32":
 
             Raises: Only on an error in the parent process.
             """
+
     else:
         def fork_exec(
             args: Sequence[StrOrBytesPath] | None,

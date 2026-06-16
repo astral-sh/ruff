@@ -8,7 +8,10 @@ use syn::{
     parenthesized, parse::Parse, spanned::Spanned,
 };
 
-use crate::rule_code_prefix::{get_prefix_ident, intersection_all};
+use crate::{
+    kebab_case::kebab_case,
+    rule_code_prefix::{get_prefix_ident, intersection_all},
+};
 
 /// A rule entry in the big match statement such a
 /// `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
@@ -253,7 +256,11 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
 
     let mut rule_noqa_code_match_arms = quote!();
 
-    for (rule, codes) in rule_to_codes {
+    // Keep the proc-macro output stable so unchanged code can be reused incrementally.
+    for (rule, codes) in rule_to_codes
+        .into_iter()
+        .sorted_by_key(|(rule, _)| rule.to_token_stream().to_string())
+    {
         let rule_name = rule.segments.last().unwrap();
         assert_eq!(
             codes.len(),
@@ -390,11 +397,13 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_group_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
+    let mut rule_parse_match_arms = quote!();
 
     for Rule {
         name, attrs, path, ..
     } in input
     {
+        let kebab_name = kebab_case(name);
         rule_variants.extend(quote! {
             #(#attrs)*
             #name,
@@ -416,6 +425,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_line_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::line(),},
         );
+        rule_parse_match_arms.extend(quote! {#(#attrs)* #kebab_name => Ok(Self::#name),});
     }
 
     quote! {
@@ -462,6 +472,14 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             pub fn line(&self) -> u32 {
                 match self { #rule_line_match_arms }
+            }
+
+            /// Try to parse a kebab-case rule name into a `Rule`.
+            pub fn from_name(name: &str) -> Result<Self, FromNameError> {
+                match name {
+                    #rule_parse_match_arms
+                    _ => Err(FromNameError::Unknown),
+                }
             }
         }
     }

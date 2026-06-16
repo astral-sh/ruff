@@ -12,7 +12,7 @@ use std::path::Path;
 use path_slash::PathExt;
 use zip::CompressionMethod;
 use zip::result::ZipResult;
-use zip::write::{FileOptions, ZipWriter};
+use zip::write::{SimpleFileOptions, ZipWriter};
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
 const TY_EXTENSIONS_STUBS: &str = "ty_extensions/ty_extensions.pyi";
@@ -41,7 +41,7 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
         CompressionMethod::Stored
     };
 
-    let options = FileOptions::default()
+    let options = SimpleFileOptions::default()
         .compression_method(method)
         .unix_permissions(0o644);
 

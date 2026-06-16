@@ -248,10 +248,13 @@ def store_any(cls: type[Any], value: Any) -> None:
     reveal_type(cls.count)  # revealed: Any
 ```
 
+## Assignments through generic aliases
+
 Assignments through generic aliases still resolve class variables.
 
 ```py
-from typing import ClassVar, Generic, TypeVar, reveal_type
+from typing import ClassVar, Generic, TypeVar
+from typing_extensions import reveal_type
 
 T = TypeVar("T")
 

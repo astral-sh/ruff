@@ -1,5 +1,5 @@
-use std::fmt::Display;
-use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
+use std::fmt::{Display, Formatter};
+use std::{borrow::Cow, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -274,6 +274,11 @@ impl Diagnostic {
             .annotations
             .iter_mut()
             .find(|ann| ann.is_primary)
+    }
+
+    /// Returns all annotations in the order in which they were added.
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.inner.annotations
     }
 
     /// Returns a mutable borrow of all annotations of this diagnostic.
@@ -688,6 +693,18 @@ impl SubDiagnostic {
         self.inner.annotations.iter().find(|ann| ann.is_primary)
     }
 
+    /// Returns a reference to the primary span of this sub-diagnostic.
+    pub fn primary_span_ref(&self) -> Option<&Span> {
+        self.primary_annotation().map(Annotation::get_span)
+    }
+
+    /// Returns the primary message for this sub-diagnostic.
+    ///
+    /// A sub-diagnostic always has a message, but it may be empty.
+    pub fn primary_message(&self) -> &str {
+        self.inner.message.as_str()
+    }
+
     /// Introspects this diagnostic and returns what kind of "primary" message
     /// it contains for concise formatting.
     ///
@@ -701,7 +718,7 @@ impl SubDiagnostic {
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
-        let main = self.inner.message.as_str();
+        let main = self.primary_message();
         let annotation = self
             .primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -1374,6 +1391,10 @@ pub struct DisplayDiagnosticConfig {
     ///
     /// Disabled by default.
     color: bool,
+    /// Whether to anonymize line numbers in full diagnostic output.
+    ///
+    /// Disabled by default.
+    anonymized_line_numbers: bool,
     /// The number of non-empty lines to show around each snippet.
     ///
     /// NOTE: It seems like making this a property of rendering *could*
@@ -1417,6 +1438,7 @@ impl DisplayDiagnosticConfig {
             program,
             format: DiagnosticFormat::default(),
             color: false,
+            anonymized_line_numbers: false,
             context: 2,
             merge_window: 2,
             preview: false,
@@ -1436,6 +1458,14 @@ impl DisplayDiagnosticConfig {
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { color: yes, ..self }
+    }
+
+    /// Whether to anonymize line numbers in full diagnostic output.
+    pub fn anonymized_line_numbers(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            anonymized_line_numbers: yes,
+            ..self
+        }
     }
 
     /// Set the number of contextual lines to show around each snippet.
