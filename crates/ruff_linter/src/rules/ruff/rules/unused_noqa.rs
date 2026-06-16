@@ -70,6 +70,12 @@ impl UnusedNOQAKind {
 ///     pass
 /// ```
 ///
+/// ## Fix safety
+///
+/// The rule's fix is marked as unsafe when a full suppression comment would be removed and there
+/// are other nested comments on the same line. Removing such a comment can change the behavior of
+/// other suppression comments before or after the removed comment.
+///
 /// ## See also
 ///
 /// This rule ignores any codes that are unknown to Ruff, as it can't determine

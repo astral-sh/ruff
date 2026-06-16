@@ -1,14 +1,20 @@
 import { SubDiagnosticSeverity } from "ty_wasm";
 import type {
+  DiagnosticAnnotation,
   Severity,
   Range,
   SubDiagnostic,
-  SubDiagnosticAnnotation,
   TextRange,
   Diagnostic as TyDiagnostic,
 } from "ty_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
+import {
+  type DiagnosticDetail,
+  type DiagnosticDetailLocation,
+  DiagnosticDetailItem,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
 import { useMemo } from "react";
 
 interface Props {
@@ -16,7 +22,7 @@ interface Props {
   currentFilePath: string | null;
   theme: Theme;
 
-  onGoTo(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticDetailLocation): void;
 }
 
 export default function Diagnostics({
@@ -68,7 +74,7 @@ function Items({
 }: {
   diagnostics: Array<Diagnostic>;
   currentFilePath: string | null;
-  onGoTo(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticDetailLocation): void;
 }) {
   if (diagnostics.length === 0) {
     return (
@@ -92,7 +98,16 @@ function Items({
         const location =
           currentFilePath == null || position == null
             ? null
-            : { path: currentFilePath, range: position };
+            : {
+                path: currentFilePath,
+                startLineNumber: startLine,
+                startColumn: startColumn,
+                endLineNumber: position.end.line,
+                endColumn: position.end.column,
+              };
+        const secondaryAnnotations = secondaryAnnotationsWithMessages(
+          diagnostic.annotations,
+        );
 
         const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
 
@@ -119,13 +134,31 @@ function Items({
                 </span>
               </button>
             )}
-            {diagnostic.subDiagnostics.length > 0 ? (
+            {/* Some subdiagnostics use whitespace to align types in columns, so
+                we use a monospace font. See
+                https://github.com/astral-sh/ruff/pull/25860#pullrequestreview-4475222305 */}
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => {
+                  const location = annotation.location ?? null;
+
+                  return (
+                    <li key={`annotation-${index}`}>
+                      <DiagnosticDetailItem
+                        item={toDisplayDiagnosticDetail({
+                          message: annotation.message,
+                          location,
+                        })}
+                        onGoTo={onGoTo}
+                      />
+                    </li>
+                  );
+                })}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
-                  <li key={index}>
+                  <li key={`sub-diagnostic-${index}`}>
                     <SubDiagnosticItem
                       subDiagnostic={subDiagnostic}
-                      currentFilePath={currentFilePath}
                       onGoTo={onGoTo}
                     />
                   </li>
@@ -142,6 +175,7 @@ function Items({
 export interface Diagnostic {
   id: string;
   message: string;
+  annotations: DiagnosticAnnotation[];
   subDiagnostics: SubDiagnostic[];
   severity: Severity;
   range: Range | null;
@@ -156,15 +190,13 @@ export type DiagnosticLocation = {
 
 function SubDiagnosticItem({
   subDiagnostic,
-  currentFilePath,
   onGoTo,
 }: {
   subDiagnostic: SubDiagnostic;
-  currentFilePath: string | null;
-  onGoTo(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticDetailLocation): void;
 }) {
-  let primaryAnnotation: SubDiagnosticAnnotation | undefined;
-  const additionalAnnotations: SubDiagnosticAnnotation[] = [];
+  let primaryAnnotation: DiagnosticAnnotation | undefined;
+  const additionalAnnotations: DiagnosticAnnotation[] = [];
 
   for (const annotation of subDiagnostic.annotations) {
     if (annotation.primary && primaryAnnotation == null) {
@@ -174,85 +206,76 @@ function SubDiagnosticItem({
     }
   }
 
+  const severity = formatSubDiagnosticSeverity(subDiagnostic.severity);
+  const primaryLocation = primaryAnnotation?.location ?? null;
+
   return (
     <>
       {primaryAnnotation == null ? (
-        <span>{formatSubDiagnostic(subDiagnostic)}</span>
+        <DiagnosticDetailItem
+          item={{ message: subDiagnostic.message, severity, location: null }}
+        />
       ) : (
-        <SubDiagnosticAnnotationItem
-          prefix={`${formatSubDiagnosticSeverity(subDiagnostic.severity)}: `}
-          message={formatSubDiagnosticAnnotation(
-            subDiagnostic,
-            primaryAnnotation,
-          )}
-          annotation={primaryAnnotation}
-          currentFilePath={currentFilePath}
+        <DiagnosticDetailItem
+          item={toDisplayDiagnosticDetail({
+            message: formatSubDiagnosticAnnotation(
+              subDiagnostic,
+              primaryAnnotation,
+            ),
+            location: primaryLocation,
+            severity,
+          })}
           onGoTo={onGoTo}
         />
       )}
       {additionalAnnotations.length > 0 ? (
         <ul className="pl-3">
-          {additionalAnnotations.map((annotation, index) => (
-            <li key={index}>
-              <SubDiagnosticAnnotationItem
-                message={formatSubDiagnosticAnnotation(
-                  subDiagnostic,
-                  annotation,
-                  false,
-                )}
-                annotation={annotation}
-                currentFilePath={currentFilePath}
-                onGoTo={onGoTo}
-              />
-            </li>
-          ))}
+          {additionalAnnotations.map((annotation, index) => {
+            const location = annotation.location ?? null;
+
+            return (
+              <li key={index}>
+                <DiagnosticDetailItem
+                  item={toDisplayDiagnosticDetail({
+                    message: formatSubDiagnosticAnnotation(
+                      subDiagnostic,
+                      annotation,
+                      false,
+                    ),
+                    location,
+                  })}
+                  onGoTo={onGoTo}
+                />
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </>
   );
 }
 
-function SubDiagnosticAnnotationItem({
-  prefix,
-  message,
-  annotation,
-  currentFilePath,
-  onGoTo,
-}: {
-  prefix?: string;
+function toDisplayDiagnosticDetail(item: {
   message: string;
-  annotation: SubDiagnosticAnnotation;
-  currentFilePath: string | null;
-  onGoTo(location: DiagnosticLocation): void;
-}) {
-  const location = annotation.location;
-  if (location == null) {
-    return (
-      <span>
-        {prefix}
-        {message}
-      </span>
-    );
-  }
+  severity?: string;
+  location: DiagnosticLocation | null;
+}): DiagnosticDetail {
+  const location = item.location;
 
-  const start = location.range.start;
-  const locationLabel =
-    location.path === currentFilePath
-      ? `[Ln ${start.line}, Col ${start.column}]`
-      : `[${location.path}: Ln ${start.line}, Col ${start.column}]`;
-
-  return (
-    <>
-      {prefix}
-      {message}{" "}
-      <button
-        onClick={() => onGoTo(location)}
-        className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-      >
-        {locationLabel}
-      </button>
-    </>
-  );
+  return {
+    message: item.message,
+    severity: item.severity,
+    location:
+      location == null
+        ? null
+        : {
+            path: location.path,
+            startLineNumber: location.range.start.line,
+            startColumn: location.range.start.column,
+            endLineNumber: location.range.end.line,
+            endColumn: location.range.end.column,
+          },
+  };
 }
 
 export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
@@ -261,7 +284,7 @@ export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
 
 export function formatSubDiagnosticAnnotation(
   subDiagnostic: SubDiagnostic,
-  annotation: SubDiagnosticAnnotation,
+  annotation: DiagnosticAnnotation,
   includeSubDiagnosticMessage = annotation.primary,
 ): string {
   if (annotation.message == null) {

@@ -123,7 +123,7 @@ repos:
       - id: ruff-format
         name: mdtest format
         types_or: [markdown]
-        files: '^crates/.*/resources/mdtest/.*\.md$'
+        files: '^crates/.*/resources/(mdtest|lint_docs)/.*\.md$'
         pass_filenames: true
         priority: 2
 

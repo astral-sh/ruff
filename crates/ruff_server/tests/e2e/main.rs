@@ -1085,7 +1085,6 @@ impl TestServerBuilder {
         self
     }
 
-    #[expect(dead_code)]
     pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document

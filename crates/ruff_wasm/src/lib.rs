@@ -32,6 +32,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    annotations: DiagnosticAnnotation[];
     subDiagnostics: SubDiagnostic[];
     start_location: {
         row: number;
@@ -57,10 +58,16 @@ export interface Diagnostic {
     } | null;
 }
 
+export interface DiagnosticAnnotation {
+    primary: boolean;
+    message: string | null;
+    location: DiagnosticLocation | null;
+}
+
 export interface SubDiagnostic {
     severity: SubDiagnosticSeverity;
     message: string;
-    location: SubDiagnosticLocation | null;
+    location: DiagnosticLocation | null;
 }
 
 export enum SubDiagnosticSeverity {
@@ -71,7 +78,7 @@ export enum SubDiagnosticSeverity {
     Fatal = "fatal",
 }
 
-export interface SubDiagnosticLocation {
+export interface DiagnosticLocation {
     path: string;
     start_location: {
         row: number;
@@ -88,6 +95,7 @@ export interface SubDiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    pub annotations: Vec<ExpandedDiagnosticAnnotation>,
     #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
     pub start_location: Location,
@@ -96,10 +104,17 @@ pub struct ExpandedMessage {
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedDiagnosticAnnotation {
+    pub primary: bool,
+    pub message: Option<String>,
+    pub location: Option<ExpandedDiagnosticLocation>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedSubDiagnostic {
     pub severity: SubDiagnosticSeverity,
     pub message: String,
-    pub location: Option<ExpandedSubDiagnosticLocation>,
+    pub location: Option<ExpandedDiagnosticLocation>,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
@@ -125,10 +140,29 @@ impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct ExpandedSubDiagnosticLocation {
+pub struct ExpandedDiagnosticLocation {
     pub path: String,
     pub start_location: Location,
     pub end_location: Location,
+}
+
+fn expanded_diagnostic_location(
+    span: &diagnostic::Span,
+    position_encoding: SourcePositionEncoding,
+) -> Option<ExpandedDiagnosticLocation> {
+    let source_file = span.as_ruff_file()?;
+    let source_code = source_file.to_source_code();
+    let range = span.range()?;
+
+    Some(ExpandedDiagnosticLocation {
+        path: source_file.name().to_string(),
+        start_location: source_code
+            .source_location(range.start(), position_encoding)
+            .into(),
+        end_location: source_code
+            .source_location(range.end(), position_encoding)
+            .into(),
+    })
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -340,37 +374,34 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
+                let annotations = msg
+                    .annotations()
+                    .iter()
+                    .map(|annotation| ExpandedDiagnosticAnnotation {
+                        primary: annotation.is_primary(),
+                        message: annotation.get_message().map(ToOwned::to_owned),
+                        location: expanded_diagnostic_location(
+                            annotation.get_span(),
+                            self.position_encoding,
+                        ),
+                    })
+                    .collect();
                 let sub_diagnostics = msg
                     .sub_diagnostics()
                     .iter()
-                    .map(|sub_diagnostic| {
-                        let location = sub_diagnostic.primary_span_ref().and_then(|span| {
-                            let source_file = span.as_ruff_file()?;
-                            let source_code = source_file.to_source_code();
-                            let range = span.range()?;
-
-                            Some(ExpandedSubDiagnosticLocation {
-                                path: source_file.name().to_string(),
-                                start_location: source_code
-                                    .source_location(range.start(), self.position_encoding)
-                                    .into(),
-                                end_location: source_code
-                                    .source_location(range.end(), self.position_encoding)
-                                    .into(),
-                            })
-                        });
-
-                        ExpandedSubDiagnostic {
-                            severity: sub_diagnostic.severity().into(),
-                            message: sub_diagnostic.concise_message().to_string(),
-                            location,
-                        }
+                    .map(|sub_diagnostic| ExpandedSubDiagnostic {
+                        severity: sub_diagnostic.severity().into(),
+                        message: sub_diagnostic.concise_message().to_string(),
+                        location: sub_diagnostic.primary_span_ref().and_then(|span| {
+                            expanded_diagnostic_location(span, self.position_encoding)
+                        }),
                     })
                     .collect();
 
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
                     message: msg.concise_message().to_string(),
+                    annotations,
                     sub_diagnostics,
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)
@@ -398,7 +429,9 @@ impl Workspace {
             })
             .collect();
 
-        serde_wasm_bindgen::to_value(&messages).map_err(into_error)
+        messages
+            .serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(true))
+            .map_err(into_error)
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {

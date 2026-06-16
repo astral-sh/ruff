@@ -6089,6 +6089,95 @@ def function():
     }
 
     #[test]
+    fn hover_bare_final_annotation() {
+        let test = hover_test(
+            r#"
+            from typing import Final
+
+            x: Final<CURSOR> = 1
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        <special-form 'typing.Final'>
+        ---------------------------------------------
+        Special typing construct to indicate final names to type checkers.
+
+        A final name cannot be re-assigned or overridden in a subclass.
+
+        For example::
+
+            MAX_SIZE: Final = 9000
+            MAX_SIZE += 1  # Error reported by type checker
+
+            class Connection:
+                TIMEOUT: Final[int] = 10
+
+            class FastConnector(Connection):
+                TIMEOUT = 1  # Error reported by type checker
+
+        There is no runtime checking of these properties.
+
+        ---------------------------------------------
+        ```xml
+        <special-form 'typing.Final'>
+        ```
+        ---
+        Special typing construct to indicate final names to type checkers.<HB>
+        <HB>
+        A final name cannot be re-assigned or overridden in a subclass.<HB>
+        <HB>
+        For example:  <HB>
+        ```````````python
+            MAX_SIZE: Final = 9000
+            MAX_SIZE += 1  # Error reported by type checker
+
+            class Connection:
+                TIMEOUT: Final[int] = 10
+
+            class FastConnector(Connection):
+                TIMEOUT = 1  # Error reported by type checker
+
+        ```````````
+        There is no runtime checking of these properties.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:4
+          |
+        4 | x: Final = 1
+          |    ^^^^^- Cursor offset
+          |    |
+          |    source
+          |
+        ");
+
+        let test = hover_test(
+            r#"
+            from typing import Final
+
+            x<CURSOR>: Final = 1
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Literal[1] (Final)
+        ---------------------------------------------
+        ```python
+        Literal[1] (Final)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:1
+          |
+        4 | x: Final = 1
+          | ^- Cursor offset
+          | |
+          | source
+          |
+        ");
+    }
+
+    #[test]
     fn hover_comprehension_type_context() {
         let test = hover_test(
             r#"

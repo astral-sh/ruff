@@ -93,6 +93,28 @@ struct TypeAndRange<'db> {
     range: TextRange,
 }
 
+type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
+
+/// Extends the current collection-use constraints with those from the previous cycle iteration.
+///
+/// Constraints for a collection can appear and disappear while dependent inference results are
+/// still changing. Retaining previous constraints makes this part of inference monotonic.
+fn extend_collection_use_constraints<'db>(
+    current: &mut CollectionUseConstraints<'db>,
+    previous: &CollectionUseConstraints<'db>,
+) {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct collection definitions are merged independently"
+    )]
+    for (collection_def, constraints) in previous {
+        current
+            .entry(*collection_def)
+            .or_default()
+            .extend(constraints);
+    }
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -771,7 +793,7 @@ struct ScopeInferenceExtra<'db> {
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
-    collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -800,6 +822,17 @@ impl<'db> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
             ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
         });
+
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(previous_extra) = previous_inference.extra.as_deref()
+            && !previous_extra.collection_use_constraints.is_empty()
+        {
+            let extra = self.extra.get_or_insert_default();
+            extend_collection_use_constraints(
+                &mut extra.collection_use_constraints,
+                &previous_extra.collection_use_constraints,
+            );
+        }
 
         self
     }
@@ -1146,7 +1179,7 @@ struct OtherDefinitionInferenceExtra<'db> {
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
-    collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -1167,6 +1200,64 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
+}
+
+impl<'db> DefinitionInferenceExtra<'db> {
+    fn into_other(self) -> OtherDefinitionInferenceExtra<'db> {
+        match self {
+            Self::Qualifiers(qualifiers) => OtherDefinitionInferenceExtra {
+                qualifiers,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::Deferred(deferred) => OtherDefinitionInferenceExtra {
+                deferred,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::Diagnostics(diagnostics) => OtherDefinitionInferenceExtra {
+                diagnostics: *diagnostics,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::Undecorated(undecorated_type) => OtherDefinitionInferenceExtra {
+                undecorated_type: Some(*undecorated_type),
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::DeferredAndUndecorated(extra) => {
+                let DeferredAndUndecorated {
+                    deferred,
+                    undecorated_type,
+                } = *extra;
+                OtherDefinitionInferenceExtra {
+                    deferred,
+                    undecorated_type: Some(undecorated_type),
+                    ..OtherDefinitionInferenceExtra::default()
+                }
+            }
+            Self::CalledFunctions(called_functions) => OtherDefinitionInferenceExtra {
+                called_functions,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::ExpectedTypes(expected_types) => OtherDefinitionInferenceExtra {
+                expected_types,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::StringAnnotations(string_annotations) => OtherDefinitionInferenceExtra {
+                string_annotations,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::DiscardsDictKeyAssignments => OtherDefinitionInferenceExtra {
+                discards_dict_key_assignments: true,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::Other(extra) => *extra,
+        }
+    }
+
+    fn collection_use_constraints(&self) -> Option<&CollectionUseConstraints<'db>> {
+        match self {
+            Self::Other(extra) => Some(&extra.collection_use_constraints),
+            _ => None,
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1232,6 +1323,26 @@ impl<'db> DefinitionInference<'db> {
             definition,
         );
 
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(previous_constraints) = previous_inference
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::collection_use_constraints)
+            && !previous_constraints.is_empty()
+        {
+            let mut extra = self
+                .extra
+                .take()
+                .map_or_else(OtherDefinitionInferenceExtra::default, |extra| {
+                    extra.into_other()
+                });
+            extend_collection_use_constraints(
+                &mut extra.collection_use_constraints,
+                previous_constraints,
+            );
+            self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
+        }
+
         self
     }
 
@@ -1254,12 +1365,10 @@ impl<'db> DefinitionInference<'db> {
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
-        match self.extra.as_deref()? {
-            DefinitionInferenceExtra::Other(extra) => {
-                extra.collection_use_constraints.get(&collection_def)
-            }
-            _ => None,
-        }
+        self.extra
+            .as_deref()?
+            .collection_use_constraints()?
+            .get(&collection_def)
     }
 
     /// Get qualifiers for an annotation expression
@@ -1411,7 +1520,7 @@ struct ExpressionInferenceExtra<'db> {
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
-    collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
 
     /// The types of every binding in this expression region.
     ///
@@ -1463,6 +1572,17 @@ impl<'db> ExpressionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        }
+
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(previous_extra) = previous.extra.as_deref()
+            && !previous_extra.collection_use_constraints.is_empty()
+        {
+            let extra = self.extra.get_or_insert_default();
+            extend_collection_use_constraints(
+                &mut extra.collection_use_constraints,
+                &previous_extra.collection_use_constraints,
+            );
         }
 
         self
@@ -1574,7 +1694,7 @@ struct StatementInferenceInnerExtra<'db> {
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
-    collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -1641,6 +1761,17 @@ impl<'db> StatementInferenceInner<'db> {
                 *declaration_ty =
                     declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
             }
+        }
+
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(previous_extra) = previous_inference.extra.as_deref()
+            && !previous_extra.collection_use_constraints.is_empty()
+        {
+            let extra = self.extra.get_or_insert_default();
+            extend_collection_use_constraints(
+                &mut extra.collection_use_constraints,
+                &previous_extra.collection_use_constraints,
+            );
         }
 
         self

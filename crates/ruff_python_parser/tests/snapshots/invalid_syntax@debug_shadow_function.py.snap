@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_function
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..125,
+        range: 0..170,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -160,6 +160,54 @@ Module(
                     ],
                 },
             ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 125..144,
+                    value: Lambda(
+                        ExprLambda {
+                            node_index: NodeIndex(None),
+                            range: 125..144,
+                            parameters: Some(
+                                Parameters {
+                                    range: 132..141,
+                                    node_index: NodeIndex(None),
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 132..141,
+                                            node_index: NodeIndex(None),
+                                            parameter: Parameter {
+                                                range: 132..141,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("__debug__"),
+                                                    range: 132..141,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 143..144,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -179,6 +227,7 @@ Module(
 2 | def f[__debug__](): ...  # type parameter name
   |       ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
 3 | def f(__debug__): ...  # parameter name
+4 | lambda __debug__: 0  # lambda parameter name
   |
 
 
@@ -187,4 +236,13 @@ Module(
 2 | def f[__debug__](): ...  # type parameter name
 3 | def f(__debug__): ...  # parameter name
   |       ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+4 | lambda __debug__: 0  # lambda parameter name
+  |
+
+
+  |
+2 | def f[__debug__](): ...  # type parameter name
+3 | def f(__debug__): ...  # parameter name
+4 | lambda __debug__: 0  # lambda parameter name
+  |        ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
   |

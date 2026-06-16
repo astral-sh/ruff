@@ -363,6 +363,14 @@ impl<'db> StaticClassLiteral<'db> {
                 self.typevars.borrow_mut().insert(bound_typevar);
             }
 
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                // The generic context contains the base class's formal type parameters, not type
+                // variables referenced by this class's base expression.
+                for ty in alias.specialization(db).types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
@@ -1449,7 +1457,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
             (
                 CodeGeneratorKind::NamedTuple,
-                "__new__" | "__init__" | "_replace" | "__replace__" | "_fields",
+                "__new__" | "__init__" | "__match_args__" | "_replace" | "__replace__" | "_fields",
             ) if self.namedtuple_base_has_unknown_fields(db) => {
                 // When the namedtuple base has unknown fields, fall back to NamedTupleFallback
                 // which has generic signatures that accept any arguments.
@@ -1471,7 +1479,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
             (
                 CodeGeneratorKind::NamedTuple,
-                "__new__" | "_replace" | "__replace__" | "_fields" | "__slots__",
+                "__match_args__" | "__new__" | "_replace" | "__replace__" | "_fields" | "__slots__",
             ) => {
                 let fields = self.fields(db, specialization, field_policy);
                 let fields_iter = fields.iter().map(|(name, field)| {

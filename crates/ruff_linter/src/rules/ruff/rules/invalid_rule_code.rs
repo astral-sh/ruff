@@ -47,6 +47,12 @@ impl InvalidRuleCodeKind {
 /// import os  # noqa: E402
 /// ```
 ///
+/// ## Fix safety
+///
+/// The rule's fix is marked as unsafe when a full suppression comment would be removed and there
+/// are other nested comments on the same line. Removing such a comment can change the behavior of
+/// other suppression comments before or after the removed comment.
+///
 /// ## Options
 ///
 /// This rule will flag rule codes that are unknown to Ruff, even if they are

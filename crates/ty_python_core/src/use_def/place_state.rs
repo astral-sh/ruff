@@ -77,7 +77,7 @@ pub(super) struct Declarations {
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -199,13 +199,6 @@ impl Declarations {
                     self.live_declarations.push(declaration);
                 }
             }
-        }
-    }
-
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
-        self.live_declarations.shrink_to_fit();
-        for declaration in &self.live_declarations {
-            reachability_constraints.mark_used(declaration.reachability_constraint);
         }
     }
 }

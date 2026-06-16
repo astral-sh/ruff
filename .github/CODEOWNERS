@@ -15,14 +15,19 @@
 /python/py-fuzzer/ @AlexWaygood
 
 # ty
-/crates/ty* @carljm @AlexWaygood @sharkdp @dcreager @ibraheemdev
-/crates/ruff_db/ @carljm @sharkdp @dcreager
-/crates/ty_project/ @carljm @sharkdp @dcreager @Gankra
-/crates/ty_ide/ @carljm @AlexWaygood @sharkdp @dcreager @Gankra @BurntSushi
-/crates/ty_server/ @carljm @sharkdp @dcreager @Gankra @BurntSushi
-/crates/ty/ @carljm @sharkdp @dcreager @ibraheemdev
-/crates/ty_wasm/ @carljm @sharkdp @dcreager @Gankra
-/scripts/ty_benchmark/ @carljm @AlexWaygood @sharkdp @dcreager @ibraheemdev
-/crates/ty_python_core/ @carljm @sharkdp @dcreager @ibraheemdev
-/crates/ty_python_semantic/ @carljm @AlexWaygood @sharkdp @dcreager @ibraheemdev
-/crates/ty_module_resolver/ @carljm @AlexWaygood @Gankra @BurntSushi
+#
+# CODEOWNERS teams in ty are for notifications only. When adding a new ty crate,
+# create or update the relevant *_notified team, use that team here, and
+# update .github/pr-reviewer-pools.toml separately to control individual
+# reviewer selection.
+/crates/ty* @astral-sh/ty_notified
+/crates/ruff_db/ @astral-sh/ruff_db_notified
+/crates/ty_project/ @astral-sh/ty_project_notified
+/crates/ty_ide/ @astral-sh/ty_ide_notified
+/crates/ty_server/ @astral-sh/ty_server_notified
+/crates/ty/ @astral-sh/ty_cli_notified
+/crates/ty_wasm/ @astral-sh/ty_wasm_notified
+/scripts/ty_benchmark/ @astral-sh/ty_benchmark_notified
+/crates/ty_python_core/ @astral-sh/ty_python_core_notified
+/crates/ty_python_semantic/ @astral-sh/ty_python_semantic_notified
+/crates/ty_module_resolver/ @astral-sh/ty_module_resolver_notified

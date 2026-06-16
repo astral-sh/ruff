@@ -3,7 +3,7 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
-        TypeContext, UnionType,
+        TypeContext, TypeVarKind, UnionType,
         diagnostic::{
             FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
             USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
@@ -434,12 +434,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let param_name = type_param.name();
                 for enclosing in enclosing_generic_contexts(db, self.index, current_scope) {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
+                        let kind = match type_param {
+                            ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
+                            ast::TypeParam::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
+                            // TODO: should be `TypeVarKind::Pep695TypeVarTuple`
+                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVar,
+                        };
                         report_shadowed_type_variable(
                             &self.context,
                             &param_name.id,
                             "function",
                             &function.name.id,
                             function.name.range(),
+                            kind,
                             other_typevar,
                         );
                     }

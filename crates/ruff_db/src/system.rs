@@ -11,7 +11,7 @@ use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
 use std::error::Error;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
@@ -124,20 +124,6 @@ pub trait System: Debug + Sync + Send {
         self.path_metadata(path).is_ok()
     }
 
-    /// Returns `true` if `path` exists on disk using the exact casing as specified in `path` for the parts after `prefix`.
-    ///
-    /// This is the same as [`Self::path_exists`] on case-sensitive systems.
-    ///
-    /// ## The use of prefix
-    ///
-    /// Prefix is only intended as an optimization for systems that can't efficiently check
-    /// if an entire path exists with the exact casing as specified in `path`. However,
-    /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool;
-
-    /// Returns the [`CaseSensitivity`] of the system's file system.
-    fn case_sensitivity(&self) -> CaseSensitivity;
-
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
@@ -220,39 +206,6 @@ pub trait System: Debug + Sync + Send {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     fn dyn_clone(&self) -> Box<dyn System>;
-}
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-pub enum CaseSensitivity {
-    /// The case sensitivity of the file system is unknown.
-    ///
-    /// The file system is either case-sensitive or case-insensitive. A caller
-    /// should not assume either case.
-    #[default]
-    Unknown,
-
-    /// The file system is case-sensitive.
-    CaseSensitive,
-
-    /// The file system is case-insensitive.
-    CaseInsensitive,
-}
-
-impl CaseSensitivity {
-    /// Returns `true` if the file system is known to be case-sensitive.
-    pub const fn is_case_sensitive(self) -> bool {
-        matches!(self, Self::CaseSensitive)
-    }
-}
-
-impl fmt::Display for CaseSensitivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CaseSensitivity::Unknown => f.write_str("unknown"),
-            CaseSensitivity::CaseSensitive => f.write_str("case-sensitive"),
-            CaseSensitivity::CaseInsensitive => f.write_str("case-insensitive"),
-        }
-    }
 }
 
 /// System trait for non-readonly systems.
@@ -341,7 +294,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize)]
 pub enum FileType {
     File,
     Directory,

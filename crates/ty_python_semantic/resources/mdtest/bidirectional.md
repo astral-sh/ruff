@@ -16,7 +16,7 @@ python-version = "3.12"
 ## Propagating target type annotation
 
 ```py
-from typing import AsyncGenerator, AsyncIterable, Generator, Iterable, Literal
+from typing import Any, AsyncGenerator, AsyncIterable, Generator, Iterable, Literal
 
 def list1[T](x: T) -> list[T]:
     return [x]
@@ -86,6 +86,39 @@ reveal_type(x)  # revealed: list[int]
 
 x: list[list[int]] = [[1], [2], *([3], [4])]
 reveal_type(x)  # revealed: list[list[int]]
+
+type IntDict = dict[str, int]
+
+unique: set[int] = {1, 2, 3}
+reveal_type(unique)  # revealed: set[int]
+
+mapping: dict[str, int] = {"a": 1, **{"b": 2}}
+reveal_type(mapping)  # revealed: dict[str, int]
+
+def dynamic_mapping() -> Any: ...
+
+dynamic_unpack: dict[str, int] = reveal_type({**dynamic_mapping()})  # revealed: dict[str | Any, int | Any]
+
+alias_mapping: IntDict = {"a": 1}
+reveal_type(alias_mapping)  # revealed: dict[str, int]
+
+optional_mapping: dict[str, int] | None = {"a": 1}
+reveal_type(optional_mapping)  # revealed: dict[str, int]
+
+either: list[int] | list[str] = [1]
+reveal_type(either)  # revealed: list[int]
+
+# A protocol context is not an exact nominal collection context and must use the general path.
+iterable: Iterable[int] = [1]
+reveal_type(iterable)  # revealed: list[int]
+
+bad_list: list[str] = [1]  # error: [invalid-assignment]
+bad_dict: dict[str, int] = {"a": "bad"}  # error: [invalid-assignment]
+
+bad_nested_list: list[list[list[str]]] = [[[1]]]  # error: [invalid-assignment]
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
+bad_unpack: dict[str, int] = {**42}
 
 x: list[list[int | str]] = [[1], [2]] * 3
 reveal_type(x)  # revealed: list[list[int | str]]
@@ -999,6 +1032,28 @@ reveal_type(x14)  # revealed: list[Divergent]
 reveal_type(x15)  # revealed: list[Divergent]
 ```
 
+Collection-use constraints must converge when multiple collection literals are used in a container
+literal. This is a regression test for <https://github.com/astral-sh/ty/issues/3778>.
+
+```py
+from typing import Any
+
+def run(cond: bool, d: dict[Any, Any]) -> list[Any]:
+    a = {}
+    b = {}
+    if cond:
+        b = d
+    return [a.get("x", 0), b.get("x", 0)]
+
+def assigned(cond: bool, d: dict[Any, Any]) -> list[Any]:
+    a = {}
+    b = {}
+    if cond:
+        b = d
+    result: list[Any] = [a.get("x", 0), b.get("x", 0)]
+    return result
+```
+
 ```py
 def _(i):
     x16 = []
@@ -1057,6 +1112,20 @@ def _(flag: bool):
 
     # TODO: This should reveal `list[int]`.
     reveal_type(x22)  # revealed: list[Unknown]
+```
+
+```py
+x23 = [None, None, None]
+x23[0] = 1
+x23[1] = "2"
+x23[2] = 3.0
+reveal_type(x23)  # revealed: list[int | str | float | None]
+```
+
+```py
+x24 = {"a": 1}
+x24[1] = "b"
+reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
 ## Multi-inference diagnostics

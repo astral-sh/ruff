@@ -7,7 +7,7 @@ use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_pa
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
@@ -899,6 +899,15 @@ impl Diagnostic {
         JsString::from(self.inner.concise_message().to_string())
     }
 
+    #[wasm_bindgen]
+    pub fn annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
+        self.inner
+            .annotations()
+            .iter()
+            .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+            .collect()
+    }
+
     #[wasm_bindgen(js_name = "subDiagnostics")]
     pub fn sub_diagnostics(&self, workspace: &Workspace) -> Vec<SubDiagnostic> {
         self.inner
@@ -908,25 +917,7 @@ impl Diagnostic {
                 let annotations = sub_diagnostic
                     .annotations()
                     .iter()
-                    .map(|annotation| {
-                        let location =
-                            FileRange::try_from(annotation.get_span())
-                                .ok()
-                                .map(|file_range| Location {
-                                    path: file_range.file().path(&workspace.db).to_string(),
-                                    range: Range::from_file_range(
-                                        &workspace.db,
-                                        file_range,
-                                        workspace.position_encoding,
-                                    ),
-                                });
-
-                        SubDiagnosticAnnotation {
-                            primary: annotation.is_primary(),
-                            message: annotation.get_message().map(ToOwned::to_owned),
-                            location,
-                        }
-                    })
+                    .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
                     .collect();
 
                 SubDiagnostic {
@@ -1013,17 +1004,38 @@ pub struct SubDiagnostic {
     #[wasm_bindgen(getter_with_clone)]
     pub message: String,
     #[wasm_bindgen(getter_with_clone)]
-    pub annotations: Vec<SubDiagnosticAnnotation>,
+    pub annotations: Vec<DiagnosticAnnotation>,
 }
 
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubDiagnosticAnnotation {
+pub struct DiagnosticAnnotation {
     pub primary: bool,
     #[wasm_bindgen(getter_with_clone)]
     pub message: Option<String>,
     #[wasm_bindgen(getter_with_clone)]
     pub location: Option<Location>,
+}
+
+impl DiagnosticAnnotation {
+    fn from_db(workspace: &Workspace, annotation: &diagnostic::Annotation) -> Self {
+        let location = FileRange::try_from(annotation.get_span())
+            .ok()
+            .map(|file_range| Location {
+                path: file_range.file().path(&workspace.db).to_string(),
+                range: Range::from_file_range(
+                    &workspace.db,
+                    file_range,
+                    workspace.position_encoding,
+                ),
+            });
+
+        Self {
+            primary: annotation.is_primary(),
+            message: annotation.get_message().map(ToOwned::to_owned),
+            location,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -1610,14 +1622,6 @@ impl System for WasmSystem {
         _path: &SystemVirtualPath,
     ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
     }
 
     fn which(&self, _name: &str) -> WhichResult {

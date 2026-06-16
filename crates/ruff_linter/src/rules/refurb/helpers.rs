@@ -32,7 +32,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
             args: Box::from([]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

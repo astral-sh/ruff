@@ -1240,15 +1240,11 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) {
-        let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
-            if let Some(ty) = ty
-                && let Some(LiteralValueTypeKind::Bool(value)) = ty.as_literal_value_kind()
-            {
-                value
-            } else {
-                // TODO: emit a diagnostic if we receive `bool`
-                default
-            }
+        let to_bool = |ty: &Option<Type<'_>>, default| {
+            ty.map_or(Some(default), |ty| match ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(value)) => Some(value),
+                _ => None,
+            })
         };
 
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
@@ -2195,6 +2191,16 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Dataclass) => {
+                            let parameter_types = overload.parameter_types();
+                            let (cls_argument, dataclass_parameter_types) = overload
+                                .signature
+                                .parameters()
+                                .positional_only_by_name("cls")
+                                .map(|(index, _)| {
+                                    (parameter_types[index], &parameter_types[index + 1..])
+                                })
+                                .unwrap_or((None, parameter_types));
+
                             if let [
                                 init,
                                 repr,
@@ -2203,57 +2209,66 @@ impl<'db> Bindings<'db> {
                                 unsafe_hash,
                                 frozen,
                                 versioned_parameters @ ..,
-                            ] = overload.parameter_types()
+                            ] = dataclass_parameter_types
                             {
                                 let mut flags = DataclassFlags::empty();
+                                let invalid_order = to_bool(order, false) == Some(true)
+                                    && to_bool(eq, true) == Some(false);
+                                let mut invalid_weakref_slot = false;
 
-                                if to_bool(init, true) {
+                                // TODO: Emit a diagnostic if a dataclass flag is not statically
+                                // known.
+                                if to_bool(init, true).unwrap_or(true) {
                                     flags |= DataclassFlags::INIT;
                                 }
-                                if to_bool(repr, true) {
+                                if to_bool(repr, true).unwrap_or(true) {
                                     flags |= DataclassFlags::REPR;
                                 }
-                                if to_bool(eq, true) {
+                                if to_bool(eq, true).unwrap_or(true) {
                                     flags |= DataclassFlags::EQ;
                                 }
-                                if to_bool(order, false) {
+                                if to_bool(order, false).unwrap_or(false) {
                                     flags |= DataclassFlags::ORDER;
                                 }
-                                if to_bool(unsafe_hash, false) {
+                                if to_bool(unsafe_hash, false).unwrap_or(false) {
                                     flags |= DataclassFlags::UNSAFE_HASH;
                                 }
-                                if to_bool(frozen, false) {
+                                if to_bool(frozen, false).unwrap_or(false) {
                                     flags |= DataclassFlags::FROZEN;
                                 }
-
                                 match versioned_parameters {
                                     // Python < 3.10.
                                     [] => {}
                                     // Python 3.10.
                                     [match_args, kw_only, slots] => {
-                                        if to_bool(match_args, true) {
+                                        if to_bool(match_args, true).unwrap_or(true) {
                                             flags |= DataclassFlags::MATCH_ARGS;
                                         }
-                                        if to_bool(kw_only, false) {
+                                        if to_bool(kw_only, false).unwrap_or(false) {
                                             flags |= DataclassFlags::KW_ONLY;
                                         }
-                                        if to_bool(slots, false) {
+                                        if to_bool(slots, false).unwrap_or(false) {
                                             flags |= DataclassFlags::SLOTS;
                                         }
                                     }
                                     // Python >= 3.11.
                                     [match_args, kw_only, slots, weakref_slot] => {
-                                        if to_bool(match_args, true) {
+                                        if to_bool(match_args, true).unwrap_or(true) {
                                             flags |= DataclassFlags::MATCH_ARGS;
                                         }
-                                        if to_bool(kw_only, false) {
+                                        if to_bool(kw_only, false).unwrap_or(false) {
                                             flags |= DataclassFlags::KW_ONLY;
                                         }
-                                        if to_bool(slots, false) {
+                                        if to_bool(slots, false).unwrap_or(false) {
                                             flags |= DataclassFlags::SLOTS;
                                         }
-                                        if to_bool(weakref_slot, false) {
+                                        if to_bool(weakref_slot, false).unwrap_or(false) {
                                             flags |= DataclassFlags::WEAKREF_SLOT;
+                                        }
+                                        if to_bool(weakref_slot, false) == Some(true)
+                                            && to_bool(slots, false) == Some(false)
+                                        {
+                                            invalid_weakref_slot = true;
                                         }
                                     }
                                     _ => {}
@@ -2261,22 +2276,36 @@ impl<'db> Bindings<'db> {
 
                                 let params = DataclassParams::from_flags(db, flags);
 
-                                overload.set_return_type(Type::DataclassDecorator(params));
-                            }
+                                if cls_argument.is_none_or(|cls_ty| cls_ty.is_none(db)) {
+                                    overload.set_return_type(Type::DataclassDecorator(params));
+                                }
 
-                            // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`)
-                            if let [Some(Type::ClassLiteral(class_literal)), ..] =
-                                overload.parameter_types()
-                            {
-                                if let Some(target) = invalid_dataclass_target(db, class_literal) {
-                                    overload
-                                        .errors
-                                        .push(BindingError::InvalidDataclassApplication(target));
-                                } else {
-                                    let params = DataclassParams::default_params(db);
-                                    overload.set_return_type(Type::from(
-                                        class_literal.with_dataclass_params(db, Some(params)),
+                                if invalid_order {
+                                    overload.errors.push(BindingError::InvalidDataclassArgument(
+                                        InvalidDataclassArgument::OrderRequiresEq,
                                     ));
+                                }
+                                if invalid_weakref_slot {
+                                    overload.errors.push(BindingError::InvalidDataclassArgument(
+                                        InvalidDataclassArgument::WeakrefSlotRequiresSlots,
+                                    ));
+                                }
+
+                                // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`).
+                                if let Some(Type::ClassLiteral(class_literal)) =
+                                    cls_argument.as_ref()
+                                {
+                                    if let Some(target) =
+                                        invalid_dataclass_target(db, class_literal)
+                                    {
+                                        overload.errors.push(
+                                            BindingError::InvalidDataclassApplication(target),
+                                        );
+                                    } else {
+                                        overload.set_return_type(Type::from(
+                                            class_literal.with_dataclass_params(db, Some(params)),
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -2304,16 +2333,16 @@ impl<'db> Bindings<'db> {
                                 .ok()
                                 .flatten();
 
-                            if to_bool(&eq_default, true) {
+                            if to_bool(&eq_default, true).unwrap_or(true) {
                                 flags |= DataclassTransformerFlags::EQ_DEFAULT;
                             }
-                            if to_bool(&order_default, false) {
+                            if to_bool(&order_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::ORDER_DEFAULT;
                             }
-                            if to_bool(&kw_only_default, false) {
+                            if to_bool(&kw_only_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
                             }
-                            if to_bool(&frozen_default, false) {
+                            if to_bool(&frozen_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
                             }
 
@@ -6793,6 +6822,18 @@ pub(crate) enum InvalidArgumentTypeProvenance {
     OpenTypedDictExtraItems,
 }
 
+/// A statically known combination of arguments that makes a stdlib `dataclass` decorator invalid.
+///
+/// Each variant represents a combination that causes the returned decorator to raise when applied
+/// to a class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvalidDataclassArgument {
+    /// `order=True` combined with `eq=False`.
+    OrderRequiresEq,
+    /// `weakref_slot=True` combined with `slots=False`.
+    WeakrefSlotRequiresSlots,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
@@ -6862,6 +6903,8 @@ pub(crate) enum BindingError<'db> {
     CalledTopCallable(Type<'db>),
     /// The `@dataclass` decorator was applied to an invalid target.
     InvalidDataclassApplication(InvalidDataclassTarget),
+    /// The stdlib `dataclass` decorator factory was called with incompatible arguments.
+    InvalidDataclassArgument(InvalidDataclassArgument),
 }
 
 impl BindingError<'_> {
@@ -6945,6 +6988,7 @@ impl BindingError<'_> {
             BindingError::CalledTopCallable(..)
             | BindingError::InternalCallError(..)
             | BindingError::InvalidDataclassApplication(..)
+            | BindingError::InvalidDataclassArgument(..)
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
             | BindingError::PropertyHasNoSetter(..)
@@ -7005,6 +7049,7 @@ impl<'db> BindingError<'db> {
         match self {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
+            | Self::InvalidDataclassArgument(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
             | Self::CalledTopCallable(_)
@@ -7524,6 +7569,20 @@ impl<'db> BindingError<'db> {
                     };
                     let mut diag = builder.into_diagnostic(message);
                     diag.info(info);
+                }
+            }
+
+            Self::InvalidDataclassArgument(argument) => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    builder.into_diagnostic(match argument {
+                        InvalidDataclassArgument::OrderRequiresEq => {
+                            "`order=True` requires `eq=True`"
+                        }
+                        InvalidDataclassArgument::WeakrefSlotRequiresSlots => {
+                            "`weakref_slot=True` requires `slots=True`"
+                        }
+                    });
                 }
             }
         }

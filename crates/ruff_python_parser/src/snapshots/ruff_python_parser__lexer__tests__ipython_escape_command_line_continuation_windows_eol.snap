@@ -5,16 +5,7 @@ expression: ipython_escape_command_line_continuation_eol(WINDOWS_EOL)
 ## Tokens
 ```
 [
-    (
-        IpyEscapeCommand {
-            value: "matplotlib   --inline",
-            kind: Magic,
-        },
-        0..25,
-    ),
-    (
-        Newline,
-        25..25,
-    ),
+    IpyEscapeCommand 0..25,
+    Newline 25..25,
 ]
 ```
