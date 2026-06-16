@@ -2,7 +2,7 @@ use lsp_types::SemanticToken;
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
-use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
+use ty_ide::{SemanticTokenModifier, SemanticTokenType};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionEncoding, ToRangeExt};
@@ -17,8 +17,51 @@ pub(crate) fn generate_semantic_tokens(
     multiline_token_support: bool,
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
+
+    // Notebooks require cell-local coordinate conversion, which is an LSP-server concern.
+    // For regular files, we can use the shared encoder from ty_ide.
+    if source.as_notebook().is_some() {
+        generate_semantic_tokens_notebook(
+            db,
+            file,
+            range,
+            encoding,
+            multiline_token_support,
+        )
+    } else {
+        ty_ide::encoded_semantic_tokens(
+            db,
+            file,
+            range,
+            encoding.into(),
+            multiline_token_support,
+        )
+        .into_iter()
+        .map(convert_semantic_token)
+        .collect()
+    }
+}
+
+fn convert_semantic_token(token: ty_ide::EncodedSemanticToken) -> SemanticToken {
+    SemanticToken {
+        delta_line: token.delta_line,
+        delta_start: token.delta_start,
+        length: token.length,
+        token_type: token.token_type,
+        token_modifiers_bitset: token.token_modifiers_bitset,
+    }
+}
+
+fn generate_semantic_tokens_notebook(
+    db: &ProjectDatabase,
+    file: ruff_db::files::File,
+    range: Option<TextRange>,
+    encoding: PositionEncoding,
+    multiline_token_support: bool,
+) -> Vec<SemanticToken> {
+    let source = source_text(db, file);
     let line_index = line_index(db, file);
-    let semantic_token_data = semantic_tokens(db, file, range);
+    let semantic_token_data = ty_ide::semantic_tokens(db, file, range);
 
     let mut encoder = Encoder {
         tokens: Vec::with_capacity(semantic_token_data.len()),
