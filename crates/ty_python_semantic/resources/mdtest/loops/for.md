@@ -133,6 +133,18 @@ for x in (1, "a", b"foo"):
 reveal_type(x)
 ```
 
+## With literal list
+
+```py
+for x in ["a", "b"]:
+    reveal_type(x)  # revealed: Literal["a", "b"]
+
+async def _():
+    # error: [not-iterable]
+    async for x in ["a", "b"]:
+        reveal_type(x)  # revealed: Unknown
+```
+
 ## With non-callable iterator
 
 ```py
