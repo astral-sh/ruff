@@ -113,6 +113,14 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
+    type_property_test!(
+        structural_negation_subtyping_matches_materialized_negation, db,
+        forall types s, t. match s {
+            Type::Intersection(intersection) => intersection.negation_is_subtype_of(db, t) == s.negate(db).is_subtype_of(db, t),
+            _ => true,
+        }
+    );
+
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
         disjoint_from_is_irreflexive, db,

@@ -957,8 +957,13 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
+                let negation_is_subtype = if let Type::Intersection(intersection) = ty {
+                    intersection.negation_is_subtype_of(self.db, element_type)
+                } else {
+                    let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                    negated.is_subtype_of(self.db, element_type)
+                };
+                if negation_is_subtype {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of

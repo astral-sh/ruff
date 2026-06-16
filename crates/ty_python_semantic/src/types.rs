@@ -6938,6 +6938,21 @@ impl<'db> Type<'db> {
 }
 
 impl<'db> IntersectionType<'db> {
+    /// Return whether the negation of this intersection is a subtype of `target`.
+    ///
+    /// Applying De Morgan's law to an intersection produces a union. Checking each branch
+    /// directly avoids constructing and simplifying that temporary union, which can be costly
+    /// for the large intersections produced by repeated narrowing.
+    pub(crate) fn negation_is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        self.positive(db)
+            .iter()
+            .all(|positive| positive.negate(db).is_subtype_of(db, target))
+            && self
+                .negative(db)
+                .iter()
+                .all(|negative| negative.is_subtype_of(db, target))
+    }
+
     // Calls the dunder on each element separately and combines the results.
     // This avoids intersecting bound methods (which often collapses to Never)
     // and instead intersects the return types.
