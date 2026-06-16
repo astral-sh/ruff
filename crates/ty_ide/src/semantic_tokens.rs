@@ -196,6 +196,9 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
 }
 
 /// An LSP-compatible semantic token encoded relative to the previous token.
+///
+/// Mirrors `lsp_types::SemanticToken` but in ty's domain types — the LSP-layer
+/// conversion happens in `ty_server`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncodedSemanticToken {
     pub delta_line: u32,
