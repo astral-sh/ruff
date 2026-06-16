@@ -1388,6 +1388,9 @@ Intersection types can also be written using the `&` and `~` operators, without 
 ```toml
 [environment]
 python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
 ```
 
 ```py
@@ -1396,12 +1399,10 @@ class B: ...
 class C: ...
 
 def _(
-    a_and_b: A & B,  # error: [experimental-syntax] "Intersection type syntax is experimental"
-    i1: A & B | C,  # error: [experimental-syntax] "Intersection type syntax is experimental"
-    i2: A | B & C,  # error: [experimental-syntax] "Intersection type syntax is experimental"
-    not_a: ~A,  # error: [experimental-syntax] "Negation type syntax is experimental"
-    # error: [experimental-syntax] "Intersection type syntax is experimental"
-    # error: [experimental-syntax] "Intersection type syntax is experimental"
+    a_and_b: A & B,
+    i1: A & B | C,
+    i2: A | B & C,
+    not_a: ~A,
     nested: A & B & C,
 ) -> None:
     reveal_type(a_and_b)  # revealed: A & B
@@ -1430,6 +1431,9 @@ negation type:
 ```toml
 [environment]
 python-version = "3.13"
+
+[rules]
+experimental-syntax = "ignore"
 ```
 
 ```py
@@ -1437,10 +1441,8 @@ class A: ...
 class B: ...
 
 def _(
-    # error: [experimental-syntax] "Intersection type syntax is experimental"
     # error: [unsupported-operator] "Operator `&` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
     a_and_b: A & B,
-    # error: [experimental-syntax] "Negation type syntax is experimental"
     # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'A'>`"
     not_a: ~A,
 ) -> None:
