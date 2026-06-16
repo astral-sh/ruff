@@ -14,8 +14,8 @@ pub(crate) use self::static_literal::{
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, KnownInstanceType, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -344,6 +344,11 @@ fn inherits_from_any_inner<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bo
         Type::ClassLiteral(base) => inherits_from_any_inner(db, *base),
         Type::GenericAlias(alias) => {
             inherits_from_any_inner(db, ClassLiteral::Static(alias.origin(db)))
+        }
+        Type::KnownInstance(KnownInstanceType::Annotated(ty)) => {
+            ty.inner(db).as_nominal_instance().is_some_and(|instance| {
+                inherits_from_any_inner(db, instance.class(db).class_literal(db))
+            })
         }
         _ => false,
     })

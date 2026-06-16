@@ -106,6 +106,24 @@ b: FinalClass = B()
 c: FinalClass = C()
 ```
 
+`Annotated` metadata on a base does not change this behavior:
+
+```py
+from typing import Annotated, Any, Literal, final
+from ty_extensions import reveal_mro
+
+class A(Any): ...
+class B(Annotated[A, "metadata"]): ...
+
+@final
+class FinalClass: ...
+
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, Any, <class 'object'>)
+
+x: FinalClass = B()
+y: Literal[1] = B()
+```
+
 A class with a base whose type is `Any` or `Unknown` is different. Its instances retain the ordinary
 nominal type of the class, but the dynamic MRO entry makes them gradually assignable to non-final
 types:
