@@ -1075,6 +1075,8 @@ impl<'m> ContextCursor<'m> {
     fn incomplete_keywords(&self) -> Option<&'static [&'static str]> {
         const IN: &[&str] = &["in"];
         const AS: &[&str] = &["as"];
+        const IF: &[&str] = &["if"];
+        const MATCH: &[&str] = &["as", "if"];
 
         let preceding_token = |keyword: &str| {
             let (tokens, start) = match self.typed {
@@ -1140,6 +1142,43 @@ impl<'m> ContextCursor<'m> {
                         })
                     }
                     _ => None,
+                })
+        {
+            return Some(self.unless_already_present(keywords));
+        }
+
+        if let Some(token) = preceding_token("as").or_else(|| preceding_token("if"))
+            && let Some(keywords) = self
+                .covering_node(token.range())
+                .ancestors()
+                .find_map(|node| {
+                    let ast::AnyNodeRef::MatchCase(case) = node else {
+                        return None;
+                    };
+                    match &case.pattern {
+                        ast::Pattern::MatchAs(ast::PatternMatchAs {
+                            pattern: Some(pattern),
+                            name: Some(name),
+                            ..
+                        }) => {
+                            if name.is_valid()
+                                && let Some(keywords) = self.keywords_after_range(
+                                    case.pattern.range(),
+                                    node,
+                                    token,
+                                    IF,
+                                    &[],
+                                )
+                            {
+                                Some(keywords)
+                            } else {
+                                self.keywords_after_range(pattern.range(), node, token, MATCH, AS)
+                            }
+                        }
+                        pattern => {
+                            self.keywords_after_range(pattern.range(), node, token, MATCH, AS)
+                        }
+                    }
                 })
         {
             return Some(self.unless_already_present(keywords));
@@ -8168,6 +8207,59 @@ match status:
     }
 
     #[test]
+    fn match_pattern_suggests_keywords() {
+        for (source, expected) in [
+            (
+                "\
+match status:
+    case 400 <CURSOR>",
+                "as\nif",
+            ),
+            (
+                "\
+match status:
+    case 400 a<CURSOR>",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case 400 i<CURSOR>",
+                "if",
+            ),
+            (
+                "\
+match status:
+    case (400) <CURSOR>",
+                "as\nif",
+            ),
+            (
+                "\
+match status:
+    case (400 <CURSOR>)",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case (
+        400  # comment
+        <CURSOR>
+    )",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case 400 as value <CURSOR>",
+                "if",
+            ),
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), expected);
+        }
+    }
+
+    #[test]
     fn no_contextual_keywords_inside_parentheses() {
         for (source, unexpected) in [
             ("for (foo <CURSOR>) in items: pass", "in"),
@@ -8175,6 +8267,11 @@ match status:
             (
                 "try:\n    pass\nexcept (ValueError <CURSOR>) as error: pass",
                 "as",
+            ),
+            ("match status:\n    case (400 <CURSOR>): pass", "if"),
+            (
+                "match status:\n    case (400 as value <CURSOR>): pass",
+                "if",
             ),
         ] {
             let builder = completion_test_builder(source);
@@ -8248,6 +8345,8 @@ for foo<CURSOR>
             "[foo for foo <CURSOR>in items]",
             "with open('bar') <CURSOR>as file: pass",
             "try:\n    pass\nexcept ValueError <CURSOR>as error: pass",
+            "match status:\n    case 400 <CURSOR>as value: pass",
+            "match status:\n    case 400 <CURSOR>if condition: pass",
         ] {
             assert_eq!(
                 completion_test_builder(source).build().snapshot(),
