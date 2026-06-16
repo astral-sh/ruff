@@ -666,10 +666,10 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
 
 ## Enum equality semantics
 
-Enum value patterns use the enum class's actual `__eq__` implementation. Members of an ordinary
-`Enum` compare by identity and cannot equal `None`. Members of `StrEnum` compare equal to string
-literals with the same value. Matching a member against itself is exhaustive whenever its comparison
-behavior is known, even if its underlying value is not:
+Enum value patterns use the enum class's actual `__eq__` implementation. Members of an enum whose
+`__eq__` resolves to `object.__eq__` compare by identity and cannot equal `None`. `StrEnum` members
+compare equal to string literals with the same value. Matching a member against itself is exhaustive
+whenever its comparison behavior is known, even if its underlying value is not:
 
 ```toml
 [environment]
