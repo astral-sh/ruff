@@ -393,6 +393,10 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                     if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
                         return subject_ty;
                     }
+                    let class_ty = Type::instance(db, class.top_materialization(db));
+                    if kind.is_argumentless() && subject_ty.is_subtype_of(db, class_ty) {
+                        return Type::Never;
+                    }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_argumentless()
@@ -434,16 +438,9 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         _ => return Type::Never,
     }
 
-    let subject_independent_ty = definite_match_pattern_type(db, kind);
-    // The subject-aware checks above can reject an otherwise exhaustive-looking pattern. Do not
-    // let the less precise fallback reintroduce that conclusion.
-    if subject_ty.is_subtype_of(db, subject_independent_ty) {
-        return Type::Never;
-    }
-
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_positive(subject_independent_ty)
+        .add_positive(definite_match_pattern_type(db, kind))
         .build()
 }
 
