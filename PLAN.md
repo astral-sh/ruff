@@ -37,18 +37,17 @@ Important current structures and methods:
 - `ConstraintBounds<'db>` currently stores:
     - `lower: Option<Type<'db>>`
     - `upper: Option<Type<'db>>`
-- `ConstraintBoundsBuilder<'db>` still accumulates upper bounds in a temporary CNF-like form:
-    - `upper: FxIndexSet<Type<'db>>`
-    - each entry is one upper clause
-    - `add_upper` prunes redundant clauses
-    - `finish` currently still collapses this to a single `Type` with `IntersectionType::from_elements` or, if the estimated distributed size is too large, falls back to `Unknown`
-    - `PathBounds::compute` then wraps that finalized upper type in `PathBound.upper: UpperBound<'db>` as a transition step; Phase 4 will preserve the raw factored clauses directly
+- `ConstraintBoundsBuilder<'db>` now accumulates upper bounds directly in factored form:
+    - `upper: UpperBound<'db>`
+    - each stored entry is one upper clause
+    - `add_upper` delegates to `UpperBound::add_clause`
+    - `finish` returns a `PathBound`, moving the accumulated `UpperBound` into `PathBound.upper` without exact materialization or the old `Unknown` fallback heuristic
 - `ConstraintId::intersect` now uses a transient `UpperBound` for merged-upper reasoning:
     - it checks combined range satisfiability clause-wise before punting on union-bearing uppers
     - it returns `IntersectionResult::Disjoint` for unsatisfiable merged ranges
     - it returns `IntersectionResult::CannotSimplify` for satisfiable union-bearing merged uppers instead of constructing a distributed intersection
     - the old `MAX_UPPER_BOUND_SIZE` heuristic has been removed
-- `PathBounds::compute` uses `ConstraintBoundsBuilder` per typevar per BDD path and returns named `PathBound` values.
+- `PathBounds::compute` uses `ConstraintBoundsBuilder` per typevar per BDD path and returns named `PathBound` values with factored upper bounds.
 - `PathBound<'db>` currently stores:
     - `bound_typevar: BoundTypeVarInstance<'db>`
     - `lower: Option<Type<'db>>`
@@ -434,7 +433,7 @@ These phases are implementation slices, not a license to defer cleanup or testin
 
 ### Phase 1: Introduce `UpperBound`
 
-Temporary note: `UpperBound` and bounded-witness helpers have `dead_code` expectations while they are unit-tested but not yet wired into path-bound storage/solution extraction. Remove those expectations as the later phases make the new APIs load-bearing.
+Temporary note: some bounded-witness helpers still have `dead_code` expectations while they are unit-tested but not yet wired into solution extraction. Remove those expectations as Phase 6 makes the remaining APIs load-bearing.
 
 - [x] Add an `UpperBound<'db>` type in or near `constraints.rs`, wrapping `FxOrderSet<Type<'db>>`.
 - [x] Document the factored-CNF representation and invariants next to the type.
@@ -501,13 +500,18 @@ Temporary note: `UpperBound` and bounded-witness helpers have `dead_code` expect
 
 ### Phase 4: Preserve factored upper bounds through path extraction
 
-- [ ] Change `ConstraintBoundsBuilder`'s upper accumulator from a raw `FxIndexSet<Type<'db>>` to `UpperBound<'db>`, with `add_upper` delegating to `UpperBound::add_clause`.
-- [ ] Change `ConstraintBoundsBuilder::finish` so it returns a `PathBound`, moving the accumulated `UpperBound` directly into `PathBound.upper` instead of exact materialization or the current `Unknown` fallback heuristic.
-- [ ] Call `upper.shrink_to_fit()` directly in `ConstraintBoundsBuilder::finish` before constructing the `PathBound`; do not add a `PathBound::shrink_to_fit` helper unless future fields need it.
-- [ ] Ensure `PathBounds::compute` still produces stable results.
-- [ ] Update path-bound display/debug code at the same time as the `PathBound` representation change, rendering factored upper bounds clearly and directly without materializing `UpperBound` into a single ordinary `Type`.
-- [ ] Audit the touched display/debug helpers for accidental exact materialization.
-- [ ] Update `PathBounds` snapshots/tests if displays change.
+- [x] Change `ConstraintBoundsBuilder`'s upper accumulator from a raw `FxIndexSet<Type<'db>>` to `UpperBound<'db>`, with `add_upper` delegating to `UpperBound::add_clause`.
+- [x] Change `ConstraintBoundsBuilder::finish` so it returns a `PathBound`, moving the accumulated `UpperBound` directly into `PathBound.upper` instead of exact materialization or the current `Unknown` fallback heuristic.
+- [x] Call `upper.shrink_to_fit()` directly in `ConstraintBoundsBuilder::finish` before constructing the `PathBound`; do not add a `PathBound::shrink_to_fit` helper unless future fields need it.
+- [x] Ensure `PathBounds::compute` still produces stable results.
+    - Added `path_bounds_preserve_factored_upper_bounds`, which checks that two union upper clauses remain as two `UpperBound` clauses in extracted path bounds.
+- [x] Update path-bound display/debug code at the same time as the `PathBound` representation change, rendering factored upper bounds clearly and directly without materializing `UpperBound` into a single ordinary `Type`.
+    - There is no dedicated path-bound display helper; derived debug output now renders the raw `UpperBound` field.
+- [x] Audit the touched display/debug helpers for accidental exact materialization.
+    - No path-bound display/debug helper materializes upper bounds. `PathBounds::default_solve` still exact-materializes upper bounds and is intentionally left for Phase 6 solution-extraction work.
+- [x] Update `PathBounds` snapshots/tests if displays change.
+    - No snapshots changed.
+    - Focused test command: `cargo test -p ty_python_semantic types::constraints::tests::`.
 
 ### Phase 5: Add bounded partial DNF witness generation
 

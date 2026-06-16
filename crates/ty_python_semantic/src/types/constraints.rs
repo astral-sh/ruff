@@ -3376,13 +3376,13 @@ struct InteriorNodeData {
 /// Accumulates lower and upper bounds for a single typevar on a single BDD path.
 ///
 /// Lower bounds are collected into a union (they are alternatives for the minimum type the
-/// typevar can specialize to). Upper bounds are collected into an intersection (the typevar
+/// typevar can specialize to). Upper bounds are kept as a factored intersection (the typevar
 /// must satisfy all of them simultaneously). Once the path has been fully traversed, the
-/// accumulated sets are collapsed into a [`ConstraintBounds`].
+/// accumulated bounds are stored in a [`PathBound`].
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
     lower: FxIndexSet<Type<'db>>,
-    upper: FxIndexSet<Type<'db>>,
+    upper: UpperBound<'db>,
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
@@ -3395,60 +3395,18 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     }
 
     fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        // Upper bounds are intersectioned. If `ty` is a union, that involves distributing
-        // the union elements through the existing type. That makes it worth checking first
-        // whether any of the types in the upper bound are redundant.
-
-        // First check if there's an existing upper bound clause that is a subtype of the
-        // new type. If so, adding the new type does nothing to the intersection.
-        if self
-            .upper
-            .iter()
-            .any(|existing| existing.is_redundant_with(db, ty))
-        {
-            return;
-        }
-
-        // Otherwise remove any existing clauses that are a supertype of the new type,
-        // since the intersection will clip them to the new type.
-        self.upper
-            .retain(|existing| !ty.is_redundant_with(db, *existing));
-        self.upper.insert(ty);
+        self.upper.add_clause(db, ty);
     }
 
-    fn finish(self, db: &'db dyn Db) -> ConstraintBounds<'db> {
-        let lower = (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower));
-        let upper = if self.upper.is_empty() {
-            None
-        } else {
-            // The final upper bound is the intersection of all of the individual upper bounds that
-            // we discovered for this typevar on this path. If those individual upper bounds are
-            // unions, we have to distribute the intersection across those unions in a way that can
-            // blow up the size of the resulting type. Detect that in advance, and fall back on
-            // `Unknown` if so. (`Unknown` is a good conservative fallback because it preserves the
-            // fact that there was an upper bound without forcing a large intersection to be
-            // materialized.)
-            //
-            // This temporary solution-extraction heuristic remains until path extraction stores
-            // the accumulated clauses as a factored `UpperBound` directly. Use a larger allowed
-            // size here since this is called much less frequently than sequent map elaboration.
-            let estimated_union_size = self.upper.iter().fold(1usize, |size, upper| {
-                size.saturating_mul(upper.union_size(db))
-            });
-            let estimated_intersection_size = self.upper.iter().fold(0usize, |size, upper| {
-                size.saturating_add(upper.intersection_size(db))
-            });
-            let estimated_upper_bound_size =
-                estimated_union_size.saturating_mul(estimated_intersection_size);
-            let max_upper_bound_size = self.upper.len().saturating_mul(4);
-
-            if self.upper.len() > 1 && estimated_upper_bound_size > max_upper_bound_size {
-                Some(Type::unknown())
-            } else {
-                Some(IntersectionType::from_elements(db, self.upper))
-            }
-        };
-        ConstraintBounds::new(lower, upper)
+    fn finish(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> PathBound<'db> {
+        let Self { lower, mut upper } = self;
+        let lower = (!lower.is_empty()).then(|| UnionType::from_elements(db, lower));
+        upper.shrink_to_fit();
+        PathBound {
+            bound_typevar,
+            lower,
+            upper,
+        }
     }
 }
 
@@ -3461,20 +3419,6 @@ pub(crate) struct PathBound<'db> {
 }
 
 impl<'db> PathBound<'db> {
-    fn from_constraint_bounds(
-        bound_typevar: BoundTypeVarInstance<'db>,
-        bounds: ConstraintBounds<'db>,
-    ) -> Self {
-        let upper = bounds
-            .upper
-            .map_or_else(UpperBound::none, UpperBound::from_clause);
-        Self {
-            bound_typevar,
-            lower: bounds.lower,
-            upper,
-        }
-    }
-
     pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
         Self {
             bound_typevar,
@@ -3619,9 +3563,7 @@ impl<'db> PathBounds<'db> {
 
             let path_bounds = mappings
                 .drain()
-                .map(|(bound_typevar, bounds)| {
-                    PathBound::from_constraint_bounds(bound_typevar, bounds.finish(db))
-                })
+                .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
                 .collect();
             result.push(path_bounds);
         }
@@ -3655,9 +3597,7 @@ impl<'db> PathBounds<'db> {
 
         let path = mappings
             .drain()
-            .map(|(bound_typevar, bounds)| {
-                PathBound::from_constraint_bounds(bound_typevar, bounds.finish(db))
-            })
+            .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
     }
@@ -7078,7 +7018,12 @@ mod tests {
             .bounded_partial_dnf_witness(&db, None)
             .expect("expected a witness");
 
-        assert!(witness.union_size(&db) <= MAX_PARTIAL_DNF_TERMS);
+        let witness_union_size = match witness {
+            Type::Union(union) => union.elements(&db).len(),
+            Type::Never => 0,
+            _ => 1,
+        };
+        assert!(witness_union_size <= MAX_PARTIAL_DNF_TERMS);
         assert!(witness.is_constraint_set_assignable_to(&db, left));
         assert!(witness.is_constraint_set_assignable_to(&db, right));
     }
@@ -7159,6 +7104,37 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn path_bounds_preserve_factored_upper_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
+        let mut constraints =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, int_or_str);
+        let other = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, str_or_bytes);
+        constraints.intersect(&db, &builder, other);
+
+        let path_bounds = PathBounds::compute(&db, &builder, constraints.node);
+        let PathBounds::Constrained(paths) = path_bounds else {
+            panic!("expected constrained path bounds");
+        };
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0].len(), 1);
+
+        let path_bound = &paths[0][0];
+        assert_eq!(path_bound.bound_typevar, t);
+        assert_eq!(path_bound.lower, None);
+        assert_eq!(
+            path_bound.upper.clauses,
+            FxOrderSet::from_iter([int_or_str, str_or_bytes])
+        );
     }
 
     #[test]
