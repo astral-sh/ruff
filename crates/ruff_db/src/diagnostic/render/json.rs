@@ -102,9 +102,8 @@ pub(super) fn diagnostic_to_json<'a>(
     // and the severity is displayed.
     if config.preview {
         JsonDiagnostic {
-            name: NameOrCode::Name {
-                name: diagnostic.id().as_str(),
-            },
+            code: diagnostic.secondary_code().map(|code| code.as_str()),
+            name: diagnostic.id().as_str(),
             severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
@@ -117,9 +116,8 @@ pub(super) fn diagnostic_to_json<'a>(
         }
     } else {
         JsonDiagnostic {
-            name: NameOrCode::Code {
-                code: diagnostic.secondary_code_or_id(),
-            },
+            code: Some(diagnostic.secondary_code_or_id()),
+            name: diagnostic.id().as_str(),
             severity: Severity::Error,
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
@@ -230,8 +228,8 @@ impl Serialize for ExpandedEdits<'_> {
 #[derive(Serialize)]
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
-    #[serde(flatten)]
-    name: NameOrCode<'a>,
+    code: Option<&'a str>,
+    name: &'a str,
     severity: Severity,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
@@ -240,13 +238,6 @@ pub(crate) struct JsonDiagnostic<'a> {
     message: ConciseMessage<'a>,
     noqa_row: Option<OneIndexed>,
     url: Option<&'a str>,
-}
-
-#[derive(Serialize)]
-#[serde(untagged)]
-enum NameOrCode<'a> {
-    Name { name: &'a str },
-    Code { code: &'a str },
 }
 
 #[derive(Serialize)]
@@ -335,6 +326,7 @@ mod tests {
               "row": 1
             },
             "message": "main diagnostic message",
+            "name": "test-diagnostic",
             "noqa_row": null,
             "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
@@ -361,6 +353,7 @@ mod tests {
         [
           {
             "cell": null,
+            "code": null,
             "end_location": null,
             "filename": null,
             "fix": null,

@@ -20,6 +20,7 @@ exit_code: 1
 [
   {
     "cell": null,
+    "code": "F401",
     "end_location": {
       "column": 10,
       "row": 1
@@ -54,6 +55,7 @@ exit_code: 1
   },
   {
     "cell": null,
+    "code": "F821",
     "end_location": {
       "column": 6,
       "row": 2
@@ -72,6 +74,7 @@ exit_code: 1
   },
   {
     "cell": null,
+    "code": null,
     "end_location": {
       "column": 6,
       "row": 3
