@@ -314,7 +314,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        self.store_expression_type(annotation, annotation_ty.inner_type());
+        // Keep bare `Final` as a special form for IDE features. The annotation's inner type
+        // remains `Unknown`, allowing a declaration such as `x: Final = 1` to infer its type
+        // from the assigned value.
+        let expression_ty = if annotation_ty.qualifiers == TypeQualifiers::FINAL
+            && matches!(annotation, ast::Expr::Attribute(_) | ast::Expr::Name(_))
+        {
+            Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::Final))
+        } else {
+            annotation_ty.inner_type()
+        };
+        self.store_expression_type(annotation, expression_ty);
         self.store_qualifiers(annotation, annotation_ty.qualifiers());
 
         annotation_ty
