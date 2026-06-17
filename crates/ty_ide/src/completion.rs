@@ -69,7 +69,7 @@ pub fn completion<'db>(
     );
     match context.kind {
         ContextKind::Keywords(keywords) => {
-            for keyword in keywords.iter() {
+            for &keyword in keywords {
                 completions
                     .add(CompletionBuilder::keyword(keyword.as_str()).context_specific(true));
             }
@@ -660,24 +660,9 @@ struct Context<'m> {
 
 #[derive(Debug)]
 enum ContextKind<'m> {
-    Keywords(ContextualKeywords),
+    Keywords(&'static [ContextualKeyword]),
     Import(ImportStatement<'m>),
     NonImport(ContextNonImport<'m>),
-}
-
-#[derive(Debug)]
-struct ContextualKeywords {
-    candidates: &'static [ContextualKeyword],
-    following_token: Option<TokenKind>,
-}
-
-impl ContextualKeywords {
-    fn iter(&self) -> impl Iterator<Item = ContextualKeyword> + '_ {
-        self.candidates
-            .iter()
-            .copied()
-            .filter(|keyword| Some(keyword.token_kind()) != self.following_token)
-    }
 }
 
 /// A Python keyword offered only when it is valid in the incomplete syntax at the cursor.
@@ -1138,29 +1123,34 @@ impl<'m> ContextCursor<'m> {
         None
     }
 
-    /// Excludes a candidate if it is already the next non-trivia token.
-    fn without_already_present(
+    /// Returns only the candidates that can precede an already present contextual keyword.
+    ///
+    /// `candidates` must be ordered as the keywords can appear in source.
+    fn before_already_present(
         &self,
         candidates: &'static [ContextualKeyword],
-    ) -> ContextualKeywords {
-        let following_token = if self
+    ) -> &'static [ContextualKeyword] {
+        if self
             .tokens_before
             .last()
             .is_some_and(|token| token.end() > self.offset)
         {
-            None
-        } else {
-            self.parsed
-                .tokens()
-                .after(self.offset)
-                .iter()
-                .find(|token| !token.kind().is_trivia())
-                .map(Token::kind)
-        };
-        ContextualKeywords {
-            candidates,
-            following_token,
+            return candidates;
         }
+
+        let Some(next) = self
+            .parsed
+            .tokens()
+            .after(self.offset)
+            .iter()
+            .find(|token| !token.kind().is_trivia())
+        else {
+            return candidates;
+        };
+        candidates
+            .iter()
+            .position(|keyword| keyword.token_kind() == next.kind())
+            .map_or(candidates, |position| &candidates[..position])
     }
 
     /// Returns keywords when the cursor follows syntax that can only be
@@ -1168,7 +1158,7 @@ impl<'m> ContextCursor<'m> {
     ///
     /// This first identifies keywords compatible with the typed prefix, then finds the
     /// complete token immediately before the cursor, and finally checks its enclosing syntax.
-    fn incomplete_keywords(&self) -> Option<ContextualKeywords> {
+    fn incomplete_keywords(&self) -> Option<&'static [ContextualKeyword]> {
         const IN: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::In);
         const AS: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::As);
         const IF: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::If);
@@ -1230,7 +1220,7 @@ impl<'m> ContextCursor<'m> {
                 _ => None,
             })
         {
-            return Some(self.without_already_present(keywords));
+            return Some(self.before_already_present(keywords));
         }
 
         // Context managers and exception types can be followed by `as`.
@@ -1250,7 +1240,7 @@ impl<'m> ContextCursor<'m> {
                 _ => None,
             })
         {
-            return Some(self.without_already_present(keywords));
+            return Some(self.before_already_present(keywords));
         }
 
         // Match patterns can be followed by `as` or `if`; an existing alias can only be
@@ -1282,7 +1272,7 @@ impl<'m> ContextCursor<'m> {
                 }
             })
         {
-            return Some(self.without_already_present(keywords));
+            return Some(self.before_already_present(keywords));
         }
 
         None
@@ -8337,12 +8327,6 @@ match status:
             (
                 "\
 match status:
-    case 400 <CURSOR> as value",
-                "if",
-            ),
-            (
-                "\
-match status:
     case (400) <CURSOR>",
                 "as\nif",
             ),
@@ -8464,6 +8448,7 @@ for foo<CURSOR>
             "[foo for foo <CURSOR>in items]",
             "with open('bar') <CURSOR>as file: pass",
             "try:\n    pass\nexcept ValueError <CURSOR>as error: pass",
+            "match status:\n    case 400 <CURSOR>as value: pass",
         ] {
             assert_eq!(
                 completion_test_builder(source).build().snapshot(),
