@@ -1095,6 +1095,23 @@ def _(x: list[str]):
     reveal_type(accepts_callable(GenericClass)(x, x))
 ```
 
+### Callable instances
+
+Generic parameters can be inferred from the `__call__` method of a class instance.
+
+```py
+from typing import Callable
+
+def call[R](callable: Callable[[], R]) -> R:
+    return callable()
+
+class MyCallable:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(call(MyCallable()))  # revealed: int
+```
+
 ### `Callable`s that return union types
 
 ```py

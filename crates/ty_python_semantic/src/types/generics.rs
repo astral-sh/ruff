@@ -2819,7 +2819,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal, Type::NominalInstance(actual_nominal)) => {
+            // Callable nominal instances are handled structurally below using their `__call__`
+            // method.
+            (formal, Type::NominalInstance(actual_nominal))
+                if !matches!(formal, Type::Callable(_)) =>
+            {
                 // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
                     formal.tuple_instance_spec(self.db),
