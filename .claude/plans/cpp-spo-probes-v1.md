@@ -359,3 +359,26 @@ downcast") deferred as the optional follow-up.
   still green (re-run byte-identical with signatures included).
 - **Next (optional, operator's "1"):** `is_const` / `is_static` method flags
   (`+2` predicates → 52) — the ORM-downcast shape (`const` = read accessor).
+
+## Update — 2026-06-16 (ORM-downcast shape: is_const + is_static — vocab 50→52, both operator shapes shipped)
+
+Operator's optional "1" — `is_const` / `is_static` method flags, the ORM-downcast
+shape (`const` = read accessor, `static` = class-level). Same pattern as the
+signature shape:
+
+- **Closed-vocab bump:** +2 predicates → `IsConst`, `IsStatic`.
+  `predicate_count_locked_at_50` → `_at_52`; ALL/doc/`default_provenance`
+  (`CppExtracted`) in lockstep. **17 C++ machine-plane predicates** now.
+- **IR:** `CppMethod` gains `is_const` + `is_static` bools; also `#[derive(Default)]`
+  added (future construction-site churn relief) + an `#[expect(struct_excessive_bools)]`
+  (4 independent C++ qualifiers — not a state machine; enums would be artificial).
+- **Walker:** `build_method` reads `is_const_method()` / `is_static_method()`.
+  Hermetic test asserts `bool operator==(...) const` → `is_const` true, not static.
+- **Measured:** ccutil **3527 → 3850 triples** (+323); ccstruct **8164 → 8972**
+  (+808). CPP-AST-RT still deterministic.
+
+**Both operator-requested shapes now shipped.** Final C++ machine-plane vocab =
+17 predicates (was 13): + `returns_type`, `has_param_type` (AST-DLL signature
+shape) + `is_const`, `is_static` (ORM-downcast shape). The harvester now emits a
+codegen-ready surface: identity (classid via OGAR), inheritance, fields, function
+membership, full signatures, const/static qualifiers, template use, friendship.

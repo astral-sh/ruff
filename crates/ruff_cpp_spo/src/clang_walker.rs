@@ -436,5 +436,7 @@ fn build_method(m: &Entity) -> CppMethod {
         requires_clause: None,
         return_type,
         param_types,
+        is_const: m.is_const_method(),
+        is_static: m.is_static_method(),
     }
 }

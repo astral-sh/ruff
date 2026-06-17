@@ -328,6 +328,8 @@ mod tests {
             requires_clause: None,
             return_type: None,
             param_types: Vec::new(),
+            is_const: false,
+            is_static: false,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -339,6 +341,8 @@ mod tests {
             requires_clause: None,
             return_type: None,
             param_types: Vec::new(),
+            is_const: false,
+            is_static: false,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -482,6 +486,8 @@ mod tests {
                     requires_clause: None,
                     return_type: None,
                     param_types: Vec::new(),
+                    is_const: false,
+                    is_static: false,
                 }),
                 Declaration::Template(CppTemplate {
                     kind: CppTemplateKind::Instantiation,
@@ -687,6 +693,9 @@ class Recognizer : public Classify {
             .find(|m| m.operator_kind.is_some())
             .expect("operator== method");
         assert_eq!(op.operator_kind.as_deref(), Some("operator=="));
+        // ORM-downcast shape: `bool operator==(...) const` is const, not static.
+        assert!(op.is_const, "const operator== must set is_const");
+        assert!(!op.is_static, "operator== is not static");
 
         // Constructors and destructors are member functions too: libclang
         // reports them under cursor kinds distinct from `Method`, but the walker

@@ -313,6 +313,12 @@ pub enum Predicate {
     /// before the first `:`) so a triple SET preserves order + arity. The
     /// parameter half of the AST-DLL signature shape.
     HasParamType,
+    /// `(class.method, is_const, "true")` — a const-qualified member function
+    /// (read accessor). The ORM-downcast shape.
+    IsConst,
+    /// `(class.method, is_static, "true")` — a static member function
+    /// (class-level, no implicit `this`).
+    IsStatic,
 }
 
 impl Predicate {
@@ -374,6 +380,8 @@ impl Predicate {
             Self::StaticAsserts => "static_asserts",
             Self::ReturnsType => "returns_type",
             Self::HasParamType => "has_param_type",
+            Self::IsConst => "is_const",
+            Self::IsStatic => "is_static",
         }
     }
 
@@ -441,6 +449,8 @@ impl Predicate {
             "static_asserts" => Self::StaticAsserts,
             "returns_type" => Self::ReturnsType,
             "has_param_type" => Self::HasParamType,
+            "is_const" => Self::IsConst,
+            "is_static" => Self::IsStatic,
             _ => return None,
         })
     }
@@ -449,8 +459,8 @@ impl Predicate {
     /// closed-vocab round-trip test and by any consumer that needs to
     /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// **Length invariant:** `ALL.len() == 51` (7 core + 29 AR-shape +
-    /// 15 C++ machine-plane). A new variant added to [`Predicate`] **must**
+    /// **Length invariant:** `ALL.len() == 53` (7 core + 29 AR-shape +
+    /// 17 C++ machine-plane). A new variant added to [`Predicate`] **must**
     /// be appended here in the same order, or the closed-vocab round-trip
     /// test fails.
     pub const ALL: &'static [Predicate] = &[
@@ -508,6 +518,8 @@ impl Predicate {
         Self::StaticAsserts,
         Self::ReturnsType,
         Self::HasParamType,
+        Self::IsConst,
+        Self::IsStatic,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -558,7 +570,9 @@ impl Predicate {
             | Self::RequiresConcept
             | Self::StaticAsserts
             | Self::ReturnsType
-            | Self::HasParamType => Provenance::CppExtracted,
+            | Self::HasParamType
+            | Self::IsConst
+            | Self::IsStatic => Provenance::CppExtracted,
             // OpenProject AR-shape (everything else from the 27)
             Self::DeclaresAssociation
             | Self::ValidatesConstraint
@@ -698,15 +712,15 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_51() {
+    fn predicate_count_locked_at_53() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 29 OpenProject AR-shape (PR #15 added `association_kind`
-        // so the FK-direction bug is fixable downstream) + 15 C++
-        // machine-plane (operator-approved `returns_type` + `has_param_type`
-        // — the AST-DLL signature shape) = 51. Council review of any new
-        // variant means this number changes — the test must change with the
-        // source.
-        assert_eq!(Predicate::ALL.len(), 51);
+        // so the FK-direction bug is fixable downstream) + 17 C++ machine-
+        // plane (operator-approved `returns_type` + `has_param_type` AST-DLL
+        // signature shape, then `is_const` + `is_static` ORM-downcast shape)
+        // = 53. Council review of any new variant means this number changes —
+        // the test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 53);
     }
 
     #[test]
