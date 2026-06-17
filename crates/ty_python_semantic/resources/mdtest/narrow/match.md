@@ -1220,6 +1220,8 @@ A class pattern can fail after its `isinstance` check if a requested attribute i
 preserves both direct fallthrough and fallthrough from a nested sequence pattern:
 
 ```py
+from typing import final
+
 class MissingAttributes:
     __match_args__ = ("x", "missing")
     x: int = 0
@@ -1243,6 +1245,22 @@ def keyword_class_pattern_in_sequence_preserves_fallback(
             pass
         case _:
             reveal_type(value)  # revealed: tuple[MissingAttributes]
+
+def attribute_condition() -> bool:
+    return bool()
+
+@final
+class PossiblyMissingAttribute:
+    if attribute_condition():
+        x: int = 0
+
+def possibly_missing_attribute_is_not_exhaustive(
+    value: PossiblyMissingAttribute,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PossiblyMissingAttribute(x=_):
+            return 1
 ```
 
 ## Sequence exhaustiveness
