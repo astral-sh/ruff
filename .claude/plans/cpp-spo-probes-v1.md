@@ -292,3 +292,42 @@ Research-first round per operator's "best possible C, then compare":
   GenericVector<char>` an edge to it. **All three primary CPP-* probes are now
   green** (SCHEMA-FIT ~91%, AST-RT deterministic, TEMPLATE-DET deterministic +
   non-degenerate).
+
+## Update — 2026-06-16 (option exploration + ccstruct motherlode probe)
+
+Free exploration of "what's next beyond the three primary probes," with the
+operator-mandated honesty bar (measure first, then ship):
+
+- **Option survey, measured against the corpus:**
+  - **`template Foo<int>;` explicit instantiations (C-extra)** — grepped, **0
+    instances** in ccutil. Skip until a corpus with them appears.
+  - **B-revisited (namespace-qualified `template_specialises`)** — fixes the
+    locked-test bug where the predicate sits on a *using* class instead of the
+    specialised one; **0 specs in ccutil** so no behavioural lift, but a real IR
+    correctness fix. Hold pending paired test update.
+  - **`is_const` / `is_static` method flags** — high value (OCR-essential, e.g.
+    `UNICHARSET::unichar_to_id` is `const`), low walker cost; **but blocked on
+    closed-vocab approval** (would add 2 predicates, bumping
+    `predicate_count_locked_at_47` → 49). Council-review territory; not
+    autoattended.
+  - **Method signature TYPES as edges (`has_param_type`, `returns_type`)** —
+    biggest graph enrichment, but **same closed-vocab approval** + new IR shape.
+    Defer to a deliberate ontology round.
+  - **Walk `src/ccstruct` (the OCR motherlode)** — uses *existing*
+    infrastructure (`extract_tree`), needs no predicate change. Done (below).
+  - **Open a PR for the 5 increments** — best value-per-effort for landing
+    measurable progress on `main`.
+- **ccstruct motherlode probe (new test, gated on `TESSERACT_SRC`):**
+  `extract_tree("src/ccstruct")` reaches the OCR data model. Measured:
+  **155 classes, 5264 triples, 32 deterministic `template_instantiates` edges**
+  (vs ccutil's 67 / 2215 / 31). Captures every OCR core class
+  (`BLOCK`/`WERD`/`TBLOB`/`C_BLOB`/`POLY_BLOCK`/`TWERD`/`BLOBNBOX`/...) plus
+  template-edges to `GenericVector<T>` / `BandTriMatrix<T>` /
+  `GENERIC_2D_ARRAY<T>` / `KDPair<Key,Data>` / `PointerVector<T>`. The
+  harvester scales past the utility shell to the load-bearing surface with the
+  same deterministic shape.
+  - Honest nuance: signature template-ids in **template definitions** resolve
+    to canonical-parameter form (`GenericVector<T>`, `KDPair<Key, Data>`),
+    not concrete args. Still deterministic and useful (links to the primary),
+    just less specific than the concrete `Box<int>` case from ccutil's
+    *non-template* class fields.

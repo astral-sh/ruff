@@ -1157,4 +1157,64 @@ class Recognizer : public Classify {
             "template_instantiates set must be identical across runs (CPP-TEMPLATE-DET)"
         );
     }
+
+    /// `src/ccstruct` smoke — Tesseract's OCR data-model motherlode (`BLOCK` /
+    /// `WERD` / `BLOB` / `COUTLINE` families). Confirms the harvester scales past
+    /// ccutil to the OCR-load-bearing surface with the same deterministic shape.
+    /// Gated on `TESSERACT_SRC`. Measured: 155 classes / 5264 triples / 32
+    /// deterministic `template_instantiates` edges (vs ccutil's 67 / 2215 / 31),
+    /// including links to `GenericVector<T>`, `BandTriMatrix<T>`,
+    /// `GENERIC_2D_ARRAY<T>`, `KDPair<Key, Data>`, `PointerVector<T>`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn ccstruct_motherlode_smoke() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccstruct");
+        if !dir.is_dir() {
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccstruct").display()),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("src/classify").display()),
+            format!("-I{}", root.join("src/dict").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let g = extract_tree(&dir, &args).expect("libclang init");
+        let triples = expand(&g);
+        eprintln!(
+            "[CCSTRUCT] {} classes, {} triples",
+            g.models.len(),
+            triples.len()
+        );
+        // Core OCR types must be present — proves the harvester reaches the
+        // load-bearing surface, not just the utility/ccutil shell.
+        let names: std::collections::BTreeSet<&str> =
+            g.models.iter().map(|m| m.name.as_str()).collect();
+        for must in [
+            "tesseract::BLOCK",
+            "tesseract::WERD",
+            "tesseract::TBLOB",
+            "tesseract::C_BLOB",
+        ] {
+            assert!(
+                names.contains(must),
+                "ccstruct harvest must include OCR core class {must}"
+            );
+        }
+        assert!(
+            g.models.len() >= 100,
+            "expected many ccstruct classes, got {}",
+            g.models.len()
+        );
+    }
 }
