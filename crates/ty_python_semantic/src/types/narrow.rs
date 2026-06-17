@@ -35,7 +35,9 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
-use super::equality::{evaluate_type_equality, evaluate_type_inequality};
+use super::equality::{
+    equality_exclusion_constraint, evaluate_type_equality, evaluate_type_inequality,
+};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -2088,7 +2090,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         (narrowed != lhs_ty).then_some(narrowed)
     }
 
-    fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+    fn evaluate_expr_not_in(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let iterable = rhs_ty.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
         let mut builder = IntersectionBuilder::new(self.db);
@@ -2099,7 +2101,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         for element_ty in fixed_length.all_elements().iter().copied() {
             let element_ty = element_ty.resolve_type_alias(self.db);
             if element_ty.is_single_valued(self.db)
-                && let Some(constraint) = evaluate_type_equality(self.db, lhs_ty, element_ty, false)
+                && let Some(constraint) = equality_exclusion_constraint(self.db, element_ty)
             {
                 builder = builder.add_positive(constraint);
                 constrained = true;
@@ -2136,7 +2138,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             ast::CmpOp::Is => Some(rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(rhs_ty),
             _ => None,
         }
     }

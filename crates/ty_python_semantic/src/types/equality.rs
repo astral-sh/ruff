@@ -157,6 +157,25 @@ pub(super) fn evaluate_type_equality<'db>(
     })
 }
 
+/// Return a constraint excluding every value known to compare equal to `ty`.
+pub(super) fn equality_exclusion_constraint<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let ty = ty.resolve_type_alias(db);
+    enum_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
+        .or_else(|| builtin_literal_constraint(db, ty, ty, false))
+        .or_else(|| {
+            (ComparisonEvaluator::new(db).evaluate(
+                ty,
+                ty,
+                ComparisonBranch::Positive,
+                ComparisonOperator::Equality,
+            ) == ComparisonResult::AlwaysTrue)
+                .then(|| ty.negate(db))
+        })
+}
+
 /// Return a constraint for `left` in a branch where `left != right` has the given truthiness.
 ///
 /// Returns `None` when the comparison behavior of either operand is not precise enough to safely
