@@ -222,9 +222,7 @@ impl<'db> Type<'db> {
             }
 
             let term = project_non_cycle(element)?;
-            if ProjectionContainer::is_custom_generic_container(db, element)
-                && !term.is_ambiguous(db)
-            {
+            if ProjectionContainer::is_generic_container(db, element) && !term.is_ambiguous(db) {
                 for root in &roots {
                     ProjectionEvidenceSet::push_fact(
                         &mut facts,
@@ -278,21 +276,22 @@ impl<'db> Type<'db> {
                 let direct_container = ProjectionContainer::from_direct_type(db, element);
                 let needs_evidence = direct_container
                     .as_ref()
-                    .is_some_and(|container| container.needs_evidence_for_projection(db));
+                    .is_some_and(ProjectionContainer::needs_evidence_for_projection);
 
                 if !mentions_root && direct_container.is_none() {
                     return None;
                 }
 
-                // Non-recursive generic arms without built-in projection support provide
-                // replayable evidence below. Recursive arms of that kind only need to mark a
-                // self-reference; querying their methods again can reenter the same cycle.
                 if mentions_root && needs_evidence {
-                    if matches!(op, ProjectionOp::Subscript(_)) {
-                        return ProjectionContainer::infer_projection_op(db, element, op);
-                    }
-
-                    return Some(ProjectionTerm::Exact(Type::Divergent(*root)));
+                    // Avoid reentering method or iteration inference for recursive generic arms.
+                    // Subscript has a projection-suppressed path that can still expose the
+                    // recursive element type without extending the projection cycle.
+                    return match op {
+                        ProjectionOp::Subscript(_) => {
+                            ProjectionContainer::infer_projection_op(db, element, op)
+                        }
+                        _ => None,
+                    };
                 }
 
                 let term = project_non_cycle(element)?;
@@ -944,13 +943,7 @@ impl<'db> ProjectionContainer<'db> {
 
         if let Some((class, specialization)) = class_specialization {
             let arguments = specialization.types(db);
-            let supports_projection = match class.known(db) {
-                Some(known_class) => {
-                    Self::known_container_supports_projection(db, known_class, arguments)
-                }
-                None => !arguments.is_empty(),
-            };
-            if supports_projection {
+            if !arguments.is_empty() {
                 return Some(Self::Generic {
                     class,
                     arguments: arguments.to_vec(),
@@ -960,39 +953,6 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         None
-    }
-
-    fn known_container_supports_projection(
-        db: &'db dyn Db,
-        class: KnownClass,
-        arguments: &[Type<'db>],
-    ) -> bool {
-        Self::known_container_iter_item_type(class, arguments, false).is_some()
-            || Self::known_container_iter_item_type(class, arguments, true).is_some()
-            || Self::known_container_get_item_type(db, class, arguments).is_some()
-            || Self::known_container_slice_type(db, class, arguments).is_some()
-            || Self::known_container_await_result_type(class, arguments).is_some()
-            || Self::known_container_method_call0_type(
-                db,
-                class,
-                arguments,
-                &Name::new_static("keys"),
-            )
-            .is_some()
-            || Self::known_container_method_call0_type(
-                db,
-                class,
-                arguments,
-                &Name::new_static("values"),
-            )
-            .is_some()
-            || Self::known_container_method_call0_type(
-                db,
-                class,
-                arguments,
-                &Name::new_static("items"),
-            )
-            .is_some()
     }
 
     fn collect_projection_terms(
@@ -1017,12 +977,14 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
-            Self::Generic { arm, .. } => *arm,
+            Self::Generic { arm, .. } => {
+                return evidence?.project_generic_path(db, root, *arm, path);
+            }
         };
         Self::project_type_path(db, ty, root, evidence, path)
     }
 
-    fn needs_evidence_for_projection(&self, _db: &'db dyn Db) -> bool {
+    const fn needs_evidence_for_projection(&self) -> bool {
         matches!(self, Self::Generic { .. })
     }
 
@@ -1043,7 +1005,7 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         if let Some(term) =
-            evidence.and_then(|evidence| evidence.project_custom_path(db, root, ty, path))
+            evidence.and_then(|evidence| evidence.project_generic_path(db, root, ty, path))
         {
             return Some(term);
         }
@@ -1053,7 +1015,7 @@ impl<'db> ProjectionContainer<'db> {
 
         let single_op_path = ProjectionPath::from_op(op);
         let projected = evidence
-            .and_then(|evidence| evidence.project_custom_path(db, root, ty, &single_op_path))
+            .and_then(|evidence| evidence.project_generic_path(db, root, ty, &single_op_path))
             .or_else(|| Self::project_op(db, ty, op))?;
 
         if tail.is_empty() {
@@ -1135,9 +1097,9 @@ impl<'db> ProjectionContainer<'db> {
             ProjectionOp::Iter { is_async } => Self::project_iter_item(db, ty, is_async),
             ProjectionOp::Unpack(unpack) => Self::project_unpack(db, ty, unpack),
             ProjectionOp::Subscript(subscript) => Self::project_subscript(db, ty, subscript),
-            ProjectionOp::CallMethod0(method) => Self::project_method_call0(db, ty, method),
-            ProjectionOp::ContextEnter { .. } => None,
-            ProjectionOp::AwaitResult => Self::project_await_result(db, ty),
+            ProjectionOp::CallMethod0(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => None,
         }
     }
 
@@ -1181,17 +1143,6 @@ impl<'db> ProjectionContainer<'db> {
             ));
         }
 
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(element) = Self::known_container_iter_item_type(
-                known_class,
-                specialization.types(db),
-                is_async,
-            )
-        {
-            return Some(ProjectionTerm::Homogeneous(element));
-        }
-
         None
     }
 
@@ -1226,14 +1177,6 @@ impl<'db> ProjectionContainer<'db> {
             return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
         }
 
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(element) =
-                Self::known_container_iter_item_type(known_class, specialization.types(db), false)
-        {
-            return Some(ProjectionTerm::Homogeneous(element));
-        }
-
         None
     }
 
@@ -1246,14 +1189,6 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             return Self::project_star_unpack_tuple(db, spec.as_ref(), prefix, suffix, position);
-        }
-
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(element) =
-                Self::known_container_iter_item_type(known_class, specialization.types(db), false)
-        {
-            return Some(Self::star_unpack_homogeneous(element, position));
         }
 
         None
@@ -1308,55 +1243,6 @@ impl<'db> ProjectionContainer<'db> {
                     }
                 },
             };
-        }
-
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-        {
-            return match subscript {
-                ProjectionSubscript::LiteralInt(_)
-                | ProjectionSubscript::Int
-                | ProjectionSubscript::Unknown => {
-                    Self::known_container_get_item_type(db, known_class, specialization.types(db))
-                        .map(ProjectionTerm::Homogeneous)
-                }
-                ProjectionSubscript::StaticSlice(_) => {
-                    Self::known_container_slice_type(db, known_class, specialization.types(db))
-                        .map(ProjectionTerm::Exact)
-                }
-            };
-        }
-
-        None
-    }
-
-    fn project_method_call0(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        method: ProjectionMethodName<'db>,
-    ) -> Option<ProjectionTerm<'db>> {
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(return_ty) = Self::known_container_method_call0_type(
-                db,
-                known_class,
-                specialization.types(db),
-                method.name(db),
-            )
-        {
-            return Some(ProjectionTerm::Exact(return_ty));
-        }
-
-        None
-    }
-
-    fn project_await_result(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(result) =
-                Self::known_container_await_result_type(known_class, specialization.types(db))
-        {
-            return Some(ProjectionTerm::Exact(result));
         }
 
         None
@@ -1415,128 +1301,6 @@ impl<'db> ProjectionContainer<'db> {
                 }))
                 .to_instance(db)
             }
-        }
-    }
-
-    fn known_container_iter_item_type(
-        class: KnownClass,
-        arguments: &[Type<'db>],
-        is_async: bool,
-    ) -> Option<Type<'db>> {
-        let index = if is_async {
-            match class {
-                KnownClass::AsyncGenerator
-                | KnownClass::AsyncGeneratorType
-                | KnownClass::AsyncIterator
-                | KnownClass::TyExtensionsAsyncIterable
-                | KnownClass::TyExtensionsAsyncIterator => 0,
-                _ => return None,
-            }
-        } else {
-            match class {
-                KnownClass::List
-                | KnownClass::Set
-                | KnownClass::FrozenSet
-                | KnownClass::Deque
-                | KnownClass::Iterable
-                | KnownClass::Iterator
-                | KnownClass::Sequence
-                | KnownClass::TyExtensionsIterable
-                | KnownClass::TyExtensionsIterator => 0,
-
-                KnownClass::Dict
-                | KnownClass::DefaultDict
-                | KnownClass::OrderedDict
-                | KnownClass::ChainMap
-                | KnownClass::Counter
-                | KnownClass::Mapping => 0,
-
-                KnownClass::Generator => 0,
-
-                _ => return None,
-            }
-        };
-
-        arguments.get(index).copied()
-    }
-
-    fn known_container_await_result_type(
-        class: KnownClass,
-        arguments: &[Type<'db>],
-    ) -> Option<Type<'db>> {
-        let index = match class {
-            KnownClass::Awaitable => 0,
-            KnownClass::Coroutine | KnownClass::CoroutineType => 2,
-            _ => return None,
-        };
-
-        arguments.get(index).copied()
-    }
-
-    fn known_container_get_item_type(
-        db: &'db dyn Db,
-        class: KnownClass,
-        arguments: &[Type<'db>],
-    ) -> Option<Type<'db>> {
-        match class {
-            KnownClass::List | KnownClass::Deque | KnownClass::Sequence => {
-                arguments.first().copied()
-            }
-            KnownClass::Dict
-            | KnownClass::DefaultDict
-            | KnownClass::OrderedDict
-            | KnownClass::ChainMap
-            | KnownClass::Mapping => arguments.get(1).copied(),
-            KnownClass::Counter => Some(KnownClass::Int.to_instance(db)),
-            _ => None,
-        }
-    }
-
-    fn known_container_slice_type(
-        db: &'db dyn Db,
-        class: KnownClass,
-        arguments: &[Type<'db>],
-    ) -> Option<Type<'db>> {
-        let element = match class {
-            KnownClass::List | KnownClass::Sequence => arguments.first().copied()?,
-            _ => return None,
-        };
-
-        Some(class.to_specialized_instance(db, &[element]))
-    }
-
-    fn known_container_method_call0_type(
-        db: &'db dyn Db,
-        class: KnownClass,
-        arguments: &[Type<'db>],
-        method_name: &Name,
-    ) -> Option<Type<'db>> {
-        let item = Self::known_container_mapping_view_item_type(db, class, arguments, method_name)?;
-        Some(KnownClass::Iterable.to_specialized_instance(db, &[item]))
-    }
-
-    fn known_container_mapping_view_item_type(
-        db: &'db dyn Db,
-        class: KnownClass,
-        arguments: &[Type<'db>],
-        method_name: &Name,
-    ) -> Option<Type<'db>> {
-        let key = arguments.first().copied()?;
-        let value = match class {
-            KnownClass::Dict
-            | KnownClass::DefaultDict
-            | KnownClass::OrderedDict
-            | KnownClass::ChainMap
-            | KnownClass::Mapping => arguments.get(1).copied()?,
-            KnownClass::Counter => KnownClass::Int.to_instance(db),
-            _ => return None,
-        };
-
-        match method_name.as_str() {
-            "keys" => Some(key),
-            "values" => Some(value),
-            "items" => Some(Type::heterogeneous_tuple(db, [key, value])),
-            _ => None,
         }
     }
 
@@ -1678,9 +1442,11 @@ impl<'db> ProjectionContainer<'db> {
         Some(Self::star_unpack_homogeneous(element, position))
     }
 
-    fn is_custom_generic_container(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        ty.class_specialization(db)
-            .is_some_and(|(_class, specialization)| !specialization.types(db).is_empty())
+    fn is_generic_container(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.exact_tuple_instance_spec(db).is_none()
+            && ty
+                .class_specialization(db)
+                .is_some_and(|(_, specialization)| !specialization.types(db).is_empty())
     }
 }
 
@@ -1755,7 +1521,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
             }
 
             let mut arms = Vec::new();
-            Self::collect_custom_generic_arms(db, ty, &mut arms);
+            Self::collect_generic_arms(db, ty, &mut arms);
             for arm in arms {
                 for (root, path) in &demands {
                     if arm.same_divergent_marker(db, Type::Divergent(*root)) {
@@ -1824,10 +1590,10 @@ impl<'db> ProjectionEvidenceSet<'db> {
         self.0.facts(db)
     }
 
-    fn collect_custom_generic_arms(db: &'db dyn Db, ty: Type<'db>, arms: &mut Vec<Type<'db>>) {
+    fn collect_generic_arms(db: &'db dyn Db, ty: Type<'db>, arms: &mut Vec<Type<'db>>) {
         let arms = RefCell::new(arms);
         any_over_type(db, ty, false, |nested| {
-            if ProjectionContainer::is_custom_generic_container(db, nested) {
+            if ProjectionContainer::is_generic_container(db, nested) {
                 let mut arms = arms.borrow_mut();
                 if !arms.contains(&nested) {
                     arms.push(nested);
@@ -1837,14 +1603,14 @@ impl<'db> ProjectionEvidenceSet<'db> {
         });
     }
 
-    fn project_custom_path(
+    fn project_generic_path(
         self,
         db: &'db dyn Db,
         root: DivergentType,
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
-        ProjectionContainer::is_custom_generic_container(db, arm).then_some(())?;
+        ProjectionContainer::is_generic_container(db, arm).then_some(())?;
         let normalized_arm = arm
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
@@ -1869,7 +1635,7 @@ struct ProjectionEvidenceSetInterned<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ProjectionEvidenceSetInterned<'_> {}
 
-/// The result of projecting one custom generic container arm during inference.
+/// The result of projecting one generic container arm during inference.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct ProjectionEvidenceFact<'db> {
     root: DivergentType,
