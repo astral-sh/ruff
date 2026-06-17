@@ -598,14 +598,12 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
-fn benchmark_enum_equality_with_aliased_open_union(criterion: &mut Criterion) {
+fn benchmark_intersection_enum_equality_with_aliased_open_union(criterion: &mut Criterion) {
     const DOMAIN_SIZE: usize = 128;
 
     setup_rayon();
 
-    let mut code =
-        "from enum import Enum\nfrom typing import TypeAlias\n\nclass LargeEnum(Enum):\n"
-            .to_string();
+    let mut code = "from enum import Enum\nfrom typing import Any, TypeAlias\n\nfrom ty_extensions import Intersection\n\nclass LargeEnum(Enum):\n".to_string();
     for index in 0..DOMAIN_SIZE {
         writeln!(&mut code, "    MEMBER_{index} = {index}").ok();
     }
@@ -620,20 +618,23 @@ fn benchmark_enum_equality_with_aliased_open_union(criterion: &mut Criterion) {
         write!(&mut code, "A{index}").ok();
     }
     code.push_str(
-        "\n\ndef consume(value: LargeEnum) -> None: ...\n\ndef compare(left: LargeEnum, right: LargeEnum | Open) -> None:\n    if left != right:\n        consume(left)\n",
+        "\n\ndef consume(value: LargeEnum) -> None: ...\n\ndef compare(left: Intersection[LargeEnum, Any], right: LargeEnum | Open) -> None:\n    if left != right:\n        consume(left)\n",
     );
 
-    criterion.bench_function("ty_micro[enum_equality_aliased_open_union]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
+    criterion.bench_function(
+        "ty_micro[intersection_enum_equality_aliased_open_union]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
 }
 
 /// Micro-benchmark that tests our performance when slicing and unpacking
@@ -1549,7 +1550,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
-    benchmark_enum_equality_with_aliased_open_union,
+    benchmark_intersection_enum_equality_with_aliased_open_union,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,

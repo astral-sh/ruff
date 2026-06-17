@@ -318,34 +318,17 @@ fn evaluate_comparison_once<'db>(
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
 
-    if let Some(alternatives) = finite_alternatives(db, left, operator) {
-        if !finite_comparison_expansion_is_within_limit(
-            db,
-            alternatives.len(),
-            right,
-            false,
-            operator,
-        ) {
-            if known_comparison_domains_are_disjoint(db, left, right, operator) {
-                return operator.result_from_equality(false);
-            }
-            return ComparisonResult::Ambiguous;
+    if !comparison_expansion_is_within_limit(db, left, right, operator) {
+        if known_comparison_domains_are_disjoint(db, left, right, operator) {
+            return operator.result_from_equality(false);
         }
+        return ComparisonResult::Ambiguous;
+    }
+
+    if let Some(alternatives) = finite_alternatives(db, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
     }
     if let Some(alternatives) = finite_alternatives(db, right, operator) {
-        if !finite_comparison_expansion_is_within_limit(
-            db,
-            alternatives.len(),
-            left,
-            true,
-            operator,
-        ) {
-            if known_comparison_domains_are_disjoint(db, left, right, operator) {
-                return operator.result_from_equality(false);
-            }
-            return ComparisonResult::Ambiguous;
-        }
         return evaluate_union_right(evaluator, left, &alternatives, branch, operator);
     }
 
@@ -965,22 +948,19 @@ fn finite_alternatives<'db>(
     }
 }
 
-/// Return whether expanding `alternatives` stays within the finite-comparison work budget.
-fn finite_comparison_expansion_is_within_limit(
+/// Return whether recursively expanding both operands stays within the comparison work budget.
+fn comparison_expansion_is_within_limit(
     db: &dyn Db,
-    alternatives: usize,
-    other: Type,
-    other_is_target: bool,
+    left: Type,
+    right: Type,
     operator: ComparisonOperator,
 ) -> bool {
-    if alternatives <= 1 {
-        return true;
-    }
-
-    let other_alternatives = comparison_operand_branch_count(db, other, other_is_target, operator);
-    other_alternatives <= 1
-        || alternatives
-            .checked_mul(other_alternatives)
+    let left_alternatives = comparison_operand_branch_count(db, left, true, operator);
+    let right_alternatives = comparison_operand_branch_count(db, right, false, operator);
+    left_alternatives <= 1
+        || right_alternatives <= 1
+        || left_alternatives
+            .checked_mul(right_alternatives)
             .is_some_and(|pairs| pairs <= MAX_FINITE_COMPARISON_PAIRS)
 }
 
