@@ -142,6 +142,35 @@ def empty_bytes(x: bytes):
         reveal_type(x)  # revealed: bytes
 ```
 
+## Byte containment
+
+`bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, not only the
+integers described by their iteration type. We therefore leave the subject unchanged:
+
+```py
+from typing import Literal, final
+
+@final
+class ByteSubstring(bytes): ...
+
+@final
+class ByteIndex:
+    def __index__(self) -> int:
+        return 97
+
+def bytes_subsequence(value: ByteSubstring | Literal[97]) -> None:
+    if value in b"abc":
+        reveal_type(value)  # revealed: ByteSubstring | Literal[97]
+
+def bytes_index(value: ByteIndex | Literal[97], values: bytes) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+
+def bytearray_index(value: ByteIndex | Literal[97], values: bytearray) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+```
+
 ## Assignment expressions
 
 ```py

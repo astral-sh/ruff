@@ -44,6 +44,23 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
+/// Return whether `ty` includes a value with bytes-like containment semantics.
+///
+/// `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, so their
+/// iteration element type does not describe every value that can satisfy a membership test.
+fn has_bytes_like_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| has_bytes_like_containment(db, *element)),
+        ty => {
+            ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
+                || ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
+        }
+    }
+}
+
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
 /// For example, if we have this code:
@@ -2011,6 +2028,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if has_bytes_like_containment(self.db, rhs_ty) {
+            return None;
+        }
+
         let iterable = rhs_ty.try_iterate(self.db).ok()?;
 
         // A fixed empty iteration spec does not imply empty containment: `"" in ""` and
