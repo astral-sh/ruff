@@ -53,6 +53,55 @@ fn hover_for_python_noqa() -> Result<()> {
 }
 
 #[test]
+fn hover_for_ruff_suppression_comments() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    server.open_text_document(
+        "test.py",
+        "# ruff: disable[F401]\n# ruff: enable[F401]\n# ruff: file-ignore[F401]\n# ruff: ignore[F401]\n# ruff: disable[F401] # ruff: ignore[F401]\n# ruff: ignore[F401,]\n",
+        1,
+    );
+
+    for position in [
+        Position {
+            line: 0,
+            character: 17,
+        },
+        Position {
+            line: 1,
+            character: 16,
+        },
+        Position {
+            line: 2,
+            character: 21,
+        },
+        Position {
+            line: 3,
+            character: 16,
+        },
+        Position {
+            line: 4,
+            character: 38,
+        },
+        Position {
+            line: 5,
+            character: 16,
+        },
+    ] {
+        let result = server
+            .hover_request("test.py", position)
+            .expect("Expected hover information for a Ruff suppression comment");
+
+        let lsp_types::Contents::MarkupContent(markup) = result.contents else {
+            panic!("Expected Markdown hover contents");
+        };
+        assert!(markup.value.starts_with("# unused-import (F401)"));
+    }
+
+    Ok(())
+}
+
+#[test]
 fn unavailable_document_returns_empty_response() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 

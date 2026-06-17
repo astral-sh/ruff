@@ -65,17 +65,32 @@ pub(crate) fn hover(
 
     let line = &document.contents()[line_range];
 
-    // Get the list of codes.
+    // Get the list of codes from a `noqa` or Ruff suppression comment.
     let noqa_regex = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
-    let noqa_captures = noqa_regex.captures(line)?;
-    let codes_match = noqa_captures.name("codes")?;
-    let codes_start = codes_match.start();
-    let code_regex = Regex::new(r"[A-Z]+[0-9]+").unwrap();
+    let suppression_regex = Regex::new(
+        r"(?x)
+        \#\s*ruff\s*:\s*(?:disable|enable|file-ignore|ignore)\s*\[\s*
+        (?P<codes>(?:[A-Z]+[0-9]+)(?:\s*,\s*(?:[A-Z]+[0-9]+))*\s*,?)
+        \s*\]",
+    )
+    .unwrap();
     let cursor: usize = position
         .position
         .character
         .try_into()
         .expect("column number should fit within a usize");
+    let codes_match = noqa_regex
+        .captures(line)
+        .and_then(|captures| captures.name("codes"))
+        .into_iter()
+        .chain(
+            suppression_regex
+                .captures_iter(line)
+                .filter_map(|captures| captures.name("codes")),
+        )
+        .find(|codes| cursor >= codes.start() && cursor < codes.end())?;
+    let codes_start = codes_match.start();
+    let code_regex = Regex::new(r"[A-Z]+[0-9]+").unwrap();
     let word = code_regex.find_iter(codes_match.as_str()).find(|code| {
         cursor >= (code.start() + codes_start) && cursor < (code.end() + codes_start)
     })?;
