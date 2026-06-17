@@ -52,64 +52,38 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
-/// Return whether an expression constructs a value whose membership operation compares against
-/// the values described by its iteration type.
-fn expression_uses_elementwise_containment(expr: &ast::Expr) -> bool {
-    matches!(
-        expr,
-        ast::Expr::Tuple(_)
-            | ast::Expr::List(_)
-            | ast::Expr::Set(_)
-            | ast::Expr::Dict(_)
-            | ast::Expr::Generator(_)
-            | ast::Expr::ListComp(_)
-            | ast::Expr::SetComp(_)
-            | ast::Expr::DictComp(_)
-    )
-}
-
-/// Return whether membership for `ty` compares against the values described by its iteration type.
+/// Return the type whose iteration domain describes the values searched by membership for `ty`.
 ///
-/// Open nominal types are excluded because a subclass can override `__contains__`. For final
-/// nominal types, an inherited built-in `__contains__` method cannot be paired with an overridden
-/// iterator whose element type no longer describes the values searched by containment. Tuple
-/// subclasses are an exception: as with other tuple dunder methods, we assume that unsafe
-/// overrides are reported at their definition site.
-fn type_uses_elementwise_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+/// For subclasses that inherit a known built-in `__contains__`, this returns the specialized
+/// built-in base rather than `ty` itself. This preserves the built-in containment domain even if
+/// the subclass overrides `__iter__`.
+fn elementwise_containment_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
     let ty = ty.resolve_type_alias(db);
 
     match ty {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| type_uses_elementwise_containment(db, *element)),
-        Type::TypeVar(type_var) => {
-            type_var
-                .typevar(db)
-                .bound_or_constraints(db)
-                .is_some_and(|bound_or_constraints| match bound_or_constraints {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        type_uses_elementwise_containment(db, bound)
-                    }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        type_uses_elementwise_containment(db, constraints.as_type(db))
-                    }
-                })
+        Type::Union(union) => {
+            let mut builder = UnionBuilder::new(db);
+            for element in union.elements(db) {
+                builder = builder.add(elementwise_containment_domain(db, *element)?);
+            }
+            Some(builder.build())
         }
+        Type::TypeVar(type_var) => match type_var.typevar(db).bound_or_constraints(db)? {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                elementwise_containment_domain(db, bound)
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                elementwise_containment_domain(db, constraints.as_type(db))
+            }
+        },
         Type::NewTypeInstance(newtype) => {
-            type_uses_elementwise_containment(db, newtype.concrete_base_type(db))
+            elementwise_containment_domain(db, newtype.concrete_base_type(db))
         }
-        Type::TypedDict(_) => true,
-        Type::NominalInstance(instance)
-            if instance.tuple_spec(db).is_some()
-                || instance.has_known_class(db, KnownClass::Range) =>
-        {
-            true
-        }
-        Type::NominalInstance(instance) if instance.class(db).is_final(db) => {
-            // Walk the MRO to preserve the identity of the class that defines `__contains__`;
-            // normal member lookup specializes inherited method signatures for the subclass.
-            let mut overrides_iteration = false;
+        Type::TypedDict(_) => Some(ty),
+        Type::NominalInstance(instance) => {
+            // Walk the MRO until we find either a visible override or a supported built-in
+            // implementation. Returning the built-in base preserves its specialization; normal
+            // member lookup specializes inherited signatures for the subclass instead.
             for base in instance.class(db).iter_mro(db) {
                 let class = match base {
                     ClassBase::Class(class) => class,
@@ -118,43 +92,33 @@ fn type_uses_elementwise_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> boo
                     | ClassBase::Dynamic(_)
                     | ClassBase::Divergent(_)
                     | ClassBase::TypedDict(_) => {
-                        return false;
+                        return None;
                     }
                 };
-                if class
+                if matches!(
+                    class.known(db),
+                    Some(
+                        KnownClass::List
+                            | KnownClass::Set
+                            | KnownClass::FrozenSet
+                            | KnownClass::Dict
+                            | KnownClass::Tuple
+                            | KnownClass::Range
+                    )
+                ) {
+                    return Some(Type::instance(db, class));
+                }
+                if !class
                     .own_class_member(db, None, "__contains__")
                     .is_undefined()
                 {
-                    overrides_iteration |=
-                        !class.own_class_member(db, None, "__iter__").is_undefined();
-                    continue;
+                    return None;
                 }
-                return !overrides_iteration
-                    && matches!(
-                        class.known(db),
-                        Some(
-                            KnownClass::List
-                                | KnownClass::Set
-                                | KnownClass::FrozenSet
-                                | KnownClass::Dict
-                                | KnownClass::Tuple
-                                | KnownClass::Range
-                        )
-                    );
             }
-            true
+            instance.class(db).is_final(db).then_some(ty)
         }
-        _ => false,
+        _ => None,
     }
-}
-
-fn membership_uses_elementwise_containment<'db>(
-    db: &'db dyn Db,
-    rhs_ty: Type<'db>,
-    rhs_expr: Option<&ast::Expr>,
-) -> bool {
-    rhs_expr.is_some_and(|expr| expression_uses_elementwise_containment(expr.expression_value()))
-        || type_uses_elementwise_containment(db, rhs_ty)
 }
 
 /// Narrow membership in a known string literal using substring semantics.
@@ -2974,20 +2938,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    fn evaluate_expr_in(
-        &self,
-        lhs_ty: Type<'db>,
-        rhs_ty: Type<'db>,
-        rhs_expr: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
+    fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
             return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
         }
-        if !membership_uses_elementwise_containment(self.db, rhs_ty, rhs_expr) {
-            return None;
-        }
-
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+        let containment_domain = elementwise_containment_domain(self.db, rhs_ty)?;
+        let iterable = containment_domain.try_iterate(self.db).ok()?;
 
         if iterable
             .as_fixed_length()
@@ -3073,19 +3029,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         (narrowed != lhs_ty).then_some(narrowed)
     }
 
-    fn evaluate_expr_not_in(
-        &self,
-        lhs_ty: Type<'db>,
-        rhs_ty: Type<'db>,
-        rhs_expr: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
+    fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
             return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), false);
         }
-        if !membership_uses_elementwise_containment(self.db, rhs_ty, rhs_expr) {
-            return None;
-        }
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+        let containment_domain = elementwise_containment_domain(self.db, rhs_ty)?;
+        let iterable = containment_domain.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
         let mut builder = IntersectionBuilder::new(self.db);
         let mut constrained = false;
@@ -3106,7 +3055,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         lhs_ty: Type<'db>,
         rhs_ty: Type<'db>,
-        rhs_expr: Option<&ast::Expr>,
         op: ast::CmpOp,
         is_positive: bool,
     ) -> Option<Type<'db>> {
@@ -3129,8 +3077,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             ast::CmpOp::Is => Some(rhs_ty),
-            ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty, rhs_expr),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty, rhs_expr),
+            ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }
@@ -3573,8 +3521,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) =
-                    self.evaluate_expr_compare_op(lhs_ty, rhs_ty, Some(right), *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -3596,8 +3543,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
                 && narrowable_ast(right)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
-                && let Some(ty) =
-                    self.evaluate_expr_compare_op(rhs_ty, lhs_ty, Some(left), *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -3973,7 +3919,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
 
         let mut constraints = self
-            .evaluate_expr_compare_op(subject_ty, value_ty, None, ast::CmpOp::Eq, is_positive)
+            .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
             .map(|ty| {
                 NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
             })
