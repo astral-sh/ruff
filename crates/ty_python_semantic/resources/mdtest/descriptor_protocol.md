@@ -382,6 +382,10 @@ class ClassObjectWrapper:
 
 reveal_type(ClassObjectWrapper().attribute)  # revealed: Any
 value: str = ClassObjectWrapper().attribute
+
+wrapper = ClassObjectWrapper()
+wrapper.attribute = int
+reveal_type(wrapper.attribute)  # revealed: Any
 ```
 
 ### Descriptors only work when used as class variables

@@ -3011,13 +3011,8 @@ impl<'db> Type<'db> {
                 // method before invoking the protocol.
                 Type::Dynamic(_) => return Some((ty, AttributeKind::DataDescriptor)),
                 Type::SubclassOf(subclass_of)
-                    if let Some(
-                        dynamic @ (DynamicType::Any
-                        | DynamicType::Unknown
-                        | DynamicType::UnknownGeneric(_)
-                        | DynamicType::InvalidConcatenateUnknown
-                        | DynamicType::AmbiguousOverload),
-                    ) = subclass_of.subclass_of().into_dynamic() =>
+                    if let Some(dynamic) = subclass_of.subclass_of().into_dynamic()
+                        && dynamic.is_gradual() =>
                 {
                     // `type[Any]` and `type[Unknown]` have unknown metaclasses, which could make
                     // their class-object inhabitants data descriptors.
@@ -3308,6 +3303,14 @@ impl<'db> Type<'db> {
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
             Type::Dynamic(_) => !any_of_union,
+            Type::SubclassOf(subclass_of)
+                if subclass_of
+                    .subclass_of()
+                    .into_dynamic()
+                    .is_some_and(DynamicType::is_gradual) =>
+            {
+                true
+            }
             Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
@@ -7610,6 +7613,17 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
+    pub(crate) const fn is_gradual(self) -> bool {
+        matches!(
+            self,
+            Self::Any
+                | Self::Unknown
+                | Self::UnknownGeneric(_)
+                | Self::InvalidConcatenateUnknown
+                | Self::AmbiguousOverload
+        )
+    }
+
     fn recursive_type_normalized(self) -> Self {
         self
     }
