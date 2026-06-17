@@ -261,7 +261,7 @@ keeps large comparisons from requiring a Cartesian comparison of every possible 
 
 ```py
 from enum import Enum
-from typing import Generic, Literal, TypeVar, final
+from typing import Generic, Literal, NewType, TypeVar, final
 
 class Budgeted(Enum):
     M0 = 0
@@ -338,6 +338,60 @@ def disjoint_union_over_budget(value: Budgeted | None, other: Disjoint):
     if value == other:
         reveal_type(value)  # revealed: Never
         value.name
+
+@final
+class LeftExtra: ...
+
+@final
+class RightExtra: ...
+
+LeftNewType0 = NewType("LeftNewType0", LeftExtra)
+LeftNewType1 = NewType("LeftNewType1", LeftExtra)
+LeftNewType2 = NewType("LeftNewType2", LeftExtra)
+LeftNewType3 = NewType("LeftNewType3", LeftExtra)
+LeftNewType4 = NewType("LeftNewType4", LeftExtra)
+LeftNewType5 = NewType("LeftNewType5", LeftExtra)
+LeftNewType6 = NewType("LeftNewType6", LeftExtra)
+LeftNewType7 = NewType("LeftNewType7", LeftExtra)
+LeftNewType8 = NewType("LeftNewType8", LeftExtra)
+LeftNewType9 = NewType("LeftNewType9", LeftExtra)
+LeftNewType10 = NewType("LeftNewType10", LeftExtra)
+LeftNewType11 = NewType("LeftNewType11", LeftExtra)
+LeftNewType12 = NewType("LeftNewType12", LeftExtra)
+LeftNewType13 = NewType("LeftNewType13", LeftExtra)
+LeftNewType14 = NewType("LeftNewType14", LeftExtra)
+LeftNewType15 = NewType("LeftNewType15", LeftExtra)
+LeftNewType16 = NewType("LeftNewType16", LeftExtra)
+
+LeftNewTypes = (
+    LeftNewType0
+    | LeftNewType1
+    | LeftNewType2
+    | LeftNewType3
+    | LeftNewType4
+    | LeftNewType5
+    | LeftNewType6
+    | LeftNewType7
+    | LeftNewType8
+    | LeftNewType9
+    | LeftNewType10
+    | LeftNewType11
+    | LeftNewType12
+    | LeftNewType13
+    | LeftNewType14
+    | LeftNewType15
+    | LeftNewType16
+)
+
+def newtype_wrapped_domains(value: LeftNewTypes, other: Disjoint):
+    if value == other:
+        reveal_type(value)  # revealed: Never
+
+RightConstraint = TypeVar("RightConstraint", Disjoint, RightExtra)
+
+def constrained_typevar_domains(value: Budgeted | LeftExtra, other: RightConstraint):
+    if value == other:
+        reveal_type(value)  # revealed: Never
 
 BoxT = TypeVar("BoxT")
 

@@ -528,6 +528,22 @@ fn known_comparison_domains_are_disjoint(
     left_classes.is_disjoint(&right_classes)
 }
 
+/// Return the comparison-equivalent inner type of a transparent wrapper.
+fn comparison_wrapper_inner_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    match ty {
+        Type::TypeVar(var) => {
+            let TypeVarBoundOrConstraints::Constraints(constraints) =
+                var.typevar(db).bound_or_constraints(db)?
+            else {
+                return None;
+            };
+            Some(constraints.as_type(db))
+        }
+        Type::NewTypeInstance(newtype) => Some(newtype.concrete_base_type(db)),
+        _ => None,
+    }
+}
+
 /// Collect the runtime classes represented by a domain with object identity semantics.
 ///
 /// Generic arguments are erased at runtime, so different specializations contribute the same
@@ -543,6 +559,10 @@ fn object_identity_runtime_classes<'db>(
     while let Some(ty) = pending.pop() {
         let ty = ty.resolve_type_alias(db);
         if !visited.insert(ty) {
+            continue;
+        }
+        if let Some(inner) = comparison_wrapper_inner_type(db, ty) {
+            pending.push(inner);
             continue;
         }
         match ty {
@@ -1046,22 +1066,12 @@ fn comparison_operand_branch_count(
 
         if let Some(alternatives) = finite_alternatives(db, ty, operator) {
             count = count.saturating_add(alternatives.len());
+        } else if let Some(inner) = comparison_wrapper_inner_type(db, ty) {
+            pending.push((inner, false));
         } else {
             match ty {
                 Type::Union(union) => {
                     pending.extend(union.elements(db).iter().map(|element| (*element, false)));
-                }
-                Type::TypeVar(var) => {
-                    if let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                        var.typevar(db).bound_or_constraints(db)
-                    {
-                        pending.push((constraints.as_type(db), false));
-                    } else {
-                        count += 1;
-                    }
-                }
-                Type::NewTypeInstance(newtype) => {
-                    pending.push((newtype.concrete_base_type(db), false));
                 }
                 Type::Intersection(intersection) if is_target => {
                     pending.extend(
@@ -1280,6 +1290,9 @@ impl KnownComparisonSemantics {
     ///
     /// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
     fn of_type<'db>(db: &'db dyn Db, ty: Type<'db>, operator: ComparisonOperator) -> Option<Self> {
+        if let Some(inner) = comparison_wrapper_inner_type(db, ty) {
+            return Self::of_type(db, inner, operator);
+        }
         match ty {
             Type::Union(union) => {
                 let mut elements = union.elements(db).iter().copied();
@@ -1395,6 +1408,10 @@ fn comparison_domain<'db>(
 ) -> ComparisonDomain {
     let target = target.resolve_type_alias(db);
     let ty = ty.resolve_type_alias(db);
+
+    if let Some(inner) = comparison_wrapper_inner_type(db, ty) {
+        return comparison_domain(db, target, inner, operator);
+    }
 
     match ty {
         Type::Union(union) => {
