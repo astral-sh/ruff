@@ -304,8 +304,6 @@ impl<'db> UnionElement<'db> {
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
-        let mut other_type_negated =
-            || *other_type_negated_cache.get_or_insert_with(|| other_type.negate(db));
 
         let mut collapse = false;
         let mut ignore = false;
@@ -333,7 +331,9 @@ impl<'db> UnionElement<'db> {
                 ignore = true;
                 return true;
             }
-            if collapse || other_type_negated().is_subtype_of(db, ty) {
+            if collapse
+                || other_type.negation_is_subtype_of_cached(db, ty, &mut other_type_negated_cache)
+            {
                 collapse = true;
                 return true;
             }
@@ -957,13 +957,7 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negation_is_subtype = if let Type::Intersection(intersection) = ty {
-                    intersection.negation_is_subtype_of(self.db, element_type)
-                } else {
-                    let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                    negated.is_subtype_of(self.db, element_type)
-                };
-                if negation_is_subtype {
+                if ty.negation_is_subtype_of_cached(self.db, element_type, &mut ty_negated) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of

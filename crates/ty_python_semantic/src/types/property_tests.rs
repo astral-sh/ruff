@@ -115,10 +115,7 @@ mod stable {
 
     type_property_test!(
         structural_negation_subtyping_matches_materialized_negation, db,
-        forall types s, t. match s {
-            Type::Intersection(intersection) => intersection.negation_is_subtype_of(db, t) == s.negate(db).is_subtype_of(db, t),
-            _ => true,
-        }
+        forall types s, t. s.negation_is_subtype_of(db, t) == s.negate(db).is_subtype_of(db, t)
     );
 
     // `T` is not disjoint from itself, unless `T` is `Never`.
