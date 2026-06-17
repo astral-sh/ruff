@@ -166,3 +166,28 @@ exercises `inherits_from`, `has_field`, `has_function`, `rdf:type`,
 walker doesn't populate them): `constexpr`/`consteval` + `requires` (need a
 token pass — not in the high-level `clang` API), templates, `friend`,
 macro-expansion provenance, `static_assert`. None require a vocab change.
+
+## Update — 2026-06-16 (CPP-SCHEMA-FIT real-corpus coverage RUN + ctor/dtor fix)
+
+First real coverage measurement (`cpp_schema_fit_real_corpus_coverage`, gated on
+`TESSERACT_SRC`, walks all 31 `src/ccutil` headers of `tesseract@5.5.0`):
+
+- **Before: 6570 class-body cursors, 5420 mapped = 82%.** The walker matched only
+  `EntityKind::Method`, silently dropping **Constructor (268), Destructor (139),
+  FunctionTemplate (64), ConversionFunction (24)** = 495 member-function cursors —
+  a real correctness gap (the harvester claimed to capture methods but dropped
+  every ctor/dtor).
+- **Fix:** `build_class` now maps all five function-like cursor kinds to a
+  `has_function`; `MAPPED_CURSOR_KINDS` updated in lockstep; the hermetic test
+  gains a ctor + virtual-dtor assertion. **After: 5915 mapped = 90%.**
+- **Remaining unmapped (655):** `AccessSpecifier` (436 — not a construct, noise),
+  nested `StructDecl`/`ClassDecl` (31 — emitted via `collect_classes` recursion,
+  not dropped), `VarDecl` (84 — static members, candidate `has_field`),
+  **`FriendDecl` (79 — next walker follow-up; `is_friend_of` predicate already
+  exists)**, `TypeAliasDecl` (14), `UsingDeclaration` (6), `EnumDecl` (5).
+  Excluding the noise + recursed-nested types, meaningful coverage is ~97%.
+- **Status:** `CPP-SCHEMA-FIT` real-corpus half is now RUN + measured (no longer
+  asserted). Member function templates are captured as `has_function`; class-level
+  `template_specialises`/`template_instantiates` and `friend` are still pending.
+  Next follow-up by frequency: `FriendDecl` (79), then `VarDecl` static members.
+  `CPP-AST-RT` and `CPP-TEMPLATE-DET` remain PENDING.

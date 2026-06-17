@@ -29,6 +29,7 @@
 //! process-singleton — call [`walk_tu`] sequentially, never from parallel
 //! threads in the same process.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
@@ -81,6 +82,71 @@ pub fn walk_tu(path: &Path, args: &[String]) -> Result<Vec<CppClass>, WalkError>
     Ok(out)
 }
 
+/// Coverage instrumentation for `CPP-SCHEMA-FIT`: tally the libclang
+/// `EntityKind` of every DIRECT class-body child cursor across all
+/// (non-system-header) class/struct definitions in the TU.
+///
+/// The key is the `EntityKind` `Debug` name (e.g. `"Method"`, `"FieldDecl"`,
+/// `"FriendDecl"`); the value is how many times that kind appears as a direct
+/// member. The caller computes the *mapped fraction* — `BaseSpecifier` +
+/// `FieldDecl` + `Method` are exactly the kinds [`build_class`] turns into a
+/// [`Declaration`] today — versus the total, so a real-corpus walk shows which
+/// constructs the walker silently drops (the walker-follow-up backlog:
+/// `FriendDecl`, `StaticAssert`, templates, …) rather than asserting coverage.
+/// Counts only meaningful cursors; access specifiers and comments are reported
+/// in the histogram like everything else so the caller can classify them.
+pub fn class_body_cursor_histogram(
+    path: &Path,
+    args: &[String],
+) -> Result<BTreeMap<String, usize>, WalkError> {
+    let clang = Clang::new().map_err(WalkError::Libclang)?;
+    let index = Index::new(&clang, false, false);
+    let tu = index
+        .parser(path)
+        .arguments(args)
+        .skip_function_bodies(true)
+        .parse()
+        .map_err(|e| WalkError::Parse(e.to_string()))?;
+    let mut hist = BTreeMap::new();
+    tally_class_bodies(&tu.get_entity(), &mut hist);
+    Ok(hist)
+}
+
+/// The kinds [`build_class`] maps to a [`Declaration`] today — the "covered"
+/// set for the `CPP-SCHEMA-FIT` mapped-fraction. Kept beside the walker so the
+/// coverage probe and the actual extraction can never drift apart. The
+/// function-like kinds (`Constructor` / `Destructor` / `ConversionFunction` /
+/// `FunctionTemplate`) all become a `has_function`, exactly like `Method`.
+pub const MAPPED_CURSOR_KINDS: [&str; 7] = [
+    "BaseSpecifier",
+    "FieldDecl",
+    "Method",
+    "Constructor",
+    "Destructor",
+    "ConversionFunction",
+    "FunctionTemplate",
+];
+
+/// Mirror of [`collect_classes`] that tallies direct class-body child kinds
+/// instead of building [`CppClass`]es (same class-selection + system-header
+/// filtering, so the histogram counts exactly the bodies the walker extracts).
+fn tally_class_bodies(entity: &Entity, hist: &mut BTreeMap<String, usize>) {
+    for child in entity.get_children() {
+        match child.get_kind() {
+            EntityKind::ClassDecl | EntityKind::StructDecl => {
+                if child.is_definition() && !in_system_header(&child) {
+                    for member in child.get_children() {
+                        *hist.entry(format!("{:?}", member.get_kind())).or_insert(0) += 1;
+                    }
+                }
+                tally_class_bodies(&child, hist);
+            }
+            EntityKind::Namespace => tally_class_bodies(&child, hist),
+            _ => {}
+        }
+    }
+}
+
 /// Recurse the AST, emitting a [`CppClass`] for every class/struct
 /// definition (recursing into namespaces and nested classes).
 fn collect_classes(entity: &Entity, out: &mut Vec<CppClass>) {
@@ -128,7 +194,17 @@ fn build_class(e: &Entity) -> Option<CppClass> {
                         .unwrap_or_default(),
                 }));
             }
-            EntityKind::Method => {
+            // Constructors, destructors, conversion operators, and member
+            // function templates are all member FUNCTIONS that libclang reports
+            // under cursor kinds distinct from `Method`; the harvester captures
+            // every one as a `has_function`. CPP-SCHEMA-FIT measured 495 such
+            // cursors silently dropped across ccutil when only `Method` matched
+            // (the ctor/dtor coverage gap: 82% → ~90%).
+            EntityKind::Method
+            | EntityKind::Constructor
+            | EntityKind::Destructor
+            | EntityKind::ConversionFunction
+            | EntityKind::FunctionTemplate => {
                 declarations.push(Declaration::Method(build_method(&m)));
             }
             _ => {}

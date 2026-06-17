@@ -58,7 +58,7 @@ use ruff_spo_triplet::{
 #[cfg(feature = "libclang")]
 mod clang_walker;
 #[cfg(feature = "libclang")]
-pub use clang_walker::{WalkError, walk_tu};
+pub use clang_walker::{MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_tu};
 
 /// The namespace prefix for C++ machine-plane subjects/objects.
 ///
@@ -539,7 +539,10 @@ mod libclang_tests {
 
     use ruff_spo_triplet::{expand, from_ndjson, to_ndjson};
 
-    use super::{ModelGraph, NAMESPACE, extract_dir, extract_tree, model_from_class, walk_tu};
+    use super::{
+        MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram, extract_dir,
+        extract_tree, model_from_class, walk_tu,
+    };
 
     /// `clang::Clang` is a process-singleton — serialize the libclang tests so
     /// cargo's parallel test threads never construct two at once.
@@ -564,6 +567,8 @@ class Classify {
 };
 class Recognizer : public Classify {
  public:
+  Recognizer();
+  virtual ~Recognizer();
   int Recognize(int x) noexcept override;
   bool operator==(const Recognizer& other) const;
  private:
@@ -641,6 +646,18 @@ class Recognizer : public Classify {
             .find(|m| m.operator_kind.is_some())
             .expect("operator== method");
         assert_eq!(op.operator_kind.as_deref(), Some("operator=="));
+
+        // Constructors and destructors are member functions too: libclang
+        // reports them under cursor kinds distinct from `Method`, but the walker
+        // captures both as `has_function` (the CPP-SCHEMA-FIT ctor/dtor fix).
+        assert!(
+            methods.iter().any(|m| m.name == "Recognizer"),
+            "constructor must be captured as a method"
+        );
+        assert!(
+            methods.iter().any(|m| m.name == "~Recognizer"),
+            "destructor must be captured as a method"
+        );
 
         let clear = classify
             .declarations
@@ -889,5 +906,100 @@ class Recognizer : public Classify {
                 .collect::<Vec<_>>()
         );
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// `CPP-SCHEMA-FIT` (real-corpus half) — the predicate-vocab coverage gate
+    /// (`.claude/plans/cpp-spo-probes-v1.md`). Walks every header in Tesseract's
+    /// `src/ccutil`, tallies class-body cursor kinds, and reports the *mapped
+    /// fraction* (`BaseSpecifier`/`FieldDecl`/`Method` → a `Declaration`) versus
+    /// the constructs the walker currently drops. Gated on `TESSERACT_SRC`;
+    /// prints the histogram (`--nocapture`) so the unmapped kinds drive the
+    /// walker-follow-up backlog rather than being asserted away.
+    ///
+    /// Run: `TESSERACT_SRC=/tmp/tesseract LIBCLANG_PATH=/usr/lib/llvm-18/lib \
+    ///       cargo test -p ruff_cpp_spo --features libclang -- --nocapture`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "coverage report gated on env var")]
+    fn cpp_schema_fit_real_corpus_coverage() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping CPP-SCHEMA-FIT real-corpus coverage");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+
+        // Walk every ccutil header, merge the per-TU class-body histograms.
+        let mut merged: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
+        let mut headers = 0usize;
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            let mut paths: Vec<std::path::PathBuf> = rd
+                .filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("h"))
+                .collect();
+            paths.sort();
+            for p in paths {
+                if let Ok(hist) = class_body_cursor_histogram(&p, &args) {
+                    headers += 1;
+                    for (k, v) in hist {
+                        *merged.entry(k).or_insert(0) += v;
+                    }
+                }
+            }
+        }
+
+        let total: usize = merged.values().sum();
+        let mapped: usize = MAPPED_CURSOR_KINDS
+            .iter()
+            .filter_map(|k| merged.get(*k))
+            .sum();
+        eprintln!(
+            "[CPP-SCHEMA-FIT] {headers} ccutil headers, {total} class-body cursors, \
+             {mapped} mapped ({}%)",
+            mapped * 100 / total.max(1)
+        );
+        let mut rows: Vec<(&String, &usize)> = merged.iter().collect();
+        rows.sort_by(|a, b| b.1.cmp(a.1));
+        for (kind, count) in &rows {
+            let mark = if MAPPED_CURSOR_KINDS.contains(&kind.as_str()) {
+                "MAP"
+            } else {
+                "   "
+            };
+            eprintln!("  [{mark}] {count:>5}  {kind}");
+        }
+
+        // Non-degenerate gate: the walk must reach real bodies with the OO
+        // constructs the harvester is built to extract. The mapped-fraction
+        // THRESHOLD is deliberately not asserted here yet — the first real run
+        // measures it; the unmapped kinds above name the walker follow-ups.
+        assert!(
+            headers > 0,
+            "expected to walk >=1 ccutil header (LIBCLANG_PATH?)"
+        );
+        assert!(total > 0, "expected class-body cursors from a real corpus");
+        assert!(
+            merged.get("Method").is_some_and(|&n| n > 0),
+            "histogram must contain methods (has_function)"
+        );
+        assert!(
+            merged.get("FieldDecl").is_some_and(|&n| n > 0),
+            "histogram must contain fields (has_field)"
+        );
     }
 }
