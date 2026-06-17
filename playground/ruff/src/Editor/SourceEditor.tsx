@@ -197,7 +197,10 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
         relatedInformation: diagnosticRelatedInformation(diagnostic, model.uri),
         severity: MarkerSeverity.Error,
         tags:
-          diagnostic.code === "F401" || diagnostic.code === "F841"
+          diagnostic.code === "F401" ||
+          diagnostic.code === "F841" ||
+          diagnostic.code === "unused-import" ||
+          diagnostic.code === "unused-variable"
             ? [MarkerTag.Unnecessary]
             : [],
       };
