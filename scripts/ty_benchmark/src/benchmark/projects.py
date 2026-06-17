@@ -181,8 +181,6 @@ ALL: Final = [
         python_version="3.14",
         include=["homeassistant"],
         skip="Missing dependencies on Windows" if sys.platform == "win32" else None,
-        # requirements_test_all.txt was replaced by these two files upstream.
-        # See https://github.com/home-assistant/core/blob/a0162d2ff0ed061501405a617961be149b15bd1f/requirements_all.txt#L1-L4
         install_arguments=[
             "-r",
             "requirements_all.txt",
