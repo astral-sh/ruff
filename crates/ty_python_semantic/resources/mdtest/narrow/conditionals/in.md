@@ -455,6 +455,13 @@ from typing import Literal, TypedDict, final
 class Payload(TypedDict):
     value: int
 
+def open_list_annotation(
+    x: Payload | Literal["missing"],
+    values: list[Literal["missing"]],
+):
+    if x in values:
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
+
 class IteratesMissing:
     def __iter__(self) -> Iterator[Literal["missing"]]:
         yield "missing"
@@ -604,10 +611,11 @@ def inherited_builtin_contains(
         reveal_type(x)  # revealed: Payload | Literal["missing"]
 ```
 
-## Custom containment methods on tuple subclasses
+## Tuple subclass containment
 
-A tuple subclass can override `__contains__`, so its tuple element type does not necessarily
-describe containment:
+As with `__len__`, `__bool__`, and `__eq__`, we assume that tuple subclasses do not override
+`tuple.__contains__`. Unsafe overrides will be reported at their definition site, so downstream
+narrowing continues to use the tuple's element types:
 
 ```py
 from typing import Literal, TypedDict
@@ -621,15 +629,15 @@ class ContainsEverything(tuple[Literal["missing"], ...]):
 
 def custom_tuple_contains(x: Payload | Literal["missing"], values: ContainsEverything):
     if x in values:
-        reveal_type(x)  # revealed: Payload | Literal["missing"]
+        reveal_type(x)  # revealed: Literal["missing"]
 
 class ContainsNothing(tuple[Literal[1]]):
     def __contains__(self, value: object) -> bool:
         return False
 
-def custom_tuple_not_in(x: Literal[1], values: ContainsNothing):
+def custom_tuple_not_in(x: Literal[1] | None, values: ContainsNothing):
     if x not in values:
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: None
 ```
 
 ## No present-key narrowing without a `TypedDict`
