@@ -238,22 +238,18 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
-            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
-            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
-            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
-            // the formatting of syntax errors for now. This should also be kept consistent with the
+        let id = if !config.preview
+            && let Some(code) = diag.secondary_code()
+        {
+            code.to_string()
+        } else if config.hide_severity {
+            // When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve the
+            // formatting of human-readable names for now. This should also be kept consistent with the
             // concise formatting.
-            diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
-                |code| code.to_string(),
-            )
-        } else if config.preview {
-            // In preview, Ruff shows both the severity and the human-readable name, so we don't
-            // need a colon.
-            diag.id().to_string()
+            format!("{id}:", id = diag.id())
         } else {
-            diag.secondary_code_or_id().to_string()
+            diag.id().to_string()
         };
 
         let level = if config.hide_severity {

@@ -17,7 +17,7 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-error[unused-import][*]: `os` imported but unused
+unused-import: [*] `os` imported but unused
  --> input.py:1:8
   |
 1 | import os  # F401
@@ -31,7 +31,7 @@ help: Remove unused import: `os`
 2 | match 42:  # invalid-syntax
 3 |     case _: ...
 
-error[undefined-name]: Undefined name `y`
+undefined-name: Undefined name `y`
  --> input.py:2:5
   |
 1 | import os  # F401
@@ -41,7 +41,7 @@ error[undefined-name]: Undefined name `y`
 4 |     case _: ...
   |
 
-error[invalid-syntax]: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
  --> input.py:3:1
   |
 1 | import os  # F401
