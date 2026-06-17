@@ -115,7 +115,10 @@ mod stable {
 
     type_property_test!(
         structural_negation_subtyping_matches_materialized_negation, db,
-        forall types s, t. s.negation_is_subtype_of(db, t) == s.negate(db).is_subtype_of(db, t)
+        forall types s, t. {
+            let mut cache = None;
+            s.negation_is_subtype_of_cached(db, t, &mut cache) == s.negate(db).is_subtype_of(db, t)
+        }
     );
 
     // `T` is not disjoint from itself, unless `T` is `Never`.

@@ -6936,17 +6936,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return whether the negation of this type is a subtype of `target`.
-    ///
-    /// This avoids materializing expensive negations when the subtype check can be performed
-    /// directly on the original type shape.
-    pub(crate) fn negation_is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        match self {
-            Type::Intersection(intersection) => intersection.negation_is_subtype_of(db, target),
-            _ => self.negate(db).is_subtype_of(db, target),
-        }
-    }
-
     /// Return whether the negation of this type is a subtype of `target`, reusing `negated_cache`
     /// for type shapes whose negation must still be materialized.
     pub(crate) fn negation_is_subtype_of_cached(
@@ -6956,7 +6945,7 @@ impl<'db> Type<'db> {
         negated_cache: &mut Option<Type<'db>>,
     ) -> bool {
         match self {
-            Type::Intersection(_) => self.negation_is_subtype_of(db, target),
+            Type::Intersection(intersection) => intersection.negation_is_subtype_of(db, target),
             _ => {
                 let negated = negated_cache.get_or_insert_with(|| self.negate(db));
                 negated.is_subtype_of(db, target)
