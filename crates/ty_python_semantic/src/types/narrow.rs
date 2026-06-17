@@ -153,6 +153,34 @@ fn membership_uses_elementwise_containment<'db>(
         || type_uses_elementwise_containment(db, rhs_ty)
 }
 
+/// Narrow membership in a known string literal using substring semantics.
+fn narrow_string_membership<'db>(
+    db: &'db dyn Db,
+    lhs_ty: Type<'db>,
+    haystack: &str,
+    is_contained: bool,
+) -> Option<Type<'db>> {
+    let lhs_ty = lhs_ty.resolve_type_alias(db);
+    let keep = |element: &Type<'db>| {
+        let element = element.resolve_type_alias(db);
+        if let Some(needle) = element.as_string_literal() {
+            haystack.contains(needle.value(db)) == is_contained
+        } else if is_contained && element.is_disjoint_from(db, KnownClass::Str.to_instance(db)) {
+            false
+        } else {
+            true
+        }
+    };
+
+    let narrowed = match lhs_ty {
+        Type::Union(union) => union.filter(db, keep),
+        _ if keep(&lhs_ty) => return None,
+        _ => Type::Never,
+    };
+
+    (narrowed != lhs_ty).then_some(narrowed)
+}
+
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
 /// For example, if we have this code:
@@ -2438,6 +2466,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         rhs_ty: Type<'db>,
         rhs_expr: Option<&ast::Expr>,
     ) -> Option<Type<'db>> {
+        if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
+        }
         if !membership_uses_elementwise_containment(self.db, rhs_ty, rhs_expr) {
             return None;
         }
@@ -2533,6 +2564,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         rhs_ty: Type<'db>,
         rhs_expr: Option<&ast::Expr>,
     ) -> Option<Type<'db>> {
+        if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), false);
+        }
         if !membership_uses_elementwise_containment(self.db, rhs_ty, rhs_expr) {
             return None;
         }
