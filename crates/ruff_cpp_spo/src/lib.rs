@@ -323,11 +323,15 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Tesseract::Classify.Recognize".to_string()),
+            // Per-overload override target (codex P2 #17): the signature suffix
+            // matches `cpp_method`'s per-overload method IRI convention so
+            // `virtually_overrides` joins the EXACT base overload (not just any
+            // base method with the same name).
+            overrides: Some("Tesseract::Classify.Recognize(int)".to_string()),
             operator_kind: None,
             requires_clause: None,
             return_type: None,
-            param_types: Vec::new(),
+            param_types: vec!["int".to_string()],
             is_const: false,
             is_static: false,
         });
@@ -378,7 +382,7 @@ mod tests {
             "ogit:Property"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "rdf:type",
             "ogit:Function"
         ));
@@ -394,17 +398,17 @@ mod tests {
             "cpp:Tesseract::Recognizer.recognizer_"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "is_noexcept",
             "true"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize(int)"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Clear",
+            "cpp:Tesseract::Recognizer.Clear()",
             "is_pure_virtual",
             "true"
         ));
@@ -583,6 +587,11 @@ class Box {
   T get() const;
   void set(T v);
 };
+template <typename T>
+class Box<T*> {
+ public:
+  T* get_ptr() const;
+};
 class Recognizer : public Classify {
  public:
   Recognizer();
@@ -590,6 +599,11 @@ class Recognizer : public Classify {
   int Recognize(int x) noexcept override;
   bool operator==(const Recognizer& other) const;
   void stash(const Box<char>& b);
+  // Overloaded `process` (codex P2 #17 overload-discrimination probe): the two
+  // signatures must end up on DISTINCT method IRIs (`Foo.f(int)` vs
+  // `Foo.f(double)`), not collide into one node.
+  int process(int x);
+  int process(double x);
   friend class TessdataManager;
  private:
   int recognizer_;
@@ -660,7 +674,7 @@ class Recognizer : public Classify {
         assert!(recognize.is_noexcept, "Recognize should be noexcept");
         assert_eq!(
             recognize.overrides.as_deref(),
-            Some("Tesseract::Classify.Recognize"),
+            Some("Tesseract::Classify.Recognize(int)"),
             "override target must be the fully-qualified base method"
         );
         // AST-DLL signature shape: `int Recognize(int x)` → return + one param.
@@ -696,6 +710,30 @@ class Recognizer : public Classify {
         // ORM-downcast shape: `bool operator==(...) const` is const, not static.
         assert!(op.is_const, "const operator== must set is_const");
         assert!(!op.is_static, "operator== is not static");
+
+        // Codex P2 #17 overload-discrimination probe: both `process` overloads
+        // must be captured as distinct methods (the IR carries each with its
+        // own `param_types`; `cpp_method`'s per-overload method-IRI
+        // (`process(int)` vs `process(double)`) then keeps their signature
+        // triples on separate nodes — measured downstream via the every-cpp-
+        // predicate fixture). At the IR level we observe two `process` entries
+        // with the two param-type lists.
+        let processes: Vec<&Vec<String>> = methods
+            .iter()
+            .filter(|m| m.name == "process")
+            .map(|m| &m.param_types)
+            .collect();
+        assert_eq!(
+            processes.len(),
+            2,
+            "both `process` overloads must be captured: {processes:?}"
+        );
+        let process_params: std::collections::BTreeSet<String> =
+            processes.iter().map(|p| p.join(",")).collect();
+        assert!(
+            process_params.contains("int") && process_params.contains("double"),
+            "overload signatures must be distinct (saw {process_params:?})"
+        );
 
         // Constructors and destructors are member functions too: libclang
         // reports them under cursor kinds distinct from `Method`, but the walker
@@ -735,6 +773,26 @@ class Recognizer : public Classify {
                 d, super::Declaration::Method(m) if m.name == "get"
             )),
             "class template Box::get must be captured as a method"
+        );
+        // Codex P2 #17: a `ClassTemplatePartialSpecialization` must keep its
+        // arguments in the qualified name (`Box<T *>`) so it does NOT collide
+        // with the primary `Box` in the cross-TU `BTreeMap` dedup. Both must be
+        // present, and the partial spec must carry its own distinct members.
+        let names: Vec<&str> = classes.iter().map(|c| c.name.as_str()).collect();
+        assert!(
+            names.contains(&"Box"),
+            "primary class template `Box` must be present: {names:?}"
+        );
+        assert!(
+            names.contains(&"Box<T *>"),
+            "partial spec `Box<T *>` must be present (distinct from primary): {names:?}"
+        );
+        let partial = find("Tesseract::Box<T *>");
+        assert!(
+            partial.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Method(m) if m.name == "get_ptr"
+            )),
+            "partial spec must carry its own `get_ptr` member"
         );
 
         // Shape C: template-instantiation USES become template_instantiates.
@@ -785,12 +843,12 @@ class Recognizer : public Classify {
             "cpp:Tesseract::Classify"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize(int)"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "is_noexcept",
             "true"
         ));
@@ -800,12 +858,12 @@ class Recognizer : public Classify {
             "cpp:Tesseract::Recognizer.recognizer_"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.operator==",
+            "cpp:Tesseract::Recognizer.operator==(const Recognizer &)",
             "defines_operator",
             "operator=="
         ));
         assert!(has(
-            "cpp:Tesseract::Classify.Clear",
+            "cpp:Tesseract::Classify.Clear()",
             "is_pure_virtual",
             "true"
         ));

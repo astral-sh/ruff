@@ -572,7 +572,17 @@ impl Expander {
     }
 
     fn cpp_method(&mut self, ns: &str, model_iri: &str, method: &CppMethod) {
-        let method_iri = format!("{model_iri}.{}", method.name);
+        // Per-overload identity: append `(<comma-joined-param-types>)` so
+        // overloaded methods (`void f(int)` + `void f(double)`) get distinct
+        // method IRIs (`Foo.f(int)` vs `Foo.f(double)`). Otherwise their
+        // signature triples (returns_type / has_param_type / is_noexcept …) all
+        // attach to the same `Foo.f` node and the codegen can't reconstruct the
+        // two separate overloads. Codex P2 #17.
+        let method_iri = format!(
+            "{model_iri}.{}({})",
+            method.name,
+            method.param_types.join(",")
+        );
         // Universal classification — same shape the core 7 give a Function.
         self.push(
             method_iri.clone(),
@@ -1076,7 +1086,7 @@ mod tests {
     /// macro that declared it. Downstream schema codegen reads this to
     /// gate FK-column emission (only `belongs_to` puts a column on the
     /// declaring class; `has_many`/`has_one` keep the FK on the other
-    /// table — without the kind triple, ~57 % of the OpenProject
+    /// table — without the kind triple, ~57 % of the `OpenProject`
     /// corpus's record FKs are phantom).
     #[test]
     fn ar_shape_emits_association_kind_per_relation() {
@@ -1427,7 +1437,7 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Tesseract::Classify.Recognize".to_string()),
+            overrides: Some("Tesseract::Classify.Recognize(int,const Image &)".to_string()),
             operator_kind: None,
             requires_clause: None,
             return_type: Some("int".to_string()),
@@ -1515,14 +1525,14 @@ mod tests {
             "ogit:Property"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int,const Image &)",
             "rdf:type",
             "ogit:Function"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer",
             "has_function",
-            "cpp:Tesseract::Recognizer.Recognize"
+            "cpp:Tesseract::Recognizer.Recognize(int,const Image &)"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer",
@@ -1550,7 +1560,7 @@ mod tests {
         assert!(has("is_constexpr", "constexpr"));
         assert!(has(
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize(int,const Image &)"
         ));
         assert!(has("defines_operator", "operator=="));
         assert!(has("requires_concept", "std::equality_comparable<T>"));

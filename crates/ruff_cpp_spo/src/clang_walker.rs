@@ -197,7 +197,17 @@ fn collect_classes(entity: &Entity, out: &mut Vec<CppClass>) {
 /// DIRECT member children (bases, fields, methods). Nested class decls are
 /// ignored here — [`collect_classes`] emits them separately.
 fn build_class(e: &Entity) -> Option<CppClass> {
-    let name = e.get_name()?;
+    // A `ClassTemplatePartialSpecialization` shares its primary's `get_name()`
+    // (libclang spells it as the bare template name, e.g. `Foo` for
+    // `template<class T> class Foo<T*>`); using that as-is collides with the
+    // primary in the cross-TU `BTreeMap` dedup, dropping one of the two. Use
+    // the cursor's `get_display_name()` instead — it carries the partial-spec
+    // arguments (`Foo<T *>`) so the qualified name stays distinct. Codex P2 #17.
+    let name = if matches!(e.get_kind(), EntityKind::ClassTemplatePartialSpecialization) {
+        e.get_display_name()?
+    } else {
+        e.get_name()?
+    };
     let namespace = enclosing_scopes(e);
     let mut declarations = Vec::new();
     for m in e.get_children() {
@@ -403,15 +413,28 @@ fn build_method(m: &Entity) -> CppMethod {
             .get(8)
             .is_none_or(|b| !(b.is_ascii_alphanumeric() || *b == b'_')))
     .then(|| name.clone());
-    // `override` target → the fully-qualified base method (`Base.method`), so
-    // `virtually_overrides` joins the base class's own method node (PR #9).
+    // `override` target → the fully-qualified base method with its overload
+    // signature (`Base.method(int)`), so `virtually_overrides` joins the
+    // **exact base overload** the derived method overrides — not just any
+    // method with the same name. The signature suffix matches the per-overload
+    // method-IRI convention `cpp_method` builds (codex P2 #17).
     let overrides = m
         .get_overridden_methods()
         .and_then(|ov| ov.into_iter().next())
         .and_then(|base_m| {
             let mname = base_m.get_name()?;
             let parent = base_m.get_semantic_parent()?;
-            Some(format!("{}.{mname}", qualified_name(&parent)))
+            let params: Vec<String> = base_m
+                .get_arguments()
+                .into_iter()
+                .flatten()
+                .filter_map(|a| a.get_type().map(|t| t.get_display_name()))
+                .collect();
+            Some(format!(
+                "{}.{mname}({})",
+                qualified_name(&parent),
+                params.join(",")
+            ))
         });
     // AST-DLL signature shape: return type (skip void/ctor/dtor) + ordered
     // parameter types, verbatim from the cursor.

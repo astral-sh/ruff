@@ -382,3 +382,33 @@ signature shape:
 shape) + `is_const`, `is_static` (ORM-downcast shape). The harvester now emits a
 codegen-ready surface: identity (classid via OGAR), inheritance, fields, function
 membership, full signatures, const/static qualifiers, template use, friendship.
+
+
+## Update — 2026-06-17 (codex P2 #17 — overload-discrimination + partial-spec identity)
+
+Two real correctness bugs codex flagged on PR #17 — both fixed, both with
+hermetic probes locking the fix:
+
+- **P2 #1: overload collision.** Before, `void f(int)` and `void f(double)` both
+  attached their signature triples (returns_type / has_param_type / is_noexcept …)
+  to the same `cpp:C.f` node — the codegen couldn't reconstruct the two
+  overloads. Fix: per-overload method IRI `cpp_method` builds appends
+  `(<comma-joined-param-types>)`, e.g. `cpp:C.f(int)` vs `cpp:C.f(double)`. The
+  walker's `virtually_overrides` target uses the same suffix on the base
+  overload (via `get_arguments` on the overridden cursor), so the override edge
+  joins the EXACT base overload (not just any same-name method). Hermetic probe:
+  two `process(int)` / `process(double)` overloads in the fixture must yield
+  distinct param signatures at the IR level.
+- **P2 #2: partial-spec identity collision.** A `ClassTemplatePartialSpecialization`
+  shares its primary's `get_name()` (libclang spells it as the bare template
+  name) — the cross-TU `BTreeMap` dedup by `qualified_name()` then dropped one
+  side. Fix: `build_class` uses `get_display_name()` for partial specs
+  (`Box<T *>`) and `get_name()` for everything else (`Box`). Hermetic probe:
+  primary `Box` + partial spec `Box<T *>` must coexist, each with its own
+  members (e.g. `get_ptr` on the partial spec).
+- **Measured impact (overload discrimination):** ccutil 3850 → **4129 triples**
+  (+279 — the overload discriminator splits methods that previously aliased);
+  ccstruct 8972 → **9507 triples** (+535). Class counts unchanged.
+- **Test count:** 48 ruff_spo_triplet + 14 ruff_cpp_spo (locked-shape, hermetic
+  walker, gated coverage / determinism / template-determinism probes). All green.
+  `clippy -D warnings` + fmt clean.
