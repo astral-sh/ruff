@@ -223,6 +223,21 @@ pub enum Predicate {
     /// (e.g. `op-surreal-ast::from_triples`) map the rails-type
     /// string to a `SurrealQL` `Kind` variant.
     FieldType,
+    /// `(model.<rel>, association_kind, "<kind>")` — the Rails
+    /// association macro that declared the relation, where `<kind>`
+    /// is one of `belongs_to`, `has_many`, `has_one`,
+    /// `has_and_belongs_to_many`, `accepts_nested_attributes_for`.
+    /// Sibling to [`Self::DeclaresAssociation`] (which carries the
+    /// existence fact but drops the kind).
+    ///
+    /// **Why this matters for schema codegen:** only `belongs_to`
+    /// puts a FK column on the declaring class — for `has_many`/
+    /// `has_one` the FK lives on the OTHER table. A consumer that
+    /// emits a `record<Target>` FK for every `declares_association`
+    /// triple produces ~1.9× the columns that actually exist in the
+    /// DB. The kind triple lets `op-surreal-ast::from_triples` gate
+    /// FK emission on `kind == belongs_to`.
+    AssociationKind,
 
     // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
     //
@@ -333,6 +348,7 @@ impl Predicate {
             Self::DefinesMethod => "defines_method",
             Self::UsesRefinement => "uses_refinement",
             Self::FieldType => "field_type",
+            Self::AssociationKind => "association_kind",
             // C++ machine-plane 13
             Self::InheritsFrom => "inherits_from",
             Self::HasField => "has_field",
@@ -397,6 +413,7 @@ impl Predicate {
             "defines_method" => Self::DefinesMethod,
             "uses_refinement" => Self::UsesRefinement,
             "field_type" => Self::FieldType,
+            "association_kind" => Self::AssociationKind,
             // C++ machine-plane 13
             "inherits_from" => Self::InheritsFrom,
             "has_field" => Self::HasField,
@@ -461,6 +478,7 @@ impl Predicate {
         Self::DefinesMethod,
         Self::UsesRefinement,
         Self::FieldType,
+        Self::AssociationKind,
         // C++ machine-plane 13
         Self::InheritsFrom,
         Self::HasField,
@@ -549,7 +567,8 @@ impl Predicate {
             | Self::CounterCultures
             | Self::AutoStrips
             | Self::UsesRefinement
-            | Self::FieldType => Provenance::OpenProjectExtracted,
+            | Self::FieldType
+            | Self::AssociationKind => Provenance::OpenProjectExtracted,
         }
     }
 }
@@ -662,12 +681,14 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_48() {
+    fn predicate_count_locked_at_49() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 28 OpenProject AR-shape (D-AR-5.2 added `field_type`)
-        // + 13 C++ machine-plane = 48. Council review of any new variant
-        // means this number changes — the test must change with the source.
-        assert_eq!(Predicate::ALL.len(), 48);
+        // Python) + 29 OpenProject AR-shape (this PR added
+        // `association_kind` so the FK-direction bug is fixable
+        // downstream) + 13 C++ machine-plane = 49. Council review of
+        // any new variant means this number changes — the test must
+        // change with the source.
+        assert_eq!(Predicate::ALL.len(), 49);
     }
 
     #[test]

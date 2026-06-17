@@ -9,10 +9,10 @@
 use std::collections::BTreeSet;
 
 use crate::ir::{
-    ActsAs, AssocDecl, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef, ConstexprKind,
-    CppBase, CppField, CppFriend, CppMacroUse, CppMethod, CppStaticAssert, CppTemplate,
-    CppTemplateKind, Delegation, DslCall, DynMethod, GemDsl, GemKind, Model, ModelGraph, ScopeDecl,
-    ScopeKind, StiInfo, UsingRef, Validation, ValidationKind,
+    ActsAs, AssocDecl, AssocKind, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef,
+    ConstexprKind, CppBase, CppField, CppFriend, CppMacroUse, CppMethod, CppStaticAssert,
+    CppTemplate, CppTemplateKind, Delegation, DslCall, DynMethod, GemDsl, GemKind, Model,
+    ModelGraph, ScopeDecl, ScopeKind, StiInfo, UsingRef, Validation, ValidationKind,
 };
 use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 
@@ -279,22 +279,39 @@ impl Expander {
     }
 
     fn association(&mut self, model_iri: &str, a: &AssocDecl) {
-        // The kind (belongs_to / has_many / …) is recoverable from the
-        // model graph but not emitted as part of the triple — the
-        // predicate identifies the declaration class; the (possibly many)
-        // options remain on the IR for downstream consumers that need
-        // them (e.g. an OpenProject-specific catalog mapper).
-        let _ = a.options;
-        let _ = a.kind; // not consumed by the triple; semantic = "any AR assoc"
-        // AssocKind is encoded implicitly: BelongsTo vs HasMany etc.
-        // produce the same predicate. Frontends that want to disambiguate
-        // emit a sibling `has_dsl_call{name = kind_str, args = …}` triple.
+        // The existence-of-relation fact, kind-agnostic.
+        let rel_iri = format!("{model_iri}.{}", a.name);
         self.push(
             model_iri.to_string(),
             Predicate::DeclaresAssociation,
-            format!("{model_iri}.{}", a.name),
+            rel_iri.clone(),
             Provenance::OpenProjectExtracted,
         );
+        // Kind sibling — only the consumer that cares about FK direction
+        // reads this; other consumers can ignore it.
+        //
+        // Why split into two triples (instead of encoding kind in the
+        // `declares_association` object): the existence fact is queried
+        // by many consumers (lance-graph SPO store, graph-traversal,
+        // ndjson roundtrip tests); the kind is only needed by schema
+        // codegen. Two predicates keep the existence query cheap.
+        let kind_str = match a.kind {
+            AssocKind::BelongsTo => "belongs_to",
+            AssocKind::HasMany => "has_many",
+            AssocKind::HasOne => "has_one",
+            AssocKind::HasAndBelongsToMany => "has_and_belongs_to_many",
+            AssocKind::AcceptsNestedAttributesFor => "accepts_nested_attributes_for",
+        };
+        self.push(
+            rel_iri,
+            Predicate::AssociationKind,
+            kind_str.to_string(),
+            Provenance::OpenProjectExtracted,
+        );
+        // Options remain on the IR for downstream consumers that need
+        // them (e.g. an OpenProject-specific catalog mapper) but are
+        // not surfaced as triples here.
+        let _ = a.options;
     }
 
     fn validation(&mut self, model_iri: &str, v: &Validation) {
@@ -1019,6 +1036,78 @@ mod tests {
         ));
     }
 
+    /// Every `declares_association` triple gets a sibling
+    /// `association_kind` triple on the relation IRI naming the Rails
+    /// macro that declared it. Downstream schema codegen reads this to
+    /// gate FK-column emission (only `belongs_to` puts a column on the
+    /// declaring class; `has_many`/`has_one` keep the FK on the other
+    /// table — without the kind triple, ~57 % of the OpenProject
+    /// corpus's record FKs are phantom).
+    #[test]
+    fn ar_shape_emits_association_kind_per_relation() {
+        let triples = expand(&ar_fixture());
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
+        // The fixture declares `belongs_to :project` and
+        // `has_many :time_entries`.
+        assert!(has(
+            "openproject:WorkPackage.project",
+            "association_kind",
+            "belongs_to",
+        ));
+        assert!(has(
+            "openproject:WorkPackage.time_entries",
+            "association_kind",
+            "has_many",
+        ));
+        // The other 3 AssocKind variants — locked via a focused
+        // fixture below so a future enum change can't silently drop
+        // the mapping.
+    }
+
+    /// All 5 `AssocKind` variants map to the documented kind string.
+    #[test]
+    fn association_kind_string_table() {
+        use crate::ir::{AssocDecl, AssocKind, Model, ModelGraph};
+        let mut g = ModelGraph::new("openproject");
+        let mut m = Model::new("M");
+        for (kind, _label) in [
+            (AssocKind::BelongsTo, "belongs_to"),
+            (AssocKind::HasMany, "has_many"),
+            (AssocKind::HasOne, "has_one"),
+            (AssocKind::HasAndBelongsToMany, "has_and_belongs_to_many"),
+            (
+                AssocKind::AcceptsNestedAttributesFor,
+                "accepts_nested_attributes_for",
+            ),
+        ] {
+            m.associations.push(AssocDecl {
+                kind,
+                name: format!("{kind:?}").to_lowercase(),
+                options: vec![],
+            });
+        }
+        g.models.push(m);
+        let triples = expand(&g);
+        let kinds_seen: std::collections::BTreeSet<&str> = triples
+            .iter()
+            .filter(|t| t.p == "association_kind")
+            .map(|t| t.o.as_str())
+            .collect();
+        for expected in [
+            "belongs_to",
+            "has_many",
+            "has_one",
+            "has_and_belongs_to_many",
+            "accepts_nested_attributes_for",
+        ] {
+            assert!(
+                kinds_seen.contains(expected),
+                "association_kind `{expected}` missing from emission; saw {kinds_seen:?}",
+            );
+        }
+    }
+
     #[test]
     fn ar_shape_emits_validates_and_normalizes() {
         let triples = expand(&ar_fixture());
@@ -1268,6 +1357,7 @@ mod tests {
             "counter_cultures",
             "auto_strips",
             "uses_refinement",
+            "association_kind",
             // Inferred (per-edge override)
             "defines_method",
             // Structural (block markers)
