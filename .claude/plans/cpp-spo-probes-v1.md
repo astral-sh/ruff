@@ -258,3 +258,37 @@ specialisations), per the three candidate shapes (A erase / B explicit-specialis
   determinism, relevant only once C is implemented. Coverage/determinism are
   otherwise green (`CPP-SCHEMA-FIT` now counts template-class bodies too;
   `CPP-AST-RT` byte-identical with templates included).
+
+## Update — 2026-06-16 (Shape C: template_instantiates from field/signature types — CPP-TEMPLATE-DET GREEN)
+
+Research-first round per operator's "best possible C, then compare":
+
+- **Measured first (before implementing):** ccutil has 7 instantiation uses in
+  field types (`std::vector` 5, `GenericVector` 1, `std::function` 1) and 0 in
+  bases (`build_base` already resolves bases to the primary template name —
+  `PointerVector : GenericVector<T*>` records `inherits_from GenericVector`, no
+  args). Verified the gap is non-redundant: `expand::cpp_field` explicitly drops
+  `type_name` (`let _ = &field.type_name; // carried on IR for catalog consumers`),
+  so field/signature template-uses were **invisible in the triples**.
+- **Best-shape design — syntactic, deterministic:** capture template-id type
+  strings from (a) field types (`FieldDecl`/`VarDecl`'s `get_type`) and
+  (b) method signatures (return + parameter types from `get_result_type` /
+  `get_arguments`). This is a *syntactic* use the walker already sees — NOT a
+  libclang implicit-instantiation cursor (the per-TU-incomplete thing the
+  Inferred provenance flags). Determinism is structural: the cursor children are
+  in source order, `expand` sorts the triple set.
+- **Helpers:** `template_instantiation(&type_display)` strips `const`/`volatile`
+  prefixes + trailing `*`/`&`, returns the verbatim template-id (`GenericVector<char>`)
+  per the `CppTemplate::name` IR convention; `collect_signature_instantiations`
+  pushes one Instantiation declaration per template-id in a signature.
+- **Measured result:** ccutil **2184 → 2215 triples** (+31 deterministic
+  `template_instantiates` edges); hermetic fixture asserts both field-type
+  (`Box<int>`) and signature-type (`Box<char>`) instantiation capture; the
+  `cpp_template_det_determinism` probe runs `extract_dir` twice and asserts the
+  `template_instantiates` set is identical — **GREEN**.
+- **C vs A vs A+C (now measured):** A captured 0 template-relationship triples;
+  C adds 31 strictly non-redundant ones. A+C is the combination already shipped:
+  A makes `GenericVector` a node, C makes `Recognizer template_instantiates
+  GenericVector<char>` an edge to it. **All three primary CPP-* probes are now
+  green** (SCHEMA-FIT ~91%, AST-RT deterministic, TEMPLATE-DET deterministic +
+  non-degenerate).

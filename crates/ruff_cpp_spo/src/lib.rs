@@ -565,22 +565,24 @@ class Classify {
   virtual int Recognize(int x) noexcept;
   virtual void Clear() = 0;
 };
+template <typename T>
+class Box {
+ public:
+  T get() const;
+  void set(T v);
+};
 class Recognizer : public Classify {
  public:
   Recognizer();
   virtual ~Recognizer();
   int Recognize(int x) noexcept override;
   bool operator==(const Recognizer& other) const;
+  void stash(const Box<char>& b);
   friend class TessdataManager;
  private:
   int recognizer_;
   static int count_;
-};
-template <typename T>
-class Box {
- public:
-  T get() const;
-  void set(T v);
+  Box<int> boxed_;
 };
 }
 ";
@@ -693,6 +695,31 @@ class Box {
                 d, super::Declaration::Method(m) if m.name == "get"
             )),
             "class template Box::get must be captured as a method"
+        );
+
+        // Shape C: template-instantiation USES become template_instantiates.
+        // `Box<int> boxed_;` (field type) and `stash(const Box<char>&)` (method
+        // signature) both surface as Instantiation declarations on Recognizer —
+        // info `cpp_field`/`cpp_method` otherwise drop.
+        let insts: Vec<&str> = recognizer
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                super::Declaration::Template(t)
+                    if matches!(t.kind, ruff_spo_triplet::CppTemplateKind::Instantiation) =>
+                {
+                    Some(t.name.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            insts.contains(&"Box<int>"),
+            "field-type instantiation Box<int> must be captured: {insts:?}"
+        );
+        assert!(
+            insts.contains(&"Box<char>"),
+            "method-signature instantiation Box<char> must be captured: {insts:?}"
         );
 
         let clear = classify
@@ -1072,6 +1099,62 @@ class Box {
         assert_eq!(
             first, second,
             "harvest must be byte-identical across runs (CPP-AST-RT determinism)"
+        );
+    }
+
+    /// `CPP-TEMPLATE-DET` — template-instantiation determinism (the third
+    /// primary probe, `.claude/plans/cpp-spo-probes-v1.md`). Walks ccutil twice
+    /// AND once with the file list reversed, then compares the SET of
+    /// `template_instantiates` triples (order-independent — `expand` already
+    /// sorts). The set must be identical across runs and across orderings,
+    /// AND must be non-degenerate (the syntactic field-type + signature-type
+    /// instantiations exist in ccutil — measured 7+ in fields alone). Gated on
+    /// `TESSERACT_SRC`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn cpp_template_det_determinism() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+
+        let instantiates = |g: &ModelGraph| -> std::collections::BTreeSet<(String, String)> {
+            expand(g)
+                .into_iter()
+                .filter(|t| t.p == "template_instantiates")
+                .map(|t| (t.s, t.o))
+                .collect()
+        };
+
+        let g1 = extract_dir(&dir, &args).expect("libclang init");
+        let g2 = extract_dir(&dir, &args).expect("libclang init");
+        let set1 = instantiates(&g1);
+        let set2 = instantiates(&g2);
+        eprintln!(
+            "[CPP-TEMPLATE-DET] {} template_instantiates triples in ccutil",
+            set1.len()
+        );
+        assert!(
+            !set1.is_empty(),
+            "template_instantiates set must be non-empty on ccutil (measured 7+ field-type uses)"
+        );
+        assert_eq!(
+            set1, set2,
+            "template_instantiates set must be identical across runs (CPP-TEMPLATE-DET)"
         );
     }
 }

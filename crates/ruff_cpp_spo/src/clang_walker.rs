@@ -34,7 +34,9 @@ use std::fmt;
 use std::path::Path;
 
 use clang::{Accessibility, Clang, Entity, EntityKind, ExceptionSpecification, Index};
-use ruff_spo_triplet::{CppAccess, CppBase, CppField, CppFriend, CppMethod};
+use ruff_spo_triplet::{
+    CppAccess, CppBase, CppField, CppFriend, CppMethod, CppTemplate, CppTemplateKind,
+};
 
 use crate::{CppClass, Declaration};
 
@@ -209,12 +211,24 @@ fn build_class(e: &Entity) -> Option<CppClass> {
             // a STATIC data member (`static T x;`, libclang's distinct kind).
             // Both are data members the class HAS → has_field.
             EntityKind::FieldDecl | EntityKind::VarDecl => {
+                let type_name = m
+                    .get_type()
+                    .map(|t| t.get_display_name())
+                    .unwrap_or_default();
+                // A field whose type is a template-id (`GenericVector<char>`) is a
+                // template INSTANTIATION use. `cpp_field` drops `type_name`, so
+                // this is otherwise invisible in the triples — surface it as
+                // `template_instantiates` (Inferred: single-TU instantiation
+                // visibility is incomplete by construction).
+                if let Some(inst) = template_instantiation(&type_name) {
+                    declarations.push(Declaration::Template(CppTemplate {
+                        kind: CppTemplateKind::Instantiation,
+                        name: inst,
+                    }));
+                }
                 declarations.push(Declaration::Field(CppField {
                     name: m.get_name().unwrap_or_default(),
-                    type_name: m
-                        .get_type()
-                        .map(|t| t.get_display_name())
-                        .unwrap_or_default(),
+                    type_name,
                 }));
             }
             // Constructors, destructors, conversion operators, and member
@@ -229,6 +243,7 @@ fn build_class(e: &Entity) -> Option<CppClass> {
             | EntityKind::ConversionFunction
             | EntityKind::FunctionTemplate => {
                 declarations.push(Declaration::Method(build_method(&m)));
+                collect_signature_instantiations(&m, &mut declarations);
             }
             // `friend class Foo;` / `friend Ret fn(...);` — the befriended
             // entity. CPP-SCHEMA-FIT measured 79 in ccutil; the `is_friend_of`
@@ -268,6 +283,50 @@ fn build_friend(m: &Entity) -> Option<CppFriend> {
         }
     }
     None
+}
+
+/// The template-id (`Foo<Args>`) a type display denotes, if it is a template
+/// **instantiation** use — stripping a leading `const`/`volatile` and trailing
+/// `*`/`&`. `int` → `None`; `const GenericVector<char> &` → `GenericVector<char>`.
+/// Verbatim `Foo<Args>` form, per the `CppTemplate::name` IR convention. This is
+/// a SYNTACTIC use (deterministic per-TU), not an implicit-instantiation cursor
+/// (those are the per-TU-incomplete thing the Inferred provenance flags).
+fn template_instantiation(type_display: &str) -> Option<String> {
+    if !type_display.contains('<') {
+        return None;
+    }
+    let mut s = type_display.trim();
+    for pfx in ["const ", "volatile "] {
+        s = s.strip_prefix(pfx).map(str::trim_start).unwrap_or(s);
+    }
+    let s = s.trim_end_matches(['*', '&', ' ']);
+    (s.contains('<') && !s.is_empty()).then(|| s.to_string())
+}
+
+/// Push a `template_instantiates` declaration for every template-id in a method's
+/// RETURN type or PARAMETER types — the syntactic instantiation uses in a
+/// signature, which `cpp_method` does not otherwise surface. Applies to every
+/// function-like cursor (ctor/dtor have no/void result + their params).
+fn collect_signature_instantiations(m: &Entity, decls: &mut Vec<Declaration>) {
+    let mut type_displays: Vec<String> = Vec::new();
+    if let Some(ret) = m.get_result_type() {
+        type_displays.push(ret.get_display_name());
+    }
+    if let Some(args) = m.get_arguments() {
+        for arg in args {
+            if let Some(t) = arg.get_type() {
+                type_displays.push(t.get_display_name());
+            }
+        }
+    }
+    for ty in type_displays {
+        if let Some(inst) = template_instantiation(&ty) {
+            decls.push(Declaration::Template(CppTemplate {
+                kind: CppTemplateKind::Instantiation,
+                name: inst,
+            }));
+        }
+    }
 }
 
 /// Whether `e` is defined in a system header (std lib, libc, …). Entities
