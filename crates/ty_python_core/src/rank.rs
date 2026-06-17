@@ -23,7 +23,7 @@ use get_size2::GetSize;
 ///
 /// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
 /// bits of overhead on 32-bit platforms.
-#[derive(Clone, Debug, Eq, PartialEq, GetSize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize)]
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
     bits: BitBox<Chunk, Msb0>,
@@ -42,8 +42,21 @@ type Chunk = u32;
 
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
+#[expect(unsafe_code)]
+unsafe impl salsa::Update for RankBitBox {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = unsafe { &mut *old_pointer };
+        if *old_ref != new_value {
+            *old_ref = new_value;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 impl RankBitBox {
-    pub(crate) fn from_bits(iter: impl Iterator<Item = bool>) -> Self {
+    pub fn from_bits(iter: impl Iterator<Item = bool>) -> Self {
         let bits: BitBox<Chunk, Msb0> = iter.collect();
         let chunk_ranks = bits
             .as_raw_slice()
@@ -58,8 +71,23 @@ impl RankBitBox {
     }
 
     #[inline]
+    pub fn len(&self) -> usize {
+        self.bits.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.bits.is_empty()
+    }
+
+    #[inline]
     pub fn get_bit(&self, index: usize) -> Option<bool> {
         self.bits.get(index).map(|bit| *bit)
+    }
+
+    #[inline]
+    pub fn iter_ones(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
+        self.bits.iter_ones()
     }
 
     /// Returns the number of bits _before_ (and not including) the given index that are set.

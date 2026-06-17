@@ -14,9 +14,9 @@
 - [x] Write the initial implementation plan.
 - [x] Decision: compact `nodes` and `constraints` using rank mappings, without rewriting retained IDs.
 - [x] Decision: leave `typevars` dense/uncompacted because that arena is usually small, and retaining it avoids extra typevar-marking complexity.
-- [ ] Implement compacted owned storage with query-builder overlays.
-- [ ] Add tests that exercise compacted owned sets via both `query` and `load`.
-- [ ] Run targeted tests and prek.
+- [x] Implement compacted owned storage with query-builder overlays.
+- [x] Add tests that exercise compacted owned sets via both `query` and `load`.
+- [x] Run targeted tests and prek.
 
 ## Goal
 
