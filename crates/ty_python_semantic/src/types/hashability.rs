@@ -76,6 +76,16 @@ fn hashability<'db>(db: &'db dyn Db, ty: Type<'db>) -> Hashability {
         Type::Union(union) => {
             Hashability::from_alternatives(union.elements(db).iter().map(|ty| ty.hashability(db)))
         }
+        Type::Intersection(intersection) => {
+            if intersection
+                .iter_positive(db)
+                .any(|ty| ty.hashability(db) == Hashability::Always)
+            {
+                Hashability::Always
+            } else {
+                Hashability::Maybe
+            }
+        }
         // Recursive aliases are not fully supported. Any alias that reaches this point was not
         // unpacked by the union builder, so avoid recursively traversing its value type.
         Type::TypeAlias(_) => Hashability::Maybe,

@@ -1123,7 +1123,7 @@ is currently understood by ty as being equivalent to `object`, much like `Suppor
 
 ```py
 from typing import Hashable, Protocol
-from ty_extensions import Not
+from ty_extensions import Intersection, Not
 
 class SupportsHash(Protocol):
     def __hash__(self) -> int: ...
@@ -1149,6 +1149,9 @@ def check_hashable_or_not_int(x: Hashable | Not[int]):
 
 def check_not_int_or_hashable(x: Not[int] | Hashable):
     reveal_type(x)  # revealed: object
+
+def check_hashable_or_non_final_intersection(x: Hashable | Intersection[int, Not[bool]]):
+    reveal_type(x)  # revealed: Hashable | (int & ~bool)
 
 def check_hashable_or_supports_hash(x: Hashable | SupportsHash):
     reveal_type(x)  # revealed: Hashable
@@ -1353,6 +1356,16 @@ def check_hashable_or_hashable_typevar(x: Hashable | THashable):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_typevar_or_hashable(x: THashable | Hashable):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_intersection(
+    x: Hashable | Intersection[THashable, Not[bool]],
+):
+    reveal_type(x)  # revealed: Hashable
+
+def check_intersection_or_hashable(
+    x: Intersection[THashable, Not[bool]] | Hashable,
+):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_unhashable_typevar(x: Hashable | TUnhashable):
