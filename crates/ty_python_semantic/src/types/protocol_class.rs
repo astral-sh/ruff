@@ -861,6 +861,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ProtocolMemberKind::Method(source_method),
                             ProtocolMemberKind::Method(target_method),
+                        ) if source_method == target_method
+                            && self
+                                .relation
+                                .can_safely_assume_reflexivity(Type::Callable(source_method)) =>
+                        {
+                            self.always()
+                        }
+
+                        (
+                            ProtocolMemberKind::Method(source_method),
+                            ProtocolMemberKind::Method(target_method),
                         ) => self.check_callable_pair(
                             db,
                             source_method.bind_self(db, None),
