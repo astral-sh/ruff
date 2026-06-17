@@ -270,12 +270,26 @@ pub enum Predicate {
     // declarative), [`Self::UsesMacroExpansion`] and
     // [`Self::TemplateInstantiates`] are Inferred (macro provenance + single-
     // TU instantiation visibility are heuristic).
-    /// `(class, inherits_from, base_class)` — single + multiple
-    /// inheritance. One triple per base. The access specifier
-    /// (public/protected/private) and virtual-inheritance flag are carried
-    /// on the IR ([`crate::CppBase`]) but not emitted in the triple — the
-    /// object stays a clean base-class IRI for graph traversal (same
-    /// treatment as [`Self::DeclaresAssociation`] dropping `AssocKind`).
+    /// `(class, inherits_from, base_class)` — class inheritance.
+    /// One triple per base.
+    ///
+    /// **Cross-frontend predicate.** Both C++ class inheritance and
+    /// Rails STI (Single Table Inheritance, `class Foo <
+    /// ApplicationRecord` with `inheritance_column`) emit this. Wire
+    /// shape is identical; per-emission provenance differs:
+    ///
+    /// - C++ frontend (`ruff_cpp_spo`): default
+    ///   [`Provenance::CppExtracted`]. The access specifier
+    ///   (public/protected/private) and virtual-inheritance flag are
+    ///   carried on [`crate::CppBase`] but not emitted in the triple.
+    /// - Rails frontend (`ruff_ruby_spo` / `ruff_spo_triplet::expand`):
+    ///   emitted with [`Provenance::OpenProjectExtracted`] from the
+    ///   `StiInfo` slot. The `abstract_class` /
+    ///   `inheritance_column` metadata are carried on the IR only.
+    ///
+    /// Distinct from [`Self::IncludesModule`] which is method-body
+    /// composition — STI shares a single physical table via a
+    /// type-discriminator column.
     InheritsFrom,
     /// `(class, has_field, class.field)` — a data-member declaration. The
     /// resolved type is carried on the IR ([`crate::CppField`]); the C++

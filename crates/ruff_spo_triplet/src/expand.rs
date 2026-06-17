@@ -86,9 +86,12 @@ use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 ///     (per-edge, since dynamism is the whole reason for the variant).
 /// 20. For each `refinements[i]`:
 ///     `(ns:model, uses_refinement, <refinement_module>)` — `OpenProjectExtracted`.
-/// 21. If `sti.is_some()`: emit `(ns:model, includes_module, <parent>)`
-///     for `sti.inherits_from` — `OpenProjectExtracted`. The
-///     `abstract_class` / `inheritance_column` fields are metadata only.
+/// 21. If `sti.is_some()`: emit `(ns:model, inherits_from, <parent>)`
+///     for `sti.inherits_from` — `OpenProjectExtracted`. Reuses the
+///     `inherits_from` predicate originally introduced for C++ class
+///     inheritance (wire shape is identical; per-emission provenance
+///     differs). `abstract_class` / `inheritance_column` are metadata
+///     only.
 ///
 /// # Determinism
 ///
@@ -250,7 +253,7 @@ impl Expander {
             self.refinement(&model_iri, r);
         }
         if let Some(sti) = &model.sti {
-            self.sti(&model_iri, sti);
+            self.sti(ns, &model_iri, sti);
         }
 
         // ───── C++ machine-plane ─────
@@ -544,12 +547,27 @@ impl Expander {
         );
     }
 
-    fn sti(&mut self, model_iri: &str, sti: &StiInfo) {
+    fn sti(&mut self, ns: &str, model_iri: &str, sti: &StiInfo) {
         if let Some(parent) = &sti.inherits_from {
+            // Rails STI parents lower to `InheritsFrom` (same predicate
+            // C++ uses for class inheritance) — the wire shape is
+            // identical: subject = class, object = namespaced base
+            // IRI (`openproject:Issue`, NOT bare `Issue`). The
+            // namespace makes the parent joinable to its own
+            // `ObjectType` declaration — without it, downstream
+            // graph traversal can't link the inherits_from edge to
+            // the parent class node (codex P2 on #19).
+            //
+            // The distinction from `IncludesModule` matters
+            // semantically: STI is single-table inheritance with a
+            // type-discriminator column, while module inclusion is
+            // method-body composition. Downstream consumers (graph
+            // build, schema visualizer) need both signals separately
+            // to render the type hierarchy correctly.
             self.push(
                 model_iri.to_string(),
-                Predicate::IncludesModule,
-                parent.clone(),
+                Predicate::InheritsFrom,
+                format!("{ns}:{parent}"),
                 Provenance::OpenProjectExtracted,
             );
         }
@@ -1528,11 +1546,31 @@ mod tests {
                 .iter()
                 .any(|t| t.p == "uses_refinement" && t.o == "OpenProject::DateRange")
         );
-        // STI → includes_module to parent.
+        // STI → `inherits_from` (NOT `includes_module`) — STI is
+        // single-table inheritance with a type discriminator column,
+        // semantically distinct from method-body composition. The
+        // parent is emitted as a namespaced IRI (`openproject:Issue`)
+        // so it's joinable to the parent's own `ObjectType`
+        // declaration (codex P2 on #19; mirrors the C++ `InheritsFrom`
+        // arm).
         assert!(
             triples
                 .iter()
-                .any(|t| t.p == "includes_module" && t.o == "Issue")
+                .any(|t| t.p == "inherits_from" && t.o == "openproject:Issue"),
+            "STI parent must be namespaced; got triples: {:?}",
+            triples
+                .iter()
+                .filter(|t| t.p == "inherits_from")
+                .collect::<Vec<_>>(),
+        );
+        // The STI parent must NOT also appear under `includes_module`
+        // — that would conflate the two semantics.
+        assert!(
+            !triples
+                .iter()
+                .any(|t| t.p == "includes_module"
+                    && (t.o == "Issue" || t.o == "openproject:Issue")),
+            "STI parent must not double-emit as includes_module",
         );
     }
 
@@ -1814,10 +1852,16 @@ mod tests {
 
     /// The Python/Ruby fixtures must emit ZERO C++ predicates — the C++
     /// sibling Vecs default empty, so no cross-language leakage occurs.
+    ///
+    /// Note: `inherits_from` is intentionally cross-frontend — both
+    /// C++ class inheritance and Rails STI emit it (wire shape is
+    /// identical; the predicate is in the C++ machine-plane block
+    /// historically because that's where it landed first). It's
+    /// excluded from the guard list below since Rails STI fixtures
+    /// legitimately emit it.
     #[test]
-    fn non_cpp_fixtures_emit_no_cpp_predicates() {
-        let cpp_predicates = [
-            "inherits_from",
+    fn non_cpp_fixtures_emit_no_cpp_only_predicates() {
+        let cpp_only_predicates = [
             "has_field",
             "template_specialises",
             "template_instantiates",
@@ -1839,8 +1883,8 @@ mod tests {
             let triples = expand(&graph);
             for t in &triples {
                 assert!(
-                    !cpp_predicates.contains(&t.p.as_str()),
-                    "non-C++ fixture leaked C++ predicate `{}`",
+                    !cpp_only_predicates.contains(&t.p.as_str()),
+                    "non-C++ fixture leaked C++-only predicate `{}`",
                     t.p,
                 );
             }
