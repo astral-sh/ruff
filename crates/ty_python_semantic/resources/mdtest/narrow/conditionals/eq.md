@@ -151,6 +151,57 @@ def _(value: Foo | Bar):
         reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
 ```
 
+The same narrowing applies when comparing enum members directly with their inherited integer or
+string values. The negative constraint excludes both the builtin literal and every enum member known
+to compare equal to it:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+
+class IntMember(int, Enum):
+    X = 1
+    Y = 2
+
+class Integer(IntEnum):
+    X = 1
+    Y = 2
+
+class String(StrEnum):
+    X = "X"
+    Y = "Y"
+
+class StrMember(str, Enum):
+    X = "X"
+    Y = "Y"
+
+def _(value: IntMember | Integer | String | StrMember):
+    if value == 1:
+        pass
+    else:
+        reveal_type(value)  # revealed: Literal[IntMember.Y, Integer.Y] | String | StrMember
+
+    if value != 1:
+        reveal_type(value)  # revealed: Literal[IntMember.Y, Integer.Y] | String | StrMember
+
+    if value == "X":
+        pass
+    else:
+        reveal_type(value)  # revealed: IntMember | Integer | Literal[String.Y, StrMember.Y]
+
+    if value != "X":
+        reveal_type(value)  # revealed: IntMember | Integer | Literal[String.Y, StrMember.Y]
+
+def random() -> bool:
+    return False
+
+def loop_back():
+    value = IntMember.X if random() else IntMember.Y
+    if value != 1:
+        while random():
+            reveal_type(value)  # revealed: Literal[IntMember.Y, Integer.Y]
+            value = Integer.Y
+```
+
 A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
 the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
 members' runtime values cannot be determined statically:
@@ -280,7 +331,7 @@ def _(generate_next_value: Any):
         if value == "explicit":
             reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT]
         else:
-            reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT, "other"]
+            reveal_type(value)  # revealed: Literal["other"]
 ```
 
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:

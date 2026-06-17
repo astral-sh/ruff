@@ -11,7 +11,7 @@ use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
     EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueTypeKind,
-    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -135,7 +135,15 @@ pub(super) fn evaluate_type_equality<'db>(
         ComparisonOperator::Equality,
         condition_expects_equality,
     )
-    .or_else(|| builtin_literal_constraint(db, left, right, condition_expects_equality))
+    .or_else(|| {
+        builtin_literal_constraint(
+            db,
+            left,
+            right,
+            ComparisonOperator::Equality,
+            condition_expects_equality,
+        )
+    })
     .or_else(|| {
         if comparison_domain(db, left, right, ComparisonOperator::Equality)
             == ComparisonDomain::Known
@@ -185,7 +193,15 @@ pub(super) fn evaluate_type_inequality<'db>(
         ComparisonOperator::Inequality,
         condition_expects_equality,
     )
-    .or_else(|| builtin_literal_constraint(db, left, right, condition_expects_equality))
+    .or_else(|| {
+        builtin_literal_constraint(
+            db,
+            left,
+            right,
+            ComparisonOperator::Inequality,
+            condition_expects_equality,
+        )
+    })
     .or_else(|| {
         ComparisonEvaluator::new(db)
             .evaluate(left, right, branch, ComparisonOperator::Inequality)
@@ -526,34 +542,36 @@ fn builtin_literal_constraint<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
+    operator: ComparisonOperator,
     condition_expects_equality: bool,
 ) -> Option<Type<'db>> {
     let Type::LiteralValue(right) = right.resolve_type_alias(db) else {
         return None;
     };
 
-    let equal_to_right = match right.kind() {
+    let mut equal_to_right = match right.kind() {
         LiteralValueTypeKind::Int(value) => {
             let mut builder = UnionBuilder::new(db).add(Type::LiteralValue(right));
             if matches!(value.as_i64(), 0 | 1) {
                 builder = builder.add(Type::bool_literal(value.as_i64() == 1));
             }
-            builder.build()
+            builder
         }
-        LiteralValueTypeKind::Bool(value) => UnionType::from_two_elements(
-            db,
-            Type::LiteralValue(right),
-            Type::int_literal(i64::from(value)),
-        ),
+        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db)
+            .add(Type::LiteralValue(right))
+            .add(Type::int_literal(i64::from(value))),
         LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => {
-            Type::LiteralValue(right)
+            UnionBuilder::new(db).add(Type::LiteralValue(right))
         }
         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
     };
 
     if !condition_expects_equality {
-        return Some(equal_to_right.negate(db));
+        equal_to_right = add_equal_enum_literals(db, left, right.kind(), operator, equal_to_right);
+        return Some(equal_to_right.build().negate(db));
     }
+
+    let equal_to_right = equal_to_right.build();
 
     match left.resolve_type_alias(db) {
         Type::Union(union) => union
@@ -564,6 +582,38 @@ fn builtin_literal_constraint<'db>(
         left => is_builtin_literal_type(db, left),
     }
     .then_some(equal_to_right)
+}
+
+/// Add finite enum members in `ty` that are known to compare equal to `right`.
+fn add_equal_enum_literals<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    right: LiteralValueTypeKind<'db>,
+    operator: ComparisonOperator,
+    mut builder: UnionBuilder<'db>,
+) -> UnionBuilder<'db> {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                builder = add_equal_enum_literals(db, *element, right, operator, builder);
+            }
+        }
+        Type::LiteralValue(literal) => {
+            if matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
+                && known_literal_equality(db, literal.kind(), right, operator) == Some(true)
+            {
+                builder = builder.add(Type::LiteralValue(literal));
+            }
+        }
+        ty => {
+            if let Some(alternatives) = finite_alternatives(db, ty, operator) {
+                for alternative in alternatives {
+                    builder = add_equal_enum_literals(db, alternative, right, operator, builder);
+                }
+            }
+        }
+    }
+    builder
 }
 
 /// Return a constraint when every possible value of `left` is a member of the same enum as `right`.
