@@ -570,6 +570,7 @@ from enum import Enum, IntEnum
 from typing import Any, Literal, TypeVar
 
 T = TypeVar("T", bound=object)
+U = TypeVar("U")
 EQUAL_VALUES = TypeVar("EQUAL_VALUES", Literal[0], Literal[False])
 RUNTIME_TYPE_VAR = TypeVar("RUNTIME_TYPE_VAR")
 
@@ -627,6 +628,11 @@ def _(x: Any):
 def _(x: T):
     if x != Color.RED:
         reveal_type(x)  # revealed: T@_ & ~Literal[Color.RED]
+
+def _(x: U | Literal[Color.RED]):
+    if x == Color.RED:
+        return
+    reveal_type(x)  # revealed: U@_ & ~Literal[Color.RED]
 
 def _(x: Any, y: EQUAL_VALUES):
     if x != y:
