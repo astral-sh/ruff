@@ -241,16 +241,31 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
-/// Maximum number of pairwise checks introduced by expanding a finite comparison domain.
+/// Maximum number of recursive evaluations after both comparison operands branch.
 ///
 /// A large finite domain can still be compared with a single alternative because that work is
-/// linear. This limit only prevents Cartesian expansion when both operands can branch.
-const MAX_FINITE_COMPARISON_PAIRS: usize = 256;
+/// linear. This limit only bounds Cartesian work after both operands expand into alternatives.
+const MAX_CARTESIAN_EVALUATIONS: usize = 256;
 
-/// Tracks comparisons that are already in progress so recursive evaluation terminates.
+#[derive(Copy, Clone)]
+enum ComparisonOperand {
+    Target,
+    Other,
+}
+
+#[derive(Copy, Clone, Default)]
+struct ComparisonExpansion {
+    target: bool,
+    other: bool,
+}
+
+/// Tracks active comparisons and bounds recursive work after both operands branch.
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     active: FxHashSet<ComparisonKey<'db>>,
+    expansion: ComparisonExpansion,
+    cartesian_evaluations: usize,
+    exhausted: bool,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
@@ -258,7 +273,34 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             active: FxHashSet::default(),
+            expansion: ComparisonExpansion::default(),
+            cartesian_evaluations: 0,
+            exhausted: false,
         }
+    }
+
+    /// Evaluate with one operand expanded into multiple alternatives.
+    fn with_expansion(
+        &mut self,
+        operand: ComparisonOperand,
+        alternatives: usize,
+        evaluate: impl FnOnce(&mut Self) -> ComparisonResult<'db>,
+    ) -> ComparisonResult<'db> {
+        if self.exhausted {
+            return ComparisonResult::Ambiguous;
+        }
+        if alternatives <= 1 {
+            return evaluate(self);
+        }
+
+        let previous = self.expansion;
+        match operand {
+            ComparisonOperand::Target => self.expansion.target = true,
+            ComparisonOperand::Other => self.expansion.other = true,
+        }
+        let result = evaluate(self);
+        self.expansion = previous;
+        result
     }
 
     /// Evaluate a comparison recursively, treating `left` as the operand being constrained.
@@ -288,6 +330,15 @@ impl<'db> ComparisonEvaluator<'db> {
     ) -> ComparisonResult<'db> {
         let left = left.resolve_type_alias(self.db);
         let right = right.resolve_type_alias(self.db);
+        let is_root = self.active.is_empty();
+
+        if is_root && known_comparison_domains_are_disjoint(self.db, left, right, operator) {
+            return operator.result_from_equality(false);
+        }
+        if self.exhausted {
+            return ComparisonResult::Ambiguous;
+        }
+
         let key = ComparisonKey {
             left,
             right,
@@ -301,9 +352,24 @@ impl<'db> ComparisonEvaluator<'db> {
             return ComparisonResult::Ambiguous;
         }
 
+        if self.expansion.target && self.expansion.other {
+            if self.cartesian_evaluations == MAX_CARTESIAN_EVALUATIONS {
+                self.exhausted = true;
+                self.active.remove(&key);
+                return ComparisonResult::Ambiguous;
+            }
+            self.cartesian_evaluations += 1;
+        }
+
         let result = evaluate_comparison_once(self, left, right, branch, operator);
         self.active.remove(&key);
-        result
+        // Exhaustion can happen after an outer union has accumulated partial results. Discard the
+        // entire root result so traversal order cannot affect narrowing.
+        if is_root && self.exhausted {
+            ComparisonResult::Ambiguous
+        } else {
+            result
+        }
     }
 }
 
@@ -318,13 +384,6 @@ fn evaluate_comparison_once<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
-
-    if !comparison_expansion_is_within_limit(db, left, right, operator) {
-        if known_comparison_domains_are_disjoint(db, left, right, operator) {
-            return operator.result_from_equality(false);
-        }
-        return ComparisonResult::Ambiguous;
-    }
 
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
@@ -408,13 +467,19 @@ fn evaluate_comparison_once<'db>(
         (other, Type::Union(union)) => {
             evaluate_union_right(evaluator, other, union.elements(db), branch, operator)
         }
-        (Type::Intersection(intersection), other) => evaluate_intersection_left(
-            evaluator,
-            Type::Intersection(intersection),
-            intersection.positive(db),
-            other,
-            branch,
-            operator,
+        (Type::Intersection(intersection), other) => evaluator.with_expansion(
+            ComparisonOperand::Target,
+            intersection.positive(db).len(),
+            |evaluator| {
+                evaluate_intersection_left(
+                    evaluator,
+                    Type::Intersection(intersection),
+                    intersection.positive(db),
+                    other,
+                    branch,
+                    operator,
+                )
+            },
         ),
 
         (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
@@ -793,8 +858,10 @@ fn evaluate_union_left<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
-    evaluate_target_union(db, elements, branch, |element| {
-        evaluator.evaluate(element, other, branch, operator)
+    evaluator.with_expansion(ComparisonOperand::Target, elements.len(), |evaluator| {
+        evaluate_target_union(db, elements, branch, |element| {
+            evaluator.evaluate(element, other, branch, operator)
+        })
     })
 }
 
@@ -886,14 +953,16 @@ fn evaluate_union_right<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
-    evaluate_against_results(
-        db,
-        left,
-        branch,
-        elements
-            .iter()
-            .map(|element| evaluator.evaluate(left, *element, branch, operator)),
-    )
+    evaluator.with_expansion(ComparisonOperand::Other, elements.len(), |evaluator| {
+        evaluate_against_results(
+            db,
+            left,
+            branch,
+            elements
+                .iter()
+                .map(|element| evaluator.evaluate(left, *element, branch, operator)),
+        )
+    })
 }
 
 /// Combine comparison results produced by alternatives of the non-target operand.
@@ -1019,78 +1088,6 @@ fn finite_alternatives<'db>(
         }
         _ => None,
     }
-}
-
-/// Return whether recursively expanding both operands stays within the comparison work budget.
-fn comparison_expansion_is_within_limit(
-    db: &dyn Db,
-    left: Type,
-    right: Type,
-    operator: ComparisonOperator,
-) -> bool {
-    let left_alternatives = comparison_operand_branch_count(db, left, true, operator);
-    let right_alternatives = comparison_operand_branch_count(db, right, false, operator);
-    left_alternatives <= 1
-        || right_alternatives <= 1
-        || left_alternatives
-            .checked_mul(right_alternatives)
-            .is_some_and(|pairs| pairs <= MAX_FINITE_COMPARISON_PAIRS)
-}
-
-/// Estimate how many alternatives the evaluator visits after recursively unpacking `ty`.
-///
-/// The count stops once it exceeds the finite-comparison work budget. Re-entering a type that is
-/// still active also exceeds the estimate conservatively so recursive types cannot make this walk
-/// cycle. Completed shared subgraphs are counted again because the evaluator revisits them.
-fn comparison_operand_branch_count(
-    db: &dyn Db,
-    ty: Type,
-    is_target: bool,
-    operator: ComparisonOperator,
-) -> usize {
-    let over_limit = MAX_FINITE_COMPARISON_PAIRS + 1;
-    let mut pending = vec![(ty, false)];
-    let mut active = FxHashSet::default();
-    let mut count = 0usize;
-
-    while let Some((ty, exiting)) = pending.pop() {
-        let ty = ty.resolve_type_alias(db);
-        if exiting {
-            active.remove(&ty);
-            continue;
-        }
-        if !active.insert(ty) {
-            return over_limit;
-        }
-        pending.push((ty, true));
-
-        if let Some(alternatives) = finite_alternatives(db, ty, operator) {
-            count = count.saturating_add(alternatives.len());
-        } else if let Some(inner) = comparison_wrapper_inner_type(db, ty) {
-            pending.push((inner, false));
-        } else {
-            match ty {
-                Type::Union(union) => {
-                    pending.extend(union.elements(db).iter().map(|element| (*element, false)));
-                }
-                Type::Intersection(intersection) if is_target => {
-                    pending.extend(
-                        intersection
-                            .positive(db)
-                            .iter()
-                            .map(|element| (*element, false)),
-                    );
-                }
-                _ => count += 1,
-            }
-        }
-
-        if count > MAX_FINITE_COMPARISON_PAIRS {
-            return over_limit;
-        }
-    }
-
-    count
 }
 
 /// Return a constraint for literal pairs whose equality cannot be decided statically.
