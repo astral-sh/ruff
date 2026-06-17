@@ -1,3 +1,4 @@
+use crate::edit::ToRangeExt;
 use crate::server::Result;
 use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
@@ -8,6 +9,7 @@ use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_python_ast::SourceType;
 use ruff_source_file::OneIndexed;
+use ruff_text_size::{TextRange, TextSize};
 use std::fmt::Write;
 
 pub(crate) struct Hover;
@@ -98,6 +100,10 @@ pub(crate) fn hover(
             cursor >= (identifier.start() + identifiers_start)
                 && cursor < (identifier.end() + identifiers_start)
         })?;
+    let identifier_range = TextRange::new(
+        line_range.start() + TextSize::try_from(identifiers_start + identifier.start()).ok()?,
+        line_range.start() + TextSize::try_from(identifiers_start + identifier.end()).ok()?,
+    );
 
     // Get the rule for the identifier under the cursor.
     let identifier = identifier.as_str();
@@ -120,7 +126,11 @@ pub(crate) fn hover(
             value: output,
         }
         .into(),
-        range: None,
+        range: Some(identifier_range.to_range(
+            document.contents(),
+            document.index(),
+            snapshot.encoding(),
+        )),
     };
 
     Some(hover)
