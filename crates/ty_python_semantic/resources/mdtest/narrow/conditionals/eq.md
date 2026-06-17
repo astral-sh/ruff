@@ -125,7 +125,8 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
 `IntEnum` members from different classes compare using their integer values:
 
 ```py
-from enum import IntEnum
+from enum import IntEnum, auto
+from typing import Literal
 
 class Foo(IntEnum):
     X = 1
@@ -160,6 +161,21 @@ def _(value: Foo | Shifted):
         reveal_type(value)  # revealed: Literal[Foo.X] | Shifted
     else:
         reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
+
+# `int.__new__` converts the generated string to `1` at runtime.
+class Generated(IntEnum):
+    # error: [invalid-method-override]
+    def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
+        return "1"
+
+    ONE = auto()
+
+class Other(IntEnum):
+    ONE = 1
+
+def _(value: Generated | Other):
+    if value == Generated.ONE:
+        reveal_type(value)  # revealed: Generated | Other
 ```
 
 An assignment to `__new__`, `__init__`, or other methods can replace the value declared in the class

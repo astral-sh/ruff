@@ -356,7 +356,17 @@ impl<'db> EnumMetadata<'db> {
         } else if is_auto
             && let Some(function) = self.value_construction.generate_next_value.function()
         {
-            Some(function.signature(db).overload_return_type_or_unknown(db))
+            let generated = function.signature(db).overload_return_type_or_unknown(db);
+            if self
+                .value_annotation
+                .is_some_and(|annotation| !generated.is_assignable_to(db, annotation))
+            {
+                // The inherited value constructor can normalize the generated value. For
+                // example, `IntEnum` converts `"1"` to `1` through `int.__new__`.
+                None
+            } else {
+                Some(generated)
+            }
         } else {
             // TODO: `IntEnum` normalizes boolean member values to `int`. The declared boolean has
             // the same equality behavior, but we do not model the exact runtime `.value` here.
