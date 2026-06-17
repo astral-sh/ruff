@@ -418,8 +418,8 @@ reveal_type(Derived().f(1))  # revealed: str
 
 ### Implicit receivers in final classes
 
-For a final class, including a generic final class, an implicit `type[Self]` receiver refers to the
-exact class object and can bind to another classmethod on that class:
+For a final class, an implicit `type[Self]` receiver is compatible with the exact class object. For
+a generic final class, that exact class object is a generic alias:
 
 ```toml
 [environment]
@@ -427,17 +427,16 @@ python-version = "3.12"
 ```
 
 ```py
+from __future__ import annotations
+
 from typing import final
 from ty_extensions import TypeOf
 
 @final
 class Final:
     @classmethod
-    def call_from_classmethod(cls) -> None:
+    def call_method(cls) -> None:
         cls.method()
-
-    def call_from_instance(self) -> None:
-        self.method()
 
     @classmethod
     def method(cls) -> None: ...
@@ -445,15 +444,8 @@ class Final:
 @final
 class GenericFinal[T]:
     @classmethod
-    def call_from_classmethod(cls) -> None:
-        cls.method()
-        exact: TypeOf[GenericFinal[T]] = cls
-
-    def call_from_instance(self) -> None:
-        self.method()
-
-    @classmethod
-    def method(cls) -> None: ...
+    def class_object(cls) -> TypeOf[GenericFinal[T]]:
+        return cls
 ```
 
 ### Accessing the classmethod as a static member
