@@ -572,7 +572,17 @@ impl Expander {
     }
 
     fn cpp_method(&mut self, ns: &str, model_iri: &str, method: &CppMethod) {
-        let method_iri = format!("{model_iri}.{}", method.name);
+        // Per-overload identity: append `(<comma-joined-param-types>)` so
+        // overloaded methods (`void f(int)` + `void f(double)`) get distinct
+        // method IRIs (`Foo.f(int)` vs `Foo.f(double)`). Otherwise their
+        // signature triples (returns_type / has_param_type / is_noexcept …) all
+        // attach to the same `Foo.f` node and the codegen can't reconstruct the
+        // two separate overloads. Codex P2 #17.
+        let method_iri = format!(
+            "{model_iri}.{}({})",
+            method.name,
+            method.param_types.join(",")
+        );
         // Universal classification — same shape the core 7 give a Function.
         self.push(
             method_iri.clone(),
@@ -628,6 +638,41 @@ impl Expander {
                 method_iri.clone(),
                 Predicate::DefinesOperator,
                 op.clone(),
+                Provenance::CppExtracted,
+            );
+        }
+        // AST-DLL signature shape: return type (one edge) + parameter types (one
+        // edge each, `<index>:<type>` so the unordered triple set keeps order).
+        if let Some(ret) = &method.return_type {
+            self.push(
+                method_iri.clone(),
+                Predicate::ReturnsType,
+                ret.clone(),
+                Provenance::CppExtracted,
+            );
+        }
+        for (i, param) in method.param_types.iter().enumerate() {
+            self.push(
+                method_iri.clone(),
+                Predicate::HasParamType,
+                format!("{i}:{param}"),
+                Provenance::CppExtracted,
+            );
+        }
+        // ORM-downcast shape: const = read accessor, static = class-level.
+        if method.is_const {
+            self.push(
+                method_iri.clone(),
+                Predicate::IsConst,
+                "true".to_string(),
+                Provenance::CppExtracted,
+            );
+        }
+        if method.is_static {
+            self.push(
+                method_iri.clone(),
+                Predicate::IsStatic,
+                "true".to_string(),
                 Provenance::CppExtracted,
             );
         }
@@ -1041,7 +1086,7 @@ mod tests {
     /// macro that declared it. Downstream schema codegen reads this to
     /// gate FK-column emission (only `belongs_to` puts a column on the
     /// declaring class; `has_many`/`has_one` keep the FK on the other
-    /// table — without the kind triple, ~57 % of the OpenProject
+    /// table — without the kind triple, ~57 % of the `OpenProject`
     /// corpus's record FKs are phantom).
     #[test]
     fn ar_shape_emits_association_kind_per_relation() {
@@ -1392,9 +1437,13 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Tesseract::Classify.Recognize".to_string()),
+            overrides: Some("Tesseract::Classify.Recognize(int,const Image &)".to_string()),
             operator_kind: None,
             requires_clause: None,
+            return_type: Some("int".to_string()),
+            param_types: vec!["int".to_string(), "const Image &".to_string()],
+            is_const: true,
+            is_static: false,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -1404,6 +1453,10 @@ mod tests {
             overrides: None,
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
+            is_const: false,
+            is_static: false,
         });
         rec.methods.push(CppMethod {
             name: "kMaxRating".to_string(),
@@ -1413,6 +1466,10 @@ mod tests {
             overrides: None,
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
+            is_const: false,
+            is_static: true,
         });
         rec.methods.push(CppMethod {
             name: "operator==".to_string(),
@@ -1422,6 +1479,10 @@ mod tests {
             overrides: None,
             operator_kind: Some("operator==".to_string()),
             requires_clause: Some("std::equality_comparable<T>".to_string()),
+            return_type: None,
+            param_types: Vec::new(),
+            is_const: false,
+            is_static: false,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -1464,14 +1525,14 @@ mod tests {
             "ogit:Property"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int,const Image &)",
             "rdf:type",
             "ogit:Function"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer",
             "has_function",
-            "cpp:Tesseract::Recognizer.Recognize"
+            "cpp:Tesseract::Recognizer.Recognize(int,const Image &)"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer",
@@ -1499,10 +1560,17 @@ mod tests {
         assert!(has("is_constexpr", "constexpr"));
         assert!(has(
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize(int,const Image &)"
         ));
         assert!(has("defines_operator", "operator=="));
         assert!(has("requires_concept", "std::equality_comparable<T>"));
+        // AST-DLL signature shape: return type + ordered (index-prefixed) params.
+        assert!(has("returns_type", "int"));
+        assert!(has("has_param_type", "0:int"));
+        assert!(has("has_param_type", "1:const Image &"));
+        // ORM-downcast shape: const (read accessor) + static (class-level).
+        assert!(has("is_const", "true"));
+        assert!(has("is_static", "true"));
     }
 
     #[test]
@@ -1550,6 +1618,10 @@ mod tests {
             "is_noexcept",
             "requires_concept",
             "static_asserts",
+            "returns_type",
+            "has_param_type",
+            "is_const",
+            "is_static",
         ] {
             assert!(
                 seen.contains(p),
@@ -1576,6 +1648,10 @@ mod tests {
             "is_noexcept",
             "requires_concept",
             "static_asserts",
+            "returns_type",
+            "has_param_type",
+            "is_const",
+            "is_static",
         ];
         for graph in [fixture(), ar_fixture()] {
             let triples = expand(&graph);

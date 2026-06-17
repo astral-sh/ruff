@@ -29,11 +29,14 @@
 //! process-singleton — call [`walk_tu`] sequentially, never from parallel
 //! threads in the same process.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
 use clang::{Accessibility, Clang, Entity, EntityKind, ExceptionSpecification, Index};
-use ruff_spo_triplet::{CppAccess, CppBase, CppField, CppMethod};
+use ruff_spo_triplet::{
+    CppAccess, CppBase, CppField, CppFriend, CppMethod, CppTemplate, CppTemplateKind,
+};
 
 use crate::{CppClass, Declaration};
 
@@ -81,12 +84,97 @@ pub fn walk_tu(path: &Path, args: &[String]) -> Result<Vec<CppClass>, WalkError>
     Ok(out)
 }
 
+/// Coverage instrumentation for `CPP-SCHEMA-FIT`: tally the libclang
+/// `EntityKind` of every DIRECT class-body child cursor across all
+/// (non-system-header) class/struct definitions in the TU.
+///
+/// The key is the `EntityKind` `Debug` name (e.g. `"Method"`, `"FieldDecl"`,
+/// `"FriendDecl"`); the value is how many times that kind appears as a direct
+/// member. The caller computes the *mapped fraction* — `BaseSpecifier` +
+/// `FieldDecl` + `Method` are exactly the kinds [`build_class`] turns into a
+/// [`Declaration`] today — versus the total, so a real-corpus walk shows which
+/// constructs the walker silently drops (the walker-follow-up backlog:
+/// `FriendDecl`, `StaticAssert`, templates, …) rather than asserting coverage.
+/// Counts only meaningful cursors; access specifiers and comments are reported
+/// in the histogram like everything else so the caller can classify them.
+pub fn class_body_cursor_histogram(
+    path: &Path,
+    args: &[String],
+) -> Result<BTreeMap<String, usize>, WalkError> {
+    let clang = Clang::new().map_err(WalkError::Libclang)?;
+    let index = Index::new(&clang, false, false);
+    let tu = index
+        .parser(path)
+        .arguments(args)
+        .skip_function_bodies(true)
+        .parse()
+        .map_err(|e| WalkError::Parse(e.to_string()))?;
+    let mut hist = BTreeMap::new();
+    tally_class_bodies(&tu.get_entity(), &mut hist);
+    Ok(hist)
+}
+
+/// The kinds [`build_class`] maps to a [`Declaration`] today — the "covered"
+/// set for the `CPP-SCHEMA-FIT` mapped-fraction. Kept beside the walker so the
+/// coverage probe and the actual extraction can never drift apart. The
+/// function-like kinds (`Method` / `Constructor` / `Destructor` /
+/// `ConversionFunction` / `FunctionTemplate`) become a `has_function`;
+/// `FieldDecl` + `VarDecl` (static members) become `has_field`; `FriendDecl`
+/// becomes `is_friend_of`; `BaseSpecifier` becomes `inherits_from`.
+pub const MAPPED_CURSOR_KINDS: [&str; 9] = [
+    "BaseSpecifier",
+    "FieldDecl",
+    "VarDecl",
+    "Method",
+    "Constructor",
+    "Destructor",
+    "ConversionFunction",
+    "FunctionTemplate",
+    "FriendDecl",
+];
+
+/// Mirror of [`collect_classes`] that tallies direct class-body child kinds
+/// instead of building [`CppClass`]es (same class-selection + system-header
+/// filtering, so the histogram counts exactly the bodies the walker extracts).
+fn tally_class_bodies(entity: &Entity, hist: &mut BTreeMap<String, usize>) {
+    for child in entity.get_children() {
+        match child.get_kind() {
+            // Kept in lockstep with `collect_classes`: templated classes count
+            // too, so the coverage histogram reflects exactly what is harvested.
+            EntityKind::ClassDecl
+            | EntityKind::StructDecl
+            | EntityKind::ClassTemplate
+            | EntityKind::ClassTemplatePartialSpecialization => {
+                if child.is_definition() && !in_system_header(&child) {
+                    for member in child.get_children() {
+                        *hist.entry(format!("{:?}", member.get_kind())).or_insert(0) += 1;
+                    }
+                }
+                tally_class_bodies(&child, hist);
+            }
+            EntityKind::Namespace => tally_class_bodies(&child, hist),
+            _ => {}
+        }
+    }
+}
+
 /// Recurse the AST, emitting a [`CppClass`] for every class/struct
 /// definition (recursing into namespaces and nested classes).
 fn collect_classes(entity: &Entity, out: &mut Vec<CppClass>) {
     for child in entity.get_children() {
         match child.get_kind() {
-            EntityKind::ClassDecl | EntityKind::StructDecl => {
+            // Plain classes/structs AND templated classes. libclang FLATTENS a
+            // template cursor — its direct children are the template params
+            // (skipped by `build_class`'s `_` arm) + the members — so the same
+            // `build_class` handles all four unchanged. The harvested name is the
+            // bare template name (`GenericVector`, no `<T>`). Shape A: template
+            // classes become classes; the template-relationship predicates
+            // (`template_specialises` / `template_instantiates`) are a separate,
+            // data-driven follow-up (ccutil measured 0 explicit specialisations).
+            EntityKind::ClassDecl
+            | EntityKind::StructDecl
+            | EntityKind::ClassTemplate
+            | EntityKind::ClassTemplatePartialSpecialization => {
                 // Skip class definitions originating in system headers (the
                 // std:: / __gnu_cxx:: machinery dragged in transitively) — an
                 // SPO harvest of a project wants the project's own classes,
@@ -109,7 +197,17 @@ fn collect_classes(entity: &Entity, out: &mut Vec<CppClass>) {
 /// DIRECT member children (bases, fields, methods). Nested class decls are
 /// ignored here — [`collect_classes`] emits them separately.
 fn build_class(e: &Entity) -> Option<CppClass> {
-    let name = e.get_name()?;
+    // A `ClassTemplatePartialSpecialization` shares its primary's `get_name()`
+    // (libclang spells it as the bare template name, e.g. `Foo` for
+    // `template<class T> class Foo<T*>`); using that as-is collides with the
+    // primary in the cross-TU `BTreeMap` dedup, dropping one of the two. Use
+    // the cursor's `get_display_name()` instead — it carries the partial-spec
+    // arguments (`Foo<T *>`) so the qualified name stays distinct. Codex P2 #17.
+    let name = if matches!(e.get_kind(), EntityKind::ClassTemplatePartialSpecialization) {
+        e.get_display_name()?
+    } else {
+        e.get_name()?
+    };
     let namespace = enclosing_scopes(e);
     let mut declarations = Vec::new();
     for m in e.get_children() {
@@ -119,17 +217,51 @@ fn build_class(e: &Entity) -> Option<CppClass> {
                     declarations.push(Declaration::Base(base));
                 }
             }
-            EntityKind::FieldDecl => {
+            // FieldDecl = a non-static data member; a VarDecl in a class body is
+            // a STATIC data member (`static T x;`, libclang's distinct kind).
+            // Both are data members the class HAS → has_field.
+            EntityKind::FieldDecl | EntityKind::VarDecl => {
+                let type_name = m
+                    .get_type()
+                    .map(|t| t.get_display_name())
+                    .unwrap_or_default();
+                // A field whose type is a template-id (`GenericVector<char>`) is a
+                // template INSTANTIATION use. `cpp_field` drops `type_name`, so
+                // this is otherwise invisible in the triples — surface it as
+                // `template_instantiates` (Inferred: single-TU instantiation
+                // visibility is incomplete by construction).
+                if let Some(inst) = template_instantiation(&type_name) {
+                    declarations.push(Declaration::Template(CppTemplate {
+                        kind: CppTemplateKind::Instantiation,
+                        name: inst,
+                    }));
+                }
                 declarations.push(Declaration::Field(CppField {
                     name: m.get_name().unwrap_or_default(),
-                    type_name: m
-                        .get_type()
-                        .map(|t| t.get_display_name())
-                        .unwrap_or_default(),
+                    type_name,
                 }));
             }
-            EntityKind::Method => {
+            // Constructors, destructors, conversion operators, and member
+            // function templates are all member FUNCTIONS that libclang reports
+            // under cursor kinds distinct from `Method`; the harvester captures
+            // every one as a `has_function`. CPP-SCHEMA-FIT measured 495 such
+            // cursors silently dropped across ccutil when only `Method` matched
+            // (the ctor/dtor coverage gap: 82% → ~90%).
+            EntityKind::Method
+            | EntityKind::Constructor
+            | EntityKind::Destructor
+            | EntityKind::ConversionFunction
+            | EntityKind::FunctionTemplate => {
                 declarations.push(Declaration::Method(build_method(&m)));
+                collect_signature_instantiations(&m, &mut declarations);
+            }
+            // `friend class Foo;` / `friend Ret fn(...);` — the befriended
+            // entity. CPP-SCHEMA-FIT measured 79 in ccutil; the `is_friend_of`
+            // predicate + `CppFriend` IR already exist (PR #8).
+            EntityKind::FriendDecl => {
+                if let Some(friend) = build_friend(&m) {
+                    declarations.push(Declaration::Friend(friend));
+                }
             }
             _ => {}
         }
@@ -139,6 +271,72 @@ fn build_class(e: &Entity) -> Option<CppClass> {
         name,
         declarations,
     })
+}
+
+/// Extract the befriended entity's name from a `friend` declaration cursor.
+///
+/// The befriended entity is the `FriendDecl`'s child cursor (the `FriendDecl`
+/// itself is anonymous). For `friend class Foo;` the child is a `TypeRef` whose
+/// referenced TYPE display is the clean fully-qualified name
+/// (`Tesseract::TessdataManager`) — the cursor *spelling* would carry a
+/// `class `/`struct ` elaboration, so we read the type, not the spelling. For
+/// `friend Ret fn(...);` the child is the friend `FunctionDecl`, whose own name
+/// is what `is_friend_of` should point to.
+fn build_friend(m: &Entity) -> Option<CppFriend> {
+    for child in m.get_children() {
+        let name = match child.get_kind() {
+            EntityKind::TypeRef => child.get_type().map(|t| t.get_display_name()),
+            _ => child.get_name(),
+        };
+        if let Some(name) = name.filter(|s| !s.is_empty()) {
+            return Some(CppFriend { name });
+        }
+    }
+    None
+}
+
+/// The template-id (`Foo<Args>`) a type display denotes, if it is a template
+/// **instantiation** use — stripping a leading `const`/`volatile` and trailing
+/// `*`/`&`. `int` → `None`; `const GenericVector<char> &` → `GenericVector<char>`.
+/// Verbatim `Foo<Args>` form, per the `CppTemplate::name` IR convention. This is
+/// a SYNTACTIC use (deterministic per-TU), not an implicit-instantiation cursor
+/// (those are the per-TU-incomplete thing the Inferred provenance flags).
+fn template_instantiation(type_display: &str) -> Option<String> {
+    if !type_display.contains('<') {
+        return None;
+    }
+    let mut s = type_display.trim();
+    for pfx in ["const ", "volatile "] {
+        s = s.strip_prefix(pfx).map(str::trim_start).unwrap_or(s);
+    }
+    let s = s.trim_end_matches(['*', '&', ' ']);
+    (s.contains('<') && !s.is_empty()).then(|| s.to_string())
+}
+
+/// Push a `template_instantiates` declaration for every template-id in a method's
+/// RETURN type or PARAMETER types — the syntactic instantiation uses in a
+/// signature, which `cpp_method` does not otherwise surface. Applies to every
+/// function-like cursor (ctor/dtor have no/void result + their params).
+fn collect_signature_instantiations(m: &Entity, decls: &mut Vec<Declaration>) {
+    let mut type_displays: Vec<String> = Vec::new();
+    if let Some(ret) = m.get_result_type() {
+        type_displays.push(ret.get_display_name());
+    }
+    if let Some(args) = m.get_arguments() {
+        for arg in args {
+            if let Some(t) = arg.get_type() {
+                type_displays.push(t.get_display_name());
+            }
+        }
+    }
+    for ty in type_displays {
+        if let Some(inst) = template_instantiation(&ty) {
+            decls.push(Declaration::Template(CppTemplate {
+                kind: CppTemplateKind::Instantiation,
+                name: inst,
+            }));
+        }
+    }
 }
 
 /// Whether `e` is defined in a system header (std lib, libc, …). Entities
@@ -215,16 +413,41 @@ fn build_method(m: &Entity) -> CppMethod {
             .get(8)
             .is_none_or(|b| !(b.is_ascii_alphanumeric() || *b == b'_')))
     .then(|| name.clone());
-    // `override` target → the fully-qualified base method (`Base.method`), so
-    // `virtually_overrides` joins the base class's own method node (PR #9).
+    // `override` target → the fully-qualified base method with its overload
+    // signature (`Base.method(int)`), so `virtually_overrides` joins the
+    // **exact base overload** the derived method overrides — not just any
+    // method with the same name. The signature suffix matches the per-overload
+    // method-IRI convention `cpp_method` builds (codex P2 #17).
     let overrides = m
         .get_overridden_methods()
         .and_then(|ov| ov.into_iter().next())
         .and_then(|base_m| {
             let mname = base_m.get_name()?;
             let parent = base_m.get_semantic_parent()?;
-            Some(format!("{}.{mname}", qualified_name(&parent)))
+            let params: Vec<String> = base_m
+                .get_arguments()
+                .into_iter()
+                .flatten()
+                .filter_map(|a| a.get_type().map(|t| t.get_display_name()))
+                .collect();
+            Some(format!(
+                "{}.{mname}({})",
+                qualified_name(&parent),
+                params.join(",")
+            ))
         });
+    // AST-DLL signature shape: return type (skip void/ctor/dtor) + ordered
+    // parameter types, verbatim from the cursor.
+    let return_type = m
+        .get_result_type()
+        .map(|t| t.get_display_name())
+        .filter(|d| !d.is_empty() && d != "void");
+    let param_types = m
+        .get_arguments()
+        .into_iter()
+        .flatten()
+        .filter_map(|a| a.get_type().map(|t| t.get_display_name()))
+        .collect();
     CppMethod {
         name,
         is_pure_virtual: m.is_pure_virtual_method(),
@@ -234,5 +457,9 @@ fn build_method(m: &Entity) -> CppMethod {
         overrides,
         operator_kind,
         requires_clause: None,
+        return_type,
+        param_types,
+        is_const: m.is_const_method(),
+        is_static: m.is_static_method(),
     }
 }

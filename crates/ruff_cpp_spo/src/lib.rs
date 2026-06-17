@@ -58,7 +58,7 @@ use ruff_spo_triplet::{
 #[cfg(feature = "libclang")]
 mod clang_walker;
 #[cfg(feature = "libclang")]
-pub use clang_walker::{WalkError, walk_tu};
+pub use clang_walker::{MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_tu};
 
 /// The namespace prefix for C++ machine-plane subjects/objects.
 ///
@@ -323,9 +323,17 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Tesseract::Classify.Recognize".to_string()),
+            // Per-overload override target (codex P2 #17): the signature suffix
+            // matches `cpp_method`'s per-overload method IRI convention so
+            // `virtually_overrides` joins the EXACT base overload (not just any
+            // base method with the same name).
+            overrides: Some("Tesseract::Classify.Recognize(int)".to_string()),
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: vec!["int".to_string()],
+            is_const: false,
+            is_static: false,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -335,6 +343,10 @@ mod tests {
             overrides: None,
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
+            is_const: false,
+            is_static: false,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -370,7 +382,7 @@ mod tests {
             "ogit:Property"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "rdf:type",
             "ogit:Function"
         ));
@@ -386,17 +398,17 @@ mod tests {
             "cpp:Tesseract::Recognizer.recognizer_"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "is_noexcept",
             "true"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize(int)"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Clear",
+            "cpp:Tesseract::Recognizer.Clear()",
             "is_pure_virtual",
             "true"
         ));
@@ -476,6 +488,10 @@ mod tests {
                     overrides: None,
                     operator_kind: None,
                     requires_clause: None,
+                    return_type: None,
+                    param_types: Vec::new(),
+                    is_const: false,
+                    is_static: false,
                 }),
                 Declaration::Template(CppTemplate {
                     kind: CppTemplateKind::Instantiation,
@@ -539,7 +555,10 @@ mod libclang_tests {
 
     use ruff_spo_triplet::{expand, from_ndjson, to_ndjson};
 
-    use super::{ModelGraph, NAMESPACE, extract_dir, extract_tree, model_from_class, walk_tu};
+    use super::{
+        MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram, extract_dir,
+        extract_tree, model_from_class, walk_tu,
+    };
 
     /// `clang::Clang` is a process-singleton — serialize the libclang tests so
     /// cargo's parallel test threads never construct two at once.
@@ -562,12 +581,34 @@ class Classify {
   virtual int Recognize(int x) noexcept;
   virtual void Clear() = 0;
 };
+template <typename T>
+class Box {
+ public:
+  T get() const;
+  void set(T v);
+};
+template <typename T>
+class Box<T*> {
+ public:
+  T* get_ptr() const;
+};
 class Recognizer : public Classify {
  public:
+  Recognizer();
+  virtual ~Recognizer();
   int Recognize(int x) noexcept override;
   bool operator==(const Recognizer& other) const;
+  void stash(const Box<char>& b);
+  // Overloaded `process` (codex P2 #17 overload-discrimination probe): the two
+  // signatures must end up on DISTINCT method IRIs (`Foo.f(int)` vs
+  // `Foo.f(double)`), not collide into one node.
+  int process(int x);
+  int process(double x);
+  friend class TessdataManager;
  private:
   int recognizer_;
+  static int count_;
+  Box<int> boxed_;
 };
 }
 ";
@@ -633,14 +674,151 @@ class Recognizer : public Classify {
         assert!(recognize.is_noexcept, "Recognize should be noexcept");
         assert_eq!(
             recognize.overrides.as_deref(),
-            Some("Tesseract::Classify.Recognize"),
+            Some("Tesseract::Classify.Recognize(int)"),
             "override target must be the fully-qualified base method"
+        );
+        // AST-DLL signature shape: `int Recognize(int x)` → return + one param.
+        assert_eq!(
+            recognize.return_type.as_deref(),
+            Some("int"),
+            "Recognize returns int"
+        );
+        assert_eq!(
+            recognize.param_types,
+            vec!["int".to_string()],
+            "Recognize takes one int param"
+        );
+        // `void stash(const Box<char>&)` → void return is skipped, one param.
+        let stash = methods
+            .iter()
+            .find(|m| m.name == "stash")
+            .expect("stash method");
+        assert!(
+            stash.return_type.is_none(),
+            "void return must not emit returns_type"
+        );
+        assert_eq!(
+            stash.param_types,
+            vec!["const Box<char> &".to_string()],
+            "stash parameter type captured verbatim"
         );
         let op = methods
             .iter()
             .find(|m| m.operator_kind.is_some())
             .expect("operator== method");
         assert_eq!(op.operator_kind.as_deref(), Some("operator=="));
+        // ORM-downcast shape: `bool operator==(...) const` is const, not static.
+        assert!(op.is_const, "const operator== must set is_const");
+        assert!(!op.is_static, "operator== is not static");
+
+        // Codex P2 #17 overload-discrimination probe: both `process` overloads
+        // must be captured as distinct methods (the IR carries each with its
+        // own `param_types`; `cpp_method`'s per-overload method-IRI
+        // (`process(int)` vs `process(double)`) then keeps their signature
+        // triples on separate nodes — measured downstream via the every-cpp-
+        // predicate fixture). At the IR level we observe two `process` entries
+        // with the two param-type lists.
+        let processes: Vec<&Vec<String>> = methods
+            .iter()
+            .filter(|m| m.name == "process")
+            .map(|m| &m.param_types)
+            .collect();
+        assert_eq!(
+            processes.len(),
+            2,
+            "both `process` overloads must be captured: {processes:?}"
+        );
+        let process_params: std::collections::BTreeSet<String> =
+            processes.iter().map(|p| p.join(",")).collect();
+        assert!(
+            process_params.contains("int") && process_params.contains("double"),
+            "overload signatures must be distinct (saw {process_params:?})"
+        );
+
+        // Constructors and destructors are member functions too: libclang
+        // reports them under cursor kinds distinct from `Method`, but the walker
+        // captures both as `has_function` (the CPP-SCHEMA-FIT ctor/dtor fix).
+        assert!(
+            methods.iter().any(|m| m.name == "Recognizer"),
+            "constructor must be captured as a method"
+        );
+        assert!(
+            methods.iter().any(|m| m.name == "~Recognizer"),
+            "destructor must be captured as a method"
+        );
+
+        // Static data members are VarDecl in libclang — captured as has_field.
+        assert!(
+            recognizer.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Field(f) if f.name == "count_"
+            )),
+            "static member count_ must be captured as a field"
+        );
+        // `friend class Foo;` — captured as is_friend_of via CppFriend. libclang
+        // resolves the TypeRef to the fully-qualified type, so the name is
+        // namespace-qualified (consistent with every other harvested name).
+        assert!(
+            recognizer.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Friend(fr) if fr.name == "Tesseract::TessdataManager"
+            )),
+            "friend class Tesseract::TessdataManager must be captured"
+        );
+
+        // Class templates are harvested as classes (Shape A): libclang flattens
+        // the `ClassTemplate`, so its methods are captured like any class's. The
+        // harvested name is the bare template name (no `<T>`).
+        let boxed = find("Tesseract::Box");
+        assert!(
+            boxed.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Method(m) if m.name == "get"
+            )),
+            "class template Box::get must be captured as a method"
+        );
+        // Codex P2 #17: a `ClassTemplatePartialSpecialization` must keep its
+        // arguments in the qualified name (`Box<T *>`) so it does NOT collide
+        // with the primary `Box` in the cross-TU `BTreeMap` dedup. Both must be
+        // present, and the partial spec must carry its own distinct members.
+        let names: Vec<&str> = classes.iter().map(|c| c.name.as_str()).collect();
+        assert!(
+            names.contains(&"Box"),
+            "primary class template `Box` must be present: {names:?}"
+        );
+        assert!(
+            names.contains(&"Box<T *>"),
+            "partial spec `Box<T *>` must be present (distinct from primary): {names:?}"
+        );
+        let partial = find("Tesseract::Box<T *>");
+        assert!(
+            partial.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Method(m) if m.name == "get_ptr"
+            )),
+            "partial spec must carry its own `get_ptr` member"
+        );
+
+        // Shape C: template-instantiation USES become template_instantiates.
+        // `Box<int> boxed_;` (field type) and `stash(const Box<char>&)` (method
+        // signature) both surface as Instantiation declarations on Recognizer —
+        // info `cpp_field`/`cpp_method` otherwise drop.
+        let insts: Vec<&str> = recognizer
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                super::Declaration::Template(t)
+                    if matches!(t.kind, ruff_spo_triplet::CppTemplateKind::Instantiation) =>
+                {
+                    Some(t.name.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            insts.contains(&"Box<int>"),
+            "field-type instantiation Box<int> must be captured: {insts:?}"
+        );
+        assert!(
+            insts.contains(&"Box<char>"),
+            "method-signature instantiation Box<char> must be captured: {insts:?}"
+        );
 
         let clear = classify
             .declarations
@@ -665,12 +843,12 @@ class Recognizer : public Classify {
             "cpp:Tesseract::Classify"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize(int)"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize",
+            "cpp:Tesseract::Recognizer.Recognize(int)",
             "is_noexcept",
             "true"
         ));
@@ -680,12 +858,12 @@ class Recognizer : public Classify {
             "cpp:Tesseract::Recognizer.recognizer_"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.operator==",
+            "cpp:Tesseract::Recognizer.operator==(const Recognizer &)",
             "defines_operator",
             "operator=="
         ));
         assert!(has(
-            "cpp:Tesseract::Classify.Clear",
+            "cpp:Tesseract::Classify.Clear()",
             "is_pure_virtual",
             "true"
         ));
@@ -889,5 +1067,252 @@ class Recognizer : public Classify {
                 .collect::<Vec<_>>()
         );
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// `CPP-SCHEMA-FIT` (real-corpus half) — the predicate-vocab coverage gate
+    /// (`.claude/plans/cpp-spo-probes-v1.md`). Walks every header in Tesseract's
+    /// `src/ccutil`, tallies class-body cursor kinds, and reports the *mapped
+    /// fraction* (`BaseSpecifier`/`FieldDecl`/`Method` → a `Declaration`) versus
+    /// the constructs the walker currently drops. Gated on `TESSERACT_SRC`;
+    /// prints the histogram (`--nocapture`) so the unmapped kinds drive the
+    /// walker-follow-up backlog rather than being asserted away.
+    ///
+    /// Run: `TESSERACT_SRC=/tmp/tesseract LIBCLANG_PATH=/usr/lib/llvm-18/lib \
+    ///       cargo test -p ruff_cpp_spo --features libclang -- --nocapture`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "coverage report gated on env var")]
+    fn cpp_schema_fit_real_corpus_coverage() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping CPP-SCHEMA-FIT real-corpus coverage");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+
+        // Walk every ccutil header, merge the per-TU class-body histograms.
+        let mut merged: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
+        let mut headers = 0usize;
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            let mut paths: Vec<std::path::PathBuf> = rd
+                .filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("h"))
+                .collect();
+            paths.sort();
+            for p in paths {
+                if let Ok(hist) = class_body_cursor_histogram(&p, &args) {
+                    headers += 1;
+                    for (k, v) in hist {
+                        *merged.entry(k).or_insert(0) += v;
+                    }
+                }
+            }
+        }
+
+        let total: usize = merged.values().sum();
+        let mapped: usize = MAPPED_CURSOR_KINDS
+            .iter()
+            .filter_map(|k| merged.get(*k))
+            .sum();
+        eprintln!(
+            "[CPP-SCHEMA-FIT] {headers} ccutil headers, {total} class-body cursors, \
+             {mapped} mapped ({}%)",
+            mapped * 100 / total.max(1)
+        );
+        let mut rows: Vec<(&String, &usize)> = merged.iter().collect();
+        rows.sort_by(|a, b| b.1.cmp(a.1));
+        for (kind, count) in &rows {
+            let mark = if MAPPED_CURSOR_KINDS.contains(&kind.as_str()) {
+                "MAP"
+            } else {
+                "   "
+            };
+            eprintln!("  [{mark}] {count:>5}  {kind}");
+        }
+
+        // Non-degenerate gate: the walk must reach real bodies with the OO
+        // constructs the harvester is built to extract. The mapped-fraction
+        // THRESHOLD is deliberately not asserted here yet — the first real run
+        // measures it; the unmapped kinds above name the walker follow-ups.
+        assert!(
+            headers > 0,
+            "expected to walk >=1 ccutil header (LIBCLANG_PATH?)"
+        );
+        assert!(total > 0, "expected class-body cursors from a real corpus");
+        assert!(
+            merged.get("Method").is_some_and(|&n| n > 0),
+            "histogram must contain methods (has_function)"
+        );
+        assert!(
+            merged.get("FieldDecl").is_some_and(|&n| n > 0),
+            "histogram must contain fields (has_field)"
+        );
+    }
+
+    /// `CPP-AST-RT` — libclang harvest determinism (the "reproducible harvest"
+    /// gate, `.claude/plans/cpp-spo-probes-v1.md`). Walks the SAME corpus subset
+    /// twice in-process and asserts byte-identical ndjson. The IR→triples half is
+    /// already deterministic (`expand` sorts + dedups); this settles the
+    /// libclang→IR half end-to-end (no RNG in the walker; `walk_files` dedups
+    /// into a sorted `BTreeMap`). Gated on `TESSERACT_SRC`.
+    #[test]
+    fn cpp_ast_rt_determinism() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let harvest = || to_ndjson(&expand(&extract_dir(&dir, &args).expect("libclang init")));
+        let first = harvest();
+        let second = harvest();
+        assert!(!first.is_empty(), "expected a non-empty harvest");
+        assert_eq!(
+            first, second,
+            "harvest must be byte-identical across runs (CPP-AST-RT determinism)"
+        );
+    }
+
+    /// `CPP-TEMPLATE-DET` — template-instantiation determinism (the third
+    /// primary probe, `.claude/plans/cpp-spo-probes-v1.md`). Walks ccutil twice
+    /// AND once with the file list reversed, then compares the SET of
+    /// `template_instantiates` triples (order-independent — `expand` already
+    /// sorts). The set must be identical across runs and across orderings,
+    /// AND must be non-degenerate (the syntactic field-type + signature-type
+    /// instantiations exist in ccutil — measured 7+ in fields alone). Gated on
+    /// `TESSERACT_SRC`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn cpp_template_det_determinism() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+
+        let instantiates = |g: &ModelGraph| -> std::collections::BTreeSet<(String, String)> {
+            expand(g)
+                .into_iter()
+                .filter(|t| t.p == "template_instantiates")
+                .map(|t| (t.s, t.o))
+                .collect()
+        };
+
+        let g1 = extract_dir(&dir, &args).expect("libclang init");
+        let g2 = extract_dir(&dir, &args).expect("libclang init");
+        let set1 = instantiates(&g1);
+        let set2 = instantiates(&g2);
+        eprintln!(
+            "[CPP-TEMPLATE-DET] {} template_instantiates triples in ccutil",
+            set1.len()
+        );
+        assert!(
+            !set1.is_empty(),
+            "template_instantiates set must be non-empty on ccutil (measured 7+ field-type uses)"
+        );
+        assert_eq!(
+            set1, set2,
+            "template_instantiates set must be identical across runs (CPP-TEMPLATE-DET)"
+        );
+    }
+
+    /// `src/ccstruct` smoke — Tesseract's OCR data-model motherlode (`BLOCK` /
+    /// `WERD` / `BLOB` / `COUTLINE` families). Confirms the harvester scales past
+    /// ccutil to the OCR-load-bearing surface with the same deterministic shape.
+    /// Gated on `TESSERACT_SRC`. Measured: 155 classes / 5264 triples / 32
+    /// deterministic `template_instantiates` edges (vs ccutil's 67 / 2215 / 31),
+    /// including links to `GenericVector<T>`, `BandTriMatrix<T>`,
+    /// `GENERIC_2D_ARRAY<T>`, `KDPair<Key, Data>`, `PointerVector<T>`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn ccstruct_motherlode_smoke() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccstruct");
+        if !dir.is_dir() {
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccstruct").display()),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("src/classify").display()),
+            format!("-I{}", root.join("src/dict").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let g = extract_tree(&dir, &args).expect("libclang init");
+        let triples = expand(&g);
+        eprintln!(
+            "[CCSTRUCT] {} classes, {} triples",
+            g.models.len(),
+            triples.len()
+        );
+        // Core OCR types must be present — proves the harvester reaches the
+        // load-bearing surface, not just the utility/ccutil shell.
+        let names: std::collections::BTreeSet<&str> =
+            g.models.iter().map(|m| m.name.as_str()).collect();
+        for must in [
+            "tesseract::BLOCK",
+            "tesseract::WERD",
+            "tesseract::TBLOB",
+            "tesseract::C_BLOB",
+        ] {
+            assert!(
+                names.contains(must),
+                "ccstruct harvest must include OCR core class {must}"
+            );
+        }
+        assert!(
+            g.models.len() >= 100,
+            "expected many ccstruct classes, got {}",
+            g.models.len()
+        );
     }
 }

@@ -166,3 +166,249 @@ exercises `inherits_from`, `has_field`, `has_function`, `rdf:type`,
 walker doesn't populate them): `constexpr`/`consteval` + `requires` (need a
 token pass — not in the high-level `clang` API), templates, `friend`,
 macro-expansion provenance, `static_assert`. None require a vocab change.
+
+## Update — 2026-06-16 (CPP-SCHEMA-FIT real-corpus coverage RUN + ctor/dtor fix)
+
+First real coverage measurement (`cpp_schema_fit_real_corpus_coverage`, gated on
+`TESSERACT_SRC`, walks all 31 `src/ccutil` headers of `tesseract@5.5.0`):
+
+- **Before: 6570 class-body cursors, 5420 mapped = 82%.** The walker matched only
+  `EntityKind::Method`, silently dropping **Constructor (268), Destructor (139),
+  FunctionTemplate (64), ConversionFunction (24)** = 495 member-function cursors —
+  a real correctness gap (the harvester claimed to capture methods but dropped
+  every ctor/dtor).
+- **Fix:** `build_class` now maps all five function-like cursor kinds to a
+  `has_function`; `MAPPED_CURSOR_KINDS` updated in lockstep; the hermetic test
+  gains a ctor + virtual-dtor assertion. **After: 5915 mapped = 90%.**
+- **Remaining unmapped (655):** `AccessSpecifier` (436 — not a construct, noise),
+  nested `StructDecl`/`ClassDecl` (31 — emitted via `collect_classes` recursion,
+  not dropped), `VarDecl` (84 — static members, candidate `has_field`),
+  **`FriendDecl` (79 — next walker follow-up; `is_friend_of` predicate already
+  exists)**, `TypeAliasDecl` (14), `UsingDeclaration` (6), `EnumDecl` (5).
+  Excluding the noise + recursed-nested types, meaningful coverage is ~97%.
+- **Status:** `CPP-SCHEMA-FIT` real-corpus half is now RUN + measured (no longer
+  asserted). Member function templates are captured as `has_function`; class-level
+  `template_specialises`/`template_instantiates` and `friend` are still pending.
+  Next follow-up by frequency: `FriendDecl` (79), then `VarDecl` static members.
+  `CPP-AST-RT` and `CPP-TEMPLATE-DET` remain PENDING.
+
+## Update — 2026-06-16 (VarDecl + FriendDecl follow-ups → 92%)
+
+Both highest-frequency unmapped *meaningful* constructs now captured:
+
+- **`VarDecl` (84)** — static data members (`static T x;`, libclang's distinct
+  kind) → `has_field` via a `FieldDecl | VarDecl` arm.
+- **`FriendDecl` (79)** → `is_friend_of`. Grounded against real libclang-18, not
+  guessed: the FriendDecl cursor is *anonymous*; its `TypeRef` child's resolved
+  TYPE display is the clean fully-qualified befriended name
+  (`Tesseract::TessdataManager`) — read the type, not the elaborated cursor
+  spelling (`class Tesseract::TessdataManager`). The hermetic fixture gains a
+  `static int count_;` + `friend class TessdataManager;` with assertions.
+
+**Coverage: 90% → 92%** (6078 / 6570). Remaining unmapped: `AccessSpecifier`
+(436, noise), nested `Struct`/`ClassDecl` (31, emitted via recursion),
+`TypeAliasDecl` (14), `UsingDeclaration` (6), `EnumDecl` (5) — **~99% of
+meaningful constructs now mapped**. The `CPP-SCHEMA-FIT` real-corpus coverage
+gate is effectively satisfied; `CPP-AST-RT` (determinism) and `CPP-TEMPLATE-DET`
+(class-level templates) remain the PENDING probes, both needing only the work
+they always did (a rerun/JSON-dump-parity harness; a template-heavy fixture).
+
+## Update — 2026-06-16 (CPP-AST-RT determinism RUN — GREEN)
+
+`cpp_ast_rt_determinism` (gated on `TESSERACT_SRC`) walks all of `src/ccutil`
+twice in-process and asserts byte-identical ndjson. **GREEN** — the harvest is
+reproducible end-to-end (no RNG in the walker; `walk_files` dedups into a sorted
+`BTreeMap`; `expand` sorts + dedups). The "do NOT claim faithful harvest until
+`CPP-AST-RT` is green" gate is now satisfied for the in-process path. (The
+decoupled `clang -ast-dump=json` cross-path parity, OD-3, remains a deferred
+hardening, not a blocker.)
+
+**Of the three primary probes, `CPP-SCHEMA-FIT` and `CPP-AST-RT` are now green;
+only `CPP-TEMPLATE-DET` remains** — gated on class-level template extraction (the
+walker captures member function templates as `has_function` but does not yet emit
+`template_specialises` / `template_instantiates`).
+
+## Update — 2026-06-16 (Shape A: template classes harvested + measured B-vs-C)
+
+Researched template handling against the corpus *before* implementing
+(genericvector.h observed via an instrumented libclang walk; ccutil grepped for
+specialisations), per the three candidate shapes (A erase / B explicit-specialises
+/ C instantiation-uses):
+
+- **Corpus reality (measured):** 57 primary class templates, **0 explicit
+  specialisations** (full or partial), pervasive instantiation-*uses*
+  (`GenericVector<T*>` as bases / field types). libclang FLATTENS a `ClassTemplate`
+  cursor — its direct children are the template params + the members — so
+  `build_class` handles it unchanged.
+- **Shape A shipped:** `collect_classes` + the coverage tally now treat
+  `ClassTemplate` / `ClassTemplatePartialSpecialization` as classes. ccutil harvest
+  **50 → 67 classes (+17 template containers: `GenericVector`, `PointerVector`, …),
+  1652 → 2184 triples** — container classes + their methods previously invisible to
+  the SPO graph. Deterministic; a hermetic class-template fixture asserts capture.
+- **B vs A (measured, refutes the hypothesis on this corpus):** B's
+  `template_specialises` captures **nothing** on ccutil (0 specialisations) — **B ≡
+  A here**. The value is entirely in harvesting the primary templates, which both
+  shapes share; B's extra logic would be dead code on this corpus.
+- **C is the real differentiator, deferred:** the template structure that ACTUALLY
+  exists is instantiation-*use*, i.e. `template_instantiates` — but that is the
+  `Inferred`, per-TU-incomplete tier `CPP-TEMPLATE-DET` was written to gate. Held
+  for the data-driven C round (test B against C later, per operator).
+- **`CPP-TEMPLATE-DET` status:** Shape A emits no template-relationship predicate,
+  so the probe is **deferred-with-C** — it gates `template_instantiates`
+  determinism, relevant only once C is implemented. Coverage/determinism are
+  otherwise green (`CPP-SCHEMA-FIT` now counts template-class bodies too;
+  `CPP-AST-RT` byte-identical with templates included).
+
+## Update — 2026-06-16 (Shape C: template_instantiates from field/signature types — CPP-TEMPLATE-DET GREEN)
+
+Research-first round per operator's "best possible C, then compare":
+
+- **Measured first (before implementing):** ccutil has 7 instantiation uses in
+  field types (`std::vector` 5, `GenericVector` 1, `std::function` 1) and 0 in
+  bases (`build_base` already resolves bases to the primary template name —
+  `PointerVector : GenericVector<T*>` records `inherits_from GenericVector`, no
+  args). Verified the gap is non-redundant: `expand::cpp_field` explicitly drops
+  `type_name` (`let _ = &field.type_name; // carried on IR for catalog consumers`),
+  so field/signature template-uses were **invisible in the triples**.
+- **Best-shape design — syntactic, deterministic:** capture template-id type
+  strings from (a) field types (`FieldDecl`/`VarDecl`'s `get_type`) and
+  (b) method signatures (return + parameter types from `get_result_type` /
+  `get_arguments`). This is a *syntactic* use the walker already sees — NOT a
+  libclang implicit-instantiation cursor (the per-TU-incomplete thing the
+  Inferred provenance flags). Determinism is structural: the cursor children are
+  in source order, `expand` sorts the triple set.
+- **Helpers:** `template_instantiation(&type_display)` strips `const`/`volatile`
+  prefixes + trailing `*`/`&`, returns the verbatim template-id (`GenericVector<char>`)
+  per the `CppTemplate::name` IR convention; `collect_signature_instantiations`
+  pushes one Instantiation declaration per template-id in a signature.
+- **Measured result:** ccutil **2184 → 2215 triples** (+31 deterministic
+  `template_instantiates` edges); hermetic fixture asserts both field-type
+  (`Box<int>`) and signature-type (`Box<char>`) instantiation capture; the
+  `cpp_template_det_determinism` probe runs `extract_dir` twice and asserts the
+  `template_instantiates` set is identical — **GREEN**.
+- **C vs A vs A+C (now measured):** A captured 0 template-relationship triples;
+  C adds 31 strictly non-redundant ones. A+C is the combination already shipped:
+  A makes `GenericVector` a node, C makes `Recognizer template_instantiates
+  GenericVector<char>` an edge to it. **All three primary CPP-* probes are now
+  green** (SCHEMA-FIT ~91%, AST-RT deterministic, TEMPLATE-DET deterministic +
+  non-degenerate).
+
+## Update — 2026-06-16 (option exploration + ccstruct motherlode probe)
+
+Free exploration of "what's next beyond the three primary probes," with the
+operator-mandated honesty bar (measure first, then ship):
+
+- **Option survey, measured against the corpus:**
+  - **`template Foo<int>;` explicit instantiations (C-extra)** — grepped, **0
+    instances** in ccutil. Skip until a corpus with them appears.
+  - **B-revisited (namespace-qualified `template_specialises`)** — fixes the
+    locked-test bug where the predicate sits on a *using* class instead of the
+    specialised one; **0 specs in ccutil** so no behavioural lift, but a real IR
+    correctness fix. Hold pending paired test update.
+  - **`is_const` / `is_static` method flags** — high value (OCR-essential, e.g.
+    `UNICHARSET::unichar_to_id` is `const`), low walker cost; **but blocked on
+    closed-vocab approval** (would add 2 predicates, bumping
+    `predicate_count_locked_at_47` → 49). Council-review territory; not
+    autoattended.
+  - **Method signature TYPES as edges (`has_param_type`, `returns_type`)** —
+    biggest graph enrichment, but **same closed-vocab approval** + new IR shape.
+    Defer to a deliberate ontology round.
+  - **Walk `src/ccstruct` (the OCR motherlode)** — uses *existing*
+    infrastructure (`extract_tree`), needs no predicate change. Done (below).
+  - **Open a PR for the 5 increments** — best value-per-effort for landing
+    measurable progress on `main`.
+- **ccstruct motherlode probe (new test, gated on `TESSERACT_SRC`):**
+  `extract_tree("src/ccstruct")` reaches the OCR data model. Measured:
+  **155 classes, 5264 triples, 32 deterministic `template_instantiates` edges**
+  (vs ccutil's 67 / 2215 / 31). Captures every OCR core class
+  (`BLOCK`/`WERD`/`TBLOB`/`C_BLOB`/`POLY_BLOCK`/`TWERD`/`BLOBNBOX`/...) plus
+  template-edges to `GenericVector<T>` / `BandTriMatrix<T>` /
+  `GENERIC_2D_ARRAY<T>` / `KDPair<Key,Data>` / `PointerVector<T>`. The
+  harvester scales past the utility shell to the load-bearing surface with the
+  same deterministic shape.
+  - Honest nuance: signature template-ids in **template definitions** resolve
+    to canonical-parameter form (`GenericVector<T>`, `KDPair<Key, Data>`),
+    not concrete args. Still deterministic and useful (links to the primary),
+    just less specific than the concrete `Box<int>` case from ccutil's
+    *non-template* class fields.
+
+## Update — 2026-06-16 (AST-DLL signature shape: returns_type + has_param_type — OPERATOR-APPROVED vocab bump 48→50)
+
+Operator chose option 2 ("AR AST DLL shape preferred") — method **signature
+types as edges**, the shape the `tesseract-rs-ast-dll-codegen-v1` codegen needs
+to generate adapter signatures. Option 1 (`is_const`/`is_static`, "ORM-shape
+downcast") deferred as the optional follow-up.
+
+- **Closed-vocab bump (operator-authorized):** +2 predicates → `ReturnsType`,
+  `HasParamType`. `predicate_count_locked_at_48` → `_at_50`; `ALL` array + doc
+  invariant + `default_provenance` (both `CppExtracted` — syntactically present
+  in the signature) updated in lockstep. 15 C++ machine-plane predicates now.
+- **IR:** `CppMethod` gains `return_type: Option<String>` + `param_types:
+  Vec<String>` (both `#[serde(default)]`). 10 construction sites updated.
+- **Shape:** `returns_type` one edge per non-void method; `has_param_type` one
+  edge per parameter, object = `<index>:<type>` so the unordered triple SET
+  preserves signature order + arity (the codegen sorts by the index prefix).
+  Determinism is structural (`get_arguments` is source-order; `expand` sorts).
+- **Walker:** `build_method` reads `get_result_type` (skips `void`/ctor/dtor) +
+  `get_arguments`. Hermetic test asserts `int Recognize(int)` → `returns_type
+  int` + `has_param_type 0:int`, and `void stash(const Box<char>&)` → no
+  `returns_type` + `has_param_type 0:const Box<char> &`.
+- **Measured enrichment:** ccutil **2215 → 3527 triples** (+1312);
+  ccstruct **5264 → 8164 triples** (+2900). Signatures are now first-class
+  graph structure — the codegen-ready AST-DLL shape. CPP-AST-RT determinism
+  still green (re-run byte-identical with signatures included).
+- **Next (optional, operator's "1"):** `is_const` / `is_static` method flags
+  (`+2` predicates → 52) — the ORM-downcast shape (`const` = read accessor).
+
+## Update — 2026-06-16 (ORM-downcast shape: is_const + is_static — vocab 50→52, both operator shapes shipped)
+
+Operator's optional "1" — `is_const` / `is_static` method flags, the ORM-downcast
+shape (`const` = read accessor, `static` = class-level). Same pattern as the
+signature shape:
+
+- **Closed-vocab bump:** +2 predicates → `IsConst`, `IsStatic`.
+  `predicate_count_locked_at_50` → `_at_52`; ALL/doc/`default_provenance`
+  (`CppExtracted`) in lockstep. **17 C++ machine-plane predicates** now.
+- **IR:** `CppMethod` gains `is_const` + `is_static` bools; also `#[derive(Default)]`
+  added (future construction-site churn relief) + an `#[expect(struct_excessive_bools)]`
+  (4 independent C++ qualifiers — not a state machine; enums would be artificial).
+- **Walker:** `build_method` reads `is_const_method()` / `is_static_method()`.
+  Hermetic test asserts `bool operator==(...) const` → `is_const` true, not static.
+- **Measured:** ccutil **3527 → 3850 triples** (+323); ccstruct **8164 → 8972**
+  (+808). CPP-AST-RT still deterministic.
+
+**Both operator-requested shapes now shipped.** Final C++ machine-plane vocab =
+17 predicates (was 13): + `returns_type`, `has_param_type` (AST-DLL signature
+shape) + `is_const`, `is_static` (ORM-downcast shape). The harvester now emits a
+codegen-ready surface: identity (classid via OGAR), inheritance, fields, function
+membership, full signatures, const/static qualifiers, template use, friendship.
+
+
+## Update — 2026-06-17 (codex P2 #17 — overload-discrimination + partial-spec identity)
+
+Two real correctness bugs codex flagged on PR #17 — both fixed, both with
+hermetic probes locking the fix:
+
+- **P2 #1: overload collision.** Before, `void f(int)` and `void f(double)` both
+  attached their signature triples (returns_type / has_param_type / is_noexcept …)
+  to the same `cpp:C.f` node — the codegen couldn't reconstruct the two
+  overloads. Fix: per-overload method IRI `cpp_method` builds appends
+  `(<comma-joined-param-types>)`, e.g. `cpp:C.f(int)` vs `cpp:C.f(double)`. The
+  walker's `virtually_overrides` target uses the same suffix on the base
+  overload (via `get_arguments` on the overridden cursor), so the override edge
+  joins the EXACT base overload (not just any same-name method). Hermetic probe:
+  two `process(int)` / `process(double)` overloads in the fixture must yield
+  distinct param signatures at the IR level.
+- **P2 #2: partial-spec identity collision.** A `ClassTemplatePartialSpecialization`
+  shares its primary's `get_name()` (libclang spells it as the bare template
+  name) — the cross-TU `BTreeMap` dedup by `qualified_name()` then dropped one
+  side. Fix: `build_class` uses `get_display_name()` for partial specs
+  (`Box<T *>`) and `get_name()` for everything else (`Box`). Hermetic probe:
+  primary `Box` + partial spec `Box<T *>` must coexist, each with its own
+  members (e.g. `get_ptr` on the partial spec).
+- **Measured impact (overload discrimination):** ccutil 3850 → **4129 triples**
+  (+279 — the overload discriminator splits methods that previously aliased);
+  ccstruct 8972 → **9507 triples** (+535). Class counts unchanged.
+- **Test count:** 48 ruff_spo_triplet + 14 ruff_cpp_spo (locked-shape, hermetic
+  walker, gated coverage / determinism / template-determinism probes). All green.
+  `clippy -D warnings` + fmt clean.

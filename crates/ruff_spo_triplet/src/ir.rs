@@ -569,7 +569,12 @@ pub struct CppField {
 /// set flag additionally expands to a method-property predicate. The flags
 /// are not mutually exclusive (a method can be both `constexpr` and
 /// `noexcept`, an `operator` and an `override`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent C++ method qualifiers (pure-virtual / noexcept / const / static) — \
+              not a state machine; any combination is valid, so two-variant enums would be artificial"
+)]
 pub struct CppMethod {
     /// Method name (e.g. `Recognize`). For operators, the spelled name
     /// (e.g. `operator==`); the operator kind is also set in
@@ -601,6 +606,26 @@ pub struct CppMethod {
     /// unconstrained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires_clause: Option<String>,
+    /// Return type, verbatim (e.g. `bool`, `const char *`) → `returns_type`.
+    /// `None` (and not emitted) for `void` / constructors / destructors — the
+    /// AST-DLL shape treats absent `returns_type` as "no value returned".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<String>,
+    /// Parameter types in signature order, verbatim → one `has_param_type` each.
+    /// Order + arity are preserved by the `<index>:<type>` object encoding the
+    /// expander emits (a triple set is unordered, so the position rides the
+    /// object). The AST-DLL codegen reconstructs the ordered signature from
+    /// `return_type` + these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub param_types: Vec<String>,
+    /// `T method() const;` — a const-qualified member function → `is_const`.
+    /// The ORM-downcast shape: a const method is a read accessor (no mutation).
+    #[serde(default)]
+    pub is_const: bool,
+    /// `static T method();` — a static member function → `is_static`
+    /// (class-level, no implicit `this`).
+    #[serde(default)]
+    pub is_static: bool,
 }
 
 /// `constexpr` vs `consteval` compile-time markers.
