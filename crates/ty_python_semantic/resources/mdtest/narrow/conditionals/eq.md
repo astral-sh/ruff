@@ -122,6 +122,139 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+Unlike plain `Enum` members, `IntEnum` members inherit integer equality. Members of different
+`IntEnum` classes therefore compare equal when they have the same integer value, so both equality
+and inequality narrowing must account for matching members from every class in the union:
+
+```py
+from enum import IntEnum
+
+class Foo(IntEnum):
+    X = 1
+    Y = 2
+
+class Bar(IntEnum):
+    A = 1
+    B = 2
+
+reveal_type(Foo.X.value)  # revealed: Literal[1]
+
+def _(value: Foo | Bar):
+    if value == Foo.X:
+        reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+    else:
+        reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
+
+    if value != Foo.X:
+        reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
+    else:
+        reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+```
+
+The same narrowing applies when comparing enum members directly with their inherited integer or
+string values. The negative constraint excludes both the builtin literal and every enum member known
+to compare equal to it:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+
+class IntMember(int, Enum):
+    X = 1
+    Y = 2
+
+class Integer(IntEnum):
+    X = 1
+    Y = 2
+
+class String(StrEnum):
+    X = "X"
+    Y = "Y"
+
+class StrMember(str, Enum):
+    X = "X"
+    Y = "Y"
+
+def _(value: IntMember | Integer | String | StrMember):
+    if value == 1:
+        pass
+    else:
+        reveal_type(value)  # revealed: Literal[IntMember.Y, Integer.Y] | String | StrMember
+
+    if value != 1:
+        reveal_type(value)  # revealed: Literal[IntMember.Y, Integer.Y] | String | StrMember
+
+    if value == "X":
+        pass
+    else:
+        reveal_type(value)  # revealed: IntMember | Integer | Literal[String.Y, StrMember.Y]
+
+    if value != "X":
+        reveal_type(value)  # revealed: IntMember | Integer | Literal[String.Y, StrMember.Y]
+
+def random() -> bool:
+    return False
+
+def loop_back():
+    value = IntMember.X if random() else IntMember.Y
+    if value != 1:
+        while random():
+            reveal_type(value)  # revealed: Literal[IntMember.Y, Integer.Y]
+            value = Integer.Y
+```
+
+A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
+the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
+members' runtime values cannot be determined statically:
+
+```py
+from enum import IntEnum
+
+class Foo(IntEnum):
+    X = 1
+    Y = 2
+
+class Shifted(IntEnum):
+    def __new__(cls, value: int) -> "Shifted":
+        member = int.__new__(cls, value + 1)
+        member._value_ = value + 1
+        return member
+
+    A = 1
+    B = 2
+
+def _(value: Foo | Shifted):
+    if value == Foo.X:
+        reveal_type(value)  # revealed: Literal[Foo.X] | Shifted
+    else:
+        reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
+```
+
+The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
+member. Here, the inherited `int.__new__` converts the generated string `"1"` to the integer `1`.
+Because the generated value's exact conversion is not modeled, we cannot use it to decide whether
+members of `Generated` and `Other` compare equal:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+
+class Generated(IntEnum):
+    # error: [invalid-method-override]
+    def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
+        return "1"
+
+    ONE = auto()
+
+class Other(IntEnum):
+    ONE = 1
+
+reveal_type(Generated.ONE.value)  # revealed: int
+
+def _(value: Generated | Other):
+    if value == Generated.ONE:
+        reveal_type(value)  # revealed: Generated | Other
+```
+
 An assignment to `__new__`, `__init__`, or other methods can replace the value declared in the class
 body. In that case, we cannot compare an enum member with its declared value statically:
 
@@ -198,7 +331,7 @@ def _(generate_next_value: Any):
         if value == "explicit":
             reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT]
         else:
-            reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT, "other"]
+            reveal_type(value)  # revealed: Literal["other"]
 ```
 
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:

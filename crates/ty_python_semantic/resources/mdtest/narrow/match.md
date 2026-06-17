@@ -724,6 +724,21 @@ def exact_int_enum_member_is_exhaustive(status: Literal[Status.READY]) -> int:
         case Status.READY:
             return 1
 
+class First(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class Second(IntEnum):
+    ONE = 1
+    TWO = 2
+
+def cross_int_enum_members(value: First | Second) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
+        case _:
+            reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
+
 class Automatic(StrEnum):
     GENERATED = auto()
 
