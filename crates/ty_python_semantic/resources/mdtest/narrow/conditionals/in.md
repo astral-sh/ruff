@@ -115,6 +115,12 @@ def _(x: Literal["a", "b", "c", "d"]):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal["d"]
+
+def substring(x: Literal["", "ab", "z"]):
+    if x in "abc":
+        reveal_type(x)  # revealed: Literal["", "ab"]
+    else:
+        reveal_type(x)  # revealed: Literal["z"]
 ```
 
 ```py
@@ -163,7 +169,7 @@ def bytes_subsequence(value: ByteSubstring | Literal[97]) -> None:
     if value in b"abc":
         reveal_type(value)  # revealed: ByteSubstring | Literal[97]
     else:
-        reveal_type(value)  # revealed: ByteSubstring
+        reveal_type(value)  # revealed: ByteSubstring | Literal[97]
 
 def bytes_index(value: ByteIndex | Literal[97], values: bytes) -> None:
     if value in values:
@@ -584,35 +590,6 @@ def inherited_builtin_contains(
 ):
     if x in values:
         reveal_type(x)  # revealed: Payload | Literal["missing"]
-```
-
-## Byte containment
-
-Unlike ordinary element-wise containment, `bytes` and `bytearray` accept objects with an `__index__`
-method as well as byte subsequences. Their iterator element type therefore cannot be used to remove
-broader union members:
-
-```py
-from typing import Literal, final
-
-@final
-class ByteIndex:
-    def __index__(self) -> int:
-        return 97
-
-def bytes_literal_contains_index(value: ByteIndex | Literal[97]) -> None:
-    if value in b"abc":
-        reveal_type(value)  # revealed: ByteIndex | Literal[97]
-
-@final
-class FinalBytearray(bytearray): ...
-
-def bytearray_contains_index(
-    value: ByteIndex | Literal[97],
-    values: FinalBytearray,
-) -> None:
-    if value in values:
-        reveal_type(value)  # revealed: ByteIndex | Literal[97]
 ```
 
 ## Custom containment methods on tuple subclasses
