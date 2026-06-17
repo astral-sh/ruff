@@ -296,6 +296,34 @@ reveal_type(AnyWrapper().non_data)  # revealed: Literal["non-data"] | NonDataDes
 reveal_type(AnyWrapper().data)  # revealed: Literal["data"]
 ```
 
+If a dynamic base appears before a concrete descriptor base, the concrete method establishes that
+the type is a descriptor but does not erase the possibility that the higher dynamic base overrides
+that method:
+
+```py
+from typing import Any, Literal
+
+class DynamicBase:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["dynamic"]:
+        return "dynamic"
+
+class ConcreteBase:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["concrete"]:
+        return "concrete"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+Base: Any = DynamicBase
+
+class Descriptor(Base, ConcreteBase): ...
+
+class HigherDynamicBaseWrapper:
+    attribute: Descriptor = Descriptor()
+
+reveal_type(HigherDynamicBaseWrapper().attribute)  # revealed: Literal["concrete"] & Any
+```
+
 ### Directly dynamic descriptor values
 
 Requiring concrete descriptor methods when inspecting a nominal type's MRO does not mean that a

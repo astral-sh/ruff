@@ -3039,7 +3039,7 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = ty
+            let concrete_descr_get = ty
                 .class_member_with_policy(
                     db,
                     "__get__".into(),
@@ -3048,16 +3048,24 @@ impl<'db> Type<'db> {
                 .place;
 
             if let Place::Defined(DefinedPlace {
-                ty: descr_get,
-                definedness: descr_get_boundness,
+                ty: concrete_descr_get,
                 ..
-            }) = descr_get
+            }) = concrete_descr_get
             {
                 // A recursive member lookup can yield the internal cycle marker. It does not
                 // represent a concrete descriptor method and must not escape through the access.
-                if descr_get.is_divergent() {
+                if concrete_descr_get.is_divergent() {
                     return None;
                 }
+
+                let Place::Defined(DefinedPlace {
+                    ty: descr_get,
+                    definedness: descr_get_boundness,
+                    ..
+                }) = ty.class_member(db, "__get__".into()).place
+                else {
+                    return None;
+                };
 
                 let instance_ty = instance.unwrap_or_else(|| Type::none(db));
                 let return_ty = descr_get
