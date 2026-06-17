@@ -328,7 +328,8 @@ reveal_type(HigherDynamicBaseWrapper().attribute)  # revealed: Literal["concrete
 
 Requiring concrete descriptor methods when inspecting a nominal type's MRO does not mean that a
 value whose own type is dynamic is definitely not a descriptor. It could be a data descriptor and
-take precedence over a class attribute:
+take precedence over a class attribute. The same uncertainty applies when a dynamic type is one arm
+of a union:
 
 ```py
 from typing import Any, Literal
@@ -347,6 +348,14 @@ class C(metaclass=Meta):
     attribute: int = 1
 
 reveal_type(C.attribute)  # revealed: Any
+
+class UnionMeta(type):
+    attribute: Any | DataDescriptor = DataDescriptor()
+
+class UnionC(metaclass=UnionMeta):
+    attribute: int = 1
+
+reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 ```
 
 ### Descriptors only work when used as class variables
