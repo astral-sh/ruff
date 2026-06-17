@@ -857,14 +857,31 @@ fn strip_class_name_marker(s: &str) -> &str {
 /// yields `["presence", "uniqueness"]`.
 ///
 /// The closed set covers the validation kinds Rails ships in
-/// `ActiveModel::Validations`. Unknown keys (e.g. `if:`, `on:`,
-/// `allow_nil:`, `message:`) are filter-side conditions that don't
-/// change the validation semantics for the schema layer — they pass
-/// through silently.
+/// `ActiveModel::Validations`. Unknown option keys (e.g. `if:`,
+/// `on:`, `message:`) are filter-side conditions that don't change
+/// the validation kind — they pass through silently.
 ///
-/// Returns in source order (preserving Rails declaration order), no
-/// dedup — duplicate keys in the same declaration are vanishingly
-/// rare and a downstream consumer that cares can dedupe.
+/// **Gating** — if the validation carries any gating option that
+/// makes it conditional (`if:`, `unless:`, `on:`, `allow_nil:`,
+/// `allow_blank:`) the function returns an empty Vec, suppressing
+/// all `validation_kind` emission for this validation. The
+/// rationale (codex P2 on #21):
+/// `validates :age, numericality: true, allow_nil: true` is a
+/// conditional Rails constraint — the schema-level
+/// `ASSERT type::is_number($value)` would over-enforce by
+/// rejecting NONE, which Rails would have allowed. The
+/// schema-quality consumer falls back to the catch-all presence
+/// behaviour from the `validates_constraint` triple, which is the
+/// safer default.
+///
+/// **Falsy validator values** — `validates :foo, presence: false`
+/// is a no-op in Rails. Skip such keys so the schema doesn't
+/// invent a constraint where none exists.
+///
+/// Returns in source order (preserving Rails declaration order),
+/// no dedup — duplicate keys in the same declaration are
+/// vanishingly rare and a downstream consumer that cares can
+/// dedupe.
 fn extract_validation_kinds(options: &[(String, String)]) -> Vec<&'static str> {
     const RECOGNISED: &[&str] = &[
         "presence",
@@ -876,11 +893,52 @@ fn extract_validation_kinds(options: &[(String, String)]) -> Vec<&'static str> {
         "exclusion",
         "acceptance",
         "confirmation",
+        // Codex P2 on #21: `absence` (inverse-of-presence) and
+        // `comparison` (>, <, >=, <=) are built-in Rails validators
+        // too. The schema consumer maps `absence` to
+        // `$value == NONE` and `comparison` to a presence-style
+        // fallback (parametric — the comparand isn't on the kind
+        // triple yet).
+        "absence",
+        "comparison",
     ];
+    // Codex P2 on #21: any of these gating options makes the
+    // validation conditional in Rails — suppress kind emission so
+    // the schema doesn't invent an unconditional constraint.
+    const GATING_OPTIONS: &[&str] = &[
+        "if",
+        "unless",
+        "on",
+        "allow_nil",
+        "allow_blank",
+    ];
+    if options
+        .iter()
+        .any(|(k, _)| GATING_OPTIONS.contains(&k.as_str()))
+    {
+        return Vec::new();
+    }
     options
         .iter()
-        .filter_map(|(k, _)| RECOGNISED.iter().copied().find(|r| *r == k.as_str()))
+        .filter_map(|(k, v)| {
+            RECOGNISED
+                .iter()
+                .copied()
+                .find(|r| *r == k.as_str())
+                .filter(|_| !is_falsy_validator_value(v))
+        })
         .collect()
+}
+
+/// `validates :foo, presence: false` / `presence: nil` is a no-op
+/// in Rails. Returning `true` here causes the corresponding kind to
+/// be skipped (codex P2 on #21).
+///
+/// Hash-form values like `length: { maximum: 255 }` render via
+/// `as_hash_options` and arrive verbatim (e.g. `{maximum: 255}`)
+/// — those are truthy.
+fn is_falsy_validator_value(v: &str) -> bool {
+    matches!(v.trim(), "false" | "nil")
 }
 
 fn delegate_prefix(d: &Delegation) -> Option<String> {
@@ -1515,15 +1573,15 @@ mod tests {
     }
 
     /// Unit-level lock on the validation-kind extractor — recognised
-    /// keys preserve declaration order; unrecognised pass through.
+    /// keys preserve declaration order; unrecognised non-gating keys
+    /// (e.g. `message:`) pass through silently.
     #[test]
     fn extract_validation_kinds_recognises_canonical_rails_set() {
         let opts: Vec<(String, String)> = [
             ("presence", "true"),
-            ("if", ":published"),
+            ("message", "\"required\""),
             ("uniqueness", "true"),
             ("length", "{maximum: 255}"),
-            ("allow_nil", "true"),
             ("format", "/.../"),
         ]
         .iter()
@@ -1535,16 +1593,94 @@ mod tests {
         );
         // Empty options → empty.
         assert!(extract_validation_kinds(&[]).is_empty());
-        // Only-conditions (no recognised keys) → empty.
-        let only_conds: Vec<(String, String)> = [
-            ("if", ":foo"),
-            ("on", ":create"),
-            ("allow_blank", "true"),
-        ]
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
-        assert!(extract_validation_kinds(&only_conds).is_empty());
+        // Only non-recognised (no kind keys) → empty.
+        let only_msg: Vec<(String, String)> = [("message", "\"oops\"")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        assert!(extract_validation_kinds(&only_msg).is_empty());
+    }
+
+    /// **D-AR-5.8 — gating suppression (codex P2 on #21)** — when
+    /// the validation carries any gating option (`if`, `unless`,
+    /// `on`, `allow_nil`, `allow_blank`), `extract_validation_kinds`
+    /// returns an empty Vec. The schema consumer falls back to the
+    /// catch-all presence behaviour from the `validates_constraint`
+    /// triple — safer than over-enforcing a conditional constraint.
+    #[test]
+    fn extract_validation_kinds_suppresses_on_gating_options() {
+        let mk = |opts: &[(&str, &str)]| -> Vec<(String, String)> {
+            opts.iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        // Each gating option, individually, must suppress emission.
+        for gating in ["if", "unless", "on", "allow_nil", "allow_blank"] {
+            let opts = mk(&[
+                ("presence", "true"),
+                ("numericality", "true"),
+                (gating, ":anything"),
+            ]);
+            assert!(
+                extract_validation_kinds(&opts).is_empty(),
+                "gating option `{gating}` must suppress kind emission",
+            );
+        }
+    }
+
+    /// **D-AR-5.8 — falsy validator skip (codex P2 on #21)** —
+    /// `validates :foo, presence: false` / `presence: nil` is a no-op
+    /// in Rails; emitting a `validation_kind` triple for it would
+    /// invent a schema constraint where Rails has none.
+    #[test]
+    fn extract_validation_kinds_skips_falsy_validator_values() {
+        let mk = |opts: &[(&str, &str)]| -> Vec<(String, String)> {
+            opts.iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        // `presence: false` is a no-op; `uniqueness: true` still
+        // fires.
+        let opts = mk(&[("presence", "false"), ("uniqueness", "true")]);
+        assert_eq!(extract_validation_kinds(&opts), vec!["uniqueness"]);
+        // `nil` value, same treatment.
+        let opts = mk(&[("presence", "nil"), ("numericality", "true")]);
+        assert_eq!(extract_validation_kinds(&opts), vec!["numericality"]);
+        // All falsy → empty.
+        let opts = mk(&[("presence", "false"), ("uniqueness", "nil")]);
+        assert!(extract_validation_kinds(&opts).is_empty());
+    }
+
+    /// **D-AR-5.8 — additional Rails kinds (codex P2 on #21)** —
+    /// the recognised set now includes `absence` (inverse of
+    /// presence) and `comparison` (greater_than / less_than family).
+    /// Both lift to `validation_kind` triples the downstream
+    /// consumer can act on.
+    #[test]
+    fn extract_validation_kinds_recognises_absence_and_comparison() {
+        let mk = |opts: &[(&str, &str)]| -> Vec<(String, String)> {
+            opts.iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        // `validates :archived_at, absence: true`
+        assert_eq!(
+            extract_validation_kinds(&mk(&[("absence", "true")])),
+            vec!["absence"],
+        );
+        // `validates :end_date, comparison: { greater_than: :start_date }`
+        assert_eq!(
+            extract_validation_kinds(&mk(&[("comparison", "{greater_than: :start_date}")])),
+            vec!["comparison"],
+        );
+        // Combined with other kinds.
+        assert_eq!(
+            extract_validation_kinds(&mk(&[
+                ("presence", "true"),
+                ("absence", "true"),
+            ])),
+            vec!["presence", "absence"],
+        );
     }
 
     #[test]
