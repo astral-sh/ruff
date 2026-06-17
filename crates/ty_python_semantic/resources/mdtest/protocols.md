@@ -1215,6 +1215,9 @@ from typing import Literal, final
 @final
 class C: ...
 
+@final
+class Box[T]: ...
+
 class NonFinal: ...
 
 @final
@@ -1264,6 +1267,12 @@ def check_hashable_or_final(x: Hashable | C):
     reveal_type(x)  # revealed: Hashable
 
 def check_final_or_hashable(x: C | Hashable):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_final_generic(x: Hashable | Box[int]):
+    reveal_type(x)  # revealed: Hashable
+
+def check_final_generic_or_hashable(x: Box[int] | Hashable):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_explicit_hash(x: Hashable | ExplicitHash):

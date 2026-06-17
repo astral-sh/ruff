@@ -1,4 +1,6 @@
-use super::{ClassType, KnownClass, NominalInstanceType, Type, TypeVarBoundOrConstraints};
+use super::{
+    ClassBase, ClassType, KnownClass, NominalInstanceType, Type, TypeVarBoundOrConstraints,
+};
 use crate::Db;
 
 /// Whether every value represented by a type can be hashed at runtime.
@@ -115,6 +117,9 @@ fn effective_class_hashability<'db>(
     instance: Type<'db>,
 ) -> Hashability {
     for base in class.iter_mro(db) {
+        if matches!(base, ClassBase::Generic) {
+            continue;
+        }
         let Some(base) = base.into_class() else {
             return Hashability::Maybe;
         };
