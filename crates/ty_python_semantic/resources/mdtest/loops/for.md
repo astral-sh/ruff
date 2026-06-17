@@ -1444,6 +1444,46 @@ for _ in range(1_000_000):
 reveal_type(i)  # revealed: int
 ```
 
+### Recursive packing/unpacking
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar
+
+i = (1,)
+for _i in range(10):
+    (j,) = i
+    j += 1
+    i = (j,)
+
+reveal_type(i)  # revealed: tuple[int]
+
+a = [1]
+for _ in range(10):
+    [b] = a
+    b += 1
+    a = [b]
+
+reveal_type(a)  # revealed: list[int]
+
+LoopT = TypeVar("LoopT")
+
+class LoopVarBox(Generic[LoopT]):
+    def __init__(self, value: LoopT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[LoopT]:
+        return iter(())
+
+box = LoopVarBox(1)
+for _ in range(10):
+    (value,) = box
+    value += 1
+    box = LoopVarBox(value)
+
+reveal_type(box)  # revealed: LoopVarBox[int]
+```
+
 ### A binding that didn't exist before the loop started
 
 ```py

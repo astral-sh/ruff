@@ -13,11 +13,12 @@ use ty_python_core::EvaluationMode;
 
 use super::{
     DivergentType, DynamicType, KnownClass, MemberLookupPolicy, StaticClassLiteral, TupleSpec,
-    Type, UnionType, call::CallArguments, instance::SliceLiteral,
+    Type, UnionBuilder, UnionType, call::CallArguments, instance::SliceLiteral,
 };
 use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
 
@@ -193,7 +194,7 @@ impl<'db> Type<'db> {
         mut project_non_cycle: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
     ) -> Option<ProjectionResult<'db>> {
         if !self.has_top_level_cycle_artifact(db) {
-            return None;
+            return self.try_nested_cycle_projection_result(db, op, project_non_cycle);
         }
 
         let Type::Union(union) = self else {
@@ -252,6 +253,63 @@ impl<'db> Type<'db> {
         Some(ProjectionResult {
             ty: UnionType::from_elements_cycle_recovery(db, elements),
             projection_evidence,
+        })
+    }
+
+    fn try_nested_cycle_projection_result(
+        self,
+        db: &'db dyn Db,
+        op: ProjectionOp<'db>,
+        mut project_non_cycle: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
+    ) -> Option<ProjectionResult<'db>> {
+        let mut roots = Vec::new();
+        Self::collect_projection_artifact_roots(db, self, &mut roots);
+        let [root] = roots.as_slice() else {
+            return None;
+        };
+
+        let elements = self.top_level_projection_union_elements(db);
+        let mut facts = Vec::new();
+        let path = ProjectionPath::from_op(op);
+        let terms = elements
+            .into_iter()
+            .map(|element| {
+                let mentions_root = element.mentions_cycle_artifact_direct(db, *root);
+                let direct_container = ProjectionContainer::from_direct_type(db, element);
+                let is_custom =
+                    matches!(direct_container, Some(ProjectionContainer::Custom { .. }));
+
+                if !mentions_root && direct_container.is_none() {
+                    return None;
+                }
+
+                // Non-recursive custom arms provide replayable evidence below. Recursive custom
+                // arms only need to mark a self-reference; querying their methods again can reenter
+                // the same cycle.
+                if mentions_root && is_custom {
+                    return Some(ProjectionTerm::Exact(Type::Divergent(*root)));
+                }
+
+                let term = project_non_cycle(element)?;
+                if !mentions_root && is_custom && !term.is_ambiguous(db) {
+                    ProjectionEvidenceSet::push_fact(
+                        &mut facts,
+                        ProjectionEvidenceFact {
+                            root: *root,
+                            arm: element,
+                            path: path.clone(),
+                            term,
+                        },
+                    );
+                }
+                Some(term)
+            })
+            .collect::<Option<Vec<_>>>()?;
+
+        let ty = Self::solve_projection_terms(db, *root, &path, &terms)?;
+        Some(ProjectionResult {
+            ty,
+            projection_evidence: ProjectionEvidenceSet::new(db, facts),
         })
     }
 
@@ -383,10 +441,124 @@ impl<'db> Type<'db> {
             .filter(|element| {
                 !matches!(element, Type::Divergent(divergent) if divergent.same_marker(root))
             })
-            .map(|element| element.replace_solved_projection_artifacts(db, root, &solved_ops))
+            .map(|element| {
+                Some((
+                    element.replace_solved_projection_artifacts(db, root, &solved_ops)?,
+                    element.mentions_cycle_artifact_direct(db, root),
+                ))
+            })
             .collect::<Option<Vec<_>>>()?;
 
-        Some(UnionType::from_elements_cycle_recovery(db, elements))
+        Some(Self::union_projection_cycle_recovery(db, elements))
+    }
+
+    fn union_projection_cycle_recovery(db: &'db dyn Db, elements: Vec<(Self, bool)>) -> Self {
+        if let Some(ty) = Self::try_union_fixed_length_tuples_cycle_recovery(db, &elements) {
+            return ty;
+        }
+
+        if let Some(ty) = Self::try_union_direct_instances_cycle_recovery(db, &elements) {
+            return ty;
+        }
+
+        UnionType::from_elements_cycle_recovery(db, elements.into_iter().map(|(ty, _)| ty))
+    }
+
+    fn try_union_fixed_length_tuples_cycle_recovery(
+        db: &'db dyn Db,
+        elements: &[(Self, bool)],
+    ) -> Option<Self> {
+        let [(first, _), rest @ ..] = elements else {
+            return None;
+        };
+        let first_spec = first.exact_tuple_instance_spec(db)?;
+        let first_tuple = first_spec.as_ref().as_fixed_length()?;
+        let mut element_builders = first_tuple
+            .iter_all_elements()
+            .map(|element| {
+                UnionBuilder::new(db)
+                    .cycle_recovery(true)
+                    .recursively_defined(RecursivelyDefined::Yes)
+                    .add(element)
+            })
+            .collect::<Vec<_>>();
+
+        for (element, _) in rest {
+            let spec = element.exact_tuple_instance_spec(db)?;
+            let tuple = spec.as_ref().as_fixed_length()?;
+            if tuple.len() != element_builders.len() {
+                return None;
+            }
+
+            for (builder, element) in element_builders.iter_mut().zip(tuple.iter_all_elements()) {
+                builder.add_in_place(element);
+            }
+        }
+
+        Some(Type::heterogeneous_tuple(
+            db,
+            element_builders.into_iter().map(UnionBuilder::build),
+        ))
+    }
+
+    fn try_union_direct_instances_cycle_recovery(
+        db: &'db dyn Db,
+        elements: &[(Self, bool)],
+    ) -> Option<Self> {
+        let [(first, first_is_recursive), rest @ ..] = elements else {
+            return None;
+        };
+        let (class, specialization) = first.direct_class_specialization(db)?;
+        if class.is_known(db, KnownClass::Tuple) {
+            return None;
+        }
+        let mut recursive_count = usize::from(*first_is_recursive);
+        let mut seed_count = usize::from(!*first_is_recursive);
+        let mut argument_builders = specialization
+            .types(db)
+            .iter()
+            .map(|argument| {
+                UnionBuilder::new(db)
+                    .cycle_recovery(true)
+                    .recursively_defined(RecursivelyDefined::Yes)
+                    .add(*argument)
+            })
+            .collect::<Vec<_>>();
+
+        for (element, is_recursive) in rest {
+            let (element_class, specialization) = element.direct_class_specialization(db)?;
+            if element_class != class {
+                return None;
+            }
+
+            let arguments = specialization.types(db);
+            if arguments.len() != argument_builders.len() {
+                return None;
+            }
+
+            recursive_count += usize::from(*is_recursive);
+            seed_count += usize::from(!*is_recursive);
+
+            for (builder, argument) in argument_builders.iter_mut().zip(arguments) {
+                builder.add_in_place(*argument);
+            }
+        }
+
+        // For invariant containers, argument-wise union is only used as widening for one recursive
+        // chain. Multiple seed arms remain a union unless normal union simplification merges them.
+        if recursive_count == 0 || seed_count != 1 {
+            return None;
+        }
+
+        let arguments = argument_builders
+            .into_iter()
+            .map(UnionBuilder::build)
+            .collect::<Vec<_>>();
+
+        Type::from(class.apply_specialization(db, |generic_context| {
+            generic_context.specialize(db, arguments)
+        }))
+        .to_instance(db)
     }
 
     fn top_level_projection_union_elements(self, db: &'db dyn Db) -> Vec<Self> {
@@ -550,6 +722,75 @@ impl<'db> Type<'db> {
         });
     }
 
+    fn collect_cycle_artifact_roots(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        roots: &mut Vec<DivergentType>,
+    ) {
+        Self::collect_cycle_artifact_roots_impl(db, ty, roots, true);
+    }
+
+    fn collect_projection_artifact_roots(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        roots: &mut Vec<DivergentType>,
+    ) {
+        // Bare `Divergent` inside containers appears in recursive aliases too. Nested projection
+        // recovery only starts from an already-recorded projection demand.
+        Self::collect_cycle_artifact_roots_impl(db, ty, roots, false);
+    }
+
+    fn collect_cycle_artifact_roots_impl(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        roots: &mut Vec<DivergentType>,
+        include_divergent: bool,
+    ) {
+        match ty {
+            Type::Divergent(root) if include_divergent => {
+                Self::push_cycle_artifact_root(roots, root);
+                return;
+            }
+            Type::Projection(projection) => {
+                Self::push_cycle_artifact_root(roots, projection.root(db));
+                return;
+            }
+            _ => {}
+        }
+
+        if let Type::Union(union) = ty {
+            for element in union.elements(db) {
+                Self::collect_cycle_artifact_roots_impl(db, *element, roots, include_divergent);
+            }
+            return;
+        }
+
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            for element in spec.as_ref().iter_all_elements() {
+                Self::collect_cycle_artifact_roots_impl(db, element, roots, include_divergent);
+            }
+            return;
+        }
+
+        if let Some((_, specialization)) = ty.direct_class_specialization(db) {
+            for argument in specialization.types(db) {
+                Self::collect_cycle_artifact_roots_impl(db, *argument, roots, include_divergent);
+            }
+        }
+    }
+
+    fn push_cycle_artifact_root(roots: &mut Vec<DivergentType>, root: DivergentType) {
+        if !roots.iter().any(|candidate| candidate.same_marker(root)) {
+            roots.push(root);
+        }
+    }
+
+    fn mentions_cycle_artifact_direct(self, db: &'db dyn Db, root: DivergentType) -> bool {
+        let mut roots = Vec::new();
+        Self::collect_cycle_artifact_roots(db, self, &mut roots);
+        roots.iter().any(|candidate| candidate.same_marker(root))
+    }
+
     fn solved_projection_type(
         solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
         path: &ProjectionPath<'db>,
@@ -680,13 +921,27 @@ enum ProjectionContainer<'db> {
 
 impl<'db> ProjectionContainer<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        Self::from_type_impl(db, ty, false)
+    }
+
+    fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        Self::from_type_impl(db, ty, true)
+    }
+
+    fn from_type_impl(db: &'db dyn Db, ty: Type<'db>, direct: bool) -> Option<Self> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             return Some(Self::Tuple {
                 spec: spec.as_ref().clone(),
             });
         }
 
-        if let Some((class, specialization)) = ty.class_specialization(db) {
+        let class_specialization = if direct {
+            ty.direct_class_specialization(db)
+        } else {
+            ty.class_specialization(db)
+        };
+
+        if let Some((class, specialization)) = class_specialization {
             let arguments = specialization.types(db);
             if let Some(known_class) = class.known(db)
                 && Self::known_container_supports_projection(db, known_class, arguments)
@@ -1537,7 +1792,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     }
 
     fn project_custom_path(
-        &self,
+        self,
         db: &'db dyn Db,
         root: DivergentType,
         arm: Type<'db>,

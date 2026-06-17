@@ -1408,6 +1408,21 @@ impl<'db> Type<'db> {
             .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
     }
 
+    /// If this type is directly a specialized class instance, returns the class and specialization.
+    ///
+    /// Unlike [`Type::class_specialization`], this does not expand aliases, type-variable bounds, or
+    /// literal fallbacks. Use it when a caller must inspect an already-materialized container shape
+    /// without triggering additional inference.
+    fn direct_class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        self.as_nominal_instance()?
+            .class(db)
+            .static_class_literal(db)
+            .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
+    }
+
     /// If this type is a class instance, returns its class.
     pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
