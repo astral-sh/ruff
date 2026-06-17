@@ -303,15 +303,36 @@ impl Expander {
             AssocKind::AcceptsNestedAttributesFor => "accepts_nested_attributes_for",
         };
         self.push(
-            rel_iri,
+            rel_iri.clone(),
             Predicate::AssociationKind,
             kind_str.to_string(),
             Provenance::OpenProjectExtracted,
         );
-        // Options remain on the IR for downstream consumers that need
-        // them (e.g. an OpenProject-specific catalog mapper) but are
-        // not surfaced as triples here.
-        let _ = a.options;
+        // `class_name:` override: Rails lets a relation point at a class
+        // whose name doesn't follow the camelcase-singular convention
+        // (`belongs_to :owner, class_name: 'User'`). Emit a sibling
+        // `class_name` triple so the downstream Schema consumer can
+        // resolve the target class instead of inventing `record<Owner>`.
+        // Absence of this triple means "use the convention" — preserves
+        // pre-#15 ndjson dumps bit-for-bit.
+        //
+        // The Ruby parser (`ruff_ruby_spo`) stores option values via
+        // `render_node`, which preserves source-level quote characters —
+        // a literal `class_name: "User"` ends up in `options` as the
+        // string `"User"` (8 chars including the quote pair). Strip
+        // those before emission so the consumer sees the bare class
+        // name `User` (codex P2 on #18).
+        if let Some((_, raw_override)) =
+            a.options.iter().find(|(k, _)| k == "class_name")
+        {
+            let normalized = strip_class_name_marker(raw_override);
+            self.push(
+                rel_iri,
+                Predicate::ClassName,
+                normalized.to_string(),
+                Provenance::OpenProjectExtracted,
+            );
+        }
     }
 
     fn validation(&mut self, model_iri: &str, v: &Validation) {
@@ -738,6 +759,33 @@ fn field_type_from_options(options: &[(String, String)]) -> Option<String> {
         .find_map(|(k, v)| (k == "type" && !v.is_empty()).then(|| v.clone()))
 }
 
+/// Strip surrounding Ruby-source markers (string-literal quotes,
+/// symbol leading colon) from a Rails option value, returning the
+/// bare class name slice.
+///
+/// `ruff_ruby_spo::walk::render_node` stores option values verbatim
+/// from source:
+///
+/// - `class_name: "User"` (string literal)   → `"User"` (quote pair)
+/// - `class_name: 'User'` (single-quoted)    → `'User'` (quote pair)
+/// - `class_name:  User`  (bare const ref)   → `User`
+/// - `class_name: :User`  (symbol literal)   → `:User` (leading colon)
+///
+/// Downstream FK resolvers compare the value against bare class
+/// names like `User`. All four input forms must collapse to the
+/// bare name before emission, or the override silently fails for
+/// the more common quoted forms.
+///
+/// Inputs without a matching marker pass through unchanged.
+fn strip_class_name_marker(s: &str) -> &str {
+    for q in ['"', '\''] {
+        if let Some(inner) = s.strip_prefix(q).and_then(|t| t.strip_suffix(q)) {
+            return inner;
+        }
+    }
+    s.strip_prefix(':').unwrap_or(s)
+}
+
 fn delegate_prefix(d: &Delegation) -> Option<String> {
     for (k, v) in &d.options {
         if k == "prefix" {
@@ -1152,6 +1200,139 @@ mod tests {
         }
     }
 
+    /// **D-AR-5.4** — `class_name:` option override: when an
+    /// `AssocDecl` carries a `class_name` option, the expander emits
+    /// a sibling `class_name` triple keyed by the relation IRI. The
+    /// downstream Schema consumer uses this in preference to the
+    /// camelcase-singular convention on the relation name.
+    #[test]
+    fn ar_shape_emits_class_name_override_when_option_present() {
+        let mut g = ModelGraph::new("openproject");
+        let mut wp = Model::new("WorkPackage");
+        // `belongs_to :owner, class_name: 'User'` — the relation
+        // name `:owner` doesn't follow the Rails convention; the
+        // override points at `User`.
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "owner".to_string(),
+            options: vec![("class_name".to_string(), "User".to_string())],
+        });
+        // A second association WITHOUT class_name — the override must
+        // be relation-scoped, not model-scoped.
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "project".to_string(),
+            options: vec![],
+        });
+        g.models.push(wp);
+        let triples = expand(&g);
+
+        // The override fires on the `owner` relation.
+        let has = |s: &str, p: &str, o: &str| {
+            triples.iter().any(|t| t.s == s && t.p == p && t.o == o)
+        };
+        assert!(
+            has(
+                "openproject:WorkPackage.owner",
+                "class_name",
+                "User",
+            ),
+            "class_name override missing for `:owner`",
+        );
+
+        // The `project` relation does NOT get a class_name triple
+        // (absence means convention applies).
+        let project_class_name_count = triples
+            .iter()
+            .filter(|t| {
+                t.s == "openproject:WorkPackage.project" && t.p == "class_name"
+            })
+            .count();
+        assert_eq!(
+            project_class_name_count, 0,
+            "class_name must NOT be emitted when option is absent",
+        );
+    }
+
+    /// **D-AR-5.4 — marker stripping (codex P2 on #18)** — the real
+    /// Ruby frontend (`ruff_ruby_spo::walk::render_node`) stores
+    /// option values verbatim, preserving source-level markers:
+    /// strings keep their `"`/`'` pair, symbols keep their leading
+    /// `:`. Downstream FK resolvers compare against bare class names
+    /// like `User`, so all four source forms (`"User"`, `'User'`,
+    /// `User`, `:User`) must strip down to the bare name before
+    /// emission.
+    #[test]
+    fn ar_shape_strips_class_name_source_markers() {
+        let mut g = ModelGraph::new("openproject");
+        let mut wp = Model::new("WorkPackage");
+        // Four variants of `class_name: …` Rails syntax:
+        //   double-quoted, single-quoted, bare const reference,
+        //   and symbol literal — render_node emits each
+        //   verbatim-with-markers.
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "double_quoted".to_string(),
+            options: vec![("class_name".to_string(), "\"User\"".to_string())],
+        });
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "single_quoted".to_string(),
+            options: vec![("class_name".to_string(), "'User'".to_string())],
+        });
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "bare_const".to_string(),
+            options: vec![("class_name".to_string(), "User".to_string())],
+        });
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "symbol_form".to_string(),
+            options: vec![("class_name".to_string(), ":User".to_string())],
+        });
+        g.models.push(wp);
+        let triples = expand(&g);
+
+        // All four lower to the same bare `User` object.
+        for relation in ["double_quoted", "single_quoted", "bare_const", "symbol_form"] {
+            let s = format!("openproject:WorkPackage.{relation}");
+            let class_name_objects: Vec<&str> = triples
+                .iter()
+                .filter(|t| t.s == s && t.p == "class_name")
+                .map(|t| t.o.as_str())
+                .collect();
+            assert_eq!(
+                class_name_objects,
+                vec!["User"],
+                "relation `{relation}` must emit bare `User`; got {class_name_objects:?}",
+            );
+        }
+    }
+
+    /// Unit-level lock on the marker-stripper — covers each source
+    /// form independently plus the unmatched-quote edge cases.
+    #[test]
+    fn strip_class_name_marker_handles_all_source_forms() {
+        // String literals: both quote forms.
+        assert_eq!(strip_class_name_marker("\"User\""), "User");
+        assert_eq!(strip_class_name_marker("'User'"), "User");
+        // Bare const reference: pass through.
+        assert_eq!(strip_class_name_marker("User"), "User");
+        // Symbol form: leading `:` stripped.
+        assert_eq!(strip_class_name_marker(":User"), "User");
+        // Namespaced (string form): inner namespace preserved; the
+        // downstream consumer normalises the `::`-prefix.
+        assert_eq!(
+            strip_class_name_marker("\"Storages::FileLink\""),
+            "Storages::FileLink",
+        );
+        // Mismatched / unmatched leading quote: pass through unchanged
+        // (safer than fabricating semantics from a half-quoted input).
+        assert_eq!(strip_class_name_marker("\"User"), "\"User");
+        assert_eq!(strip_class_name_marker("User\""), "User\"");
+        assert_eq!(strip_class_name_marker(""), "");
+    }
+
     #[test]
     fn ar_shape_emits_validates_and_normalizes() {
         let triples = expand(&ar_fixture());
@@ -1402,6 +1583,7 @@ mod tests {
             "auto_strips",
             "uses_refinement",
             "association_kind",
+            "class_name",
             // Inferred (per-edge override)
             "defines_method",
             // Structural (block markers)
