@@ -2076,6 +2076,20 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
 
+        // Preserve the shared specialization of a constrained TypeVar. Expanding the TypeVar
+        // before comparing it with `lhs_ty` would lose the correlation between this occurrence
+        // and other occurrences in the same function.
+        if let Type::TypeVar(typevar) = rhs_ty
+            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                typevar.typevar(self.db).bound_or_constraints(self.db)
+            && constraints.elements(self.db).iter().all(|constraint| {
+                evaluate_type_equality(self.db, lhs_ty, *constraint, true)
+                    .is_some_and(|narrowed| narrowed.is_equivalent_to(self.db, *constraint))
+            })
+        {
+            return Some(rhs_ty);
+        }
+
         let has_single_valued_component = match lhs_ty {
             Type::Union(union) => union
                 .elements(self.db)
@@ -2117,13 +2131,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let mut builder = IntersectionBuilder::new(self.db);
         let mut constrained = false;
 
-        // `not in` negates equality with every element; it does not use `__ne__`. Only
-        // single-valued slots are guaranteed to contain the value represented by their type.
+        // `not in` negates equality with every element; it does not use `__ne__`. Only add an
+        // exclusion when every value represented by a slot is known to compare equal.
         for element_ty in fixed_length.all_elements().iter().copied() {
-            let element_ty = element_ty.resolve_type_alias(self.db);
-            if element_ty.is_single_valued(self.db)
-                && let Some(constraint) = equality_exclusion_constraint(self.db, element_ty)
-            {
+            if let Some(constraint) = equality_exclusion_constraint(self.db, element_ty) {
                 builder = builder.add_positive(constraint);
                 constrained = true;
             }

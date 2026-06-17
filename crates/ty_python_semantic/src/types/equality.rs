@@ -163,8 +163,8 @@ pub(super) fn equality_exclusion_constraint<'db>(
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
     let ty = ty.resolve_type_alias(db);
-    enum_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
-        .or_else(|| builtin_literal_constraint(db, ty, ty, false))
+    builtin_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
+        .or_else(|| ty.is_single_valued(db).then(|| ty.negate(db)))
         .or_else(|| {
             (ComparisonEvaluator::new(db).evaluate(
                 ty,

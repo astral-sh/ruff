@@ -223,10 +223,31 @@ def broad_element_type_with_unknown(values: dict[str, int]):
         reveal_type(x)  # revealed: None | Unknown
 ```
 
+## Correlated constrained type variables
+
+```py
+from enum import Enum
+from typing import Literal, TypeVar
+
+class E(Enum):
+    A = 1
+    B = 2
+
+T = TypeVar("T", Literal[E.A], Literal[E.B])
+
+def correlated_typevar(x: E, y: T) -> T:
+    if x in (y,):
+        reveal_type(x)  # revealed: T@correlated_typevar
+        return x
+    return y
+```
+
 ## Direct `not in` conditional
 
 ```py
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
+
+T = TypeVar("T", Literal[1], Literal[2])
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x not in ("a", "c"):
@@ -262,6 +283,19 @@ def union_tuple_slot_with_exact_value(
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
         reveal_type(x)  # revealed: Literal[1, 2, 3]
+
+def equality_equivalent_union_slot(
+    x: Literal[0, False, 2],
+    values: tuple[Literal[0, False]],
+) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[2]
+    else:
+        reveal_type(x)  # revealed: Literal[0, False]
+
+def correlated_typevar(x: T | None, y: T) -> None:
+    if x not in (y,):
+        reveal_type(x)  # revealed: None
 
 def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     if x not in (missing, None):
