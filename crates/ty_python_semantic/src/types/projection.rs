@@ -276,22 +276,23 @@ impl<'db> Type<'db> {
             .map(|element| {
                 let mentions_root = element.mentions_cycle_artifact_direct(db, *root);
                 let direct_container = ProjectionContainer::from_direct_type(db, element);
-                let is_custom =
-                    matches!(direct_container, Some(ProjectionContainer::Custom { .. }));
+                let needs_evidence = direct_container
+                    .as_ref()
+                    .is_some_and(|container| container.needs_evidence_for_projection(db));
 
                 if !mentions_root && direct_container.is_none() {
                     return None;
                 }
 
-                // Non-recursive custom arms provide replayable evidence below. Recursive custom
-                // arms only need to mark a self-reference; querying their methods again can reenter
-                // the same cycle.
-                if mentions_root && is_custom {
+                // Non-recursive generic arms without built-in projection support provide
+                // replayable evidence below. Recursive arms of that kind only need to mark a
+                // self-reference; querying their methods again can reenter the same cycle.
+                if mentions_root && needs_evidence {
                     return Some(ProjectionTerm::Exact(Type::Divergent(*root)));
                 }
 
                 let term = project_non_cycle(element)?;
-                if !mentions_root && is_custom && !term.is_ambiguous(db) {
+                if !mentions_root && needs_evidence && !term.is_ambiguous(db) {
                     ProjectionEvidenceSet::push_fact(
                         &mut facts,
                         ProjectionEvidenceFact {
@@ -908,11 +909,7 @@ enum ProjectionContainer<'db> {
     Tuple {
         spec: TupleSpec<'db>,
     },
-    Known {
-        class: KnownClass,
-        arguments: Vec<Type<'db>>,
-    },
-    Custom {
+    Generic {
         class: StaticClassLiteral<'db>,
         arguments: Vec<Type<'db>>,
         arm: Type<'db>,
@@ -943,17 +940,14 @@ impl<'db> ProjectionContainer<'db> {
 
         if let Some((class, specialization)) = class_specialization {
             let arguments = specialization.types(db);
-            if let Some(known_class) = class.known(db)
-                && Self::known_container_supports_projection(db, known_class, arguments)
-            {
-                return Some(Self::Known {
-                    class: known_class,
-                    arguments: arguments.to_vec(),
-                });
-            }
-
-            if class.known(db).is_none() && !arguments.is_empty() {
-                return Some(Self::Custom {
+            let supports_projection = match class.known(db) {
+                Some(known_class) => {
+                    Self::known_container_supports_projection(db, known_class, arguments)
+                }
+                None => !arguments.is_empty(),
+            };
+            if supports_projection {
+                return Some(Self::Generic {
                     class,
                     arguments: arguments.to_vec(),
                     arm: ty,
@@ -1019,10 +1013,13 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
-            Self::Known { class, arguments } => class.to_specialized_instance(db, arguments),
-            Self::Custom { arm, .. } => return evidence?.project_custom_path(db, root, *arm, path),
+            Self::Generic { arm, .. } => *arm,
         };
         Self::project_type_path(db, ty, root, evidence, path)
+    }
+
+    fn needs_evidence_for_projection(&self, db: &'db dyn Db) -> bool {
+        matches!(self, Self::Generic { class, .. } if class.known(db).is_none())
     }
 
     fn project_type_path(
@@ -1342,17 +1339,7 @@ impl<'db> ProjectionContainer<'db> {
                     Some(Type::tuple(TupleType::mixed(db, prefix, variable, suffix)))
                 }
             },
-            Self::Known { class, arguments } => {
-                let arguments = arguments
-                    .into_iter()
-                    .map(|argument| {
-                        argument.replace_solved_projection_artifacts(db, root, solved_ops)
-                    })
-                    .collect::<Option<Vec<_>>>()?;
-
-                Some(class.to_specialized_instance(db, &arguments))
-            }
-            Self::Custom {
+            Self::Generic {
                 class, arguments, ..
             } => {
                 let arguments = arguments
