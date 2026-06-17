@@ -10,7 +10,7 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
         .with_file("pyproject.toml", "tool.ruff.preview = true")?
         .build();
 
-    server.open_text_document("test.py", "import os", 1);
+    server.open_text_document("test.py", "import os\n", 1);
 
     let diagnostics = server.document_diagnostic_request("test.py", None);
 
@@ -47,8 +47,8 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
                 "newText": "",
                 "range": {
                   "end": {
-                    "character": 9,
-                    "line": 0
+                    "character": 0,
+                    "line": 1
                   },
                   "start": {
                     "character": 0,
@@ -61,8 +61,8 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
               "newText": "  # noqa: F401\n",
               "range": {
                 "end": {
-                  "character": 9,
-                  "line": 0
+                  "character": 0,
+                  "line": 1
                 },
                 "start": {
                   "character": 9,
