@@ -240,6 +240,12 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
+/// Maximum number of pairwise checks introduced by expanding a finite comparison domain.
+///
+/// A large finite domain can still be compared with a single alternative because that work is
+/// linear. This limit only prevents Cartesian expansion when both operands can branch.
+const MAX_FINITE_COMPARISON_PAIRS: usize = 256;
+
 /// Tracks comparisons that are already in progress so recursive evaluation terminates.
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
@@ -313,9 +319,33 @@ fn evaluate_comparison_once<'db>(
     let db = evaluator.db;
 
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
+        if !finite_comparison_expansion_is_within_limit(
+            db,
+            alternatives.len(),
+            right,
+            false,
+            operator,
+        ) {
+            if known_comparison_domains_are_disjoint(db, left, right, operator) {
+                return operator.result_from_equality(false);
+            }
+            return ComparisonResult::Ambiguous;
+        }
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
     }
     if let Some(alternatives) = finite_alternatives(db, right, operator) {
+        if !finite_comparison_expansion_is_within_limit(
+            db,
+            alternatives.len(),
+            left,
+            true,
+            operator,
+        ) {
+            if known_comparison_domains_are_disjoint(db, left, right, operator) {
+                return operator.result_from_equality(false);
+            }
+            return ComparisonResult::Ambiguous;
+        }
         return evaluate_union_right(evaluator, left, &alternatives, branch, operator);
     }
 
@@ -485,6 +515,22 @@ fn evaluate_comparison_once<'db>(
 
         _ => ComparisonResult::Ambiguous,
     }
+}
+
+fn known_comparison_domains_are_disjoint(
+    db: &dyn Db,
+    left: Type,
+    right: Type,
+    operator: ComparisonOperator,
+) -> bool {
+    let Some(left_semantics) = KnownComparisonSemantics::of_type(db, left, operator) else {
+        return false;
+    };
+    let Some(right_semantics) = KnownComparisonSemantics::of_type(db, right, operator) else {
+        return false;
+    };
+    left_semantics != right_semantics
+        || (left_semantics == KnownComparisonSemantics::Object && left.is_disjoint_from(db, right))
 }
 
 /// Return whether every value represented by `ty` is known to compare equal to every other value.
@@ -917,6 +963,91 @@ fn finite_alternatives<'db>(
         }
         _ => None,
     }
+}
+
+/// Return whether expanding `alternatives` stays within the finite-comparison work budget.
+fn finite_comparison_expansion_is_within_limit(
+    db: &dyn Db,
+    alternatives: usize,
+    other: Type,
+    other_is_target: bool,
+    operator: ComparisonOperator,
+) -> bool {
+    if alternatives <= 1 {
+        return true;
+    }
+
+    let other_alternatives = comparison_operand_branch_count(db, other, other_is_target, operator);
+    other_alternatives <= 1
+        || alternatives
+            .checked_mul(other_alternatives)
+            .is_some_and(|pairs| pairs <= MAX_FINITE_COMPARISON_PAIRS)
+}
+
+/// Estimate how many alternatives the evaluator visits after recursively unpacking `ty`.
+///
+/// The count stops once it exceeds the finite-comparison work budget. Re-entering a type that is
+/// still active also exceeds the estimate conservatively so recursive types cannot make this walk
+/// cycle. Completed shared subgraphs are counted again because the evaluator revisits them.
+fn comparison_operand_branch_count(
+    db: &dyn Db,
+    ty: Type,
+    is_target: bool,
+    operator: ComparisonOperator,
+) -> usize {
+    let over_limit = MAX_FINITE_COMPARISON_PAIRS + 1;
+    let mut pending = vec![(ty, false)];
+    let mut active = FxHashSet::default();
+    let mut count = 0usize;
+
+    while let Some((ty, exiting)) = pending.pop() {
+        let ty = ty.resolve_type_alias(db);
+        if exiting {
+            active.remove(&ty);
+            continue;
+        }
+        if !active.insert(ty) {
+            return over_limit;
+        }
+        pending.push((ty, true));
+
+        if let Some(alternatives) = finite_alternatives(db, ty, operator) {
+            count = count.saturating_add(alternatives.len());
+        } else {
+            match ty {
+                Type::Union(union) => {
+                    pending.extend(union.elements(db).iter().map(|element| (*element, false)));
+                }
+                Type::TypeVar(var) => {
+                    if let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                        var.typevar(db).bound_or_constraints(db)
+                    {
+                        pending.push((constraints.as_type(db), false));
+                    } else {
+                        count += 1;
+                    }
+                }
+                Type::NewTypeInstance(newtype) => {
+                    pending.push((newtype.concrete_base_type(db), false));
+                }
+                Type::Intersection(intersection) if is_target => {
+                    pending.extend(
+                        intersection
+                            .positive(db)
+                            .iter()
+                            .map(|element| (*element, false)),
+                    );
+                }
+                _ => count += 1,
+            }
+        }
+
+        if count > MAX_FINITE_COMPARISON_PAIRS {
+            return over_limit;
+        }
+    }
+
+    count
 }
 
 /// Return a constraint for literal pairs whose equality cannot be decided statically.

@@ -59,6 +59,7 @@ def _(x: bool):
 ```py
 from enum import Enum
 from typing import Literal
+from typing_extensions import assert_type
 
 from ty_extensions import Intersection, Not
 
@@ -253,6 +254,101 @@ reveal_type(Generated.ONE.value)  # revealed: int
 def _(value: Generated | Other):
     if value == Generated.ONE:
         reveal_type(value)  # revealed: Generated | Other
+```
+
+Finite-domain narrowing has a work limit when both operands contain multiple alternatives. This
+keeps large comparisons from requiring a Cartesian comparison of every possible pair:
+
+```py
+from enum import Enum
+from typing import Literal, TypeVar, final
+
+class Budgeted(Enum):
+    M0 = 0
+    M1 = 1
+    M2 = 2
+    M3 = 3
+    M4 = 4
+    M5 = 5
+    M6 = 6
+    M7 = 7
+    M8 = 8
+    M9 = 9
+    M10 = 10
+    M11 = 11
+    M12 = 12
+    M13 = 13
+    M14 = 14
+    M15 = 15
+    M16 = 16
+
+class Disjoint(Enum):
+    M0 = 0
+    M1 = 1
+    M2 = 2
+    M3 = 3
+    M4 = 4
+    M5 = 5
+    M6 = 6
+    M7 = 7
+    M8 = 8
+    M9 = 9
+    M10 = 10
+    M11 = 11
+    M12 = 12
+    M13 = 13
+    M14 = 14
+    M15 = 15
+    M16 = 16
+
+WithinBudget = Literal[
+    Budgeted.M0,
+    Budgeted.M1,
+    Budgeted.M2,
+    Budgeted.M3,
+    Budgeted.M4,
+    Budgeted.M5,
+    Budgeted.M6,
+    Budgeted.M7,
+    Budgeted.M8,
+    Budgeted.M9,
+    Budgeted.M10,
+    Budgeted.M11,
+    Budgeted.M12,
+    Budgeted.M13,
+    Budgeted.M14,
+]
+OverBudget = Literal[WithinBudget, Budgeted.M15]
+
+def within_budget(value: Budgeted, other: WithinBudget):
+    if value == other:
+        assert_type(value, WithinBudget)
+
+def over_budget(value: Budgeted, other: OverBudget | None):
+    if value == other:
+        assert_type(value, Budgeted)
+
+def disjoint_over_budget(value: Budgeted, other: Disjoint):
+    if value != other:
+        pass
+    else:
+        reveal_type(value)  # revealed: Never
+
+class Shared(Enum):
+    A = 1
+    B = 2
+
+@final
+class Other: ...
+
+T = TypeVar("T", Literal[Shared.A], Other)
+U = TypeVar("U", Literal[Shared.A], Other)
+
+def shared_constraint_domain(value: Shared, other: T | U):
+    if value != other:
+        pass
+    else:
+        reveal_type(value)  # revealed: Literal[Shared.A]
 ```
 
 An assignment to `__new__`, `__init__`, or other methods can replace the value declared in the class
