@@ -430,16 +430,6 @@ impl KnownUnion {
         }
     }
 
-    pub(crate) const fn contains(self, class: Option<KnownClass>) -> bool {
-        match self {
-            Self::Float => matches!(class, Some(KnownClass::Int | KnownClass::Float)),
-            Self::Complex => matches!(
-                class,
-                Some(KnownClass::Int | KnownClass::Float | KnownClass::Complex)
-            ),
-        }
-    }
-
     pub(crate) fn to_type(self, db: &dyn Db) -> Type<'_> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(

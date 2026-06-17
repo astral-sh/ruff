@@ -4,50 +4,38 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::types::{Type, print_type_for_provide_type};
+use ty_python_semantic::types::{Type, print_type};
 use ty_python_semantic::{HasType, SemanticModel};
 
-/// Returns the endpoint-specific public type representation for each requested range.
+/// Returns the endpoint-specific public type representation for the requested range.
 ///
 /// This applies provide-type normalizations and is not a general-purpose type printing API.
-pub fn provide_types<I>(db: &dyn Db, file: File, ranges: I) -> Vec<Option<String>>
-where
-    I: IntoIterator<Item = Option<TextRange>>,
-{
+pub fn provide_type(db: &dyn Db, file: File, range: TextRange) -> Option<String> {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
-
-    ranges
-        .into_iter()
-        .map(|range| {
-            let range = range?;
-            let covering_node = covering_node(parsed.syntax().into(), range);
-            let ty = match covering_node.find_first(AnyNodeRef::is_expression) {
-                Ok(found) => expression_type(&model, found.node())?,
-                Err(covering_node) => {
-                    let handler = covering_node
-                        .find_first(|node| {
-                            matches!(node, AnyNodeRef::ExceptHandlerExceptHandler(_))
-                        })
-                        .ok()?
-                        .node();
-                    let AnyNodeRef::ExceptHandlerExceptHandler(handler) = handler else {
-                        return None;
-                    };
-                    if !handler
-                        .name
-                        .as_ref()
-                        .is_some_and(|name| name.range().contains_range(range))
-                    {
-                        return None;
-                    }
-                    handler.inferred_type(&model)?
-                }
+    let covering_node = covering_node(parsed.syntax().into(), range);
+    let ty = match covering_node.find_first(AnyNodeRef::is_expression) {
+        Ok(found) => expression_type(&model, found.node())?,
+        Err(covering_node) => {
+            let handler = covering_node
+                .find_first(|node| matches!(node, AnyNodeRef::ExceptHandlerExceptHandler(_)))
+                .ok()?
+                .node();
+            let AnyNodeRef::ExceptHandlerExceptHandler(handler) = handler else {
+                return None;
             };
+            if !handler
+                .name
+                .as_ref()
+                .is_some_and(|name| name.range().contains_range(range))
+            {
+                return None;
+            }
+            handler.inferred_type(&model)?
+        }
+    };
 
-            print_type_for_provide_type(db, ty).ok()
-        })
-        .collect()
+    print_type(db, ty).ok()
 }
 
 fn expression_type<'db>(model: &SemanticModel<'db>, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
@@ -73,8 +61,9 @@ fn expression_type<'db>(model: &SemanticModel<'db>, node: AnyNodeRef<'_>) -> Opt
 
 #[cfg(test)]
 mod tests {
-    use crate::provide_type::provide_types;
+    use crate::provide_type::provide_type;
 
+    use insta::{assert_debug_snapshot, assert_snapshot};
     use ruff_db::{
         files::{File, system_path_to_file},
         system::{DbWithTestSystem, DbWithWritableSystem, SystemPathBuf},
@@ -94,7 +83,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "foo.C");
+        assert_snapshot!(test.provided_type(), @"foo.C");
     }
 
     #[test]
@@ -110,7 +99,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "foo.A.B");
+        assert_snapshot!(test.provided_type(), @"foo.A.B");
     }
 
     #[test]
@@ -128,7 +117,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "foo.A[foo.B]");
+        assert_snapshot!(test.provided_type(), @"foo.A[foo.B]");
     }
 
     #[test]
@@ -142,7 +131,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "foo.f.A");
+        assert_snapshot!(test.provided_type(), @"foo.f.A");
     }
 
     #[test]
@@ -156,7 +145,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "builtins.OSError");
+        assert_snapshot!(test.provided_type(), @"builtins.OSError");
     }
 
     #[test]
@@ -170,9 +159,9 @@ mod tests {
             "#,
         );
 
-        assert_eq!(
+        assert_snapshot!(
             test.provided_type(),
-            "ty_extensions.TypeOf[builtins.OSError]"
+            @"ty_extensions.TypeOf[builtins.OSError]"
         );
     }
 
@@ -187,7 +176,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "ty_extensions.TypeOf[foo.A]");
+        assert_snapshot!(test.provided_type(), @"ty_extensions.TypeOf[foo.A]");
     }
 
     #[test]
@@ -200,7 +189,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "def foo.f() -> builtins.int: ...");
+        assert_snapshot!(test.provided_type(), @"def foo.f() -> builtins.int: ...");
     }
 
     #[test]
@@ -212,33 +201,42 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "ty_extensions.TypeOf[foo.A]");
+        assert_snapshot!(test.provided_type(), @"ty_extensions.TypeOf[foo.A]");
     }
 
     #[test]
-    fn provide_type_applies_documented_normalizations() {
-        for (source, expected) in [
-            ("value = <START>1.0<END>", "builtins.float"),
-            (
-                "type Alias = int\nvalue = <START>Alias<END>",
-                "typing_extensions.TypeAliasType",
-            ),
-            (
-                "type Alias[T] = list[T]\nvalue = <START>Alias[int]<END>",
-                "types.GenericAlias",
-            ),
-            (
-                "type Alias = int\ndef f(value: Alias):\n    <START>value<END>",
-                "foo.Alias",
-            ),
-        ] {
-            let test = ProvideTypeTest::with_source(source);
-            assert_eq!(
-                provide_types(&test.db, test.file, [Some(test.range)])[0].as_deref(),
-                Some(expected),
-                "source: {source}"
-            );
-        }
+    fn provide_float_literal_type() {
+        let test = ProvideTypeTest::with_source("value = <START>1.0<END>");
+        assert_snapshot!(test.provided_type(), @"builtins.float");
+    }
+
+    #[test]
+    fn provide_type_alias_object_type() {
+        let test = ProvideTypeTest::with_source("type Alias = int\nvalue = <START>Alias<END>");
+        assert_snapshot!(test.provided_type(), @"typing_extensions.TypeAliasType");
+    }
+
+    #[test]
+    fn provide_generic_alias_object_type() {
+        let test =
+            ProvideTypeTest::with_source("type Alias[T] = list[T]\nvalue = <START>Alias[int]<END>");
+        assert_snapshot!(test.provided_type(), @"types.GenericAlias");
+    }
+
+    #[test]
+    fn provide_type_alias_instance_type() {
+        let test = ProvideTypeTest::with_source(
+            "type Alias = int\ndef f(value: Alias):\n    <START>value<END>",
+        );
+        assert_snapshot!(test.provided_type(), @"foo.Alias");
+    }
+
+    #[test]
+    fn provide_annotated_type() {
+        let test = ProvideTypeTest::with_source(
+            "from typing import Annotated\nvalue = <START>Annotated[int, 'metadata']<END>",
+        );
+        assert_snapshot!(test.provided_type(), @"builtins.int");
     }
 
     #[test]
@@ -253,7 +251,7 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "foo.C");
+        assert_snapshot!(test.provided_type(), @"foo.C");
     }
 
     #[test]
@@ -274,9 +272,9 @@ mod tests {
             "#,
         );
 
-        assert_eq!(
-            provide_types(&test.db, test.file, [Some(test.range)]),
-            [None]
+        assert_debug_snapshot!(
+            provide_type(&test.db, test.file, test.range),
+            @"None"
         );
     }
 
@@ -290,17 +288,15 @@ mod tests {
             "#,
         );
 
-        assert_eq!(test.provided_type(), "T1@foo.A | T2@foo.A.f");
+        assert_snapshot!(test.provided_type(), @"T1@foo.A | T2@foo.A.f");
     }
 
     #[test]
     fn unsupported_type_returns_none() {
-        let test = ProvideTypeTest::with_source(
-            "from typing import Annotated\nvalue = <START>Annotated[int, 'metadata']<END>",
-        );
-        assert_eq!(
-            provide_types(&test.db, test.file, [Some(test.range)]),
-            [None]
+        let test = ProvideTypeTest::with_source("import sys\nvalue = <START>sys<END>");
+        assert_debug_snapshot!(
+            provide_type(&test.db, test.file, test.range),
+            @"None"
         );
     }
 
@@ -354,11 +350,7 @@ mod tests {
         }
 
         fn provided_type(&self) -> String {
-            let mut types = provide_types(&self.db, self.file, [Some(self.range)]);
-            assert_eq!(types.len(), 1);
-            types
-                .pop()
-                .flatten()
+            provide_type(&self.db, self.file, self.range)
                 .expect("selected type should be printable")
         }
     }

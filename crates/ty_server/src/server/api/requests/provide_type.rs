@@ -8,7 +8,7 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::{LspRequestMethod, MessageDirection, Range, Request, TextDocumentIdentifier, Uri};
 use serde::{Deserialize, Serialize};
-use ty_ide::provide_types;
+use ty_ide::provide_type;
 use ty_project::ProjectDatabase;
 
 pub(crate) struct ProvideTypeRequestHandler;
@@ -20,13 +20,15 @@ pub(crate) struct ProvideTypeRequestHandler;
 /// ty's internal type model and should not be used as a general-purpose type display format. The
 /// result is a single-line, fully-qualified, Python-derived type expression intended for clients
 /// to parse. The syntax and normalization contract are documented by
-/// `ty_python_semantic::types::print_type_for_provide_type`.
+/// `ty_python_semantic::types::print_type`.
 ///
-/// In particular, exact `float` and `complex` instances use their public classes, runtime PEP 695
-/// alias objects use their canonical runtime class, and direct synthesized-protocol intersection
-/// constraints are omitted. No other type is widened, resolved, or omitted. A result is `null`
-/// when the range has no expression type or no supported representation remains after these
-/// normalizations.
+/// Python allows multiple declarations to have the same qualified name. To distinguish them, the
+/// result adds `@1`, `@2`, and so on to the duplicated name in source order. For example, two
+/// module-level classes named `C` are printed as `module.C@1` and `module.C@2`. The suffix is not
+/// stable across edits.
+///
+/// A result is `null` when the range has no expression type or no supported representation remains
+/// after the documented normalizations.
 ///
 #[derive(Debug)]
 pub enum ProvideTypeRequest {}
@@ -74,14 +76,15 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             return Ok(None);
         };
 
-        let types = provide_types(
-            db,
-            file,
-            params
-                .ranges
-                .iter()
-                .map(|range| range.to_text_range(db, file, snapshot.uri(), snapshot.encoding())),
-        );
+        let types = params
+            .ranges
+            .iter()
+            .map(|range| {
+                range
+                    .to_text_range(db, file, snapshot.uri(), snapshot.encoding())
+                    .and_then(|range| provide_type(db, file, range))
+            })
+            .collect();
 
         Ok(Some(ProvideTypeResponse { types }))
     }
