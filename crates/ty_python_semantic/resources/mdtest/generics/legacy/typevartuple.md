@@ -295,6 +295,28 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### `TypeVarTuple` with `ParamSpec`
+
+```py
+from typing import Callable, Generic, TypeVarTuple, ParamSpec
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class TypeVarTupleWithParamSpec(Generic[*Ts, **P]):
+    fn: Callable[P, tuple[*Ts]]
+
+reveal_type(TypeVarTupleWithParamSpec[[str, int]]().fn)  # revealed: (str, int, /) -> tuple[()]
+reveal_type(TypeVarTupleWithParamSpec[int, [str, int]]().fn)  # revealed: (str, int, /) -> tuple[int]
+reveal_type(TypeVarTupleWithParamSpec[int, str, [str, int]]().fn)  # revealed: (str, int, /) -> tuple[int, str]
+
+# error: [invalid-type-arguments]
+reveal_type(TypeVarTupleWithParamSpec[str, int]().fn)  # revealed: (...) -> tuple[str]
+
+reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str]
+reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str]
+```
+
 ### Inferred specialization from construction
 
 Calling a generic class without explicit type arguments infers its specialization from the
@@ -499,4 +521,24 @@ Second = First[int, *Ts]
 def f(a1: First[str, bool], a2: Second[str, bool]) -> None:
     reveal_type(a1)  # revealed: tuple[bytes, str, bool]
     reveal_type(a2)  # revealed: tuple[bytes, int, str, bool]
+```
+
+### Using Callable
+
+```py
+from typing import Callable, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+Alias = Callable[[*Ts], None]
+
+def test(fn: Alias[int, *Ts]) -> tuple[*Ts]: ...
+
+def fn0(a: int) -> None: ...
+def fn1(a: int, b: str) -> None: ...
+def fn2(a: int, b: str, c: bytes) -> None: ...
+
+reveal_type(test(fn0))  # revealed: tuple[()]
+reveal_type(test(fn1))  # revealed: tuple[str]
+reveal_type(test(fn2))  # revealed: tuple[str, bytes]
 ```
