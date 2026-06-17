@@ -284,6 +284,22 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
+## Final upper bounds
+
+A type variable with a final upper bound has only one possible class object:
+
+```py
+from typing import final
+from ty_extensions import TypeOf
+
+@final
+class Final: ...
+
+def accepts_exact(cls: TypeOf[Final]) -> None: ...
+def bounded[T: Final](cls: type[T]) -> None:
+    accepts_exact(cls)
+```
+
 ## Metaclass instances
 
 ```py

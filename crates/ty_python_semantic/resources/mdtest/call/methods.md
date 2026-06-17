@@ -418,17 +418,36 @@ reveal_type(Derived().f(1))  # revealed: str
 
 ### Implicit receivers in final classes
 
-For a final class, an implicit `type[Self]` receiver refers to the exact class object and can bind
-to another classmethod on that class:
+For a final class, including a generic final class, an implicit `type[Self]` receiver refers to the
+exact class object and can bind to another classmethod on that class:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import final
+from ty_extensions import TypeOf
 
 @final
 class Final:
     @classmethod
     def call_from_classmethod(cls) -> None:
         cls.method()
+
+    def call_from_instance(self) -> None:
+        self.method()
+
+    @classmethod
+    def method(cls) -> None: ...
+
+@final
+class GenericFinal[T]:
+    @classmethod
+    def call_from_classmethod(cls) -> None:
+        cls.method()
+        exact: TypeOf[GenericFinal[T]] = cls
 
     def call_from_instance(self) -> None:
         self.method()
