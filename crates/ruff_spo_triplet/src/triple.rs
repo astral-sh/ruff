@@ -239,6 +239,23 @@ pub enum Predicate {
     /// FK emission on `kind == belongs_to`.
     AssociationKind,
 
+    /// `(<model>.<rel>, class_name, "<TargetClass>")` — Rails
+    /// `class_name:` association option override (`belongs_to :owner,
+    /// class_name: 'User'`).
+    ///
+    /// Subject is the relation IRI (`openproject:WorkPackage.owner`),
+    /// object is the Ruby class name verbatim (`"User"`). When
+    /// present, downstream consumers MUST use this as the target
+    /// class instead of inferring it from the Rails camelcase-singular
+    /// convention on the relation name. Without this, the schema
+    /// emits a phantom `record<Owner>` for a `belongs_to :owner,
+    /// class_name: 'User'` declaration — the relation name doesn't
+    /// map to a real table.
+    ///
+    /// Only emitted when the `AssocDecl.options` carries a
+    /// `class_name` key; absence means "use the Rails convention".
+    ClassName,
+
     // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
     //
     // The 13 net-new predicates for the C++ frontend. Subject conventions
@@ -364,6 +381,7 @@ impl Predicate {
             Self::UsesRefinement => "uses_refinement",
             Self::FieldType => "field_type",
             Self::AssociationKind => "association_kind",
+            Self::ClassName => "class_name",
             // C++ machine-plane 13
             Self::InheritsFrom => "inherits_from",
             Self::HasField => "has_field",
@@ -433,6 +451,7 @@ impl Predicate {
             "uses_refinement" => Self::UsesRefinement,
             "field_type" => Self::FieldType,
             "association_kind" => Self::AssociationKind,
+            "class_name" => Self::ClassName,
             // C++ machine-plane 13
             "inherits_from" => Self::InheritsFrom,
             "has_field" => Self::HasField,
@@ -502,6 +521,7 @@ impl Predicate {
         Self::UsesRefinement,
         Self::FieldType,
         Self::AssociationKind,
+        Self::ClassName,
         // C++ machine-plane 13
         Self::InheritsFrom,
         Self::HasField,
@@ -599,7 +619,8 @@ impl Predicate {
             | Self::AutoStrips
             | Self::UsesRefinement
             | Self::FieldType
-            | Self::AssociationKind => Provenance::OpenProjectExtracted,
+            | Self::AssociationKind
+            | Self::ClassName => Provenance::OpenProjectExtracted,
         }
     }
 }
@@ -712,15 +733,18 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_53() {
+    fn predicate_count_locked_at_54() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 29 OpenProject AR-shape (PR #15 added `association_kind`
-        // so the FK-direction bug is fixable downstream) + 17 C++ machine-
-        // plane (operator-approved `returns_type` + `has_param_type` AST-DLL
-        // signature shape, then `is_const` + `is_static` ORM-downcast shape)
-        // = 53. Council review of any new variant means this number changes —
-        // the test must change with the source.
-        assert_eq!(Predicate::ALL.len(), 53);
+        // Python) + 30 OpenProject AR-shape (PR #15 added
+        // `association_kind` so the FK-direction bug is fixable
+        // downstream; this PR adds `class_name` so `belongs_to :owner,
+        // class_name: 'User'` can emit `record<User>` instead of
+        // phantom `record<Owner>`) + 17 C++ machine-plane (operator-
+        // approved `returns_type` + `has_param_type` AST-DLL signature
+        // shape, then `is_const` + `is_static` ORM-downcast shape) =
+        // 54. Council review of any new variant means this number
+        // changes — the test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 54);
     }
 
     #[test]
