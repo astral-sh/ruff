@@ -169,10 +169,8 @@ fn narrow_string_membership<'db>(
         let element = element.resolve_type_alias(db);
         if let Some(needle) = element.as_string_literal() {
             haystack.contains(needle.value(db)) == is_contained
-        } else if is_contained && element.is_disjoint_from(db, KnownClass::Str.to_instance(db)) {
-            false
         } else {
-            true
+            !(is_contained && element.is_disjoint_from(db, KnownClass::Str.to_instance(db)))
         }
     };
 
