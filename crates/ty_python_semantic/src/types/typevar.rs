@@ -1612,7 +1612,6 @@ impl<'db> TypeVarConstraints<'db> {
                 })
             },
             qualifiers,
-            projection_evidence: None,
         }
     }
 

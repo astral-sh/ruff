@@ -352,7 +352,6 @@ impl<'db> UnionType<'db> {
                 })
             },
             qualifiers,
-            projection_evidence: None,
         }
     }
 
@@ -930,7 +929,6 @@ impl<'db> IntersectionType<'db> {
                 })
             },
             qualifiers,
-            projection_evidence: None,
         }
     }
 

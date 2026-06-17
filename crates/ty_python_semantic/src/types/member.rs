@@ -15,16 +15,16 @@ pub(super) struct Member<'db> {
 }
 
 impl<'db> Member<'db> {
+    pub(super) const fn new(inner: PlaceAndQualifiers<'db>) -> Self {
+        Self { inner }
+    }
+
     pub(super) fn unbound() -> Self {
-        Self {
-            inner: PlaceAndQualifiers::unbound(),
-        }
+        Self::new(PlaceAndQualifiers::unbound())
     }
 
     pub(super) fn definitely_declared(ty: Type<'db>) -> Self {
-        Self {
-            inner: Place::declared(ty).into(),
-        }
+        Self::new(Place::declared(ty).into())
     }
 
     /// Returns the type qualifiers of this member.
@@ -67,9 +67,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 
             if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
                 // Trust the declared type if we see a class-level declaration
-                return Member {
-                    inner: place_and_quals,
-                };
+                return Member::new(place_and_quals);
             }
 
             if let PlaceAndQualifiers {
@@ -90,17 +88,15 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                Member {
-                    inner: match inferred {
-                        Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(place) => Place::Defined(DefinedPlace {
-                            ty,
-                            provenance: place.provenance.or(declared_provenance),
-                            ..place
-                        })
-                        .with_qualifiers(qualifiers),
-                    },
-                }
+                Member::new(match inferred {
+                    Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
+                    Place::Defined(place) => Place::Defined(DefinedPlace {
+                        ty,
+                        provenance: place.provenance.or(declared_provenance),
+                        ..place
+                    })
+                    .with_qualifiers(qualifiers),
+                })
             } else {
                 Member::unbound()
             }
