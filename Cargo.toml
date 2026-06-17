@@ -95,7 +95,7 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.9.0", features = [
+get-size2 = { version = "0.10.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
