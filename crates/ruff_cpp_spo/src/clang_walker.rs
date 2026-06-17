@@ -137,7 +137,12 @@ pub const MAPPED_CURSOR_KINDS: [&str; 9] = [
 fn tally_class_bodies(entity: &Entity, hist: &mut BTreeMap<String, usize>) {
     for child in entity.get_children() {
         match child.get_kind() {
-            EntityKind::ClassDecl | EntityKind::StructDecl => {
+            // Kept in lockstep with `collect_classes`: templated classes count
+            // too, so the coverage histogram reflects exactly what is harvested.
+            EntityKind::ClassDecl
+            | EntityKind::StructDecl
+            | EntityKind::ClassTemplate
+            | EntityKind::ClassTemplatePartialSpecialization => {
                 if child.is_definition() && !in_system_header(&child) {
                     for member in child.get_children() {
                         *hist.entry(format!("{:?}", member.get_kind())).or_insert(0) += 1;
@@ -156,7 +161,18 @@ fn tally_class_bodies(entity: &Entity, hist: &mut BTreeMap<String, usize>) {
 fn collect_classes(entity: &Entity, out: &mut Vec<CppClass>) {
     for child in entity.get_children() {
         match child.get_kind() {
-            EntityKind::ClassDecl | EntityKind::StructDecl => {
+            // Plain classes/structs AND templated classes. libclang FLATTENS a
+            // template cursor — its direct children are the template params
+            // (skipped by `build_class`'s `_` arm) + the members — so the same
+            // `build_class` handles all four unchanged. The harvested name is the
+            // bare template name (`GenericVector`, no `<T>`). Shape A: template
+            // classes become classes; the template-relationship predicates
+            // (`template_specialises` / `template_instantiates`) are a separate,
+            // data-driven follow-up (ccutil measured 0 explicit specialisations).
+            EntityKind::ClassDecl
+            | EntityKind::StructDecl
+            | EntityKind::ClassTemplate
+            | EntityKind::ClassTemplatePartialSpecialization => {
                 // Skip class definitions originating in system headers (the
                 // std:: / __gnu_cxx:: machinery dragged in transitively) — an
                 // SPO harvest of a project wants the project's own classes,

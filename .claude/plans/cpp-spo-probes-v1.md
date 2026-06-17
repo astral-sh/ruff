@@ -227,3 +227,34 @@ hardening, not a blocker.)
 only `CPP-TEMPLATE-DET` remains** — gated on class-level template extraction (the
 walker captures member function templates as `has_function` but does not yet emit
 `template_specialises` / `template_instantiates`).
+
+## Update — 2026-06-16 (Shape A: template classes harvested + measured B-vs-C)
+
+Researched template handling against the corpus *before* implementing
+(genericvector.h observed via an instrumented libclang walk; ccutil grepped for
+specialisations), per the three candidate shapes (A erase / B explicit-specialises
+/ C instantiation-uses):
+
+- **Corpus reality (measured):** 57 primary class templates, **0 explicit
+  specialisations** (full or partial), pervasive instantiation-*uses*
+  (`GenericVector<T*>` as bases / field types). libclang FLATTENS a `ClassTemplate`
+  cursor — its direct children are the template params + the members — so
+  `build_class` handles it unchanged.
+- **Shape A shipped:** `collect_classes` + the coverage tally now treat
+  `ClassTemplate` / `ClassTemplatePartialSpecialization` as classes. ccutil harvest
+  **50 → 67 classes (+17 template containers: `GenericVector`, `PointerVector`, …),
+  1652 → 2184 triples** — container classes + their methods previously invisible to
+  the SPO graph. Deterministic; a hermetic class-template fixture asserts capture.
+- **B vs A (measured, refutes the hypothesis on this corpus):** B's
+  `template_specialises` captures **nothing** on ccutil (0 specialisations) — **B ≡
+  A here**. The value is entirely in harvesting the primary templates, which both
+  shapes share; B's extra logic would be dead code on this corpus.
+- **C is the real differentiator, deferred:** the template structure that ACTUALLY
+  exists is instantiation-*use*, i.e. `template_instantiates` — but that is the
+  `Inferred`, per-TU-incomplete tier `CPP-TEMPLATE-DET` was written to gate. Held
+  for the data-driven C round (test B against C later, per operator).
+- **`CPP-TEMPLATE-DET` status:** Shape A emits no template-relationship predicate,
+  so the probe is **deferred-with-C** — it gates `template_instantiates`
+  determinism, relevant only once C is implemented. Coverage/determinism are
+  otherwise green (`CPP-SCHEMA-FIT` now counts template-class bodies too;
+  `CPP-AST-RT` byte-identical with templates included).

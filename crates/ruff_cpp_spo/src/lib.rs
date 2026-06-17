@@ -576,6 +576,12 @@ class Recognizer : public Classify {
   int recognizer_;
   static int count_;
 };
+template <typename T>
+class Box {
+ public:
+  T get() const;
+  void set(T v);
+};
 }
 ";
         let _guard = CLANG_LOCK
@@ -676,6 +682,17 @@ class Recognizer : public Classify {
                 d, super::Declaration::Friend(fr) if fr.name == "Tesseract::TessdataManager"
             )),
             "friend class Tesseract::TessdataManager must be captured"
+        );
+
+        // Class templates are harvested as classes (Shape A): libclang flattens
+        // the `ClassTemplate`, so its methods are captured like any class's. The
+        // harvested name is the bare template name (no `<T>`).
+        let boxed = find("Tesseract::Box");
+        assert!(
+            boxed.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Method(m) if m.name == "get"
+            )),
+            "class template Box::get must be captured as a method"
         );
 
         let clear = classify
