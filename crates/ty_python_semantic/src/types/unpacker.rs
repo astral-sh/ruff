@@ -75,7 +75,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         let value_type = value_inference.expression_type(value_expr);
         let allow_projection = matches!(
             value.kind(),
-            UnpackKind::Assign | UnpackKind::Iterable { .. }
+            UnpackKind::Assign | UnpackKind::Iterable { .. } | UnpackKind::ContextManager { .. }
         );
 
         let value_type = match value.kind() {

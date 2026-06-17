@@ -3576,6 +3576,27 @@ class ProjectionCustomContext:
 
         reveal_type(self.x)  # revealed: ContextBox[int]
 
+class TupleContextBox(Generic[ProjectionT, ProjectionU]):
+    def __init__(self, first: ProjectionT, second: ProjectionU) -> None:
+        self.first = first
+        self.second = second
+
+    def __enter__(self) -> tuple[ProjectionT, ProjectionU]:
+        return self.first, self.second
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+class ProjectionCustomContextUnpack:
+    def __init__(self) -> None:
+        self.x = TupleContextBox(0, "")
+
+    def read(self) -> None:
+        with self.x as (number, text):
+            self.x = TupleContextBox(number, text)
+
+        reveal_type(self.x)  # revealed: TupleContextBox[int, str]
+
 class AsyncContextBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
         self.value = value
