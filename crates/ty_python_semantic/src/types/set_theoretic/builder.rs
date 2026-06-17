@@ -129,6 +129,21 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Return `true` if union simplification should preserve this pair because one element is
+/// `Hashable` and the other is a non-final nominal instance.
+///
+/// Hashability does not obey normal inheritance rules: subclasses of hashable classes can be
+/// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
+fn should_preserve_hashable_union(db: &dyn Db, left: Type, right: Type) -> bool {
+    let is_hashable =
+        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(db));
+    let is_non_final_nominal_instance =
+        |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(db).is_final(db));
+
+    (is_hashable(left) && is_non_final_nominal_instance(right))
+        || (is_hashable(right) && is_non_final_nominal_instance(left))
+}
+
 /// Combine union elements that cover more of the same enum class.
 ///
 /// Enum complements are intersections like `Color & ~Literal[Color.RED]`. When a union contains
@@ -921,6 +936,15 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
+            }
+
+            // `object` already contains every possible union element.
+            if element_type == Type::object() {
+                return;
+            }
+
+            if should_preserve_hashable_union(self.db, ty, element_type) {
+                continue;
             }
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
