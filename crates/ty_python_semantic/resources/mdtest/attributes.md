@@ -3287,9 +3287,9 @@ class ProjectionHomogeneousTupleSlice:
         reveal_type(self.x)  # revealed: tuple[int, ...]
 ```
 
-Projection recovery also works for simple custom generic containers that define their own
-iteration behavior. Some recursive relationships that depend on user-defined method behavior are
-still approximated:
+Projection recovery also works for simple custom generic containers that define their own iteration
+behavior. Some recursive relationships that depend on user-defined method behavior are still
+approximated:
 
 ```py
 from collections.abc import AsyncIterator, Callable, Generator, Iterator, Mapping
