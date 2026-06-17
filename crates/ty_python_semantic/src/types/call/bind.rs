@@ -4933,13 +4933,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // Filter out inferable typevars (cross-typevar references from
                         // SequentMap transitivity) and unspecialized typevars (from partially
                         // specialized contexts).
-                        let inferred_ty = binding.solution.filter_union(self.db, |ty| {
-                            if ty.has_unspecialized_type_var(self.db) {
-                                partially_specialized_declared_type.insert(identity);
-                                return false;
-                            }
-                            true
-                        });
+                        let inferred_ty = builder
+                            .remove_inferable_typevar_artifacts_from_solution(
+                                binding.bound_typevar,
+                                binding.solution,
+                            )
+                            .filter_union(self.db, |ty| {
+                                if ty.has_unspecialized_type_var(self.db) {
+                                    partially_specialized_declared_type.insert(identity);
+                                    return false;
+                                }
+                                true
+                            });
                         if inferred_ty.has_unspecialized_type_var(self.db) {
                             continue;
                         }

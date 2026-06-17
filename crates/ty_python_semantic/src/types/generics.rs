@@ -1999,12 +1999,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // TODO: This is a solution-level projection. A more principled version would live in the
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
         // for and existentially quantifying away the other typevars in that domain.
-        if self.can_remove_inferable_typevar_artifacts(generic_context) {
-            for identity in generic_context.variables_inner(self.db).keys() {
-                if let Some(ty) = types.get_mut(identity) {
-                    *ty =
-                        self.remove_inferable_typevar_artifacts_from_solution(generic_context, *ty);
-                }
+        for (identity, variable) in generic_context.variables_inner(self.db) {
+            if let Some(ty) = types.get_mut(identity) {
+                *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
             }
         }
 
@@ -2096,54 +2093,47 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         })
     }
 
-    fn can_remove_inferable_typevar_artifacts(&self, generic_context: GenericContext<'db>) -> bool {
-        // Mixed contexts can intentionally use one context's typevars to solve another (for
-        // example, constructor calls whose `__init__` self annotation remaps class typevars).
-        // Only remove artifacts for ordinary generic calls whose typevars all come from one
-        // source-level binding context.
-        let mut binding_contexts = generic_context
-            .variables_inner(self.db)
-            .values()
-            .map(|typevar| typevar.binding_context(self.db));
-        let Some(first) = binding_contexts.next() else {
-            return false;
-        };
-        first != BindingContext::Synthetic && binding_contexts.all(|context| context == first)
-    }
-
     fn is_inferable_typevar_artifact(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> bool {
+        let target_context = target.binding_context(self.db);
         ty.as_typevar().is_some_and(|typevar| {
-            typevar.is_inferable(self.db, self.inferable)
-                && generic_context.contains(self.db, typevar.identity(self.db))
+            // Relationships across binding contexts can intentionally remap one generic context
+            // onto another, as with constructor `self` annotations. Synthetic contexts do not
+            // identify a single source-level binding, so they are not safe to project either.
+            target_context != BindingContext::Synthetic
+                && typevar.is_inferable(self.db, self.inferable)
+                && typevar.binding_context(self.db) == target_context
         })
     }
 
-    fn remove_inferable_typevar_artifacts_from_solution(
+    /// Remove inferable type variables introduced by transitivity within the target's binding
+    /// context while preserving intentional relationships to other generic contexts.
+    pub(crate) fn remove_inferable_typevar_artifacts_from_solution(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(generic_context, ty);
-        self.remove_inferable_typevar_artifacts_from_upper_bound(generic_context, ty)
+        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(target, ty);
+        self.remove_inferable_typevar_artifacts_from_upper_bound(target, ty)
     }
 
     fn remove_inferable_typevar_artifacts_from_lower_bound(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         match ty {
             Type::Union(union)
-                if union.elements(self.db).iter().any(|element| {
-                    !self.is_inferable_typevar_artifact(generic_context, *element)
-                }) =>
+                if union
+                    .elements(self.db)
+                    .iter()
+                    .any(|element| !self.is_inferable_typevar_artifact(target, *element)) =>
             {
                 union.filter(self.db, |element| {
-                    !self.is_inferable_typevar_artifact(generic_context, *element)
+                    !self.is_inferable_typevar_artifact(target, *element)
                 })
             }
             _ => ty,
@@ -2152,17 +2142,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     fn remove_inferable_typevar_artifacts_from_upper_bound(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         match ty {
             Type::Intersection(intersection)
-                if intersection.iter_positive(self.db).any(|element| {
-                    !self.is_inferable_typevar_artifact(generic_context, element)
-                }) =>
+                if intersection
+                    .iter_positive(self.db)
+                    .any(|element| !self.is_inferable_typevar_artifact(target, element)) =>
             {
                 intersection.map_positive(self.db, |element| {
-                    if self.is_inferable_typevar_artifact(generic_context, *element) {
+                    if self.is_inferable_typevar_artifact(target, *element) {
                         Type::object()
                     } else {
                         *element
