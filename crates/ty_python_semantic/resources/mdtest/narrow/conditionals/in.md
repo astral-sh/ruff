@@ -108,7 +108,9 @@ def _(x: str):
 ```
 
 ```py
-from typing import Literal
+from typing import Literal, TypeVar
+
+T = TypeVar("T", Literal["a"], Literal["d"])
 
 def _(x: Literal["a", "b", "c", "d"]):
     if x in "abc":
@@ -121,6 +123,12 @@ def substring(x: Literal["", "ab", "z"]):
         reveal_type(x)  # revealed: Literal["", "ab"]
     else:
         reveal_type(x)  # revealed: Literal["z"]
+
+def constrained_substring(x: T):
+    if x in "abc":
+        reveal_type(x)  # revealed: T@constrained_substring & Literal["a"]
+    else:
+        reveal_type(x)  # revealed: T@constrained_substring & Literal["d"]
 ```
 
 ```py

@@ -165,6 +165,7 @@ fn narrow_string_membership<'db>(
     is_contained: bool,
 ) -> Option<Type<'db>> {
     let lhs_ty = lhs_ty.resolve_type_alias(db);
+    let lhs_domain = lhs_ty.flatten_typevars(db);
     let keep = |element: &Type<'db>| {
         let element = element.resolve_type_alias(db);
         if let Some(needle) = element.as_string_literal() {
@@ -174,13 +175,13 @@ fn narrow_string_membership<'db>(
         }
     };
 
-    let narrowed = match lhs_ty {
+    let narrowed = match lhs_domain {
         Type::Union(union) => union.filter(db, keep),
-        _ if keep(&lhs_ty) => return None,
+        _ if keep(&lhs_domain) => return None,
         _ => Type::Never,
     };
 
-    (narrowed != lhs_ty).then_some(narrowed)
+    (narrowed != lhs_domain).then_some(narrowed)
 }
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
