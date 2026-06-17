@@ -553,7 +553,7 @@ mod libclang_tests {
     use std::io::Write;
     use std::sync::Mutex;
 
-    use ruff_spo_triplet::{cpp_projection, expand, from_ndjson, reassemble, to_ndjson};
+    use ruff_spo_triplet::{Triple, cpp_projection, expand, from_ndjson, reassemble, to_ndjson};
 
     use super::{
         MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram, extract_dir,
@@ -1111,6 +1111,74 @@ class Recognizer : public Classify {
             differing.is_empty(),
             "all {} ccutil classes must round-trip byte-exact; residual: {differing:?}",
             r1.models.len(),
+        );
+    }
+
+    /// `CPP-CODEGEN-RT` — the stage-2 emitter (`ruff_cpp_codegen`) run on the
+    /// REAL corpus: harvest ccutil, project the method plane, and assert the
+    /// emitter's signature-plane round-trip holds against `expand` on every
+    /// class (a dropped method or mangled param would break it). Then render the
+    /// manifest and check it carries the PARITY marker and one `MethodSig`
+    /// literal per harvested method. Gated on `TESSERACT_SRC`. This is the test
+    /// integration point where both ends of the C++ -> Rust pipeline meet.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn cpp_codegen_emitter_roundtrips_on_real_corpus() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping CPP-CODEGEN-RT");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let g = extract_dir(&dir, &args).expect("libclang init (LIBCLANG_PATH set)");
+
+        // Signature-plane round-trip: the emitter's manifest decompiles to the
+        // same signature triples `expand` emits, on the real harvested graph.
+        let sig = |triples: Vec<Triple>| -> std::collections::BTreeSet<(String, String, String)> {
+            triples
+                .into_iter()
+                .filter(ruff_cpp_codegen::is_signature_plane)
+                .map(|t| (t.s, t.p, t.o))
+                .collect()
+        };
+        let manifests = ruff_cpp_codegen::project(&g);
+        let from_manifest = sig(ruff_cpp_codegen::decompile(&manifests, NAMESPACE));
+        let from_expand = sig(expand(&g));
+        assert_eq!(
+            from_manifest, from_expand,
+            "emitter manifest signature plane must round-trip against expand on real ccutil"
+        );
+
+        // Render the manifest; check the honesty marker + per-method completeness.
+        let src = ruff_cpp_codegen::render(&manifests);
+        let total_methods: usize = g.models.iter().map(|m| m.methods.len()).sum();
+        eprintln!(
+            "[CPP-CODEGEN-RT] {} classes, {total_methods} methods -> {} bytes of MethodSig manifest",
+            g.models.len(),
+            src.len()
+        );
+        assert!(
+            src.contains("PARITY: UNRUN (operator-blocked: leptonica)"),
+            "every generated file must carry the PARITY marker"
+        );
+        assert_eq!(
+            src.matches("MethodSig {").count(),
+            total_methods,
+            "one MethodSig literal per harvested method"
         );
     }
 

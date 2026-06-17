@@ -1,0 +1,17 @@
+[package]
+name = "ruff_cpp_codegen"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.86"
+description = "Stage 2 of the C++→Rust AST-DLL pipeline: turns the reassembled ModelGraph method plane (from ruff_cpp_spo's harvest, via ruff_spo_triplet::reassemble) into a per-class MethodSig manifest and renders it as Rust source that targets the OGAR Core. Emit-text-only — names lance-graph-contract types as text, never compiles against lance-graph. The manifest is gated by a signature-plane round-trip against the live harvested triples (decompile == expand's signature arm), so a dropped method or mangled param fails the build."
+license = "MIT"
+
+[lib]
+name = "ruff_cpp_codegen"
+
+[dependencies]
+ruff_spo_triplet = { workspace = true }
+
+[lints]
+workspace = true
