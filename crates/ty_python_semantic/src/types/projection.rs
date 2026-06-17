@@ -1402,6 +1402,7 @@ impl<'db> CycleProjectionType<'db> {
     }
 }
 
+// Due to salsa restrictions, it is not possible to directly intern a public struct containing a private type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct CycleProjectionTypeInterned<'db> {
     root: DivergentType,
@@ -1467,6 +1468,8 @@ enum CycleProjectionOp<'db> {
     Iter { is_async: bool },
     Unpack(CycleUnpackProjection),
     Subscript(CycleProjectionSubscript),
+    // There is no reason to target only 0-argument methods.
+    // It would be nice to be able to scale it without compromising performance.
     CallMethod0(CycleProjectionMethodName<'db>),
     ContextEnter { is_async: bool },
     AwaitResult,
