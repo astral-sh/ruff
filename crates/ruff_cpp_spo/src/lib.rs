@@ -1021,4 +1021,40 @@ class Recognizer : public Classify {
             "histogram must contain fields (has_field)"
         );
     }
+
+    /// `CPP-AST-RT` — libclang harvest determinism (the "reproducible harvest"
+    /// gate, `.claude/plans/cpp-spo-probes-v1.md`). Walks the SAME corpus subset
+    /// twice in-process and asserts byte-identical ndjson. The IR→triples half is
+    /// already deterministic (`expand` sorts + dedups); this settles the
+    /// libclang→IR half end-to-end (no RNG in the walker; `walk_files` dedups
+    /// into a sorted `BTreeMap`). Gated on `TESSERACT_SRC`.
+    #[test]
+    fn cpp_ast_rt_determinism() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let harvest = || to_ndjson(&expand(&extract_dir(&dir, &args).expect("libclang init")));
+        let first = harvest();
+        let second = harvest();
+        assert!(!first.is_empty(), "expected a non-empty harvest");
+        assert_eq!(
+            first, second,
+            "harvest must be byte-identical across runs (CPP-AST-RT determinism)"
+        );
+    }
 }

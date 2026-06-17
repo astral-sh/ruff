@@ -212,3 +212,18 @@ meaningful constructs now mapped**. The `CPP-SCHEMA-FIT` real-corpus coverage
 gate is effectively satisfied; `CPP-AST-RT` (determinism) and `CPP-TEMPLATE-DET`
 (class-level templates) remain the PENDING probes, both needing only the work
 they always did (a rerun/JSON-dump-parity harness; a template-heavy fixture).
+
+## Update — 2026-06-16 (CPP-AST-RT determinism RUN — GREEN)
+
+`cpp_ast_rt_determinism` (gated on `TESSERACT_SRC`) walks all of `src/ccutil`
+twice in-process and asserts byte-identical ndjson. **GREEN** — the harvest is
+reproducible end-to-end (no RNG in the walker; `walk_files` dedups into a sorted
+`BTreeMap`; `expand` sorts + dedups). The "do NOT claim faithful harvest until
+`CPP-AST-RT` is green" gate is now satisfied for the in-process path. (The
+decoupled `clang -ast-dump=json` cross-path parity, OD-3, remains a deferred
+hardening, not a blocker.)
+
+**Of the three primary probes, `CPP-SCHEMA-FIT` and `CPP-AST-RT` are now green;
+only `CPP-TEMPLATE-DET` remains** — gated on class-level template extraction (the
+walker captures member function templates as `has_function` but does not yet emit
+`template_specialises` / `template_instantiates`).
