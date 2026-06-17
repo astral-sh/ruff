@@ -22,6 +22,10 @@ use crate::rules::flake8_datetimez::helpers;
 /// `datetime.datetime.today()` creates a "naive" object; instead, use
 /// `datetime.datetime.now(tz=...)` to create a timezone-aware object.
 ///
+/// Additionally, the name `today()` can be misleading, as it returns the current
+/// date and time, not just the current date. `now(tz=...)` makes this intent
+/// explicit while also allowing a timezone to be specified.
+///
 /// ## Example
 /// ```python
 /// import datetime
