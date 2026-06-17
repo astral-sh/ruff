@@ -156,7 +156,7 @@ ALL: Final = [
         name="discord.py",
         repository="https://github.com/Rapptz/discord.py.git",
         revision="2fbed9362422dad4f7850eb6c5d9b1f8bff7c71a",
-        python_version="3.8",
+        python_version="3.10",
         include=["discord"],
         install_arguments=[
             "-r",

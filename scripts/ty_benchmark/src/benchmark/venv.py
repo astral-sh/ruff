@@ -58,10 +58,13 @@ class Venv:
 
         return Venv(project_name=project, project_path=parent)
 
-    def install(self, pip_install_args: list[str]) -> None:
+    def install(
+        self, pip_install_args: list[str], *, include_mypy: bool = False
+    ) -> None:
         """Installs the dependencies required to type check the project."""
 
         logging.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
+        mypy_overrides = Path(__file__).with_name("mypy-overrides.txt")
 
         command = [
             "uv",
@@ -75,7 +78,14 @@ class Venv:
             # annotations of one of that project's dependencies
             "--exclude-newer",
             "2026-06-07T00:00:00Z",
-            "mypy==2.1.0",  # We need to install mypy into the virtual environment or it fails to load plugins.
+            # Mypy needs to be installed into the project virtual environment
+            # or it fails to load project-local plugins. The override keeps
+            # project dev dependencies from pinning a different mypy version.
+            *(
+                ["--overrides", mypy_overrides.as_posix(), "mypy"]
+                if include_mypy
+                else []
+            ),
             *pip_install_args,
         ]
 
