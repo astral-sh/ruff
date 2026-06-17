@@ -22,6 +22,35 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+Known standard-library enum constructors preserve literal `.value` types when they do not normalize
+the declared value. The inherited `_value_` annotation remains the fallback when construction does
+normalize the value or when accessing `.value` on the enum class as a whole:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+
+class Integer(IntEnum):
+    ONE = 1
+    TRUE = True
+
+reveal_type(Integer.ONE.value)  # revealed: Literal[1]
+reveal_type(Integer.ONE._value_)  # revealed: Literal[1]
+reveal_type(Integer.TRUE.value)  # revealed: int
+
+def _(value: Integer):
+    reveal_type(value.value)  # revealed: int
+
+class ConvertedGenerated(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
+        return "1"
+
+    ONE = auto()
+
+reveal_type(ConvertedGenerated.ONE.value)  # revealed: int
+```
+
 ## Constructor calls
 
 ```py
@@ -1160,8 +1189,7 @@ class SingleMember(StrEnum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
 
-Using `auto()` with `IntEnum` also works as expected. `IntEnum` declares `_value_: int` in typeshed,
-so `.value` is typed as `int` rather than a precise literal:
+Using `auto()` with `IntEnum` also produces precise literal values:
 
 ```py
 from enum import IntEnum, auto
@@ -1170,8 +1198,8 @@ class Answer(IntEnum):
     YES = auto()
     NO = auto()
 
-reveal_type(Answer.YES.value)  # revealed: int
-reveal_type(Answer.NO.value)  # revealed: int
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
 As does using `auto()` for other enums that use `int` as a mixin:

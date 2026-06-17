@@ -283,7 +283,7 @@ fn check_class_declaration<'db>(
                 } else if enum_info
                     .value_construction
                     .can_validate_with_value_annotation()
-                    && let Some(expected_type) = enum_info.value_annotation
+                    && let Some(expected_type) = enum_info.value_annotation_type()
                 {
                     if !member_value_type.is_assignable_to(db, expected_type) {
                         if let Some(builder) = context.report_lint(
