@@ -168,6 +168,19 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "b"] | int
     else:
         reveal_type(x)  # revealed: Literal["c"] | None | int
+
+def broad_element_type(x: str | None, values: dict[str, int]):
+    if x in values:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str | None
+
+def broad_element_type_with_unknown(values: dict[str, int]):
+    x = [None][0]
+    if x in values:
+        reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(x)  # revealed: None | Unknown
 ```
 
 ## Direct `not in` conditional
@@ -188,6 +201,12 @@ def broad_set_element(x: Literal[1, 2], values: set[int]) -> None:
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
         reveal_type(x)  # revealed: Literal[1, 2]
+
+def broad_dict_element(x: str | None, values: dict[str, int]) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: str
 
 def union_tuple_slot(x: Literal[1, 2], values: tuple[Literal[1, 2]]) -> None:
     if x not in values:

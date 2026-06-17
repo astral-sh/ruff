@@ -2031,12 +2031,61 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if let Type::Union(union) = rhs_values {
             let mut builder = UnionBuilder::new(self.db);
             for rhs_value in union.elements(self.db) {
-                builder = builder.add(evaluate_type_equality(self.db, lhs_ty, *rhs_value, true)?);
+                builder = builder.add(self.evaluate_membership_equality(lhs_ty, *rhs_value)?);
             }
             Some(builder.build())
         } else {
-            evaluate_type_equality(self.db, lhs_ty, rhs_values, true)
+            self.evaluate_membership_equality(lhs_ty, rhs_values)
         }
+    }
+
+    /// Apply equality compatibility without losing the container's declared element domain.
+    ///
+    /// Generic equality retains disjoint single-valued arms when an element subclass could define
+    /// custom equality. Membership narrowing instead removes those arms unless the equality
+    /// evaluator can establish a more specific compatibility, while retaining broader arms whose
+    /// runtime values may still match an element.
+    fn evaluate_membership_equality(
+        &self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
+        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+
+        let has_single_valued_component = match lhs_ty {
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .any(|element| element.is_single_valued(self.db)),
+            _ => lhs_ty.is_single_valued(self.db),
+        };
+        if !has_single_valued_component {
+            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true);
+        }
+
+        let mut builder = UnionBuilder::new(self.db);
+        let add_lhs_element = |builder: UnionBuilder<'db>, element: Type<'db>| {
+            let element = element.resolve_type_alias(self.db);
+            match evaluate_type_equality(self.db, element, rhs_ty, true) {
+                Some(Type::Never) => builder,
+                Some(constraint) => builder.add(constraint),
+                None if !element.is_single_valued(self.db) => builder.add(element),
+                None => builder,
+            }
+        };
+
+        if let Type::Union(union) = lhs_ty {
+            for element in union.elements(self.db).iter().copied() {
+                builder = add_lhs_element(builder, element);
+            }
+        } else {
+            builder = add_lhs_element(builder, lhs_ty);
+        }
+
+        builder = builder.add(rhs_ty);
+        let narrowed = builder.build();
+        (narrowed != lhs_ty).then_some(narrowed)
     }
 
     fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
