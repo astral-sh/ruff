@@ -155,6 +155,10 @@ impl<'db> Type<'db> {
         op: CycleProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<Self>,
     ) -> Option<Self> {
+        if !self.has_top_level_cycle_artifact(db) {
+            return None;
+        }
+
         let Type::Union(union) = self else {
             return self.try_cycle_projection(db, op);
         };
@@ -176,6 +180,14 @@ impl<'db> Type<'db> {
 
     pub(crate) const fn is_cycle_artifact(&self) -> bool {
         matches!(self, Type::Divergent(_) | Type::CycleProjection(_))
+    }
+
+    fn has_top_level_cycle_artifact(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Divergent(_) | Type::CycleProjection(_) => true,
+            Type::Union(union) => union.elements(db).iter().any(Self::is_cycle_artifact),
+            _ => false,
+        }
     }
 
     /// Returns `true` if both types originate from the same cycle root, regardless

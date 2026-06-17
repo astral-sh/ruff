@@ -2923,7 +2923,7 @@ class ProjectionTuple:
         self.x = (0,)
 
     def read(self, items) -> None:
-        x, = self.x
+        (x,) = self.x
         while x < len(items):
             if x:
                 x += 1
@@ -2956,7 +2956,7 @@ class ProjectionList:
         self.x = [0]
 
     def read(self, items) -> None:
-        x, = self.x
+        (x,) = self.x
         while x < len(items):
             if x:
                 x += 1
@@ -3033,7 +3033,7 @@ class ProjectionSet:
         self.x = {0}
 
     def read(self) -> None:
-        x, = self.x
+        (x,) = self.x
         self.x = {x}
 
         reveal_type(self.x)  # revealed: set[int]
@@ -3083,7 +3083,7 @@ class ProjectionDictValue:
         self.x = [0]
 
     def read(self) -> None:
-        x, = self.x
+        (x,) = self.x
         self.x = {"value": x}
 
         reveal_type(self.x)  # revealed: dict[str, int | str]
@@ -3246,7 +3246,7 @@ class ProjectionCustomBox:
         self.x = Box(0)
 
     def read(self) -> None:
-        x, = self.x
+        (x,) = self.x
         self.x = Box(x)
 
         reveal_type(self.x)  # revealed: Box[int]
@@ -3269,7 +3269,7 @@ class ProjectionCustomBoxInList:
 
     def read(self) -> None:
         for box in self.x:
-            x, = box
+            (x,) = box
             self.x = [Box(x)]
 
         reveal_type(self.x)  # revealed: list[Box[int]]
@@ -3320,7 +3320,7 @@ class ProjectionCustomNonGenericItem:
         self.x = ConstantIterable(0)
 
     def read(self) -> None:
-        x, = self.x
+        (x,) = self.x
         self.x = ConstantIterable(x)
 
         reveal_type(self.x)  # revealed: ConstantIterable[str]
@@ -3330,13 +3330,9 @@ class OverloadedBox(Generic[ProjectionT]):
         pass
 
     @overload
-    def __iter__(self) -> Iterator[int]:
-        ...
-
+    def __iter__(self) -> Iterator[int]: ...
     @overload
-    def __iter__(self) -> Iterator[str]:
-        ...
-
+    def __iter__(self) -> Iterator[str]: ...
     def __iter__(self) -> Iterator[Any]:
         return iter(())
 
@@ -3346,7 +3342,7 @@ class ProjectionCustomOverloadedIterator:
 
     def read(self, flag: bool) -> None:
         if flag:
-            x, = self.x
+            (x,) = self.x
             self.x = OverloadedBox(x)
         else:
             self.x = OverloadedBox("")
@@ -3358,13 +3354,9 @@ class SelfOverloadedBox(Generic[ProjectionT]):
         pass
 
     @overload
-    def __iter__(self: "SelfOverloadedBox[int]") -> Iterator[int]:
-        ...
-
+    def __iter__(self: "SelfOverloadedBox[int]") -> Iterator[int]: ...
     @overload
-    def __iter__(self: "SelfOverloadedBox[str]") -> Iterator[str]:
-        ...
-
+    def __iter__(self: "SelfOverloadedBox[str]") -> Iterator[str]: ...
     def __iter__(self) -> Iterator[Any]:
         return iter(())
 
@@ -3373,7 +3365,7 @@ class ProjectionCustomAnyOverload:
         self.x = SelfOverloadedBox(value)
 
     def read(self) -> None:
-        x, = self.x
+        (x,) = self.x
         self.x = SelfOverloadedBox(x)
 
         reveal_type(self.x)  # revealed: SelfOverloadedBox[Any]
@@ -3400,7 +3392,7 @@ class ProjectionCustomInvariant:
             self.x = str_box
 
     def read(self, update: bool) -> None:
-        item, = self.x
+        (item,) = self.x
         if update:
             self.x = InvariantProjectionBox(item)
 
@@ -3426,7 +3418,7 @@ class ProjectionCustomCovariant:
             self.x = str_box
 
     def read(self, update: bool) -> None:
-        item, = self.x
+        (item,) = self.x
         if update:
             self.x = CovariantProjectionBox(item)
 
@@ -3452,7 +3444,7 @@ class ProjectionCustomContravariant:
             self.x = str_box
 
     def read(self, update: bool) -> None:
-        callback, = self.x
+        (callback,) = self.x
         if update:
             self.x = ContravariantProjectionBox(callback)
 
@@ -3700,7 +3692,7 @@ class ProjectionMixedContainer:
         self.x = [0]
 
     def read(self, items) -> None:
-        x, = self.x
+        (x,) = self.x
         while x < len(items):
             if x:
                 x += 1
@@ -3733,7 +3725,7 @@ class ProjectionNestedWrappedAssignment:
         self.x = [(0,)]
 
     def read(self) -> None:
-        (x,), = self.x
+        ((x,),) = self.x
         self.x = [(x,)]
 
         reveal_type(self.x)  # revealed: list[tuple[int]]
@@ -3797,7 +3789,7 @@ class ProjectionMixedContainerNoneNarrowing:
         self.x = [value]
 
     def read(self, items: list[object]) -> None:
-        x, = self.x
+        (x,) = self.x
         while items:
             if x is None:
                 break
@@ -3825,7 +3817,7 @@ class ProjectionMixedContainerNegativePredicate:
         self.x = [value]
 
     def read(self, items: list[object]) -> None:
-        x, = self.x
+        (x,) = self.x
         while items:
             if is_str(x):
                 break
@@ -3836,7 +3828,7 @@ class ProjectionMixedContainerNegativePredicate:
         # TODO: it would be nice if this were `list[object] | tuple[~str]`.
         reveal_type(self.x)  # revealed: list[object] | tuple[object]
         if isinstance(self.x, tuple):
-            y, = self.x
+            (y,) = self.x
             # TODO: it would be nice if this were `~str`.
             reveal_type(y)  # revealed: object
             # TODO: it would be nice if this did not produce an error.
