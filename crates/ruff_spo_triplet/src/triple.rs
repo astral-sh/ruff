@@ -304,6 +304,15 @@ pub enum Predicate {
     /// `(class, static_asserts, "<condition>")` — a `static_assert` in
     /// class scope.
     StaticAsserts,
+    /// `(class.method, returns_type, "<type>")` — the method's return type,
+    /// verbatim. Not emitted for `void` / ctors / dtors. The return half of the
+    /// AST-DLL signature shape (with [`Self::HasParamType`]).
+    ReturnsType,
+    /// `(class.method, has_param_type, "<index>:<type>")` — one per parameter,
+    /// in signature order. The 0-based position rides the object (leading digits
+    /// before the first `:`) so a triple SET preserves order + arity. The
+    /// parameter half of the AST-DLL signature shape.
+    HasParamType,
 }
 
 impl Predicate {
@@ -363,6 +372,8 @@ impl Predicate {
             Self::IsNoexcept => "is_noexcept",
             Self::RequiresConcept => "requires_concept",
             Self::StaticAsserts => "static_asserts",
+            Self::ReturnsType => "returns_type",
+            Self::HasParamType => "has_param_type",
         }
     }
 
@@ -428,6 +439,8 @@ impl Predicate {
             "is_noexcept" => Self::IsNoexcept,
             "requires_concept" => Self::RequiresConcept,
             "static_asserts" => Self::StaticAsserts,
+            "returns_type" => Self::ReturnsType,
+            "has_param_type" => Self::HasParamType,
             _ => return None,
         })
     }
@@ -436,8 +449,8 @@ impl Predicate {
     /// closed-vocab round-trip test and by any consumer that needs to
     /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// **Length invariant:** `ALL.len() == 47` (7 core + 27 AR-shape +
-    /// 13 C++ machine-plane). A new variant added to [`Predicate`] **must**
+    /// **Length invariant:** `ALL.len() == 51` (7 core + 29 AR-shape +
+    /// 15 C++ machine-plane). A new variant added to [`Predicate`] **must**
     /// be appended here in the same order, or the closed-vocab round-trip
     /// test fails.
     pub const ALL: &'static [Predicate] = &[
@@ -493,6 +506,8 @@ impl Predicate {
         Self::IsNoexcept,
         Self::RequiresConcept,
         Self::StaticAsserts,
+        Self::ReturnsType,
+        Self::HasParamType,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -541,7 +556,9 @@ impl Predicate {
             | Self::IsConstexpr
             | Self::IsNoexcept
             | Self::RequiresConcept
-            | Self::StaticAsserts => Provenance::CppExtracted,
+            | Self::StaticAsserts
+            | Self::ReturnsType
+            | Self::HasParamType => Provenance::CppExtracted,
             // OpenProject AR-shape (everything else from the 27)
             Self::DeclaresAssociation
             | Self::ValidatesConstraint
@@ -681,14 +698,15 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_49() {
+    fn predicate_count_locked_at_51() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 29 OpenProject AR-shape (this PR added
-        // `association_kind` so the FK-direction bug is fixable
-        // downstream) + 13 C++ machine-plane = 49. Council review of
-        // any new variant means this number changes — the test must
-        // change with the source.
-        assert_eq!(Predicate::ALL.len(), 49);
+        // Python) + 29 OpenProject AR-shape (PR #15 added `association_kind`
+        // so the FK-direction bug is fixable downstream) + 15 C++
+        // machine-plane (operator-approved `returns_type` + `has_param_type`
+        // — the AST-DLL signature shape) = 51. Council review of any new
+        // variant means this number changes — the test must change with the
+        // source.
+        assert_eq!(Predicate::ALL.len(), 51);
     }
 
     #[test]

@@ -326,6 +326,8 @@ mod tests {
             overrides: Some("Tesseract::Classify.Recognize".to_string()),
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -335,6 +337,8 @@ mod tests {
             overrides: None,
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -476,6 +480,8 @@ mod tests {
                     overrides: None,
                     operator_kind: None,
                     requires_clause: None,
+                    return_type: None,
+                    param_types: Vec::new(),
                 }),
                 Declaration::Template(CppTemplate {
                     kind: CppTemplateKind::Instantiation,
@@ -650,6 +656,31 @@ class Recognizer : public Classify {
             recognize.overrides.as_deref(),
             Some("Tesseract::Classify.Recognize"),
             "override target must be the fully-qualified base method"
+        );
+        // AST-DLL signature shape: `int Recognize(int x)` → return + one param.
+        assert_eq!(
+            recognize.return_type.as_deref(),
+            Some("int"),
+            "Recognize returns int"
+        );
+        assert_eq!(
+            recognize.param_types,
+            vec!["int".to_string()],
+            "Recognize takes one int param"
+        );
+        // `void stash(const Box<char>&)` → void return is skipped, one param.
+        let stash = methods
+            .iter()
+            .find(|m| m.name == "stash")
+            .expect("stash method");
+        assert!(
+            stash.return_type.is_none(),
+            "void return must not emit returns_type"
+        );
+        assert_eq!(
+            stash.param_types,
+            vec!["const Box<char> &".to_string()],
+            "stash parameter type captured verbatim"
         );
         let op = methods
             .iter()

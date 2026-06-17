@@ -601,6 +601,18 @@ pub struct CppMethod {
     /// unconstrained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires_clause: Option<String>,
+    /// Return type, verbatim (e.g. `bool`, `const char *`) → `returns_type`.
+    /// `None` (and not emitted) for `void` / constructors / destructors — the
+    /// AST-DLL shape treats absent `returns_type` as "no value returned".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<String>,
+    /// Parameter types in signature order, verbatim → one `has_param_type` each.
+    /// Order + arity are preserved by the `<index>:<type>` object encoding the
+    /// expander emits (a triple set is unordered, so the position rides the
+    /// object). The AST-DLL codegen reconstructs the ordered signature from
+    /// `return_type` + these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub param_types: Vec<String>,
 }
 
 /// `constexpr` vs `consteval` compile-time markers.

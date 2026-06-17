@@ -631,6 +631,24 @@ impl Expander {
                 Provenance::CppExtracted,
             );
         }
+        // AST-DLL signature shape: return type (one edge) + parameter types (one
+        // edge each, `<index>:<type>` so the unordered triple set keeps order).
+        if let Some(ret) = &method.return_type {
+            self.push(
+                method_iri.clone(),
+                Predicate::ReturnsType,
+                ret.clone(),
+                Provenance::CppExtracted,
+            );
+        }
+        for (i, param) in method.param_types.iter().enumerate() {
+            self.push(
+                method_iri.clone(),
+                Predicate::HasParamType,
+                format!("{i}:{param}"),
+                Provenance::CppExtracted,
+            );
+        }
         if let Some(req) = &method.requires_clause {
             // Last potential use of `method_iri` — move, don't clone.
             self.push(
@@ -1395,6 +1413,8 @@ mod tests {
             overrides: Some("Tesseract::Classify.Recognize".to_string()),
             operator_kind: None,
             requires_clause: None,
+            return_type: Some("int".to_string()),
+            param_types: vec!["int".to_string(), "const Image &".to_string()],
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -1404,6 +1424,8 @@ mod tests {
             overrides: None,
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
         });
         rec.methods.push(CppMethod {
             name: "kMaxRating".to_string(),
@@ -1413,6 +1435,8 @@ mod tests {
             overrides: None,
             operator_kind: None,
             requires_clause: None,
+            return_type: None,
+            param_types: Vec::new(),
         });
         rec.methods.push(CppMethod {
             name: "operator==".to_string(),
@@ -1422,6 +1446,8 @@ mod tests {
             overrides: None,
             operator_kind: Some("operator==".to_string()),
             requires_clause: Some("std::equality_comparable<T>".to_string()),
+            return_type: None,
+            param_types: Vec::new(),
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -1503,6 +1529,10 @@ mod tests {
         ));
         assert!(has("defines_operator", "operator=="));
         assert!(has("requires_concept", "std::equality_comparable<T>"));
+        // AST-DLL signature shape: return type + ordered (index-prefixed) params.
+        assert!(has("returns_type", "int"));
+        assert!(has("has_param_type", "0:int"));
+        assert!(has("has_param_type", "1:const Image &"));
     }
 
     #[test]
@@ -1550,6 +1580,8 @@ mod tests {
             "is_noexcept",
             "requires_concept",
             "static_asserts",
+            "returns_type",
+            "has_param_type",
         ] {
             assert!(
                 seen.contains(p),
@@ -1576,6 +1608,8 @@ mod tests {
             "is_noexcept",
             "requires_concept",
             "static_asserts",
+            "returns_type",
+            "has_param_type",
         ];
         for graph in [fixture(), ar_fixture()] {
             let triples = expand(&graph);

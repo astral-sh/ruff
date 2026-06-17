@@ -413,6 +413,18 @@ fn build_method(m: &Entity) -> CppMethod {
             let parent = base_m.get_semantic_parent()?;
             Some(format!("{}.{mname}", qualified_name(&parent)))
         });
+    // AST-DLL signature shape: return type (skip void/ctor/dtor) + ordered
+    // parameter types, verbatim from the cursor.
+    let return_type = m
+        .get_result_type()
+        .map(|t| t.get_display_name())
+        .filter(|d| !d.is_empty() && d != "void");
+    let param_types = m
+        .get_arguments()
+        .into_iter()
+        .flatten()
+        .filter_map(|a| a.get_type().map(|t| t.get_display_name()))
+        .collect();
     CppMethod {
         name,
         is_pure_virtual: m.is_pure_virtual_method(),
@@ -422,5 +434,7 @@ fn build_method(m: &Entity) -> CppMethod {
         overrides,
         operator_kind,
         requires_clause: None,
+        return_type,
+        param_types,
     }
 }

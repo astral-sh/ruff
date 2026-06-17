@@ -331,3 +331,31 @@ operator-mandated honesty bar (measure first, then ship):
     not concrete args. Still deterministic and useful (links to the primary),
     just less specific than the concrete `Box<int>` case from ccutil's
     *non-template* class fields.
+
+## Update — 2026-06-16 (AST-DLL signature shape: returns_type + has_param_type — OPERATOR-APPROVED vocab bump 48→50)
+
+Operator chose option 2 ("AR AST DLL shape preferred") — method **signature
+types as edges**, the shape the `tesseract-rs-ast-dll-codegen-v1` codegen needs
+to generate adapter signatures. Option 1 (`is_const`/`is_static`, "ORM-shape
+downcast") deferred as the optional follow-up.
+
+- **Closed-vocab bump (operator-authorized):** +2 predicates → `ReturnsType`,
+  `HasParamType`. `predicate_count_locked_at_48` → `_at_50`; `ALL` array + doc
+  invariant + `default_provenance` (both `CppExtracted` — syntactically present
+  in the signature) updated in lockstep. 15 C++ machine-plane predicates now.
+- **IR:** `CppMethod` gains `return_type: Option<String>` + `param_types:
+  Vec<String>` (both `#[serde(default)]`). 10 construction sites updated.
+- **Shape:** `returns_type` one edge per non-void method; `has_param_type` one
+  edge per parameter, object = `<index>:<type>` so the unordered triple SET
+  preserves signature order + arity (the codegen sorts by the index prefix).
+  Determinism is structural (`get_arguments` is source-order; `expand` sorts).
+- **Walker:** `build_method` reads `get_result_type` (skips `void`/ctor/dtor) +
+  `get_arguments`. Hermetic test asserts `int Recognize(int)` → `returns_type
+  int` + `has_param_type 0:int`, and `void stash(const Box<char>&)` → no
+  `returns_type` + `has_param_type 0:const Box<char> &`.
+- **Measured enrichment:** ccutil **2215 → 3527 triples** (+1312);
+  ccstruct **5264 → 8164 triples** (+2900). Signatures are now first-class
+  graph structure — the codegen-ready AST-DLL shape. CPP-AST-RT determinism
+  still green (re-run byte-identical with signatures included).
+- **Next (optional, operator's "1"):** `is_const` / `is_static` method flags
+  (`+2` predicates → 52) — the ORM-downcast shape (`const` = read accessor).
