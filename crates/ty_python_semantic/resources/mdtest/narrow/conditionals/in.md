@@ -166,9 +166,20 @@ def bytes_index(value: ByteIndex | Literal[97], values: bytes) -> None:
     if value in values:
         reveal_type(value)  # revealed: ByteIndex | Literal[97]
 
+def bytes_union_container(
+    value: Literal[b"a", 97],
+    values: bytes | tuple[int, ...],
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
+
 def bytearray_index(value: ByteIndex | Literal[97], values: bytearray) -> None:
     if value in values:
         reveal_type(value)  # revealed: ByteIndex | Literal[97]
+
+def bytearray_subsequence(value: Literal[b"a", 97], values: bytearray) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
 ```
 
 ## Assignment expressions
