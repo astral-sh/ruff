@@ -133,10 +133,10 @@ class Invalid:
     def bad_settable_property(self, x: int) -> None: ...
     @lossy_decorator
     @override
-    def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
+    def lossy(self): ...  # error: [invalid-explicit-override]
     @override
     @lossy_decorator
-    def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
+    def lossy2(self): ...  # error: [invalid-explicit-override]
 
 # TODO: all overrides in this class should cause us to emit *Liskov* violations,
 # but not `@override` violations
@@ -440,14 +440,25 @@ class BaseProperty:
     @property
     def prop(self) -> int:
         return 1
+
+    def method(self) -> int:
+        return 1
 ```
 
 `property_setter.py`:
 
 ```py
-from typing_extensions import override
+from typing_extensions import Callable, TypeVar, override
 
 from base_property import BaseProperty
+
+_T = TypeVar("_T")
+
+def wrap(f: _T) -> Callable[[object], _T]:
+    return lambda _: f
+
+def coinflip() -> bool:
+    return True
 
 class MissingOverride(BaseProperty):
     @BaseProperty.prop.setter
@@ -459,6 +470,39 @@ class InvalidExplicitOverride:
     @override
     def prop(self, value: int) -> None:  # error: [invalid-explicit-override]
         pass
+
+class WrappedMethod(BaseProperty):
+    @wrap(BaseProperty.method)
+    def method(self) -> int:  # error: [missing-override-decorator]
+        return 2
+
+class WrappedInvalidExplicitOverride:
+    @wrap(BaseProperty.method)
+    @override
+    def method(self) -> int:  # error: [invalid-explicit-override]
+        return 2
+
+class WrappedMethodWithOverrideBranch(BaseProperty):
+    if coinflip():
+        @wrap(BaseProperty.method)
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 2
+
+    else:
+        @override
+        def method(self) -> int:
+            return 3
+
+class WrappedInvalidExplicitOverrideWithUndecoratedBranch:
+    if coinflip():
+        @wrap(BaseProperty.method)
+        @override
+        def method(self) -> int:  # error: [invalid-explicit-override]
+            return 2
+
+    else:
+        def method(self) -> int:
+            return 3
 ```
 
 `stub.pyi`:
@@ -697,10 +741,13 @@ class Child(Parent):
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the
 implementation function. However, we nonetheless respect the decorator in this situation, even
-though we also emit `invalid-overload` on these methods.
+though we may also emit `invalid-overload` on these methods.
 
 ```py
-from typing_extensions import override, overload
+from typing_extensions import Any, Callable, override, overload
+
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+    return fn
 
 class Spam:
     @overload
@@ -732,6 +779,16 @@ class Spam:
     def baz(self, x: int) -> int: ...
     # error: [invalid-explicit-override]
     def baz(self, x: str | int) -> str | int:
+        return x
+
+    @overload
+    @override
+    def quux(self, x: str) -> str: ...
+    @overload
+    def quux(self, x: int) -> int: ...
+    @lossy_decorator
+    # error: [invalid-explicit-override]
+    def quux(self, x: str | int) -> str | int:
         return x
 ```
 
