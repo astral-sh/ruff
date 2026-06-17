@@ -3149,12 +3149,13 @@ impl<'db> Type<'db> {
         }
 
         match attribute {
-            // Preserve the existing bottom and cycle behavior without performing descriptor
-            // member lookups that cannot provide any additional information.
+            // A directly dynamic attribute could be a data descriptor even though we cannot see
+            // its methods. Preserve that uncertainty, along with the existing bottom and cycle
+            // behavior, without performing member lookups that cannot add information.
             PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
-                        ty: Type::Divergent(_) | Type::Never,
+                        ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
                         ..
                     }),
                 qualifiers: _,
@@ -3265,6 +3266,7 @@ impl<'db> Type<'db> {
 
     /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.
     /// If this type is a union, requires all elements of union to be data descriptors.
+    /// A directly dynamic type is treated as a data descriptor because it could inhabit one.
     pub(crate) fn is_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, false)
     }
@@ -3272,15 +3274,15 @@ impl<'db> Type<'db> {
     /// Returns whether this type should be considered a possible data descriptor.
     /// If this type is a union, returns true if _any_ element is a data descriptor.
     /// This is used to determine whether an attribute assignment is valid for narrowing.
-    /// Dynamic types are not considered data descriptors because no concrete `__set__` or
-    /// `__delete__` method is visible on them.
+    /// For practical convenience, dynamic union elements are not considered possible data
+    /// descriptors here, because doing so would disable narrowing too frequently.
     pub(crate) fn may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, true)
     }
 
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
-            Type::Dynamic(_) => false,
+            Type::Dynamic(_) => !any_of_union,
             Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)

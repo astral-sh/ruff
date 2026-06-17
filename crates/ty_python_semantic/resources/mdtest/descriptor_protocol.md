@@ -296,6 +296,31 @@ reveal_type(AnyWrapper().non_data)  # revealed: Literal["non-data"] | NonDataDes
 reveal_type(AnyWrapper().data)  # revealed: Literal["data"]
 ```
 
+### Directly dynamic descriptor values
+
+Requiring concrete descriptor methods when inspecting a nominal type's MRO does not mean that a
+value whose own type is dynamic is definitely not a descriptor. It could be a data descriptor and
+take precedence over a class attribute:
+
+```py
+from typing import Any, Literal
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["descriptor"]:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class Meta(type):
+    attribute: Any = DataDescriptor()
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+reveal_type(C.attribute)  # revealed: Any
+```
+
 ### Descriptors only work when used as class variables
 
 Descriptors only work when used as class variables. When put in instances, they have no effect.
