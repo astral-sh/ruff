@@ -240,6 +240,19 @@ def correlated_typevar(x: E, y: T) -> T:
         reveal_type(x)  # revealed: T@correlated_typevar
         return x
     return y
+
+U = TypeVar("U", int, str)
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
+    if x in (y,):
+        reveal_type(x)  # revealed: AlwaysEqual
+        # error: [invalid-return-type] "Return type does not match returned value: expected `U@unrelated_typevar`, found `AlwaysEqual`"
+        return x
+    return y
 ```
 
 ## Direct `not in` conditional
