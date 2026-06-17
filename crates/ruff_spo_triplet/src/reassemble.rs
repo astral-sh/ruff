@@ -74,6 +74,7 @@ struct MethodAcc {
     requires_clause: Option<String>,
     is_const: bool,
     is_static: bool,
+    access: CppAccess,
 }
 
 /// Reassemble the C++ machine-plane projection of a triple set into a
@@ -182,6 +183,15 @@ pub fn reassemble(triples: &[Triple]) -> ModelGraph {
                     acc.is_static = true;
                 }
             }
+            "has_visibility" => {
+                if let Some(acc) = method_acc.get_mut(&t.s) {
+                    acc.access = match t.o.as_str() {
+                        "protected" => CppAccess::Protected,
+                        "private" => CppAccess::Private,
+                        _ => CppAccess::Public,
+                    };
+                }
+            }
             "has_field" => {
                 if let Some(model) = classes.get_mut(&t.s) {
                     let prefix = format!("{}.", t.s);
@@ -282,6 +292,7 @@ pub fn reassemble(triples: &[Triple]) -> ModelGraph {
             param_types,
             is_const: acc.is_const,
             is_static: acc.is_static,
+            access: acc.access,
         });
     }
 
@@ -419,6 +430,7 @@ mod tests {
             param_types: vec!["int".to_string(), "const Image &".to_string()],
             is_const: true,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -432,6 +444,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "kMaxRating".to_string(),
@@ -445,6 +458,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: true,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "operator==".to_string(),
@@ -458,6 +472,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,

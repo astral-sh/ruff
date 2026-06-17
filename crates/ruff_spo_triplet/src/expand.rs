@@ -10,9 +10,9 @@ use std::collections::BTreeSet;
 
 use crate::ir::{
     ActsAs, AssocDecl, AssocKind, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef,
-    ConstexprKind, CppBase, CppField, CppFriend, CppMacroUse, CppMethod, CppStaticAssert,
-    CppTemplate, CppTemplateKind, Delegation, DslCall, DynMethod, GemDsl, GemKind, Model,
-    ModelGraph, ScopeDecl, ScopeKind, StiInfo, UsingRef, Validation, ValidationKind,
+    ConstexprKind, CppAccess, CppBase, CppField, CppFriend, CppMacroUse, CppMethod,
+    CppStaticAssert, CppTemplate, CppTemplateKind, Delegation, DslCall, DynMethod, GemDsl, GemKind,
+    Model, ModelGraph, ScopeDecl, ScopeKind, StiInfo, UsingRef, Validation, ValidationKind,
 };
 use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 
@@ -704,6 +704,18 @@ impl Expander {
                 Provenance::CppExtracted,
             );
         }
+        // Access specifier — always present (every method has a visibility).
+        self.push(
+            method_iri.clone(),
+            Predicate::HasVisibility,
+            match method.access {
+                CppAccess::Public => "public",
+                CppAccess::Protected => "protected",
+                CppAccess::Private => "private",
+            }
+            .to_string(),
+            Provenance::CppExtracted,
+        );
         if let Some(req) = &method.requires_clause {
             // Last potential use of `method_iri` — move, don't clone.
             self.push(
@@ -1631,6 +1643,7 @@ mod tests {
             param_types: vec!["int".to_string(), "const Image &".to_string()],
             is_const: true,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -1644,6 +1657,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "kMaxRating".to_string(),
@@ -1657,6 +1671,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: true,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "operator==".to_string(),
@@ -1670,6 +1685,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -1758,6 +1774,8 @@ mod tests {
         // ORM-downcast shape: const (read accessor) + static (class-level).
         assert!(has("is_const", "true"));
         assert!(has("is_static", "true"));
+        // Access specifier (fixture methods are all public).
+        assert!(has("has_visibility", "public"));
     }
 
     #[test]
@@ -1809,6 +1827,7 @@ mod tests {
             "has_param_type",
             "is_const",
             "is_static",
+            "has_visibility",
         ] {
             assert!(
                 seen.contains(p),

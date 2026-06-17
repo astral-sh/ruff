@@ -334,6 +334,7 @@ mod tests {
             param_types: vec!["int".to_string()],
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -347,6 +348,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -492,6 +494,7 @@ mod tests {
                     param_types: Vec::new(),
                     is_const: false,
                     is_static: false,
+                    access: CppAccess::Public,
                 }),
                 Declaration::Template(CppTemplate {
                     kind: CppTemplateKind::Instantiation,

@@ -466,5 +466,11 @@ fn build_method(m: &Entity) -> CppMethod {
         param_types,
         is_const: m.is_const_method(),
         is_static: m.is_static_method(),
+        access: match m.get_accessibility() {
+            Some(Accessibility::Protected) => CppAccess::Protected,
+            Some(Accessibility::Private) => CppAccess::Private,
+            // Public, or unreported (e.g. free function) — default Public.
+            _ => CppAccess::Public,
+        },
     }
 }
