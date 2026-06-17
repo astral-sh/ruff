@@ -137,6 +137,37 @@ def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
         reveal_type(c)  # revealed: Literal[1]
 ```
 
+When a generic class object is compared with an exact class object, the exact class object is not
+widened to the generic type. The intersection is retained because it preserves the relationship
+between the class object and `T`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Y:
+    def __init__(self) -> None: ...
+
+class Z(Y):
+    def __init__(self, x: int) -> None: ...
+
+def narrow[T: (Y, Z)](klass: type[T]) -> None:
+    if klass is Y:
+        reveal_type(klass)  # revealed: type[T@narrow] & <class 'Y'>
+        reveal_type(Y)  # revealed: <class 'Y'> & type[T@narrow]
+
+    if klass is Z:
+        reveal_type(klass)  # revealed: <class 'Z'>
+        reveal_type(Z)  # revealed: <class 'Z'>
+
+def construct[T: (Y, Z)](klass: type[T]) -> T:
+    if klass is Y:
+        return Y()
+    raise AssertionError
+```
+
 ## `is` where the other operand is a call expression
 
 ```py
