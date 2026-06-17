@@ -1443,20 +1443,25 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     pub(crate) fn top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
-        self.materialize(
-            db,
-            MaterializationKind::Top,
-            &ApplyTypeMappingVisitor::default(),
-        )
+        (*self).cached_materialization(db, MaterializationKind::Top)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     pub(crate) fn bottom_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+        (*self).cached_materialization(db, MaterializationKind::Bottom)
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn cached_materialization(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
         self.materialize(
             db,
-            MaterializationKind::Bottom,
+            materialization_kind,
             &ApplyTypeMappingVisitor::default(),
         )
     }
