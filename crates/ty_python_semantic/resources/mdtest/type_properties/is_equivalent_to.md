@@ -84,22 +84,23 @@ static_assert(not is_equivalent_to(type[object], type[Any]))
 
 ## Unions and intersections
 
-```py
-from typing import Any, Literal
-from ty_extensions import Intersection, Not, Unknown, is_equivalent_to, static_assert
+```pyi
+from typing import Any, Literal, TypeAlias
+from ty_extensions import Unknown, is_equivalent_to, static_assert
 from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
 static_assert(is_equivalent_to(str | int | Any, str | int | Unknown))
 static_assert(is_equivalent_to(str | int, int | str))
-static_assert(is_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]]))
-static_assert(is_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))
+static_assert(is_equivalent_to(str & int & ~bytes & ~None, int & str & ~None & ~bytes))
+static_assert(is_equivalent_to((str | int) & ~type[Any], (int | str) & ~type[Unknown]))
 
 static_assert(not is_equivalent_to(str | int, int | str | bytes))
 static_assert(not is_equivalent_to(str | int | bytes, int | str | dict))  # error: [missing-type-argument]
 
 static_assert(is_equivalent_to(Unknown, Unknown | Any))
-static_assert(is_equivalent_to(Unknown, Intersection[Unknown, Any]))
+UnknownAndAny: TypeAlias = Unknown & Any
+static_assert(is_equivalent_to(Unknown, UnknownAndAny))
 
 class P: ...
 class Q: ...
@@ -124,25 +125,25 @@ static_assert(is_equivalent_to(R | P | Q, R | Q | P))  # 15
 
 static_assert(is_equivalent_to(str | None, None | str))
 
-static_assert(is_equivalent_to(Intersection[P, Q], Intersection[Q, P]))
-static_assert(is_equivalent_to(Intersection[Q, Not[P]], Intersection[Not[P], Q]))
-static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], R, Q]))
-static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
+static_assert(is_equivalent_to(P & Q, Q & P))
+static_assert(is_equivalent_to(Q & ~P, ~P & Q))
+static_assert(is_equivalent_to(Q & R & ~P, ~P & R & Q))
+static_assert(is_equivalent_to((Q | R) & ~(P | S), ~(S | P) & (R | Q)))
 
 class Single(Enum):
     VALUE = 1
 
 static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
 
-static_assert(is_equivalent_to(Any, Any | Intersection[Any, str]))
-static_assert(is_equivalent_to(Any, Intersection[str, Any] | Any))
-static_assert(is_equivalent_to(Any, Any | Intersection[Any, Not[None]]))
-static_assert(is_equivalent_to(Any, Intersection[Not[None], Any] | Any))
+static_assert(is_equivalent_to(Any, Any | Any & str))
+static_assert(is_equivalent_to(Any, str & Any | Any))
+static_assert(is_equivalent_to(Any, Any | Any & ~None))
+static_assert(is_equivalent_to(Any, ~None & Any | Any))
 
-static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, str]))
-static_assert(is_equivalent_to(Any, Intersection[str, Unknown] | Unknown))
-static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, Not[None]]))
-static_assert(is_equivalent_to(Any, Intersection[Not[None], Unknown] | Unknown))
+static_assert(is_equivalent_to(Any, Unknown | Unknown & str))
+static_assert(is_equivalent_to(Any, str & Unknown | Unknown))
+static_assert(is_equivalent_to(Any, Unknown | Unknown & ~None))
+static_assert(is_equivalent_to(Any, ~None & Unknown | Unknown))
 ```
 
 ## Tuples
@@ -159,8 +160,8 @@ static_assert(not is_equivalent_to(tuple[str, int], tuple[int, str]))
 
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
 
-```py
-from ty_extensions import is_equivalent_to, TypeOf, static_assert, Intersection, Not
+```pyi
+from ty_extensions import is_equivalent_to, TypeOf, static_assert
 from typing import Literal
 
 class P: ...
@@ -170,15 +171,13 @@ class S: ...
 
 static_assert(is_equivalent_to(tuple[P | Q], tuple[Q | P]))
 static_assert(is_equivalent_to(tuple[P | None], tuple[None | P]))
-static_assert(
-    is_equivalent_to(tuple[Intersection[P, Q] | Intersection[R, Not[S]]], tuple[Intersection[Not[S], R] | Intersection[Q, P]])
-)
+static_assert(is_equivalent_to(tuple[P & Q | R & ~S], tuple[~S & R | Q & P]))
 ```
 
 ## Unions containing tuples containing tuples containing unions (etc.)
 
-```py
-from ty_extensions import is_equivalent_to, static_assert, Intersection
+```pyi
+from ty_extensions import is_equivalent_to, static_assert
 
 class P: ...
 class Q: ...
@@ -191,22 +190,22 @@ static_assert(
 )
 static_assert(
     is_equivalent_to(
-        tuple[tuple[tuple[tuple[tuple[Intersection[P, Q]]]]]],
-        tuple[tuple[tuple[tuple[tuple[Intersection[Q, P]]]]]],
+        tuple[tuple[tuple[tuple[tuple[P & Q]]]]],
+        tuple[tuple[tuple[tuple[tuple[Q & P]]]]],
     )
 )
 ```
 
 ## Intersections containing tuples containing unions
 
-```py
-from ty_extensions import is_equivalent_to, static_assert, Intersection
+```pyi
+from ty_extensions import is_equivalent_to, static_assert
 
 class P: ...
 class Q: ...
 class R: ...
 
-static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
+static_assert(is_equivalent_to(tuple[P | Q] & R, tuple[Q | P] & R))
 ```
 
 ## Unions containing generic instances parameterized by unions
