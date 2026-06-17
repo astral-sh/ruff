@@ -412,3 +412,114 @@ hermetic probes locking the fix:
 - **Test count:** 48 ruff_spo_triplet + 14 ruff_cpp_spo (locked-shape, hermetic
   walker, gated coverage / determinism / template-determinism probes). All green.
   `clippy -D warnings` + fmt clean.
+
+## Update — 2026-06-17 (CPP-REASSEMBLE-RT — the inverse of expand; generator stage 1 landed + RUN GREEN)
+
+The AST-DLL codegen's **stage-1 reassembler** (`ruff_spo_triplet::reassemble`) —
+the inverse of `expand`'s C++ machine-plane projection — is implemented and
+gated. This is the re-scoped **C-FIRST** deliverable from the lance-graph
+transcode council (5-consolidate + 3-brutal-critique, 2026-06-17): the three
+brutal critics replaced the originally-planned "self-authored golden + run-twice
+determinism" gate (a tautology) with a **round-trip structural-equivalence
+falsifier** that compares against the live graph, not a frozen file — immune to
+the harvester-vocab drift the freshness check exposed (live harvest 2032 triples
+vs a stale 880-line scratch manifest).
+
+- **`reassemble(triples) -> ModelGraph`** groups a triple set back into per-class
+  structure (members / methods / bases / templates / friends / macro uses /
+  static asserts). **Method identity is recovered from the index-prefixed
+  `has_param_type` triples** (`0:int`, `1:const Image &`) and the `(params)` IRI
+  suffix is reconstructed-and-stripped to recover the name — **never split on
+  `,`** (the baton-auditor's P1(a): `std::map<int, int>` has no clean `,`-split
+  inverse). Class attribution is anchor-first (the explicit `rdf:type
+  ObjectType` triple + `has_function` edges), never a rightmost-`.` split.
+- **`cpp_projection(graph)`** exposed as the formal round-trip target (clone +
+  blank the 3 never-emitted fields `type_name`/`access`/`virtual_base` + canonical
+  sort). The identity `reassemble(expand(&g)) == cpp_projection(&g)` holds for any
+  C++-plane graph with **distinct** method IRIs.
+- **In-crate falsifier (6 tests):** full-surface round-trip + three adversarial
+  cases that make it a real measurement — two classes sharing a method name
+  (`UNICHARMAP` / `UNICHARSET` `unichar_to_id`, no cross-attribution), one class
+  with overloads (no collapse), comma-bearing templated param (`std::map<int,
+  int>`, no `,`-split corruption) — plus empty + determinism. **54
+  ruff_spo_triplet tests, all green; `clippy -D warnings` clean.**
+- **`CPP-REASSEMBLE-RT` real-corpus probe** (`ruff_cpp_spo`, gated on
+  `TESSERACT_SRC`): harvest ccutil → expand → ndjson → `from_ndjson` →
+  `reassemble`, then assert (1) **class-set preservation** (anchor-first, no
+  class invented/lost) and (2) **idempotence** (`reassemble∘expand` is a fixed
+  point). **RUN GREEN on Tesseract 5.5.0 ccutil: 67 classes, both invariants
+  hold.**
+
+### NEW FINDING (measured, not synthesized) — const-overload method-IRI collision
+
+The probe's fidelity report: **48/67 ccutil classes round-trip byte-exact vs
+`cpp_projection`; 19 differ.** The 19-class tail is a **real harvester
+limitation the falsifier quantified**: const/non-const overloads with identical
+parameter types (`T& at(i)` vs `const T& at(i) const`) collide on ONE method IRI
+because **const-ness is not in the `(params)` suffix**, so `expand`'s
+per-`(s,p,o)` dedup merges them and the generator cannot reconstruct the two
+overloads. This generalizes the baton-auditor's P1(a) (commas) to a second
+collision axis (cv-qualification), now measured at 19/67 on real data.
+
+- **Why idempotence still holds:** both round-trip endpoints are post-projection,
+  so the collision collapses identically on both sides — the fixed-point property
+  is unaffected. Strict `cpp_projection` equality is therefore *deliberately not*
+  asserted on the real corpus (it would be too strong); the collision count is
+  **measured and printed**, per the probe-style "report, don't assert away".
+- **GAP-CONST-OVERLOAD (queued, NOT autoattended — closed-vocab adjacent):** make
+  the method IRI cv-aware (append ` const` to the suffix, or emit a dedicated
+  disambiguator), so const and non-const overloads get distinct nodes. This is a
+  harvester IRI-scheme change with downstream codegen impact; defer to a
+  deliberate round (operator-gated, like the prior vocab bumps). Until then the
+  generator must treat a const-colliding method as a single merged adapter — a
+  documented, quantified known-gap, not a silent drop.
+
+- **Test count:** **54 ruff_spo_triplet + 15 ruff_cpp_spo**, all green.
+  `clippy -D warnings` + fmt clean on both crates (default + `libclang` feature).
+
+## Update — 2026-06-17 (D — cv-aware method IRI: GAP-CONST-OVERLOAD RESOLVED → CPP-REASSEMBLE-RT 67/67)
+
+D shipped (the council's step-2 prerequisite). The method IRI is now cv-aware —
+`expand::cpp_method` appends ` const` when `is_const`, `clang_walker` does the
+same for the `virtually_overrides` target (keyed on `base_m.is_const_method()`),
+and `reassemble` reconstructs the suffix from the recovered `is_const`. This is a
+**correctness fix, not a vocab change** (predicate count stays 54; it is the C++
+spelling of the cv-qualifier, already part of a method's C++ identity).
+
+**The falsifier corrected the council's assumption with data.** The earlier
+"19/67 = const-overload collisions" was an *inference*; the cv-aware IRI fixed
+only **3** of them (48/67 → 51/67). The remaining 16 were **not** const
+overloads — and tracing them (per-class `methods/templates/fields` count delta in
+the probe output) split them cleanly:
+
+- **13 classes** (GenericVector `t4/10`, PointerVector, the KDPair* / X_LIST*
+  families, …): **methods matched; only `templates` differed** — benign
+  duplicate `template_instantiates` (the same template-id used in several method
+  signatures emits identical triples). `expand` dedups `(s,p,o)`; `cpp_projection`
+  did **not** dedup, so it spuriously kept the duplicates. **Metric bug, not
+  information loss.**
+- **2 classes** (TFile `m22/24`, X_ITER `m5/6`): a method harvested twice (exact
+  duplicate) — same root cause (projection not deduping).
+- **1 class** (UnicityTable, all counts equal): a const/non-const `at`/`operator[]`
+  pair with an **equal `(name, params)` sort key** — the stable sort preserved two
+  different pre-sort orders (reassemble: BTreeMap-by-IRI, non-const first;
+  projection: source order, const first) → same content, different order.
+
+**Two round-trip-metric fixes followed (the falsifier earning its keep):**
+1. `cpp_projection`/`canonicalize_cpp` now **de-duplicates** every C++ collection
+   after sorting — mirroring `expand`'s `(s,p,o)` dedup. Real collisions (same
+   sort key, different content) are not equal, so dedup keeps them; only exact
+   duplicates collapse. (Fixed the 13 + 2.)
+2. The methods sort key now includes **`is_const`** so a const/non-const pair
+   sorts deterministically (non-const before const) on both sides. (Fixed
+   UnicityTable.)
+
+**Result: `CPP-REASSEMBLE-RT` is now 67/67 byte-exact, 0 differ** — and the
+assertion is a **hard gate** (`differing.is_empty()`), so any regression or a NEW
+collision source (e.g. ref-qualified `&`/`&&` overloads in a future corpus)
+reopens it and fails. `GAP-CONST-OVERLOAD` is **RESOLVED**; no documented merged-
+adapter known-gap remains. In-crate falsifier gains
+`const_and_nonconst_overload_stay_distinct`.
+
+- **Test count:** **58 ruff_spo_triplet + 15 ruff_cpp_spo**, all green.
+  `clippy -D warnings` + fmt clean on both crates.

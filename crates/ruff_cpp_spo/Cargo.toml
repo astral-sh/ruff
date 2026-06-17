@@ -37,5 +37,11 @@ libclang = ["dep:clang"]
 name = "harvest_unicharset"
 required-features = ["libclang"]
 
+[dev-dependencies]
+# End-to-end pipeline test only (harvest -> reassemble -> ruff_cpp_codegen emit).
+# The harvester does NOT depend on the codegen at runtime — this is the test
+# integration point where both ends of the C++->Rust pipeline meet.
+ruff_cpp_codegen = { workspace = true }
+
 [lints]
 workspace = true

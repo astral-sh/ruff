@@ -350,6 +350,11 @@ pub enum Predicate {
     /// `(class.method, is_static, "true")` — a static member function
     /// (class-level, no implicit `this`).
     IsStatic,
+    /// `(class.method, has_visibility, "public"|"protected"|"private")` — the
+    /// member access specifier. The OO API-surface + intrusiveness signal:
+    /// public methods are the adapter surface; private/protected are likely
+    /// internal (a routing hint for the codegen's hand-port deny-list).
+    HasVisibility,
 }
 
 impl Predicate {
@@ -414,6 +419,7 @@ impl Predicate {
             Self::HasParamType => "has_param_type",
             Self::IsConst => "is_const",
             Self::IsStatic => "is_static",
+            Self::HasVisibility => "has_visibility",
         }
     }
 
@@ -484,6 +490,7 @@ impl Predicate {
             "has_param_type" => Self::HasParamType,
             "is_const" => Self::IsConst,
             "is_static" => Self::IsStatic,
+            "has_visibility" => Self::HasVisibility,
             _ => return None,
         })
     }
@@ -554,6 +561,7 @@ impl Predicate {
         Self::HasParamType,
         Self::IsConst,
         Self::IsStatic,
+        Self::HasVisibility,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -606,7 +614,8 @@ impl Predicate {
             | Self::ReturnsType
             | Self::HasParamType
             | Self::IsConst
-            | Self::IsStatic => Provenance::CppExtracted,
+            | Self::IsStatic
+            | Self::HasVisibility => Provenance::CppExtracted,
             // OpenProject AR-shape (everything else from the 27)
             Self::DeclaresAssociation
             | Self::ValidatesConstraint
@@ -747,18 +756,19 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_54() {
+    fn predicate_count_locked_at_55() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 30 OpenProject AR-shape (PR #15 added
         // `association_kind` so the FK-direction bug is fixable
-        // downstream; this PR adds `class_name` so `belongs_to :owner,
+        // downstream; #18 added `class_name` so `belongs_to :owner,
         // class_name: 'User'` can emit `record<User>` instead of
-        // phantom `record<Owner>`) + 17 C++ machine-plane (operator-
+        // phantom `record<Owner>`) + 18 C++ machine-plane (operator-
         // approved `returns_type` + `has_param_type` AST-DLL signature
-        // shape, then `is_const` + `is_static` ORM-downcast shape) =
-        // 54. Council review of any new variant means this number
-        // changes — the test must change with the source.
-        assert_eq!(Predicate::ALL.len(), 54);
+        // shape, then `is_const` + `is_static` ORM-downcast shape, then
+        // `has_visibility` access specifier) = 55. Council review of any
+        // new variant means this number changes — the test must change
+        // with the source.
+        assert_eq!(Predicate::ALL.len(), 55);
     }
 
     #[test]

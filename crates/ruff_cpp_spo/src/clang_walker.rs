@@ -431,9 +431,14 @@ fn build_method(m: &Entity) -> CppMethod {
                 .filter_map(|a| a.get_type().map(|t| t.get_display_name()))
                 .collect();
             Some(format!(
-                "{}.{mname}({})",
+                "{}.{mname}({}){}",
                 qualified_name(&parent),
-                params.join(",")
+                params.join(","),
+                if base_m.is_const_method() {
+                    " const"
+                } else {
+                    ""
+                }
             ))
         });
     // AST-DLL signature shape: return type (skip void/ctor/dtor) + ordered
@@ -461,5 +466,11 @@ fn build_method(m: &Entity) -> CppMethod {
         param_types,
         is_const: m.is_const_method(),
         is_static: m.is_static_method(),
+        access: match m.get_accessibility() {
+            Some(Accessibility::Protected) => CppAccess::Protected,
+            Some(Accessibility::Private) => CppAccess::Private,
+            // Public, or unreported (e.g. free function) — default Public.
+            _ => CppAccess::Public,
+        },
     }
 }

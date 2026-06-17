@@ -542,9 +542,10 @@ pub struct CppBase {
 }
 
 /// C++ access specifiers for inheritance + members.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum CppAccess {
     /// `public` — visible everywhere.
+    #[default]
     Public,
     /// `protected` — visible to the class and its derivatives.
     Protected,
@@ -626,6 +627,11 @@ pub struct CppMethod {
     /// (class-level, no implicit `this`).
     #[serde(default)]
     pub is_static: bool,
+    /// Member access specifier → `has_visibility`. The OO API-surface +
+    /// intrusiveness signal (public = adapter surface; private/protected =
+    /// likely internal). Defaults to `Public`.
+    #[serde(default)]
+    pub access: CppAccess,
 }
 
 /// `constexpr` vs `consteval` compile-time markers.

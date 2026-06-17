@@ -3086,10 +3086,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_cpp_codegen"
+version = "0.1.0"
+dependencies = [
+ "ruff_spo_triplet",
+]
+
+[[package]]
 name = "ruff_cpp_spo"
 version = "0.1.0"
 dependencies = [
  "clang",
+ "ruff_cpp_codegen",
  "ruff_spo_triplet",
 ]
 

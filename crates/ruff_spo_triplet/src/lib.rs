@@ -56,6 +56,7 @@
 mod expand;
 mod ir;
 mod ndjson;
+mod reassemble;
 mod triple;
 
 pub use expand::expand;
@@ -67,6 +68,7 @@ pub use ir::{
     ValidationKind,
 };
 pub use ndjson::{ParseError, from_ndjson, to_ndjson};
+pub use reassemble::{cpp_projection, reassemble};
 pub use triple::{EntityKind, Predicate, Provenance, Triple};
 
 #[cfg(test)]

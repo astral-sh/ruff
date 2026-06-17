@@ -334,6 +334,7 @@ mod tests {
             param_types: vec!["int".to_string()],
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.methods.push(CppMethod {
             name: "Clear".to_string(),
@@ -347,6 +348,7 @@ mod tests {
             param_types: Vec::new(),
             is_const: false,
             is_static: false,
+            access: CppAccess::Public,
         });
         rec.templates.push(CppTemplate {
             kind: CppTemplateKind::Specialisation,
@@ -492,6 +494,7 @@ mod tests {
                     param_types: Vec::new(),
                     is_const: false,
                     is_static: false,
+                    access: CppAccess::Public,
                 }),
                 Declaration::Template(CppTemplate {
                     kind: CppTemplateKind::Instantiation,
@@ -553,7 +556,7 @@ mod libclang_tests {
     use std::io::Write;
     use std::sync::Mutex;
 
-    use ruff_spo_triplet::{expand, from_ndjson, to_ndjson};
+    use ruff_spo_triplet::{Triple, cpp_projection, expand, from_ndjson, reassemble, to_ndjson};
 
     use super::{
         MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram, extract_dir,
@@ -858,7 +861,7 @@ class Recognizer : public Classify {
             "cpp:Tesseract::Recognizer.recognizer_"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.operator==(const Recognizer &)",
+            "cpp:Tesseract::Recognizer.operator==(const Recognizer &) const",
             "defines_operator",
             "operator=="
         ));
@@ -985,6 +988,200 @@ class Recognizer : public Classify {
             parsed
                 .iter()
                 .all(|t| t.s.starts_with("cpp:") || t.s.starts_with("exc:"))
+        );
+    }
+
+    /// `CPP-REASSEMBLE-RT` — the AST-DLL generator's stage-1 reassembler run
+    /// against the REAL corpus (the re-scoped C-FIRST falsifier). Harvests
+    /// `ccutil`, expands to triples, serialises + parses ndjson, then
+    /// [`reassemble`]s the triple set back into a [`ModelGraph`] and checks the
+    /// round-trip invariants that MUST hold on real data:
+    ///
+    /// 1. **Class-set preservation** — reassembly recovers exactly the
+    ///    harvested class set (anchor-first attribution: no class invented or
+    ///    lost, no cross-attribution).
+    /// 2. **Idempotence** — `reassemble(expand(·))` is a fixed point. Expanding
+    ///    and reassembling the reassembled graph yields an identical graph.
+    ///    This catches any non-determinism / ordering / attribution bug on real
+    ///    data without tripping over the const-vs-non-const method-IRI
+    ///    collisions that make strict `cpp_projection` equality too strong on a
+    ///    real corpus (const-ness is not in the `(params)` suffix, so a
+    ///    `T& at(i)` / `const T& at(i) const` pair shares one IRI and `expand`
+    ///    merges them — a real harvester limitation this probe MEASURES).
+    /// 3. **Fidelity report** — prints how many classes round-trip byte-exact
+    ///    against [`cpp_projection`] and how many differ (the IRI-collision
+    ///    tail), so the collision count is measured, not asserted away.
+    ///
+    /// `ccutil/unicharset.h` carries the `UNICHARSET` / `UNICHARMAP`
+    /// same-named-method pair that makes anchor-first attribution non-trivial,
+    /// so this is a genuine real-data falsifier, not a fixture echo. Gated on
+    /// `TESSERACT_SRC`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "fidelity report gated on env var")]
+    fn cpp_reassemble_round_trip_on_real_corpus() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping CPP-REASSEMBLE-RT");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+
+        let g = extract_dir(&dir, &args).expect("libclang init (LIBCLANG_PATH set)");
+        let parsed = from_ndjson(&to_ndjson(&expand(&g))).expect("ndjson round-trips");
+        let r1 = reassemble(&parsed);
+
+        // (1) Class-set preservation — the anchor-first guarantee on real data.
+        let harvested: std::collections::BTreeSet<&str> =
+            g.models.iter().map(|m| m.name.as_str()).collect();
+        let recovered: std::collections::BTreeSet<&str> =
+            r1.models.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(
+            harvested, recovered,
+            "reassembly must recover exactly the harvested class set"
+        );
+
+        // (2) Idempotence — reassemble∘expand is a fixed point on real data.
+        let r2 = reassemble(&expand(&r1));
+        assert_eq!(
+            r1, r2,
+            "reassembly must be a fixed point on the real corpus (CPP-REASSEMBLE-RT)"
+        );
+
+        // (3) Fidelity vs the collision-blind projection — measured, not gated.
+        // A class "differs" when reassembly cannot recover it byte-exact, which
+        // happens when two harvested methods collide on one method IRI (same
+        // name + params + cv-qualifier) but differ in a field the IRI does not
+        // carry. D (the cv-aware IRI) removed the const/non-const subset; any
+        // residual is a DIFFERENT collision source (ref-qualified `&`/`&&`
+        // overloads, or a method harvested twice) — a follow-up, named here.
+        let projection = cpp_projection(&g);
+        let differing: Vec<String> = r1
+            .models
+            .iter()
+            .filter_map(|m| {
+                let p = projection.models.iter().find(|p| p.name == m.name)?;
+                if p == m {
+                    return None;
+                }
+                // Pinpoint WHERE it differs: methods (real overload collision)
+                // vs templates (benign duplicate-instantiation collapse — expand
+                // dedups (s,p,o), cpp_projection does not) vs fields.
+                Some(format!(
+                    "{}(m{}/{} t{}/{} f{}/{})",
+                    m.name,
+                    m.methods.len(),
+                    p.methods.len(),
+                    m.templates.len(),
+                    p.templates.len(),
+                    m.member_fields.len(),
+                    p.member_fields.len(),
+                ))
+            })
+            .collect();
+        let exact = r1.models.len() - differing.len();
+        eprintln!(
+            "[CPP-REASSEMBLE-RT] {} classes; {exact} round-trip byte-exact, {} differ \
+             (reassembled/projected counts): {differing:?}",
+            r1.models.len(),
+            differing.len(),
+        );
+
+        // Sanity anchor: UNICHARSET (the canonical ccutil class) must survive.
+        assert!(
+            recovered.iter().any(|n| n.ends_with("UNICHARSET")),
+            "reassembled ccutil must include UNICHARSET: {recovered:?}"
+        );
+        // Hard gate: every ccutil class round-trips byte-exact. The cv-aware
+        // method IRI (D) + the projection dedup + the is_const sort key closed
+        // the entire collision tail (was 48/67). A regression or a NEW
+        // collision source (e.g. ref-qualified `&`/`&&` overloads in a future
+        // corpus) reopens it and fails here.
+        assert!(
+            differing.is_empty(),
+            "all {} ccutil classes must round-trip byte-exact; residual: {differing:?}",
+            r1.models.len(),
+        );
+    }
+
+    /// `CPP-CODEGEN-RT` — the stage-2 emitter (`ruff_cpp_codegen`) run on the
+    /// REAL corpus: harvest ccutil, project the method plane, and assert the
+    /// emitter's signature-plane round-trip holds against `expand` on every
+    /// class (a dropped method or mangled param would break it). Then render the
+    /// manifest and check it carries the PARITY marker and one `MethodSig`
+    /// literal per harvested method. Gated on `TESSERACT_SRC`. This is the test
+    /// integration point where both ends of the C++ -> Rust pipeline meet.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn cpp_codegen_emitter_roundtrips_on_real_corpus() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping CPP-CODEGEN-RT");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let g = extract_dir(&dir, &args).expect("libclang init (LIBCLANG_PATH set)");
+
+        // Signature-plane round-trip: the emitter's manifest decompiles to the
+        // same signature triples `expand` emits, on the real harvested graph.
+        let sig = |triples: Vec<Triple>| -> std::collections::BTreeSet<(String, String, String)> {
+            triples
+                .into_iter()
+                .filter(ruff_cpp_codegen::is_signature_plane)
+                .map(|t| (t.s, t.p, t.o))
+                .collect()
+        };
+        let manifests = ruff_cpp_codegen::project(&g);
+        let from_manifest = sig(ruff_cpp_codegen::decompile(&manifests, NAMESPACE));
+        let from_expand = sig(expand(&g));
+        assert_eq!(
+            from_manifest, from_expand,
+            "emitter manifest signature plane must round-trip against expand on real ccutil"
+        );
+
+        // Render the manifest; check the honesty marker + per-method completeness.
+        let src = ruff_cpp_codegen::render(&manifests);
+        let total_methods: usize = g.models.iter().map(|m| m.methods.len()).sum();
+        eprintln!(
+            "[CPP-CODEGEN-RT] {} classes, {total_methods} methods -> {} bytes of MethodSig manifest",
+            g.models.len(),
+            src.len()
+        );
+        assert!(
+            src.contains("PARITY: UNRUN (operator-blocked: leptonica)"),
+            "every generated file must carry the PARITY marker"
+        );
+        assert_eq!(
+            src.matches("MethodSig {").count(),
+            total_methods,
+            "one MethodSig literal per harvested method"
         );
     }
 
