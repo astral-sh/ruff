@@ -710,11 +710,18 @@ fn evaluate_target_union<'db>(
 
     let removed = removed_any.then(|| removed.build());
     let mut builder = UnionBuilder::new(db);
-    for narrowed in narrowed {
+    for (original, narrowed) in elements.iter().zip(narrowed) {
         let Some(mut narrowed) = narrowed else {
             continue;
         };
-        if let Some(removed) = removed {
+        // This is a performance optimization that keeps repeated comparisons from building
+        // progressively larger types. For example, if `value == "a"` is false for
+        // `Literal["a", "b"] | Any`, the `"a"` case is gone and the `"b"` case can stay as-is.
+        // Only the `Any` case needs to remember that the value is not `"a"`; adding the same
+        // exclusion to `"b"` would not narrow it further.
+        if original.is_dynamic()
+            && let Some(removed) = removed
+        {
             narrowed = IntersectionBuilder::new(db)
                 .add_positive(narrowed)
                 .add_negative(removed)
