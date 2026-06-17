@@ -2,11 +2,10 @@ use std::fmt::{Debug, Display, Formatter};
 
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
-use strum::IntoEnumIterator;
 
-use crate::Applicability;
+use crate::{Applicability, UnresolvedRuleSelector};
 use crate::{
-    RuleSelector, display_settings,
+    display_settings,
     registry::{Rule, RuleSet},
     rule_selector::{PreviewOptions, Specificity},
 };
@@ -45,48 +44,60 @@ impl FixSafetyTable {
     }
 
     pub fn from_rule_selectors(
-        extend_safe_fixes: &[RuleSelector],
-        extend_unsafe_fixes: &[RuleSelector],
+        extend_safe_fixes: &[UnresolvedRuleSelector],
+        extend_unsafe_fixes: &[UnresolvedRuleSelector],
         preview_options: &PreviewOptions,
     ) -> Self {
+        #[derive(Copy, Clone)]
         enum Override {
             Safe,
             Unsafe,
         }
 
-        let safety_override_map: FxHashMap<Rule, Override> = {
-            Specificity::iter()
-                .flat_map(|spec| {
-                    let safe_overrides = extend_safe_fixes
-                        .iter()
-                        .filter(|selector| selector.specificity() == spec)
-                        .flat_map(|selector| selector.rules(preview_options))
-                        .map(|rule| (rule, Override::Safe));
+        let mut safety_override_map: FxHashMap<Rule, (Specificity, Override)> =
+            FxHashMap::default();
+        let selectors = extend_safe_fixes
+            .iter()
+            .map(|selector| (selector, Override::Safe))
+            .chain(
+                extend_unsafe_fixes
+                    .iter()
+                    .map(|selector| (selector, Override::Unsafe)),
+            );
 
-                    let unsafe_overrides = extend_unsafe_fixes
-                        .iter()
-                        .filter(|selector| selector.specificity() == spec)
-                        .flat_map(|selector| selector.rules(preview_options))
-                        .map(|rule| (rule, Override::Unsafe));
+        for (selector, o) in selectors {
+            let Some(selector) = selector.resolve(preview_options.mode) else {
+                continue;
+            };
+            let specificity = selector.specificity();
 
-                    // Unsafe overrides take precedence over safe overrides
-                    safe_overrides.chain(unsafe_overrides).collect::<Vec<_>>()
-                })
-                // More specified selectors take precedence over less specified selectors
-                .collect()
-        };
+            for rule in selector.rules(preview_options) {
+                safety_override_map
+                    .entry(rule)
+                    .and_modify(|existing| {
+                        // More specific selectors take precedence. Unsafe overrides take
+                        // precedence when both selectors have the same specificity.
+                        if specificity > existing.0
+                            || (specificity == existing.0 && matches!(o, Override::Unsafe))
+                        {
+                            *existing = (specificity, o);
+                        }
+                    })
+                    .or_insert((specificity, o));
+            }
+        }
 
         FixSafetyTable {
             forced_safe: safety_override_map
                 .iter()
-                .filter_map(|(rule, o)| match o {
+                .filter_map(|(rule, (_, o))| match o {
                     Override::Safe => Some(*rule),
                     Override::Unsafe => None,
                 })
                 .collect(),
             forced_unsafe: safety_override_map
                 .iter()
-                .filter_map(|(rule, o)| match o {
+                .filter_map(|(rule, (_, o))| match o {
                     Override::Unsafe => Some(*rule),
                     Override::Safe => None,
                 })
@@ -155,11 +166,11 @@ mod tests {
         FixSafetyTable::from_rule_selectors(
             &safe_fixes
                 .iter()
-                .map(|s| s.parse().unwrap())
+                .map(|s| UnresolvedRuleSelector::from_selector(*s))
                 .collect::<Vec<_>>(),
             &unsafe_fixes
                 .iter()
-                .map(|s| s.parse().unwrap())
+                .map(|s| UnresolvedRuleSelector::from_selector(*s))
                 .collect::<Vec<_>>(),
             &PreviewOptions::default(),
         )

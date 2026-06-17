@@ -20,7 +20,7 @@ use ruff_python_ast::{self as ast, PySourceType, SourceType};
 
 use crate::Applicability;
 use crate::registry::RuleSet;
-use crate::rule_selector::RuleSelector;
+use crate::rule_selector::UnresolvedRuleSelector;
 use crate::{display_settings, fs};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
@@ -357,21 +357,22 @@ impl<T> PerFile<T> {
 ///
 /// See [`PerFile`] for details of the representation.
 #[derive(Debug, Clone)]
-pub struct PerFileIgnore(PerFile<RuleSet>);
+pub struct PerFileIgnore(PerFile<Vec<UnresolvedRuleSelector>>);
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
-        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore
-        // disabled rules
-        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
-        Self(PerFile::new(pattern, project_root, rules))
+    pub fn new(
+        pattern: String,
+        selectors: Vec<UnresolvedRuleSelector>,
+        project_root: Option<&Path>,
+    ) -> Self {
+        Self(PerFile::new(pattern, project_root, selectors))
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternPrefixPair {
     pub pattern: String,
-    pub prefix: RuleSelector,
+    pub prefix: UnresolvedRuleSelector,
 }
 
 impl PatternPrefixPair {
@@ -405,7 +406,7 @@ impl FromStr for PatternPrefixPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let pattern = pattern_str.into();
-        let prefix = RuleSelector::from_str(code_string)?;
+        let prefix = UnresolvedRuleSelector::from_selector(code_string);
         Ok(Self { pattern, prefix })
     }
 }
@@ -927,9 +928,29 @@ impl CompiledPerFileIgnoreList {
     /// Given a list of [`PerFileIgnore`] patterns, create a compiled set of globs.
     ///
     /// Returns an error if either of the glob patterns cannot be parsed.
-    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>, preview: PreviewMode) -> Result<Self> {
         Ok(Self(CompiledPerFileList::resolve(
-            per_file_ignores.into_iter().map(|ignore| ignore.0),
+            per_file_ignores.into_iter().map(|ignore| {
+                let PerFile {
+                    basename,
+                    absolute,
+                    negated,
+                    data: selectors,
+                } = ignore.0;
+                // Rules in preview are included here even if preview mode is disabled; it's safe to
+                // ignore disabled rules.
+                let data = selectors
+                    .iter()
+                    .filter_map(|selector| selector.resolve(preview))
+                    .flat_map(|selector| selector.all_rules())
+                    .collect();
+                PerFile {
+                    basename,
+                    absolute,
+                    negated,
+                    data,
+                }
+            }),
         )?))
     }
 }

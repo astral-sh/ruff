@@ -1,11 +1,11 @@
-use std::{path::PathBuf, str::FromStr as _};
+use std::path::PathBuf;
 
 use lsp_types::Uri;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use ruff_linter::{RuleSelector, line_width::LineLength, rule_selector::ParseError};
+use ruff_linter::{UnresolvedRuleSelector, line_width::LineLength};
 
 use crate::{
     format::FormatBackend,
@@ -128,27 +128,9 @@ impl ClientOptions {
             lint_preview: lint.preview,
             format_preview: format.preview,
             format_backend: format.backend,
-            select: lint.select.and_then(|select| {
-                Self::resolve_rules(
-                    &select,
-                    RuleSelectorKey::Select,
-                    &mut contains_invalid_settings,
-                )
-            }),
-            extend_select: lint.extend_select.and_then(|select| {
-                Self::resolve_rules(
-                    &select,
-                    RuleSelectorKey::ExtendSelect,
-                    &mut contains_invalid_settings,
-                )
-            }),
-            ignore: lint.ignore.and_then(|ignore| {
-                Self::resolve_rules(
-                    &ignore,
-                    RuleSelectorKey::Ignore,
-                    &mut contains_invalid_settings,
-                )
-            }),
+            select: lint.select.map(Self::unresolved_rules),
+            extend_select: lint.extend_select.map(Self::unresolved_rules),
+            ignore: lint.ignore.map(Self::unresolved_rules),
             exclude: self.exclude.clone(),
             line_length: self.line_length,
             configuration_preference: self.configuration_preference.unwrap_or_default(),
@@ -178,23 +160,11 @@ impl ClientOptions {
         }
     }
 
-    fn resolve_rules(
-        rules: &[String],
-        key: RuleSelectorKey,
-        contains_invalid_settings: &mut bool,
-    ) -> Option<Vec<RuleSelector>> {
-        let (mut known, mut unknown) = (vec![], vec![]);
-        for rule in rules {
-            match RuleSelector::from_str(rule) {
-                Ok(selector) => known.push(selector),
-                Err(ParseError::Unknown(_)) => unknown.push(rule),
-            }
-        }
-        if !unknown.is_empty() {
-            *contains_invalid_settings = true;
-            tracing::error!("Unknown rule selectors found in `{key}`: {unknown:?}");
-        }
-        if known.is_empty() { None } else { Some(known) }
+    fn unresolved_rules(rules: Vec<String>) -> Vec<UnresolvedRuleSelector> {
+        rules
+            .into_iter()
+            .map(UnresolvedRuleSelector::from_selector)
+            .collect()
     }
 
     /// Update the preview flag for the linter and the formatter with the given value.
@@ -423,23 +393,6 @@ impl AllOptions {
     }
 }
 
-#[derive(Copy, Clone)]
-enum RuleSelectorKey {
-    Select,
-    ExtendSelect,
-    Ignore,
-}
-
-impl std::fmt::Display for RuleSelectorKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RuleSelectorKey::Select => f.write_str("lint.select"),
-            RuleSelectorKey::ExtendSelect => f.write_str("lint.extendSelect"),
-            RuleSelectorKey::Ignore => f.write_str("lint.ignore"),
-        }
-    }
-}
-
 pub(crate) trait Combine {
     #[must_use]
     fn combine(mut self, other: Self) -> Self
@@ -531,15 +484,14 @@ impl_noop_combine!(LineLength);
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use insta::assert_debug_snapshot;
     use ruff_python_formatter::QuoteStyle;
     use ruff_workspace::options::{
         FormatOptions as RuffFormatOptions, LintCommonOptions, LintOptions, Options,
     };
     use serde::de::DeserializeOwned;
-
-    #[cfg(not(windows))]
-    use ruff_linter::registry::Linter;
 
     use super::*;
 
@@ -803,8 +755,8 @@ mod tests {
                     format_preview: None,
                     format_backend: None,
                     select: Some(vec![
-                        RuleSelector::Linter(Linter::Pyflakes),
-                        RuleSelector::Linter(Linter::Isort)
+                        UnresolvedRuleSelector::from_selector("F"),
+                        UnresolvedRuleSelector::from_selector("I"),
                     ]),
                     extend_select: None,
                     ignore: None,
@@ -841,8 +793,8 @@ mod tests {
                     format_preview: None,
                     format_backend: None,
                     select: Some(vec![
-                        RuleSelector::Linter(Linter::Pyflakes),
-                        RuleSelector::Linter(Linter::Isort)
+                        UnresolvedRuleSelector::from_selector("F"),
+                        UnresolvedRuleSelector::from_selector("I"),
                     ]),
                     extend_select: None,
                     ignore: None,
@@ -943,7 +895,7 @@ mod tests {
                     format_backend: None,
                     select: None,
                     extend_select: None,
-                    ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    ignore: Some(vec![UnresolvedRuleSelector::from_selector("RUF001")]),
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,
@@ -1024,7 +976,9 @@ mod tests {
                         line_length: Some(LineLength::try_from(100).unwrap()),
                         lint: Some(LintOptions {
                             common: LintCommonOptions {
-                                extend_select: Some(vec![RuleSelector::from_str("I001").unwrap()]),
+                                extend_select: Some(vec![UnresolvedRuleSelector::from_selector(
+                                    "I001",
+                                )]),
                                 ..Default::default()
                             },
                             ..Default::default()
@@ -1035,7 +989,7 @@ mod tests {
                         }),
                         ..Default::default()
                     }))),
-                    extend_select: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    extend_select: Some(vec![UnresolvedRuleSelector::from_selector("RUF001")]),
                     ..Default::default()
                 }
             }

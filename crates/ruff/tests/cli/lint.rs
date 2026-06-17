@@ -762,22 +762,16 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
         @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    error: invalid value 'extend-select=['F481']' for '--config <CONFIG_OPTION>'
-
-      tip: A `--config` flag must either be a path to a `.toml` configuration file
-           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
-           option
-
-    Could not parse the supplied argument as a `ruff.toml` configuration option:
-
-    Unknown rule selector: `F481`
-
-    For more information, try '--help'.
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
+      - 'extend-select' -> 'lint.extend-select'
+    warning: Invalid rule selector: `F481`
+    warning: No Python files found under the given path(s)
     ");
 }
 

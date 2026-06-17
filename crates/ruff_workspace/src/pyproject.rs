@@ -276,7 +276,7 @@ mod tests {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_linter::codes;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
@@ -355,7 +355,7 @@ select = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            select: Some(vec![codes::Pycodestyle::E501.into()]),
+                            select: Some(vec![UnresolvedRuleSelector::from_selector("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -379,8 +379,10 @@ ignore = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            extend_select: Some(vec![codes::Ruff::_100.into()]),
-                            ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                            extend_select: Some(vec![UnresolvedRuleSelector::from_selector(
+                                "RUF100",
+                            )]),
+                            ignore: Some(vec![UnresolvedRuleSelector::from_selector("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -458,7 +460,7 @@ line_length = 79
 select = ["E123"]
 "#,
             )
-            .is_err()
+            .is_ok()
         );
 
         assert!(
@@ -560,7 +562,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
                     common: LintCommonOptions {
                         per_file_ignores: Some(FxHashMap::from_iter([(
                             "__init__.py".to_string(),
-                            vec![codes::Pyflakes::_401.into()]
+                            vec![UnresolvedRuleSelector::from_selector("F401")]
                         )])),
                         ..LintCommonOptions::default()
                     },
@@ -580,7 +582,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         let result = PatternPrefixPair::from_str("foo: E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("E501:foo");
-        assert!(result.is_err());
+        assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("E501");
         assert!(result.is_err());
         let result = PatternPrefixPair::from_str("foo");
@@ -590,6 +592,6 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         let result = PatternPrefixPair::from_str("**/bar:E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("bar:E503");
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 }

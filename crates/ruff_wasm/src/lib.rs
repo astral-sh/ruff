@@ -10,12 +10,12 @@ use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
-use ruff_linter::Locator;
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
+use ruff_linter::{Locator, UnresolvedRuleSelector};
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
@@ -310,7 +310,15 @@ impl Workspace {
                     allowed_confusables: Some(Vec::default()),
                     dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
                     ignore: Some(Vec::default()),
-                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    select: Some(
+                        DEFAULT_SELECTORS
+                            .iter()
+                            .map(|selector| {
+                                let (prefix, code) = selector.prefix_and_code();
+                                UnresolvedRuleSelector::from_selector(format!("{prefix}{code}"))
+                            })
+                            .collect(),
+                    ),
                     extend_fixable: Some(Vec::default()),
                     extend_select: Some(Vec::default()),
                     external: Some(Vec::default()),
