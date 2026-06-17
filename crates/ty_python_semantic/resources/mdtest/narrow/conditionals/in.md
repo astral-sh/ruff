@@ -104,7 +104,7 @@ def _(x: str):
     if x in "abc":
         reveal_type(x)  # revealed: str
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
 ```
 
 ```py
