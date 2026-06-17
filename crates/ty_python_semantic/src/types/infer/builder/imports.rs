@@ -376,6 +376,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
+                ..
             } = module_literal.static_member(db, name)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {

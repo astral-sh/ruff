@@ -21,6 +21,7 @@ use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
+use super::super::projection::ProjectionEvidenceSet;
 use super::{
     DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
     ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
@@ -343,6 +344,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// Projection facts collected from nested inference regions.
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+
     /// If the inference region refers to a definition, whether synthesized dictionary-key
     /// assignments derived from its right-hand side should be discarded.
     discards_dict_key_assignments: bool,
@@ -392,6 +396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
+            projection_evidence: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
         }
@@ -447,6 +452,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+    }
+
+    fn extend_projection_evidence(&mut self, other: Option<ProjectionEvidenceSet<'db>>) {
+        self.projection_evidence =
+            ProjectionEvidenceSet::merged(self.db(), self.projection_evidence, other);
     }
 
     fn extend_definition(
@@ -505,6 +515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.qualifiers.extend(extra.qualifiers.iter().copied());
                     self.type_expression_flags
                         .extend(extra.type_expression_flags.iter().copied());
+                    self.extend_projection_evidence(extra.projection_evidence);
 
                     #[expect(
                         clippy::iter_over_hash_type,
@@ -556,6 +567,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
+            self.extend_projection_evidence(extra.projection_evidence);
         }
     }
 
@@ -579,6 +591,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
+            self.extend_projection_evidence(extra.projection_evidence);
 
             #[expect(
                 clippy::iter_over_hash_type,
@@ -609,6 +622,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
+            self.extend_projection_evidence(extra.projection_evidence);
 
             #[expect(
                 clippy::iter_over_hash_type,
@@ -1301,6 +1315,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let PlaceAndQualifiers {
             place: resolved_place,
             qualifiers,
+            ..
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
@@ -1979,6 +1994,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty = match with_item.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
+                self.extend_projection_evidence(unpacked.projection_evidence());
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -2867,6 +2883,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 PlaceAndQualifiers {
                                     place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
                                     qualifiers: _,
+                                    ..
                                 } => attr_ty.is_callable_type(),
                                 _ => false,
                             };
@@ -2928,6 +2945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty: meta_attr_ty, ..
                             }),
                         qualifiers,
+                        ..
                     } => {
                         // Resolve `Self` type variables to the concrete instance type.
                         let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
@@ -2999,6 +3017,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             ..
                                         }),
                                     qualifiers,
+                                    ..
                                 } = fallback_attr
                                 {
                                     // Bind `Self` via MRO matching.
@@ -3052,6 +3071,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ..
                                 }),
                             qualifiers,
+                            ..
                         }) = fallback_attr
                         {
                             // Bind `Self` via MRO matching.
@@ -3137,6 +3157,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty: meta_attr_ty, ..
                             }),
                         qualifiers,
+                        ..
                     } => {
                         if emit_diagnostics
                             && self.invalid_assignment_to_final_attribute(
@@ -3253,6 +3274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ..
                                 }),
                             qualifiers,
+                            ..
                         }) = fallback_attr
                         {
                             let class_attr_ty =
@@ -3757,6 +3779,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // The assignment statement owns unpacking diagnostics so that targets without a
                 // name definition are still checked, and each diagnostic is reported only once.
                 let unpacked = infer_unpack_types(self.db(), unpack);
+                self.extend_projection_evidence(unpacked.projection_evidence());
                 unpacked.expression_type(target)
             }
             None => {
@@ -5124,10 +5147,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
             let iterable_type = builder.infer_standalone_expression(iter, tcx);
-            if let Some(element_type) =
-                iterable_type.try_iter_projection_with_mode(builder.db(), mode)
+            if let Some(projected) =
+                iterable_type.try_iter_projection_result_with_mode(builder.db(), mode)
             {
-                element_type
+                builder.extend_projection_evidence(projected.projection_evidence());
+                projected.ty()
             } else if !*is_async
                 && let Some(element_type) = builder
                     .fixed_length_iterable_element_type(iter, |expr| builder.expression_type(expr))
@@ -5156,6 +5180,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let loop_var_value_type = match for_stmt.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
+                self.extend_projection_evidence(unpacked.projection_evidence());
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -5169,9 +5194,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mode = EvaluationMode::from_is_async(for_stmt.is_async());
 
                 if let Some(projected) =
-                    iterable_type.try_iter_projection_with_mode(self.db(), mode)
+                    iterable_type.try_iter_projection_result_with_mode(self.db(), mode)
                 {
-                    projected
+                    self.extend_projection_evidence(projected.projection_evidence());
+                    projected.ty()
                 } else if !for_stmt.is_async()
                     && let Some(element_type) = self
                         .fixed_length_iterable_element_type(iterable, |expr| {
@@ -7271,6 +7297,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.index.constraining_collection_uses(collection_def)
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
+                self.extend_projection_evidence(statement_use_types.projection_evidence());
 
                 if let Some(divergent) = statement_use_types
                     .expression_type(use_expression)
@@ -7898,6 +7925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_type = match comprehension.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
+                self.extend_projection_evidence(unpacked.projection_evidence());
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -8918,9 +8946,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
             && let Some(projected) = self
                 .expression_type(value)
-                .try_method_call_projection(db, &attr.id)
+                .try_method_call_projection_result(db, &attr.id)
         {
-            projected
+            self.extend_projection_evidence(projected.projection_evidence());
+            projected.ty()
         } else {
             bindings.return_type(db)
         };
@@ -9143,8 +9172,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(self.db(), &[tcx])),
         );
 
-        if let Some(projection) = expr_type.try_await_projection(self.db()) {
-            return projection;
+        if let Some(projection) = expr_type.try_await_projection_result(self.db()) {
+            self.extend_projection_evidence(projection.projection_evidence());
+            return projection.ty();
         }
 
         expr_type.try_await(self.db()).unwrap_or_else(|err| {
@@ -9336,6 +9366,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Place::Undefined.into()
                 }
             });
+
+        self.extend_projection_evidence(resolved_after_fallback.projection_evidence);
 
         let ty =
             resolved_after_fallback.unwrap_with_diagnostic(db, |lookup_error| match lookup_error {
@@ -9963,6 +9995,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::ExprRef::Attribute(attribute),
             );
             constraint_keys.extend(keys);
+            self.extend_projection_evidence(resolved.projection_evidence);
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
@@ -9975,6 +10008,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let fallback_place = value_type.member(db, &attr.id).map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         });
+        self.extend_projection_evidence(fallback_place.projection_evidence);
 
         let attr_name = &attr.id;
         let resolved_type =
@@ -10727,6 +10761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_recovery,
+            projection_evidence: nested_projection_evidence,
             dataclass_field_specifiers: _,
 
             // Ignored; only relevant to definition regions
@@ -10744,6 +10779,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
         } = self;
 
+        let db = context.db();
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            nested_projection_evidence,
+            ProjectionEvidenceSet::from_types(
+                db,
+                expressions
+                    .values()
+                    .copied()
+                    .chain(bindings.iter().map(|(_, ty)| *ty)),
+            ),
+        );
         let diagnostics = context.finish();
         let _ = scope;
 
@@ -10762,6 +10809,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 || !collection_use_constraints.is_empty()
                 || !expected_types.is_empty()
                 || cycle_recovery.is_some()
+                || projection_evidence.is_some()
                 || !bindings.is_empty()
                 || !diagnostics.is_empty()).then(|| {
                 if bindings.len() > 20 {
@@ -10780,7 +10828,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_recovery,
-                    collection_use_constraints
+                    collection_use_constraints,
+                    projection_evidence,
                 })
             });
 
@@ -10808,6 +10857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_recovery,
+            projection_evidence: nested_projection_evidence,
             called_functions,
             mut return_types_and_ranges,
 
@@ -10825,12 +10875,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region: _,
         } = self;
 
+        let db = context.db();
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            nested_projection_evidence,
+            ProjectionEvidenceSet::from_types(
+                db,
+                expressions
+                    .values()
+                    .copied()
+                    .chain(bindings.iter().map(|(_, ty)| *ty))
+                    .chain(declarations.iter().map(|(_, ty)| ty.inner_type()))
+                    .chain(
+                        return_types_and_ranges
+                            .iter()
+                            .map(|type_and_range| type_and_range.ty),
+                    ),
+            ),
+        );
         let _ = scope;
         let diagnostics = context.finish();
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
             || cycle_recovery.is_some()
+            || projection_evidence.is_some()
             || !expected_types.is_empty()
             || !deferred.is_empty()
             || !called_functions.is_empty()
@@ -10851,6 +10920,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
+                projection_evidence,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
@@ -10928,6 +10998,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             cycle_recovery: _,
+            projection_evidence: _,
             qualifiers: _,
             type_expression_flags: _,
         } = self;
@@ -10964,6 +11035,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_recovery,
+            projection_evidence: nested_projection_evidence,
             undecorated_type,
             discards_dict_key_assignments,
             called_functions,
@@ -10979,6 +11051,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
         } = self;
 
+        let db = context.db();
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            nested_projection_evidence,
+            ProjectionEvidenceSet::from_types(
+                db,
+                expressions
+                    .values()
+                    .copied()
+                    .chain(bindings.iter().map(|(_, ty)| *ty))
+                    .chain(declarations.iter().map(|(_, ty)| ty.inner_type()))
+                    .chain(undecorated_type.iter().copied()),
+            ),
+        );
         let _ = scope;
         let diagnostics = context.finish();
 
@@ -10987,6 +11073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(!collection_use_constraints.is_empty())
             + usize::from(!called_functions.is_empty())
             + usize::from(!type_expression_flags.is_empty())
+            + usize::from(projection_evidence.is_some())
             + usize::from(cycle_recovery.is_some())
             + usize::from(!deferred.is_empty())
             + usize::from(!diagnostics.is_empty())
@@ -11043,6 +11130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                     type_expression_flags: FrozenMap::from(type_expression_flags),
+                    projection_evidence,
                     cycle_recovery,
                     deferred: deferred.into_boxed_slice(),
                     diagnostics,
@@ -11095,6 +11183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             scope,
             cycle_recovery,
+            projection_evidence: nested_projection_evidence,
             qualifiers,
 
             // Ignored, never leaked into other scopes
@@ -11118,6 +11207,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
         } = self;
 
+        let db = context.db();
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            nested_projection_evidence,
+            ProjectionEvidenceSet::from_types(db, expressions.values().copied()),
+        );
         let _ = scope;
         let diagnostics = context.finish();
 
@@ -11125,6 +11220,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !expected_types.is_empty()
             || !diagnostics.is_empty()
             || cycle_recovery.is_some()
+            || projection_evidence.is_some()
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty()
             || !qualifiers.is_empty())
@@ -11136,6 +11232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 expected_types: FrozenMap::from(expected_types),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
+                projection_evidence,
                 cycle_recovery,
                 diagnostics,
             })
@@ -11175,6 +11272,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: _,
             string_annotations: _,
             expected_types: _,
+            projection_evidence: _,
             scope: _,
             bindings: _,
             declarations: _,
@@ -11222,6 +11320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_recovery,
+            projection_evidence,
             dataclass_field_specifiers: _,
 
             // Ignored; only relevant to definition regions
@@ -11255,6 +11354,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expressions.extend(expressions.iter());
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
+        self.extend_projection_evidence(projection_evidence);
         self.string_annotations
             .extend(string_annotations.iter().copied());
         self.expected_types.extend(expected_types.iter());

@@ -331,6 +331,7 @@ impl<'db> ProtocolInterface<'db> {
                 place: Place::bound(member.ty())
                     .with_provenance(Provenance::from_definition(member.definition())),
                 qualifiers: member.qualifiers(),
+                projection_evidence: None,
             })
             .unwrap_or_else(|| Type::object().member(db, name))
     }

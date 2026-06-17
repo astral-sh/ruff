@@ -3325,10 +3325,8 @@ class ProjectionCustomStarredBox:
         first, *rest = self.x
         self.x = Box(first)
 
-        # TODO: should be `int`
-        reveal_type(first)  # revealed: int | Divergent
-        # TODO: should be `list[int]`
-        reveal_type(rest)  # revealed: list[int] | list[Divergent]
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
         reveal_type(self.x)  # revealed: Box[int]
 
 class ProjectionCustomBoxInList:
@@ -3357,8 +3355,7 @@ class ProjectionCustomParameterOrder:
         for text, number in self.x:
             self.x = ReversedPair(number, text)
 
-        # TODO: should be `ReversedPair[int, str]`
-        reveal_type(self.x)  # revealed: ReversedPair[int, str] | ReversedPair[Divergent, Divergent]
+        reveal_type(self.x)  # revealed: ReversedPair[int, str]
 
 class NestedBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
@@ -3375,8 +3372,7 @@ class ProjectionCustomNested:
         for (item,) in self.x:
             self.x = NestedBox(item)
 
-        # TODO: should be `NestedBox[int]`
-        reveal_type(self.x)  # revealed: NestedBox[int] | NestedBox[Divergent]
+        reveal_type(self.x)  # revealed: NestedBox[int]
 
 class ConstantIterable(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
@@ -3594,8 +3590,7 @@ class ProjectionCustomMethodFor:
         for item in self.x.view():
             self.x = ViewBox(item)
 
-        # TODO: should be `ViewBox[int]`
-        reveal_type(self.x)  # revealed: ViewBox[int] | ViewBox[Divergent]
+        reveal_type(self.x)  # revealed: ViewBox[int]
 
 class ProjectionCustomMapping(Generic[ProjectionT, ProjectionU], Mapping[ProjectionT, ProjectionU]):
     def __getitem__(self, key: ProjectionT) -> ProjectionU:
@@ -3615,8 +3610,7 @@ class ProjectionCustomMappingValues:
         for value in self.x.values():
             self.x = {0: value}
 
-        # TODO: should be `ProjectionCustomMapping[int, str] | dict[int, str]`
-        reveal_type(self.x)  # revealed: ProjectionCustomMapping[int, str] | dict[int, Divergent]
+        reveal_type(self.x)  # revealed: ProjectionCustomMapping[int, str] | dict[int, str]
 
 class ProjectionCustomMappingItems:
     def __init__(self, values: ProjectionCustomMapping[int, str]) -> None:
@@ -3626,8 +3620,7 @@ class ProjectionCustomMappingItems:
         for key, value in self.x.items():
             self.x = {key: value}
 
-        # TODO: should be `ProjectionCustomMapping[int, str] | dict[int, str]`
-        reveal_type(self.x)  # revealed: ProjectionCustomMapping[int, str] | dict[Divergent, Divergent]
+        reveal_type(self.x)  # revealed: ProjectionCustomMapping[int, str] | dict[int, str]
 
 class ContextBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
@@ -3754,8 +3747,7 @@ class ProjectionCustomAsyncFor:
         async for item in self.x:
             self.x = AsyncBox(item)
 
-        # TODO: should be `AsyncBox[int]`
-        reveal_type(self.x)  # revealed: AsyncBox[int] | AsyncBox[Divergent]
+        reveal_type(self.x)  # revealed: AsyncBox[int]
 
 class AsyncTupleBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
@@ -3776,8 +3768,7 @@ class ProjectionCustomAsyncForUnpack:
         async for (item,) in self.x:
             self.x = AsyncTupleBox(item)
 
-        # TODO: should be `AsyncTupleBox[int]`
-        reveal_type(self.x)  # revealed: AsyncTupleBox[int] | AsyncTupleBox[Divergent]
+        reveal_type(self.x)  # revealed: AsyncTupleBox[int]
 ```
 
 Different container wrappers can share the same unpack projection:

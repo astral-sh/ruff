@@ -12,8 +12,9 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    DynamicType, KnownClass, MemberLookupPolicy, ProjectionEvidenceSet, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type_with_projection_evidence,
+    inferred_declaration, is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -323,9 +324,19 @@ impl<'db> Place<'db> {
 
     #[must_use]
     pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> PlaceAndQualifiers<'db> {
+        self.with_qualifiers_and_projection_evidence(qualifiers, None)
+    }
+
+    #[must_use]
+    pub(crate) fn with_qualifiers_and_projection_evidence(
+        self,
+        qualifiers: TypeQualifiers,
+        projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
         PlaceAndQualifiers {
             place: self,
             qualifiers,
+            projection_evidence,
         }
     }
 
@@ -780,6 +791,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
+    pub(crate) projection_evidence: Option<ProjectionEvidenceSet<'db>>,
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
@@ -823,11 +835,12 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {
-            PlaceAndQualifiers { place, qualifiers }
-                if (qualifiers.contains(TypeQualifiers::FINAL)
-                    && place
-                        .ignore_possibly_undefined()
-                        .is_some_and(|ty| ty.is_unknown())) =>
+            PlaceAndQualifiers {
+                place, qualifiers, ..
+            } if (qualifiers.contains(TypeQualifiers::FINAL)
+                && place
+                    .ignore_possibly_undefined()
+                    .is_some_and(|ty| ty.is_unknown())) =>
             {
                 Some(*qualifiers)
             }
@@ -843,6 +856,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         PlaceAndQualifiers {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
+            projection_evidence: self.projection_evidence,
         }
     }
 
@@ -857,6 +871,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
+                ..
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
@@ -871,6 +886,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             PlaceAndQualifiers {
                 place: Place::Undefined,
                 qualifiers,
+                ..
             } => Err(LookupError::Undefined(qualifiers)),
         }
     }
@@ -916,6 +932,11 @@ impl<'db> PlaceAndQualifiers<'db> {
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            self.projection_evidence,
+            previous_place.projection_evidence,
+        );
         let qualifiers = if cycle.iteration() <= 1 {
             self.qualifiers
         } else {
@@ -927,7 +948,12 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                ty: current.ty.cycle_normalized_with_projection_evidence(
+                    db,
+                    prev.ty,
+                    cycle,
+                    projection_evidence.as_ref(),
+                ),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -948,7 +974,13 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, cycle),
+                ty: current
+                    .ty
+                    .recursive_type_normalized_with_projection_evidence(
+                        db,
+                        cycle,
+                        projection_evidence.as_ref(),
+                    ),
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -963,7 +995,11 @@ impl<'db> PlaceAndQualifiers<'db> {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        ty: prev.ty.recursive_type_normalized_with_projection_evidence(
+                            db,
+                            cycle,
+                            projection_evidence.as_ref(),
+                        ),
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -971,7 +1007,11 @@ impl<'db> PlaceAndQualifiers<'db> {
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
-        PlaceAndQualifiers { place, qualifiers }
+        PlaceAndQualifiers {
+            place,
+            qualifiers,
+            projection_evidence,
+        }
     }
 }
 
@@ -1017,9 +1057,10 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, None)
+        let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+        return inferred
             .place
-            .with_qualifiers(qualifiers);
+            .with_qualifiers_and_projection_evidence(qualifiers, inferred.projection_evidence);
     }
 
     match declared {
@@ -1035,9 +1076,12 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers,
+            ..
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let projection_evidence = inferred.projection_evidence;
+            match inferred.place {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1051,7 +1095,7 @@ pub(crate) fn place_by_id<'db>(
                     public_type_policy: PublicTypePolicy::Raw,
                     provenance: inferred_provenance.or(declared_provenance),
                 })
-                .with_qualifiers(qualifiers),
+                .with_qualifiers_and_projection_evidence(qualifiers, projection_evidence),
                 Place::Undefined => Place::Defined(DefinedPlace {
                     ty: Type::unknown(),
                     origin,
@@ -1059,7 +1103,7 @@ pub(crate) fn place_by_id<'db>(
                     public_type_policy: PublicTypePolicy::Raw,
                     provenance: declared_provenance,
                 })
-                .with_qualifiers(qualifiers),
+                .with_qualifiers_and_projection_evidence(qualifiers, projection_evidence),
             }
         }
         // Place is declared, trust the declared type
@@ -1070,6 +1114,7 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers: _,
+            ..
         } => place_and_quals,
         // Place is possibly declared
         PlaceAndQualifiers {
@@ -1082,10 +1127,12 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers,
+            ..
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let projection_evidence = inferred.projection_evidence;
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1121,17 +1168,24 @@ pub(crate) fn place_by_id<'db>(
                 }),
             };
 
-            PlaceAndQualifiers { place, qualifiers }
+            PlaceAndQualifiers {
+                place,
+                qualifiers,
+                projection_evidence,
+            }
         }
         // Place is undeclared, infer the type from bindings
         PlaceAndQualifiers {
             place: Place::Undefined,
             qualifiers: _,
+            ..
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place;
+            let inferred_result =
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let mut inferred = inferred_result.place;
+            let projection_evidence = inferred_result.projection_evidence;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1178,14 +1232,20 @@ pub(crate) fn place_by_id<'db>(
                 || scope_has_private_visibility
                 || in_stub_file
             {
-                inferred.into()
+                inferred.with_qualifiers_and_projection_evidence(
+                    TypeQualifiers::empty(),
+                    projection_evidence,
+                )
             } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
                 inferred
                     .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
+                    .with_qualifiers_and_projection_evidence(
+                        TypeQualifiers::empty(),
+                        projection_evidence,
+                    )
             }
         }
     }
@@ -1509,6 +1569,7 @@ fn place_from_bindings_impl<'db>(
     let mut provenance = Provenance::Unknown;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
+    let mut projection_evidence = None;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1632,7 +1693,10 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = binding_type(db, binding);
+            let (binding_ty, binding_projection_evidence) =
+                binding_type_with_projection_evidence(db, binding);
+            projection_evidence =
+                ProjectionEvidenceSet::merged(db, projection_evidence, binding_projection_evidence);
             Some((
                 narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
                 static_reachability,
@@ -1694,12 +1758,14 @@ fn place_from_bindings_impl<'db>(
     PlaceWithDefinition {
         place,
         first_definition,
+        projection_evidence,
     }
 }
 
 pub(super) struct PlaceWithDefinition<'db> {
     pub(super) place: Place<'db>,
     pub(super) first_definition: Option<Definition<'db>>,
+    pub(super) projection_evidence: Option<ProjectionEvidenceSet<'db>>,
 }
 
 /// Accumulates types from multiple bindings or declarations, and eventually builds a

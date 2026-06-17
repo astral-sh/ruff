@@ -20,9 +20,9 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, ProjectionEvidenceSet,
+        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType,
+        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -41,8 +41,8 @@ use crate::{
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::infer_unpack_types,
-        infer_expression_type, inferred_declaration,
+        infer::{infer_expression_types, infer_unpack_types},
+        inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
@@ -2227,6 +2227,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let mut is_attribute_bound = false;
         let mut provenance = Provenance::Unknown;
+        let mut projection_evidence = None;
 
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
@@ -2315,15 +2316,29 @@ impl<'db> StaticClassLiteral<'db> {
                         // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
                         // on the right-hand side.
 
-                        let inferred_ty = infer_expression_type(
+                        let inference = infer_expression_types(
                             db,
                             index.expression(value),
                             TypeContext::default(),
                         );
+                        projection_evidence = ProjectionEvidenceSet::merged(
+                            db,
+                            projection_evidence,
+                            inference.projection_evidence(),
+                        );
+                        let inferred_ty = inference.expression_type(value);
+                        projection_evidence = ProjectionEvidenceSet::merged(
+                            db,
+                            projection_evidence,
+                            ProjectionEvidenceSet::from_types(db, [inferred_ty]),
+                        );
                         return Member {
                             inner: Place::bound(inferred_ty)
                                 .with_definition(declaration)
-                                .with_qualifiers(all_qualifiers),
+                                .with_qualifiers_and_projection_evidence(
+                                    all_qualifiers,
+                                    projection_evidence,
+                                ),
                         };
                     }
 
@@ -2410,6 +2425,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //     [.., self.name, ..] = <value>
 
                             let unpacked = infer_unpack_types(db, unpack);
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                unpacked.projection_evidence(),
+                            );
                             Some(unpacked.expression_type(assign.target(&module)))
                         }
                         None => {
@@ -2417,11 +2437,18 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     self.name = <value>
 
-                            Some(infer_expression_type(
+                            let value = assign.value(&module);
+                            let inference = infer_expression_types(
                                 db,
-                                index.expression(assign.value(&module)),
+                                index.expression(value),
                                 TypeContext::default(),
-                            ))
+                            );
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                inference.projection_evidence(),
+                            );
+                            Some(inference.expression_type(value))
                         }
                     },
                     DefinitionKind::For(for_stmt) => match for_stmt.target_kind() {
@@ -2431,6 +2458,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //     for .., self.name, .. in <iterable>:
 
                             let unpacked = infer_unpack_types(db, unpack);
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                unpacked.projection_evidence(),
+                            );
                             Some(unpacked.expression_type(for_stmt.target(&module)))
                         }
                         TargetKind::Single => {
@@ -2438,11 +2470,18 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     for self.name in <iterable>:
 
-                            let iterable_ty = infer_expression_type(
+                            let iterable = for_stmt.iterable(&module);
+                            let inference = infer_expression_types(
                                 db,
-                                index.expression(for_stmt.iterable(&module)),
+                                index.expression(iterable),
                                 TypeContext::default(),
                             );
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                inference.projection_evidence(),
+                            );
+                            let iterable_ty = inference.expression_type(iterable);
                             // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                             Some(iterable_ty.iterate(db).homogeneous_element_type(db))
                         }
@@ -2454,6 +2493,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //     with <context_manager> as .., self.name, ..:
 
                             let unpacked = infer_unpack_types(db, unpack);
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                unpacked.projection_evidence(),
+                            );
                             Some(unpacked.expression_type(with_item.target(&module)))
                         }
                         TargetKind::Single => {
@@ -2461,11 +2505,18 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     with <context_manager> as self.name:
 
-                            let context_ty = infer_expression_type(
+                            let context_expr = with_item.context_expr(&module);
+                            let inference = infer_expression_types(
                                 db,
-                                index.expression(with_item.context_expr(&module)),
+                                index.expression(context_expr),
                                 TypeContext::default(),
                             );
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                inference.projection_evidence(),
+                            );
+                            let context_ty = inference.expression_type(context_expr);
                             Some(if with_item.is_async() {
                                 context_ty.aenter(db)
                             } else {
@@ -2481,6 +2532,11 @@ impl<'db> StaticClassLiteral<'db> {
                                 //     [... for .., self.name, .. in <iterable>]
 
                                 let unpacked = infer_unpack_types(db, unpack);
+                                projection_evidence = ProjectionEvidenceSet::merged(
+                                    db,
+                                    projection_evidence,
+                                    unpacked.projection_evidence(),
+                                );
                                 Some(unpacked.expression_type(comprehension.target(&module)))
                             }
                             TargetKind::Single => {
@@ -2488,11 +2544,18 @@ impl<'db> StaticClassLiteral<'db> {
                                 //
                                 //     [... for self.name in <iterable>]
 
-                                let iterable_ty = infer_expression_type(
+                                let iterable = comprehension.iterable(&module);
+                                let inference = infer_expression_types(
                                     db,
-                                    index.expression(comprehension.iterable(&module)),
+                                    index.expression(iterable),
                                     TypeContext::default(),
                                 );
+                                projection_evidence = ProjectionEvidenceSet::merged(
+                                    db,
+                                    projection_evidence,
+                                    inference.projection_evidence(),
+                                );
+                                let iterable_ty = inference.expression_type(iterable);
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 Some(iterable_ty.iterate(db).homogeneous_element_type(db))
                             }
@@ -2518,16 +2581,21 @@ impl<'db> StaticClassLiteral<'db> {
 
         Member {
             inner: if is_attribute_bound {
-                Place::bound(
-                    union_of_inferred_types
-                        .build()
-                        .promote(db)
-                        .promote_singletons(db),
-                )
-                .with_provenance(provenance)
-                .with_qualifiers(qualifiers)
+                let inferred_ty = union_of_inferred_types
+                    .build()
+                    .promote(db)
+                    .promote_singletons(db);
+                projection_evidence = ProjectionEvidenceSet::merged(
+                    db,
+                    projection_evidence,
+                    ProjectionEvidenceSet::from_types(db, [inferred_ty]),
+                );
+                Place::bound(inferred_ty)
+                    .with_provenance(provenance)
+                    .with_qualifiers_and_projection_evidence(qualifiers, projection_evidence)
             } else {
-                Place::Undefined.with_qualifiers(qualifiers)
+                Place::Undefined
+                    .with_qualifiers_and_projection_evidence(qualifiers, projection_evidence)
             },
         }
     }
@@ -2570,6 +2638,7 @@ impl<'db> StaticClassLiteral<'db> {
                             ..
                         }),
                     qualifiers,
+                    ..
                 } => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
@@ -2714,6 +2783,7 @@ impl<'db> StaticClassLiteral<'db> {
                 PlaceAndQualifiers {
                     place: Place::Undefined,
                     qualifiers: _,
+                    ..
                 } => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.

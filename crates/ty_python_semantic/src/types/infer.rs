@@ -62,6 +62,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
+use super::projection::ProjectionEvidenceSet;
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -409,45 +410,12 @@ fn expression_cycle_initial<'db>(
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
 ///
 /// This is a small helper around [`infer_expression_types()`] to reduce the boilerplate.
-/// Use [`infer_expression_type()`] if it isn't guaranteed that `expression` is in the same file to
-/// avoid cross-file query dependencies.
 pub(crate) fn infer_same_file_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression, tcx);
-    inference.expression_type(expression.node_ref(db))
-}
-
-/// Infers the type of an expression where the expression might come from another file.
-///
-/// Use this over [`infer_expression_types`] if the expression might come from another file than the
-/// enclosing query to avoid cross-file query dependencies.
-///
-/// Use [`infer_same_file_expression_type`] if it is guaranteed that  `expression` is in the same
-/// to avoid unnecessary salsa ingredients. This is normally the case inside the `TypeInferenceBuilder`.
-pub(crate) fn infer_expression_type<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-    tcx: TypeContext<'db>,
-) -> Type<'db> {
-    infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
-}
-
-#[salsa::tracked(
-    cycle_initial=|_, id, _| Type::divergent(id),
-    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
-        result.cycle_normalized(db, *previous, cycle)
-    },
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
-    let (expression, _) = input.into_inner(db);
-
-    // It's okay to call the "same file" version here because we're inside a salsa query.
-    let inference = infer_expression_types_impl(db, input);
-
     inference.expression_type(expression.node_ref(db))
 }
 
@@ -795,6 +763,9 @@ struct ScopeInferenceExtra<'db> {
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
+    /// Projection facts computed during inference for cycle recovery.
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -819,8 +790,23 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            self.extra
+                .as_deref()
+                .and_then(|extra| extra.projection_evidence),
+            previous_inference
+                .extra
+                .as_deref()
+                .and_then(|extra| extra.projection_evidence),
+        );
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
+            ty.cycle_normalized_with_projection_evidence(
+                db,
+                previous_inference.expression_type(expr),
+                cycle,
+                projection_evidence.as_ref(),
+            )
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -832,6 +818,11 @@ impl<'db> ScopeInference<'db> {
                 &mut extra.collection_use_constraints,
                 &previous_extra.collection_use_constraints,
             );
+        }
+
+        if let Some(projection_evidence) = projection_evidence {
+            let extra = self.extra.get_or_insert_default();
+            extra.projection_evidence = Some(projection_evidence);
         }
 
         self
@@ -1006,14 +997,20 @@ impl<'db> DefinitionTypes<'db> {
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized(db, previous_ty, cycle)
+            ty.cycle_normalized_with_projection_evidence(
+                db,
+                previous_ty,
+                cycle,
+                projection_evidence,
+            )
         } else {
-            ty.recursive_type_normalized(db, cycle)
+            ty.recursive_type_normalized_with_projection_evidence(db, cycle, projection_evidence)
         }
     }
 
@@ -1021,14 +1018,28 @@ impl<'db> DefinitionTypes<'db> {
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
-            ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
+            ty.map_type(|inner| {
+                inner.cycle_normalized_with_projection_evidence(
+                    db,
+                    previous_ty.inner_type(),
+                    cycle,
+                    projection_evidence,
+                )
+            })
         } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
+            ty.map_type(|inner| {
+                inner.recursive_type_normalized_with_projection_evidence(
+                    db,
+                    cycle,
+                    projection_evidence,
+                )
+            })
         }
     }
 
@@ -1037,27 +1048,48 @@ impl<'db> DefinitionTypes<'db> {
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
         owner: Definition<'db>,
     ) -> Self {
         match self {
             Self::Empty => Self::Empty,
             Self::Binding(ty) => Self::Binding(Self::normalize_binding(
-                db, previous, cycle, owner, owner, ty,
+                db,
+                previous,
+                cycle,
+                projection_evidence,
+                owner,
+                owner,
+                ty,
             )),
             Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
-                db, previous, cycle, owner, owner, ty,
+                db,
+                previous,
+                cycle,
+                projection_evidence,
+                owner,
+                owner,
+                ty,
             )),
             Self::BindingAndDeclaration(declaration_ty) => {
                 let binding_ty = Self::normalize_binding(
                     db,
                     previous,
                     cycle,
+                    projection_evidence,
                     owner,
                     owner,
                     declaration_ty.inner_type(),
                 );
-                let declaration_ty =
-                    Self::normalize_declaration(db, previous, cycle, owner, owner, declaration_ty);
+                let declaration_ty = Self::normalize_declaration(
+                    db,
+                    previous,
+                    cycle,
+                    projection_evidence,
+                    owner,
+                    owner,
+                    declaration_ty,
+                );
 
                 if binding_ty == declaration_ty.inner_type() {
                     Self::BindingAndDeclaration(declaration_ty)
@@ -1070,10 +1102,26 @@ impl<'db> DefinitionTypes<'db> {
             }
             Self::Other(mut other) => {
                 for (definition, ty) in &mut other.bindings {
-                    *ty = Self::normalize_binding(db, previous, cycle, owner, *definition, *ty);
+                    *ty = Self::normalize_binding(
+                        db,
+                        previous,
+                        cycle,
+                        projection_evidence,
+                        owner,
+                        *definition,
+                        *ty,
+                    );
                 }
                 for (definition, ty) in &mut other.declarations {
-                    *ty = Self::normalize_declaration(db, previous, cycle, owner, *definition, *ty);
+                    *ty = Self::normalize_declaration(
+                        db,
+                        previous,
+                        cycle,
+                        projection_evidence,
+                        owner,
+                        *definition,
+                        *ty,
+                    );
                 }
 
                 match (&*other.bindings, &*other.declarations) {
@@ -1181,6 +1229,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
+    /// Projection facts computed during inference for cycle recovery.
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -1258,6 +1309,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
             _ => None,
         }
     }
+
+    fn projection_evidence(&self) -> Option<&ProjectionEvidenceSet<'db>> {
+        match self {
+            Self::Other(extra) => extra.projection_evidence.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1312,34 +1370,61 @@ impl<'db> DefinitionInference<'db> {
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            self.extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::projection_evidence)
+                .copied(),
+            previous_inference
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::projection_evidence)
+                .copied(),
+        );
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_projection_evidence(
+                db,
+                previous_ty,
+                cycle,
+                projection_evidence.as_ref(),
+            );
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
             &previous_inference.types,
             cycle,
+            projection_evidence.as_ref(),
             definition,
         );
 
-        if cycle.iteration() > crate::TAINTED_CYCLES
-            && let Some(previous_constraints) = previous_inference
-                .extra
-                .as_deref()
-                .and_then(DefinitionInferenceExtra::collection_use_constraints)
-            && !previous_constraints.is_empty()
-        {
+        let previous_constraints = (cycle.iteration() > crate::TAINTED_CYCLES)
+            .then(|| {
+                previous_inference
+                    .extra
+                    .as_deref()
+                    .and_then(DefinitionInferenceExtra::collection_use_constraints)
+            })
+            .flatten()
+            .filter(|constraints| !constraints.is_empty());
+
+        if previous_constraints.is_some() || projection_evidence.is_some() {
             let mut extra = self
                 .extra
                 .take()
                 .map_or_else(OtherDefinitionInferenceExtra::default, |extra| {
                     extra.into_other()
                 });
-            extend_collection_use_constraints(
-                &mut extra.collection_use_constraints,
-                previous_constraints,
-            );
+            if let Some(previous_constraints) = previous_constraints {
+                extend_collection_use_constraints(
+                    &mut extra.collection_use_constraints,
+                    previous_constraints,
+                );
+            }
+            if let Some(projection_evidence) = projection_evidence {
+                extra.projection_evidence = Some(projection_evidence);
+            }
             self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
         }
 
@@ -1412,6 +1497,13 @@ impl<'db> DefinitionInference<'db> {
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    pub(crate) fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        self.extra
+            .as_deref()
+            .and_then(DefinitionInferenceExtra::projection_evidence)
+            .copied()
     }
 
     fn bindings(
@@ -1522,6 +1614,9 @@ struct ExpressionInferenceExtra<'db> {
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
+    /// Projection facts computed during inference for cycle recovery.
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+
     /// The types of every binding in this expression region.
     ///
     /// Only very few expression regions have bindings (around 0.1%).
@@ -1554,6 +1649,16 @@ impl<'db> ExpressionInference<'db> {
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            self.extra
+                .as_deref()
+                .and_then(|extra| extra.projection_evidence),
+            previous
+                .extra
+                .as_deref()
+                .and_then(|extra| extra.projection_evidence),
+        );
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
                 if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
@@ -1562,16 +1667,30 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
+                    *binding_ty = binding_ty.cycle_normalized_with_projection_evidence(
+                        db,
+                        *previous_binding,
+                        cycle,
+                        projection_evidence.as_ref(),
+                    );
                 } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+                    *binding_ty = binding_ty.recursive_type_normalized_with_projection_evidence(
+                        db,
+                        cycle,
+                        projection_evidence.as_ref(),
+                    );
                 }
             }
         }
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_projection_evidence(
+                db,
+                previous_ty,
+                cycle,
+                projection_evidence.as_ref(),
+            );
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1583,6 +1702,11 @@ impl<'db> ExpressionInference<'db> {
                 &mut extra.collection_use_constraints,
                 &previous_extra.collection_use_constraints,
             );
+        }
+
+        if let Some(projection_evidence) = projection_evidence {
+            let extra = self.extra.get_or_insert_default();
+            extra.projection_evidence = Some(projection_evidence);
         }
 
         self
@@ -1611,6 +1735,12 @@ impl<'db> ExpressionInference<'db> {
             .as_ref()?
             .collection_use_constraints
             .get(&collection_def)
+    }
+
+    pub(crate) fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.projection_evidence)
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
@@ -1652,6 +1782,14 @@ impl<'db> StatementInference<'db> {
             StatementInference::Other(inference) => {
                 inference.collection_use_constraints(collection_def)
             }
+        }
+    }
+
+    pub(crate) fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        match self {
+            StatementInference::Expression(inference) => inference.projection_evidence(),
+            StatementInference::Definition(_, inference) => inference.projection_evidence(),
+            StatementInference::Other(inference) => inference.projection_evidence(),
         }
     }
 }
@@ -1696,6 +1834,9 @@ struct StatementInferenceInnerExtra<'db> {
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
+    /// Projection facts computed during inference for cycle recovery.
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -1733,9 +1874,24 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            self.extra
+                .as_deref()
+                .and_then(|extra| extra.projection_evidence),
+            previous_inference
+                .extra
+                .as_deref()
+                .and_then(|extra| extra.projection_evidence),
+        );
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_projection_evidence(
+                db,
+                previous_ty,
+                cycle,
+                projection_evidence.as_ref(),
+            );
         }
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
@@ -1743,9 +1899,18 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
             {
-                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
+                *binding_ty = binding_ty.cycle_normalized_with_projection_evidence(
+                    db,
+                    *previous_binding,
+                    cycle,
+                    projection_evidence.as_ref(),
+                );
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+                *binding_ty = binding_ty.recursive_type_normalized_with_projection_evidence(
+                    db,
+                    cycle,
+                    projection_evidence.as_ref(),
+                );
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -1755,11 +1920,21 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
+                    decl_ty.cycle_normalized_with_projection_evidence(
+                        db,
+                        previous_declaration.inner_type(),
+                        cycle,
+                        projection_evidence.as_ref(),
+                    )
                 });
             } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+                *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                    decl_ty.recursive_type_normalized_with_projection_evidence(
+                        db,
+                        cycle,
+                        projection_evidence.as_ref(),
+                    )
+                });
             }
         }
 
@@ -1772,6 +1947,11 @@ impl<'db> StatementInferenceInner<'db> {
                 &mut extra.collection_use_constraints,
                 &previous_extra.collection_use_constraints,
             );
+        }
+
+        if let Some(projection_evidence) = projection_evidence {
+            let extra = self.extra.get_or_insert_default();
+            extra.projection_evidence = Some(projection_evidence);
         }
 
         self
@@ -1800,6 +1980,12 @@ impl<'db> StatementInferenceInner<'db> {
             .as_ref()?
             .collection_use_constraints
             .get(&collection_def)
+    }
+
+    pub(crate) fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.projection_evidence)
     }
 
     fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
