@@ -165,6 +165,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
+    if !watch {
+        ruff_db::disable_lru(&mut db);
+    }
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);

@@ -39,6 +39,10 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     ParsedModule::new(file, parsed)
 }
 
+pub(super) fn disable_lru(db: &mut dyn Db) {
+    parsed_module::set_lru_capacity(db, 0);
+}
+
 pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
