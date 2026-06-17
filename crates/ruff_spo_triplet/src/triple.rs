@@ -256,6 +256,25 @@ pub enum Predicate {
     /// `class_name` key; absence means "use the Rails convention".
     ClassName,
 
+    /// `(<model>.<attr>, validation_kind, "<kind>")` — Rails
+    /// `validates :attr, <kind>: true` option keys (`presence`,
+    /// `uniqueness`, `length`, `format`, `numericality`, `inclusion`,
+    /// `exclusion`, `acceptance`, `confirmation`).
+    ///
+    /// Subject is the validated attribute IRI
+    /// (`openproject:WorkPackage.subject`), object is the canonical
+    /// Rails validation key. One validation declaration with multiple
+    /// kinds emits multiple triples (`validates :email, presence:
+    /// true, format: { with: /…/ }` → two `validation_kind` triples).
+    ///
+    /// Distinct from the existence-of-validation
+    /// [`Self::ValidatesConstraint`] triple (subject = model). Both
+    /// are emitted so the consumer can choose: graph traversal joins
+    /// on `validates_constraint`, schema-quality consumers gate on
+    /// `validation_kind` to emit richer `ASSERT` clauses or `UNIQUE`
+    /// indices.
+    ValidationKind,
+
     // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
     //
     // The 13 net-new predicates for the C++ frontend. Subject conventions
@@ -401,6 +420,7 @@ impl Predicate {
             Self::FieldType => "field_type",
             Self::AssociationKind => "association_kind",
             Self::ClassName => "class_name",
+            Self::ValidationKind => "validation_kind",
             // C++ machine-plane 13
             Self::InheritsFrom => "inherits_from",
             Self::HasField => "has_field",
@@ -472,6 +492,7 @@ impl Predicate {
             "field_type" => Self::FieldType,
             "association_kind" => Self::AssociationKind,
             "class_name" => Self::ClassName,
+            "validation_kind" => Self::ValidationKind,
             // C++ machine-plane 13
             "inherits_from" => Self::InheritsFrom,
             "has_field" => Self::HasField,
@@ -543,6 +564,7 @@ impl Predicate {
         Self::FieldType,
         Self::AssociationKind,
         Self::ClassName,
+        Self::ValidationKind,
         // C++ machine-plane 13
         Self::InheritsFrom,
         Self::HasField,
@@ -643,7 +665,8 @@ impl Predicate {
             | Self::UsesRefinement
             | Self::FieldType
             | Self::AssociationKind
-            | Self::ClassName => Provenance::OpenProjectExtracted,
+            | Self::ClassName
+            | Self::ValidationKind => Provenance::OpenProjectExtracted,
         }
     }
 }
@@ -756,19 +779,19 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_55() {
+    fn predicate_count_locked_at_56() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 30 OpenProject AR-shape (PR #15 added
+        // Python) + 31 OpenProject AR-shape (PR #15 added
         // `association_kind` so the FK-direction bug is fixable
         // downstream; #18 added `class_name` so `belongs_to :owner,
         // class_name: 'User'` can emit `record<User>` instead of
-        // phantom `record<Owner>`) + 18 C++ machine-plane (operator-
-        // approved `returns_type` + `has_param_type` AST-DLL signature
-        // shape, then `is_const` + `is_static` ORM-downcast shape, then
-        // `has_visibility` access specifier) = 55. Council review of any
-        // new variant means this number changes — the test must change
-        // with the source.
-        assert_eq!(Predicate::ALL.len(), 55);
+        // phantom `record<Owner>`; this PR adds `validation_kind` so
+        // the downstream consumer can lift Rails validation kinds
+        // (`presence` → ASSERT, `uniqueness` → UNIQUE INDEX, …) into
+        // richer SurrealQL constraints) + 18 C++ machine-plane =
+        // 56. Council review of any new variant means this number
+        // changes — the test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 56);
     }
 
     #[test]

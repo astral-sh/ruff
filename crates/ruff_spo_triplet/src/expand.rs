@@ -350,6 +350,35 @@ impl Expander {
             v.target.clone(),
             Provenance::OpenProjectExtracted,
         );
+        // For `validates :attr, presence: true, uniqueness: true`-style
+        // declarations, surface each recognised validation kind as a
+        // sibling triple keyed by the validated-attribute IRI. The
+        // downstream Schema consumer reads these to gate richer
+        // SurrealQL clauses (presence → ASSERT $value != NONE,
+        // uniqueness → UNIQUE INDEX, etc.) — without them, every
+        // validation collapses to the catch-all non-null ASSERT.
+        //
+        // Multiple kinds per validation emit multiple triples
+        // (declaration order). The `Normalizes` / `Validate` block
+        // forms carry no kind options on the IR, so they emit zero
+        // `validation_kind` triples (correct — there's no schema
+        // contribution to make).
+        if matches!(
+            v.kind,
+            ValidationKind::Validates
+                | ValidationKind::ValidatesAssociated
+                | ValidationKind::ValidatesEach
+        ) {
+            let attr_iri = format!("{model_iri}.{}", v.target);
+            for kind in extract_validation_kinds(&v.options) {
+                self.push(
+                    attr_iri.clone(),
+                    Predicate::ValidationKind,
+                    kind.to_string(),
+                    Provenance::OpenProjectExtracted,
+                );
+            }
+        }
     }
 
     fn callback(&mut self, model_iri: &str, cb: &Callback) {
@@ -821,6 +850,37 @@ fn strip_class_name_marker(s: &str) -> &str {
         }
     }
     s.strip_prefix(':').unwrap_or(s)
+}
+
+/// Recognise Rails validation-kind option keys in declaration
+/// order. `validates :email, presence: true, uniqueness: true`
+/// yields `["presence", "uniqueness"]`.
+///
+/// The closed set covers the validation kinds Rails ships in
+/// `ActiveModel::Validations`. Unknown keys (e.g. `if:`, `on:`,
+/// `allow_nil:`, `message:`) are filter-side conditions that don't
+/// change the validation semantics for the schema layer — they pass
+/// through silently.
+///
+/// Returns in source order (preserving Rails declaration order), no
+/// dedup — duplicate keys in the same declaration are vanishingly
+/// rare and a downstream consumer that cares can dedupe.
+fn extract_validation_kinds(options: &[(String, String)]) -> Vec<&'static str> {
+    const RECOGNISED: &[&str] = &[
+        "presence",
+        "uniqueness",
+        "length",
+        "format",
+        "numericality",
+        "inclusion",
+        "exclusion",
+        "acceptance",
+        "confirmation",
+    ];
+    options
+        .iter()
+        .filter_map(|(k, _)| RECOGNISED.iter().copied().find(|r| *r == k.as_str()))
+        .collect()
 }
 
 fn delegate_prefix(d: &Delegation) -> Option<String> {
@@ -1368,6 +1428,125 @@ mod tests {
         assert_eq!(strip_class_name_marker(""), "");
     }
 
+    /// **D-AR-5.8** — Rails `validates :attr, <kind>: true` option
+    /// keys lift to sibling `validation_kind` triples keyed by the
+    /// attribute IRI. Multiple kinds per declaration emit multiple
+    /// triples; block-form `validate { ... }` (no option-keys) emits
+    /// none.
+    #[test]
+    fn ar_shape_emits_validation_kind_per_recognised_option() {
+        let mut g = ModelGraph::new("openproject");
+        let mut user = Model::new("User");
+        // `validates :email, presence: true, uniqueness: true, format: { with: /.../ }`
+        user.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "email".to_string(),
+            options: vec![
+                ("presence".to_string(), "true".to_string()),
+                ("uniqueness".to_string(), "true".to_string()),
+                ("format".to_string(), "/.../".to_string()),
+            ],
+        });
+        // `validates :age, numericality: true`
+        user.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "age".to_string(),
+            options: vec![("numericality".to_string(), "true".to_string())],
+        });
+        // Block-form `validate :method` — no option-keys, emits zero
+        // validation_kind triples (the existence-of-validation
+        // `validates_constraint` triple still fires).
+        user.validations.push(Validation {
+            kind: ValidationKind::Validate,
+            target: "custom_check".to_string(),
+            options: vec![],
+        });
+        // Unknown option key (`if:`, `allow_nil:`, etc.) — pass
+        // through silently, no validation_kind emitted.
+        user.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "title".to_string(),
+            options: vec![("if".to_string(), ":published?".to_string())],
+        });
+        g.models.push(user);
+
+        let triples = expand(&g);
+        let kinds_for = |attr_iri: &str| -> BTreeSet<&str> {
+            triples
+                .iter()
+                .filter(|t| t.s == attr_iri && t.p == "validation_kind")
+                .map(|t| t.o.as_str())
+                .collect()
+        };
+
+        assert_eq!(
+            kinds_for("openproject:User.email"),
+            BTreeSet::from(["presence", "uniqueness", "format"]),
+            "email must emit all three recognised kinds",
+        );
+        assert_eq!(
+            kinds_for("openproject:User.age"),
+            BTreeSet::from(["numericality"]),
+        );
+        // Block-form validate emits no validation_kind triples.
+        assert!(
+            kinds_for("openproject:User.custom_check").is_empty(),
+            "block-form validate must not emit validation_kind",
+        );
+        // Unknown options also emit none.
+        assert!(
+            kinds_for("openproject:User.title").is_empty(),
+            "non-recognised option keys must not emit validation_kind",
+        );
+
+        // The existence-of-validation `validates_constraint` triple
+        // still fires for ALL four declarations (backward compat).
+        let validates_targets: Vec<&str> = triples
+            .iter()
+            .filter(|t| t.p == "validates_constraint")
+            .map(|t| t.o.as_str())
+            .collect();
+        for target in ["email", "age", "custom_check", "title"] {
+            assert!(
+                validates_targets.contains(&target),
+                "validates_constraint must fire for `{target}` (backward compat)",
+            );
+        }
+    }
+
+    /// Unit-level lock on the validation-kind extractor — recognised
+    /// keys preserve declaration order; unrecognised pass through.
+    #[test]
+    fn extract_validation_kinds_recognises_canonical_rails_set() {
+        let opts: Vec<(String, String)> = [
+            ("presence", "true"),
+            ("if", ":published"),
+            ("uniqueness", "true"),
+            ("length", "{maximum: 255}"),
+            ("allow_nil", "true"),
+            ("format", "/.../"),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        assert_eq!(
+            extract_validation_kinds(&opts),
+            vec!["presence", "uniqueness", "length", "format"],
+        );
+        // Empty options → empty.
+        assert!(extract_validation_kinds(&[]).is_empty());
+        // Only-conditions (no recognised keys) → empty.
+        let only_conds: Vec<(String, String)> = [
+            ("if", ":foo"),
+            ("on", ":create"),
+            ("allow_blank", "true"),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        assert!(extract_validation_kinds(&only_conds).is_empty());
+    }
+
     #[test]
     fn ar_shape_emits_validates_and_normalizes() {
         let triples = expand(&ar_fixture());
@@ -1639,6 +1818,7 @@ mod tests {
             "uses_refinement",
             "association_kind",
             "class_name",
+            "validation_kind",
             // Inferred (per-edge override)
             "defines_method",
             // Structural (block markers)
