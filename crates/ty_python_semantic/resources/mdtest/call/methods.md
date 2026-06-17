@@ -416,6 +416,27 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
+### Implicit receivers in final classes
+
+For a final class, an implicit `type[Self]` receiver refers to the exact class object and can bind
+to another classmethod on that class:
+
+```py
+from typing import final
+
+@final
+class Final:
+    @classmethod
+    def call_from_classmethod(cls) -> None:
+        cls.method()
+
+    def call_from_instance(self) -> None:
+        self.method()
+
+    @classmethod
+    def method(cls) -> None: ...
+```
+
 ### Accessing the classmethod as a static member
 
 Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We

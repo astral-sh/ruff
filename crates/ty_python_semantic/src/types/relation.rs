@@ -956,8 +956,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// Do not use instance subtyping for an exact class object. For `T: (Y, Z)` where `Z` extends
     /// `Y`, doing so would incorrectly simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and
     /// `Z` instances are subtypes of `Y`, but only the class object `Y` satisfies `klass is Y`.
-    fn can_check_typevar_subclass_relation_to_target(db: &'db dyn Db, target: Type<'db>) -> bool {
-        !matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_))
+    ///
+    /// The exception is `type[Self]` for a final class. In that case, the class cannot be
+    /// subclassed, so its exact class object is the only possible specialization of `Self`.
+    fn can_check_typevar_subclass_relation_to_target(
+        db: &'db dyn Db,
+        source_subclass: SubclassOfType<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let is_final_self_class_object = matches!(target, Type::ClassLiteral(_))
+            && source_subclass.into_type_var().is_some_and(|source_i| {
+                let source_typevar = source_i.typevar(db);
+                source_typevar.is_self(db)
+                    && source_typevar
+                        .upper_bound(db)
+                        .and_then(|bound| SubclassOfType::try_from_instance(db, bound))
+                        == Some(target)
+            });
+
+        (!matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_))
+            || is_final_self_class_object)
             && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
     }
 
@@ -1343,7 +1361,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // precise representation for "all instances of any classes with a given metaclass").
             (Type::SubclassOf(subclass_of), _)
                 if subclass_of.is_type_var()
-                    && Self::can_check_typevar_subclass_relation_to_target(db, target) =>
+                    && Self::can_check_typevar_subclass_relation_to_target(
+                        db,
+                        subclass_of,
+                        target,
+                    ) =>
             {
                 self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
             }
