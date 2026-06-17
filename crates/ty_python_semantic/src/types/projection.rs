@@ -288,6 +288,10 @@ impl<'db> Type<'db> {
                 // replayable evidence below. Recursive arms of that kind only need to mark a
                 // self-reference; querying their methods again can reenter the same cycle.
                 if mentions_root && needs_evidence {
+                    if matches!(op, ProjectionOp::Subscript(_)) {
+                        return ProjectionContainer::infer_projection_op(db, element, op);
+                    }
+
                     return Some(ProjectionTerm::Exact(Type::Divergent(*root)));
                 }
 
@@ -1018,8 +1022,8 @@ impl<'db> ProjectionContainer<'db> {
         Self::project_type_path(db, ty, root, evidence, path)
     }
 
-    fn needs_evidence_for_projection(&self, db: &'db dyn Db) -> bool {
-        matches!(self, Self::Generic { class, .. } if class.known(db).is_none())
+    fn needs_evidence_for_projection(&self, _db: &'db dyn Db) -> bool {
+        matches!(self, Self::Generic { .. })
     }
 
     fn project_type_path(
@@ -1056,13 +1060,70 @@ impl<'db> ProjectionContainer<'db> {
             return Some(projected);
         }
 
-        Self::project_type_path(
+        Self::project_term_path(
             db,
-            projected.ty(db),
+            projected,
             root,
             evidence,
             &ProjectionPath::from_ops(tail.iter().copied()),
         )
+    }
+
+    fn project_term_path(
+        db: &'db dyn Db,
+        term: ProjectionTerm<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        let ProjectionTerm::List(element) = term else {
+            return Self::project_type_path(db, term.ty(db), root, evidence, path);
+        };
+
+        // Preserve the list wrapper from starred unpacking while applying the tail path.
+        // Converting to `list[T]` would require generic-container evidence for this synthetic list.
+        let ops = path.ops();
+        let (&op, tail) = ops.split_first()?;
+        let projected = Self::project_list_op(db, element, op)?;
+        if tail.is_empty() {
+            return Some(projected);
+        }
+
+        Self::project_term_path(
+            db,
+            projected,
+            root,
+            evidence,
+            &ProjectionPath::from_ops(tail.iter().copied()),
+        )
+    }
+
+    fn project_list_op(
+        db: &'db dyn Db,
+        element: Type<'db>,
+        op: ProjectionOp<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        match op {
+            ProjectionOp::Iter { is_async: false } => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Iter { is_async: true } => None,
+            ProjectionOp::Unpack(UnpackProjection::Exact { .. }) => {
+                Some(ProjectionTerm::Homogeneous(element))
+            }
+            ProjectionOp::Unpack(UnpackProjection::Star { position, .. }) => {
+                Some(Self::star_unpack_homogeneous(element, position))
+            }
+            ProjectionOp::Subscript(
+                ProjectionSubscript::Unknown
+                | ProjectionSubscript::Int
+                | ProjectionSubscript::LiteralInt(_),
+            ) => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Subscript(ProjectionSubscript::StaticSlice(_)) => Some(
+                ProjectionTerm::Exact(KnownClass::List.to_specialized_instance(db, &[element])),
+            ),
+            ProjectionOp::CallMethod0(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => None,
+        }
     }
 
     fn project_op(
@@ -1552,7 +1613,7 @@ impl<'db> ProjectionContainer<'db> {
             }
             ProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack),
             ProjectionOp::Subscript(subscript) => Some(ProjectionTerm::Exact(
-                ty.subscript(db, subscript.to_type(db), ast::ExprContext::Load)
+                ty.subscript_without_projection(db, subscript.to_type(db), ast::ExprContext::Load)
                     .ok()?,
             )),
             ProjectionOp::CallMethod0(method) => Some(ProjectionTerm::Exact(
@@ -1619,9 +1680,7 @@ impl<'db> ProjectionContainer<'db> {
 
     fn is_custom_generic_container(db: &'db dyn Db, ty: Type<'db>) -> bool {
         ty.class_specialization(db)
-            .is_some_and(|(class, specialization)| {
-                class.known(db).is_none() && !specialization.types(db).is_empty()
-            })
+            .is_some_and(|(_class, specialization)| !specialization.types(db).is_empty())
     }
 }
 
