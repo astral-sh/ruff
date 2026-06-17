@@ -2534,7 +2534,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ..
                             }),
                         qualifiers,
-                        ..
                     } = class.own_instance_member(db, name).inner
                     {
                         if boundness == Definedness::AlwaysDefined {
@@ -2613,7 +2612,6 @@ impl<'db> CompletedMemberLookup<'db> {
                 PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace { ty, provenance, .. }),
                     qualifiers,
-                    ..
                 },
                 Some(dynamic),
             ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
@@ -2624,7 +2622,6 @@ impl<'db> CompletedMemberLookup<'db> {
                 PlaceAndQualifiers {
                     place: Place::Undefined,
                     qualifiers,
-                    ..
                 },
                 Some(dynamic),
             ) => Place::bound(dynamic).with_qualifiers(qualifiers),

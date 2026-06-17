@@ -824,12 +824,11 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {
-            PlaceAndQualifiers {
-                place, qualifiers, ..
-            } if (qualifiers.contains(TypeQualifiers::FINAL)
-                && place
-                    .ignore_possibly_undefined()
-                    .is_some_and(|ty| ty.is_unknown())) =>
+            PlaceAndQualifiers { place, qualifiers }
+                if (qualifiers.contains(TypeQualifiers::FINAL)
+                    && place
+                        .ignore_possibly_undefined()
+                        .is_some_and(|ty| ty.is_unknown())) =>
             {
                 Some(*qualifiers)
             }
@@ -859,7 +858,6 @@ impl<'db> PlaceAndQualifiers<'db> {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
-                ..
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
@@ -874,7 +872,6 @@ impl<'db> PlaceAndQualifiers<'db> {
             PlaceAndQualifiers {
                 place: Place::Undefined,
                 qualifiers,
-                ..
             } => Err(LookupError::Undefined(qualifiers)),
         }
     }
@@ -1063,7 +1060,6 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers,
-            ..
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
@@ -1100,7 +1096,6 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers: _,
-            ..
         } => place_and_quals,
         // Place is possibly declared
         PlaceAndQualifiers {
@@ -1113,7 +1108,6 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers,
-            ..
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
@@ -1159,7 +1153,6 @@ pub(crate) fn place_by_id<'db>(
         PlaceAndQualifiers {
             place: Place::Undefined,
             qualifiers: _,
-            ..
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();

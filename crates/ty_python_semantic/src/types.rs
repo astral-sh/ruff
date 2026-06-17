@@ -3190,7 +3190,6 @@ impl<'db> Type<'db> {
                     provenance,
                 }),
             qualifiers,
-            ..
         } = attribute
             && let Some(fallback) = ty.materialized_divergent_fallback()
         {
@@ -3220,7 +3219,6 @@ impl<'db> Type<'db> {
                         ..
                     }),
                 qualifiers: _,
-                ..
             } => (attribute, AttributeKind::DataDescriptor),
 
             PlaceAndQualifiers {
@@ -3233,7 +3231,6 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
-                ..
             } => (
                 union
                     .map_with_boundness(db, |elem| {
@@ -3270,7 +3267,6 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
-                ..
             } => (
                 if intersection.positive(db).is_empty() {
                     attribute
@@ -3304,7 +3300,6 @@ impl<'db> Type<'db> {
                         provenance,
                     }),
                 qualifiers: _,
-                ..
             } => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
@@ -3409,7 +3404,6 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place: meta_attr,
                 qualifiers: meta_attr_qualifiers,
-                ..
             },
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
@@ -3422,7 +3416,6 @@ impl<'db> Type<'db> {
         let PlaceAndQualifiers {
             place: fallback,
             qualifiers: fallback_qualifiers,
-            ..
         } = fallback;
 
         match (meta_attr, meta_attr_kind, fallback) {
@@ -5413,7 +5406,6 @@ impl<'db> Type<'db> {
                         ..
                     }),
                 qualifiers: _,
-                ..
             } => member,
             member @ PlaceAndQualifiers {
                 place:
@@ -5422,14 +5414,12 @@ impl<'db> Type<'db> {
                         ..
                     }),
                 qualifiers: _,
-                ..
             } => member
                 .or_fall_back_to(db, custom_getattribute_result)
                 .or_fall_back_to(db, custom_getattr_result),
             PlaceAndQualifiers {
                 place: Place::Undefined,
                 qualifiers: _,
-                ..
             } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
         }
     }
