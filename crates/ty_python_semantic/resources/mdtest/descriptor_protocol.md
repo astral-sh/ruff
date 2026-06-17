@@ -358,6 +358,32 @@ class UnionC(metaclass=UnionMeta):
 reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 ```
 
+### Gradual class-object descriptor values
+
+A `type[Any]` value has an unknown metaclass, which could make the class object itself a data
+descriptor. Accessing an attribute with this type preserves that descriptor uncertainty:
+
+```py
+from typing import Any
+
+class DescriptorMeta(type):
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class Descriptor(metaclass=DescriptorMeta): ...
+
+descriptor: type[Any] = Descriptor
+
+class ClassObjectWrapper:
+    attribute: type[Any] = descriptor
+
+reveal_type(ClassObjectWrapper().attribute)  # revealed: Any
+value: str = ClassObjectWrapper().attribute
+```
+
 ### Descriptors only work when used as class variables
 
 Descriptors only work when used as class variables. When put in instances, they have no effect.

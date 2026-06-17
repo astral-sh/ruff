@@ -3010,6 +3010,19 @@ impl<'db> Type<'db> {
                 // nominal type with a dynamic base, for which we require a concrete descriptor
                 // method before invoking the protocol.
                 Type::Dynamic(_) => return Some((ty, AttributeKind::DataDescriptor)),
+                Type::SubclassOf(subclass_of)
+                    if let Some(
+                        dynamic @ (DynamicType::Any
+                        | DynamicType::Unknown
+                        | DynamicType::UnknownGeneric(_)
+                        | DynamicType::InvalidConcatenateUnknown
+                        | DynamicType::AmbiguousOverload),
+                    ) = subclass_of.subclass_of().into_dynamic() =>
+                {
+                    // `type[Any]` and `type[Unknown]` have unknown metaclasses, which could make
+                    // their class-object inhabitants data descriptors.
+                    return Some((Type::Dynamic(dynamic), AttributeKind::DataDescriptor));
+                }
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
