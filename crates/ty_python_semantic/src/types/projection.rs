@@ -141,6 +141,10 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// ```python
+    /// x: Divergent => x[n]: Projection_{Subscript[n]}(Divergent)
+    /// x: Projection_{op}(Divergent) => x[n]: Projection_{op, Subscript[n]}(Divergent)
+    /// ```
     fn try_projection(self, db: &'db dyn Db, op: ProjectionOp<'db>) -> Option<Self> {
         match self {
             Type::Divergent(root) => Some(Self::Projection(ProjectionType::new(
@@ -167,19 +171,17 @@ impl<'db> Type<'db> {
             return self.try_projection(db, op);
         };
 
-        let mut saw_projection = false;
         let mut elements = Vec::new();
 
         for element in union.elements(db).iter().copied() {
             if let Some(projected) = element.try_projection(db, op) {
-                saw_projection = true;
                 elements.push(projected);
             } else {
                 elements.push(project_non_cycle(element)?);
             }
         }
 
-        saw_projection.then(|| UnionType::from_elements_cycle_recovery(db, elements))
+        Some(UnionType::from_elements_cycle_recovery(db, elements))
     }
 
     pub(crate) const fn is_cycle_artifact(&self) -> bool {
@@ -219,7 +221,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        let evidence = CycleRecoveryEvidence::from_type(db, root, self, &paths);
+        let evidence = CycleRecoveryEvidence::from_type(db, self, &paths);
         self.try_container_projection_cycle_normalized(db, root, &paths, &evidence)
     }
 
@@ -407,7 +409,7 @@ impl<'db> Type<'db> {
             return Some(());
         }
 
-        Self::add_productive_projection_term(db, term, productive_terms);
+        productive_terms.push(term);
         Some(())
     }
 
@@ -475,42 +477,6 @@ impl<'db> Type<'db> {
         match paths.as_slice() {
             [path] => Self::solved_projection_type(solved_ops, path),
             _ => None,
-        }
-    }
-
-    fn add_productive_projection_term(
-        db: &'db dyn Db,
-        term: Type<'db>,
-        productive_terms: &mut Vec<Type<'db>>,
-    ) {
-        if productive_terms
-            .iter()
-            .any(|existing| Self::projection_term_absorbs(db, *existing, term))
-        {
-            return;
-        }
-
-        productive_terms.retain(|existing| !Self::projection_term_absorbs(db, term, *existing));
-        productive_terms.push(term);
-    }
-
-    fn projection_term_absorbs(
-        db: &'db dyn Db,
-        possible_base: Type<'db>,
-        possible_subtype: Type<'db>,
-    ) -> bool {
-        if possible_base == possible_subtype {
-            return true;
-        }
-
-        let Type::Intersection(intersection) = possible_subtype else {
-            return false;
-        };
-
-        if intersection.positive(db).is_empty() {
-            possible_base == Type::object()
-        } else {
-            intersection.positive(db).contains(&possible_base)
         }
     }
 
@@ -895,12 +861,7 @@ struct CycleRecoveryEvidence<'db> {
 }
 
 impl<'db> CycleRecoveryEvidence<'db> {
-    fn from_type(
-        db: &'db dyn Db,
-        root: DivergentType,
-        ty: Type<'db>,
-        paths: &[ProjectionPath<'db>],
-    ) -> Vec<Self> {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>, paths: &[ProjectionPath<'db>]) -> Vec<Self> {
         let arms = RefCell::new(Vec::new());
         any_over_type(db, ty, false, |nested| {
             if ProjectionContainer::is_custom_generic_container(db, nested) {
@@ -914,10 +875,6 @@ impl<'db> CycleRecoveryEvidence<'db> {
 
         let mut evidence: Vec<Self> = Vec::new();
         for arm in arms.into_inner() {
-            if arm.same_divergent_marker(db, Type::Divergent(root)) {
-                continue;
-            }
-
             for path in paths {
                 for suffix in path.suffixes() {
                     let Some(term) = ProjectionContainer::project_type_path(db, arm, None, &suffix)
