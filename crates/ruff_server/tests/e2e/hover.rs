@@ -102,6 +102,39 @@ fn hover_for_ruff_suppression_comments() -> Result<()> {
 }
 
 #[test]
+fn hover_for_human_readable_rule_name() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "pyproject.toml",
+            r#"
+[tool.ruff]
+preview = true
+"#,
+        )?
+        .build();
+
+    server.open_text_document("test.py", "import os  # ruff: ignore[unused-import]\n", 1);
+
+    let result = server
+        .hover_request(
+            "test.py",
+            Position {
+                line: 0,
+                character: 29,
+            },
+        )
+        .expect("Expected hover information for a human-readable rule name");
+
+    let lsp_types::Contents::MarkupContent(markup) = result.contents else {
+        panic!("Expected Markdown hover contents");
+    };
+    assert!(markup.value.starts_with("# unused-import (F401)"));
+
+    Ok(())
+}
+
+#[test]
 fn unavailable_document_returns_empty_response() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 

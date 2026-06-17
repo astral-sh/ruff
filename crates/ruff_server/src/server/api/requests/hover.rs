@@ -4,6 +4,7 @@ use anyhow::Context;
 use lsp_types::{self as types, HoverRequest};
 use regex::Regex;
 use ruff_linter::FixAvailability;
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_python_ast::SourceType;
 use ruff_source_file::OneIndexed;
@@ -65,12 +66,12 @@ pub(crate) fn hover(
 
     let line = &document.contents()[line_range];
 
-    // Get the list of codes from a `noqa` or Ruff suppression comment.
+    // Get the list of rule identifiers from a `noqa` or Ruff suppression comment.
     let noqa_regex = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
     let suppression_regex = Regex::new(
         r"(?x)
         \#\s*ruff\s*:\s*(?:disable|enable|file-ignore|ignore)\s*\[\s*
-        (?P<codes>(?:[A-Z]+[0-9]+)(?:\s*,\s*(?:[A-Z]+[0-9]+))*\s*,?)
+        (?P<codes>(?:[A-Z]+[0-9]+|[a-z][a-z0-9-]*)(?:\s*,\s*(?:[A-Z]+[0-9]+|[a-z][a-z0-9-]*))*\s*,?)
         \s*\]",
     )
     .unwrap();
@@ -79,7 +80,7 @@ pub(crate) fn hover(
         .character
         .try_into()
         .expect("column number should fit within a usize");
-    let codes_match = noqa_regex
+    let identifiers_match = noqa_regex
         .captures(line)
         .and_then(|captures| captures.name("codes"))
         .into_iter()
@@ -88,19 +89,29 @@ pub(crate) fn hover(
                 .captures_iter(line)
                 .filter_map(|captures| captures.name("codes")),
         )
-        .find(|codes| cursor >= codes.start() && cursor < codes.end())?;
-    let codes_start = codes_match.start();
-    let code_regex = Regex::new(r"[A-Z]+[0-9]+").unwrap();
-    let word = code_regex.find_iter(codes_match.as_str()).find(|code| {
-        cursor >= (code.start() + codes_start) && cursor < (code.end() + codes_start)
-    })?;
+        .find(|identifiers| cursor >= identifiers.start() && cursor < identifiers.end())?;
+    let identifiers_start = identifiers_match.start();
+    let identifier_regex = Regex::new(r"[A-Z]+[0-9]+|[a-z][a-z0-9-]*").unwrap();
+    let identifier = identifier_regex
+        .find_iter(identifiers_match.as_str())
+        .find(|identifier| {
+            cursor >= (identifier.start() + identifiers_start)
+                && cursor < (identifier.end() + identifiers_start)
+        })?;
 
-    // Get rule for the code under the cursor.
-    let rule = Rule::from_code(word.as_str());
-    let output = if let Ok(rule) = rule {
+    // Get the rule for the identifier under the cursor.
+    let identifier = identifier.as_str();
+    let rule = Rule::from_code(identifier).ok().or_else(|| {
+        if is_human_readable_names_enabled(snapshot.query().settings().linter.preview) {
+            Rule::from_name(identifier).ok()
+        } else {
+            None
+        }
+    });
+    let output = if let Some(rule) = rule {
         format_rule_text(rule)
     } else {
-        format!("{}: Rule not found", word.as_str())
+        format!("{identifier}: Rule not found")
     };
 
     let hover = types::Hover {
