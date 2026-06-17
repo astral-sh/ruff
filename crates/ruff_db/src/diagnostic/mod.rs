@@ -7,7 +7,7 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
@@ -928,8 +928,6 @@ impl Annotation {
 /// These tags are used to provide additional information about the annotation.
 /// and are passed through to the language server protocol.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,

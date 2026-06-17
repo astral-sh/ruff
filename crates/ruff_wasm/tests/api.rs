@@ -4,12 +4,12 @@ use serde::Serialize;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use ruff_db::diagnostic::DiagnosticTag;
 use ruff_linter::registry::Rule;
 use ruff_source_file::OneIndexed;
 use ruff_wasm::{
-    ExpandedDiagnosticAnnotation, ExpandedDiagnosticLocation, ExpandedMessage,
-    ExpandedSubDiagnostic, Location, PositionEncoding, SubDiagnosticSeverity, Workspace,
+    ExpandedDiagnosticAnnotation, ExpandedDiagnosticLocation, ExpandedDiagnosticTag,
+    ExpandedMessage, ExpandedSubDiagnostic, Location, PositionEncoding, SubDiagnosticSeverity,
+    Workspace,
 };
 
 macro_rules! check {
@@ -195,7 +195,10 @@ fn diagnostic_tags() {
             .into_iter()
             .map(|diagnostic| diagnostic.tags)
             .collect::<Vec<_>>(),
-        [[DiagnosticTag::Deprecated], [DiagnosticTag::Unnecessary]]
+        [
+            [ExpandedDiagnosticTag::Deprecated],
+            [ExpandedDiagnosticTag::Unnecessary],
+        ]
     );
 }
 

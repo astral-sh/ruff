@@ -99,7 +99,7 @@ export interface DiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
-    pub tags: Vec<diagnostic::DiagnosticTag>,
+    pub tags: Vec<ExpandedDiagnosticTag>,
     pub annotations: Vec<ExpandedDiagnosticAnnotation>,
     #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
@@ -181,6 +181,22 @@ struct ExpandedEdit {
     location: Location,
     end_location: Location,
     content: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpandedDiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for ExpandedDiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
 }
 
 /// Perform global constructor initialization.
@@ -414,7 +430,12 @@ impl Workspace {
                 ExpandedMessage {
                     code: code.to_string(),
                     message: msg.concise_message().to_string(),
-                    tags: msg.primary_tags().unwrap_or_default().to_vec(),
+                    tags: msg
+                        .primary_tags()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(ExpandedDiagnosticTag::from)
+                        .collect(),
                     annotations,
                     sub_diagnostics,
                     start_location: source_code
