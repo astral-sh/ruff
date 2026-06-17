@@ -598,6 +598,16 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+fn write_union_type_alias(code: &mut String, name: &str, member_prefix: &str, size: usize) {
+    write!(code, "\n{name}: TypeAlias = ").ok();
+    for index in 0..size {
+        if index > 0 {
+            code.push_str(" | ");
+        }
+        write!(code, "{member_prefix}{index}").ok();
+    }
+}
+
 fn benchmark_intersection_enum_equality_with_aliased_open_union(criterion: &mut Criterion) {
     const DOMAIN_SIZE: usize = 128;
 
@@ -610,13 +620,7 @@ fn benchmark_intersection_enum_equality_with_aliased_open_union(criterion: &mut 
     for index in 0..DOMAIN_SIZE {
         writeln!(&mut code, "\nclass A{index}: ...").ok();
     }
-    code.push_str("\nOpen: TypeAlias = ");
-    for index in 0..DOMAIN_SIZE {
-        if index > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "A{index}").ok();
-    }
+    write_union_type_alias(&mut code, "Open", "A", DOMAIN_SIZE);
     code.push_str(
         "\n\ndef consume(value: LargeEnum) -> None: ...\n\ndef compare(left: Intersection[LargeEnum, Any], right: LargeEnum | Open) -> None:\n    if left != right:\n        consume(left)\n",
     );
@@ -647,20 +651,8 @@ fn benchmark_disjoint_final_class_union_equality(criterion: &mut Criterion) {
         writeln!(&mut code, "\n@final\nclass Left{index}: ...").ok();
         writeln!(&mut code, "\n@final\nclass Right{index}: ...").ok();
     }
-    code.push_str("\nLeft: TypeAlias = ");
-    for index in 0..DOMAIN_SIZE {
-        if index > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Left{index}").ok();
-    }
-    code.push_str("\nRight: TypeAlias = ");
-    for index in 0..DOMAIN_SIZE {
-        if index > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Right{index}").ok();
-    }
+    write_union_type_alias(&mut code, "Left", "Left", DOMAIN_SIZE);
+    write_union_type_alias(&mut code, "Right", "Right", DOMAIN_SIZE);
     code.push_str(
         "\n\ndef consume(value: Left) -> None: ...\n\ndef compare(left: Left, right: Right) -> None:\n    if left != right:\n        consume(left)\n",
     );
