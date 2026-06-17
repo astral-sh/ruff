@@ -722,7 +722,14 @@ We only synthesize a key-access protocol for string membership tests on right-ha
 include a `TypedDict`. Other membership tests can mean substring or element containment instead:
 
 ```py
-from typing import Literal
+from typing import Literal, TypedDict
+
+class Values(TypedDict):
+    present: int
+
+def typed_dict_container(value: Literal["present", 1], values: Values) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal["present"]
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
