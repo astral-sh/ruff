@@ -3732,10 +3732,8 @@ class ProjectionCoroutine:
         item = await self.x
         self.x = projection_identity(item)
 
-        # TODO: should be `int`
-        reveal_type(item)  # revealed: int | Divergent
-        # TODO: should be `CoroutineType[Any, Any, int]`
-        reveal_type(self.x)  # revealed: CoroutineType[Any, Any, int | Divergent]
+        reveal_type(item)  # revealed: int
+        reveal_type(self.x)  # revealed: CoroutineType[Any, Any, int]
 
 class AsyncBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:

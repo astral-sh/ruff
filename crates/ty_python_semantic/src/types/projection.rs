@@ -965,7 +965,7 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<Type<'db>> {
         let index = match class {
             KnownClass::Awaitable => 0,
-            KnownClass::CoroutineType => 2,
+            KnownClass::Coroutine | KnownClass::CoroutineType => 2,
             _ => return None,
         };
 
