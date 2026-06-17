@@ -33,6 +33,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    tags: DiagnosticTag[];
     annotations: DiagnosticAnnotation[];
     subDiagnostics: SubDiagnostic[];
     start_location: {
@@ -58,6 +59,8 @@ export interface Diagnostic {
         }[];
     } | null;
 }
+
+export type DiagnosticTag = "unnecessary" | "deprecated";
 
 export interface DiagnosticAnnotation {
     primary: boolean;
@@ -96,6 +99,7 @@ export interface DiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    pub tags: Vec<diagnostic::DiagnosticTag>,
     pub annotations: Vec<ExpandedDiagnosticAnnotation>,
     #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
@@ -410,6 +414,7 @@ impl Workspace {
                 ExpandedMessage {
                     code: code.to_string(),
                     message: msg.concise_message().to_string(),
+                    tags: msg.primary_tags().unwrap_or_default().to_vec(),
                     annotations,
                     sub_diagnostics,
                     start_location: source_code
