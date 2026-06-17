@@ -129,6 +129,13 @@ def constrained_substring(x: T):
         reveal_type(x)  # revealed: T@constrained_substring & Literal["a"]
     else:
         reveal_type(x)  # revealed: T@constrained_substring & Literal["d"]
+
+def union_literal_haystack(x: Literal["a", "ab", "z"], flag: bool):
+    values = "abc" if flag else "def"
+    if x in values:
+        reveal_type(x)  # revealed: Literal["a", "ab"]
+    else:
+        reveal_type(x)  # revealed: Literal["a", "ab", "z"]
 ```
 
 ```py

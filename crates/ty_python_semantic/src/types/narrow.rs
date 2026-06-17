@@ -2939,8 +2939,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
+        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+        if let Some(haystack) = rhs_ty.as_string_literal() {
             return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
+        }
+        if let Type::Union(union) = rhs_ty {
+            let mut builder = UnionBuilder::new(self.db);
+            for element in union.elements(self.db) {
+                builder = builder.add(self.evaluate_expr_in(lhs_ty, *element)?);
+            }
+            let narrowed = builder.build();
+            return (narrowed != lhs_ty).then_some(narrowed);
         }
         let containment_domain = elementwise_containment_domain(self.db, rhs_ty)?;
         let iterable = containment_domain.try_iterate(self.db).ok()?;
