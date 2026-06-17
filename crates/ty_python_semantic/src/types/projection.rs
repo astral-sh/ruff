@@ -213,12 +213,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
     ) -> Option<Self> {
-        if !self.contains_projection_for_root(db, root) {
+        let mut paths = Vec::new();
+        Self::collect_projection_ops(db, root, self, &mut paths);
+        if paths.is_empty() {
             return None;
         }
 
-        let evidence = CycleRecoveryEvidence::from_type(db, root, self);
-        self.try_container_projection_cycle_normalized(db, root, &evidence)
+        let evidence = CycleRecoveryEvidence::from_type(db, root, self, &paths);
+        self.try_container_projection_cycle_normalized(db, root, &paths, &evidence)
     }
 
     /// Solves all projections of `root` that can be explained by top-level containers.
@@ -226,7 +228,7 @@ impl<'db> Type<'db> {
     /// The solver works in four steps:
     ///
     /// 1. Split the candidate recursive type into its top-level union arms and
-    ///    collect every projection path rooted at `root`.
+    ///    reuse the collected projection paths rooted at `root`.
     /// 2. Treat non-root union arms as container evidence. Each supported arm
     ///    must be able to project every collected path.
     /// 3. Solve each path from the terms produced by those containers, dropping
@@ -241,15 +243,13 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
+        paths: &[ProjectionPath<'db>],
         evidence: &[CycleRecoveryEvidence<'db>],
     ) -> Option<Self> {
         let elements = self.top_level_projection_union_elements(db);
         let mut containers = Vec::new();
-        let mut ops = Vec::new();
 
         for element in &elements {
-            Self::collect_projection_ops(db, root, *element, &mut ops);
-
             if element.same_divergent_marker(db, Type::Divergent(root)) {
                 continue;
             }
@@ -258,11 +258,11 @@ impl<'db> Type<'db> {
             containers.push(container);
         }
 
-        if containers.is_empty() || ops.is_empty() {
+        if containers.is_empty() {
             return None;
         }
 
-        let mut terms_by_op = ops
+        let mut terms_by_op = paths
             .iter()
             .cloned()
             .map(|path| (path, Vec::new()))
@@ -333,29 +333,21 @@ impl<'db> Type<'db> {
                     Self::collect_projection_component_terms(
                         db,
                         root,
-                        path,
+                        Some(path),
                         term,
                         &mut saw_self_reference,
                         &mut productive_terms,
                     )?;
                 }
-                ProjectionTerm::Homogeneous(term) => {
-                    Self::collect_homogeneous_projection_component_terms(
+                ProjectionTerm::Homogeneous(term) | ProjectionTerm::List(term) => {
+                    Self::collect_projection_component_terms(
                         db,
                         root,
+                        None,
                         term,
                         &mut saw_self_reference,
                         &mut productive_terms,
-                    );
-                }
-                ProjectionTerm::List(term) => {
-                    Self::collect_homogeneous_projection_component_terms(
-                        db,
-                        root,
-                        term,
-                        &mut saw_self_reference,
-                        &mut productive_terms,
-                    );
+                    )?;
                 }
             }
         }
@@ -382,38 +374,10 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn collect_homogeneous_projection_component_terms(
-        db: &'db dyn Db,
-        root: DivergentType,
-        term: Type<'db>,
-        saw_self_reference: &mut bool,
-        productive_terms: &mut Vec<Type<'db>>,
-    ) {
-        if let Type::Union(union) = term {
-            for element in union.elements(db) {
-                Self::collect_homogeneous_projection_component_terms(
-                    db,
-                    root,
-                    *element,
-                    saw_self_reference,
-                    productive_terms,
-                );
-            }
-            return;
-        }
-
-        if term.mentions_cycle_artifact(db, root) {
-            *saw_self_reference = true;
-            return;
-        }
-
-        Self::add_productive_projection_term(db, term, productive_terms);
-    }
-
     fn collect_projection_component_terms(
         db: &'db dyn Db,
         root: DivergentType,
-        path: &ProjectionPath<'db>,
+        path: Option<&ProjectionPath<'db>>,
         term: Type<'db>,
         saw_self_reference: &mut bool,
         productive_terms: &mut Vec<Type<'db>>,
@@ -432,7 +396,9 @@ impl<'db> Type<'db> {
             return Some(());
         }
 
-        if term.mentions_nonmatching_projection(db, root, path) {
+        if let Some(path) = path
+            && term.mentions_nonmatching_projection(db, root, path)
+        {
             return None;
         }
 
@@ -548,13 +514,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn contains_projection_for_root(self, db: &'db dyn Db, root: DivergentType) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
-            Type::Projection(projection) => projection.root(db).same_marker(root),
-            _ => false,
-        })
-    }
-
     fn mentions_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
         any_over_type(db, self, false, |ty| match ty {
             Type::Divergent(divergent) => divergent.same_marker(root),
@@ -635,16 +594,18 @@ impl<'db> ProjectionContainer<'db> {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
             Self::Generic { arm, .. } => *arm,
         };
-        Self::project_type_path(db, ty, evidence, path)
+        Self::project_type_path(db, ty, Some(evidence), path)
     }
 
     fn project_type_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        evidence: &[CycleRecoveryEvidence<'db>],
+        evidence: Option<&[CycleRecoveryEvidence<'db>]>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
-        if let Some(term) = Self::project_custom_path(db, ty, evidence, path) {
+        if let Some(evidence) = evidence
+            && let Some(term) = Self::project_custom_path(db, ty, evidence, path)
+        {
             return Some(term);
         }
 
@@ -682,29 +643,6 @@ impl<'db> ProjectionContainer<'db> {
         evidence
             .iter()
             .find_map(|fact| (fact.arm == ty && fact.path.eq(path)).then_some(fact.term))
-    }
-
-    fn infer_projection_path(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        ops: &[ProjectionOp<'db>],
-    ) -> Option<ProjectionTerm<'db>> {
-        let (&op, tail) = ops.split_first()?;
-
-        let projected = match op {
-            ProjectionOp::Iter { is_async } => Self::infer_iter_item(db, ty, is_async)?,
-            ProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack)?,
-            ProjectionOp::Subscript(subscript) => Self::infer_subscript(db, ty, subscript)?,
-            ProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
-            ProjectionOp::ContextEnter { is_async } => Self::infer_context_enter(db, ty, is_async)?,
-            ProjectionOp::AwaitResult => Self::infer_await_result(db, ty)?,
-        };
-
-        if tail.is_empty() {
-            return Some(projected);
-        }
-
-        Self::infer_projection_path(db, projected.ty(db), tail)
     }
 
     fn project_star_unpack_tuple(
@@ -957,10 +895,12 @@ struct CycleRecoveryEvidence<'db> {
 }
 
 impl<'db> CycleRecoveryEvidence<'db> {
-    fn from_type(db: &'db dyn Db, root: DivergentType, ty: Type<'db>) -> Vec<Self> {
-        let mut paths = Vec::new();
-        Type::collect_projection_ops(db, root, ty, &mut paths);
-
+    fn from_type(
+        db: &'db dyn Db,
+        root: DivergentType,
+        ty: Type<'db>,
+        paths: &[ProjectionPath<'db>],
+    ) -> Vec<Self> {
         let arms = RefCell::new(Vec::new());
         any_over_type(db, ty, false, |nested| {
             if ProjectionContainer::is_custom_generic_container(db, nested) {
@@ -978,10 +918,9 @@ impl<'db> CycleRecoveryEvidence<'db> {
                 continue;
             }
 
-            for path in &paths {
+            for path in paths {
                 for suffix in path.suffixes() {
-                    let Some(term) =
-                        ProjectionContainer::infer_projection_path(db, arm, suffix.ops())
+                    let Some(term) = ProjectionContainer::project_type_path(db, arm, None, &suffix)
                     else {
                         continue;
                     };
