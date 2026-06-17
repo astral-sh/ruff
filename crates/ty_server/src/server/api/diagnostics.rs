@@ -468,15 +468,9 @@ pub(super) fn to_lsp_diagnostic(
                     encoding,
                 ));
 
-                related_information.extend(
-                    sub_diagnostic
-                        .annotations()
-                        .iter()
-                        .filter(|annotation| !annotation.is_primary())
-                        .filter_map(|annotation| {
-                            annotation_to_related_information(db, annotation, encoding)
-                        }),
-                );
+                related_information.extend(sub_diagnostic.secondary_annotations().filter_map(
+                    |annotation| annotation_to_related_information(db, annotation, encoding),
+                ));
             }
 
             Some(related_information)
