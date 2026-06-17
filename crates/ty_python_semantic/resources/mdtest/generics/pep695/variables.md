@@ -672,17 +672,16 @@ def unbounded_unconstrained[T](t: T) -> None:
         reveal_type(x)  # revealed: T@unbounded_unconstrained | Any
 ```
 
-The union of a bounded typevar with its bound is that bound. (The typevar is guaranteed to be
-specialized to a subtype of the bound.) The union of a bounded typevar with a subtype of its bound
-cannot be simplified. (The typevar might be specialized to a different subtype of the bound.)
+The union of a bounded typevar with another type cannot be simplified based on its bound. The
+typevar might be explicitly specialized to a dynamic type.
 
 ```py
 def bounded[T: Base](t: T) -> None:
     def _(x: T | Super) -> None:
-        reveal_type(x)  # revealed: Super
+        reveal_type(x)  # revealed: T@bounded | Super
 
     def _(x: T | Base) -> None:
-        reveal_type(x)  # revealed: Base
+        reveal_type(x)  # revealed: T@bounded | Base
 
     def _(x: T | Sub) -> None:
         reveal_type(x)  # revealed: T@bounded | Sub
@@ -694,21 +693,19 @@ def bounded[T: Base](t: T) -> None:
         reveal_type(x)  # revealed: T@bounded | Any
 ```
 
-The union of a constrained typevar with a type depends on how that type relates to the constraints.
-If all of the constraints are a subtype of that type, the union simplifies to that type. Inversely,
-if the type is a subtype of every constraint, the union simplifies to the typevar. Otherwise, the
-union cannot be simplified.
+The union of a constrained typevar with another type cannot be simplified based on its constraints.
+The typevar might be explicitly specialized to a dynamic type.
 
 ```py
 def constrained[T: (Base, Sub)](t: T) -> None:
     def _(x: T | Super) -> None:
-        reveal_type(x)  # revealed: Super
+        reveal_type(x)  # revealed: T@constrained | Super
 
     def _(x: T | Base) -> None:
-        reveal_type(x)  # revealed: Base
+        reveal_type(x)  # revealed: T@constrained | Base
 
     def _(x: T | Sub) -> None:
-        reveal_type(x)  # revealed: T@constrained
+        reveal_type(x)  # revealed: T@constrained | Sub
 
     def _(x: T | Unrelated) -> None:
         reveal_type(x)  # revealed: T@constrained | Unrelated
@@ -748,19 +745,17 @@ def unbounded_unconstrained[T](t: T) -> None:
         reveal_type(x)  # revealed: T@unbounded_unconstrained & Any
 ```
 
-The intersection of a bounded typevar with its bound or a supertype of its bound is the typevar
-itself. (The typevar might be specialized to a subtype of the bound.) The intersection of a bounded
-typevar with a subtype of its bound cannot be simplified. (The typevar might be specialized to a
-different subtype of the bound.) The intersection of a bounded typevar with a type that is disjoint
+The intersection of a bounded typevar with another type cannot be simplified based on subtyping
+relationships with its bound. The intersection of a bounded typevar with a type that is disjoint
 from its bound is `Never`.
 
 ```py
 def bounded[T: Base](t: T) -> None:
     def _(x: Intersection[T, Super]) -> None:
-        reveal_type(x)  # revealed: T@bounded
+        reveal_type(x)  # revealed: T@bounded & Super
 
     def _(x: Intersection[T, Base]) -> None:
-        reveal_type(x)  # revealed: T@bounded
+        reveal_type(x)  # revealed: T@bounded & Base
 
     def _(x: Intersection[T, Sub]) -> None:
         reveal_type(x)  # revealed: T@bounded & Sub

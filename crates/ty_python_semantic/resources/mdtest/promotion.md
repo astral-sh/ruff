@@ -194,8 +194,9 @@ mapping_segments = {**get_segments_by_name(), "start": (1, 2), "end": (3, 4, 5)}
 reveal_type(mapping_segments)  # revealed: dict[str, tuple[int, int] | tuple[int, int, int]]
 ```
 
-This also applies when the non-literal tuple type is hidden behind a type alias or a type variable,
-or when it is subsumed by one of the literal tuple types while building the union.
+This also applies when the non-literal tuple type is hidden behind a type alias or `NewType`, or
+when it is subsumed by one of the literal tuple types while building the union. Type variables
+remain in the union because they can be explicitly specialized to a dynamic type.
 
 ```toml
 [environment]
@@ -230,7 +231,8 @@ reveal_type(newtype_segments)  # revealed: list[tuple[int, int] | tuple[int, int
 
 def check_bound_typevar_segment(segment: BoundSegment) -> None:
     bound_typevar_segments = [segment, (1, 2), (3, 4, 5)]
-    reveal_type(bound_typevar_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+    # revealed: list[BoundSegment@check_bound_typevar_segment | tuple[int, int] | tuple[int, int, int]]
+    reveal_type(bound_typevar_segments)
 
 def check_constrained_typevar_segment(segment: ConstrainedSegment) -> None:
     constrained_typevar_segments = [segment, (1, 2), (3, 4, 5)]

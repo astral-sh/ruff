@@ -103,7 +103,7 @@ def _[T: int](x: type | type[T]):
     reveal_type(x())  # revealed: Any
 
 def _[T: int](x: type[int] | type[T]):
-    reveal_type(x())  # revealed: int
+    reveal_type(x())  # revealed: int | T@_
 
 def _[T](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int | T@_
@@ -123,10 +123,10 @@ def narrow_a[B: A](a: A, b: B):
     reveal_type(type_of_a)  # revealed: type[A]
 
     if isinstance(a, type(b)):
-        reveal_type(a)  # revealed: B@narrow_a
+        reveal_type(a)  # revealed: A & B@narrow_a
 
     if issubclass(type_of_a, type(b)):
-        reveal_type(type_of_a)  # revealed: type[B@narrow_a]
+        reveal_type(type_of_a)  # revealed: type[A] & type[B@narrow_a]
 ```
 
 Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed

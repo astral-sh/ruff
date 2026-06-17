@@ -171,6 +171,8 @@ def _(x: Union[int]):
 If the type variable has an upper bound, the specialized type must satisfy that bound:
 
 ```py
+from typing import Any
+
 type Bounded[T: int] = list[T]
 type BoundedByUnion[T: int | str] = list[T]
 
@@ -189,6 +191,15 @@ reveal_type(BoundedByUnion[int])  # revealed: <type alias 'BoundedByUnion[int]'>
 reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias 'BoundedByUnion[IntSubclass]'>
 reveal_type(BoundedByUnion[str])  # revealed: <type alias 'BoundedByUnion[str]'>
 reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[int | str]'>
+
+# A type variable can be explicitly specialized to a dynamic type, so it must not be simplified
+# out of a union with its bound. All types, including dynamic types, are still subtypes of object.
+type IntOr[T: int] = int | T
+type ObjectOr[T: int] = object | T
+
+def _(int_or: IntOr[Any], object_or: ObjectOr[Any]):
+    reveal_type(int_or)  # revealed: int | Any
+    reveal_type(object_or)  # revealed: object
 
 type TupleOfIntAndStr[T: int, U: str] = tuple[T, U]
 
