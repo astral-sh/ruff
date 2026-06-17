@@ -72,7 +72,9 @@ fn expression_uses_elementwise_containment(expr: &ast::Expr) -> bool {
 ///
 /// Open nominal types are excluded because a subclass can override `__contains__`. For final
 /// nominal types, an inherited built-in `__contains__` method cannot be paired with an overridden
-/// iterator whose element type no longer describes the values searched by containment.
+/// iterator whose element type no longer describes the values searched by containment. Tuple
+/// subclasses are an exception: as with other tuple dunder methods, we assume that unsafe
+/// overrides are reported at their definition site.
 fn type_uses_elementwise_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
 
@@ -99,10 +101,8 @@ fn type_uses_elementwise_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> boo
         }
         Type::TypedDict(_) => true,
         Type::NominalInstance(instance)
-            if matches!(
-                instance.known_class(db),
-                Some(KnownClass::Tuple | KnownClass::Range)
-            ) =>
+            if instance.tuple_spec(db).is_some()
+                || instance.has_known_class(db, KnownClass::Range) =>
         {
             true
         }
