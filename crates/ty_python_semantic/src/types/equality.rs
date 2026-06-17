@@ -286,9 +286,6 @@ impl<'db> ComparisonEvaluator<'db> {
         alternatives: usize,
         evaluate: impl FnOnce(&mut Self) -> ComparisonResult<'db>,
     ) -> ComparisonResult<'db> {
-        if self.exhausted {
-            return ComparisonResult::Ambiguous;
-        }
         if alternatives <= 1 {
             return evaluate(self);
         }

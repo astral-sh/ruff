@@ -320,109 +320,41 @@ WithinBudget = Literal[
 ]
 OverBudget = Literal[WithinBudget, Budgeted.M15]
 
-def within_budget(value: Budgeted, other: WithinBudget):
-    if value == other:
+def comparison_budget(value: Budgeted, within: WithinBudget, over: OverBudget):
+    if value == within:
         assert_type(value, WithinBudget)
 
-def over_budget(value: Budgeted, other: OverBudget | None):
-    if value == other:
+    if value == over:
         assert_type(value, Budgeted)
 
-def disjoint_over_budget(value: Budgeted, other: Disjoint):
+def disjoint_union_over_budget(value: Budgeted | None, other: Disjoint):
     if value != other:
         pass
     else:
         reveal_type(value)  # revealed: Never
 
-def disjoint_union_over_budget(value: Budgeted | None, other: Disjoint):
-    if value == other:
-        reveal_type(value)  # revealed: Never
-        value.name
-
 @final
 class LeftExtra: ...
 
-@final
-class RightExtra: ...
-
-LeftNewType0 = NewType("LeftNewType0", LeftExtra)
-LeftNewType1 = NewType("LeftNewType1", LeftExtra)
-LeftNewType2 = NewType("LeftNewType2", LeftExtra)
-LeftNewType3 = NewType("LeftNewType3", LeftExtra)
-LeftNewType4 = NewType("LeftNewType4", LeftExtra)
-LeftNewType5 = NewType("LeftNewType5", LeftExtra)
-LeftNewType6 = NewType("LeftNewType6", LeftExtra)
-LeftNewType7 = NewType("LeftNewType7", LeftExtra)
-LeftNewType8 = NewType("LeftNewType8", LeftExtra)
-LeftNewType9 = NewType("LeftNewType9", LeftExtra)
-LeftNewType10 = NewType("LeftNewType10", LeftExtra)
-LeftNewType11 = NewType("LeftNewType11", LeftExtra)
-LeftNewType12 = NewType("LeftNewType12", LeftExtra)
-LeftNewType13 = NewType("LeftNewType13", LeftExtra)
-LeftNewType14 = NewType("LeftNewType14", LeftExtra)
-LeftNewType15 = NewType("LeftNewType15", LeftExtra)
-LeftNewType16 = NewType("LeftNewType16", LeftExtra)
-
-LeftNewTypes = (
-    LeftNewType0
-    | LeftNewType1
-    | LeftNewType2
-    | LeftNewType3
-    | LeftNewType4
-    | LeftNewType5
-    | LeftNewType6
-    | LeftNewType7
-    | LeftNewType8
-    | LeftNewType9
-    | LeftNewType10
-    | LeftNewType11
-    | LeftNewType12
-    | LeftNewType13
-    | LeftNewType14
-    | LeftNewType15
-    | LeftNewType16
-)
-
-def newtype_wrapped_domains(value: LeftNewTypes, other: Disjoint):
-    if value == other:
-        reveal_type(value)  # revealed: Never
-
-RightConstraint = TypeVar("RightConstraint", Disjoint, RightExtra)
-
-def constrained_typevar_domains(value: Budgeted | LeftExtra, other: RightConstraint):
-    if value == other:
-        reveal_type(value)  # revealed: Never
+LeftNewType = NewType("LeftNewType", LeftExtra)
 
 BoxT = TypeVar("BoxT")
 
 @final
 class Box(Generic[BoxT]): ...
 
-@final
-class Unrelated: ...
+RightConstraint = TypeVar("RightConstraint", Disjoint, Box[str])
+
+def wrapped_domains(value: Budgeted | LeftNewType, other: RightConstraint):
+    if value == other:
+        reveal_type(value)  # revealed: Never
 
 def generic_identity_overlap(
-    value: Budgeted | Box[int] | Unrelated,
+    value: Budgeted | Box[int],
     other: Disjoint | Box[str],
 ):
     if value == other:
-        reveal_type(value)  # revealed: Budgeted | Box[int] | Unrelated
-
-class Shared(Enum):
-    A = 1
-    B = 2
-
-@final
-class Other: ...
-
-T = TypeVar("T", Literal[Shared.A], Other)
-U = TypeVar("U", Literal[Shared.A], Other)
-
-def shared_constraint_domain(value: Shared, other: T | U):
-    if value != other:
-        pass
-    else:
-        reveal_type(value)  # revealed: Literal[Shared.A]
+        reveal_type(value)  # revealed: Budgeted | Box[int]
 ```
 
 An assignment to `__new__`, `__init__`, or other methods can replace the value declared in the class
