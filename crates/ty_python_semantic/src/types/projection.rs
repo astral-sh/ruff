@@ -282,6 +282,15 @@ impl<'db> Type<'db> {
                     return None;
                 }
 
+                if mentions_root
+                    && let Some(container @ ProjectionContainer::Tuple { .. }) =
+                        direct_container.as_ref()
+                {
+                    // Project recursive tuple arms structurally. Calling the normal projection
+                    // path here would reenter cycle recovery through tuple subscript handling.
+                    return container.project_path(db, *root, None, &path);
+                }
+
                 if mentions_root && needs_evidence {
                     // Avoid reentering method or iteration inference for recursive generic arms.
                     // Subscript has a projection-suppressed path that can still expose the

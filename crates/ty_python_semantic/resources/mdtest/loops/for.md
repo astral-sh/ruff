@@ -1807,6 +1807,40 @@ reveal_type(node)  # revealed: Node
 reveal_type(node.next)  # revealed: Node | None
 ```
 
+### Recursive tuple projections in loop-local containers
+
+```py
+def tuple_entries() -> list[tuple[int, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]:
+    return []
+
+def tuple_projection_with_side_containers() -> None:
+    out = []
+    seen: set[object] = set()
+    bound = None
+
+    for entry in sorted(tuple_entries(), key=lambda item: item[0]):
+        if entry in seen:
+            continue
+
+        seen.add(entry)
+        _, address = entry
+        host, requested_port = address[:2]
+
+        if requested_port == 0 and bound is not None:
+            address = tuple([host, bound] + list(address[2:]))
+
+        try:
+            pass
+        except OSError as error:
+            if error.errno == 1 and address[0] == "::1":
+                continue
+
+        out.append(object())
+        reveal_type(address)  # revealed: tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]
+
+    reveal_type(out)  # revealed: list[object]
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the
