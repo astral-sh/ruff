@@ -98,12 +98,13 @@ pub(super) fn diagnostic_to_json<'a>(
         },
     });
 
-    // In preview, the locations and filename can be optional.
+    // In preview, the locations and filename can be optional
+    // and the severity is displayed.
     if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code().map(|code| code.as_str()),
             name: diagnostic.id().as_str(),
-            severity: Severity::Error,
+            severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
