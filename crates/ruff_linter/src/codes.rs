@@ -340,6 +340,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "110") => rules::flake8_async::rules::AsyncBusyWait,
         (Flake8Async, "115") => rules::flake8_async::rules::AsyncZeroSleep,
         (Flake8Async, "116") => rules::flake8_async::rules::LongSleepNotForever,
+        (Flake8Async, "119") => rules::flake8_async::rules::YieldInContextManagerInAsyncGenerator,
         (Flake8Async, "210") => rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
         (Flake8Async, "212") => rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction,
         (Flake8Async, "220") => rules::flake8_async::rules::CreateSubprocessInAsyncFunction,
@@ -635,6 +636,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
         (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
+        (Pydocstyle, "421") => rules::pydocstyle::rules::PropertyDocstringStartsWithVerb,
 
         // pep8-naming
         (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,
@@ -1076,6 +1078,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
+        (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1223,4 +1226,10 @@ impl std::fmt::Display for Rule {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.write_str(self.into())
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromNameError {
+    #[error("unknown rule name")]
+    Unknown,
 }

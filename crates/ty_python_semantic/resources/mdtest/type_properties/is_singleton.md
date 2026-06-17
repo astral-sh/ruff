@@ -4,10 +4,10 @@ A type is a singleton type iff it has exactly one inhabitant.
 
 ## Basic
 
-```py
+```pyi
 from types import UnionType
 from typing_extensions import Any, Callable, Literal, Never, TypeAliasType
-from ty_extensions import Intersection, TypeOf, is_singleton, static_assert
+from ty_extensions import TypeOf, is_singleton, static_assert
 from enum import Enum
 
 class Answer(Enum):
@@ -30,7 +30,7 @@ def _(answer: Answer) -> None:
         return
     static_assert(is_singleton(TypeOf[answer]))
 
-def _(answer: Intersection[Answer, Any]) -> None:
+def _(answer: Answer & Any) -> None:
     if answer is Answer.NO:
         return
     static_assert(not is_singleton(TypeOf[answer]))

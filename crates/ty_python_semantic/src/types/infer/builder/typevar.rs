@@ -1,5 +1,6 @@
 use crate::{
     Program,
+    reachability::is_reachable,
     types::{
         BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
         TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
@@ -27,7 +28,10 @@ use ruff_db::{
 };
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::{definition::Definition, scope::NodeWithScopeKind};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    scope::NodeWithScopeKind,
+};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_typevar_definition(
@@ -65,7 +69,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity = TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695);
+        let identity =
+            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695TypeVar);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
@@ -911,7 +916,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             target_name.clone(),
             Some(definition),
-            TypeVarKind::ParamSpec,
+            TypeVarKind::LegacyParamSpec,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, variance, default,
@@ -1140,6 +1145,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
+        let previous_definition_in = |scope, place, before| {
+            let use_def = self.index.use_def_map(scope);
+            use_def
+                .reachable_bindings(place)
+                .map(|binding| {
+                    (
+                        binding.binding_order,
+                        binding.binding,
+                        binding.reachability_constraint,
+                    )
+                })
+                .chain(use_def.reachable_declarations(place).map(|declaration| {
+                    (
+                        declaration.declaration_order,
+                        declaration.declaration,
+                        declaration.reachability_constraint,
+                    )
+                }))
+                .filter(|(order, _, _)| *order < before)
+                .filter(|(_, _, reachability)| is_reachable(db, use_def, *reachability))
+                .filter_map(|(order, definition, _)| {
+                    definition
+                        .definition()
+                        .map(|definition| (order, definition))
+                })
+                .filter(|(_, definition)| definition.kind(db).is_user_visible())
+                .max_by_key(|(order, _)| *order)
+                .map(|(_, definition)| definition)
+        };
+
+        let scope = definition.file_scope(db);
+        let place = definition.place(db);
+        let use_def = self.index.use_def_map(scope);
+        let definition_order = use_def.reachable_bindings(place).find_map(|binding| {
+            (binding.binding.definition() == Some(definition)).then_some(binding.binding_order)
+        });
+        debug_assert!(definition_order.is_some());
+
+        let previous_definition = definition_order
+            .and_then(|before| previous_definition_in(scope, place, before))
+            .or_else(|| {
+                self.forwarded_assignment_owner(scope, place.expect_symbol())
+                    .and_then(|(owner_scope, owner_place)| {
+                        let owner_use_def = self.index.use_def_map(owner_scope);
+                        let before = owner_use_def
+                            .reachable_bindings(owner_place.into())
+                            .find_map(|binding| {
+                                let definition = binding.binding.definition()?;
+                                let DefinitionKind::NestedBindings(nested) = definition.kind(db)
+                                else {
+                                    return None;
+                                };
+                                nested
+                                    .nested_declarations
+                                    .iter()
+                                    .any(|declaration| declaration.file_scope_id == scope)
+                                    .then_some(binding.binding_order)
+                            })?;
+                        previous_definition_in(owner_scope, owner_place.into(), before)
+                    })
+            });
+        if let Some(previous_definition) = previous_definition
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, target)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot redefine `{target_name}` as a type variable"
+            ));
+            diagnostic.annotate(
+                self.context
+                    .secondary(previous_definition.focus_range(db, self.module()))
+                    .message("Previously defined here"),
+            );
+        }
+
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
@@ -1173,7 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             target_name.clone(),
             Some(definition),
-            TypeVarKind::Legacy,
+            TypeVarKind::LegacyTypeVar,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,

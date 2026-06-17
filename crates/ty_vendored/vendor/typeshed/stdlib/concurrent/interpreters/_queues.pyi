@@ -116,6 +116,7 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
                 If "unbounditems" is UNBOUND then it is returned by get() in place
                 of the unbound item.
                 """
+
         else:
             def put(
                 self,
@@ -137,6 +138,7 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
                 then the "next object" is determined by the value of the
                 "unbounditems" argument to put().
                 """
+
         else:
             def get(self, timeout: SupportsIndex | None = None, *, _delay: float = 0.01) -> object: ...
 

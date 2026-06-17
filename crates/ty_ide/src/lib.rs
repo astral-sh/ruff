@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod call_hierarchy;
 mod code_action;
 mod completion;
 mod doc_highlights;
@@ -30,8 +31,14 @@ mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
+pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
+pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
-pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
+pub use completion::{
+    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
+    CompletionSettings, completion,
+};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;
@@ -391,7 +398,9 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
+    };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
@@ -448,11 +457,34 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
+                let config = config
+                    .clone()
+                    .anonymized_line_numbers(diagnostic_touches_vendored_file(&self.db, &diag));
                 write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
             buf
         }
+    }
+
+    pub(super) fn diagnostic_touches_vendored_file(db: &dyn Db, diagnostic: &Diagnostic) -> bool {
+        fn annotation_is_vendored(db: &dyn Db, annotation: &Annotation) -> bool {
+            matches!(
+                annotation.get_span().file(),
+                UnifiedFile::Ty(file) if file.path(db).is_vendored_path()
+            )
+        }
+
+        diagnostic
+            .primary_annotation()
+            .into_iter()
+            .chain(diagnostic.secondary_annotations())
+            .chain(diagnostic.sub_diagnostics().iter().flat_map(|sub| {
+                sub.primary_annotation()
+                    .into_iter()
+                    .chain(sub.secondary_annotations())
+            }))
+            .any(|annotation| annotation_is_vendored(db, annotation))
     }
 
     /// The file and offset into that file where a `<CURSOR>` marker
@@ -508,8 +540,7 @@ mod tests {
                 if let Some(top) = top {
                     let top = SystemPath::new(top);
                     if db.system().is_directory(top) {
-                        db.files()
-                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                        db.files().try_add_root(&db, top, FileRootKind::SearchPath);
                     }
                 }
 
@@ -649,7 +680,7 @@ mod tests {
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);
             db.files()
-                .try_add_root(&db, &site_packages_path, FileRootKind::LibrarySearchPath);
+                .try_add_root(&db, &site_packages_path, FileRootKind::SearchPath);
 
             let mut cursor: Option<Cursor> = None;
             for &Source {

@@ -814,7 +814,9 @@ impl<'db> BoundSuperType<'db> {
                 return delegate_to(KnownClass::ModuleType.to_instance(db));
             }
             Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
-            Type::PropertyInstance(_) => return delegate_to(KnownClass::Property.to_instance(db)),
+            Type::PropertyInstance(property) => {
+                return delegate_to(property.instance_fallback(db));
+            }
             Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
@@ -839,7 +841,8 @@ impl<'db> BoundSuperType<'db> {
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Callable(_)
-            | Type::DataclassTransformer(_) => {
+            | Type::DataclassTransformer(_)
+            | Type::TypeForm(_) => {
                 return Err(BoundSuperError::AbstractOwnerType {
                     owner_type,
                     pivot_class: pivot_class_type,

@@ -4,6 +4,6 @@ expression: diagnostics
 ---
 {
   "uri": "file://<temp_dir>/src/foo.py",
-  "diagnostics": [],
-  "version": 1
+  "version": 1,
+  "diagnostics": []
 }

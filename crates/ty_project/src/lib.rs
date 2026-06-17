@@ -6,7 +6,7 @@ use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
-pub use db::tests::TestDb;
+pub use db::testing::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 
@@ -15,7 +15,7 @@ pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::files::{File, FileRootKind};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
@@ -182,24 +182,12 @@ impl Project {
             settings_diagnostics,
             program_settings_diagnostics,
         );
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
+
+        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
-            .new(db);
-
-        project.try_add_file_root(db);
-
-        project
-    }
-
-    fn try_add_file_root(self, db: &dyn Db) {
-        // This adds a file root for the project itself. This enables
-        // tracking of when changes are made to the files in a project
-        // at the directory level. At time of writing (2025-07-17),
-        // this is used for caching completions for submodules.
-        db.files()
-            .try_add_root(db, self.root(db), FileRootKind::Project);
+            .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -284,7 +272,6 @@ impl Project {
 
         if metadata_changed {
             self.set_metadata(db).to(Box::new(metadata));
-            self.try_add_file_root(db);
         }
 
         if metadata_changed || settings_changed {
@@ -867,7 +854,7 @@ where
 mod tests {
     use crate::check_file_impl;
     use crate::db::Db as _;
-    use crate::db::tests::TestDb;
+    use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;

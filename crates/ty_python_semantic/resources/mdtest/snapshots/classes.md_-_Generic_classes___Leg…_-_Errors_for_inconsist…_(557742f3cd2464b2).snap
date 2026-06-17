@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -41,30 +41,37 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 26 | class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
 27 | 
 28 | # Implicit specialization is fine:
-29 | class Fine(Parent, Grandparent[T1, T2]): ...
-30 | class AlsoFine(Parent3, Parent4[T1, T2]): ...
-31 | class Dandy(Parent, Parent3, Parent4): ...
-32 | 
-33 | # Edge cases: the first class is implicitly specialized
-34 | # (or explicitly specialized with `Any`s), but later classes are not:
-35 | 
-36 | # error: [invalid-generic-class]
-37 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
-38 | 
-39 | # error: [invalid-generic-class]
-40 | class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
-41 | 
-42 | # error: [invalid-generic-class]
-43 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
-44 | 
-45 | # error: [invalid-generic-class]
-46 | class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
-47 | 
+29 | class Fine(Parent, Grandparent[T1, T2]): ...  # error: [missing-type-argument]
+30 | class AlsoFine(Parent3, Parent4[T1, T2]): ...  # error: [missing-type-argument]
+31 | 
+32 | # error: [missing-type-argument]
+33 | # error: [missing-type-argument]
+34 | # error: [missing-type-argument]
+35 | class Dandy(Parent, Parent3, Parent4): ...
+36 | 
+37 | # Edge cases: the first class is implicitly specialized
+38 | # (or explicitly specialized with `Any`s), but later classes are not:
+39 | 
+40 | # error: [missing-type-argument]
+41 | # error: [invalid-generic-class]
+42 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
+43 | 
+44 | # error: [invalid-generic-class]
+45 | class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
+46 | 
+47 | # error: [missing-type-argument]
 48 | # error: [invalid-generic-class]
-49 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+49 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
 50 | 
 51 | # error: [invalid-generic-class]
-52 | class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
+52 | class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
+53 | 
+54 | # error: [missing-type-argument]
+55 | # error: [invalid-generic-class]
+56 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+57 | 
+58 | # error: [invalid-generic-class]
+59 | class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
 ```
 
 # Diagnostics
@@ -109,10 +116,60 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 ```
 
 ```
-error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:37:7
+info[missing-type-argument]: Missing type arguments for generic class `Parent` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:29:12
    |
-37 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
+29 | class Fine(Parent, Grandparent[T1, T2]): ...  # error: [missing-type-argument]
+   |            ^^^^^^
+   |
+
+```
+
+```
+info[missing-type-argument]: Missing type arguments for generic class `Parent3` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:30:16
+   |
+30 | class AlsoFine(Parent3, Parent4[T1, T2]): ...  # error: [missing-type-argument]
+   |                ^^^^^^^
+   |
+
+```
+
+```
+info[missing-type-argument]: Missing type arguments for generic class `Parent` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:35:13
+   |
+35 | class Dandy(Parent, Parent3, Parent4): ...
+   |             ^^^^^^
+   |
+
+```
+
+```
+info[missing-type-argument]: Missing type arguments for generic class `Parent3` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:35:21
+   |
+35 | class Dandy(Parent, Parent3, Parent4): ...
+   |                     ^^^^^^^
+   |
+
+```
+
+```
+info[missing-type-argument]: Missing type arguments for generic class `Parent4` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:35:30
+   |
+35 | class Dandy(Parent, Parent3, Parent4): ...
+   |                              ^^^^^^^
+   |
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:42:7
+   |
+42 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
    |       ^^^^^^^^^^^^^^^^^^---------------^^---------------^
    |                         |                |
    |                         |                Later class base inherits from `Grandparent[T2@BadChild4, T1@BadChild4]`
@@ -122,10 +179,20 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 ```
 
 ```
-error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:40:7
+info[missing-type-argument]: Missing type arguments for generic class `Parent` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:42:17
    |
-40 | class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
+42 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
+   |                 ^^^^^^
+   |
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:45:7
+   |
+45 | class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------------^^---------------^
    |                                   |                |
    |                                   |                Later class base inherits from `Grandparent[T2@BadChild5, T1@BadChild5]`
@@ -136,9 +203,9 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 
 ```
 error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:43:7
+  --> src/mdtest_snippet.py:49:7
    |
-43 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+49 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
    |       ^^^^^^^^^^--------------^^^^^^^^^^^---------------^
    |                 |                        |
    |                 |                        Later class base inherits from `Grandparent[T2@BadChild6, T1@BadChild6]`
@@ -148,10 +215,20 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 ```
 
 ```
-error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:46:7
+info[missing-type-argument]: Missing type arguments for generic class `Parent3` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:49:33
    |
-46 | class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
+49 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
+   |                                 ^^^^^^^
+   |
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:52:7
+   |
+52 | class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
    |       ^^^^^^^^^^--------------^^^^^^^^^^^^^^^^^^^^^---------------^
    |                 |                                  |
    |                 |                                  Later class base inherits from `Grandparent[T2@BadChild7, T1@BadChild7]`
@@ -162,9 +239,9 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 
 ```
 error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:49:7
+  --> src/mdtest_snippet.py:56:7
    |
-49 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+56 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
    |       ^^^^^^^^^^--------------^^---------------^^^^^^^^^^
    |                 |               |
    |                 |               Later class base inherits from `Grandparent[T2@BadChild8, T1@BadChild8]`
@@ -174,10 +251,20 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 ```
 
 ```
-error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
-  --> src/mdtest_snippet.py:52:7
+info[missing-type-argument]: Missing type arguments for generic class `Parent4` (expected 2 type arguments)
+  --> src/mdtest_snippet.py:56:50
    |
-52 | class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
+56 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
+   |                                                  ^^^^^^^
+   |
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:59:7
+   |
+59 | class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
    |       ^^^^^^^^^^--------------^^---------------^^^^^^^^^^^^^^^^^^^^
    |                 |               |
    |                 |               Later class base inherits from `Grandparent[T2@BadChild9, T1@BadChild9]`

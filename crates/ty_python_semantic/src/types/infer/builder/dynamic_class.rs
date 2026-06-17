@@ -7,6 +7,7 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
     IncompatibleBases, SUBCLASS_OF_FINAL_CLASS, UNSUPPORTED_DYNAMIC_BASE,
+    report_inconsistent_generic_bases,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::infer::builder::TypeInferenceBuilder;
@@ -234,6 +235,31 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     );
 
     false
+}
+
+/// Report conflicting specializations of the same generic base in a dynamic class's MRO.
+///
+/// For example, `type("C", (A, B), {})` is invalid if `A` inherits `G[int]`
+/// while `B` inherits `G[str]`, just as an equivalent `class C(A, B): ...` is.
+pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
+    context: &InferContext<'db, '_>,
+    dynamic_class: DynamicClassLiteral<'db>,
+    bases: &ast::Expr,
+) {
+    let db = context.db();
+    let explicit_bases = dynamic_class.explicit_bases(db);
+    let base_nodes = bases
+        .as_tuple_expr()
+        .map(|tuple| tuple.elts.as_slice())
+        .filter(|nodes| {
+            nodes.len() == explicit_bases.len() && !nodes.iter().any(ast::Expr::is_starred_expr)
+        });
+    report_inconsistent_generic_bases(
+        context,
+        dynamic_class.header_range(db),
+        explicit_bases,
+        base_nodes,
+    );
 }
 
 /// Report diagnostics for a dynamic MRO error. Shared by both

@@ -2,7 +2,7 @@ use compact_str::CompactString;
 use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
@@ -18,13 +18,14 @@ use smallvec::{SmallVec, smallvec};
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_ruff_ignore_enabled;
+use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
+use crate::settings::types::PreviewMode;
 use crate::{Locator, Violation, warn_user_once};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -41,8 +42,25 @@ enum SuppressionAction {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SuppressionComment {
-    /// Range containing the entire suppression comment
+    /// Range containing the entire suppression comment.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// import math  # start # ruff:ignore[F401] reason # end
+    ///                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    /// ```
     range: TextRange,
+
+    /// Range of the entire comment token.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// import math  # start # ruff:ignore[F401] reason # end
+    ///              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    /// ```
+    token_range: TextRange,
 
     /// The action directive
     action: SuppressionAction,
@@ -59,6 +77,11 @@ impl SuppressionComment {
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
     }
+
+    /// Return whether the comment is nested within a wider comment token.
+    fn is_nested(&self) -> bool {
+        self.token_range != self.range
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,7 +94,8 @@ pub(crate) struct PendingSuppressionComment<'a> {
 }
 
 impl PendingSuppressionComment<'_> {
-    /// Whether the comment "matches" another comment, based on indentation and suppressed codes
+    /// Whether the comment "matches" another comment, based on indentation and suppressed codes.
+    ///
     /// Expects a "forward search" for matches, ie, will only match if the current comment is a
     /// "disable" comment and other is the matching "enable" comment.
     fn matches(&self, other: &PendingSuppressionComment, source: &str) -> bool {
@@ -102,6 +126,30 @@ pub(crate) struct Suppression {
 impl Suppression {
     fn codes(&self) -> &[TextRange] {
         &self.comments.first().codes
+    }
+
+    /// Returns whether or not the suppression is a standalone `ruff:ignore` comment.
+    fn is_ignore(&self) -> bool {
+        matches!(
+            self.comments,
+            SuppressionComments::Single(SuppressionComment {
+                action: SuppressionAction::Ignore,
+                ..
+            })
+        )
+    }
+
+    /// Return the [`Rule`] associated with this suppression.
+    fn rule(&self, preview: PreviewMode) -> Option<Rule> {
+        if let Ok(rule) = Rule::from_code(get_redirect_target(&self.code).unwrap_or(&self.code)) {
+            return Some(rule);
+        }
+
+        if is_human_readable_names_enabled(preview) {
+            return Rule::from_name(&self.code).ok();
+        }
+
+        None
     }
 }
 
@@ -143,14 +191,12 @@ pub(crate) enum InvalidSuppressionKind {
     NotModuleScope,
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct InvalidSuppression {
     kind: InvalidSuppressionKind,
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Suppressions {
     /// Valid suppression ranges with associated comments
@@ -161,6 +207,8 @@ pub struct Suppressions {
 
     /// Parse errors from suppression comments
     errors: Vec<ParseError>,
+
+    preview: PreviewMode,
 }
 
 #[derive(Debug)]
@@ -170,6 +218,12 @@ struct SuppressionDiagnostic<'a> {
     duplicated_codes: Vec<&'a str>,
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
+
+    /// Whether one of the invalid codes was totally unknown and may be external.
+    has_unknown_code: bool,
+
+    /// Whether one of the invalid codes was a rule name with preview disabled.
+    has_stable_rule_name: bool,
 }
 
 impl<'a> SuppressionDiagnostic<'a> {
@@ -180,6 +234,8 @@ impl<'a> SuppressionDiagnostic<'a> {
             duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
+            has_unknown_code: false,
+            has_stable_rule_name: false,
         }
     }
 
@@ -209,15 +265,43 @@ impl Suppressions {
         self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
-    /// Check if a diagnostic is suppressed by any known range suppressions
+    /// Check if a diagnostic is suppressed by any known range suppressions.
+    ///
+    /// A suppression applies for the given diagnostic if it fully contains the diagnostic's range.
+    /// For example, noting that the `RUF015` diagnostic spans from the opening `[` to the end of
+    /// the subscript expression:
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    ///     *range(10)
+    /// ][0]
+    /// # ruff:enable[RUF015]
+    /// ```
+    ///
+    /// is suppressed, but
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    /// # ruff:enable[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
+    ///
+    /// is not. For `ruff:ignore`, this rule is augmented to check whether the diagnostic's start
+    /// offset is contained instead, meaning that this _will_ be suppressed:
+    ///
+    /// ```python
+    /// suppressed = [  # ruff:ignore[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
         }
 
-        let Some(code) = diagnostic.secondary_code() else {
-            return false;
-        };
         let Some(span) = diagnostic.primary_span() else {
             return false;
         };
@@ -228,7 +312,32 @@ impl Suppressions {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
-            if *code == suppression_code && suppression.range.contains_range(range) {
+
+            let code_matches = diagnostic
+                .secondary_code()
+                .is_some_and(|code| *code == suppression_code);
+
+            let name_matches = is_human_readable_names_enabled(self.preview)
+                && diagnostic.name() == suppression_code;
+
+            if !code_matches && !name_matches {
+                continue;
+            }
+
+            // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
+            // its parent) is covered by the suppression. Range suppression comments must fully
+            // contain the diagnostic range.
+            let suppressed = if suppression.is_ignore() {
+                suppression.range.contains(range.start())
+                    || range.is_empty() && suppression.range.end() == range.start()
+                    || diagnostic
+                        .parent()
+                        .is_some_and(|parent| suppression.range.contains(parent))
+            } else {
+                suppression.range.contains_range(range)
+            };
+
+            if suppressed {
                 suppression.used.set(true);
                 return true;
             }
@@ -243,63 +352,59 @@ impl Suppressions {
             context: &LintContext,
             locator: &Locator,
         ) -> bool {
-            if let Some((group_key, group)) = grouped_diagnostic
-                && key.is_none_or(|key| key != *group_key)
-            {
-                if group.any_invalid() {
-                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &group.invalid_codes,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: group.invalid_codes.iter().join(", "),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: group.suppression.codes().len()
-                                == group.invalid_codes.len(),
-                        },
-                    ) {
+            let Some((group_key, group)) = grouped_diagnostic else {
+                return false;
+            };
+
+            if key.is_some_and(|key| key == *group_key) {
+                return false;
+            }
+
+            if group.any_invalid() {
+                if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &group.invalid_codes,
+                    true,
+                    InvalidRuleCode {
+                        rule_code: group.invalid_codes.iter().join(", "),
+                        kind: InvalidRuleCodeKind::Suppression,
+                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                    },
+                ) {
+                    if group.has_unknown_code {
                         diagnostic.help(
                             "Add non-Ruff rule codes to the `lint.external` configuration option",
                         );
                     }
+                    if group.has_stable_rule_name {
+                        diagnostic.help("Enable `lint.preview` to use rule names");
+                    }
                 }
-                if group.any_unused() {
-                    let mut codes = group.disabled_codes.clone();
-                    codes.extend(group.unused_codes.clone());
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &codes,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes {
-                                disabled: group
-                                    .disabled_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                duplicated: group
-                                    .duplicated_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                unmatched: group
-                                    .unused_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                            }),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
-                    );
-                }
-                true
-            } else {
-                false
             }
+
+            if group.any_unused() {
+                let mut codes = group.disabled_codes.clone();
+                codes.extend(group.unused_codes.clone());
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &codes,
+                    false,
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            disabled: &group.disabled_codes,
+                            duplicated: &group.duplicated_codes,
+                            unmatched: &group.unused_codes,
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                );
+            }
+
+            true
         }
 
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
@@ -316,16 +421,20 @@ impl Suppressions {
 
             let code_str = suppression.code.as_str();
 
-            if !code_is_valid(&suppression.code, &context.settings().external) {
+            let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
+            let name_is_known = Rule::from_name(&suppression.code).is_ok();
+            let name_is_valid = is_human_readable_names_enabled(self.preview) && name_is_known;
+
+            if !code_is_valid && !name_is_valid {
                 // InvalidRuleCode
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
                 group.invalid_codes.push(code_str);
+                group.has_unknown_code |= !name_is_known;
+                group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
                 // UnusedNOQA
-                let Ok(rule) = Rule::from_code(
-                    get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
-                ) else {
+                let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
                 };
 
@@ -399,6 +508,10 @@ impl Suppressions {
         highlight_only_code: bool,
         kind: T,
     ) -> Option<DiagnosticGuard<'a, 'b>> {
+        if !context.is_rule_enabled(T::rule()) {
+            return None;
+        }
+
         let first_comment = suppression.comments.first();
         let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
@@ -406,22 +519,40 @@ impl Suppressions {
             remove_codes,
             highlight_only_code,
         );
-        if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
-            if let Some(second_comment) = suppression.comments.second() {
-                let (second_range, second_range_edit) = Suppressions::delete_codes_or_comment(
-                    locator,
-                    second_comment,
-                    remove_codes,
-                    highlight_only_code,
-                );
-                diagnostic.secondary_annotation("", second_range);
-                diagnostic.set_fix(Fix::safe_edits(edit, [second_range_edit]));
+
+        // It's unsafe to remove an entire nested comment but okay to remove a subset of its codes.
+        let applicability =
+            if first_comment.is_nested() && edit.range().contains_range(first_comment.range) {
+                Applicability::Unsafe
             } else {
-                diagnostic.set_fix(Fix::safe_edit(edit));
-            }
-            return Some(diagnostic);
-        }
-        None
+                Applicability::Safe
+            };
+
+        let mut diagnostic = context.report_custom_diagnostic(kind, range);
+
+        let fix = if let Some(second_comment) = suppression.comments.second() {
+            let (second_range, second_edit) = Suppressions::delete_codes_or_comment(
+                locator,
+                second_comment,
+                remove_codes,
+                highlight_only_code,
+            );
+            diagnostic.secondary_annotation_without_message(second_range);
+            let applicability = if applicability.is_unsafe()
+                || second_comment.is_nested()
+                    && second_edit.range().contains_range(second_comment.range)
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            Fix::applicable_edits(edit, [second_edit], applicability)
+        } else {
+            Fix::applicable_edit(edit, applicability)
+        };
+        diagnostic.set_fix(fix);
+
+        Some(diagnostic)
     }
 
     fn delete_codes_or_comment(
@@ -431,16 +562,16 @@ impl Suppressions {
         highlight_only_code: bool,
     ) -> (TextRange, Edit) {
         let mut range = comment.range;
-        let edit = if comment.codes.len() == 1 {
+        let edit = if let [code] = comment.codes.as_slice() {
             if highlight_only_code {
-                range = comment.codes[0];
+                range = *code;
             }
             delete_comment(comment.range, locator)
-        } else if remove_codes.len() == 1 {
+        } else if let [remove_code] = remove_codes {
             let code_index = comment
                 .codes
                 .iter()
-                .position(|range| locator.slice(range) == remove_codes[0])
+                .position(|range| locator.slice(range) == *remove_code)
                 .unwrap();
             if highlight_only_code {
                 range = comment.codes[code_index];
@@ -458,14 +589,9 @@ impl Suppressions {
             };
             Edit::range_deletion(code_range)
         } else {
-            let first = comment
-                .codes
-                .first()
-                .expect("suppression comment without codes");
-            let last = comment
-                .codes
-                .last()
-                .expect("suppression comment without codes");
+            let [first, .., last] = comment.codes.as_slice() else {
+                unreachable!("suppression comment without codes");
+            };
             let code_range = TextRange::new(first.start(), last.end());
             let remaining = comment
                 .codes_as_str(locator.contents())
@@ -512,94 +638,31 @@ impl<'a> SuppressionsBuilder<'a> {
             .comment_ranges()
             .iter()
             .copied()
-            .filter_map(|comment_range| {
-                let mut parser = SuppressionParser::new(self.source, comment_range);
-                match parser.parse_comment() {
-                    Ok(comment) => Some(comment),
-                    Err(ParseError {
-                        kind: ParseErrorKind::NotASuppression,
-                        ..
-                    }) => None,
-                    Err(error) => {
-                        errors.push(error);
-                        None
-                    }
+            .flat_map(|comment_range| SuppressionParser::new(self.source, comment_range))
+            .filter_map(|comment| match comment {
+                Ok(comment) => Some(comment),
+                Err(ParseError {
+                    kind: ParseErrorKind::NotASuppression,
+                    ..
+                }) => None,
+                Err(error) => {
+                    errors.push(error);
+                    None
                 }
             })
             .peekable();
 
         'comments: while let Some(suppression) = suppressions.peek() {
             indents.clear();
-            let (before, after) = tokens.split_at(suppression.range.start());
 
             // Standalone suppression comments
-
-            if suppression.action == SuppressionAction::Ignore {
-                if is_ruff_ignore_enabled(self.settings) {
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
-                        .is_some()
-                    {
-                        // own-line ignore
-                        Self::standalone_comment_range(suppression.range, before, after)
-                    } else {
-                        // trailing ignore
-                        self.trailing_comment_range(suppression.range, before)
-                    };
-                    for code in suppression.codes_as_str(self.source) {
-                        self.valid.push(Suppression {
-                            code: code.into(),
-                            range,
-                            used: false.into(),
-                            comments: SuppressionComments::Single(suppression.clone()),
-                        });
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:ignore comment found but not active, enable preview mode"
-                    );
-                }
-                suppressions.next();
-                continue;
-            } else if suppression.action == SuppressionAction::FileIgnore {
-                if is_ruff_ignore_enabled(self.settings) {
-                    match indentation_at_offset(suppression.range.start(), self.source) {
-                        // Module scope
-                        Some("") => {
-                            let range = TextRange::up_to(self.source.text_len());
-                            for code in suppression.codes_as_str(self.source) {
-                                self.valid.push(Suppression {
-                                    code: code.into(),
-                                    range,
-                                    used: false.into(),
-                                    comments: SuppressionComments::Single(suppression.clone()),
-                                });
-                            }
-                        }
-                        // Indented/inside block
-                        Some(_) => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::NotModuleScope,
-                                comment: suppression.clone(),
-                            });
-                        }
-                        // Trailing
-                        None => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression.clone(),
-                            });
-                        }
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:file-ignore comment found but not active, enable preview mode"
-                    );
-                }
+            if self.register_standalone_suppression(suppression, tokens) {
                 suppressions.next();
                 continue;
             }
 
             // Matched suppression comments
+            let (before, after) = tokens.split_at(suppression.token_range.start());
 
             let mut count = 0;
             let last_indent = before
@@ -636,42 +699,44 @@ impl<'a> SuppressionsBuilder<'a> {
                         }
                     }
                     TokenKind::Comment => {
-                        let Some(suppression) =
-                            suppressions.next_if(|suppression| suppression.range == token.range())
-                        else {
-                            continue;
-                        };
-
-                        let Some(indent) =
-                            indentation_at_offset(suppression.range.start(), self.source)
-                        else {
-                            // trailing suppressions are not supported
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression,
-                            });
-                            continue;
-                        };
-
-                        // comment matches current block's indentation, or precedes an indent/dedent token
-                        if indent == current_indent
-                            || after[token_index..]
-                                .iter()
-                                .find(|t| !t.kind().is_trivia())
-                                .is_some_and(|t| {
-                                    matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
-                                })
+                        while let Some(suppression) = suppressions
+                            .next_if(|suppression| suppression.token_range == token.range())
                         {
-                            self.pending.push(PendingSuppressionComment {
-                                indent,
-                                comment: suppression,
-                            });
-                        } else {
-                            // weirdly indented? ¯\_(ツ)_/¯
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Indentation,
-                                comment: suppression,
-                            });
+                            if self.register_standalone_suppression(&suppression, tokens) {
+                                continue;
+                            }
+
+                            let Some(indent) =
+                                indentation_at_offset(suppression.range.start(), self.source)
+                            else {
+                                // trailing suppressions are not supported
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Trailing,
+                                    comment: suppression,
+                                });
+                                continue;
+                            };
+
+                            // comment matches current block's indentation, or precedes an indent/dedent token
+                            if indent == current_indent
+                                || after[token_index..]
+                                    .iter()
+                                    .find(|t| !t.kind().is_trivia())
+                                    .is_some_and(|t| {
+                                        matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
+                                    })
+                            {
+                                self.pending.push(PendingSuppressionComment {
+                                    indent,
+                                    comment: suppression,
+                                });
+                            } else {
+                                // weirdly indented? ¯\_(ツ)_/¯
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Indentation,
+                                    comment: suppression,
+                                });
+                            }
                         }
                     }
                     _ => {}
@@ -698,6 +763,83 @@ impl<'a> SuppressionsBuilder<'a> {
             valid: self.valid,
             invalid: self.invalid,
             errors,
+            preview: self.settings.preview,
+        }
+    }
+
+    /// Handles a single-comment suppression like `ruff:ignore` or `ruff:file-ignore` and returns
+    /// `true` if such a comment was found.
+    fn register_standalone_suppression(
+        &mut self,
+        suppression: &SuppressionComment,
+        tokens: &Tokens,
+    ) -> bool {
+        match suppression.action {
+            SuppressionAction::Ignore => {
+                if is_ruff_ignore_enabled(self.settings) {
+                    let (before, after) = tokens.split_at(suppression.token_range.start());
+                    let range = if indentation_at_offset(suppression.range.start(), self.source)
+                        .is_some()
+                    {
+                        // own-line ignore
+                        Self::standalone_comment_range(suppression.range, before, after)
+                    } else {
+                        // trailing ignore
+                        self.trailing_comment_range(suppression.token_range, before)
+                    };
+                    for code in suppression.codes_as_str(self.source) {
+                        self.valid.push(Suppression {
+                            code: code.into(),
+                            range,
+                            used: false.into(),
+                            comments: SuppressionComments::Single(suppression.clone()),
+                        });
+                    }
+                } else {
+                    warn_user_once!(
+                        "#ruff:ignore comment found but not active, enable preview mode"
+                    );
+                }
+                true
+            }
+            SuppressionAction::FileIgnore => {
+                if is_ruff_ignore_enabled(self.settings) {
+                    match indentation_at_offset(suppression.range.start(), self.source) {
+                        // Module scope
+                        Some("") => {
+                            let range = TextRange::up_to(self.source.text_len());
+                            for code in suppression.codes_as_str(self.source) {
+                                self.valid.push(Suppression {
+                                    code: code.into(),
+                                    range,
+                                    used: false.into(),
+                                    comments: SuppressionComments::Single(suppression.clone()),
+                                });
+                            }
+                        }
+                        // Indented/inside block
+                        Some(_) => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::NotModuleScope,
+                                comment: suppression.clone(),
+                            });
+                        }
+                        // Trailing
+                        None => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::Trailing,
+                                comment: suppression.clone(),
+                            });
+                        }
+                    }
+                } else {
+                    warn_user_once!(
+                        "#ruff:file-ignore comment found but not active, enable preview mode"
+                    );
+                }
+                true
+            }
+            SuppressionAction::Disable | SuppressionAction::Enable => false,
         }
     }
 
@@ -836,10 +978,12 @@ impl<'a> SuppressionsBuilder<'a> {
         for next_token in after {
             match next_token.kind() {
                 TokenKind::Newline => {
+                    end = next_token.start();
                     break;
                 }
                 TokenKind::Comment => {}
                 TokenKind::NonLogicalNewline if is_inner_comment => {
+                    end = next_token.start();
                     if seen_nonlogical_newline && !is_blank_or_comment_only {
                         break;
                     }
@@ -965,10 +1109,28 @@ impl<'src> SuppressionParser<'src> {
     }
 
     fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
+        let comment_start = self.offset();
+
+        match self.parse_comment_inner(comment_start) {
+            Ok(comment) => Ok(comment),
+            Err(kind) => {
+                self.cursor.eat_while(|c| c != '#');
+                Err(ParseError::new(
+                    kind,
+                    TextRange::new(comment_start, self.offset()),
+                ))
+            }
+        }
+    }
+
+    fn parse_comment_inner(
+        &mut self,
+        comment_start: TextSize,
+    ) -> Result<SuppressionComment, ParseErrorKind> {
         self.cursor.start_token();
 
         if !self.cursor.eat_char('#') {
-            return self.error(ParseErrorKind::CommentWithoutHash);
+            return Err(ParseErrorKind::CommentWithoutHash);
         }
 
         self.eat_whitespace();
@@ -976,30 +1138,37 @@ impl<'src> SuppressionParser<'src> {
         let action = self.eat_action()?;
         let codes = self.eat_codes()?;
         if codes.is_empty() {
-            return Err(ParseError::new(ParseErrorKind::MissingCodes, self.range));
+            return Err(ParseErrorKind::MissingCodes);
         }
 
         self.eat_whitespace();
-        let reason = TextRange::new(self.offset(), self.range.end());
+
+        let reason_start = self.offset();
+
+        // Consume the comment until its end or until the next "sub-comment" starts.
+        self.cursor.eat_while(|c| c != '#');
+
+        let reason = TextRange::new(reason_start, self.offset());
 
         Ok(SuppressionComment {
-            range: self.range,
+            range: TextRange::new(comment_start, self.offset()),
+            token_range: self.range,
             action,
             codes,
             reason,
         })
     }
 
-    fn eat_action(&mut self) -> Result<SuppressionAction, ParseError> {
+    fn eat_action(&mut self) -> Result<SuppressionAction, ParseErrorKind> {
         if !self.cursor.as_str().starts_with("ruff") {
-            return self.error(ParseErrorKind::NotASuppression);
+            return Err(ParseErrorKind::NotASuppression);
         }
 
         self.cursor.skip_bytes("ruff".len());
         self.eat_whitespace();
 
         if !self.cursor.eat_char(':') {
-            return self.error(ParseErrorKind::NotASuppression);
+            return Err(ParseErrorKind::NotASuppression);
         }
         self.eat_whitespace();
 
@@ -1019,23 +1188,23 @@ impl<'src> SuppressionParser<'src> {
             || self.cursor.as_str().starts_with("isort")
         {
             // alternate suppression variants, ignore for now
-            self.error(ParseErrorKind::NotASuppression)
+            Err(ParseErrorKind::NotASuppression)
         } else {
-            self.error(ParseErrorKind::UnknownAction)
+            Err(ParseErrorKind::UnknownAction)
         }
     }
 
-    fn eat_codes(&mut self) -> Result<SmallVec<[TextRange; 2]>, ParseError> {
+    fn eat_codes(&mut self) -> Result<SmallVec<[TextRange; 2]>, ParseErrorKind> {
         self.eat_whitespace();
         if !self.cursor.eat_char('[') {
-            return self.error(ParseErrorKind::MissingCodes);
+            return Err(ParseErrorKind::MissingCodes);
         }
 
         let mut codes: SmallVec<[TextRange; 2]> = smallvec![];
 
         loop {
             if self.cursor.is_eof() {
-                return self.error(ParseErrorKind::MissingBracket);
+                return Err(ParseErrorKind::MissingBracket);
             }
 
             self.eat_whitespace();
@@ -1046,7 +1215,7 @@ impl<'src> SuppressionParser<'src> {
 
             let code_start = self.offset();
             if !self.eat_word() {
-                return self.error(ParseErrorKind::InvalidCode);
+                return Err(ParseErrorKind::InvalidCode);
             }
 
             codes.push(TextRange::new(code_start, self.offset()));
@@ -1058,9 +1227,9 @@ impl<'src> SuppressionParser<'src> {
                 }
 
                 return if self.cursor.is_eof() {
-                    self.error(ParseErrorKind::MissingBracket)
+                    Err(ParseErrorKind::MissingBracket)
                 } else {
-                    self.error(ParseErrorKind::MissingComma)
+                    Err(ParseErrorKind::MissingComma)
                 };
             }
         }
@@ -1089,9 +1258,17 @@ impl<'src> SuppressionParser<'src> {
     fn offset(&self) -> TextSize {
         self.range.start() + self.range.len() - self.cursor.text_len()
     }
+}
 
-    fn error<T>(&self, kind: ParseErrorKind) -> Result<T, ParseError> {
-        Err(ParseError::new(kind, self.range))
+impl Iterator for SuppressionParser<'_> {
+    type Item = Result<SuppressionComment, ParseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor.is_eof() {
+            return None;
+        }
+
+        Some(self.parse_comment())
     }
 }
 
@@ -1809,7 +1986,7 @@ def bar():
             ],
             errors: [
                 ParseError {
-                    text: "# ruff: disable  # parse error!",
+                    text: "# ruff: disable  ",
                     kind: MissingCodes,
                 },
             ],
@@ -2593,6 +2770,37 @@ def foo():
                 reason: "",
             },
         )
+        "##,
+        );
+    }
+
+    #[test]
+    fn trailing_comment_own_line_ignore() {
+        let source = "# ruff: ignore[some-thing]
+x = 1 # trailing";
+        let comment = Suppressions::debug(source);
+        assert_debug_snapshot!(
+            comment,
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: ignore[some-thing]\nx = 1 # trailing",
+                    code: "some-thing",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: ignore[some-thing]",
+                        action: Ignore,
+                        codes: [
+                            "some-thing",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
         "##,
         );
     }

@@ -144,7 +144,9 @@ pub struct ReachabilityConstraints {
     /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
     /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
     /// index of that node in the `used_interiors` vector.
-    used_indices: RankBitBox,
+    ///
+    /// If all interior nodes were retained, the original ID can be used directly instead.
+    used_indices: Option<Box<RankBitBox>>,
 }
 
 impl ReachabilityConstraints {
@@ -152,20 +154,20 @@ impl ReachabilityConstraints {
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.as_u32() as usize;
-        debug_assert!(
-            self.used_indices().get_bit(raw_index).unwrap_or(false),
-            "all used reachability constraints should have been marked as used",
-        );
-        let index = self.used_indices().rank(raw_index) as usize;
-        self.used_interiors()[index]
+        if let Some(used_indices) = &self.used_indices {
+            debug_assert!(
+                used_indices.get_bit(raw_index).unwrap_or(false),
+                "all used reachability constraints should have been marked as used",
+            );
+            let index = used_indices.rank(raw_index) as usize;
+            self.used_interiors[index]
+        } else {
+            self.used_interiors[raw_index]
+        }
     }
 
     pub fn used_interiors(&self) -> &[InteriorNode] {
         &self.used_interiors
-    }
-
-    pub fn used_indices(&self) -> &RankBitBox {
-        &self.used_indices
     }
 }
 
@@ -193,14 +195,21 @@ pub struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
-        let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
-        let used_interiors = (self.interiors.into_iter())
-            .zip(self.interior_used)
-            .filter_map(|(interior, used)| used.then_some(interior))
-            .collect();
-        ReachabilityConstraints {
-            used_interiors,
-            used_indices,
+        if self.interior_used.iter().all(|used| *used) {
+            ReachabilityConstraints {
+                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_indices: None,
+            }
+        } else {
+            let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
+            let used_interiors = (self.interiors.into_iter())
+                .zip(self.interior_used)
+                .filter_map(|(interior, used)| used.then_some(interior))
+                .collect();
+            ReachabilityConstraints {
+                used_interiors,
+                used_indices: Some(Box::new(used_indices)),
+            }
         }
     }
 

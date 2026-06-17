@@ -212,6 +212,17 @@ impl Tokens {
         }
         (before, after)
     }
+
+    /// Return the range of the token at the given offset.
+    ///
+    /// Returns an empty range at the given offset if there's no token at the offset,
+    /// or if the offset is between two tokens.
+    pub fn token_range(&self, offset: TextSize) -> TextRange {
+        match self.at_offset(offset) {
+            TokenAt::Single(token) => token.range(),
+            TokenAt::None | TokenAt::Between(..) => TextRange::empty(offset),
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a Tokens {

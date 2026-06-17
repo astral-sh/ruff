@@ -22,6 +22,7 @@ Settings: WorkspaceSettings {
     },
     completions: CompletionSettings {
         auto_import: true,
+        complete_function_parentheses: false,
     },
     overrides: None,
 }

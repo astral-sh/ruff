@@ -89,8 +89,9 @@ fn has_contextmanager_decorator(checker: &Checker, function_def: &StmtFunctionDe
 /// - It is inside a `try` block that has `finally` or `except` handlers.
 /// - It is in a terminal position within a `with` block body (the context manager's
 ///   `__exit__` handles cleanup).
-/// - It is in a terminal position (last statement in the function body, or immediately
-///   followed by `return`), meaning there is no cleanup code that could be skipped.
+/// - It is in a terminal position (last statement in the function body, immediately
+///   followed by `return`, or immediately followed by `break` from a loop that itself
+///   sits in a terminal position), meaning there is no cleanup code that could be skipped.
 struct YieldFinallyVisitor<'a, 'b> {
     /// The checker used to emit diagnostics.
     checker: &'a Checker<'b>,
@@ -98,8 +99,12 @@ struct YieldFinallyVisitor<'a, 'b> {
     /// `finally` or `except` handlers.
     in_protected_try: bool,
     /// Whether the visitor is at a terminal position: the last statement in
-    /// the function body, or a `yield` immediately before a `return`.
+    /// the function body, a `yield` immediately before a `return`, or a `yield`
+    /// immediately before a `break` from a terminal loop.
     in_terminal_position: bool,
+    /// Whether a `break` from the innermost enclosing loop would exit to
+    /// a terminal position.
+    in_terminal_loop: bool,
 }
 
 impl<'a, 'b> YieldFinallyVisitor<'a, 'b> {
@@ -109,6 +114,7 @@ impl<'a, 'b> YieldFinallyVisitor<'a, 'b> {
             checker,
             in_protected_try: false,
             in_terminal_position: false,
+            in_terminal_loop: false,
         }
     }
 }
@@ -175,7 +181,10 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_expr(iter);
                 self.visit_expr(target);
                 let terminal = self.in_terminal_position;
+                let prev_loop = self.in_terminal_loop;
+                self.in_terminal_loop = terminal;
                 self.visit_body_with_terminal(body, terminal);
+                self.in_terminal_loop = prev_loop;
                 self.visit_body_with_terminal(orelse, terminal);
             }
 
@@ -184,7 +193,10 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
             }) => {
                 self.visit_expr(test);
                 let terminal = self.in_terminal_position;
+                let prev_loop = self.in_terminal_loop;
+                self.in_terminal_loop = terminal;
                 self.visit_body_with_terminal(body, terminal);
+                self.in_terminal_loop = prev_loop;
                 self.visit_body_with_terminal(orelse, terminal);
             }
 
@@ -232,18 +244,21 @@ impl YieldFinallyVisitor<'_, '_> {
 
     /// Visits each statement in `body`, tracking whether each is in a terminal position.
     ///
-    /// A statement is considered terminal if it is the last in the body (when `terminal` is true)
-    /// or if it is a yield statement immediately followed by a `return`.
+    /// A statement is considered terminal if it is the last in the body (when `terminal` is true),
+    /// if it is a yield statement immediately followed by a `return`, or if it is a yield
+    /// statement immediately followed by a `break` from a terminal loop.
     fn visit_body_with_terminal(&mut self, body: &[Stmt], terminal: bool) {
         for (i, stmt) in body.iter().enumerate() {
             let is_last = i == body.len() - 1;
-            let is_yield_before_return = Self::is_yield_statement(stmt)
-                && body
-                    .get(i + 1)
-                    .is_some_and(|next| matches!(next, Stmt::Return(_)));
+            let is_yield_before_terminator = Self::is_yield_statement(stmt)
+                && body.get(i + 1).is_some_and(|next| match next {
+                    Stmt::Return(_) => true,
+                    Stmt::Break(_) => self.in_terminal_loop,
+                    _ => false,
+                });
 
             let prev = self.in_terminal_position;
-            self.in_terminal_position = (is_last && terminal) || is_yield_before_return;
+            self.in_terminal_position = (is_last && terminal) || is_yield_before_terminator;
             self.visit_stmt(stmt);
             self.in_terminal_position = prev;
         }

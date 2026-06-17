@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::StmtTry;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
 
@@ -89,18 +89,23 @@ impl Violation for TooManyStatementsInTryClause {
 /// W0717
 pub(crate) fn too_many_try_statements(
     checker: &Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
+    try_stmt: &StmtTry,
     max_statements: usize,
 ) {
-    let statements = num_statements(body);
+    // Ignore cases with only `finally` clauses and no `except` handlers. These can't accidentally
+    // catch the wrong exception and are instead being used more like context managers.
+    if try_stmt.handlers.is_empty() {
+        return;
+    }
+
+    let statements = num_statements(&try_stmt.body);
     if statements > max_statements {
         checker.report_diagnostic(
             TooManyStatementsInTryClause {
                 statements,
                 max_statements,
             },
-            stmt.identifier(),
+            TextRange::at(try_stmt.start(), "try".text_len()),
         );
     }
 }

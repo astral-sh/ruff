@@ -1,6 +1,6 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
-use lsp_types::{CodeAction, CodeActionKind, request::CodeActionResolveRequest};
+use lsp_types::{CodeAction, CodeActionKind, CodeActionResolveRequest};
 
 use crate::TestServerBuilder;
 
@@ -84,7 +84,7 @@ fn code_action_without_valid_url_returns_unchanged_action() -> Result<()> {
 
     let action = CodeAction {
         title: "Some other code action".to_string(),
-        kind: Some(CodeActionKind::QUICKFIX),
+        kind: Some(CodeActionKind::QuickFix),
         ..Default::default()
     };
 
@@ -100,7 +100,7 @@ fn invalid_code_action_resolve_data_returns_unchanged_action() -> Result<()> {
     let action = CodeAction {
         title: "Ruff: Fix all auto-fixable problems".to_string(),
         kind: Some(CodeActionKind::from("source.fixAll.ruff")),
-        data: Some(serde_json::json!("not-a-url")),
+        data: Some(serde_json::json!("not-a-uri")),
         ..Default::default()
     };
 

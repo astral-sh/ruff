@@ -83,7 +83,7 @@ class ObsoleteHeaderDefect(HeaderDefect):
     """Header uses syntax declared obsolete by RFC 5322"""
 
 class NonASCIILocalPartDefect(HeaderDefect):
-    """local_part contains non-ASCII characters"""
+    """Unused. Note: this error is deprecated and may be removed in the future."""
 
 class InvalidDateDefect(HeaderDefect):
     """Header has unparsable or invalid date"""

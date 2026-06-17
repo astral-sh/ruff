@@ -2,33 +2,62 @@
 
 This repository contains both Ruff (a Python linter and formatter) and ty (a Python type checker). The crates follow a naming convention: `ruff_*` for Ruff-specific code and `ty_*` for ty-specific code. ty reuses several Ruff crates, including the Python parser (`ruff_python_parser`) and AST definitions (`ruff_python_ast`).
 
+## Code reviews
+
+When reviewing a branch or pull request, be deliberately nitpicky. Report not
+only bugs and regressions, but also architectural and maintenance risks, weak
+test coverage, unclear code, unnecessary complexity, and meaningful style or
+consistency issues. Order findings by severity, cite files and lines, and
+distinguish blockers from non-blocking improvements. Number each review point
+for easy reference in subsequent review discussion.
+
 ## Running Tests
 
-Run all tests (setting `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_DEBUG="line-tables-only"` to enable optimizations while retaining some debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
+Run all tests (using `nextest` for faster execution, setting `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_DEBUG="line-tables-only"` to enable optimizations while retaining some debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
-CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run
 ```
 
 Run tests for a specific crate:
 
 ```sh
-CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic
 ```
 
 Run a single mdtest file. The path to the mdtest file should be relative to the `crates/ty_python_semantic/resources/mdtest` folder:
 
 ```sh
-CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- <path/to/mdtest_file.md>
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
 ```
 
 To run a specific mdtest within a file, use a substring of the Markdown header text as `MDTEST_TEST_FILTER`. Only use this if it's necessary to isolate a single test case:
 
 ```sh
+MDTEST_TEST_FILTER="<filter>" CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::<path/to/mdtest_file.md>
+```
+
+### Fallback without nextest
+
+If `cargo nextest` is not available, use `cargo test` with the same environment variables:
+
+```sh
+# Run all tests.
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test
+
+# Run tests for a specific crate.
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic
+
+# Run a single mdtest file.
+CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- <path/to/mdtest_file.md>
+
+# Run a specific mdtest within a file.
 MDTEST_TEST_FILTER="<filter>" CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- <path/to/mdtest_file.md>
 ```
 
 After running the tests, always review the contents of any snapshots that have been added or updated.
+
+When running tests with `INSTA_FORCE_PASS=1`, check for `.pending-snap` files if any affected tests use inline snapshots.
 
 ## Running Clippy
 
@@ -52,20 +81,11 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
-## Reproducing and minimizing ty ecosystem changes
+When working on ty, first read `.agents/skills/working-on-ty/SKILL.md`, then also read and follow any more specific ty skills it points to.
 
-If asked to reproduce changes in the ty ecosystem, use this script to clone the project to some
-directory and install its dependencies into `.venv`:
+## Generated Release Workflow
 
-```sh
-uv run scripts/setup_primer_project.py <project-name> <some-temp-dir>
-```
-
-If asked to *minimize* a change in the ty ecosystem, you should start off with the above command to ensure that the change reproduces. You should then attempt to minimize the Python code required to demonstrate a behaviour difference between ty on your feature branch and ty on the main branch. Your minimization process should consist of systematically removing files from the cloned ecosystem project, and stripping content from existing files, until the behaviour difference between your branch and `main` no longer reproduces.
-
-## Pull Requests
-
-When working on ty, PR titles should start with `[ty]` and be tagged with the `ty` GitHub label.
+Parts of `.github/workflows/release.yml` are generated by cargo-dist from `dist-workspace.toml`. Before editing the release workflow, check whether the relevant section is generated. Prefer changing `dist-workspace.toml` or the referenced reusable workflow instead of editing generated YAML. After modifying cargo-dist configuration, regenerate the workflow with the cargo-dist version pinned in `dist-workspace.toml` and inspect the resulting diff to ensure the change will survive future regenerations.
 
 ## Development Guidelines
 
@@ -81,6 +101,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains.
 - If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible. But if a lint is complaining about unused/dead code, it's usually best to just delete the unused code.
 - Use comments purposefully. Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way.
-- When adding new ty checks, it's important to make error messages concise. Think about how an error message would look on a narrow terminal screen. Sometimes more detail can be provided in subdiagnostics or secondary annotations, but it's also important to make sure that the diagnostic is understandable if the user has passed `--output-format=concise`.
-- **Salsa incrementality (ty):** Any method that accesses `.node()` must be `#[salsa::tracked]`, or it will break incrementality. Prefer higher-level semantic APIs over raw AST access.
 - Run `cargo dev generate-all` after changing configuration options, CLI arguments, lint rules, or environment variable definitions, as these changes require regeneration of schemas, docs, and CLI references.
+- Don't prefix tests with `test_`.
+- Don't separate struct definitions from their `impl` blocks unless the `impl` is deliberately placed in a separate file, as for large structs.
+- Avoid running `uv run` for any scripts from the repository root unless you use `--no-project`, `--script` or similar. Using `uv run` from the Ruff repo root without these flags will build Ruff from source, which is very slow and usually unnecessary.

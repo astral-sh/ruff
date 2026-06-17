@@ -145,20 +145,20 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                     Err(BoolError::IncorrectArguments {
                         truthiness: type_to_truthiness(bindings.return_type(db)),
                         not_boolable_type: *self,
                     })
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
+                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _, _)) => {
                     Err(BoolError::NotCallable {
                         not_boolable_type: *self,
                     })
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
+                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _)) => {
                     Err(BoolError::Other {
                         not_boolable_type: *self,
                     })
@@ -213,14 +213,17 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)
-            | Type::TypeGuard(_) => Truthiness::Ambiguous,
+            | Type::TypeGuard(_)
+            | Type::TypeForm(_) => Truthiness::Ambiguous,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
+                } else if td.openness(db).is_closed()
+                    && td.items(db).values().all(|field| !field.may_be_present(db))
+                {
+                    Truthiness::AlwaysFalse
                 } else {
-                    // We can potentially infer empty typeddicts as always falsy if they're `closed=True`,
-                    // but as of 22-01-26 we don't yet support PEP 728.
                     Truthiness::Ambiguous
                 }
             }

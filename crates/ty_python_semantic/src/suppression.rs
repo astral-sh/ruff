@@ -23,27 +23,7 @@ use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `ty: ignore` directives that are no longer applicable.
-    ///
-    /// ## Why is this bad?
-    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
-    /// included by mistake, and should be removed to avoid confusion.
-    ///
-    /// ## Examples
-    /// ```py
-    /// a = 20 / 2  # ty: ignore[division-by-zero]
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```py
-    /// a = 20 / 2
-    /// ```
-    ///
-    /// ## Options
-    /// Set [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-    /// to `false` to prevent this rule from reporting unused `type: ignore` comments.
+    #[doc = include_str!("../resources/lint_docs/unused-ignore-comment.md")]
     pub static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `ty: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -52,28 +32,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `type: ignore` directives that are no longer applicable.
-    ///
-    /// ## Why is this bad?
-    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
-    /// included by mistake, and should be removed to avoid confusion.
-    ///
-    /// ## Examples
-    /// ```py
-    /// a = 20 / 2  # type: ignore
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```py
-    /// a = 20 / 2
-    /// ```
-    ///
-    /// ## Options
-    ///
-    /// This rule is skipped if [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-    /// to `false`.
+    #[doc = include_str!("../resources/lint_docs/unused-type-ignore-comment.md")]
     pub(crate) static UNUSED_TYPE_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
         status: LintStatus::stable("0.0.14"),
@@ -82,23 +41,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.
-    ///
-    /// ## Why is this bad?
-    /// A `ty: ignore[code]` or a `type:ignore[ty:code] directive with a `code` that doesn't match
-    /// any known rule will not suppress any type errors, and is probably a mistake.
-    ///
-    /// ## Examples
-    /// ```py
-    /// a = 20 / 0  # ty: ignore[division-by-zer]
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```py
-    /// a = 20 / 0  # ty: ignore[division-by-zero]
-    /// ```
+    #[doc = include_str!("../resources/lint_docs/ignore-comment-unknown-rule.md")]
     pub(crate) static IGNORE_COMMENT_UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -107,22 +50,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.
-    ///
-    /// ## Why is this bad?
-    /// A syntactically incorrect ignore comment is probably a mistake and is useless.
-    ///
-    /// ## Examples
-    /// ```py
-    /// a = 20 / 0  # type: ignoree
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```py
-    /// a = 20 / 0  # type: ignore
-    /// ```
+    #[doc = include_str!("../resources/lint_docs/invalid-ignore-comment.md")]
     pub(crate) static INVALID_IGNORE_COMMENT = {
         summary: "detects ignore comments that use invalid syntax",
         status: LintStatus::stable("0.0.1-alpha.1"),

@@ -39,6 +39,10 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     ParsedModule::new(file, parsed)
 }
 
+pub(super) fn disable_lru(db: &mut dyn Db) {
+    parsed_module::set_lru_capacity(db, 0);
+}
+
 pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
@@ -60,25 +64,29 @@ pub fn parsed_string_annotation(
     indexed::ensure_indexed(&expr, string.node_index().load()).map_err(|err| {
         let message = match err {
             NodeIndexError::NoParent => {
-                "internal error: string annotation's parent had no NodeIndex".to_owned()
+                "Internal error: string annotation's parent had no NodeIndex"
             }
-            NodeIndexError::TooNested => "too many levels of nested string annotations; remove the redundant nested quotes".to_owned(),
+            NodeIndexError::TooNested => {
+                "Too many levels of nested string annotations; \
+                remove the redundant nested quotes"
+            }
             NodeIndexError::OverflowedIndices => {
-                "file too long for string annotations; either break up the file or don't use string annotations".to_owned()
+                "File too long for string annotations; either break up the file \
+                or don't use string annotations"
             }
             NodeIndexError::OverflowedSubIndices => {
-                "file too long for nested string annotations; remove the redundant nested quotes".to_owned()
+                "File too long for nested string annotations; remove the redundant nested quotes"
             }
             NodeIndexError::ExhaustedSubIndices => {
-                "string annotation is too long; consider introducing type aliases to simplify".to_owned()
+                "String annotation is too long; consider introducing type aliases to simplify"
             }
             NodeIndexError::ExhaustedSubSubIndices => {
-                "nested string annotation is too long; remove the redundant nested quotes".to_owned()
+                "Nested string annotation is too long; remove the redundant nested quotes"
             }
         };
 
         ParseError {
-            error: ParseErrorType::OtherError(message),
+            error: ParseErrorType::StringAnnotationError(message),
             location: string.range,
         }
     })?;

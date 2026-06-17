@@ -1,0 +1,42 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Annotated subscript targets
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | numbers: list[int] = []
+2 | # error: [invalid-type-form]
+3 | # error: [invalid-assignment]
+4 | numbers[0]: str = "three"
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `Literal["three"]` on object of type `list[int]`
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | numbers[0]: str = "three"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+
+```
+
+```
+error[invalid-type-form]: Type annotations are not allowed on subscripted expressions
+ --> src/mdtest_snippet.py:4:13
+  |
+4 | numbers[0]: str = "three"
+  |             ^^^
+  |
+
+```

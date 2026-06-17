@@ -6,7 +6,7 @@ use crate::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
         NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -18,6 +18,7 @@ use crate::{
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
+        type_form::walk_typeform_type,
         typed_dict::walk_typed_dict_type,
         typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
         walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
@@ -64,6 +65,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_typeguard_type(&self, db: &'db dyn Db, type_is: TypeGuardType<'db>) {
         walk_typeguard_type(db, type_is, self);
+    }
+
+    fn visit_typeform_type(&self, db: &'db dyn Db, typeform: TypeFormType<'db>) {
+        walk_typeform_type(db, typeform, self);
     }
 
     fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
@@ -145,6 +150,7 @@ pub(super) enum NonAtomicType<'db> {
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
     TypeGuard(TypeGuardType<'db>),
+    TypeForm(TypeFormType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
@@ -215,6 +221,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::TypeGuard(type_guard) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
             }
+            Type::TypeForm(typeform) => TypeKind::NonAtomic(NonAtomicType::TypeForm(typeform)),
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
@@ -257,6 +264,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
         NonAtomicType::TypeGuard(type_guard) => visitor.visit_typeguard_type(db, type_guard),
+        NonAtomicType::TypeForm(typeform) => visitor.visit_typeform_type(db, typeform),
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }

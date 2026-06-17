@@ -25,7 +25,7 @@ ty_combine = { workspace = true }
 
 bitflags = { workspace = true }
 bitvec = { workspace = true }
-get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
+get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
 ruff_macros = { workspace = true, optional = true }
@@ -36,6 +36,7 @@ serde = { workspace = true, optional = true }
 serde_json = {workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
+thin-vec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

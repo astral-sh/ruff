@@ -20,8 +20,9 @@ def create_dynamic(spec: ModuleSpec, file: Any = None, /) -> types.ModuleType:
 def acquire_lock() -> None:
     """Acquires the interpreter's import lock for the current thread.
 
-    This lock should be used by import hooks to ensure thread-safety when importing
-    modules. On platforms without threads, this function does nothing.
+    This lock should be used by import hooks to ensure thread-safety when
+    importing modules.  On platforms without threads, this function does
+    nothing.
     """
 
 def exec_builtin(mod: types.ModuleType, /) -> int:

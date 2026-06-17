@@ -789,12 +789,15 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(ReturnInGenerator, error.range);
                 }
             }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
+            | SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension
+            | SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
             | SemanticSyntaxErrorKind::LazyImportStar
             | SemanticSyntaxErrorKind::LazyFutureImport
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
+            | SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
@@ -873,6 +876,21 @@ impl SemanticSyntaxContext for Checker<'_> {
             } = scope.kind
             {
                 return true;
+            }
+        }
+        false
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Generator { .. } => {}
+                ScopeKind::Class(_) => return true,
+                ScopeKind::Function(_)
+                | ScopeKind::Lambda(_)
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => return false,
             }
         }
         false
@@ -3514,6 +3532,7 @@ impl<'a> LintContext<'a> {
     ///
     /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
     /// sub-diagnostics before the fix title. See its documentation for more details.
+    #[expect(unused)]
     pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
@@ -3719,7 +3738,19 @@ impl DiagnosticGuard<'_, '_> {
         range: impl Ranged,
     ) {
         let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let message = message.into_diagnostic_message();
+        debug_assert!(
+            !message.as_str().is_empty(),
+            "use `secondary_annotation_without_message` for annotations without a message"
+        );
         let ann = Annotation::secondary(span).message(message);
+        self.diagnostic.as_mut().unwrap().annotate(ann);
+    }
+
+    /// Add a secondary annotation without a message at the given range.
+    pub(crate) fn secondary_annotation_without_message(&mut self, range: impl Ranged) {
+        let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let ann = Annotation::secondary(span);
         self.diagnostic.as_mut().unwrap().annotate(ann);
     }
 }

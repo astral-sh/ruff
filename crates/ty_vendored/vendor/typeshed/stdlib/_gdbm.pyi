@@ -81,5 +81,6 @@ if sys.platform != "win32":
             The optional mode argument is the Unix mode of the file, used only
             when the database has to be created.  It defaults to octal 0o666.
             """
+
     else:
         def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _gdbm: ...

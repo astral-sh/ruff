@@ -109,8 +109,11 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<Test
     let existing = existing_tests(&tests_dir)?;
 
     let mut updated_files = vec![];
+    // Sort so `TestFiles` reports generated files that need updating deterministically.
+    let mut sorted_tests = tests.iter().collect::<Vec<_>>();
+    sorted_tests.sort_unstable_by_key(|(name, _)| *name);
 
-    for (name, test) in tests {
+    for (name, test) in sorted_tests {
         let path = match existing.get(name) {
             Some(path) => path.clone(),
             None => tests_dir.join(name).with_extension("py"),
@@ -124,12 +127,15 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<Test
         updated_files.push(path);
     }
 
+    let mut unreferenced = existing
+        .into_iter()
+        .filter(|(name, _)| !tests.contains_key(name))
+        .map(|(_, path)| path)
+        .collect::<Vec<_>>();
+    unreferenced.sort_unstable();
+
     Ok(TestFiles {
-        unreferenced: existing
-            .into_iter()
-            .filter(|(name, _)| !tests.contains_key(name))
-            .map(|(_, path)| path)
-            .collect::<Vec<_>>(),
+        unreferenced,
         updated: updated_files,
     })
 }

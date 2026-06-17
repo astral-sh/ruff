@@ -17,11 +17,12 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
-use ty_python_core::scope::FileScopeId;
+use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
 
@@ -78,13 +79,18 @@ impl<'db> SemanticModel<'db> {
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
-        let index = semantic_index(self.db, self.file);
         let mut members = FxHashMap::default();
+        let index = semantic_index(self.db, self.file);
         let Some(file_scope) = self.scope(node) else {
             return members;
         };
 
-        for (file_scope, _) in index.ancestor_scopes(file_scope) {
+        for (file_scope, _) in index
+            .visible_ancestor_scopes(file_scope)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             for memberdef in
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
@@ -119,7 +125,8 @@ impl<'db> SemanticModel<'db> {
         let is_typing_extensions_available = self.file.is_stub(self.db)
             || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
-            .into_iter()
+            .iter()
+            .copied()
             .filter(|module| {
                 is_typing_extensions_available || module.name(self.db) != &typing_extensions
             })
@@ -174,6 +181,10 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "completion order is determined later by relevance ranking"
+        )]
         for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
                 name,
@@ -192,9 +203,7 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for submodule in module.all_submodules(self.db) {
             let ty = Type::module_literal(self.db, self.file, *submodule);
-            let Some(base) = submodule.name(self.db).components().next_back() else {
-                continue;
-            };
+            let base = submodule.name(self.db).last_component();
             completions.push(Completion {
                 name: Name::new(base),
                 ty: Some(ty),
@@ -227,7 +236,6 @@ impl<'db> SemanticModel<'db> {
     /// scope of this model's `File` are returned.
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
         let index = semantic_index(self.db, self.file);
-
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
@@ -324,6 +332,20 @@ impl<'db> SemanticModel<'db> {
                 Some(expr) => index.try_expression_scope_id(&expr),
             },
         }
+    }
+
+    /// Returns the scopes enclosing `node`, starting with the scope containing
+    /// the node itself.
+    ///
+    /// Like [`Self::scope`], this handles nodes inside string annotations.
+    pub fn ancestor_scopes(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
+        let index = semantic_index(self.db, self.file);
+        self.scope(node)
+            .into_iter()
+            .flat_map(move |scope| index.ancestor_scopes(scope))
     }
 
     /// Returns the first local definition created by `covering_node`, if any.
@@ -450,15 +472,19 @@ impl<'db> SemanticModel<'db> {
                 else {
                     return TypeQualifiers::empty();
                 };
-                let module = parsed_module(self.db, self.file).load(self.db);
+                let definition_file = definition.file(self.db);
+                let module = parsed_module(self.db, definition_file).load(self.db);
                 if !definition
                     .kind(self.db)
-                    .category(self.file.is_stub(self.db), &module)
+                    .category(definition_file.is_stub(self.db), &module)
                     .is_declaration()
                 {
                     return TypeQualifiers::empty();
                 }
-                declaration_type(self.db, definition).qualifiers()
+                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
+                    return TypeQualifiers::empty();
+                };
+                declared.qualifiers()
             }
             ExprRef::Attribute(attr) => {
                 let Some(value_ty) = attr.value.inferred_type(self) else {

@@ -4,10 +4,12 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg,
+    self, EXPERIMENTAL_SYNTAX, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
+    UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
+    report_missing_type_arguments, report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -18,10 +20,11 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
+    any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -112,6 +115,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
+        report_missing_type_arguments(&self.context, ty, annotation);
         let result_ty = ty
             .default_specialize(self.db())
             .in_type_expression(
@@ -128,6 +132,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let ignore_runtime_errors = |builder: &Self| {
+            builder.deferred_state.is_deferred()
+                || builder.in_stub()
+                || builder.is_in_type_checking_block(builder.scope(), expression)
+                || builder
+                    .inference_flags()
+                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+        };
+
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -210,12 +223,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let right_ty = self.infer_type_expression(&binary.right);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !self.deferred_state.is_deferred()
-                            && !self.is_in_type_checking_block(self.scope(), binary)
-                            && !self
-                                .inference_flags()
-                                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-                        {
+                        if !ignore_runtime_errors(self) {
                             let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
@@ -338,6 +346,44 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
 
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
+                    }
+                    ast::Operator::BitAnd => {
+                        if let Some(builder) =
+                            self.context.report_lint(&EXPERIMENTAL_SYNTAX, binary)
+                        {
+                            builder.into_diagnostic("Intersection type syntax is experimental");
+                        }
+
+                        let left_ty = self.infer_type_expression(&binary.left);
+                        let right_ty = self.infer_type_expression(&binary.right);
+
+                        if !ignore_runtime_errors(self) {
+                            // Infer the operands as values to report the types used by the runtime
+                            // operation rather than their interpretation as type expressions.
+                            let mut speculative_builder = self.speculate();
+                            let left_value = speculative_builder
+                                .infer_expression(&binary.left, TypeContext::default());
+                            let right_value = speculative_builder
+                                .infer_expression(&binary.right, TypeContext::default());
+                            if Type::try_call_bin_op(
+                                self.db(),
+                                left_value,
+                                ast::Operator::BitAnd,
+                                right_value,
+                            )
+                            .is_err()
+                            {
+                                report_unsupported_binary_operation(
+                                    &self.context,
+                                    binary,
+                                    left_value,
+                                    right_value,
+                                    ast::Operator::BitAnd,
+                                );
+                            }
+                        }
+
+                        IntersectionType::from_two_elements(self.db(), left_ty, right_ty)
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -544,6 +590,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ),
                 );
                 Type::unknown()
+            }
+
+            ast::Expr::UnaryOp(
+                unary @ ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Invert,
+                    operand,
+                    ..
+                },
+            ) => {
+                if let Some(builder) = self.context.report_lint(&EXPERIMENTAL_SYNTAX, unary) {
+                    builder.into_diagnostic("Negation type syntax is experimental");
+                }
+
+                let operand_ty = self.infer_type_expression(operand);
+
+                if !ignore_runtime_errors(self) {
+                    let operand_value = self
+                        .speculate()
+                        .infer_expression(operand, TypeContext::default());
+                    if let Err(error) = operand_value.try_call_dunder(
+                        self.db(),
+                        "__invert__",
+                        CallArguments::none(),
+                        TypeContext::default(),
+                    ) {
+                        self.report_unsupported_unary_operator(
+                            unary,
+                            ast::UnaryOp::Invert,
+                            operand_value,
+                            "__invert__",
+                            Some(&error),
+                        );
+                    }
+                }
+
+                operand_ty.negate(self.db())
             }
 
             ast::Expr::UnaryOp(unary) => {
@@ -1239,7 +1321,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
                     }
-                    Type::SpecialForm(special_form @ SpecialFormType::Callable) => {
+                    Type::SpecialForm(
+                        special_form @ (SpecialFormType::TypingCallable
+                        | SpecialFormType::CollectionsAbcCallable),
+                    ) => {
                         self.infer_parameterized_special_form_type_expression(
                             subscript,
                             special_form,
@@ -1579,7 +1664,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::unknown()
                     }
                 }
-
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
@@ -1914,7 +1998,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => self.infer_type_expression(arguments_slice),
             },
-            SpecialFormType::Callable => self.infer_callable_type(subscript),
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                self.infer_callable_type(subscript)
+            }
 
             // `ty_extensions` special forms
             SpecialFormType::Not => {
@@ -2044,6 +2130,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(arguments_slice, type_of_type);
                 }
                 type_of_type
+            }
+            SpecialFormType::TypeForm => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let type_argument = if let [argument] = arguments {
+                    self.infer_type_expression(argument)
+                } else {
+                    let num_arguments = arguments.len();
+
+                    if !self.in_string_annotation() {
+                        for argument in arguments {
+                            self.infer_expression(argument, TypeContext::default());
+                        }
+                    }
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
+
+                    Type::unknown()
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, type_argument);
+                }
+                TypeFormType::from_type_expression(db, type_argument)
             }
 
             SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
@@ -2194,7 +2311,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.type_expression_context()
                     ));
                     diag.info("`typing.Concatenate` is only valid:");
-                    diag.info(" - as the first argument to `typing.Callable`");
+                    diag.info(" - as the first argument to `Callable`");
                     diag.info(" - as a type argument for a `ParamSpec` parameter");
                 }
 

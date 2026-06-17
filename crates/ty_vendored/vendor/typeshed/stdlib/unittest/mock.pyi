@@ -243,7 +243,7 @@ class NonCallableMock(Base, Any):
         """assert that the mock was never called."""
 
     def assert_called_once_with(self, *args: Any, **kwargs: Any) -> None:
-        """assert that the mock was called exactly once and that that call was
+        """assert that the mock was called exactly once and that call was
         with the specified arguments.
         """
 
@@ -316,6 +316,7 @@ class NonCallableMock(Base, Any):
         >>> attrs = {'method.return_value': 3, 'other.side_effect': KeyError}
         >>> mock.configure_mock(**attrs)
         """
+
     return_value: Any
     side_effect: Any
     called: bool
@@ -342,6 +343,7 @@ class NonCallableMock(Base, Any):
         For non-callable mocks the callable variant will be used (rather than
         any custom subclass).
         """
+
     if sys.version_info >= (3, 13):
         def _calls_repr(self) -> str:
             """Renders self.mock_calls as a string.
@@ -352,6 +354,7 @@ class NonCallableMock(Base, Any):
                     If self.mock_calls is empty, an empty string is returned. The
                     output will be truncated if very long.
             """
+
     else:
         def _calls_repr(self, prefix: str = "Calls") -> str:
             """Renders self.mock_calls as a string.
@@ -854,6 +857,7 @@ class AsyncMockMixin(Base):
         """
         See :func:`.Mock.reset_mock()`
         """
+
     await_count: int
     await_args: _Call | None
     await_args_list: _CallList

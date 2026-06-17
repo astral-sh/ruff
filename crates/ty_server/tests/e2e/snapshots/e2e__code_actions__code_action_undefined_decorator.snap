@@ -27,6 +27,7 @@ expression: code_actions
         "message": "Name `deprecated` used when not defined"
       }
     ],
+    "isPreferred": true,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -45,8 +46,7 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": true
+    }
   },
   {
     "title": "Ignore 'unresolved-reference' for this line",
@@ -72,6 +72,7 @@ expression: code_actions
         "message": "Name `deprecated` used when not defined"
       }
     ],
+    "isPreferred": false,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -90,7 +91,6 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": false
+    }
   }
 ]

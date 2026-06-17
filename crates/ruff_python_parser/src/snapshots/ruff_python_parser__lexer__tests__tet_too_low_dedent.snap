@@ -5,46 +5,16 @@ expression: "lex_invalid(source, Mode::Module)"
 ## Tokens
 ```
 [
-    (
-        If,
-        0..2,
-    ),
-    (
-        True,
-        3..7,
-    ),
-    (
-        Colon,
-        7..8,
-    ),
-    (
-        Newline,
-        8..9,
-    ),
-    (
-        Indent,
-        9..13,
-    ),
-    (
-        Pass,
-        13..17,
-    ),
-    (
-        Newline,
-        17..18,
-    ),
-    (
-        Unknown,
-        18..20,
-    ),
-    (
-        Pass,
-        20..24,
-    ),
-    (
-        Newline,
-        24..24,
-    ),
+    If 0..2,
+    True 3..7,
+    Colon 7..8,
+    Newline 8..9,
+    Indent 9..13,
+    Pass 13..17,
+    Newline 17..18,
+    Unknown 18..20,
+    Pass 20..24,
+    Newline 24..24,
 ]
 ```
 ## Errors

@@ -264,6 +264,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
@@ -392,9 +393,7 @@ impl From<TypeRelation> for UpcastPolicy {
             TypeRelation::Subtyping
             | TypeRelation::Redundancy { .. }
             | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                UpcastPolicy::Unsound
-            }
+            TypeRelation::Assignability => UpcastPolicy::Unsound,
         }
     }
 }
@@ -486,6 +485,16 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_staticmethod_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
+    }
+
+    /// Returns `true` if this callable represents a function used as a class member.
+    pub fn is_method_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.kind(db),
+            CallableTypeKind::FunctionLike
+                | CallableTypeKind::StaticMethodLike
+                | CallableTypeKind::ClassMethodLike
+        )
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {

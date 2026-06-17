@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.93"
+rust-version = "1.94"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -95,7 +95,7 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.8.0", features = [
+get-size2 = { version = "0.10.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -131,9 +131,7 @@ libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
-lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c", features = [
-    "proposed",
-] }
+lsp-types = { package = "gen-lsp-types", version = "0.8.0", features = ["url"] }
 matchit = { version = "0.9.0" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.49", features = ["v2"] }
@@ -158,13 +156,14 @@ regex-automata = { version = "0.4.9" }
 regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
-# When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { version="0.26.1", default-features = false, features = [
+# When updating salsa, make sure to also update the version in `fuzz/Cargo.toml`
+salsa = { version = "0.27.0", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
     "inventory",
 ] }
+same-file = { version = "1.0.6" }
 schemars = { version = "1.0.4" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -217,7 +216,7 @@ wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
 which = { version = "8.0.0" }
 wild = { version = "2" }
-zip = { version = "0.6.6", default-features = false }
+zip = { version = "5.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [workspace.metadata.cargo-shear]
 ignored = [
@@ -260,6 +259,7 @@ unnecessary_debug_formatting = "allow" # too many instances, the display also do
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
 ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
+iter_over_hash_type = "warn"
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"

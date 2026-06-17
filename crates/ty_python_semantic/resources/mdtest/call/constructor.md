@@ -603,7 +603,7 @@ class Tracer:
 from typing import Generic, TypeVar
 
 S = TypeVar("S")
-T = TypeVar("T", bound="Box")
+T = TypeVar("T", bound="Box")  # error: [missing-type-argument]
 
 class Box(Generic[S]):
     def __new__(cls: type[T], x: S) -> T:
@@ -999,7 +999,7 @@ from __future__ import annotations
 from typing import Generic, TypeVar, overload
 
 S = TypeVar("S")
-T = TypeVar("T", bound="E")
+T = TypeVar("T", bound="E")  # error: [missing-type-argument]
 
 class E(Generic[S]):
     @overload

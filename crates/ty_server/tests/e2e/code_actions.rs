@@ -1,11 +1,11 @@
 use crate::{TestServer, TestServerBuilder};
 use anyhow::Result;
-use lsp_types::{DocumentDiagnosticReportResult, Position, Range, request::CodeActionRequest};
+use lsp_types::{CodeActionRequest, DocumentDiagnosticReport, Position, Range};
 use ruff_db::system::SystemPath;
 
 fn code_actions_at(
     server: &TestServer,
-    diagnostics: DocumentDiagnosticReportResult,
+    diagnostics: DocumentDiagnosticReport,
     file: &SystemPath,
     range: Range,
 ) -> lsp_types::CodeActionParams {
@@ -16,10 +16,12 @@ fn code_actions_at(
         range,
         context: lsp_types::CodeActionContext {
             diagnostics: match diagnostics {
-                lsp_types::DocumentDiagnosticReportResult::Report(
-                    lsp_types::DocumentDiagnosticReport::Full(report),
-                ) => report.full_document_diagnostic_report.items,
-                _ => panic!("Expected full diagnostic report"),
+                DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => {
+                    report.full_document_diagnostic_report.items
+                }
+                DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+                    panic!("Expected full diagnostic report")
+                }
             },
             only: None,
             trigger_kind: None,

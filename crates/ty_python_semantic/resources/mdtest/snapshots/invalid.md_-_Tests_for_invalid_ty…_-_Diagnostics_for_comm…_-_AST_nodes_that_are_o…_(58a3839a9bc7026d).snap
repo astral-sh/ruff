@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -64,11 +64,14 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 ```
 
 ```
-error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation: Unexpected token at the end of an expression
- --> src/mdtest_snippet.py:9:8
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+ --> src/mdtest_snippet.py:9:9
   |
 9 |     d: "invalid syntax",
-  |        ^^^^^^^^^^^^^^^^ Did you mean `typing.Literal["invalid syntax"]`?
+  |         --------^^^^^^
+  |                 |
+  |                 Unexpected token at the end of an expression
   |
+help: Did you mean `typing.Literal["invalid syntax"]`?
 
 ```

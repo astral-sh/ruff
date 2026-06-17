@@ -44,6 +44,20 @@ We **require all use of AI in contributions to follow our
 
 If your contribution does not follow the policy, it will be closed.
 
+### Local skills for Codex or Claude
+
+This repository includes local agent skills for ty development under `.agents/skills`.
+
+Contributors using Codex for development should find that Codex auto-discovers the skills and uses
+them automatically when necessary. Claude Code users may be prompted to install the
+`ty-skills@ruff-agent-skills` local plugin. If the skills are not installed automatically, install
+them manually from the repository root by running these slash commands inside Claude Code:
+
+```text
+/plugin marketplace add ./.agents
+/plugin install ty-skills@ruff-agent-skills
+```
+
 ## The Basics
 
 ### Prerequisites

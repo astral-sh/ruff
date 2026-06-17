@@ -304,11 +304,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
+                    target_class.is_object(db) || self.is_eager_assignability(),
                 )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -342,7 +342,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    !left.could_coexist_in_mro_with(db, right, self.constraints),
+                    !left.could_coexist_in_mro_with_disjointness_checker(db, right, self),
                 )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {

@@ -41,8 +41,8 @@ use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
+    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -127,6 +127,21 @@ fn merge_truthiness_guarded_pair<'db>(
     } else {
         None
     }
+}
+
+/// Return `true` if union simplification should preserve this pair because one element is
+/// `Hashable` and the other is a non-final nominal instance.
+///
+/// Hashability does not obey normal inheritance rules: subclasses of hashable classes can be
+/// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
+fn should_preserve_hashable_union(db: &dyn Db, left: Type, right: Type) -> bool {
+    let is_hashable =
+        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(db));
+    let is_non_final_nominal_instance =
+        |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(db).is_final(db));
+
+    (is_hashable(left) && is_non_final_nominal_instance(right))
+        || (is_hashable(right) && is_non_final_nominal_instance(left))
 }
 
 /// Combine union elements that cover more of the same enum class.
@@ -304,8 +319,6 @@ impl<'db> UnionElement<'db> {
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
-        let mut other_type_negated =
-            || *other_type_negated_cache.get_or_insert_with(|| other_type.negate(db));
 
         let mut collapse = false;
         let mut ignore = false;
@@ -333,7 +346,9 @@ impl<'db> UnionElement<'db> {
                 ignore = true;
                 return true;
             }
-            if collapse || other_type_negated().is_subtype_of(db, ty) {
+            if collapse
+                || other_type.negation_is_subtype_of_cached(db, ty, &mut other_type_negated_cache)
+            {
                 collapse = true;
                 return true;
             }
@@ -923,6 +938,15 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // `object` already contains every possible union element.
+            if element_type == Type::object() {
+                return;
+            }
+
+            if should_preserve_hashable_union(self.db, ty, element_type) {
+                continue;
+            }
+
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
             if let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type) {
                 to_remove.push(i);
@@ -957,8 +981,7 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
+                if ty.negation_is_subtype_of_cached(self.db, element_type, &mut ty_negated) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of
@@ -1340,6 +1363,38 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return;
         }
 
+        // A runtime class value of `TypeForm[T]` has type `type[T]`.
+        match new_positive {
+            Type::TypeForm(typeform) => {
+                if let Some(narrowed) = SubclassOfType::try_from_instance(
+                    db,
+                    typeform.type_argument(db).resolve_type_alias(db),
+                ) && self.positive.swap_remove(&KnownClass::Type.to_instance(db))
+                {
+                    new_positive = narrowed;
+                }
+            }
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                if let Some((index, narrowed)) =
+                    self.positive
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, positive)| match positive {
+                            Type::TypeForm(typeform) => SubclassOfType::try_from_instance(
+                                db,
+                                typeform.type_argument(db).resolve_type_alias(db),
+                            )
+                            .map(|narrowed| (index, narrowed)),
+                            _ => None,
+                        })
+                {
+                    self.positive.swap_remove_index(index);
+                    new_positive = narrowed;
+                }
+            }
+            _ => {}
+        }
+
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::literal_string()) => {
@@ -1576,7 +1631,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                                 existing_enum.enum_class(db) == new_enum.enum_class(db)
                             })
                     {
-                        if existing_negative == &new_negative {
+                        if existing_negative.as_enum_literal() == Some(new_enum) {
                             return;
                         }
                         continue;
@@ -1600,7 +1655,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         if let Some(existing_enum) = existing_positive.as_enum_literal()
                             && existing_enum.enum_class(db) == new_enum.enum_class(db)
                         {
-                            if existing_positive == &new_negative {
+                            if existing_enum == new_enum {
                                 *self = Self::default();
                                 self.positive.insert(Type::Never);
                             }

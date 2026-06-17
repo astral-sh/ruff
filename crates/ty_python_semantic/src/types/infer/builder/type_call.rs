@@ -7,7 +7,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::{
     TypeInferenceBuilder,
-    dynamic_class::{DynamicClassKind, report_dynamic_mro_errors},
+    dynamic_class::{
+        DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
+    },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast::name::Name;
@@ -273,6 +275,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // Check for MRO errors.
             if report_dynamic_mro_errors(&self.context, dynamic_class, call_expr, bases_arg) {
+                report_inconsistent_dynamic_generic_bases(&self.context, dynamic_class, bases_arg);
+
                 // MRO succeeded, check for instance-layout-conflict.
                 disjoint_bases.remove_redundant_entries(db);
                 if disjoint_bases.len() > 1 {
