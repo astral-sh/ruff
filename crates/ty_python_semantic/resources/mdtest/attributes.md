@@ -3012,6 +3012,25 @@ class ProjectionMixedContainerOperationNarrowing:
         reveal_type(self.x)  # revealed: list[int | None] | tuple[int]
 ```
 
+Terminal assignments in other methods are also part of the projected attribute type:
+
+```py
+class ProjectionTerminalAssignmentInOtherMethod:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def replace(self) -> None:
+        self.x = [""]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int] | list[str] | tuple[int | str]
+```
+
 Starred unpacking also recovers the prefix, suffix, and rest element types:
 
 ```py
