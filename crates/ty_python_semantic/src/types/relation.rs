@@ -953,9 +953,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// must pass `is_metaclass_instance`) or the regular instance domain (it must have Some
     /// `.to_instance()`)?
     ///
-    /// An exact class object cannot be projected into the instance domain for this check. Doing so
-    /// would incorrectly treat `type[T]` as a subtype of that single class object merely because
-    /// every possible specialization of `T` is a subtype of an instance of that class.
+    /// Do not use instance subtyping for an exact class object. For `T: (Y, Z)` where `Z` extends
+    /// `Y`, doing so would incorrectly simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and
+    /// `Z` instances are subtypes of `Y`, but only the class object `Y` satisfies `klass is Y`.
     fn can_check_typevar_subclass_relation_to_target(db: &'db dyn Db, target: Type<'db>) -> bool {
         !matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_))
             && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
