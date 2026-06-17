@@ -648,8 +648,10 @@ fn evaluate_union_left<'db>(
 
 /// Combine comparison results for the alternatives of the union being constrained.
 ///
-/// Alternatives that cannot satisfy the selected branch are removed. Dynamic alternatives retain
-/// negative constraints for removed arms so that the result still describes the branch predicate.
+/// Alternatives that cannot satisfy the selected branch are removed. Alternatives whose narrowed
+/// type may overlap a removed arm retain negative constraints so that the overlap does not
+/// reintroduce removed values. Dynamic alternatives also retain those constraints because their
+/// gradual type can still materialize to a removed arm after individual narrowing.
 fn evaluate_target_union<'db>(
     db: &'db dyn Db,
     elements: &[Type<'db>],
@@ -671,7 +673,7 @@ fn evaluate_target_union<'db>(
             ComparisonResult::AlwaysTrue => {
                 all_false = false;
                 if branch == ComparisonBranch::Positive {
-                    narrowed.push(Some(*element));
+                    narrowed.push(Some((*element, false)));
                 } else {
                     narrowed.push(None);
                     removed = removed.add(*element);
@@ -685,18 +687,18 @@ fn evaluate_target_union<'db>(
                     removed = removed.add(*element);
                     removed_any = true;
                 } else {
-                    narrowed.push(Some(*element));
+                    narrowed.push(Some((*element, false)));
                 }
             }
             ComparisonResult::CanNarrow(narrowed_element) => {
                 all_true = false;
                 all_false = false;
-                narrowed.push(Some(narrowed_element));
+                narrowed.push(Some((narrowed_element, true)));
             }
             ComparisonResult::Ambiguous => {
                 all_true = false;
                 all_false = false;
-                narrowed.push(Some(*element));
+                narrowed.push(Some((*element, true)));
             }
         }
     }
@@ -710,11 +712,14 @@ fn evaluate_target_union<'db>(
 
     let removed = removed_any.then(|| removed.build());
     let mut builder = UnionBuilder::new(db);
-    for narrowed in narrowed {
-        let Some(mut narrowed) = narrowed else {
+    for (original, narrowed) in elements.iter().zip(narrowed) {
+        let Some((mut narrowed, may_overlap_removed)) = narrowed else {
             continue;
         };
-        if let Some(removed) = removed {
+        if let Some(removed) = removed
+            && (original.is_dynamic()
+                || (may_overlap_removed && !narrowed.is_disjoint_from(db, removed)))
+        {
             narrowed = IntersectionBuilder::new(db)
                 .add_positive(narrowed)
                 .add_negative(removed)

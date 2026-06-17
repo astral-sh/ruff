@@ -393,11 +393,16 @@ python-version = "3.11"
 
 ```py
 from enum import StrEnum
+from typing import Literal, TypeVar
 from typing_extensions import LiteralString
+from ty_extensions import Not
 
 class Color(StrEnum):
     RED = "red"
 
+T = TypeVar("T", bound=object)
+
+def accepts_not_red(value: Not[Literal["red"]]) -> None: ...
 def narrow_literal_string_with_enum(value: LiteralString | None):
     if value == Color.RED:
         reveal_type(value)  # revealed: Literal["red"]
@@ -408,6 +413,10 @@ def narrow_literal_string_with_enum(value: LiteralString | None):
         reveal_type(value)  # revealed: (LiteralString & ~Literal["red"]) | None
     else:
         reveal_type(value)  # revealed: Literal["red"]
+
+def narrow_bound_typevar_with_enum(value: T | Literal["red"]):
+    if value != Color.RED:
+        accepts_not_red(value)
 ```
 
 ## Module literals
