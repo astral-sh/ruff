@@ -519,7 +519,7 @@ intersection retains element constraints from all its iterable components once o
 establishes known containment behavior:
 
 ```py
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sized
 from typing import Literal, NewType, TypeVar, final
 
 @final
@@ -593,6 +593,13 @@ def narrowed_to_tuple(
 ) -> None:
     if isinstance(values, tuple) and value in values:
         reveal_type(value)  # revealed: Literal[1]
+
+def narrowed_to_unknown_intersection(
+    value: Token | Literal[1],
+    values: Iterable[Literal[1]],
+) -> None:
+    if isinstance(values, Sized) and value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
 ```
 
 ## Inherited built-in containment
