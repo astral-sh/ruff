@@ -2966,6 +2966,52 @@ class ProjectionList:
         reveal_type(self.x)  # revealed: list[int]
 ```
 
+The unpacked value can be transformed before it is wrapped again:
+
+```py
+class ProjectionMixedContainerOperationWidening:
+    def __init__(self, value: int) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object], text: str | None) -> None:
+        (x,) = self.x
+        while items:
+            if text is not None:
+                x = text
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int] | tuple[int | str]
+
+class ProjectionMixedContainerOperationChange:
+    def __init__(self, value: int) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            text = str(x)
+            self.x = (text,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int] | tuple[str]
+
+class ProjectionMixedContainerOperationNarrowing:
+    def __init__(self, value: int | None) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            if x is None:
+                break
+            x += 1
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int | None] | tuple[int]
+```
+
 Starred unpacking also recovers the prefix, suffix, and rest element types:
 
 ```py
