@@ -274,8 +274,10 @@ A capture gets its type from the sequence element it binds. A starred capture is
 a fixed-length tuple, we can determine exactly which elements appear in that list.
 
 ```py
-from typing import Any
+from typing import Any, TypeVar
 from ty_extensions import Unknown
+
+BoundTupleT = TypeVar("BoundTupleT", bound=tuple[int] | tuple[str])
 
 def test_match_star_capture(value: tuple[int, str, bool]) -> None:
     match value:
@@ -315,6 +317,13 @@ def test_later_failure_rejects_earlier_capture(value: tuple[str, str]) -> None:
     match value:
         case [item, int()]:
             reveal_type(item)  # revealed: Never
+
+# A nested capture receives the element type from a type variable's bound, rather than the type
+# variable that represents the complete sequence.
+def test_capture_from_typevar_bound(value: BoundTupleT) -> None:
+    match value:
+        case [item]:
+            reveal_type(item)  # revealed: int | str
 ```
 
 ## Captures from unions of tuples
