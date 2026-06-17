@@ -933,6 +933,13 @@ impl<'db> IntersectionType<'db> {
     /// Return a version of this intersection type where any type variables in the positive elements
     /// have been replaced by their bounds or constraints, and where any newtypes in the positive elements
     /// have been replaced by their concrete base types.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn with_expanded_typevars_and_newtypes(self, db: &'db dyn Db) -> Type<'db> {
         expand_intersection_typevars_and_newtypes(db, self.positive(db), self.negative(db))
     }
