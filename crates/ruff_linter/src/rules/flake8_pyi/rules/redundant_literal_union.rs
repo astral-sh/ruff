@@ -23,6 +23,11 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// `Literal[1] | int` is equivalent to `int`, as `str` and `int` are the
 /// supertypes of `"A"` and `1` respectively.
 ///
+/// This is an opinionated rule that may not suit all projects. For example, a
+/// stub may use `Literal["A", "B"] | str` to preserve editor completions for
+/// common values while still allowing arbitrary strings. In such cases, consider
+/// disabling this rule or adding a `noqa` comment for the affected annotation.
+///
 /// ## Example
 /// ```pyi
 /// from typing import Literal
