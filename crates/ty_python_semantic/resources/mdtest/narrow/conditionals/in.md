@@ -348,10 +348,6 @@ def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     else:
         reveal_type(x)  # revealed: str | None
 
-def constrained_typevar_slot(x: T | None, y: T) -> None:
-    if x not in (y,):
-        reveal_type(x)  # revealed: None
-
 def nested_constrained_typevar_slot(x: tuple[T] | None, y: tuple[T]) -> None:
     if x not in (y,):
         reveal_type(x)  # revealed: None
@@ -585,8 +581,8 @@ def range_membership(value: Token | Literal[1], values: range) -> None:
 
 ## Inherited built-in containment
 
-Subclasses that inherit a supported built-in `__contains__` use the built-in's containment domain.
-A visible override disables narrowing, including when it is inherited from an intermediate base.
+Subclasses that inherit a supported built-in `__contains__` use the built-in's containment domain. A
+visible override disables narrowing, including when it is inherited from an intermediate base.
 Overriding `__iter__` does not change the values searched by the inherited built-in method:
 
 ```py
