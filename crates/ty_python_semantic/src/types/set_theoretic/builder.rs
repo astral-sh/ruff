@@ -170,6 +170,14 @@ fn should_preserve_hash_protocol_pair(db: &dyn Db, left: Type, right: Type) -> b
     other.hashability(db) != Hashability::Always
 }
 
+/// Return `true` if general complement coverage must run before a pair-specific preservation rule.
+fn requires_complement_coverage(db: &dyn Db, left: Type, right: Type) -> bool {
+    let is_simple_negation =
+        |ty| matches!(ty, Type::Intersection(intersection) if intersection.is_simple_negation(db));
+
+    is_simple_negation(left) || is_simple_negation(right)
+}
+
 /// Return `true` if normal redundancy simplification should preserve both types in this pair.
 ///
 /// Pair-specific soundness exceptions belong here so literal and ordinary union elements apply
@@ -996,7 +1004,20 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if should_preserve_union_pair(self.db, ty, element_type) {
+            let should_preserve_pair = should_preserve_union_pair(self.db, ty, element_type);
+            if should_preserve_pair
+                && requires_complement_coverage(self.db, ty, element_type)
+                && should_simplify_full
+                && !matches!(element_type, Type::TypeAlias(_))
+            {
+                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                if negated.is_subtype_of(self.db, element_type) {
+                    self.collapse_to_object();
+                    return;
+                }
+            }
+
+            if should_preserve_pair {
                 continue;
             }
 

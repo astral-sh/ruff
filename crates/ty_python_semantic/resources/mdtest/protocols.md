@@ -1144,6 +1144,12 @@ def check_hashable_or_not_hashable(x: Hashable | Not[Hashable]):
 def check_not_hashable_or_hashable(x: Not[Hashable] | Hashable):
     reveal_type(x)  # revealed: object
 
+def check_hashable_or_not_int(x: Hashable | Not[int]):
+    reveal_type(x)  # revealed: object
+
+def check_not_int_or_hashable(x: Not[int] | Hashable):
+    reveal_type(x)  # revealed: object
+
 def check_hashable_or_supports_hash(x: Hashable | SupportsHash):
     reveal_type(x)  # revealed: Hashable
 
