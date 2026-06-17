@@ -5,6 +5,7 @@
 //! methods.
 
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 use crate::{Db, place::PlaceAndQualifiers};
 
@@ -54,7 +55,7 @@ enum ComparisonResult<'db> {
 }
 
 /// The branch of a comparison for which a narrowing constraint is being computed.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum ComparisonBranch {
     Positive,
     Negative,
@@ -139,7 +140,8 @@ pub(super) fn evaluate_type_equality<'db>(
         if comparison_domain(db, left, right, ComparisonOperator::Equality)
             == ComparisonDomain::Known
         {
-            comparison_result(db, left, right, branch, ComparisonOperator::Equality)
+            ComparisonEvaluator::new(db)
+                .evaluate(left, right, branch, ComparisonOperator::Equality)
                 .constraint(branch)
         } else {
             None
@@ -185,7 +187,8 @@ pub(super) fn evaluate_type_inequality<'db>(
     )
     .or_else(|| builtin_literal_constraint(db, left, right, condition_expects_equality))
     .or_else(|| {
-        comparison_result(db, left, right, branch, ComparisonOperator::Inequality)
+        ComparisonEvaluator::new(db)
+            .evaluate(left, right, branch, ComparisonOperator::Inequality)
             .constraint(branch)
     })
 }
@@ -198,8 +201,7 @@ pub(crate) fn equality_truthiness<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    match comparison_result(
-        db,
+    match ComparisonEvaluator::new(db).evaluate(
         left,
         right,
         ComparisonBranch::Positive,
@@ -211,25 +213,94 @@ pub(crate) fn equality_truthiness<'db>(
     }
 }
 
-/// Evaluate a comparison recursively, treating `left` as the operand being constrained.
+/// Identifies an active comparison evaluation.
 ///
-/// `branch` selects the branch whose constraint is accumulated when either operand expands
-/// into multiple alternatives.
-fn comparison_result<'db>(
+/// Operand order and branch are significant because the left operand is the narrowing target.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+struct ComparisonKey<'db> {
+    left: Type<'db>,
+    right: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+}
+
+/// Tracks comparisons that are already in progress so recursive evaluation terminates.
+struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
+    active: FxHashSet<ComparisonKey<'db>>,
+}
+
+impl<'db> ComparisonEvaluator<'db> {
+    fn new(db: &'db dyn Db) -> Self {
+        Self {
+            db,
+            active: FxHashSet::default(),
+        }
+    }
+
+    /// Evaluate a comparison recursively, treating `left` as the operand being constrained.
+    ///
+    /// For example, proving that every constraint of `EQUAL_VALUES` compares equal recursively
+    /// evaluates the constrained type variable against itself:
+    ///
+    /// ```python
+    /// from typing import Any, Literal, TypeVar
+    ///
+    /// EQUAL_VALUES = TypeVar("EQUAL_VALUES", Literal[0], Literal[False])
+    ///
+    /// def f(x: Any, y: EQUAL_VALUES):
+    ///     if x != y:
+    ///         reveal_type(x)  # Any & ~EQUAL_VALUES
+    /// ```
+    ///
+    /// `branch` selects the branch whose constraint is accumulated when either operand expands
+    /// into multiple alternatives. Re-entering an active comparison conservatively returns an
+    /// ambiguous result instead of recursing indefinitely.
+    fn evaluate(
+        &mut self,
+        left: Type<'db>,
+        right: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        let left = left.resolve_type_alias(self.db);
+        let right = right.resolve_type_alias(self.db);
+        let key = ComparisonKey {
+            left,
+            right,
+            branch,
+            operator,
+        };
+
+        // A repeated key means that the result depends on itself. Treating it as ambiguous is
+        // conservative: callers only narrow from definite truthiness or an explicit constraint.
+        if !self.active.insert(key) {
+            return ComparisonResult::Ambiguous;
+        }
+
+        let result = evaluate_comparison_once(self, left, right, branch, operator);
+        self.active.remove(&key);
+        result
+    }
+}
+
+/// Evaluate a comparison whose aliases are resolved and whose key is registered as active.
+///
+/// Recursive comparisons must use [`ComparisonEvaluator::evaluate`] so cycles are detected.
+fn evaluate_comparison_once<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     right: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
-    let left = left.resolve_type_alias(db);
-    let right = right.resolve_type_alias(db);
+    let db = evaluator.db;
 
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
-        return evaluate_union_left(db, &alternatives, right, branch, operator);
+        return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
     }
     if let Some(alternatives) = finite_alternatives(db, right, operator) {
-        return evaluate_union_right(db, left, &alternatives, branch, operator);
+        return evaluate_union_right(evaluator, left, &alternatives, branch, operator);
     }
 
     match (left, right) {
@@ -258,7 +329,7 @@ fn comparison_result<'db>(
 
         (Type::Dynamic(_), other) => {
             if !operator.condition_expects_equality(branch)
-                && all_values_compare_equal(db, other, operator)
+                && all_values_compare_equal(evaluator, other, operator)
             {
                 ComparisonResult::CanNarrow(
                     IntersectionBuilder::new(db)
@@ -276,7 +347,7 @@ fn comparison_result<'db>(
             None => ComparisonResult::Ambiguous,
             Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
                 if !operator.condition_expects_equality(branch)
-                    && all_values_compare_equal(db, other, operator)
+                    && all_values_compare_equal(evaluator, other, operator)
                 {
                     ComparisonResult::CanNarrow(other.negate(db))
                 } else {
@@ -284,33 +355,31 @@ fn comparison_result<'db>(
                 }
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                comparison_result(db, constraints.as_type(db), other, branch, operator)
+                evaluator.evaluate(constraints.as_type(db), other, branch, operator)
             }
         },
         (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                comparison_result(db, other, constraints.as_type(db), branch, operator)
+                evaluator.evaluate(other, constraints.as_type(db), branch, operator)
             }
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
 
-        (Type::NewTypeInstance(newtype), other) => {
-            comparison_result(db, newtype.concrete_base_type(db), other, branch, operator)
-                .discard_narrowing()
-        }
-        (other, Type::NewTypeInstance(newtype)) => {
-            comparison_result(db, other, newtype.concrete_base_type(db), branch, operator)
-                .discard_narrowing()
-        }
+        (Type::NewTypeInstance(newtype), other) => evaluator
+            .evaluate(newtype.concrete_base_type(db), other, branch, operator)
+            .discard_narrowing(),
+        (other, Type::NewTypeInstance(newtype)) => evaluator
+            .evaluate(other, newtype.concrete_base_type(db), branch, operator)
+            .discard_narrowing(),
 
         (Type::Union(union), other) => {
-            evaluate_union_left(db, union.elements(db), other, branch, operator)
+            evaluate_union_left(evaluator, union.elements(db), other, branch, operator)
         }
         (other, Type::Union(union)) => {
-            evaluate_union_right(db, other, union.elements(db), branch, operator)
+            evaluate_union_right(evaluator, other, union.elements(db), branch, operator)
         }
         (Type::Intersection(intersection), other) => evaluate_intersection_left(
-            db,
+            evaluator,
             Type::Intersection(intersection),
             intersection.positive(db),
             other,
@@ -405,46 +474,14 @@ fn comparison_result<'db>(
 /// Return whether every value represented by `ty` is known to compare equal to every other value.
 ///
 /// Comparison evaluation is reused so this stays aligned with all modeled equality semantics.
-/// Self-comparisons that can decompose into dynamic types or type variables are rejected before
-/// evaluation because those branches call this helper and would otherwise recurse.
+/// Cyclic self-comparisons recover as ambiguous, so only a definite acyclic proof returns true.
 fn all_values_compare_equal<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> bool {
-    let ty = ty.resolve_type_alias(db);
-
-    // TODO: Avoid recursing into comparison evaluation until we support some kind of fixed point or
-    // cycle detection.
-    if self_comparison_may_cycle(db, ty) {
-        return false;
-    }
-
-    comparison_result(db, ty, ty, ComparisonBranch::Positive, operator)
+    evaluator.evaluate(ty, ty, ComparisonBranch::Positive, operator)
         == operator.result_from_equality(true)
-}
-
-/// Return whether self-comparison of `ty` may cycle.
-///
-/// Comparison evaluation decomposes unions, positive intersections, and `NewType` bases. Other
-/// types, including generic aliases, are atomic even when their components contain dynamic types
-/// or type variables.
-fn self_comparison_may_cycle<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Dynamic(_) | Type::TypeVar(_) => true,
-        Type::NewTypeInstance(newtype) => {
-            self_comparison_may_cycle(db, newtype.concrete_base_type(db))
-        }
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|element| self_comparison_may_cycle(db, *element)),
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|element| self_comparison_may_cycle(db, *element)),
-        _ => false,
-    }
 }
 
 /// Return whether `ty` is handled by [`builtin_literal_constraint`].
@@ -597,14 +634,15 @@ fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralTy
 
 /// Evaluate each alternative of the union being constrained and combine their branch results.
 fn evaluate_union_left<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     elements: &[Type<'db>],
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     evaluate_target_union(db, elements, branch, |element| {
-        comparison_result(db, element, other, branch, operator)
+        evaluator.evaluate(element, other, branch, operator)
     })
 }
 
@@ -689,19 +727,20 @@ fn evaluate_target_union<'db>(
 
 /// Evaluate the target against each alternative of a union on the non-target side.
 fn evaluate_union_right<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     elements: &[Type<'db>],
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     evaluate_against_results(
         db,
         left,
         branch,
         elements
             .iter()
-            .map(|element| comparison_result(db, left, *element, branch, operator)),
+            .map(|element| evaluator.evaluate(left, *element, branch, operator)),
     )
 }
 
@@ -761,13 +800,14 @@ fn evaluate_against_results<'db>(
 
 /// Combine compatible comparison results from the positive elements of an intersection target.
 fn evaluate_intersection_left<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     original: Type<'db>,
     positive: &crate::FxOrderSet<Type<'db>>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     let mut any_true = false;
     let mut any_false = false;
     let mut any_ambiguous = false;
@@ -775,7 +815,7 @@ fn evaluate_intersection_left<'db>(
     let mut builder = IntersectionBuilder::new(db).add_positive(original);
 
     for element in positive {
-        match comparison_result(db, *element, other, branch, operator) {
+        match evaluator.evaluate(*element, other, branch, operator) {
             ComparisonResult::AlwaysTrue => any_true = true,
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
@@ -976,7 +1016,7 @@ fn compare_nominal_instances<'db>(
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum ComparisonOperator {
     Equality,
     Inequality,
