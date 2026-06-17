@@ -60,7 +60,6 @@ mod reassemble;
 mod triple;
 
 pub use expand::expand;
-pub use reassemble::{cpp_projection, reassemble};
 pub use ir::{
     ActsAs, AssocDecl, AssocKind, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef,
     ConstexprKind, CppAccess, CppBase, CppField, CppFriend, CppMacroUse, CppMethod,
@@ -69,6 +68,7 @@ pub use ir::{
     ValidationKind,
 };
 pub use ndjson::{ParseError, from_ndjson, to_ndjson};
+pub use reassemble::{cpp_projection, reassemble};
 pub use triple::{EntityKind, Predicate, Provenance, Triple};
 
 #[cfg(test)]
