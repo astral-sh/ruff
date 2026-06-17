@@ -1319,12 +1319,20 @@ fn known_literal_equality<'db>(
     }
 }
 
-/// Return a statically known value with the same equality behavior as an enum member.
+/// Return the statically known runtime value of an enum member.
 ///
 /// Custom enum construction can replace the declared value, so members of such enums return `None`.
 fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Option<Type<'db>> {
     let metadata = enum_metadata(db, literal.enum_class(db))?;
-    metadata.comparison_value_type(db, literal.name(db))
+    let name = metadata.resolve_member(literal.name(db))?;
+    if metadata.member_value_may_be_transformed(name) {
+        return None;
+    }
+    if metadata.auto_members.contains(name) {
+        metadata.value_type(db, name)
+    } else {
+        metadata.members.get(name).copied()
+    }
 }
 
 /// Return whether two enum literals resolve to the same member, including aliases.

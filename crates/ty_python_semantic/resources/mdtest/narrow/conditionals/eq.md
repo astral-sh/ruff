@@ -137,6 +137,8 @@ class Bar(IntEnum):
     A = 1
     B = 2
 
+reveal_type(Foo.X.value)  # revealed: Literal[1]
+
 def _(value: Foo | Bar):
     if value == Foo.X:
         reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
@@ -194,6 +196,8 @@ class Generated(IntEnum):
 
 class Other(IntEnum):
     ONE = 1
+
+reveal_type(Generated.ONE.value)  # revealed: int
 
 def _(value: Generated | Other):
     if value == Generated.ONE:
