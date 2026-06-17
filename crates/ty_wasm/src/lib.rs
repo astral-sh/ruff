@@ -857,7 +857,6 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Diagnostic {
-    #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
 }
 
