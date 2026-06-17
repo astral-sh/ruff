@@ -1296,8 +1296,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // A typevar can be explicitly specialized to a dynamic type, regardless of its bound
             // or constraints. It is therefore not generally redundant with its bound or the union
-            // of its constraints. However, a typevar `T` is always redundant with a union that
-            // already contains `T`.
+            // of its constraints when simplifying unions and intersections. However, a typevar `T`
+            // is always redundant with a union that already contains `T`.
             (_, Type::Union(union))
                 if self.relation.can_safely_assume_reflexivity(source)
                     && union.elements(db).contains(&source) =>
@@ -1377,12 +1377,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Except for redundancy, a fully static typevar is a subtype of its upper bound, and
-            // to something similar to the union of its constraints. An unbound, unconstrained,
-            // fully static typevar has an implicit upper bound of `object` (which is handled
-            // above).
+            // Except for impure redundancy used to simplify unions and intersections, a fully
+            // static typevar is a subtype of its upper bound, and to something similar to the union
+            // of its constraints. An unbound, unconstrained, fully static typevar has an implicit
+            // upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !matches!(self.relation, TypeRelation::Redundancy { .. })
+                if !matches!(self.relation, TypeRelation::Redundancy { pure: false })
                     && !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
@@ -1405,7 +1405,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if !matches!(self.relation, TypeRelation::Redundancy { .. })
+                if !matches!(self.relation, TypeRelation::Redundancy { pure: false })
                     && !bound_typevar.is_inferable(db, self.inferable)
                     && !bound_typevar
                         .typevar(db)

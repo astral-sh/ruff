@@ -649,6 +649,7 @@ there is no guarantee what type the typevar will be specialized to.
 
 ```py
 from typing import Any
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
 
 class Super: ...
 class Base(Super): ...
@@ -691,6 +692,10 @@ def bounded[T: Base](t: T) -> None:
 
     def _(x: T | Any) -> None:
         reveal_type(x)  # revealed: T@bounded | Any
+
+    static_assert(is_subtype_of(T | Base, Base))
+    static_assert(is_subtype_of(Base, T | Base))
+    static_assert(is_equivalent_to(T | Base, Base))
 ```
 
 The union of a constrained typevar with another type cannot be simplified based on its constraints.
@@ -712,6 +717,10 @@ def constrained[T: (Base, Sub)](t: T) -> None:
 
     def _(x: T | Any) -> None:
         reveal_type(x)  # revealed: T@constrained | Any
+
+    static_assert(is_subtype_of(T | Sub, T))
+    static_assert(is_subtype_of(T, T | Sub))
+    static_assert(is_equivalent_to(T | Sub, T))
 ```
 
 ## Intersections involving typevars
