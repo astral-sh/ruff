@@ -348,6 +348,10 @@ def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     else:
         reveal_type(x)  # revealed: str | None
 
+def constrained_typevar_slot(x: T | None, y: T) -> None:
+    if x not in (y,):
+        reveal_type(x)  # revealed: None
+
 def local_literal_rhs(x: str | None) -> None:
     unavailable = [None, ""]
     if x not in unavailable:
