@@ -112,26 +112,26 @@ from typing import Literal
 
 def _(x: Literal["a", "b", "c", "d"]):
     if x in "abc":
-        reveal_type(x)  # revealed: Literal["a", "b", "c", "d"]
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
-        reveal_type(x)  # revealed: Literal["a", "b", "c", "d"]
+        reveal_type(x)  # revealed: Literal["d"]
 ```
 
 ```py
 def _(x: Literal["a", "b", "c", "e"]):
     if x in "abcd":
-        reveal_type(x)  # revealed: Literal["a", "b", "c", "e"]
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
-        reveal_type(x)  # revealed: Literal["a", "b", "c", "e"]
+        reveal_type(x)  # revealed: Literal["e"]
 ```
 
 ```py
 def _(x: Literal[1, "a", "b", "c", "d"]):
     # error: [unsupported-operator]
     if x in "abc":
-        reveal_type(x)  # revealed: Literal[1, "a", "b", "c", "d"]
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
-        reveal_type(x)  # revealed: Literal[1, "a", "b", "c", "d"]
+        reveal_type(x)  # revealed: Literal[1, "d"]
 
 def empty_string(x: str):
     if x in "":
