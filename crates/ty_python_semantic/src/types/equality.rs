@@ -1248,6 +1248,13 @@ impl KnownComparisonSemantics {
     /// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
     fn of_type<'db>(db: &'db dyn Db, ty: Type<'db>, operator: ComparisonOperator) -> Option<Self> {
         match ty {
+            Type::Union(union) => {
+                let mut elements = union.elements(db).iter().copied();
+                let first = Self::of_type(db, elements.next()?, operator)?;
+                elements
+                    .all(|element| Self::of_type(db, element, operator) == Some(first))
+                    .then_some(first)
+            }
             Type::LiteralValue(literal) => Self::of_literal(db, literal.kind(), operator),
             Type::TypedDict(_) => Some(Self::Dict),
             Type::EnumComplement(complement) => Self::of_instance(

@@ -334,6 +334,11 @@ def disjoint_over_budget(value: Budgeted, other: Disjoint):
     else:
         reveal_type(value)  # revealed: Never
 
+def disjoint_union_over_budget(value: Budgeted | None, other: Disjoint):
+    if value == other:
+        reveal_type(value)  # revealed: Never
+        value.name
+
 class Shared(Enum):
     A = 1
     B = 2
