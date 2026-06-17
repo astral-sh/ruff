@@ -817,6 +817,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let result = source_member.when_some_and(db, self.constraints, |source_member| {
+                    if source_member == target_member
+                        && self
+                            .relation
+                            .can_safely_assume_reflexivity(source_member.ty())
+                    {
+                        return self.always();
+                    }
+
                     match (source_member.kind, target_member.kind) {
                         // Method members are always immutable;
                         // they can never be subtypes of/assignable to mutable attribute members.
@@ -857,17 +865,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::Callable(protocol_bind_self(db, target_callable, None)),
                             )
                         }),
-
-                        (
-                            ProtocolMemberKind::Method(source_method),
-                            ProtocolMemberKind::Method(target_method),
-                        ) if source_method == target_method
-                            && self
-                                .relation
-                                .can_safely_assume_reflexivity(Type::Callable(source_method)) =>
-                        {
-                            self.always()
-                        }
 
                         (
                             ProtocolMemberKind::Method(source_method),

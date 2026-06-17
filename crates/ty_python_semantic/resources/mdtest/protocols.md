@@ -3627,6 +3627,27 @@ def g(x: B2[int]):
     pass
 ```
 
+## Identical inherited protocol members after specialization
+
+Identical protocol members can be short-circuited after specialization, but members whose
+specialized types differ must still be compared.
+
+```py
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class A(Protocol[T]):
+    def close(self) -> None: ...
+    def get(self) -> T: ...
+
+class B(A[T], Protocol[T]): ...
+
+static_assert(not is_subtype_of(B[int], A[str]))
+static_assert(not is_assignable_to(B[int], A[str]))
+```
+
 ## The `Generator` protocol's `_ReturnT_co` needs special casing
 
 The `_ReturnT_co` type parameter in the `Generator` protocol is the value of a `yield from` over
