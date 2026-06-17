@@ -122,6 +122,46 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+`IntEnum` members from different classes compare using their integer values:
+
+```py
+from enum import IntEnum
+
+class Foo(IntEnum):
+    X = 1
+    Y = 2
+
+class Bar(IntEnum):
+    A = 1
+    B = 2
+
+def _(value: Foo | Bar):
+    if value == Foo.X:
+        reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+    else:
+        reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
+
+    if value != Foo.X:
+        reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
+    else:
+        reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+
+class Shifted(IntEnum):
+    def __new__(cls, value: int) -> "Shifted":
+        member = int.__new__(cls, value + 1)
+        member._value_ = value + 1
+        return member
+
+    A = 1
+    B = 2
+
+def _(value: Foo | Shifted):
+    if value == Foo.X:
+        reveal_type(value)  # revealed: Literal[Foo.X] | Shifted
+    else:
+        reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
+```
+
 An assignment to `__new__`, `__init__`, or other methods can replace the value declared in the class
 body. In that case, we cannot compare an enum member with its declared value statically:
 

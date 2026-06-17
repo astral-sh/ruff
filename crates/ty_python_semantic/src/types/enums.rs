@@ -104,6 +104,18 @@ impl<'db> EnumValueConstruction<'db> {
         self.init.is_present() || self.new.is_present() || self.metaclass_may_transform_values
     }
 
+    /// Returns whether the declared or generated value is unsafe to use as equality evidence.
+    ///
+    /// Unlike `.value` inference, this trusts standard-library constructor methods whose
+    /// comparison behavior is modeled. User-defined or opaque constructors and custom metaclasses
+    /// may change that behavior arbitrarily.
+    const fn comparison_value_may_be_transformed(self, is_auto: bool) -> bool {
+        self.init.is_user_defined()
+            || self.new.is_user_defined()
+            || self.metaclass_may_transform_values
+            || (is_auto && self.generate_next_value.is_opaque())
+    }
+
     /// Returns the value to use when checking whether an enum member is an alias.
     ///
     /// For an `auto()` member with a resolvable `_generate_next_value_`, this uses the generator's
@@ -323,6 +335,32 @@ impl<'db> EnumMetadata<'db> {
             Some(annotation)
         } else {
             Some(value)
+        }
+    }
+
+    /// Return a statically known value with the same equality behavior as an enum member.
+    pub(crate) fn comparison_value_type(
+        &self,
+        db: &'db dyn Db,
+        member_name: &Name,
+    ) -> Option<Type<'db>> {
+        let member_name = self.resolve_member(member_name)?;
+        let declared_value = self.members.get(member_name).copied()?;
+
+        let is_auto = self.auto_members.contains(member_name);
+        if self
+            .value_construction
+            .comparison_value_may_be_transformed(is_auto)
+        {
+            None
+        } else if is_auto
+            && let Some(function) = self.value_construction.generate_next_value.function()
+        {
+            Some(function.signature(db).overload_return_type_or_unknown(db))
+        } else {
+            // TODO: `IntEnum` normalizes boolean member values to `int`. The declared boolean has
+            // the same equality behavior, but we do not model the exact runtime `.value` here.
+            Some(declared_value)
         }
     }
 
