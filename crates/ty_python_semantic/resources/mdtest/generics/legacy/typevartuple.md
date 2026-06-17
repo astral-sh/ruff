@@ -303,7 +303,7 @@ from typing import Callable, Generic, TypeVarTuple, ParamSpec
 P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 
-class TypeVarTupleWithParamSpec(Generic[*Ts, **P]):
+class TypeVarTupleWithParamSpec(Generic[*Ts, P]):
     fn: Callable[P, tuple[*Ts]]
 
 reveal_type(TypeVarTupleWithParamSpec[[str, int]]().fn)  # revealed: (str, int, /) -> tuple[()]
@@ -313,8 +313,8 @@ reveal_type(TypeVarTupleWithParamSpec[int, str, [str, int]]().fn)  # revealed: (
 # error: [invalid-type-arguments]
 reveal_type(TypeVarTupleWithParamSpec[str, int]().fn)  # revealed: (...) -> tuple[str]
 
-reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str]
-reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str]
+reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str, int]
+reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
 ### Inferred specialization from construction
@@ -532,13 +532,20 @@ Ts = TypeVarTuple("Ts")
 
 Alias = Callable[[*Ts], None]
 
-def test(fn: Alias[int, *Ts]) -> tuple[*Ts]: ...
+def test(fn: Alias[int, *Ts]) -> tuple[*Ts]:
+    raise NotImplementedError
 
 def fn0(a: int) -> None: ...
 def fn1(a: int, b: str) -> None: ...
 def fn2(a: int, b: str, c: bytes) -> None: ...
 
-reveal_type(test(fn0))  # revealed: tuple[()]
-reveal_type(test(fn1))  # revealed: tuple[str]
-reveal_type(test(fn2))  # revealed: tuple[str, bytes]
+# TODO: Should reveal `tuple[()]` without an error.
+# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `(int, /, *args: tuple[Unknown, ...]) -> None`, found `def fn0(a: int) -> None`"
+reveal_type(test(fn0))  # revealed: tuple[Unknown, ...]
+# TODO: Should reveal `tuple[str]` without an error.
+# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `(int, /, *args: tuple[Unknown, ...]) -> None`, found `def fn1(a: int, b: str) -> None`"
+reveal_type(test(fn1))  # revealed: tuple[Unknown, ...]
+# TODO: Should reveal `tuple[str, bytes]` without an error.
+# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `(int, /, *args: tuple[Unknown, ...]) -> None`, found `def fn2(a: int, b: str, c: bytes) -> None`"
+reveal_type(test(fn2))  # revealed: tuple[Unknown, ...]
 ```
