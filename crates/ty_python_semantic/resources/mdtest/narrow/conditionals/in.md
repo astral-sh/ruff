@@ -511,13 +511,15 @@ def assignment_expression(value: Token | Literal[1]) -> None:
         reveal_type(value)  # revealed: Literal[1]
 ```
 
-## Wrapped types with known containment
+## Wrapped and intersected types with known containment
 
 A type variable uses its upper bound or constraints, and a `NewType` uses its concrete base. Broad
-union members can be removed when every possible container has known containment behavior:
+union members can be removed when every possible container has known containment behavior. An
+intersection retains element constraints from all its iterable components once one component
+establishes known containment behavior:
 
 ```py
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Literal, NewType, TypeVar, final
 
 @final
@@ -584,6 +586,13 @@ def mixed_constraints(
 def range_membership(value: Token | Literal[1], values: range) -> None:
     if value in values:
         reveal_type(value)  # revealed: Token | Literal[1]
+
+def narrowed_to_tuple(
+    value: Token | Literal[1],
+    values: Iterable[Literal[1]],
+) -> None:
+    if isinstance(values, tuple) and value in values:
+        reveal_type(value)  # revealed: Literal[1]
 ```
 
 ## Inherited built-in containment
