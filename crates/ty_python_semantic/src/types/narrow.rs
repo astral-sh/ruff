@@ -79,6 +79,21 @@ fn elementwise_containment_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option
         Type::NewTypeInstance(newtype) => {
             elementwise_containment_domain(db, newtype.concrete_base_type(db))
         }
+        Type::Intersection(intersection) => {
+            // A known positive component establishes the containment behavior. Replace that
+            // component with its containment domain, but retain the other components so that
+            // their element types still constrain iteration.
+            let mut has_known_domain = false;
+            let domain = intersection.map_positive(db, |element| {
+                if let Some(domain) = elementwise_containment_domain(db, *element) {
+                    has_known_domain = true;
+                    domain
+                } else {
+                    *element
+                }
+            });
+            has_known_domain.then_some(domain)
+        }
         Type::TypedDict(_) => Some(ty),
         Type::NominalInstance(instance) => {
             // Walk the MRO until we find either a visible override or a supported built-in
