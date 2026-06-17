@@ -69,11 +69,15 @@ impl<'db> ProtocolClass<'db> {
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
-        self.static_class_literal(db)
-            .is_some_and(|(class_literal, _)| {
-                class_literal
-                    .known_function_decorators(db)
-                    .contains(&KnownFunction::RuntimeCheckable)
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|base| {
+                base.static_class_literal(db)
+                    .is_some_and(|(class_literal, _)| {
+                        class_literal
+                            .known_function_decorators(db)
+                            .contains(&KnownFunction::RuntimeCheckable)
+                    })
             })
     }
 
