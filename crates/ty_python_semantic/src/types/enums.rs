@@ -23,7 +23,114 @@ use crate::{
 };
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
 
-#[expect(clippy::struct_excessive_bools)]
+/// A resolved enum method, retaining both whether it is analyzable and who defines it.
+///
+/// Standard-library methods and user-defined methods are both callable functions, but callers need
+/// to distinguish them: standard-library methods have modeled behavior, while user-defined or
+/// opaque methods may replace the member value arbitrarily.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+pub(super) enum ResolvedEnumMethod<'db> {
+    #[default]
+    Absent,
+    StandardLibrary(FunctionType<'db>),
+    UserDefined(FunctionType<'db>),
+    Opaque,
+}
+
+impl<'db> ResolvedEnumMethod<'db> {
+    pub(super) const fn function(self) -> Option<FunctionType<'db>> {
+        match self {
+            Self::StandardLibrary(function) | Self::UserDefined(function) => Some(function),
+            Self::Absent | Self::Opaque => None,
+        }
+    }
+
+    const fn is_present(self) -> bool {
+        !matches!(self, Self::Absent)
+    }
+
+    const fn is_user_defined(self) -> bool {
+        matches!(self, Self::UserDefined(_) | Self::Opaque)
+    }
+
+    const fn is_opaque(self) -> bool {
+        matches!(self, Self::Opaque)
+    }
+}
+
+/// Describes the runtime steps that may transform a declared enum member value.
+///
+/// Different consumers require different levels of conservatism. Value inference treats any
+/// constructor method as a possible transformation, while alias detection follows the value
+/// captured before `__init__`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+pub(super) struct EnumValueConstruction<'db> {
+    pub(super) init: ResolvedEnumMethod<'db>,
+    pub(super) new: ResolvedEnumMethod<'db>,
+    generate_next_value: ResolvedEnumMethod<'db>,
+    pub(super) metaclass_may_transform_values: bool,
+}
+
+impl<'db> EnumValueConstruction<'db> {
+    /// Returns whether a member value can be checked directly against an explicit `_value_`
+    /// annotation.
+    ///
+    /// Constructor methods have their own call signatures and may replace `_value_`; a custom
+    /// metaclass may rewrite the member value before construction.
+    pub(crate) const fn can_validate_with_value_annotation(self) -> bool {
+        matches!(self.init, ResolvedEnumMethod::Absent)
+            && matches!(self.new, ResolvedEnumMethod::Absent)
+            && !self.metaclass_may_transform_values
+    }
+
+    /// Returns whether the declared value cannot be used as the precise type of `.value`.
+    ///
+    /// A resolvable `_generate_next_value_` is excluded because its return type can be used for an
+    /// `auto()` member instead.
+    const fn member_value_may_be_transformed(self, is_auto: bool) -> bool {
+        self.init.is_present()
+            || self.new.is_present()
+            || self.metaclass_may_transform_values
+            || (is_auto && self.generate_next_value.is_opaque())
+    }
+
+    /// Returns whether the declared member values cannot be combined into a precise instance
+    /// `.value` type.
+    ///
+    /// `_generate_next_value_` is excluded because `value_type` incorporates its return type for
+    /// each `auto()` member before the values are combined.
+    const fn instance_value_may_be_transformed(self) -> bool {
+        self.init.is_present() || self.new.is_present() || self.metaclass_may_transform_values
+    }
+
+    /// Returns the value to use when checking whether an enum member is an alias.
+    ///
+    /// For an `auto()` member with a resolvable `_generate_next_value_`, this uses the generator's
+    /// return type instead of the placeholder collected from the member declaration.
+    ///
+    /// Returns `None` when construction can rewrite `_value_` before alias registration, because
+    /// the inferred value is not reliable alias evidence in those cases. `__init__` does not affect
+    /// this result because alias registration uses the value captured before `__init__` runs.
+    fn alias_detection_value(
+        self,
+        db: &'db dyn Db,
+        value_ty: Type<'db>,
+        is_auto: bool,
+    ) -> Option<Type<'db>> {
+        if self.new.is_user_defined() || self.metaclass_may_transform_values {
+            None
+        } else if !is_auto {
+            Some(value_ty)
+        } else if self.generate_next_value.is_opaque() {
+            None
+        } else if let Some(function) = self.generate_next_value.function() {
+            Some(function.signature(db).overload_return_type_or_unknown(db))
+        } else {
+            Some(value_ty)
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
@@ -35,36 +142,8 @@ pub(crate) struct EnumMetadata<'db> {
     /// The explicit `_value_` annotation type, if declared.
     pub(crate) value_annotation: Option<Type<'db>>,
 
-    /// The custom `__init__` function, if defined on this enum.
-    ///
-    /// When present, member values are validated by synthesizing a call to
-    /// `__init__` rather than by simple type assignability.
-    pub(crate) init_function: Option<FunctionType<'db>>,
-
-    /// The custom `__new__` function, if defined on this enum.
-    ///
-    /// When present, the RHS of a member declaration is not necessarily the
-    /// value exposed through `.value`; the method can assign `_value_`
-    /// independently.
-    pub(crate) new_function: Option<FunctionType<'db>>,
-
-    /// The custom `_generate_next_value_` function, if defined on this enum.
-    ///
-    /// When present, defines the value returned by calls to `auto()`
-    pub(crate) generate_next_value_function: Option<FunctionType<'db>>,
-
-    /// Whether this enum has an opaque user-defined `__init__` binding.
-    pub(crate) opaque_init: bool,
-
-    /// Whether this enum has an opaque user-defined `__new__` binding.
-    pub(crate) opaque_new: bool,
-
-    /// Whether this enum has an opaque user-defined `_generate_next_value_` binding.
-    pub(crate) opaque_generate_next_value: bool,
-
-    /// Whether the enum metaclass may transform member values before they are passed to enum
-    /// construction hooks through a custom `__prepare__` or `__new__` binding.
-    pub(crate) custom_enum_metaclass_hooks: bool,
+    /// How enum construction may transform declared member values.
+    pub(super) value_construction: EnumValueConstruction<'db>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -167,19 +246,13 @@ impl<'db> EnumMetadata<'db> {
             aliases: FxHashMap::default(),
             auto_members: FxHashSet::default(),
             value_annotation: None,
-            init_function: None,
-            new_function: None,
-            generate_next_value_function: None,
-            opaque_init: false,
-            opaque_new: false,
-            opaque_generate_next_value: false,
-            custom_enum_metaclass_hooks: false,
+            value_construction: EnumValueConstruction::default(),
         }
     }
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
-    /// Priority: explicit `_value_` annotation, then custom construction hooks
+    /// Priority: explicit `_value_` annotation, then custom construction methods
     /// or metaclass value transformation → `Any`, then `_generate_next_value_`
     /// return type for `auto()` members, then the inferred member value type.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
@@ -190,7 +263,7 @@ impl<'db> EnumMetadata<'db> {
             Some(annotation)
         } else if self.member_value_may_be_transformed(member_name) {
             Some(Type::Dynamic(DynamicType::Any))
-        } else if let Some(func_ty) = self.generate_next_value_function
+        } else if let Some(func_ty) = self.value_construction.generate_next_value.function()
             && self.auto_members.contains(member_name)
         {
             Some(func_ty.signature(db).overload_return_type_or_unknown(db))
@@ -203,12 +276,8 @@ impl<'db> EnumMetadata<'db> {
     ///
     /// An opaque `_generate_next_value_` only affects members declared with `auto()`.
     pub(crate) fn member_value_may_be_transformed(&self, member_name: &Name) -> bool {
-        self.init_function.is_some()
-            || self.new_function.is_some()
-            || self.opaque_init
-            || self.opaque_new
-            || self.custom_enum_metaclass_hooks
-            || (self.opaque_generate_next_value && self.auto_members.contains(member_name))
+        self.value_construction
+            .member_value_may_be_transformed(self.auto_members.contains(member_name))
     }
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
@@ -234,12 +303,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some()
-            || self.new_function.is_some()
-            || self.opaque_init
-            || self.opaque_new
-            || self.custom_enum_metaclass_hooks
-        {
+        } else if self.value_construction.instance_value_may_be_transformed() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             let union = self
@@ -588,42 +652,6 @@ fn try_register_alias<'db>(
     false
 }
 
-/// Returns the value to use when checking whether an enum member is an alias.
-///
-/// For ordinary members, this is the inferred value type. For `auto()` members with a custom
-/// `_generate_next_value_`, aliasing is based on the generated value instead of the pre-generator
-/// placeholder used while collecting members.
-///
-/// Returns `None` when `__new__` or a custom metaclass can rewrite `_value_` before alias
-/// registration, or when an `auto()` generator binding is opaque, because the inferred value is not
-/// reliable alias evidence in those cases.
-#[derive(Clone, Copy)]
-struct AliasDetectionContext<'db> {
-    generate_next_value_function: Option<FunctionType<'db>>,
-    user_defined_new: bool,
-    opaque_generate_next_value: bool,
-    custom_enum_metaclass_hooks: bool,
-}
-
-fn alias_detection_value<'db>(
-    db: &'db dyn Db,
-    value_ty: Type<'db>,
-    is_auto: bool,
-    context: AliasDetectionContext<'db>,
-) -> Option<Type<'db>> {
-    if context.user_defined_new || context.custom_enum_metaclass_hooks {
-        None
-    } else if !is_auto {
-        Some(value_ty)
-    } else if context.opaque_generate_next_value {
-        None
-    } else if let Some(func_ty) = context.generate_next_value_function {
-        Some(func_ty.signature(db).overload_return_type_or_unknown(db))
-    } else {
-        Some(value_ty)
-    }
-}
-
 /// List all members of an enum.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
@@ -666,13 +694,7 @@ pub(crate) fn enum_metadata<'db>(
                 aliases,
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
-                init_function: None,
-                new_function: None,
-                generate_next_value_function: None,
-                opaque_init: false,
-                opaque_new: false,
-                opaque_generate_next_value: false,
-                custom_enum_metaclass_hooks: false,
+                value_construction: EnumValueConstruction::default(),
             });
         }
     };
@@ -700,30 +722,30 @@ pub(crate) fn enum_metadata<'db>(
     let mut prev_bool_literal = None;
     let ignored_names = enum_ignored_names(db, scope_id);
 
-    // Look up custom construction hooks, falling back to parent enum classes. An opaque hook
-    // binding still shadows hooks from classes later in the MRO.
-    let user_defined_init = custom_enum_hook(db, scope_id, "__init__")
-        .or_else(|| inherited_user_defined_enum_hook(db, class, "__init__"));
-    let (init_function, opaque_init) = resolve_enum_hook(user_defined_init, || {
-        inherited_known_enum_hook(db, class, "__init__")
+    // Look up custom construction methods, falling back to parent enum classes. An opaque binding
+    // still shadows methods from classes later in the MRO.
+    let user_defined_init = custom_enum_method(db, scope_id, "__init__")
+        .or_else(|| inherited_user_defined_enum_method(db, class, "__init__"));
+    let init = resolve_enum_method(user_defined_init, || {
+        inherited_known_enum_method(db, class, "__init__")
     });
-    let user_defined_new = custom_enum_hook(db, scope_id, "__new__")
-        .or_else(|| inherited_user_defined_enum_hook(db, class, "__new__"));
-    let (new_function, opaque_new) = resolve_enum_hook(user_defined_new, || {
-        inherited_known_enum_hook(db, class, "__new__")
+    let user_defined_new = custom_enum_method(db, scope_id, "__new__")
+        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"));
+    let new = resolve_enum_method(user_defined_new, || {
+        inherited_known_enum_method(db, class, "__new__")
     });
-    let custom_enum_metaclass_hooks = custom_enum_metaclass_hooks(db, class);
-    let user_defined_generate_next_value = custom_enum_hook(db, scope_id, "_generate_next_value_")
-        .or_else(|| inherited_user_defined_enum_hook(db, class, "_generate_next_value_"));
-    let (generate_next_value_function, opaque_generate_next_value) =
-        resolve_enum_hook(user_defined_generate_next_value, || {
-            inherited_known_enum_hook(db, class, "_generate_next_value_")
-        });
-    let alias_detection_context = AliasDetectionContext {
-        generate_next_value_function,
-        user_defined_new: user_defined_new.is_some(),
-        opaque_generate_next_value,
-        custom_enum_metaclass_hooks,
+    let metaclass_may_transform_values = enum_metaclass_may_transform_values(db, class);
+    let user_defined_generate_next_value =
+        custom_enum_method(db, scope_id, "_generate_next_value_")
+            .or_else(|| inherited_user_defined_enum_method(db, class, "_generate_next_value_"));
+    let generate_next_value = resolve_enum_method(user_defined_generate_next_value, || {
+        inherited_known_enum_method(db, class, "_generate_next_value_")
+    });
+    let value_construction = EnumValueConstruction {
+        init,
+        new,
+        generate_next_value,
+        metaclass_may_transform_values,
     };
 
     let mut aliases = FxHashMap::default();
@@ -863,12 +885,8 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
-            let alias_value_ty = alias_detection_value(
-                db,
-                value_ty,
-                auto_members.contains(name),
-                alias_detection_context,
-            );
+            let alias_value_ty =
+                value_construction.alias_detection_value(db, value_ty, auto_members.contains(name));
             if let Some(alias_value_ty) = alias_value_ty
                 && try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
             {
@@ -916,7 +934,7 @@ pub(crate) fn enum_metadata<'db>(
 
     let custom_value_annotation = custom_value_annotation(db, scope_id);
     let value_annotation = custom_value_annotation.or_else(|| {
-        if custom_enum_metaclass_hooks {
+        if metaclass_may_transform_values {
             inherited_user_defined_value_annotation(db, class)
         } else {
             inherited_value_annotation(db, class)
@@ -930,23 +948,20 @@ pub(crate) fn enum_metadata<'db>(
         aliases,
         auto_members,
         value_annotation,
-        init_function,
-        new_function,
-        generate_next_value_function,
-        opaque_init,
-        opaque_new,
-        opaque_generate_next_value,
-        custom_enum_metaclass_hooks,
+        value_construction,
     })
 }
 
-/// Returns whether an enum's metaclass has a custom value-transforming hook before the stdlib
+/// Returns whether an enum's metaclass has a custom value-transforming method before the stdlib
 /// `EnumType`/`EnumMeta` implementation.
 ///
 /// `__prepare__` can return a namespace that rewrites assignments, and `__new__` can rewrite the
-/// completed class dictionary. Either hook can therefore change member values before the stdlib
+/// completed class dictionary. Either method can therefore change member values before the stdlib
 /// enum constructor validates and forwards them to `__new__`/`__init__`.
-fn custom_enum_metaclass_hooks<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+fn enum_metaclass_may_transform_values<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
     let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
         return false;
     };
@@ -960,7 +975,7 @@ fn custom_enum_metaclass_hooks<'db>(db: &'db dyn Db, class: StaticClassLiteral<'
         .any(|base| {
             ["__prepare__", "__new__"]
                 .into_iter()
-                .any(|name| custom_enum_hook(db, base.body_scope(db), name).is_some())
+                .any(|name| custom_enum_method(db, base.body_scope(db), name).is_some())
         })
 }
 
@@ -1016,48 +1031,48 @@ fn inherited_user_defined_value_annotation<'db>(
 }
 
 #[derive(Clone, Copy)]
-enum EnumHook<'db> {
+enum EnumMethodBinding<'db> {
     Function(FunctionType<'db>),
     Opaque,
 }
 
-/// Returns the hook defined in `scope`, including opaque bindings.
-fn custom_enum_hook<'db>(
+/// Returns the enum method defined in `scope`, including opaque bindings.
+fn custom_enum_method<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: &str,
-) -> Option<EnumHook<'db>> {
+) -> Option<EnumMethodBinding<'db>> {
     let symbol_id = place_table(db, scope).symbol_id(name)?;
     let mut bindings = use_def_map(db, scope).end_of_scope_symbol_bindings(symbol_id);
     let binding = bindings.next()?;
     if bindings.next().is_some() {
-        return Some(EnumHook::Opaque);
+        return Some(EnumMethodBinding::Opaque);
     }
 
     let definition = binding.binding.definition()?;
     if !definition.kind(db).is_function_def() {
-        return Some(EnumHook::Opaque);
+        return Some(EnumMethodBinding::Opaque);
     }
 
     match binding_type(db, definition) {
-        Type::FunctionLiteral(function) => Some(EnumHook::Function(function)),
-        _ => Some(EnumHook::Opaque),
+        Type::FunctionLiteral(function) => Some(EnumMethodBinding::Function(function)),
+        _ => Some(EnumMethodBinding::Opaque),
     }
 }
 
-/// Looks up the first user-defined enum hook in the MRO.
-fn inherited_user_defined_enum_hook<'db>(
+/// Looks up the first user-defined enum method in the MRO.
+fn inherited_user_defined_enum_method<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     name: &str,
-) -> Option<EnumHook<'db>> {
+) -> Option<EnumMethodBinding<'db>> {
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_hook(db, base.body_scope(db), name))
+        .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
 }
 
-/// Looks up a function hook inherited from a known enum class.
-fn inherited_known_enum_hook<'db>(
+/// Looks up a resolvable method inherited from a known enum class.
+fn inherited_known_enum_method<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     name: &str,
@@ -1065,22 +1080,25 @@ fn inherited_known_enum_hook<'db>(
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_some())
         .find_map(
-            |base| match custom_enum_hook(db, base.body_scope(db), name) {
-                Some(EnumHook::Function(function)) => Some(function),
-                Some(EnumHook::Opaque) | None => None,
+            |base| match custom_enum_method(db, base.body_scope(db), name) {
+                Some(EnumMethodBinding::Function(function)) => Some(function),
+                Some(EnumMethodBinding::Opaque) | None => None,
             },
         )
 }
 
-/// Resolves a user-defined hook without falling through an opaque binding to the known default.
-fn resolve_enum_hook<'db>(
-    user_defined: Option<EnumHook<'db>>,
+/// Resolves a user-defined method without falling through an opaque binding to the known default.
+fn resolve_enum_method<'db>(
+    user_defined: Option<EnumMethodBinding<'db>>,
     known: impl FnOnce() -> Option<FunctionType<'db>>,
-) -> (Option<FunctionType<'db>>, bool) {
+) -> ResolvedEnumMethod<'db> {
     match user_defined {
-        Some(EnumHook::Function(function)) => (Some(function), false),
-        Some(EnumHook::Opaque) => (None, true),
-        None => (known(), false),
+        Some(EnumMethodBinding::Function(function)) => ResolvedEnumMethod::UserDefined(function),
+        Some(EnumMethodBinding::Opaque) => ResolvedEnumMethod::Opaque,
+        None => known().map_or(
+            ResolvedEnumMethod::Absent,
+            ResolvedEnumMethod::StandardLibrary,
+        ),
     }
 }
 
