@@ -175,11 +175,19 @@ fn narrow_string_membership<'db>(
         }
     };
 
-    let narrowed = match lhs_domain {
+    let mut narrowed = match lhs_domain {
         Type::Union(union) => union.filter(db, keep),
-        _ if keep(&lhs_domain) => return None,
+        _ if keep(&lhs_domain) => lhs_domain,
         _ => Type::Never,
     };
+
+    if !is_contained {
+        let mut builder = IntersectionBuilder::new(db).add_positive(narrowed);
+        for character in haystack.chars() {
+            builder = builder.add_negative(Type::single_char_string_literal(db, character));
+        }
+        narrowed = builder.build();
+    }
 
     (narrowed != lhs_domain).then_some(narrowed)
 }
