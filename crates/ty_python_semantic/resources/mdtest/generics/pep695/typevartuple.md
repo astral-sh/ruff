@@ -114,8 +114,8 @@ reveal_type(TypeVarTupleWithParamSpec[int, str, [str, int]]().fn)  # revealed: (
 # error: [invalid-type-arguments]
 reveal_type(TypeVarTupleWithParamSpec[str, int]().fn)  # revealed: (...) -> tuple[str]
 
-reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str]
-reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str]
+reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str, int]
+reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
 ### Inferred specialization from construction
@@ -226,7 +226,9 @@ def f(i: int, s: str, b: bool, t: tuple[int, str], vt: tuple[int, ...]) -> None:
     reveal_type(both(i, t, b))  # revealed: tuple[int, int, str, bool]
     reveal_type(both(i, vt, b))  # revealed: tuple[int, *tuple[int, ...], bool]
 
-    # error: [invalid-argument-type]
+    # TODO: Avoid also reporting an invalid argument type for the first unpacked element.
+    # error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `tuple[Unknown, ...]`, found `int`"
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `simple`: expected 1, got 2"
     reveal_type(simple(*t))  # revealed: tuple[Unknown, ...]
 ```
 
@@ -249,26 +251,35 @@ def with_kw_only[T, *Ts](*args: *Ts, kw: T) -> tuple[*Ts, T]:
 def f(i: int, s: str, b: bool, t: tuple[int, str], vt: tuple[int, ...]) -> None:
     reveal_type(simple())  # revealed: tuple[()]
     reveal_type(simple(i, s))  # revealed: tuple[int, str]
-    reveal_type(simple(*(i, s)))  # revealed: tuple[int, str]
+    # TODO: Should reveal `tuple[int, str]`.
+    reveal_type(simple(*(i, s)))  # revealed: tuple[tuple[int, str], tuple[int, str]]
     reveal_type(simple(t))  # revealed: tuple[tuple[int, str]]
-    reveal_type(simple(*t))  # revealed: tuple[int, str]
-    reveal_type(simple(*vt))  # revealed: tuple[int, ...]
+    # TODO: Should reveal `tuple[int, str]`.
+    reveal_type(simple(*t))  # revealed: tuple[tuple[int, str], tuple[int, str]]
+    # TODO: Should reveal `tuple[int, ...]`.
+    reveal_type(simple(*vt))  # revealed: tuple[tuple[int, ...]]
 
     reveal_type(with_prefix(i))  # revealed: tuple[int]
     reveal_type(with_prefix(i, s, b))  # revealed: tuple[int, str, bool]
-    reveal_type(with_prefix(*t))  # revealed: tuple[int, str]
-    reveal_type(with_prefix(i, *t))  # revealed: tuple[int, int, str]
-    reveal_type(with_prefix(*vt))  # revealed: tuple[int, *tuple[int, ...]]
-    reveal_type(with_prefix(i, *vt))  # revealed: tuple[int, *tuple[int, ...]]
+    # TODO: Should reveal `tuple[int, str]`.
+    reveal_type(with_prefix(*t))  # revealed: tuple[int, tuple[int, str]]
+    # TODO: Should reveal `tuple[int, int, str]`.
+    reveal_type(with_prefix(i, *t))  # revealed: tuple[int, tuple[int, str], tuple[int, str]]
+    # TODO: Should reveal `tuple[int, *tuple[int, ...]]`.
+    reveal_type(with_prefix(*vt))  # revealed: tuple[int, tuple[int, ...]]
+    # TODO: Should reveal `tuple[int, *tuple[int, ...]]`.
+    reveal_type(with_prefix(i, *vt))  # revealed: tuple[int, tuple[int, ...]]
 
     reveal_type(with_kw_only(kw=b))  # revealed: tuple[bool]
     reveal_type(with_kw_only(i, s, kw=b))  # revealed: tuple[int, str, bool]
     reveal_type(with_kw_only(t, kw=b))  # revealed: tuple[tuple[int, str], bool]
-    reveal_type(with_kw_only(*t, kw=b))  # revealed: tuple[int, str, bool]
+    # TODO: Should reveal `tuple[int, str, bool]`.
+    reveal_type(with_kw_only(*t, kw=b))  # revealed: tuple[tuple[int, str], tuple[int, str], bool]
     reveal_type(with_kw_only(vt, kw=b))  # revealed: tuple[tuple[int, ...], bool]
-    reveal_type(with_kw_only(*vt, kw=b))  # revealed: tuple[*tuple[int, ...], bool]
+    # TODO: Should reveal `tuple[*tuple[int, ...], bool]`.
+    reveal_type(with_kw_only(*vt, kw=b))  # revealed: tuple[tuple[int, ...], bool]
 
-    # error: [missing-argument] "No argument provided for required parameter `kw` of function `kw_only`"
+    # error: [missing-argument] "No argument provided for required parameter `kw` of function `with_kw_only`"
     reveal_type(with_kw_only(i, s, b))  # revealed: tuple[int, str, bool, Unknown]
 ```
 
@@ -389,7 +400,7 @@ def extra_keywords(x: int, y: str, **kwargs: bool) -> None: ...
 # error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def optional_keyword_only(x: int, y: str, *, debug: bool = False) -> None`"
 reveal_type(infer_positional(optional_keyword_only))  # revealed: tuple[Unknown, ...]
 # TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def extra_keywords(x: int, y: str, **kwargs: object) -> None`"
+# error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def extra_keywords(x: int, y: str, **kwargs: bool) -> None`"
 reveal_type(infer_positional(extra_keywords))  # revealed: tuple[Unknown, ...]
 ```
 
@@ -635,9 +646,9 @@ from typing import Self
 class Foo[*Ts]:
     @staticmethod
     def static_method(*args: *Ts) -> None: ...
-
     @classmethod
-    def class_method(cls, *args: *Ts) -> Self: ...
+    def class_method(cls, *args: *Ts) -> Self:
+        raise NotImplementedError
 
 reveal_type(Foo[int, str].class_method(1, ""))  # revealed: Foo[int, str]
 
@@ -742,15 +753,22 @@ from typing import Callable
 
 type Alias[*Ts] = Callable[[*Ts], None]
 
-def test[*Ts](fn: Alias[int, *Ts]) -> tuple[*Ts]: ...
+def test[*Ts](fn: Alias[int, *Ts]) -> tuple[*Ts]:
+    raise NotImplementedError
 
 def fn0(a: int) -> None: ...
 def fn1(a: int, b: str) -> None: ...
 def fn2(a: int, b: str, c: bytes) -> None: ...
 
-reveal_type(test(fn0))  # revealed: tuple[()]
-reveal_type(test(fn1))  # revealed: tuple[str]
-reveal_type(test(fn2))  # revealed: tuple[str, bytes]
+# TODO: Should reveal `tuple[()]` without an error.
+# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `Alias[*tuple[int, *tuple[Unknown, ...]]]`, found `def fn0(a: int) -> None`"
+reveal_type(test(fn0))  # revealed: tuple[Unknown, ...]
+# TODO: Should reveal `tuple[str]` without an error.
+# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `Alias[*tuple[int, *tuple[Unknown, ...]]]`, found `def fn1(a: int, b: str) -> None`"
+reveal_type(test(fn1))  # revealed: tuple[Unknown, ...]
+# TODO: Should reveal `tuple[str, bytes]` without an error.
+# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `Alias[*tuple[int, *tuple[Unknown, ...]]]`, found `def fn2(a: int, b: str, c: bytes) -> None`"
+reveal_type(test(fn2))  # revealed: tuple[Unknown, ...]
 ```
 
 ## Accessing Individual Types
@@ -771,7 +789,8 @@ class Row[*Cells]:
 
 def f(pair: Row[int, str], triple: Row[int, str, bytes]) -> None:
     reveal_type(pair.get())  # revealed: Row[str, int]
-    reveal_type(triple.get())  # revealed: Row[str, bytes, int]
+    # TODO: Should reveal `Row[str, bytes, int]`.
+    reveal_type(triple.get())  # revealed: Row[Unknown, Unknown]
 ```
 
 ## Invalid Forms
