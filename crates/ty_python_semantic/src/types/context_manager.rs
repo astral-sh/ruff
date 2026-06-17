@@ -40,7 +40,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Type<'db>, ContextManagerError<'db>> {
-        if let Some(projection) = self.try_cycle_context_enter_projection(db, mode) {
+        if let Some(projection) = self.try_context_enter_projection(db, mode) {
             return Ok(projection);
         }
 

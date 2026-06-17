@@ -177,7 +177,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types

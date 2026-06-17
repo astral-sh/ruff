@@ -21,43 +21,43 @@ use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
 
 impl<'db> Type<'db> {
-    pub(crate) fn try_cycle_iter_projection_with_mode(
+    pub(crate) fn try_iter_projection_with_mode(
         self,
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Option<Self> {
-        let op = CycleProjectionOp::Iter {
+        let op = ProjectionOp::Iter {
             is_async: mode.is_async(),
         };
-        self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+        self.try_projection_with_non_cycle(db, op, |ty| {
             ty.try_iterate_with_mode(db, mode)
                 .ok()
                 .map(|tuple| tuple.homogeneous_element_type(db))
         })
     }
 
-    pub(crate) fn try_cycle_unpack_projection(
+    pub(crate) fn try_unpack_projection(
         self,
         db: &'db dyn Db,
         len: usize,
         index: usize,
     ) -> Option<Self> {
-        self.try_cycle_projection(
+        self.try_projection(
             db,
-            CycleProjectionOp::Unpack(CycleUnpackProjection::Exact { len, index }),
+            ProjectionOp::Unpack(UnpackProjection::Exact { len, index }),
         )
     }
 
-    pub(crate) fn try_cycle_star_unpack_prefix_projection(
+    pub(crate) fn try_star_unpack_prefix_projection(
         self,
         db: &'db dyn Db,
         prefix: usize,
         suffix: usize,
         index: usize,
     ) -> Option<Self> {
-        self.try_cycle_projection(
+        self.try_projection(
             db,
-            CycleProjectionOp::Unpack(CycleUnpackProjection::Star {
+            ProjectionOp::Unpack(UnpackProjection::Star {
                 prefix,
                 suffix,
                 position: StarUnpackPosition::Prefix(index),
@@ -65,15 +65,15 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn try_cycle_star_unpack_rest_projection(
+    pub(crate) fn try_star_unpack_rest_projection(
         self,
         db: &'db dyn Db,
         prefix: usize,
         suffix: usize,
     ) -> Option<Self> {
-        self.try_cycle_projection(
+        self.try_projection(
             db,
-            CycleProjectionOp::Unpack(CycleUnpackProjection::Star {
+            ProjectionOp::Unpack(UnpackProjection::Star {
                 prefix,
                 suffix,
                 position: StarUnpackPosition::Rest,
@@ -81,16 +81,16 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn try_cycle_star_unpack_suffix_projection(
+    pub(crate) fn try_star_unpack_suffix_projection(
         self,
         db: &'db dyn Db,
         prefix: usize,
         suffix: usize,
         index: usize,
     ) -> Option<Self> {
-        self.try_cycle_projection(
+        self.try_projection(
             db,
-            CycleProjectionOp::Unpack(CycleUnpackProjection::Star {
+            ProjectionOp::Unpack(UnpackProjection::Star {
                 prefix,
                 suffix,
                 position: StarUnpackPosition::Suffix(index),
@@ -98,67 +98,65 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn try_cycle_subscript_projection(
+    pub(crate) fn try_subscript_projection(
         self,
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<Self> {
-        let subscript = CycleProjectionSubscript::from_type(db, slice_ty).or_else(|| {
+        let subscript = ProjectionSubscript::from_type(db, slice_ty).or_else(|| {
             (!slice_ty.is_instance_of(db, KnownClass::Slice))
-                .then_some(CycleProjectionSubscript::Unknown)
+                .then_some(ProjectionSubscript::Unknown)
         })?;
-        let op = CycleProjectionOp::Subscript(subscript);
-        self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+        let op = ProjectionOp::Subscript(subscript);
+        self.try_projection_with_non_cycle(db, op, |ty| {
             ty.subscript(db, slice_ty, ast::ExprContext::Load).ok()
         })
     }
 
-    pub(crate) fn try_cycle_method_call_projection(
+    pub(crate) fn try_method_call_projection(
         self,
         db: &'db dyn Db,
         method_name: &Name,
     ) -> Option<Self> {
-        let op = CycleProjectionOp::CallMethod0(CycleProjectionMethodName::new(db, method_name));
-        self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+        let op = ProjectionOp::CallMethod0(ProjectionMethodName::new(db, method_name));
+        self.try_projection_with_non_cycle(db, op, |ty| {
             ProjectionContainer::infer_method_call0_type_for_type(db, ty, method_name)
         })
     }
 
-    pub(crate) fn try_cycle_context_enter_projection(
+    pub(crate) fn try_context_enter_projection(
         self,
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Option<Self> {
-        let op = CycleProjectionOp::ContextEnter {
+        let op = ProjectionOp::ContextEnter {
             is_async: mode.is_async(),
         };
-        self.try_cycle_projection_with_non_cycle(db, op, |ty| ty.try_enter_with_mode(db, mode).ok())
+        self.try_projection_with_non_cycle(db, op, |ty| ty.try_enter_with_mode(db, mode).ok())
     }
 
-    pub(crate) fn try_cycle_await_projection(self, db: &'db dyn Db) -> Option<Self> {
-        self.try_cycle_projection_with_non_cycle(db, CycleProjectionOp::AwaitResult, |ty| {
+    pub(crate) fn try_await_projection(self, db: &'db dyn Db) -> Option<Self> {
+        self.try_projection_with_non_cycle(db, ProjectionOp::AwaitResult, |ty| {
             ty.try_await(db).ok()
         })
     }
 
-    fn try_cycle_projection(self, db: &'db dyn Db, op: CycleProjectionOp<'db>) -> Option<Self> {
+    fn try_projection(self, db: &'db dyn Db, op: ProjectionOp<'db>) -> Option<Self> {
         match self {
-            Type::Divergent(root) => Some(Self::CycleProjection(CycleProjectionType::new(
+            Type::Divergent(root) => Some(Self::Projection(ProjectionType::new(
                 db,
                 root,
-                CycleProjectionPath::from_op(op),
+                ProjectionPath::from_op(op),
             ))),
-            Type::CycleProjection(projection) => {
-                Some(Self::CycleProjection(projection.append(db, op)))
-            }
+            Type::Projection(projection) => Some(Self::Projection(projection.append(db, op))),
             _ => None,
         }
     }
 
-    fn try_cycle_projection_with_non_cycle(
+    fn try_projection_with_non_cycle(
         self,
         db: &'db dyn Db,
-        op: CycleProjectionOp<'db>,
+        op: ProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<Self>,
     ) -> Option<Self> {
         if !self.has_top_level_cycle_artifact(db) {
@@ -166,31 +164,31 @@ impl<'db> Type<'db> {
         }
 
         let Type::Union(union) = self else {
-            return self.try_cycle_projection(db, op);
+            return self.try_projection(db, op);
         };
 
-        let mut saw_cycle_projection = false;
+        let mut saw_projection = false;
         let mut elements = Vec::new();
 
         for element in union.elements(db).iter().copied() {
-            if let Some(projected) = element.try_cycle_projection(db, op) {
-                saw_cycle_projection = true;
+            if let Some(projected) = element.try_projection(db, op) {
+                saw_projection = true;
                 elements.push(projected);
             } else {
                 elements.push(project_non_cycle(element)?);
             }
         }
 
-        saw_cycle_projection.then(|| UnionType::from_elements_cycle_recovery(db, elements))
+        saw_projection.then(|| UnionType::from_elements_cycle_recovery(db, elements))
     }
 
     pub(crate) const fn is_cycle_artifact(&self) -> bool {
-        matches!(self, Type::Divergent(_) | Type::CycleProjection(_))
+        matches!(self, Type::Divergent(_) | Type::Projection(_))
     }
 
     fn has_top_level_cycle_artifact(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Divergent(_) | Type::CycleProjection(_) => true,
+            Type::Divergent(_) | Type::Projection(_) => true,
             Type::Union(union) => union.elements(db).iter().any(Self::is_cycle_artifact),
             _ => false,
         }
@@ -201,11 +199,9 @@ impl<'db> Type<'db> {
     pub(crate) fn same_divergent_marker(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
-            (Type::CycleProjection(left), Type::Divergent(right))
-            | (Type::Divergent(right), Type::CycleProjection(left)) => {
-                left.root(db).same_marker(right)
-            }
-            (Type::CycleProjection(left), Type::CycleProjection(right)) => {
+            (Type::Projection(left), Type::Divergent(right))
+            | (Type::Divergent(right), Type::Projection(left)) => left.root(db).same_marker(right),
+            (Type::Projection(left), Type::Projection(right)) => {
                 left.root(db).same_marker(right.root(db))
             }
             _ => false,
@@ -217,7 +213,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
     ) -> Option<Self> {
-        if !self.contains_cycle_projection_for_root(db, root) {
+        if !self.contains_projection_for_root(db, root) {
             return None;
         }
 
@@ -314,7 +310,7 @@ impl<'db> Type<'db> {
     fn solve_projection_terms(
         db: &'db dyn Db,
         root: DivergentType,
-        path: &CycleProjectionPath<'db>,
+        path: &ProjectionPath<'db>,
         terms: &[ProjectionTerm<'db>],
     ) -> Option<Self> {
         let mut saw_self_reference = false;
@@ -417,7 +413,7 @@ impl<'db> Type<'db> {
     fn collect_projection_component_terms(
         db: &'db dyn Db,
         root: DivergentType,
-        path: &CycleProjectionPath<'db>,
+        path: &ProjectionPath<'db>,
         term: Type<'db>,
         saw_self_reference: &mut bool,
         productive_terms: &mut Vec<Type<'db>>,
@@ -436,7 +432,7 @@ impl<'db> Type<'db> {
             return Some(());
         }
 
-        if term.mentions_nonmatching_cycle_projection(db, root, path) {
+        if term.mentions_nonmatching_projection(db, root, path) {
             return None;
         }
 
@@ -453,11 +449,11 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
         ty: Type<'db>,
-        paths: &mut Vec<CycleProjectionPath<'db>>,
+        paths: &mut Vec<ProjectionPath<'db>>,
     ) {
         let paths = RefCell::new(paths);
         any_over_type(db, ty, false, |nested| {
-            if let Type::CycleProjection(projection) = nested
+            if let Type::Projection(projection) = nested
                 && projection.root(db).same_marker(root)
             {
                 let mut paths = paths.borrow_mut();
@@ -471,8 +467,8 @@ impl<'db> Type<'db> {
     }
 
     fn solved_projection_type(
-        solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
-        path: &CycleProjectionPath<'db>,
+        solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
+        path: &ProjectionPath<'db>,
     ) -> Option<Self> {
         solved_ops
             .iter()
@@ -483,13 +479,13 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
+        solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
     ) -> Option<Self> {
         if !self.mentions_cycle_artifact(db, root) {
             return Some(self);
         }
 
-        if let Type::CycleProjection(projection) = self
+        if let Type::Projection(projection) = self
             && projection.root(db).same_marker(root)
         {
             return Self::solved_projection_type(solved_ops, &projection.path(db));
@@ -552,9 +548,9 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn contains_cycle_projection_for_root(self, db: &'db dyn Db, root: DivergentType) -> bool {
+    fn contains_projection_for_root(self, db: &'db dyn Db, root: DivergentType) -> bool {
         any_over_type(db, self, false, |ty| match ty {
-            Type::CycleProjection(projection) => projection.root(db).same_marker(root),
+            Type::Projection(projection) => projection.root(db).same_marker(root),
             _ => false,
         })
     }
@@ -562,19 +558,19 @@ impl<'db> Type<'db> {
     fn mentions_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
         any_over_type(db, self, false, |ty| match ty {
             Type::Divergent(divergent) => divergent.same_marker(root),
-            Type::CycleProjection(projection) => projection.root(db).same_marker(root),
+            Type::Projection(projection) => projection.root(db).same_marker(root),
             _ => false,
         })
     }
 
-    fn mentions_nonmatching_cycle_projection(
+    fn mentions_nonmatching_projection(
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        path: &CycleProjectionPath<'db>,
+        path: &ProjectionPath<'db>,
     ) -> bool {
         any_over_type(db, self, false, |ty| match ty {
-            Type::CycleProjection(projection) => {
+            Type::Projection(projection) => {
                 projection.root(db).same_marker(root) && projection.path(db).ne(path)
             }
             _ => false,
@@ -621,7 +617,7 @@ impl<'db> ProjectionContainer<'db> {
         &self,
         db: &'db dyn Db,
         evidence: &[CycleRecoveryEvidence<'db>],
-        terms_by_op: &mut [(CycleProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
+        terms_by_op: &mut [(ProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
     ) -> Option<()> {
         for (path, terms) in terms_by_op {
             terms.push(self.project_path(db, evidence, path)?);
@@ -633,7 +629,7 @@ impl<'db> ProjectionContainer<'db> {
         &self,
         db: &'db dyn Db,
         evidence: &[CycleRecoveryEvidence<'db>],
-        path: &CycleProjectionPath<'db>,
+        path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
@@ -646,7 +642,7 @@ impl<'db> ProjectionContainer<'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         evidence: &[CycleRecoveryEvidence<'db>],
-        path: &CycleProjectionPath<'db>,
+        path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(term) = Self::project_custom_path(db, ty, evidence, path) {
             return Some(term);
@@ -656,14 +652,12 @@ impl<'db> ProjectionContainer<'db> {
         let (&op, tail) = ops.split_first()?;
 
         let projected = match op {
-            CycleProjectionOp::Iter { is_async } => Self::infer_iter_item(db, ty, is_async)?,
-            CycleProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack)?,
-            CycleProjectionOp::Subscript(subscript) => Self::infer_subscript(db, ty, subscript)?,
-            CycleProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
-            CycleProjectionOp::ContextEnter { is_async } => {
-                Self::infer_context_enter(db, ty, is_async)?
-            }
-            CycleProjectionOp::AwaitResult => Self::infer_await_result(db, ty)?,
+            ProjectionOp::Iter { is_async } => Self::infer_iter_item(db, ty, is_async)?,
+            ProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack)?,
+            ProjectionOp::Subscript(subscript) => Self::infer_subscript(db, ty, subscript)?,
+            ProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
+            ProjectionOp::ContextEnter { is_async } => Self::infer_context_enter(db, ty, is_async)?,
+            ProjectionOp::AwaitResult => Self::infer_await_result(db, ty)?,
         };
 
         if tail.is_empty() {
@@ -674,7 +668,7 @@ impl<'db> ProjectionContainer<'db> {
             db,
             projected.ty(db),
             evidence,
-            &CycleProjectionPath::from_ops(tail.iter().copied()),
+            &ProjectionPath::from_ops(tail.iter().copied()),
         )
     }
 
@@ -682,7 +676,7 @@ impl<'db> ProjectionContainer<'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         evidence: &[CycleRecoveryEvidence<'db>],
-        path: &CycleProjectionPath<'db>,
+        path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         Self::is_custom_generic_container(db, ty).then_some(())?;
         evidence
@@ -693,19 +687,17 @@ impl<'db> ProjectionContainer<'db> {
     fn infer_projection_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        ops: &[CycleProjectionOp<'db>],
+        ops: &[ProjectionOp<'db>],
     ) -> Option<ProjectionTerm<'db>> {
         let (&op, tail) = ops.split_first()?;
 
         let projected = match op {
-            CycleProjectionOp::Iter { is_async } => Self::infer_iter_item(db, ty, is_async)?,
-            CycleProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack)?,
-            CycleProjectionOp::Subscript(subscript) => Self::infer_subscript(db, ty, subscript)?,
-            CycleProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
-            CycleProjectionOp::ContextEnter { is_async } => {
-                Self::infer_context_enter(db, ty, is_async)?
-            }
-            CycleProjectionOp::AwaitResult => Self::infer_await_result(db, ty)?,
+            ProjectionOp::Iter { is_async } => Self::infer_iter_item(db, ty, is_async)?,
+            ProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack)?,
+            ProjectionOp::Subscript(subscript) => Self::infer_subscript(db, ty, subscript)?,
+            ProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
+            ProjectionOp::ContextEnter { is_async } => Self::infer_context_enter(db, ty, is_async)?,
+            ProjectionOp::AwaitResult => Self::infer_await_result(db, ty)?,
         };
 
         if tail.is_empty() {
@@ -743,7 +735,7 @@ impl<'db> ProjectionContainer<'db> {
     fn infer_method_call0(
         db: &'db dyn Db,
         ty: Type<'db>,
-        method: CycleProjectionMethodName<'db>,
+        method: ProjectionMethodName<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Exact(
             Self::infer_method_call0_type_for_type(db, ty, method.name(db))?,
@@ -771,13 +763,11 @@ impl<'db> ProjectionContainer<'db> {
     fn infer_unpack(
         db: &'db dyn Db,
         ty: Type<'db>,
-        unpack: CycleUnpackProjection,
+        unpack: UnpackProjection,
     ) -> Option<ProjectionTerm<'db>> {
         match unpack {
-            CycleUnpackProjection::Exact { len, index } => {
-                Self::infer_unpack_exact(db, ty, len, index)
-            }
-            CycleUnpackProjection::Star {
+            UnpackProjection::Exact { len, index } => Self::infer_unpack_exact(db, ty, len, index),
+            UnpackProjection::Star {
                 prefix,
                 suffix,
                 position,
@@ -820,7 +810,7 @@ impl<'db> ProjectionContainer<'db> {
     fn infer_subscript(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subscript: CycleProjectionSubscript,
+        subscript: ProjectionSubscript,
     ) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Exact(
             ty.subscript(db, subscript.slice_type(db), ast::ExprContext::Load)
@@ -852,7 +842,7 @@ impl<'db> ProjectionContainer<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
+        solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
     ) -> Option<Type<'db>> {
         match self {
             Self::Tuple { spec } => match spec {
@@ -962,7 +952,7 @@ impl<'db> ProjectionTerm<'db> {
 #[derive(Debug, Clone)]
 struct CycleRecoveryEvidence<'db> {
     arm: Type<'db>,
-    path: CycleProjectionPath<'db>,
+    path: ProjectionPath<'db>,
     term: ProjectionTerm<'db>,
 }
 
@@ -1029,62 +1019,62 @@ impl ProjectionContainer<'_> {
 
 /// A projected view of a cycle root produced while recovering recursive inference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-pub struct CycleProjectionType<'db>(CycleProjectionTypeInterned<'db>);
+pub struct ProjectionType<'db>(ProjectionTypeInterned<'db>);
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for CycleProjectionType<'_> {}
+impl get_size2::GetSize for ProjectionType<'_> {}
 
-impl<'db> CycleProjectionType<'db> {
-    fn new(db: &'db dyn Db, root: DivergentType, path: CycleProjectionPath<'db>) -> Self {
-        Self(CycleProjectionTypeInterned::new(db, root, path))
+impl<'db> ProjectionType<'db> {
+    fn new(db: &'db dyn Db, root: DivergentType, path: ProjectionPath<'db>) -> Self {
+        Self(ProjectionTypeInterned::new(db, root, path))
     }
 
     pub(crate) fn root(self, db: &'db dyn Db) -> DivergentType {
         self.0.root(db)
     }
 
-    fn path(self, db: &'db dyn Db) -> CycleProjectionPath<'db> {
+    fn path(self, db: &'db dyn Db) -> ProjectionPath<'db> {
         self.0.path(db)
     }
 
-    fn append(self, db: &'db dyn Db, op: CycleProjectionOp<'db>) -> Self {
+    fn append(self, db: &'db dyn Db, op: ProjectionOp<'db>) -> Self {
         Self::new(db, self.root(db), self.path(db).append(op))
     }
 }
 
-/// Interned storage for [`CycleProjectionType`].
+/// Interned storage for [`ProjectionType`].
 // Due to salsa restrictions, it is not possible to directly intern a public struct containing a private type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct CycleProjectionTypeInterned<'db> {
+struct ProjectionTypeInterned<'db> {
     root: DivergentType,
-    path: CycleProjectionPath<'db>,
+    path: ProjectionPath<'db>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for CycleProjectionTypeInterned<'_> {}
+impl get_size2::GetSize for ProjectionTypeInterned<'_> {}
 
 /// An ordered sequence of projection operations applied to a cycle root.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct CycleProjectionPath<'db> {
-    ops: Box<[CycleProjectionOp<'db>]>,
+struct ProjectionPath<'db> {
+    ops: Box<[ProjectionOp<'db>]>,
 }
 
-impl<'db> CycleProjectionPath<'db> {
-    fn from_op(op: CycleProjectionOp<'db>) -> Self {
+impl<'db> ProjectionPath<'db> {
+    fn from_op(op: ProjectionOp<'db>) -> Self {
         Self::from_ops([op])
     }
 
-    fn from_ops(ops: impl IntoIterator<Item = CycleProjectionOp<'db>>) -> Self {
+    fn from_ops(ops: impl IntoIterator<Item = ProjectionOp<'db>>) -> Self {
         Self {
             ops: ops.into_iter().collect::<Vec<_>>().into_boxed_slice(),
         }
     }
 
-    fn ops(&self) -> &[CycleProjectionOp<'db>] {
+    fn ops(&self) -> &[ProjectionOp<'db>] {
         &self.ops
     }
 
-    fn append(&self, op: CycleProjectionOp<'db>) -> Self {
+    fn append(&self, op: ProjectionOp<'db>) -> Self {
         let mut ops = self.ops.to_vec();
         ops.push(op);
         Self {
@@ -1099,15 +1089,15 @@ impl<'db> CycleProjectionPath<'db> {
 
 /// An interned method name used by zero-argument method-call projections.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-struct CycleProjectionMethodName<'db> {
+struct ProjectionMethodName<'db> {
     #[returns(ref)]
     name: Name,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for CycleProjectionMethodName<'_> {}
+impl get_size2::GetSize for ProjectionMethodName<'_> {}
 
-impl<'db> CycleProjectionMethodName<'db> {
+impl<'db> ProjectionMethodName<'db> {
     fn new(db: &'db dyn Db, name: &Name) -> Self {
         let mut name = name.clone();
         name.shrink_to_fit();
@@ -1117,20 +1107,20 @@ impl<'db> CycleProjectionMethodName<'db> {
 
 /// A single operation that can be preserved through cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-enum CycleProjectionOp<'db> {
+enum ProjectionOp<'db> {
     Iter { is_async: bool },
-    Unpack(CycleUnpackProjection),
-    Subscript(CycleProjectionSubscript),
+    Unpack(UnpackProjection),
+    Subscript(ProjectionSubscript),
     // There is no reason to target only 0-argument methods.
     // It would be nice to be able to scale it without compromising performance.
-    CallMethod0(CycleProjectionMethodName<'db>),
+    CallMethod0(ProjectionMethodName<'db>),
     ContextEnter { is_async: bool },
     AwaitResult,
 }
 
 /// The fixed-length or starred-unpack projection of one unpacked position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-enum CycleUnpackProjection {
+enum UnpackProjection {
     Exact {
         len: usize,
         index: usize,
@@ -1144,14 +1134,14 @@ enum CycleUnpackProjection {
 
 /// A subscript projection represented precisely enough for cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-enum CycleProjectionSubscript {
+enum ProjectionSubscript {
     Unknown,
     Int,
     LiteralInt(i64),
     StaticSlice(StaticSliceProjection),
 }
 
-impl CycleProjectionSubscript {
+impl ProjectionSubscript {
     fn from_type(db: &dyn Db, slice_ty: Type<'_>) -> Option<Self> {
         if let Some(index) = slice_ty.as_int_like_literal() {
             return Some(Self::LiteralInt(index));

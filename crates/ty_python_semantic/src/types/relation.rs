@@ -281,7 +281,7 @@ impl<'db> Type<'db> {
              => true,
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -1127,8 +1127,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
-            (Type::Divergent(_) | Type::CycleProjection(_), _)
-            | (_, Type::Divergent(_) | Type::CycleProjection(_)) => {
+            (Type::Divergent(_) | Type::Projection(_), _)
+            | (_, Type::Divergent(_) | Type::Projection(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
             }
 
@@ -2531,8 +2531,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
-            (Type::Divergent(_) | Type::CycleProjection(_), _)
-            | (_, Type::Divergent(_) | Type::CycleProjection(_)) => self.never(),
+            (Type::Divergent(_) | Type::Projection(_), _)
+            | (_, Type::Divergent(_) | Type::Projection(_)) => self.never(),
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);

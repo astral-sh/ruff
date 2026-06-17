@@ -92,7 +92,7 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
-            Type::CycleProjection(_) => Some(CallableTypes::one(CallableType::function_like(
+            Type::Projection(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
             ))),

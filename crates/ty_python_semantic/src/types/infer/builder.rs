@@ -2801,7 +2801,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+            Type::Dynamic(..) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -3565,7 +3565,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::Dynamic(..)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
@@ -3618,7 +3618,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeAlias(..)
                 | Type::Dynamic(..)
                 | Type::Divergent(_)
-                | Type::CycleProjection(_)
+                | Type::Projection(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
                 | Type::BoundSuper(..) => return None,
@@ -5125,7 +5125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  `for a.x in not_iterable: ...
             let iterable_type = builder.infer_standalone_expression(iter, tcx);
             if let Some(element_type) =
-                iterable_type.try_cycle_iter_projection_with_mode(builder.db(), mode)
+                iterable_type.try_iter_projection_with_mode(builder.db(), mode)
             {
                 element_type
             } else if !*is_async
@@ -5169,7 +5169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mode = EvaluationMode::from_is_async(for_stmt.is_async());
 
                 if let Some(projected) =
-                    iterable_type.try_cycle_iter_projection_with_mode(self.db(), mode)
+                    iterable_type.try_iter_projection_with_mode(self.db(), mode)
                 {
                     projected
                 } else if !for_stmt.is_async()
@@ -5425,7 +5425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
                 | Type::Divergent(_)
-                | Type::CycleProjection(_)
+                | Type::Projection(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
                 | Type::BoundMethod(_)
@@ -8918,7 +8918,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
             && let Some(projected) = self
                 .expression_type(value)
-                .try_cycle_method_call_projection(db, &attr.id)
+                .try_method_call_projection(db, &attr.id)
         {
             projected
         } else {
@@ -9143,7 +9143,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(self.db(), &[tcx])),
         );
 
-        if let Some(projection) = expr_type.try_cycle_await_projection(self.db()) {
+        if let Some(projection) = expr_type.try_await_projection(self.db()) {
             return projection;
         }
 
@@ -10340,7 +10340,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match (op, operand_type) {
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
-            | (_, Type::Divergent(_) | Type::CycleProjection(_)) => operand_type,
+            | (_, Type::Divergent(_) | Type::Projection(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {

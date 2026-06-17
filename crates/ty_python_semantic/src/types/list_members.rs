@@ -270,7 +270,7 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy

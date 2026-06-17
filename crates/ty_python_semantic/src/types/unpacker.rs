@@ -73,7 +73,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
 
         let value_type = value_inference.expression_type(value_expr);
-        let allow_cycle_projection = matches!(
+        let allow_projection = matches!(
             value.kind(),
             UnpackKind::Assign | UnpackKind::Iterable { .. }
         );
@@ -87,7 +87,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }
             }
             UnpackKind::Iterable { mode } => value_type
-                .try_cycle_iter_projection_with_mode(self.db(), mode)
+                .try_iter_projection_with_mode(self.db(), mode)
                 .unwrap_or_else(|| {
                     value_type
                         .try_iterate_with_mode(self.db(), mode)
@@ -113,12 +113,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }),
         };
 
-        self.unpack_inner(
-            target,
-            value_expr.into(),
-            value_type,
-            allow_cycle_projection,
-        );
+        self.unpack_inner(target, value_expr.into(), value_type, allow_projection);
     }
 
     /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
@@ -199,22 +194,22 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         target: &ast::Expr,
         value_expr: AnyNodeRef<'_>,
         value_ty: Type<'db>,
-        allow_cycle_projection: bool,
+        allow_projection: bool,
     ) {
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(target.into(), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.unpack_inner(value, value_expr, value_ty, allow_cycle_projection);
+                self.unpack_inner(value, value_expr, value_ty, allow_projection);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if allow_cycle_projection
-                    && let Some(projected_tys) = self.try_cycle_unpack_projections(value_ty, elts)
+                if allow_projection
+                    && let Some(projected_tys) = self.try_unpack_projections(value_ty, elts)
                 {
                     for (target, projected_ty) in elts.iter().zip(projected_tys) {
-                        self.unpack_inner(target, value_expr, projected_ty, allow_cycle_projection);
+                        self.unpack_inner(target, value_expr, projected_ty, allow_projection);
                     }
                     return;
                 }
@@ -280,7 +275,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 // We constructed unpacker above using the length of elts, so the zip should
                 // consume the same number of elements from each.
                 for (target, value_ty) in elts.iter().zip(unpacker.into_types()) {
-                    self.unpack_inner(target, value_expr, value_ty, allow_cycle_projection);
+                    self.unpack_inner(target, value_expr, value_ty, allow_projection);
                 }
             }
             _ => {
@@ -292,20 +287,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
     }
 
-    fn try_cycle_unpack_projections(
+    fn try_unpack_projections(
         &self,
         value_ty: Type<'db>,
         targets: &[ast::Expr],
     ) -> Option<Vec<Type<'db>>> {
         if let Type::Union(union) = value_ty {
-            let mut saw_cycle_projection = false;
+            let mut saw_projection = false;
             let mut target_tys = vec![Vec::new(); targets.len()];
 
             for element in union.elements(self.db()).iter().copied() {
                 let element_tys = if let Some(projected) =
-                    self.try_cycle_unpack_projections_for_element(element, targets)
+                    self.try_unpack_projections_for_element(element, targets)
                 {
-                    saw_cycle_projection = true;
+                    saw_projection = true;
                     projected
                 } else {
                     self.try_normal_unpack_types(element, targets)?
@@ -316,7 +311,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }
             }
 
-            return saw_cycle_projection.then(|| {
+            return saw_projection.then(|| {
                 target_tys
                     .into_iter()
                     .map(|elements| UnionType::from_elements(self.db(), elements))
@@ -324,10 +319,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             });
         }
 
-        self.try_cycle_unpack_projections_for_element(value_ty, targets)
+        self.try_unpack_projections_for_element(value_ty, targets)
     }
 
-    fn try_cycle_unpack_projections_for_element(
+    fn try_unpack_projections_for_element(
         &self,
         value_ty: Type<'db>,
         targets: &[ast::Expr],
@@ -347,20 +342,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 (0..targets.len())
                     .map(|index| {
                         if index < prefix {
-                            value_ty.try_cycle_star_unpack_prefix_projection(
+                            value_ty.try_star_unpack_prefix_projection(
                                 self.db(),
                                 prefix,
                                 suffix,
                                 index,
                             )
                         } else if index == starred_index {
-                            value_ty.try_cycle_star_unpack_rest_projection(
-                                self.db(),
-                                prefix,
-                                suffix,
-                            )
+                            value_ty.try_star_unpack_rest_projection(self.db(), prefix, suffix)
                         } else {
-                            value_ty.try_cycle_star_unpack_suffix_projection(
+                            value_ty.try_star_unpack_suffix_projection(
                                 self.db(),
                                 prefix,
                                 suffix,
@@ -371,7 +362,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     .collect()
             }
             None => (0..targets.len())
-                .map(|index| value_ty.try_cycle_unpack_projection(self.db(), targets.len(), index))
+                .map(|index| value_ty.try_unpack_projection(self.db(), targets.len(), index))
                 .collect(),
         }
     }

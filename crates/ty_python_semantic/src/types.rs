@@ -39,7 +39,7 @@ pub(crate) use self::match_pattern::{
     exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type,
 };
-pub use self::projection::CycleProjectionType;
+pub use self::projection::ProjectionType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
@@ -901,8 +901,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
-    /// A cycle marker consumed by a query-free projection operation.
-    CycleProjection(CycleProjectionType<'db>),
+    /// A cycle marker consumed by a projection operation.
+    Projection(ProjectionType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -1312,7 +1312,7 @@ impl<'db> Type<'db> {
                     materialization: None,
                     ..
                 })
-                | Type::CycleProjection(_)
+                | Type::Projection(_)
         )
     }
 
@@ -1850,7 +1850,7 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => (*self)
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
-            Type::CycleProjection(_) => *self,
+            Type::Projection(_) => *self,
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
@@ -1922,7 +1922,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -1956,7 +1956,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_)
             | Type::EnumComplement(_)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -2221,7 +2221,7 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => Some(self),
             // Preserve the original cycle root when falling back from an unsolved projection.
             // The projection path is only useful if `try_projection_cycle_normalized` can solve it.
-            Type::CycleProjection(projection) => Some(Type::Divergent(projection.root(db))),
+            Type::Projection(projection) => Some(Type::Divergent(projection.root(db))),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -2330,7 +2330,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => false,
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => false,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2520,7 +2520,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::Union(..)
             | Type::AlwaysTruthy
@@ -2578,7 +2578,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 Some(Place::bound(self).into())
             }
 
@@ -2890,7 +2890,7 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, *complement, name)
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 Place::bound(self).into()
             }
 
@@ -3576,7 +3576,7 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                     Place::bound(this).into()
                 }
 
@@ -4493,7 +4493,7 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
@@ -5616,9 +5616,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
-                Some(self)
-            }
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => Some(self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -5865,7 +5863,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -5948,7 +5946,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
-            Type::Divergent(_) | Type::CycleProjection(_) => self,
+            Type::Divergent(_) | Type::Projection(_) => self,
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
@@ -6397,7 +6395,7 @@ impl<'db> Type<'db> {
                 }
                 _ => self,
             },
-            Type::CycleProjection(_) => self,
+            Type::Projection(_) => self,
 
             Type::Never
             | Type::AlwaysTruthy
@@ -6479,7 +6477,7 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) | Type::CycleProjection(_) => {}
+            Type::Divergent(_) | Type::Projection(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(self, || {
@@ -6898,7 +6896,7 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::CycleProjection(_)
+            Self::Projection(_)
             | Self::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoUnpack
@@ -7262,7 +7260,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeAlias(alias) => alias.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::CycleProjection(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
