@@ -122,11 +122,12 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
-`IntEnum` members from different classes compare using their integer values:
+Unlike plain `Enum` members, `IntEnum` members inherit integer equality. Members of different
+`IntEnum` classes therefore compare equal when they have the same integer value, so both equality
+and inequality narrowing must account for matching members from every class in the union:
 
 ```py
-from enum import IntEnum, auto
-from typing import Literal
+from enum import IntEnum
 
 class Foo(IntEnum):
     X = 1
@@ -146,6 +147,18 @@ def _(value: Foo | Bar):
         reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
     else:
         reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+```
+
+A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
+the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
+members' runtime values cannot be determined statically:
+
+```py
+from enum import IntEnum
+
+class Foo(IntEnum):
+    X = 1
+    Y = 2
 
 class Shifted(IntEnum):
     def __new__(cls, value: int) -> "Shifted":
@@ -161,8 +174,17 @@ def _(value: Foo | Shifted):
         reveal_type(value)  # revealed: Literal[Foo.X] | Shifted
     else:
         reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
+```
 
-# `int.__new__` converts the generated string to `1` at runtime.
+The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
+member. Here, the inherited `int.__new__` converts the generated string `"1"` to the integer `1`.
+Because the generated value's exact conversion is not modeled, we cannot use it to decide whether
+members of `Generated` and `Other` compare equal:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+
 class Generated(IntEnum):
     # error: [invalid-method-override]
     def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
