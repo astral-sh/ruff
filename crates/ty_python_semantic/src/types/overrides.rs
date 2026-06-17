@@ -255,34 +255,34 @@ fn check_class_declaration<'db>(
             let is_auto = enum_info.auto_members.contains(&member.name);
             let skip_type_check = (context.in_stub() && is_ellipsis)
                 || is_auto
-                || enum_info.custom_enum_metaclass_hooks;
+                || enum_info.value_construction.metaclass_may_transform_values;
 
             if !skip_type_check {
-                if let Some(new_function) = enum_info.new_function {
-                    check_enum_member_against_constructor_hook(
+                if let Some(new_function) = enum_info.value_construction.new.function() {
+                    check_enum_member_against_constructor_method(
                         context,
                         new_function,
                         Type::from(class),
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
-                        EnumConstructorHook::New,
+                        EnumConstructorMethod::New,
                     );
                 }
 
-                if let Some(init_function) = enum_info.init_function {
-                    check_enum_member_against_constructor_hook(
+                if let Some(init_function) = enum_info.value_construction.init.function() {
+                    check_enum_member_against_constructor_method(
                         context,
                         init_function,
                         instance_of_class,
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
-                        EnumConstructorHook::Init,
+                        EnumConstructorMethod::Init,
                     );
-                } else if enum_info.new_function.is_none()
-                    && !enum_info.opaque_init
-                    && !enum_info.opaque_new
+                } else if enum_info
+                    .value_construction
+                    .can_validate_with_value_annotation()
                     && let Some(expected_type) = enum_info.value_annotation
                 {
                     if !member_value_type.is_assignable_to(db, expected_type) {
@@ -1347,12 +1347,12 @@ fn check_post_init_signature<'db>(
 }
 
 #[derive(Clone, Copy, Debug)]
-enum EnumConstructorHook {
+enum EnumConstructorMethod {
     New,
     Init,
 }
 
-impl EnumConstructorHook {
+impl EnumConstructorMethod {
     fn name(self) -> &'static str {
         match self {
             Self::New => "__new__",
@@ -1361,20 +1361,20 @@ impl EnumConstructorHook {
     }
 }
 
-/// Validates an enum member value against an enum construction hook signature.
+/// Validates an enum member value against an enum constructor method signature.
 ///
 /// The enum metaclass unpacks tuple values as positional arguments to `__new__` and `__init__`,
 /// and passes non-tuple values as a single argument. This function synthesizes
 /// a call with the appropriate arguments and reports a diagnostic
 /// if the call would fail.
-fn check_enum_member_against_constructor_hook<'db>(
+fn check_enum_member_against_constructor_method<'db>(
     context: &InferContext<'db, '_>,
     function: FunctionType<'db>,
     bound_self_type: Type<'db>,
     member_value_type: Type<'db>,
     member_name: &Name,
     definition: Definition<'db>,
-    hook: EnumConstructorHook,
+    method: EnumConstructorMethod,
 ) {
     let db = context.db();
 
@@ -1412,7 +1412,7 @@ fn check_enum_member_against_constructor_hook<'db>(
         ) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Enum member `{member_name}` is incompatible with `{}`",
-                hook.name(),
+                method.name(),
             ));
             diagnostic.info(format_args!(
                 "Expected compatible arguments for `{}`",
