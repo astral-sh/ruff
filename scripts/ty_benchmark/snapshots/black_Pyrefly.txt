@@ -13,5 +13,4 @@ ERROR src/blib2to3/pytree.py:669:24-34: `newcontent` may be uninitialized [unbou
 ERROR src/blib2to3/pytree.py:755:24-39: `wrapped_content` may be uninitialized [unbound-name]
 ERROR src/blib2to3/pytree.py:846:34-45: `save_stderr` may be uninitialized [unbound-name]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 14 errors (2 suppressed, 14 warnings not shown)

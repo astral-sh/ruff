@@ -1,3 +1,2 @@
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 0 errors (181 suppressed, 3 warnings not shown)

@@ -3,5 +3,4 @@ ERROR isort/api.py:157:17-82: `Path | str` is not assignable to variable `extens
 ERROR isort/api.py:210:23-32: Argument `str | None` is not assignable to parameter `extension` with type `str` in function `isort.core.process` [bad-argument-type]
 ERROR isort/api.py:562:12-15: `key` may be uninitialized [unbound-name]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 4 errors (20 suppressed, 14 warnings not shown)

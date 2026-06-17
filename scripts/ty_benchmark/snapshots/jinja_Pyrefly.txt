@@ -26,5 +26,4 @@ ERROR src/jinja2/runtime.py:612:16-28: Returned type `None` is not assignable to
 ERROR src/jinja2/sandbox.py:244:33-43: Cannot set item in `dict[str, ((n: int = 5, html: bool = True, min: int = 20, max: int = 100) -> str) | type[Cycler] | type[Joiner] | type[Namespace] | type[dict] | type[range]]` [unsupported-operation]
 ERROR src/jinja2/utils.py:431:2-29: Class `MutableMapping` has no class attribute `register` [missing-attribute]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 27 errors (90 suppressed, 14 warnings not shown)

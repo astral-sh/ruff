@@ -1502,5 +1502,4 @@ ERROR pandas/tseries/holiday.py:540:20-34: `None` is not subscriptable [unsuppor
 ERROR pandas/util/_validators.py:463:12-15: Returned type `int | integer | Any` is not assignable to declared return type `int` [bad-return]
 ERROR typings/numba.pyi:24:21-35: No attribute `compiler` in module `numba` [missing-attribute]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 1,430 errors (841 suppressed, 146 warnings not shown)

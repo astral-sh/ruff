@@ -22013,5 +22013,4 @@ ERROR torch/xpu/streams.py:106:13-35: No attribute `_XpuEventBase` in module `to
 ERROR torch/xpu/streams.py:124:39-51: No attribute `Stream` in module `torch` [missing-attribute]
 ERROR torch/xpu/streams.py:135:37-49: No attribute `Stream` in module `torch` [missing-attribute]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 21,978 errors (7,136 suppressed, 1,942 warnings not shown)

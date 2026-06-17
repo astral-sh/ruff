@@ -10635,5 +10635,4 @@ ERROR homeassistant/util/hass_dict.pyi:140:16-46: assert_type(set[str] | set[Unk
 ERROR homeassistant/util/language.py:151:46-56: `region_idx` may be uninitialized [unbound-name]
 ERROR homeassistant/util/loop.py:105:19-36: `integration_frame` may be uninitialized [unbound-name]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- WARN <CWD>/pyrefly.toml: Extra keys found in config: ignore-missing-source
  INFO 9,588 errors (604 suppressed, 570 warnings not shown)
