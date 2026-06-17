@@ -222,14 +222,14 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
 
 def broad_element_type(x: str | None, values: dict[str, int]):
     if x in values:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str | None
     else:
         reveal_type(x)  # revealed: str | None
 
 def broad_element_type_with_unknown(values: dict[str, int]):
     x = [None][0]
     if x in values:
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: None | Unknown
     else:
         reveal_type(x)  # revealed: None | Unknown
 ```
@@ -298,7 +298,7 @@ def broad_dict_element(x: str | None, values: dict[str, int]) -> None:
     if x not in values:
         reveal_type(x)  # revealed: str | None
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str | None
 
 def union_tuple_slot(x: Literal[1, 2], values: tuple[Literal[1, 2]]) -> None:
     if x not in values:
@@ -473,20 +473,17 @@ def final_custom_contains(
 ## Exact containers inside assignment expressions
 
 An assignment expression does not change the containment behavior of the value it wraps. An exact
-list display can therefore still remove union members that cannot compare equal to any list item:
+tuple display can therefore still remove union members that cannot compare equal to any item:
 
 ```py
-from typing import final
+from typing import Literal, final
 
 @final
 class Token: ...
 
-@final
-class OtherToken: ...
-
-def assignment_expression(value: Token | None) -> None:
-    if value in (items := [OtherToken()]):
-        reveal_type(value)  # revealed: Never
+def assignment_expression(value: Token | Literal[1]) -> None:
+    if value in (items := (1,)):
+        reveal_type(value)  # revealed: Literal[1]
 ```
 
 ## Wrapped types with known containment
