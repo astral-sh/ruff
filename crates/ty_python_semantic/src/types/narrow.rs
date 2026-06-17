@@ -35,83 +35,12 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
-use super::enums::enum_metadata;
-use super::equality::{
-    enum_membership_constraint, evaluate_type_equality, evaluate_type_inequality,
-    may_compare_equal,
-};
+use super::equality::{evaluate_type_equality, evaluate_type_inequality};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
-
-fn is_union_of_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let ty = ty.resolve_type_alias(db);
-    ty.as_union().is_some_and(|union| {
-        union
-            .elements(db)
-            .iter()
-            .all(|ty| is_single_valued_union_component(db, *ty))
-    }) || is_single_valued_union_component(db, ty)
-}
-
-fn is_union_with_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let ty = ty.resolve_type_alias(db);
-    ty.as_union().is_some_and(|union| {
-        union
-            .elements(db)
-            .iter()
-            .any(|ty| is_single_valued_union_component(db, *ty))
-    }) || is_single_valued_union_component(db, ty)
-}
-
-/// Return `true` if this type can participate in single-valued-union narrowing.
-///
-/// A component can be literally single-valued, like `Literal[1]`, or a finite multi-valued
-/// domain whose alternatives can each be treated as single-valued, like `bool` or an enum
-/// complement.
-///
-/// ```python
-/// from enum import Enum
-///
-/// class Color(Enum):
-///     RED = 1
-///     BLUE = 2
-///
-/// def f(color: Color):
-///     if color is not Color.RED:
-///         # `color` is a multi-valued component, but its remaining alternatives are
-///         # single-valued enum literals.
-///         reveal_type(color)  # Literal[Color.BLUE]
-/// ```
-fn is_single_valued_union_component<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let ty = ty.resolve_type_alias(db);
-    ty.is_single_valued(db)
-        || has_finite_single_valued_union_alternatives(db, ty)
-        || ty.is_subtype_of(db, Type::literal_string())
-}
-
-/// Return whether a type has a finite domain whose members can each be treated as single-valued.
-fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let ty = ty.resolve_type_alias(db);
-
-    match ty {
-        Type::EnumComplement(complement) => complement.has_finite_single_valued_alternatives(db),
-        Type::Intersection(intersection) => intersection
-            .enum_complement(db)
-            .is_some_and(|complement| complement.has_finite_single_valued_alternatives(db)),
-        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => true,
-        Type::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db))
-                .is_some_and(|metadata| !metadata.members.is_empty())
-                && !ty.overrides_equality(db) =>
-        {
-            true
-        }
-        _ => false,
-    }
-}
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
@@ -915,11 +844,6 @@ fn merge_constraints_or<'db>(
             }
         }
     }
-}
-
-fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let ty = ty.resolve_type_alias(db);
-    ty == Type::Never || ty.is_single_valued(db)
 }
 
 /// Return the type established by a successful class pattern.
@@ -2084,119 +2008,45 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    fn exact_fixed_length_membership_values(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+    fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+
+        // A fixed empty iteration spec does not imply empty containment: `"" in ""` and
+        // `b"" in b""` are both true. Exact tuples are the fixed-length container here whose
+        // containment is known to be element-wise.
+        if matches!(
+            rhs_ty.resolve_type_alias(self.db),
+            Type::NominalInstance(instance)
+                if instance.has_known_class(self.db, KnownClass::Tuple)
+        ) && iterable
+            .as_fixed_length()
+            .is_some_and(|fixed| fixed.all_elements().is_empty())
+        {
+            return Some(Type::Never);
+        }
+        let rhs_values = iterable.homogeneous_element_type(self.db);
+        evaluate_type_equality(self.db, lhs_ty, rhs_values, true)
+    }
+
+    fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let iterable = rhs_ty.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
-        let mut builder = UnionBuilder::new(self.db);
+        let mut builder = IntersectionBuilder::new(self.db);
+        let mut constrained = false;
 
+        // `not in` negates equality with every element; it does not use `__ne__`. Only
+        // single-valued slots are guaranteed to contain the value represented by their type.
         for element_ty in fixed_length.all_elements().iter().copied() {
-            if is_exact_membership_value_domain(self.db, element_ty) {
-                builder = builder.add(element_ty);
+            let element_ty = element_ty.resolve_type_alias(self.db);
+            if element_ty.is_single_valued(self.db)
+                && let Some(constraint) = evaluate_type_equality(self.db, lhs_ty, element_ty, false)
+            {
+                builder = builder.add_positive(constraint);
+                constrained = true;
             }
         }
 
-        builder.try_build()
-    }
-
-    // TODO: Share more of this implementation with equality narrowing once we can prove that
-    // containment uses element-wise equality rather than a custom `__contains__` method.
-    fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
-
-        if let Ok(iterable) = rhs_ty.try_iterate(self.db)
-            && let Some(constraint) = enum_membership_constraint(
-                self.db,
-                lhs_ty,
-                iterable.homogeneous_element_type(self.db),
-                true,
-            )
-        {
-            return Some(constraint);
-        }
-
-        // TODO: Python calls a custom `__contains__` before falling back to iteration. Narrowing
-        // currently uses the iterable element type either way, which can over-narrow when
-        // `__contains__` implements different semantics.
-        if is_union_of_single_valued(self.db, lhs_ty) {
-            rhs_ty
-                .try_iterate(self.db)
-                .ok()
-                .map(|iterable| iterable.homogeneous_element_type(self.db))
-        } else if is_union_with_single_valued(self.db, lhs_ty) {
-            let rhs_values = rhs_ty
-                .try_iterate(self.db)
-                .ok()?
-                .homogeneous_element_type(self.db);
-
-            let mut builder = UnionBuilder::new(self.db);
-
-            // Add the narrowed values from the RHS first, to keep literals before broader types.
-            builder = builder.add(rhs_values);
-
-            if let Some(lhs_union) = lhs_ty.as_union() {
-                for element in lhs_union.elements(self.db) {
-                    // Skip types that are handled specially by RHS matching.
-                    if is_single_valued_union_component(self.db, *element) {
-                        continue;
-                    }
-                    // Skip types that cannot compare equal to any RHS value.
-                    if !may_compare_equal(self.db, *element, rhs_values) {
-                        continue;
-                    }
-                    builder = builder.add(*element);
-                }
-            }
-            Some(builder.build())
-        } else {
-            None
-        }
-    }
-
-    fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
-        let rhs_values = self.exact_fixed_length_membership_values(rhs_ty)?;
-
-        if let Some(constraint) = enum_membership_constraint(self.db, lhs_ty, rhs_values, false) {
-            return Some(constraint);
-        }
-
-        if is_union_of_single_valued(self.db, lhs_ty) {
-            // Exclude the RHS values from the entire (single-valued) LHS domain.
-            let complement = IntersectionBuilder::new(self.db)
-                .add_positive(lhs_ty)
-                .add_negative(rhs_values)
-                .build();
-            Some(complement)
-        } else if is_union_with_single_valued(self.db, lhs_ty) {
-            // Split LHS into single-valued portion and the rest. Exclude RHS values from the
-            // single-valued portion, keep the rest intact.
-            let mut single_builder = UnionBuilder::new(self.db);
-            let mut rest_builder = UnionBuilder::new(self.db);
-
-            if let Some(lhs_union) = lhs_ty.as_union() {
-                for element in lhs_union.elements(self.db) {
-                    if is_single_valued_union_component(self.db, *element) {
-                        single_builder = single_builder.add(*element);
-                    } else {
-                        rest_builder = rest_builder.add(*element);
-                    }
-                }
-            }
-
-            let single_union = single_builder.build();
-            let rest_union = rest_builder.build();
-
-            let narrowed_single = IntersectionBuilder::new(self.db)
-                .add_positive(single_union)
-                .add_negative(rhs_values)
-                .build();
-
-            // Keep order: first literal complement, then broader arms.
-            let result = UnionType::from_two_elements(self.db, narrowed_single, rest_union);
-            Some(result)
-        } else {
-            None
-        }
+        constrained.then(|| builder.build())
     }
 
     fn evaluate_expr_compare_op(

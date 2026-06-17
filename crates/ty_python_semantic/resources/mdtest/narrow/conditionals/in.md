@@ -7,7 +7,7 @@ def _(x: int):
     if x in (1, 2, 3):
         reveal_type(x)  # revealed: int
     else:
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
 
 ```py
@@ -15,7 +15,7 @@ def _(x: str):
     if x in ("a", "b", "c"):
         reveal_type(x)  # revealed: str
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
 ```
 
 ```py
@@ -104,7 +104,7 @@ def _(x: str):
     if x in "abc":
         reveal_type(x)  # revealed: str
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
 ```
 
 ```py
@@ -132,6 +132,14 @@ def _(x: Literal[1, "a", "b", "c", "d"]):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal[1, "d"]
+
+def empty_string(x: str):
+    if x in "":
+        reveal_type(x)  # revealed: str
+
+def empty_bytes(x: bytes):
+    if x in b"":
+        reveal_type(x)  # revealed: bytes
 ```
 
 ## Assignment expressions
@@ -209,7 +217,7 @@ def local_literal_rhs(x: str | None) -> None:
         # literal collection has not been mutated or aliased before the test.
         reveal_type(x)  # revealed: str | None
     else:
-        reveal_type(x)  # revealed: None | str
+        reveal_type(x)  # revealed: str | None
 
 def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
     if x not in unavailable:
@@ -249,11 +257,11 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal["missing"] | int
+        reveal_type(x)  # revealed: int | Literal["missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
-        reveal_type(x)  # revealed: Literal[1] | AlwaysEqual
+        reveal_type(x)  # revealed: AlwaysEqual | Literal[1]
 
 def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
     if x in values:
