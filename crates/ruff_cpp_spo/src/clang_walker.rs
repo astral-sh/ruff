@@ -34,7 +34,7 @@ use std::fmt;
 use std::path::Path;
 
 use clang::{Accessibility, Clang, Entity, EntityKind, ExceptionSpecification, Index};
-use ruff_spo_triplet::{CppAccess, CppBase, CppField, CppMethod};
+use ruff_spo_triplet::{CppAccess, CppBase, CppField, CppFriend, CppMethod};
 
 use crate::{CppClass, Declaration};
 
@@ -115,16 +115,20 @@ pub fn class_body_cursor_histogram(
 /// The kinds [`build_class`] maps to a [`Declaration`] today — the "covered"
 /// set for the `CPP-SCHEMA-FIT` mapped-fraction. Kept beside the walker so the
 /// coverage probe and the actual extraction can never drift apart. The
-/// function-like kinds (`Constructor` / `Destructor` / `ConversionFunction` /
-/// `FunctionTemplate`) all become a `has_function`, exactly like `Method`.
-pub const MAPPED_CURSOR_KINDS: [&str; 7] = [
+/// function-like kinds (`Method` / `Constructor` / `Destructor` /
+/// `ConversionFunction` / `FunctionTemplate`) become a `has_function`;
+/// `FieldDecl` + `VarDecl` (static members) become `has_field`; `FriendDecl`
+/// becomes `is_friend_of`; `BaseSpecifier` becomes `inherits_from`.
+pub const MAPPED_CURSOR_KINDS: [&str; 9] = [
     "BaseSpecifier",
     "FieldDecl",
+    "VarDecl",
     "Method",
     "Constructor",
     "Destructor",
     "ConversionFunction",
     "FunctionTemplate",
+    "FriendDecl",
 ];
 
 /// Mirror of [`collect_classes`] that tallies direct class-body child kinds
@@ -185,7 +189,10 @@ fn build_class(e: &Entity) -> Option<CppClass> {
                     declarations.push(Declaration::Base(base));
                 }
             }
-            EntityKind::FieldDecl => {
+            // FieldDecl = a non-static data member; a VarDecl in a class body is
+            // a STATIC data member (`static T x;`, libclang's distinct kind).
+            // Both are data members the class HAS → has_field.
+            EntityKind::FieldDecl | EntityKind::VarDecl => {
                 declarations.push(Declaration::Field(CppField {
                     name: m.get_name().unwrap_or_default(),
                     type_name: m
@@ -207,6 +214,14 @@ fn build_class(e: &Entity) -> Option<CppClass> {
             | EntityKind::FunctionTemplate => {
                 declarations.push(Declaration::Method(build_method(&m)));
             }
+            // `friend class Foo;` / `friend Ret fn(...);` — the befriended
+            // entity. CPP-SCHEMA-FIT measured 79 in ccutil; the `is_friend_of`
+            // predicate + `CppFriend` IR already exist (PR #8).
+            EntityKind::FriendDecl => {
+                if let Some(friend) = build_friend(&m) {
+                    declarations.push(Declaration::Friend(friend));
+                }
+            }
             _ => {}
         }
     }
@@ -215,6 +230,28 @@ fn build_class(e: &Entity) -> Option<CppClass> {
         name,
         declarations,
     })
+}
+
+/// Extract the befriended entity's name from a `friend` declaration cursor.
+///
+/// The befriended entity is the `FriendDecl`'s child cursor (the `FriendDecl`
+/// itself is anonymous). For `friend class Foo;` the child is a `TypeRef` whose
+/// referenced TYPE display is the clean fully-qualified name
+/// (`Tesseract::TessdataManager`) — the cursor *spelling* would carry a
+/// `class `/`struct ` elaboration, so we read the type, not the spelling. For
+/// `friend Ret fn(...);` the child is the friend `FunctionDecl`, whose own name
+/// is what `is_friend_of` should point to.
+fn build_friend(m: &Entity) -> Option<CppFriend> {
+    for child in m.get_children() {
+        let name = match child.get_kind() {
+            EntityKind::TypeRef => child.get_type().map(|t| t.get_display_name()),
+            _ => child.get_name(),
+        };
+        if let Some(name) = name.filter(|s| !s.is_empty()) {
+            return Some(CppFriend { name });
+        }
+    }
+    None
 }
 
 /// Whether `e` is defined in a system header (std lib, libc, …). Entities

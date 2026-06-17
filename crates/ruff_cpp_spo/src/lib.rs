@@ -571,8 +571,10 @@ class Recognizer : public Classify {
   virtual ~Recognizer();
   int Recognize(int x) noexcept override;
   bool operator==(const Recognizer& other) const;
+  friend class TessdataManager;
  private:
   int recognizer_;
+  static int count_;
 };
 }
 ";
@@ -657,6 +659,23 @@ class Recognizer : public Classify {
         assert!(
             methods.iter().any(|m| m.name == "~Recognizer"),
             "destructor must be captured as a method"
+        );
+
+        // Static data members are VarDecl in libclang — captured as has_field.
+        assert!(
+            recognizer.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Field(f) if f.name == "count_"
+            )),
+            "static member count_ must be captured as a field"
+        );
+        // `friend class Foo;` — captured as is_friend_of via CppFriend. libclang
+        // resolves the TypeRef to the fully-qualified type, so the name is
+        // namespace-qualified (consistent with every other harvested name).
+        assert!(
+            recognizer.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Friend(fr) if fr.name == "Tesseract::TessdataManager"
+            )),
+            "friend class Tesseract::TessdataManager must be captured"
         );
 
         let clear = classify

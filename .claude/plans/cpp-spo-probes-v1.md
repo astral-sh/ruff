@@ -191,3 +191,24 @@ First real coverage measurement (`cpp_schema_fit_real_corpus_coverage`, gated on
   `template_specialises`/`template_instantiates` and `friend` are still pending.
   Next follow-up by frequency: `FriendDecl` (79), then `VarDecl` static members.
   `CPP-AST-RT` and `CPP-TEMPLATE-DET` remain PENDING.
+
+## Update — 2026-06-16 (VarDecl + FriendDecl follow-ups → 92%)
+
+Both highest-frequency unmapped *meaningful* constructs now captured:
+
+- **`VarDecl` (84)** — static data members (`static T x;`, libclang's distinct
+  kind) → `has_field` via a `FieldDecl | VarDecl` arm.
+- **`FriendDecl` (79)** → `is_friend_of`. Grounded against real libclang-18, not
+  guessed: the FriendDecl cursor is *anonymous*; its `TypeRef` child's resolved
+  TYPE display is the clean fully-qualified befriended name
+  (`Tesseract::TessdataManager`) — read the type, not the elaborated cursor
+  spelling (`class Tesseract::TessdataManager`). The hermetic fixture gains a
+  `static int count_;` + `friend class TessdataManager;` with assertions.
+
+**Coverage: 90% → 92%** (6078 / 6570). Remaining unmapped: `AccessSpecifier`
+(436, noise), nested `Struct`/`ClassDecl` (31, emitted via recursion),
+`TypeAliasDecl` (14), `UsingDeclaration` (6), `EnumDecl` (5) — **~99% of
+meaningful constructs now mapped**. The `CPP-SCHEMA-FIT` real-corpus coverage
+gate is effectively satisfied; `CPP-AST-RT` (determinism) and `CPP-TEMPLATE-DET`
+(class-level templates) remain the PENDING probes, both needing only the work
+they always did (a rerun/JSON-dump-parity harness; a template-heavy fixture).
