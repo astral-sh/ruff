@@ -477,19 +477,21 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Never, TypeVar
-from ty_extensions import Unknown, Bottom, Top, static_assert, is_subtype_of
+from ty_extensions import Unknown, Bottom, Top, static_assert, is_assignable_to, is_subtype_of
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     # Top materialization of `T: Any` is `T: object`
 
     # Bottom materialization of `T: Any` is `T: Never`
-    static_assert(is_subtype_of(Bottom[T], Never))
+    static_assert(is_assignable_to(Bottom[T], Never))
+    static_assert(not is_subtype_of(Bottom[T], Never))
 
 def constrained_by_gradual[T: (int, Any)](t: T) -> None:
     # Top materialization of `T: (int, Any)` is `T: (int, object)`
 
     # Bottom materialization of `T: (int, Any)` is `T: (int, Never)`
-    static_assert(is_subtype_of(Bottom[T], int))
+    static_assert(is_assignable_to(Bottom[T], int))
+    static_assert(not is_subtype_of(Bottom[T], int))
 ```
 
 ## Generics

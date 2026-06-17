@@ -177,7 +177,9 @@ class B:
 
 ## Subtyping
 
-A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
+A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`. Bounds and
+constraints make `type[T]` assignable to the corresponding class-object types, but do not make it a
+subtype because `T` can be explicitly specialized to a dynamic type.
 
 ```py
 from typing import Any, Callable, Protocol
@@ -214,10 +216,11 @@ def _[T: int](_: T):
     static_assert(is_disjoint_from(type[T], int))
 
     static_assert(not is_subtype_of(type[int], type[T]))
-    static_assert(is_subtype_of(type[T], type[int]))
+    static_assert(not is_subtype_of(type[T], type[int]))
+    static_assert(is_assignable_to(type[T], type[int]))
     static_assert(not is_disjoint_from(type[T], type[int]))
 
-    static_assert(is_subtype_of(type[T], type[int] | None))
+    static_assert(not is_subtype_of(type[T], type[int] | None))
     static_assert(not is_disjoint_from(type[T], type[int] | None))
 
     static_assert(is_subtype_of(type[T], type[T]))
@@ -274,13 +277,13 @@ def _[T: (int, str)](_: T):
     static_assert(not is_disjoint_from(type[T], type[int]))
     static_assert(not is_disjoint_from(type[T], type[str]))
 
-    static_assert(is_subtype_of(type[T], type[int] | type[str]))
-    static_assert(is_subtype_of(type[T], type[int | str]))
+    static_assert(not is_subtype_of(type[T], type[int] | type[str]))
+    static_assert(not is_subtype_of(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int] | type[str]))
 
 def _[T: (int | str, int)](_: T):
-    static_assert(is_subtype_of(type[int], type[T]))
+    static_assert(not is_subtype_of(type[int], type[T]))
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 

@@ -1377,12 +1377,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Except for impure redundancy used to simplify unions and intersections, a fully
-            // static typevar is a subtype of its upper bound, and to something similar to the union
-            // of its constraints. An unbound, unconstrained, fully static typevar has an implicit
-            // upper bound of `object` (which is handled above).
+            // A typevar is assignable to its upper bound, or to something similar to the union of
+            // its constraints. It is not generally a subtype of or redundant with those types,
+            // because it can be explicitly specialized to a dynamic type. `object` is the one
+            // exception and is handled above.
             (Type::TypeVar(bound_typevar), _)
-                if !matches!(self.relation, TypeRelation::Redundancy { pure: false })
+                if self.is_eager_assignability()
                     && !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
@@ -1403,9 +1403,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
-            // disjoint, which means an lhs type might be a subtype of all of the constraints.
+            // disjoint, which means an lhs type might be assignable to all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if !matches!(self.relation, TypeRelation::Redundancy { pure: false })
+                if self.is_eager_assignability()
                     && !bound_typevar.is_inferable(db, self.inferable)
                     && !bound_typevar
                         .typevar(db)

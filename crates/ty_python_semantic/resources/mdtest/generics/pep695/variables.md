@@ -335,11 +335,11 @@ def unbounded_unconstrained[T, U](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U, T))
 ```
 
-A bounded typevar is assignable to its bound, and a bounded, fully static typevar is a subtype of
-its bound. (A typevar with a non-fully-static bound is itself non-fully-static, and therefore does
-not participate in subtyping.) A fully static bound is not assignable to, nor a subtype of, the
-typevar, since the typevar might be specialized to a smaller type. (This is true even if the bound
-is a final class, since the typevar can still be specialized to `Never`.)
+A bounded typevar is assignable to its bound, but it is not a subtype of the bound because it can be
+explicitly specialized to a dynamic type. All typevars remain subtypes of `object`, since all types,
+including dynamic types, are subtypes of `object`. A fully static bound is not assignable to, nor a
+subtype of, the typevar, since the typevar might be specialized to a smaller type. (This is true
+even if the bound is a final class, since the typevar can still be specialized to `Never`.)
 
 ```py
 from typing import Any
@@ -349,13 +349,15 @@ def bounded[T: Super](t: T) -> None:
     static_assert(is_assignable_to(T, Any))
     static_assert(is_assignable_to(Any, T))
     static_assert(is_assignable_to(T, Super))
+    static_assert(is_assignable_to(T, object))
     static_assert(not is_assignable_to(T, Sub))
     static_assert(not is_assignable_to(Super, T))
     static_assert(not is_assignable_to(Sub, T))
 
     static_assert(not is_subtype_of(T, Any))
     static_assert(not is_subtype_of(Any, T))
-    static_assert(is_subtype_of(T, Super))
+    static_assert(not is_subtype_of(T, Super))
+    static_assert(is_subtype_of(T, object))
     static_assert(not is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Sub, T))
@@ -386,7 +388,7 @@ def bounded_final[T: FinalClass](t: T) -> None:
 
     static_assert(not is_subtype_of(T, Any))
     static_assert(not is_subtype_of(Any, T))
-    static_assert(is_subtype_of(T, FinalClass))
+    static_assert(not is_subtype_of(T, FinalClass))
     static_assert(not is_subtype_of(FinalClass, T))
 ```
 
@@ -411,9 +413,10 @@ def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U, T))
 ```
 
-A constrained fully static typevar is assignable to the union of its constraints, but not to any of
-the constraints individually. None of the constraints are subtypes of the typevar, though the
-intersection of all of its constraints is a subtype of the typevar.
+A constrained fully static typevar is assignable to the union of its constraints, but it is not a
+subtype of that union because it can be explicitly specialized to a dynamic type. None of the
+constraints are subtypes of the typevar. The intersection of all constraints is assignable to the
+typevar, but it is not a subtype of the typevar.
 
 ```py
 from ty_extensions import Intersection
@@ -438,14 +441,14 @@ def constrained[T: (Base, Unrelated)](t: T) -> None:
     static_assert(not is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(T, Unrelated))
     static_assert(not is_subtype_of(T, Any))
-    static_assert(is_subtype_of(T, Super | Unrelated))
-    static_assert(is_subtype_of(T, Base | Unrelated))
+    static_assert(not is_subtype_of(T, Super | Unrelated))
+    static_assert(not is_subtype_of(T, Base | Unrelated))
     static_assert(not is_subtype_of(T, Sub | Unrelated))
     static_assert(not is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Unrelated, T))
     static_assert(not is_subtype_of(Super | Unrelated, T))
-    static_assert(is_subtype_of(Intersection[Base, Unrelated], T))
+    static_assert(not is_subtype_of(Intersection[Base, Unrelated], T))
 
 def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
     static_assert(is_assignable_to(T, Super))
@@ -693,9 +696,13 @@ def bounded[T: Base](t: T) -> None:
     def _(x: T | Any) -> None:
         reveal_type(x)  # revealed: T@bounded | Any
 
-    static_assert(is_subtype_of(T | Base, Base))
+    def _(x: T | object) -> None:
+        reveal_type(x)  # revealed: object
+
+    static_assert(not is_subtype_of(T | Base, Base))
     static_assert(is_subtype_of(Base, T | Base))
-    static_assert(is_equivalent_to(T | Base, Base))
+    static_assert(not is_equivalent_to(T | Base, Base))
+    static_assert(is_equivalent_to(T | object, object))
 ```
 
 The union of a constrained typevar with another type cannot be simplified based on its constraints.
@@ -718,9 +725,9 @@ def constrained[T: (Base, Sub)](t: T) -> None:
     def _(x: T | Any) -> None:
         reveal_type(x)  # revealed: T@constrained | Any
 
-    static_assert(is_subtype_of(T | Sub, T))
+    static_assert(not is_subtype_of(T | Sub, T))
     static_assert(is_subtype_of(T, T | Sub))
-    static_assert(is_equivalent_to(T | Sub, T))
+    static_assert(not is_equivalent_to(T | Sub, T))
 ```
 
 ## Intersections involving typevars
