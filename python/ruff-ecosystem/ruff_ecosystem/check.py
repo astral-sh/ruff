@@ -45,11 +45,8 @@ CHECK_DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-# A little permissive - it allows mismatched brackets around
-# the severity. But should be good enough while we support both
-# the old and new rendering with severities.
 CHECK_DIAGNOSTIC_LINE_RE = re.compile(
-    r"^(?P<diff>[+-])? ?(?P<location>.*?): (?P<diagnostic_id>(?:(?P<severity>[a-z]+)\[)?(?P<code>[A-Z]{1,5}[0-9]{3,4}|[a-z0-9\-]+):?\]?)(?P<fixable> \[\*\])? (?P<message>.*)"
+    r"^(?P<diff>[+-])? ?(?P<location>.*?): (?P<code>[A-Z]{1,5}[0-9]{3,4}|[a-z0-9\-]+):?(?P<fixable> \[\*\])? (?P<message>.*)"
 )
 
 PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
@@ -57,17 +54,6 @@ PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
 GITHUB_MAX_COMMENT_LENGTH = 65536  # characters
-
-
-def normalize_diagnostic_severity(line: str) -> str:
-    match = CHECK_DIAGNOSTIC_LINE_RE.match(line)
-    if match is None or match["severity"] is None:
-        return line
-
-    start, end = match.span("diagnostic_id")
-    code = match["code"]
-    separator = "" if code[0].isupper() else ":"
-    return f"{line[:start]}{code}{separator}{line[end:]}"
 
 
 def markdown_check_result(result: Result) -> str:
@@ -545,14 +531,6 @@ async def compare_check(
         baseline_task.result(),
         comparison_task.result(),
     )
-
-    if options.preview:
-        baseline_output = [
-            normalize_diagnostic_severity(line) for line in baseline_output
-        ]
-        comparison_output = [
-            normalize_diagnostic_severity(line) for line in comparison_output
-        ]
 
     for line in comparison_output:
         if PANIC_DIAGNOSTIC_LINE_RE.match(line):
