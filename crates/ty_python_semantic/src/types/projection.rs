@@ -221,7 +221,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        let evidence = CycleRecoveryEvidence::from_type(db, self, &paths);
+        let evidence = ProjectableEvidence::from_type(db, self, &paths);
         self.try_container_projection_cycle_normalized(db, root, &paths, &evidence)
     }
 
@@ -231,12 +231,26 @@ impl<'db> Type<'db> {
     ///
     /// 1. Split the candidate recursive type into its top-level union arms and
     ///    reuse the collected projection paths rooted at `root`.
+    ///    For example, for a type equation `D = tuple[int] | tuple[Projection_{Subscript[0]}(D)]`,
+    ///    * `self = tuple[int] | tuple[Projection_{Subscript[0]}(D)]`
+    ///    * `elements = [tuple[int], tuple[Projection_{Subscript[0]}(D)]]`
+    ///    * `paths = [Subscript[0]]`
     /// 2. Treat non-root union arms as container evidence. Each supported arm
     ///    must be able to project every collected path.
+    ///    Here, both tuple arms become `containers`: projecting the first arm
+    ///    by `Subscript[0]` yields `int`, while projecting the second yields
+    ///    `Projection_{Subscript[0]}(D)`. These terms are stored in
+    ///    `terms_by_op`.
+    ///    * `containers = [tuple[int], tuple[Projection_{Subscript[0]}(D)]]`
+    ///    * `terms_by_op = [(Subscript[0], [Exact(int), Exact(Projection_{Subscript[0]}(D))])]`
     /// 3. Solve each path from the terms produced by those containers, dropping
     ///    recursive self references and unioning the remaining productive terms.
+    ///    In the example, the self reference is discarded and `Subscript[0]`
+    ///    is solved as `int`, producing `solved_ops = [(Subscript[0], int)]`.
     /// 4. Rebuild the original top-level arms with every cycle artifact replaced
     ///    by its solved projection type.
+    ///    Rebuilding turns `tuple[Projection_{Subscript[0]}(D)]` into
+    ///    `tuple[int]`, so the candidate normalizes to `tuple[int]`.
     ///
     /// Returning `None` means that this recovery step cannot make progress
     /// without losing information; Salsa cycle recovery can then keep iterating
@@ -246,7 +260,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
         paths: &[ProjectionPath<'db>],
-        evidence: &[CycleRecoveryEvidence<'db>],
+        evidence: &[ProjectableEvidence<'db>],
     ) -> Option<Self> {
         let elements = self.top_level_projection_union_elements(db);
         let mut containers = Vec::new();
@@ -541,7 +555,7 @@ impl<'db> ProjectionContainer<'db> {
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
-        evidence: &[CycleRecoveryEvidence<'db>],
+        evidence: &[ProjectableEvidence<'db>],
         terms_by_op: &mut [(ProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
     ) -> Option<()> {
         for (path, terms) in terms_by_op {
@@ -553,7 +567,7 @@ impl<'db> ProjectionContainer<'db> {
     fn project_path(
         &self,
         db: &'db dyn Db,
-        evidence: &[CycleRecoveryEvidence<'db>],
+        evidence: &[ProjectableEvidence<'db>],
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
@@ -566,7 +580,7 @@ impl<'db> ProjectionContainer<'db> {
     fn project_type_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        evidence: Option<&[CycleRecoveryEvidence<'db>]>,
+        evidence: Option<&[ProjectableEvidence<'db>]>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(evidence) = evidence
@@ -602,7 +616,7 @@ impl<'db> ProjectionContainer<'db> {
     fn project_custom_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        evidence: &[CycleRecoveryEvidence<'db>],
+        evidence: &[ProjectableEvidence<'db>],
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         Self::is_custom_generic_container(db, ty).then_some(())?;
@@ -853,14 +867,31 @@ impl<'db> ProjectionTerm<'db> {
 }
 
 /// Projection facts inferred from custom generic containers in a cycle candidate.
+///
+/// Built-in containers know how to project their own type arguments directly,
+/// but custom generic containers need a small cache of inferred facts. Those
+/// facts are collected by running the same projection operation without
+/// evidence and storing only non-ambiguous successes. For a schematic arm
+/// `Box[int]` where `Box.__iter__` returns `Iterator[T]`, and a collected path
+/// `Iter`, evidence records:
+///
+/// * `arm = Box[int]`
+/// * `path = Iter`
+/// * `term = Homogeneous(int)`
+///
+/// The solver then uses this fact when it later sees the same custom arm while
+/// projecting a recursive candidate such as `D = Box[int] | Box[Projection_Iter(D)]`.
+/// `from_type` also records suffixes of collected paths: if a path is
+/// `Iter, Unpack[0]`, then evidence for `Unpack[0]` can be reused after the
+/// leading `Iter` has already been projected to another custom container.
 #[derive(Debug, Clone)]
-struct CycleRecoveryEvidence<'db> {
+struct ProjectableEvidence<'db> {
     arm: Type<'db>,
     path: ProjectionPath<'db>,
     term: ProjectionTerm<'db>,
 }
 
-impl<'db> CycleRecoveryEvidence<'db> {
+impl<'db> ProjectableEvidence<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>, paths: &[ProjectionPath<'db>]) -> Vec<Self> {
         let arms = RefCell::new(Vec::new());
         any_over_type(db, ty, false, |nested| {
