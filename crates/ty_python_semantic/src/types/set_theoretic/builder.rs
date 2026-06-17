@@ -129,20 +129,6 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
-/// Return `true` if one type is the exact negation of the other.
-///
-/// Exact complements must collapse before any pair-specific preservation rule can bypass normal
-/// redundancy simplification. For example, `Hashable | Not[Hashable]` represents `object`.
-fn are_exact_complements(db: &dyn Db, left: Type, right: Type) -> bool {
-    let is_negation_of = |candidate, other| {
-        matches!(candidate, Type::Intersection(intersection)
-            if intersection.is_simple_negation(db)
-                && intersection.negative(db).contains(&other))
-    };
-
-    is_negation_of(left, right) || is_negation_of(right, left)
-}
-
 /// Return `true` if union simplification should preserve this pair because one element requires
 /// hashability and the other can contain unhashable values.
 ///
@@ -996,11 +982,6 @@ impl<'db> UnionBuilder<'db> {
 
             // `object` already contains every possible union element.
             if element_type == Type::object() {
-                return;
-            }
-
-            if are_exact_complements(self.db, ty, element_type) {
-                self.collapse_to_object();
                 return;
             }
 

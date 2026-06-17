@@ -1128,6 +1128,9 @@ from ty_extensions import Intersection, Not
 class SupportsHash(Protocol):
     def __hash__(self) -> int: ...
 
+class InvalidHashProtocol(Protocol):
+    def __hash__(self) -> object: ...  # error: [invalid-method-override]
+
 static_assert(is_equivalent_to(object, Hashable))
 static_assert(is_assignable_to(object, Hashable))
 static_assert(is_subtype_of(object, Hashable))
@@ -1190,6 +1193,9 @@ def check_supports_hash_or_sequence(x: SupportsHash | Sequence[int]):
 def check_sequence_or_supports_hash(x: Sequence[int] | SupportsHash):
     reveal_type(x)  # revealed: Sequence[int] | SupportsHash
 
+def check_invalid_hash_protocol_or_sequence(x: InvalidHashProtocol | Sequence[int]):
+    reveal_type(x)  # revealed: InvalidHashProtocol
+
 def check_abc_hashable_or_sequence(x: AbcHashable | Sequence[AbcHashable]):
     reveal_type(x)  # revealed: Hashable | Sequence[Hashable]
 
@@ -1213,7 +1219,7 @@ be hashable. For classes, this requires both finality and a valid effective `__h
 from dataclasses import dataclass
 from enum import Enum
 from random import random
-from typing import Literal, final
+from typing import Literal, NewType, final
 
 @final
 class C: ...
@@ -1227,6 +1233,11 @@ class NonFinal: ...
 class ExplicitHash:
     def __hash__(self) -> int:
         return 0
+
+@final
+class InvalidHash:
+    def __hash__(self) -> str:  # error: [invalid-method-override]
+        return ""
 
 @final
 class ConditionalHash:
@@ -1266,6 +1277,8 @@ class UnhashableEnum(Enum):
     SECOND = 2
     __hash__: None = None
 
+FinalC = NewType("FinalC", C)
+
 def check_hashable_or_final(x: Hashable | C):
     reveal_type(x)  # revealed: Hashable
 
@@ -1282,6 +1295,12 @@ def check_hashable_or_explicit_hash(x: Hashable | ExplicitHash):
     reveal_type(x)  # revealed: Hashable
 
 def check_explicit_hash_or_hashable(x: ExplicitHash | Hashable):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_invalid_hash(x: Hashable | InvalidHash):
+    reveal_type(x)  # revealed: Hashable | InvalidHash
+
+def check_hashable_or_final_newtype(x: Hashable | FinalC):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_hashable_dataclass(x: Hashable | HashableDataclass):
