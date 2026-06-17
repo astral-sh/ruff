@@ -2024,8 +2024,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         {
             return Some(Type::Never);
         }
-        let rhs_values = iterable.homogeneous_element_type(self.db);
-        evaluate_type_equality(self.db, lhs_ty, rhs_values, true)
+        let rhs_values = iterable
+            .homogeneous_element_type(self.db)
+            .resolve_type_alias(self.db);
+
+        if let Type::Union(union) = rhs_values {
+            let mut builder = UnionBuilder::new(self.db);
+            for rhs_value in union.elements(self.db) {
+                builder = builder.add(evaluate_type_equality(self.db, lhs_ty, *rhs_value, true)?);
+            }
+            Some(builder.build())
+        } else {
+            evaluate_type_equality(self.db, lhs_ty, rhs_values, true)
+        }
     }
 
     fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
