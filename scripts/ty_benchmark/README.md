@@ -36,13 +36,6 @@ Measures how long it takes to recheck a project if there were no changes.
 
 > **Note**: Of the benchmarked type checkers, only mypy supports caching.
 
-The benchmark harness installs one benchmark-managed mypy version for every
-project. This makes results easier to compare across projects, but can diverge
-from upstream project pins. For example, PyTorch currently requires an older
-mypy version than the benchmark uses, so its mypy diagnostics include upstream's
-unsupported-version warning and should not be treated as a like-for-like PyTorch
-mypy regression.
-
 ### LSP: Time to first diagnostic
 
 Measures how long it takes for a newly started LSP to return the diagnostics for the files open in the editor.
@@ -71,6 +64,9 @@ uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_incremen
 
 The tested type checkers implement Python's type system to varying degrees and
 some projects only successfully pass type checking using a specific type checker.
+We benchmark against the latest version of each type checker, but some projects
+may use another version in practice, leading to different diagnostic results
+between benchmarking and reality.
 
 ## Updating the benchmark
 
