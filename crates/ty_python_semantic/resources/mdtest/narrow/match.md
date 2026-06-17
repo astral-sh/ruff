@@ -1236,7 +1236,14 @@ Sequence patterns also contribute to negative narrowing and exhaustiveness. Exac
 make a match exhaustive.
 
 ```py
+from typing import final
 from typing_extensions import assert_never
+
+class LengthBase:
+    x: int
+
+@final
+class LengthChild(LengthBase): ...
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
@@ -1267,6 +1274,16 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
             return left + right
         case _:
             assert_never(value)
+
+# Checking an element against its subject type does not replace the sequence pattern's length
+# check. This one-element pattern cannot match a two-element tuple.
+def subject_aware_element_keeps_length_check(
+    value: tuple[LengthChild, LengthChild],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [LengthBase(x=_)]:
+            return 1
 
 def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
