@@ -476,3 +476,50 @@ collision axis (cv-qualification), now measured at 19/67 on real data.
 
 - **Test count:** **54 ruff_spo_triplet + 15 ruff_cpp_spo**, all green.
   `clippy -D warnings` + fmt clean on both crates (default + `libclang` feature).
+
+## Update — 2026-06-17 (D — cv-aware method IRI: GAP-CONST-OVERLOAD RESOLVED → CPP-REASSEMBLE-RT 67/67)
+
+D shipped (the council's step-2 prerequisite). The method IRI is now cv-aware —
+`expand::cpp_method` appends ` const` when `is_const`, `clang_walker` does the
+same for the `virtually_overrides` target (keyed on `base_m.is_const_method()`),
+and `reassemble` reconstructs the suffix from the recovered `is_const`. This is a
+**correctness fix, not a vocab change** (predicate count stays 54; it is the C++
+spelling of the cv-qualifier, already part of a method's C++ identity).
+
+**The falsifier corrected the council's assumption with data.** The earlier
+"19/67 = const-overload collisions" was an *inference*; the cv-aware IRI fixed
+only **3** of them (48/67 → 51/67). The remaining 16 were **not** const
+overloads — and tracing them (per-class `methods/templates/fields` count delta in
+the probe output) split them cleanly:
+
+- **13 classes** (GenericVector `t4/10`, PointerVector, the KDPair* / X_LIST*
+  families, …): **methods matched; only `templates` differed** — benign
+  duplicate `template_instantiates` (the same template-id used in several method
+  signatures emits identical triples). `expand` dedups `(s,p,o)`; `cpp_projection`
+  did **not** dedup, so it spuriously kept the duplicates. **Metric bug, not
+  information loss.**
+- **2 classes** (TFile `m22/24`, X_ITER `m5/6`): a method harvested twice (exact
+  duplicate) — same root cause (projection not deduping).
+- **1 class** (UnicityTable, all counts equal): a const/non-const `at`/`operator[]`
+  pair with an **equal `(name, params)` sort key** — the stable sort preserved two
+  different pre-sort orders (reassemble: BTreeMap-by-IRI, non-const first;
+  projection: source order, const first) → same content, different order.
+
+**Two round-trip-metric fixes followed (the falsifier earning its keep):**
+1. `cpp_projection`/`canonicalize_cpp` now **de-duplicates** every C++ collection
+   after sorting — mirroring `expand`'s `(s,p,o)` dedup. Real collisions (same
+   sort key, different content) are not equal, so dedup keeps them; only exact
+   duplicates collapse. (Fixed the 13 + 2.)
+2. The methods sort key now includes **`is_const`** so a const/non-const pair
+   sorts deterministically (non-const before const) on both sides. (Fixed
+   UnicityTable.)
+
+**Result: `CPP-REASSEMBLE-RT` is now 67/67 byte-exact, 0 differ** — and the
+assertion is a **hard gate** (`differing.is_empty()`), so any regression or a NEW
+collision source (e.g. ref-qualified `&`/`&&` overloads in a future corpus)
+reopens it and fails. `GAP-CONST-OVERLOAD` is **RESOLVED**; no documented merged-
+adapter known-gap remains. In-crate falsifier gains
+`const_and_nonconst_overload_stay_distinct`.
+
+- **Test count:** **58 ruff_spo_triplet + 15 ruff_cpp_spo**, all green.
+  `clippy -D warnings` + fmt clean on both crates.

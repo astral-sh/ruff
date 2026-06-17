@@ -322,9 +322,7 @@ impl Expander {
         // string `"User"` (8 chars including the quote pair). Strip
         // those before emission so the consumer sees the bare class
         // name `User` (codex P2 on #18).
-        if let Some((_, raw_override)) =
-            a.options.iter().find(|(k, _)| k == "class_name")
-        {
+        if let Some((_, raw_override)) = a.options.iter().find(|(k, _)| k == "class_name") {
             let normalized = strip_class_name_marker(raw_override);
             self.push(
                 rel_iri,
@@ -599,10 +597,19 @@ impl Expander {
         // signature triples (returns_type / has_param_type / is_noexcept …) all
         // attach to the same `Foo.f` node and the codegen can't reconstruct the
         // two separate overloads. Codex P2 #17.
+        //
+        // The cv-qualifier is part of the identity too: a const/non-const
+        // overload pair (`T& at(i)` vs `const T& at(i) const`) shares name AND
+        // param types, so without ` const` in the IRI they collapse under the
+        // `(s, p, o)` dedup — the GAP-CONST-OVERLOAD defect (19/67 ccutil
+        // classes). Appending ` const` (the C++ spelling) keeps the two
+        // overloads on distinct nodes. `reassemble` reconstructs the same
+        // suffix from the recovered `is_const`.
         let method_iri = format!(
-            "{model_iri}.{}({})",
+            "{model_iri}.{}({}){}",
             method.name,
-            method.param_types.join(",")
+            method.param_types.join(","),
+            if method.is_const { " const" } else { "" }
         );
         // Universal classification — same shape the core 7 give a Function.
         self.push(
@@ -1228,15 +1235,10 @@ mod tests {
         let triples = expand(&g);
 
         // The override fires on the `owner` relation.
-        let has = |s: &str, p: &str, o: &str| {
-            triples.iter().any(|t| t.s == s && t.p == p && t.o == o)
-        };
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
         assert!(
-            has(
-                "openproject:WorkPackage.owner",
-                "class_name",
-                "User",
-            ),
+            has("openproject:WorkPackage.owner", "class_name", "User",),
             "class_name override missing for `:owner`",
         );
 
@@ -1244,9 +1246,7 @@ mod tests {
         // (absence means convention applies).
         let project_class_name_count = triples
             .iter()
-            .filter(|t| {
-                t.s == "openproject:WorkPackage.project" && t.p == "class_name"
-            })
+            .filter(|t| t.s == "openproject:WorkPackage.project" && t.p == "class_name")
             .count();
         assert_eq!(
             project_class_name_count, 0,
@@ -1294,7 +1294,12 @@ mod tests {
         let triples = expand(&g);
 
         // All four lower to the same bare `User` object.
-        for relation in ["double_quoted", "single_quoted", "bare_const", "symbol_form"] {
+        for relation in [
+            "double_quoted",
+            "single_quoted",
+            "bare_const",
+            "symbol_form",
+        ] {
             let s = format!("openproject:WorkPackage.{relation}");
             let class_name_objects: Vec<&str> = triples
                 .iter()
@@ -1619,7 +1624,7 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Tesseract::Classify.Recognize(int,const Image &)".to_string()),
+            overrides: Some("Tesseract::Classify.Recognize(int,const Image &) const".to_string()),
             operator_kind: None,
             requires_clause: None,
             return_type: Some("int".to_string()),
@@ -1707,14 +1712,14 @@ mod tests {
             "ogit:Property"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.Recognize(int,const Image &)",
+            "cpp:Tesseract::Recognizer.Recognize(int,const Image &) const",
             "rdf:type",
             "ogit:Function"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer",
             "has_function",
-            "cpp:Tesseract::Recognizer.Recognize(int,const Image &)"
+            "cpp:Tesseract::Recognizer.Recognize(int,const Image &) const"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer",
@@ -1742,7 +1747,7 @@ mod tests {
         assert!(has("is_constexpr", "constexpr"));
         assert!(has(
             "virtually_overrides",
-            "cpp:Tesseract::Classify.Recognize(int,const Image &)"
+            "cpp:Tesseract::Classify.Recognize(int,const Image &) const"
         ));
         assert!(has("defines_operator", "operator=="));
         assert!(has("requires_concept", "std::equality_comparable<T>"));

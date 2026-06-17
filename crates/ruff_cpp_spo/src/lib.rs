@@ -858,7 +858,7 @@ class Recognizer : public Classify {
             "cpp:Tesseract::Recognizer.recognizer_"
         ));
         assert!(has(
-            "cpp:Tesseract::Recognizer.operator==(const Recognizer &)",
+            "cpp:Tesseract::Recognizer.operator==(const Recognizer &) const",
             "defines_operator",
             "operator=="
         ));
@@ -1059,18 +1059,42 @@ class Recognizer : public Classify {
         );
 
         // (3) Fidelity vs the collision-blind projection — measured, not gated.
+        // A class "differs" when reassembly cannot recover it byte-exact, which
+        // happens when two harvested methods collide on one method IRI (same
+        // name + params + cv-qualifier) but differ in a field the IRI does not
+        // carry. D (the cv-aware IRI) removed the const/non-const subset; any
+        // residual is a DIFFERENT collision source (ref-qualified `&`/`&&`
+        // overloads, or a method harvested twice) — a follow-up, named here.
         let projection = cpp_projection(&g);
-        let exact = r1
+        let differing: Vec<String> = r1
             .models
             .iter()
-            .filter(|m| projection.models.iter().any(|p| p == *m))
-            .count();
+            .filter_map(|m| {
+                let p = projection.models.iter().find(|p| p.name == m.name)?;
+                if p == m {
+                    return None;
+                }
+                // Pinpoint WHERE it differs: methods (real overload collision)
+                // vs templates (benign duplicate-instantiation collapse — expand
+                // dedups (s,p,o), cpp_projection does not) vs fields.
+                Some(format!(
+                    "{}(m{}/{} t{}/{} f{}/{})",
+                    m.name,
+                    m.methods.len(),
+                    p.methods.len(),
+                    m.templates.len(),
+                    p.templates.len(),
+                    m.member_fields.len(),
+                    p.member_fields.len(),
+                ))
+            })
+            .collect();
+        let exact = r1.models.len() - differing.len();
         eprintln!(
-            "[CPP-REASSEMBLE-RT] {} classes; {} round-trip byte-exact vs projection, \
-             {} differ (const-overload IRI-collision tail)",
+            "[CPP-REASSEMBLE-RT] {} classes; {exact} round-trip byte-exact, {} differ \
+             (reassembled/projected counts): {differing:?}",
             r1.models.len(),
-            exact,
-            r1.models.len() - exact
+            differing.len(),
         );
 
         // Sanity anchor: UNICHARSET (the canonical ccutil class) must survive.
@@ -1078,7 +1102,16 @@ class Recognizer : public Classify {
             recovered.iter().any(|n| n.ends_with("UNICHARSET")),
             "reassembled ccutil must include UNICHARSET: {recovered:?}"
         );
-        assert!(exact > 0, "at least some classes must round-trip byte-exact");
+        // Hard gate: every ccutil class round-trips byte-exact. The cv-aware
+        // method IRI (D) + the projection dedup + the is_const sort key closed
+        // the entire collision tail (was 48/67). A regression or a NEW
+        // collision source (e.g. ref-qualified `&`/`&&` overloads in a future
+        // corpus) reopens it and fails here.
+        assert!(
+            differing.is_empty(),
+            "all {} ccutil classes must round-trip byte-exact; residual: {differing:?}",
+            r1.models.len(),
+        );
     }
 
     /// `extract_tree` recurses into subdirectories; `extract_dir` does not.

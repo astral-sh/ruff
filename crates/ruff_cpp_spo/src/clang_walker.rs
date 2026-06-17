@@ -431,9 +431,14 @@ fn build_method(m: &Entity) -> CppMethod {
                 .filter_map(|a| a.get_type().map(|t| t.get_display_name()))
                 .collect();
             Some(format!(
-                "{}.{mname}({})",
+                "{}.{mname}({}){}",
                 qualified_name(&parent),
-                params.join(",")
+                params.join(","),
+                if base_m.is_const_method() {
+                    " const"
+                } else {
+                    ""
+                }
             ))
         });
     // AST-DLL signature shape: return type (skip void/ctor/dtor) + ordered
