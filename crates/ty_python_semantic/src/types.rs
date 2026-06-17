@@ -2980,6 +2980,20 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the descriptor result type for directly dynamic values and gradual class-object
+    /// values.
+    fn dynamic_descriptor_type(self) -> Option<Type<'db>> {
+        match self {
+            Type::Dynamic(_) => Some(self),
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_dynamic()
+                .filter(|dynamic| dynamic.is_gradual())
+                .map(Type::Dynamic),
+            _ => None,
+        }
+    }
+
     /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
     /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
     /// the descriptor protocol itself.
@@ -3005,19 +3019,11 @@ impl<'db> Type<'db> {
                 return fallback.try_call_dunder_get(db, instance, owner);
             }
 
+            if let Some(dynamic) = ty.dynamic_descriptor_type() {
+                return Some((dynamic, AttributeKind::DataDescriptor));
+            }
+
             match ty {
-                // A directly dynamic value could be a data descriptor. This differs from a
-                // nominal type with a dynamic base, for which we require a concrete descriptor
-                // method before invoking the protocol.
-                Type::Dynamic(_) => return Some((ty, AttributeKind::DataDescriptor)),
-                Type::SubclassOf(subclass_of)
-                    if let Some(dynamic) = subclass_of.subclass_of().into_dynamic()
-                        && dynamic.is_gradual() =>
-                {
-                    // `type[Any]` and `type[Unknown]` have unknown metaclasses, which could make
-                    // their class-object inhabitants data descriptors.
-                    return Some((Type::Dynamic(dynamic), AttributeKind::DataDescriptor));
-                }
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
@@ -3051,58 +3057,56 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let concrete_descr_get = ty
+            let Place::Defined(DefinedPlace {
+                ty: concrete_descr_get,
+                ..
+            }) = ty
                 .class_member_with_policy(
                     db,
                     "__get__".into(),
                     MemberLookupPolicy::REQUIRE_CONCRETE,
                 )
-                .place;
+                .place
+            else {
+                return None;
+            };
 
-            if let Place::Defined(DefinedPlace {
-                ty: concrete_descr_get,
-                ..
-            }) = concrete_descr_get
-            {
-                // A recursive member lookup can yield the internal cycle marker. It does not
-                // represent a concrete descriptor method and must not escape through the access.
-                if concrete_descr_get.is_divergent() {
-                    return None;
-                }
-
-                let Place::Defined(DefinedPlace {
-                    ty: descr_get,
-                    definedness: descr_get_boundness,
-                    ..
-                }) = ty.class_member(db, "__get__".into()).place
-                else {
-                    return None;
-                };
-
-                let instance_ty = instance.unwrap_or_else(|| Type::none(db));
-                let return_ty = descr_get
-                    .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
-                    .map(|bindings| {
-                        if descr_get_boundness == Definedness::AlwaysDefined {
-                            bindings.return_type(db)
-                        } else {
-                            UnionType::from_two_elements(db, bindings.return_type(db), ty)
-                        }
-                    })
-                    // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
-                    // we should emit a diagnostic here instead of silently ignoring the error.
-                    .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
-
-                let descriptor_kind = if ty.is_data_descriptor(db) {
-                    AttributeKind::DataDescriptor
-                } else {
-                    AttributeKind::NormalOrNonDataDescriptor
-                };
-
-                Some((return_ty, descriptor_kind))
-            } else {
-                None
+            // A recursive member lookup can yield the internal cycle marker. It does not
+            // represent a concrete descriptor method and must not escape through the access.
+            if concrete_descr_get.is_divergent() {
+                return None;
             }
+
+            let Place::Defined(DefinedPlace {
+                ty: descr_get,
+                definedness: descr_get_boundness,
+                ..
+            }) = ty.class_member(db, "__get__".into()).place
+            else {
+                return None;
+            };
+
+            let instance_ty = instance.unwrap_or_else(|| Type::none(db));
+            let return_ty = descr_get
+                .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
+                .map(|bindings| {
+                    if descr_get_boundness == Definedness::AlwaysDefined {
+                        bindings.return_type(db)
+                    } else {
+                        UnionType::from_two_elements(db, bindings.return_type(db), ty)
+                    }
+                })
+                // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
+                // we should emit a diagnostic here instead of silently ignoring the error.
+                .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+
+            let descriptor_kind = if ty.is_data_descriptor(db) {
+                AttributeKind::DataDescriptor
+            } else {
+                AttributeKind::NormalOrNonDataDescriptor
+            };
+
+            Some((return_ty, descriptor_kind))
         }
 
         tracing::trace!(
@@ -3303,14 +3307,7 @@ impl<'db> Type<'db> {
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
             Type::Dynamic(_) => !any_of_union,
-            Type::SubclassOf(subclass_of)
-                if subclass_of
-                    .subclass_of()
-                    .into_dynamic()
-                    .is_some_and(DynamicType::is_gradual) =>
-            {
-                true
-            }
+            Type::SubclassOf(_) if self.dynamic_descriptor_type().is_some() => true,
             Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
