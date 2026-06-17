@@ -60,9 +60,9 @@ impl<'db> ResolvedEnumMethod<'db> {
 
 /// Describes the runtime steps that may transform a declared enum member value.
 ///
-/// Different consumers require different levels of conservatism. Value inference treats any
-/// constructor method as a possible transformation, while alias detection follows the value
-/// captured before `__init__`.
+/// Different consumers require different levels of conservatism. Value inference trusts known
+/// standard-library constructors but treats user-defined constructors as possible transformations,
+/// while alias detection follows the value captured before `__init__`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
@@ -85,11 +85,12 @@ impl<'db> EnumValueConstruction<'db> {
 
     /// Returns whether the declared value cannot be used as the precise type of `.value`.
     ///
-    /// A resolvable `_generate_next_value_` is excluded because its return type can be used for an
-    /// `auto()` member instead.
+    /// Standard-library constructors are trusted because their value normalization is reflected in
+    /// the inherited `_value_` annotation. A resolvable `_generate_next_value_` is excluded because
+    /// its return type can be used for an `auto()` member instead.
     const fn member_value_may_be_transformed(self, is_auto: bool) -> bool {
-        self.init.is_present()
-            || self.new.is_present()
+        self.init.is_user_defined()
+            || self.new.is_user_defined()
             || self.metaclass_may_transform_values
             || (is_auto && self.generate_next_value.is_opaque())
     }
@@ -131,6 +132,22 @@ impl<'db> EnumValueConstruction<'db> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+enum EnumValueAnnotation<'db> {
+    /// An annotation declared on this enum or a user-defined parent enum.
+    UserDefined(Type<'db>),
+    /// An annotation inherited from a known standard-library enum class.
+    StandardLibrary(Type<'db>),
+}
+
+impl<'db> EnumValueAnnotation<'db> {
+    const fn ty(self) -> Type<'db> {
+        match self {
+            Self::UserDefined(ty) | Self::StandardLibrary(ty) => ty,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
@@ -139,8 +156,8 @@ pub(crate) struct EnumMetadata<'db> {
     /// Members whose values were defined using `auto()`.
     pub(crate) auto_members: FxHashSet<Name>,
 
-    /// The explicit `_value_` annotation type, if declared.
-    pub(crate) value_annotation: Option<Type<'db>>,
+    /// The effective `_value_` annotation, including where it was defined.
+    value_annotation: Option<EnumValueAnnotation<'db>>,
 
     /// How enum construction may transform declared member values.
     pub(super) value_construction: EnumValueConstruction<'db>,
@@ -239,6 +256,27 @@ fn special_member_for_enum_complement<'db>(
     }
 }
 
+/// Return whether a known standard-library constructor preserves the inferred value type.
+///
+/// An inherited `_value_` annotation identifies the constructor's runtime output class. Literal
+/// values of that exact class retain their precision, while values of subclasses such as `bool`
+/// are normalized to the annotated class by constructors such as `int.__new__`.
+fn known_constructor_preserves_value_type<'db>(
+    db: &'db dyn Db,
+    value: Type<'db>,
+    annotation: Type<'db>,
+) -> bool {
+    let annotation = annotation.resolve_type_alias(db);
+    match value.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| known_constructor_preserves_value_type(db, *element, annotation)),
+        Type::LiteralValue(literal) => literal.fallback_instance(db) == annotation,
+        value => value == annotation,
+    }
+}
+
 impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
         EnumMetadata {
@@ -252,23 +290,39 @@ impl<'db> EnumMetadata<'db> {
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
-    /// Priority: explicit `_value_` annotation, then custom construction methods
-    /// or metaclass value transformation → `Any`, then `_generate_next_value_`
-    /// return type for `auto()` members, then the inferred member value type.
+    /// A user-defined `_value_` annotation takes priority. Otherwise, values transformed by
+    /// user-defined construction methods or metaclasses become `Any`. For standard-library
+    /// constructors, a literal is preserved when its runtime class matches the inherited `_value_`
+    /// annotation; otherwise, the annotation describes the normalized value.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
-        if !self.members.contains_key(member_name) {
-            return None;
+        let member_name = self.resolve_member(member_name)?;
+        let declared_value = self.members.get(member_name).copied()?;
+
+        if let Some(EnumValueAnnotation::UserDefined(annotation)) = self.value_annotation {
+            return Some(annotation);
         }
-        if let Some(annotation) = self.value_annotation {
-            Some(annotation)
-        } else if self.member_value_may_be_transformed(member_name) {
-            Some(Type::Dynamic(DynamicType::Any))
-        } else if let Some(func_ty) = self.value_construction.generate_next_value.function()
-            && self.auto_members.contains(member_name)
+        if self.member_value_may_be_transformed(member_name) {
+            return Some(Type::Dynamic(DynamicType::Any));
+        }
+
+        let value = if self.auto_members.contains(member_name)
+            && self
+                .value_construction
+                .generate_next_value
+                .is_user_defined()
+            && let Some(func_ty) = self.value_construction.generate_next_value.function()
         {
-            Some(func_ty.signature(db).overload_return_type_or_unknown(db))
+            func_ty.signature(db).overload_return_type_or_unknown(db)
         } else {
-            self.members.get(member_name).copied()
+            declared_value
+        };
+
+        if let Some(EnumValueAnnotation::StandardLibrary(annotation)) = self.value_annotation
+            && !known_constructor_preserves_value_type(db, value, annotation)
+        {
+            Some(annotation)
+        } else {
+            Some(value)
         }
     }
 
@@ -302,7 +356,7 @@ impl<'db> EnumMetadata<'db> {
             return None;
         }
         if let Some(annotation) = self.value_annotation {
-            Some(annotation)
+            Some(annotation.ty())
         } else if self.value_construction.instance_value_may_be_transformed() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
@@ -314,6 +368,11 @@ impl<'db> EnumMetadata<'db> {
                 .build();
             Some(union)
         }
+    }
+
+    /// Returns the effective `_value_` annotation type without its provenance.
+    pub(crate) fn value_annotation_type(&self) -> Option<Type<'db>> {
+        self.value_annotation.map(EnumValueAnnotation::ty)
     }
 
     /// Returns the type of `.name`/`._name_` for an enum instance that is not
@@ -932,14 +991,15 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    let custom_value_annotation = custom_value_annotation(db, scope_id);
-    let value_annotation = custom_value_annotation.or_else(|| {
-        if metaclass_may_transform_values {
-            inherited_user_defined_value_annotation(db, class)
-        } else {
-            inherited_value_annotation(db, class)
-        }
-    });
+    let value_annotation = custom_value_annotation(db, scope_id)
+        .or_else(|| inherited_user_defined_value_annotation(db, class))
+        .map(EnumValueAnnotation::UserDefined)
+        .or_else(|| {
+            (!metaclass_may_transform_values)
+                .then(|| inherited_value_annotation(db, class))
+                .flatten()
+                .map(EnumValueAnnotation::StandardLibrary)
+        });
 
     members.shrink_to_fit();
 
