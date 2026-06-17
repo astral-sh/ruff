@@ -20,6 +20,8 @@ use anyhow::{Context, Result};
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 
+pub const TY_ECOSYSTEM_PIN: &str = "2026-06-17T06:46:32Z";
+
 /// Configuration for a real-world project to benchmark
 #[derive(Debug, Clone)]
 pub struct RealWorldProject<'a> {
