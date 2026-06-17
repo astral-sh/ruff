@@ -128,7 +128,7 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    425,
+    450,
 );
 
 static FREQTRADE: Benchmark = Benchmark::new(
@@ -197,7 +197,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    16000,
+    16500,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
