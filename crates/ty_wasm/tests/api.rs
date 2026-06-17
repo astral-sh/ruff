@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use ty_wasm::{Position, PositionEncoding, SubDiagnosticSeverity, Workspace};
+use ty_wasm::{DiagnosticTag, Position, PositionEncoding, SubDiagnosticSeverity, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
@@ -59,6 +59,43 @@ fn check() {
         sub_diagnostics
             .iter()
             .all(|sub_diagnostic| sub_diagnostic.annotations.is_empty())
+    );
+}
+
+#[wasm_bindgen_test]
+fn diagnostic_tags() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse("{}").unwrap(),
+    )
+    .expect("Workspace to be created");
+
+    workspace
+        .open_file(
+            "test.py",
+            "from typing_extensions import deprecated\n\n\
+             @deprecated(\"use replacement\")\n\
+             def old() -> None: ...\n\n\
+             old()\n\
+             value = 1  # ty: ignore\n",
+        )
+        .expect("File to be opened");
+
+    let result = workspace.check().expect("Check to succeed");
+    let tags = |id| {
+        result
+            .iter()
+            .find(|diagnostic| diagnostic.id() == id)
+            .map(ty_wasm::Diagnostic::tags)
+    };
+
+    assert_eq!(tags("deprecated"), Some(vec![DiagnosticTag::Deprecated]));
+    assert_eq!(
+        tags("unused-ignore-comment"),
+        Some(vec![DiagnosticTag::Unnecessary])
     );
 }
 
