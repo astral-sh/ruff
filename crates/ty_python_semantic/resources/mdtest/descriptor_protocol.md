@@ -243,6 +243,59 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 C2().attr = 1
 ```
 
+### Descriptor methods must be concrete
+
+An unknown class base can provide any attribute, but that does not make every subclass a descriptor.
+We only apply the descriptor protocol when a concrete `__get__` method is visible:
+
+```py
+import random
+
+class A: ...
+class B: ...
+
+Base = A if random.random() > 0.5 else B
+
+class ClassWithUnknownBase(Base):  # error: [unsupported-base]
+    def known_method(self) -> None: ...
+
+class Wrapper:
+    value: ClassWithUnknownBase
+
+reveal_type(Wrapper.value)  # revealed: ClassWithUnknownBase
+reveal_type(Wrapper().value)  # revealed: ClassWithUnknownBase
+```
+
+The same applies to `Any`. A concrete `__get__` is still recognized, but an unknown `__set__` or
+`__delete__` method inherited from `Any` does not make it a data descriptor:
+
+```py
+from typing import Any, Literal
+
+class NotADescriptor(Any):
+    def known_method(self) -> None: ...
+
+class NonDataDescriptorWithAnyBase(Any):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+
+class DataDescriptorWithAnyBase(Any):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class AnyWrapper:
+    plain: NotADescriptor
+    non_data: NonDataDescriptorWithAnyBase
+    data: DataDescriptorWithAnyBase
+
+reveal_type(AnyWrapper().plain)  # revealed: NotADescriptor
+reveal_type(AnyWrapper().non_data)  # revealed: Literal["non-data"] | NonDataDescriptorWithAnyBase
+reveal_type(AnyWrapper().data)  # revealed: Literal["data"]
+```
+
 ### Descriptors only work when used as class variables
 
 Descriptors only work when used as class variables. When put in instances, they have no effect.

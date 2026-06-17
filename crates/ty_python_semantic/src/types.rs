@@ -469,6 +469,12 @@ bitflags! {
 
         /// Do not call `__getattr__` during member lookup.
         const NO_GETATTR_LOOKUP = 1 << 4;
+
+        /// Ignore members that are only available through a dynamic type.
+        ///
+        /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
+        /// member, but that does not mean that every subclass should be treated as a descriptor.
+        const REQUIRE_CONCRETE = 1 << 5;
     }
 }
 
@@ -500,6 +506,11 @@ impl MemberLookupPolicy {
     /// Do not call `__getattr__` during member lookup.
     pub(crate) const fn no_getattr_lookup(self) -> bool {
         self.contains(Self::NO_GETATTR_LOOKUP)
+    }
+
+    /// Ignore members that are only available through a dynamic type.
+    pub(crate) const fn require_concrete(self) -> bool {
+        self.contains(Self::REQUIRE_CONCRETE)
     }
 }
 
@@ -2557,6 +2568,8 @@ impl<'db> Type<'db> {
                 }))
             }
 
+            Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
+
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
@@ -3026,7 +3039,13 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = ty.class_member(db, "__get__".into()).place;
+            let descr_get = ty
+                .class_member_with_policy(
+                    db,
+                    "__get__".into(),
+                    MemberLookupPolicy::REQUIRE_CONCRETE,
+                )
+                .place;
 
             if let Place::Defined(DefinedPlace {
                 ty: descr_get,
@@ -3034,6 +3053,12 @@ impl<'db> Type<'db> {
                 ..
             }) = descr_get
             {
+                // A recursive member lookup can yield the internal cycle marker. It does not
+                // represent a concrete descriptor method and must not escape through the access.
+                if descr_get.is_divergent() {
+                    return None;
+                }
+
                 let instance_ty = instance.unwrap_or_else(|| Type::none(db));
                 let return_ty = descr_get
                     .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
@@ -3124,18 +3149,12 @@ impl<'db> Type<'db> {
         }
 
         match attribute {
-            // This branch is not strictly needed, but it short-circuits the lookup of various dunder
-            // methods and calls that would otherwise be made.
-            //
-            // Note that attribute accesses on dynamic types always succeed. For this reason, they also
-            // have `__get__`, `__set__`, and `__delete__` methods and are therefore considered to be
-            // data descriptors.
-            //
-            // The same is true for `Never`.
+            // Preserve the existing bottom and cycle behavior without performing descriptor
+            // member lookups that cannot provide any additional information.
             PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
-                        ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
+                        ty: Type::Divergent(_) | Type::Never,
                         ..
                     }),
                 qualifiers: _,
@@ -3253,17 +3272,15 @@ impl<'db> Type<'db> {
     /// Returns whether this type should be considered a possible data descriptor.
     /// If this type is a union, returns true if _any_ element is a data descriptor.
     /// This is used to determine whether an attribute assignment is valid for narrowing.
-    /// In theory, dynamic types might be data descriptor types, so it is unsafe to use
-    /// attribute assignment for narrowing if the inferred type of an attribute contains a dynamic type.
-    /// However, strictly applying this rule would disable narrowing too frequently.
-    /// Therefore, for practical convenience, we don't consider dynamic types as data descriptors.
+    /// Dynamic types are not considered data descriptors because no concrete `__set__` or
+    /// `__delete__` method is visible on them.
     pub(crate) fn may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, true)
     }
 
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
-            Type::Dynamic(_) => !any_of_union,
+            Type::Dynamic(_) => false,
             Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
@@ -3277,9 +3294,20 @@ impl<'db> Type<'db> {
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
             _ => {
-                !self.class_member(db, "__set__".into()).place.is_undefined()
+                !self
+                    .class_member_with_policy(
+                        db,
+                        "__set__".into(),
+                        MemberLookupPolicy::REQUIRE_CONCRETE,
+                    )
+                    .place
+                    .is_undefined()
                     || !self
-                        .class_member(db, "__delete__".into())
+                        .class_member_with_policy(
+                            db,
+                            "__delete__".into(),
+                            MemberLookupPolicy::REQUIRE_CONCRETE,
+                        )
                         .place
                         .is_undefined()
             }
