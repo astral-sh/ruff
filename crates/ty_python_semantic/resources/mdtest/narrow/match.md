@@ -976,7 +976,10 @@ def annotated_match_args_is_not_exhaustive(
         case AnnotatedMatchArgs(_):
             return 1
 
-flag: bool = bool()
+def condition() -> bool:
+    return bool()
+
+flag = condition()
 
 class PossiblyBoundMatchArgs:
     if flag:
@@ -989,6 +992,18 @@ def possibly_bound_match_args_is_not_exhaustive(
 ) -> int:
     match value:
         case PossiblyBoundMatchArgs(_):
+            return 1
+
+class PossiblyBoundIntMatchArgs(int):
+    if flag:
+        __match_args__ = ("missing",)
+
+def possibly_bound_match_args_does_not_enable_match_self(
+    value: PossiblyBoundIntMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PossiblyBoundIntMatchArgs(_):
             return 1
 ```
 
