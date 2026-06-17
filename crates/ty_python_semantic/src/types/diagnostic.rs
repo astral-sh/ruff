@@ -2867,7 +2867,7 @@ pub(crate) fn report_duplicate_bases(
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.focus_range(db)) else {
         return;
     };
 
@@ -2895,8 +2895,7 @@ pub(crate) fn report_duplicate_bases(
     for index in later_indices {
         let repeated_base = bases_list[*index].source_node();
         diagnostic.annotate(
-            context
-                .secondary(repeated_base)
+            Annotation::primary(context.span(repeated_base))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }

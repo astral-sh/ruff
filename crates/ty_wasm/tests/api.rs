@@ -161,7 +161,7 @@ class VeryEggyOmelette(
             .iter()
             .map(|annotation| annotation.primary)
             .collect::<Vec<_>>(),
-        [true, false, false, false]
+        [true, false, true, true]
     );
     assert_eq!(
         annotations
