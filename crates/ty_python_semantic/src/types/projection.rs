@@ -1,3 +1,10 @@
+//! Cycle-recovery projections.
+//!
+//! Recursive inference can encounter operations on a value whose final type is
+//! still being inferred. This module records those operations as projection
+//! paths, then solves them once the recovered recursive type exposes enough
+//! concrete container structure.
+
 use std::cell::RefCell;
 
 use ruff_python_ast as ast;
@@ -219,6 +226,22 @@ impl<'db> Type<'db> {
         self.try_container_projection_cycle_normalized(db, root, &evidence)
     }
 
+    /// Solves all projections of `root` that can be explained by top-level containers.
+    ///
+    /// The solver works in four steps:
+    ///
+    /// 1. Split the candidate recursive type into its top-level union arms and
+    ///    collect every projection path rooted at `root`.
+    /// 2. Treat non-root union arms as container evidence. Each supported arm
+    ///    must be able to project every collected path.
+    /// 3. Solve each path from the terms produced by those containers, dropping
+    ///    recursive self references and unioning the remaining productive terms.
+    /// 4. Rebuild the original top-level arms with every cycle artifact replaced
+    ///    by its solved projection type.
+    ///
+    /// Returning `None` means that this recovery step cannot make progress
+    /// without losing information; Salsa cycle recovery can then keep iterating
+    /// toward a wider fixed point.
     fn try_container_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
@@ -281,6 +304,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Solves the candidate terms for one projection path.
+    ///
+    /// Exact terms are checked for incompatible nested projections, while
+    /// homogeneous and list terms only contribute element types. Recursive
+    /// references to the same root are ignored when at least one non-recursive
+    /// term remains. If a path has no productive term, it solves to `Never`
+    /// only when it is not purely self-recursive. Star-unpack rest terms solve
+    /// to `list[T]`, so they cannot be mixed with scalar projection terms.
     fn solve_projection_terms(
         db: &'db dyn Db,
         root: DivergentType,
@@ -552,6 +583,7 @@ impl<'db> Type<'db> {
     }
 }
 
+/// A container shape that can explain projections of a cycle root.
 #[derive(Debug, Clone)]
 enum ProjectionContainer<'db> {
     Tuple {
@@ -1284,6 +1316,7 @@ impl<'db> ProjectionContainer<'db> {
     }
 }
 
+/// The result of applying one projection path to one container arm.
 #[derive(Debug, Clone, Copy)]
 enum ProjectionTerm<'db> {
     Exact(Type<'db>),
@@ -1308,7 +1341,7 @@ impl<'db> ProjectionTerm<'db> {
     }
 }
 
-/// Projection facts for custom generic containers in the current cycle candidate.
+/// Projection facts inferred from custom generic containers in a cycle candidate.
 #[derive(Debug, Clone)]
 struct CycleRecoveryEvidence<'db> {
     arm: Type<'db>,
@@ -1377,7 +1410,7 @@ impl ProjectionContainer<'_> {
     }
 }
 
-/// A query-free projection of a cycle root produced while recovering recursive inference.
+/// A projected view of a cycle root produced while recovering recursive inference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct CycleProjectionType<'db>(CycleProjectionTypeInterned<'db>);
 
@@ -1402,6 +1435,7 @@ impl<'db> CycleProjectionType<'db> {
     }
 }
 
+/// Interned storage for [`CycleProjectionType`].
 // Due to salsa restrictions, it is not possible to directly intern a public struct containing a private type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct CycleProjectionTypeInterned<'db> {
@@ -1412,6 +1446,7 @@ struct CycleProjectionTypeInterned<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CycleProjectionTypeInterned<'_> {}
 
+/// An ordered sequence of projection operations applied to a cycle root.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct CycleProjectionPath<'db> {
     ops: Box<[CycleProjectionOp<'db>]>,
@@ -1445,6 +1480,7 @@ impl<'db> CycleProjectionPath<'db> {
     }
 }
 
+/// An interned method name used by zero-argument method-call projections.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 struct CycleProjectionMethodName<'db> {
     #[returns(ref)]
@@ -1462,7 +1498,7 @@ impl<'db> CycleProjectionMethodName<'db> {
     }
 }
 
-/// The projection operations currently preserved through cycle recovery.
+/// A single operation that can be preserved through cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum CycleProjectionOp<'db> {
     Iter { is_async: bool },
@@ -1475,6 +1511,7 @@ enum CycleProjectionOp<'db> {
     AwaitResult,
 }
 
+/// The fixed-length or starred-unpack projection of one unpacked position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum CycleUnpackProjection {
     Exact {
@@ -1488,6 +1525,7 @@ enum CycleUnpackProjection {
     },
 }
 
+/// A subscript projection represented precisely enough for cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum CycleProjectionSubscript {
     Unknown,
@@ -1529,6 +1567,7 @@ impl CycleProjectionSubscript {
     }
 }
 
+/// The projected position within a starred unpack pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum StarUnpackPosition {
     Prefix(usize),
@@ -1536,6 +1575,7 @@ enum StarUnpackPosition {
     Suffix(usize),
 }
 
+/// A statically known `slice` value used by a subscript projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct StaticSliceProjection {
     start: Option<i32>,
