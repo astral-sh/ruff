@@ -18,7 +18,12 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// ## Why is this bad?
 /// Declaring a function `async` when it's not is usually a mistake, and will artificially limit the
 /// contexts where that function may be called. In some cases, labeling a function `async` is
-/// semantically meaningful (e.g. with the trio library).
+/// semantically meaningful (e.g. with the trio library, or when a function relies on async execution
+/// context such as `ContextVar` state).
+///
+/// If a function must remain `async` for semantic reasons, but has no other `async` features, you
+/// can add an explicit checkpoint like `await asyncio.sleep(0)` or disable this rule for that
+/// function.
 ///
 /// ## Example
 /// ```python
