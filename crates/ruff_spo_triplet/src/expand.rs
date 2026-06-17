@@ -1068,7 +1068,6 @@ mod tests {
     /// All 5 `AssocKind` variants map to the documented kind string.
     #[test]
     fn association_kind_string_table() {
-        use crate::ir::{AssocDecl, AssocKind, Model, ModelGraph};
         let mut g = ModelGraph::new("openproject");
         let mut m = Model::new("M");
         for (kind, _label) in [
