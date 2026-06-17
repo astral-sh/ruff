@@ -587,6 +587,10 @@ def range_membership(value: Token | Literal[1], values: range) -> None:
     if value in values:
         reveal_type(value)  # revealed: Token | Literal[1]
 
+def disjoint_range_membership(value: Literal["x", 1], values: range) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[1]
+
 def narrowed_to_tuple(
     value: Token | Literal[1],
     values: Iterable[Literal[1]],
