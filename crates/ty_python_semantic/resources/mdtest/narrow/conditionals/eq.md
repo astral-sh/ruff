@@ -261,7 +261,7 @@ keeps large comparisons from requiring a Cartesian comparison of every possible 
 
 ```py
 from enum import Enum
-from typing import Literal, TypeVar, final
+from typing import Generic, Literal, TypeVar, final
 
 class Budgeted(Enum):
     M0 = 0
@@ -338,6 +338,21 @@ def disjoint_union_over_budget(value: Budgeted | None, other: Disjoint):
     if value == other:
         reveal_type(value)  # revealed: Never
         value.name
+
+BoxT = TypeVar("BoxT")
+
+@final
+class Box(Generic[BoxT]): ...
+
+@final
+class Unrelated: ...
+
+def generic_identity_overlap(
+    value: Budgeted | Box[int] | Unrelated,
+    other: Disjoint | Box[str],
+):
+    if value == other:
+        reveal_type(value)  # revealed: Budgeted | Box[int] | Unrelated
 
 class Shared(Enum):
     A = 1

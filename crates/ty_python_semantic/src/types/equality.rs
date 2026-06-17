@@ -10,8 +10,9 @@ use rustc_hash::FxHashSet;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueTypeKind,
-    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
+    LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints,
+    UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -513,7 +514,36 @@ fn known_comparison_domains_are_disjoint(
         return false;
     };
     left_semantics != right_semantics
-        || (left_semantics == KnownComparisonSemantics::Object && left.is_disjoint_from(db, right))
+        || (left_semantics == KnownComparisonSemantics::Object
+            && left.is_disjoint_from(db, right)
+            && nominal_runtime_classes(db, left).is_disjoint(&nominal_runtime_classes(db, right)))
+}
+
+/// Collect the runtime classes of nominal instances represented by `ty`.
+///
+/// Generic arguments are erased at runtime, so different specializations contribute the same
+/// class even when they are statically disjoint.
+fn nominal_runtime_classes<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<ClassLiteral<'db>> {
+    let mut classes = FxHashSet::default();
+    let mut pending = vec![ty];
+    let mut visited = FxHashSet::default();
+
+    while let Some(ty) = pending.pop() {
+        let ty = ty.resolve_type_alias(db);
+        if !visited.insert(ty) {
+            continue;
+        }
+        match ty {
+            Type::Union(union) => pending.extend(union.elements(db)),
+            Type::Intersection(intersection) => pending.extend(intersection.positive(db)),
+            Type::NominalInstance(instance) => {
+                classes.insert(instance.class_literal(db));
+            }
+            _ => {}
+        }
+    }
+
+    classes
 }
 
 /// Return whether every value represented by `ty` is known to compare equal to every other value.
