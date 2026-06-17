@@ -132,6 +132,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Options
+/// - `lint.dummy-variable-rgx`
 /// - `lint.ignore-init-module-imports`
 /// - `lint.pyflakes.allowed-unused-imports`
 ///
