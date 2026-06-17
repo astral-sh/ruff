@@ -637,6 +637,47 @@ fn benchmark_intersection_enum_equality_with_aliased_open_union(criterion: &mut 
     );
 }
 
+fn benchmark_disjoint_final_class_union_equality(criterion: &mut Criterion) {
+    const DOMAIN_SIZE: usize = 128;
+
+    setup_rayon();
+
+    let mut code = "from typing import TypeAlias, final\n".to_string();
+    for index in 0..DOMAIN_SIZE {
+        writeln!(&mut code, "\n@final\nclass Left{index}: ...").ok();
+        writeln!(&mut code, "\n@final\nclass Right{index}: ...").ok();
+    }
+    code.push_str("\nLeft: TypeAlias = ");
+    for index in 0..DOMAIN_SIZE {
+        if index > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Left{index}").ok();
+    }
+    code.push_str("\nRight: TypeAlias = ");
+    for index in 0..DOMAIN_SIZE {
+        if index > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Right{index}").ok();
+    }
+    code.push_str(
+        "\n\ndef consume(value: Left) -> None: ...\n\ndef compare(left: Left, right: Right) -> None:\n    if left != right:\n        consume(left)\n",
+    );
+
+    criterion.bench_function("ty_micro[disjoint_final_class_union_equality]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -1551,6 +1592,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_intersection_enum_equality_with_aliased_open_union,
+    benchmark_disjoint_final_class_union_equality,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,

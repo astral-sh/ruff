@@ -513,17 +513,29 @@ fn known_comparison_domains_are_disjoint(
     let Some(right_semantics) = KnownComparisonSemantics::of_type(db, right, operator) else {
         return false;
     };
-    left_semantics != right_semantics
-        || (left_semantics == KnownComparisonSemantics::Object
-            && left.is_disjoint_from(db, right)
-            && nominal_runtime_classes(db, left).is_disjoint(&nominal_runtime_classes(db, right)))
+    if left_semantics != right_semantics {
+        return true;
+    }
+    if left_semantics != KnownComparisonSemantics::Object {
+        return false;
+    }
+    let Some(left_classes) = object_identity_runtime_classes(db, left) else {
+        return false;
+    };
+    let Some(right_classes) = object_identity_runtime_classes(db, right) else {
+        return false;
+    };
+    left_classes.is_disjoint(&right_classes)
 }
 
-/// Collect the runtime classes of nominal instances represented by `ty`.
+/// Collect the runtime classes represented by a domain with object identity semantics.
 ///
 /// Generic arguments are erased at runtime, so different specializations contribute the same
 /// class even when they are statically disjoint.
-fn nominal_runtime_classes<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<ClassLiteral<'db>> {
+fn object_identity_runtime_classes<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<FxHashSet<ClassLiteral<'db>>> {
     let mut classes = FxHashSet::default();
     let mut pending = vec![ty];
     let mut visited = FxHashSet::default();
@@ -535,15 +547,26 @@ fn nominal_runtime_classes<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Cla
         }
         match ty {
             Type::Union(union) => pending.extend(union.elements(db)),
-            Type::Intersection(intersection) => pending.extend(intersection.positive(db)),
             Type::NominalInstance(instance) => {
                 classes.insert(instance.class_literal(db));
             }
-            _ => {}
+            Type::LiteralValue(literal) => {
+                let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
+                    return None;
+                };
+                classes.insert(enum_literal.enum_class(db));
+            }
+            Type::EnumComplement(complement) => {
+                classes.insert(complement.enum_class(db));
+            }
+            Type::Intersection(intersection) => {
+                classes.insert(intersection.enum_complement(db)?.enum_class(db));
+            }
+            _ => return None,
         }
     }
 
-    classes
+    Some(classes)
 }
 
 /// Return whether every value represented by `ty` is known to compare equal to every other value.
