@@ -467,6 +467,28 @@ $ ruff check path/to/code/ --select F401 --select F403 --quiet
 All other configuration options can be set via the command line
 using the `--config` flag, detailed below.
 
+### Argument files
+
+Ruff can read command-line arguments from a file by prefixing the file path with `@`.
+Each argument must be written on its own line in the file. For example, given an
+`arguments.txt` file containing:
+
+```text
+--select
+F401
+src/package/__init__.py
+tests/
+```
+
+You can pass those arguments to `ruff check` with:
+
+```console
+$ ruff check @arguments.txt
+```
+
+Argument files are useful when passing a large number of paths or arguments to Ruff, such as from
+generated file lists in CI.
+
 ### The `--config` CLI flag
 
 The `--config` flag has two uses. It is most often used to point to the
