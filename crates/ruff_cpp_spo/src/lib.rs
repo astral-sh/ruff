@@ -553,7 +553,7 @@ mod libclang_tests {
     use std::io::Write;
     use std::sync::Mutex;
 
-    use ruff_spo_triplet::{expand, from_ndjson, to_ndjson};
+    use ruff_spo_triplet::{cpp_projection, expand, from_ndjson, reassemble, to_ndjson};
 
     use super::{
         MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram, extract_dir,
@@ -986,6 +986,99 @@ class Recognizer : public Classify {
                 .iter()
                 .all(|t| t.s.starts_with("cpp:") || t.s.starts_with("exc:"))
         );
+    }
+
+    /// `CPP-REASSEMBLE-RT` — the AST-DLL generator's stage-1 reassembler run
+    /// against the REAL corpus (the re-scoped C-FIRST falsifier). Harvests
+    /// `ccutil`, expands to triples, serialises + parses ndjson, then
+    /// [`reassemble`]s the triple set back into a [`ModelGraph`] and checks the
+    /// round-trip invariants that MUST hold on real data:
+    ///
+    /// 1. **Class-set preservation** — reassembly recovers exactly the
+    ///    harvested class set (anchor-first attribution: no class invented or
+    ///    lost, no cross-attribution).
+    /// 2. **Idempotence** — `reassemble(expand(·))` is a fixed point. Expanding
+    ///    and reassembling the reassembled graph yields an identical graph.
+    ///    This catches any non-determinism / ordering / attribution bug on real
+    ///    data without tripping over the const-vs-non-const method-IRI
+    ///    collisions that make strict `cpp_projection` equality too strong on a
+    ///    real corpus (const-ness is not in the `(params)` suffix, so a
+    ///    `T& at(i)` / `const T& at(i) const` pair shares one IRI and `expand`
+    ///    merges them — a real harvester limitation this probe MEASURES).
+    /// 3. **Fidelity report** — prints how many classes round-trip byte-exact
+    ///    against [`cpp_projection`] and how many differ (the IRI-collision
+    ///    tail), so the collision count is measured, not asserted away.
+    ///
+    /// `ccutil/unicharset.h` carries the `UNICHARSET` / `UNICHARMAP`
+    /// same-named-method pair that makes anchor-first attribution non-trivial,
+    /// so this is a genuine real-data falsifier, not a fixture echo. Gated on
+    /// `TESSERACT_SRC`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "fidelity report gated on env var")]
+    fn cpp_reassemble_round_trip_on_real_corpus() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping CPP-REASSEMBLE-RT");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+
+        let g = extract_dir(&dir, &args).expect("libclang init (LIBCLANG_PATH set)");
+        let parsed = from_ndjson(&to_ndjson(&expand(&g))).expect("ndjson round-trips");
+        let r1 = reassemble(&parsed);
+
+        // (1) Class-set preservation — the anchor-first guarantee on real data.
+        let harvested: std::collections::BTreeSet<&str> =
+            g.models.iter().map(|m| m.name.as_str()).collect();
+        let recovered: std::collections::BTreeSet<&str> =
+            r1.models.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(
+            harvested, recovered,
+            "reassembly must recover exactly the harvested class set"
+        );
+
+        // (2) Idempotence — reassemble∘expand is a fixed point on real data.
+        let r2 = reassemble(&expand(&r1));
+        assert_eq!(
+            r1, r2,
+            "reassembly must be a fixed point on the real corpus (CPP-REASSEMBLE-RT)"
+        );
+
+        // (3) Fidelity vs the collision-blind projection — measured, not gated.
+        let projection = cpp_projection(&g);
+        let exact = r1
+            .models
+            .iter()
+            .filter(|m| projection.models.iter().any(|p| p == *m))
+            .count();
+        eprintln!(
+            "[CPP-REASSEMBLE-RT] {} classes; {} round-trip byte-exact vs projection, \
+             {} differ (const-overload IRI-collision tail)",
+            r1.models.len(),
+            exact,
+            r1.models.len() - exact
+        );
+
+        // Sanity anchor: UNICHARSET (the canonical ccutil class) must survive.
+        assert!(
+            recovered.iter().any(|n| n.ends_with("UNICHARSET")),
+            "reassembled ccutil must include UNICHARSET: {recovered:?}"
+        );
+        assert!(exact > 0, "at least some classes must round-trip byte-exact");
     }
 
     /// `extract_tree` recurses into subdirectories; `extract_dir` does not.

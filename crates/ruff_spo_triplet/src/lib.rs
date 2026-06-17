@@ -56,9 +56,11 @@
 mod expand;
 mod ir;
 mod ndjson;
+mod reassemble;
 mod triple;
 
 pub use expand::expand;
+pub use reassemble::{cpp_projection, reassemble};
 pub use ir::{
     ActsAs, AssocDecl, AssocKind, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef,
     ConstexprKind, CppAccess, CppBase, CppField, CppFriend, CppMacroUse, CppMethod,
