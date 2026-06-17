@@ -600,6 +600,43 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for membership narrowing over a large enum.
+///
+/// The right-hand-side union should be evaluated one listed member at a time. Evaluating it as a
+/// single union expands the complete enum once per function instead.
+fn benchmark_large_enum_membership(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 512;
+    const NUM_FUNCTIONS: usize = 128;
+
+    setup_rayon();
+
+    let mut code = "from enum import Enum\n\nclass E(Enum):\n".to_string();
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+    code.push('\n');
+
+    for i in 0..NUM_FUNCTIONS {
+        writeln!(
+            &mut code,
+            "def check_{i}(value: E) -> E:\n    if value in (E.m0, E.m1):\n        return value\n    return value\n"
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[large_enum_membership]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -1564,6 +1601,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
+    benchmark_large_enum_membership,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
