@@ -3714,7 +3714,7 @@ impl<'db> Parameters<'db> {
                         return Self::concatenate(db, prefix, ConcatenateTail::Gradual);
                     }
                 }
-                _ => {}
+                Tuple::Variable(_) => {}
             }
         }
 
