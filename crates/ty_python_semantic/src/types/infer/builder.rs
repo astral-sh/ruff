@@ -2683,6 +2683,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_attribute_write_type = |attr_ty: Type<'db>| -> Type<'db> {
             if matches!(object_ty, Type::ClassLiteral(_))
                 && let Type::FunctionLiteral(function) = attr_ty
+                && function.callable_type_kind(db) == CallableTypeKind::FunctionLike
             {
                 Type::Callable(function.into_callable_type(db))
             } else {

@@ -1048,6 +1048,29 @@ def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
 Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
+Replacing a `staticmethod` or `classmethod` with a plain function is invalid even if their
+signatures match. The replacement would not preserve the descriptor's binding behavior.
+
+```py
+class DescriptorMethods:
+    @staticmethod
+    def static(x: int) -> str:
+        return str(x)
+
+    @classmethod
+    def class_(cls, x: int) -> str:
+        return str(x)
+
+def static_replacement(x: int) -> str:
+    return str(x)
+
+def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
+    return str(x)
+
+DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
+DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
