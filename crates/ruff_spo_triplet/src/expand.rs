@@ -377,6 +377,26 @@ impl Expander {
                     kind.to_string(),
                     Provenance::OpenProjectExtracted,
                 );
+                // Parametric kinds (`length: { maximum: N }`) carry
+                // their inner-hash options on the option value — a
+                // sibling `validation_param` triple per inner key
+                // surfaces them. Non-hash kinds (`presence: true`)
+                // emit zero param triples (correct — there's
+                // nothing to lower beyond the kind itself).
+                let value = v
+                    .options
+                    .iter()
+                    .find(|(k, _)| k == kind)
+                    .map(|(_, v)| v.as_str())
+                    .unwrap_or("");
+                for (inner_key, inner_value) in extract_hash_options(value) {
+                    self.push(
+                        attr_iri.clone(),
+                        Predicate::ValidationParam,
+                        format!("{kind}:{inner_key}={inner_value}"),
+                        Provenance::OpenProjectExtracted,
+                    );
+                }
             }
         }
     }
@@ -941,6 +961,85 @@ fn is_falsy_validator_value(v: &str) -> bool {
     matches!(v.trim(), "false" | "nil")
 }
 
+/// Parse a verbatim hash-literal option value like `{maximum: 255}`
+/// or `{maximum: 255, minimum: 3}` into `(key, value)` pairs, in
+/// declaration order.
+///
+/// Returns an empty Vec if the input doesn't open with `{` (e.g.
+/// boolean / nil / array literals) — non-hash kinds emit no
+/// `validation_param` triples, only the parent `validation_kind`.
+///
+/// **Format contract** (mirrors `walk::format_hash_inline`):
+///
+/// - Outer `{}` delimiters.
+/// - Pairs separated by `, ` at the TOP level only — nested
+///   `{}` / `[]` / parens are tracked via a depth counter, so
+///   commas inside them don't split.
+/// - Each pair is `key: value` (colon-separated, single space).
+/// - Whitespace around the colon and around commas is trimmed.
+/// - Values are passed through verbatim (Ruby render of the AST
+///   node — strings keep their quotes, symbols keep their `:`,
+///   nested hashes keep their `{}` etc.).
+///
+/// Malformed input (unbalanced delimiters, missing `:`) returns
+/// what could be parsed so far — best-effort, never panics.
+fn extract_hash_options(s: &str) -> Vec<(String, String)> {
+    let trimmed = s.trim();
+    let Some(inner) = trimmed.strip_prefix('{').and_then(|t| t.strip_suffix('}')) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut depth: i32 = 0;
+    let mut start = 0usize;
+    let inner_bytes = inner.as_bytes();
+    for (i, &c) in inner_bytes.iter().enumerate() {
+        match c {
+            b'{' | b'[' | b'(' => depth += 1,
+            b'}' | b']' | b')' => depth = depth.saturating_sub(1),
+            b',' if depth == 0 => {
+                if let Some(pair) = split_kv(&inner[start..i]) {
+                    out.push(pair);
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if start < inner.len() {
+        if let Some(pair) = split_kv(&inner[start..]) {
+            out.push(pair);
+        }
+    }
+    out
+}
+
+/// Split a single `key: value` pair on the first top-level `:`.
+/// Returns `None` if the segment has no usable colon.
+///
+/// **Symbol-key handling (codex P2 on #25)** —
+/// `walk::format_hash_inline` renders Ruby symbol keys via
+/// `render_node`, which prefixes them with `:`. So
+/// `validates :name, length: { maximum: 255 }` arrives here as
+/// the segment `":maximum: 255"`. Strip a single leading `:` from
+/// the trimmed segment before the colon split so the key resolves
+/// to `"maximum"`, not the empty string.
+///
+/// String-key hashes (`{ "x" => 1 }`) and rocket-form hashes are
+/// not produced by `format_hash_inline` (it only emits the
+/// symbol-key sugar form), so this stripping is safe for every
+/// shape the upstream emitter produces today.
+fn split_kv(s: &str) -> Option<(String, String)> {
+    let trimmed = s.trim().strip_prefix(':').unwrap_or_else(|| s.trim());
+    let colon = trimmed.find(':')?;
+    let (k, v) = trimmed.split_at(colon);
+    let k = k.trim().to_string();
+    let v = v[1..].trim().to_string();
+    if k.is_empty() {
+        return None;
+    }
+    Some((k, v))
+}
+
 fn delegate_prefix(d: &Delegation) -> Option<String> {
     for (k, v) in &d.options {
         if k == "prefix" {
@@ -1121,7 +1220,15 @@ mod tests {
         wp.validations.push(Validation {
             kind: ValidationKind::Validates,
             target: "subject".to_string(),
-            options: vec![("presence".to_string(), "true".to_string())],
+            options: vec![
+                ("presence".to_string(), "true".to_string()),
+                // Parametric kind — `length: { maximum: 255 }` —
+                // the fixture exercises `validation_param` emission
+                // so the exhaustiveness check sees it. The value is
+                // in the realistic form `walk::format_hash_inline`
+                // produces (`:maximum` Sym-prefixed key).
+                ("length".to_string(), "{:maximum: 255}".to_string()),
+            ],
         });
         wp.validations.push(Validation {
             kind: ValidationKind::Normalizes,
@@ -1683,6 +1790,142 @@ mod tests {
         );
     }
 
+    /// **D-AR-5.11** — `extract_hash_options` parses the
+    /// verbatim Ruby hash-literal form produced by
+    /// `walk::format_hash_inline` into `(key, value)` pairs.
+    #[test]
+    fn extract_hash_options_parses_inline_hash_literals() {
+        // Single pair — symbol-key form (`{maximum: 255}` after
+        // render_node prefixes `:` on the Sym key, the helper
+        // strips it). This is what `walk::format_hash_inline`
+        // actually produces for `validates :name,
+        // length: { maximum: 255 }`.
+        assert_eq!(
+            extract_hash_options("{:maximum: 255}"),
+            vec![("maximum".to_string(), "255".to_string())],
+        );
+        // Bare form (no Sym prefix) — defensive: passes through
+        // unchanged if it ever appears.
+        assert_eq!(
+            extract_hash_options("{maximum: 255}"),
+            vec![("maximum".to_string(), "255".to_string())],
+        );
+        // Multiple pairs, comma-separated. Symbol-prefixed keys
+        // (the realistic Ruby-frontend shape).
+        assert_eq!(
+            extract_hash_options("{:maximum: 255, :minimum: 3}"),
+            vec![
+                ("maximum".to_string(), "255".to_string()),
+                ("minimum".to_string(), "3".to_string()),
+            ],
+        );
+        // Symbol values keep their leading colon (consumer normalises).
+        assert_eq!(
+            extract_hash_options("{:greater_than: :start_date}"),
+            vec![("greater_than".to_string(), ":start_date".to_string())],
+        );
+        // Nested hashes / arrays: the OUTER comma split tracks depth,
+        // so commas inside nested `{}` / `[]` don't split the pair.
+        assert_eq!(
+            extract_hash_options("{:in: [1,2,3]}"),
+            vec![("in".to_string(), "[1,2,3]".to_string())],
+        );
+        assert_eq!(
+            extract_hash_options("{:nested: {:a: 1, :b: 2}, :other: 3}"),
+            vec![
+                ("nested".to_string(), "{:a: 1, :b: 2}".to_string()),
+                ("other".to_string(), "3".to_string()),
+            ],
+        );
+        // Empty hash.
+        assert_eq!(extract_hash_options("{}"), Vec::<(String, String)>::new());
+        // Non-hash (no `{}` delimiters) → empty (boolean/nil/array
+        // option values don't carry inner-hash params).
+        assert_eq!(extract_hash_options("true"), Vec::<(String, String)>::new());
+        assert_eq!(extract_hash_options("nil"), Vec::<(String, String)>::new());
+        assert_eq!(extract_hash_options(""), Vec::<(String, String)>::new());
+    }
+
+    /// **D-AR-5.11** — parametric `validates :foo, length: { maximum: N }`
+    /// emits sibling `validation_param` triples per inner-hash key.
+    /// Non-hash kinds (`presence: true`) emit zero `validation_param`
+    /// triples — the existing `validation_kind` covers them already.
+    #[test]
+    fn ar_shape_emits_validation_param_per_inner_hash_key() {
+        let mut g = ModelGraph::new("openproject");
+        let mut user = Model::new("User");
+        // `validates :name, length: { maximum: 256, minimum: 3 }`
+        // — option value is in the realistic form
+        // `walk::format_hash_inline` emits (symbol-prefixed keys).
+        user.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "name".to_string(),
+            options: vec![(
+                "length".to_string(),
+                "{:maximum: 256, :minimum: 3}".to_string(),
+            )],
+        });
+        // `validates :age, numericality: { greater_than: 0 }`
+        user.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "age".to_string(),
+            options: vec![(
+                "numericality".to_string(),
+                "{:greater_than: 0}".to_string(),
+            )],
+        });
+        // Non-hash kind — no validation_param triples.
+        user.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "email".to_string(),
+            options: vec![("presence".to_string(), "true".to_string())],
+        });
+        g.models.push(user);
+
+        let triples = expand(&g);
+        let params_for = |attr_iri: &str| -> BTreeSet<&str> {
+            triples
+                .iter()
+                .filter(|t| t.s == attr_iri && t.p == "validation_param")
+                .map(|t| t.o.as_str())
+                .collect()
+        };
+
+        assert_eq!(
+            params_for("openproject:User.name"),
+            BTreeSet::from(["length:maximum=256", "length:minimum=3"]),
+            "name must emit two `length:...` params",
+        );
+        assert_eq!(
+            params_for("openproject:User.age"),
+            BTreeSet::from(["numericality:greater_than=0"]),
+        );
+        // Non-hash kind: no params.
+        assert!(
+            params_for("openproject:User.email").is_empty(),
+            "presence: true is non-hash → no validation_param triples",
+        );
+
+        // validation_kind triples still fire for ALL three (backward
+        // compat — params are additive).
+        let kinds_for = |attr_iri: &str| -> BTreeSet<&str> {
+            triples
+                .iter()
+                .filter(|t| t.s == attr_iri && t.p == "validation_kind")
+                .map(|t| t.o.as_str())
+                .collect()
+        };
+        assert_eq!(kinds_for("openproject:User.name"), BTreeSet::from(["length"]));
+        assert_eq!(
+            kinds_for("openproject:User.age"),
+            BTreeSet::from(["numericality"]),
+        );
+        assert_eq!(
+            kinds_for("openproject:User.email"),
+            BTreeSet::from(["presence"]),
+        );
+    }
+
     #[test]
     fn ar_shape_emits_validates_and_normalizes() {
         let triples = expand(&ar_fixture());
@@ -1955,6 +2198,7 @@ mod tests {
             "association_kind",
             "class_name",
             "validation_kind",
+            "validation_param",
             // Inferred (per-edge override)
             "defines_method",
             // Structural (block markers)

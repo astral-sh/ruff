@@ -275,6 +275,30 @@ pub enum Predicate {
     /// indices.
     ValidationKind,
 
+    /// `(<model>.<attr>, validation_param, "<kind>:<key>=<value>")` —
+    /// the inner-hash option values carried by a parametric Rails
+    /// validator: `validates :foo, length: { maximum: 255 }` yields
+    /// `(<model>.foo, validation_param, "length:maximum=255")`.
+    ///
+    /// One triple per parametric option key (a `length: { maximum:
+    /// 255, minimum: 3 }` declaration emits two `validation_param`
+    /// triples). Subject is the validated-attribute IRI (mirrors
+    /// [`Self::ValidationKind`]); object is the canonical
+    /// `<kind>:<inner_key>=<value>` form.
+    ///
+    /// The schema-quality consumer reads these alongside
+    /// `validation_kind` to lift Rails parametric validators into
+    /// richer SurrealQL clauses than the catch-all
+    /// `$value != NONE` fallback — e.g. `length:maximum=255` lowers
+    /// to `string::len($value) <= 255`,
+    /// `numericality:greater_than=0` to `$value > 0`.
+    ///
+    /// Only emitted when the option value is a hash literal
+    /// (`{key: value, ...}`); non-hash kinds (`presence: true`,
+    /// `uniqueness: true`, …) emit only the `validation_kind`
+    /// triple — there's no inner-hash to surface.
+    ValidationParam,
+
     // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
     //
     // The 13 net-new predicates for the C++ frontend. Subject conventions
@@ -421,6 +445,7 @@ impl Predicate {
             Self::AssociationKind => "association_kind",
             Self::ClassName => "class_name",
             Self::ValidationKind => "validation_kind",
+            Self::ValidationParam => "validation_param",
             // C++ machine-plane 13
             Self::InheritsFrom => "inherits_from",
             Self::HasField => "has_field",
@@ -493,6 +518,7 @@ impl Predicate {
             "association_kind" => Self::AssociationKind,
             "class_name" => Self::ClassName,
             "validation_kind" => Self::ValidationKind,
+            "validation_param" => Self::ValidationParam,
             // C++ machine-plane 13
             "inherits_from" => Self::InheritsFrom,
             "has_field" => Self::HasField,
@@ -565,6 +591,7 @@ impl Predicate {
         Self::AssociationKind,
         Self::ClassName,
         Self::ValidationKind,
+        Self::ValidationParam,
         // C++ machine-plane 13
         Self::InheritsFrom,
         Self::HasField,
@@ -666,7 +693,8 @@ impl Predicate {
             | Self::FieldType
             | Self::AssociationKind
             | Self::ClassName
-            | Self::ValidationKind => Provenance::OpenProjectExtracted,
+            | Self::ValidationKind
+            | Self::ValidationParam => Provenance::OpenProjectExtracted,
         }
     }
 }
@@ -779,19 +807,18 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_56() {
+    fn predicate_count_locked_at_57() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 31 OpenProject AR-shape (PR #15 added
-        // `association_kind` so the FK-direction bug is fixable
-        // downstream; #18 added `class_name` so `belongs_to :owner,
-        // class_name: 'User'` can emit `record<User>` instead of
-        // phantom `record<Owner>`; this PR adds `validation_kind` so
-        // the downstream consumer can lift Rails validation kinds
-        // (`presence` → ASSERT, `uniqueness` → UNIQUE INDEX, …) into
-        // richer SurrealQL constraints) + 18 C++ machine-plane =
-        // 56. Council review of any new variant means this number
-        // changes — the test must change with the source.
-        assert_eq!(Predicate::ALL.len(), 56);
+        // Python) + 32 OpenProject AR-shape (PR #15 added
+        // `association_kind`; #18 added `class_name`; #21 added
+        // `validation_kind`; this PR adds `validation_param` so
+        // parametric Rails validators (`length: { maximum: N }`,
+        // `numericality: { greater_than: N }`, etc.) lift to richer
+        // SurrealQL clauses than the catch-all presence ASSERT)
+        // + 18 C++ machine-plane = 57. Council review of any new
+        // variant means this number changes — the test must change
+        // with the source.
+        assert_eq!(Predicate::ALL.len(), 57);
     }
 
     #[test]
