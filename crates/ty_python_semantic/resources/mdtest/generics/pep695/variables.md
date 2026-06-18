@@ -736,7 +736,7 @@ The intersection of an unbounded unconstrained typevar with any other type canno
 since there is no guarantee what type the typevar will be specialized to.
 
 ```py
-from ty_extensions import Intersection
+from ty_extensions import Intersection, is_subtype_of, static_assert
 from typing import Any
 
 class Super: ...
@@ -792,6 +792,10 @@ def accept_str_part(value: StrPart[Any]) -> None:
     reveal_type(value)  # revealed: Any & str
 
 accept_str_part("")
+
+def downstream_relations[T: int](value: Intersection[T, str]) -> None:
+    static_assert(not is_subtype_of(Intersection[T, str], bytes))
+    reveal_type(value == "")  # revealed: bool
 ```
 
 Constrained typevars can be modeled using a hypothetical `OneOf` connector, where the typevar must

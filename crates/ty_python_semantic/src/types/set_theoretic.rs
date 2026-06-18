@@ -930,11 +930,21 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
-    /// Return a version of this intersection type where any type variables in the positive elements
-    /// have been replaced by their bounds or constraints, and where any newtypes in the positive elements
+    /// Return a version of this intersection type where any `Self` type variables in the positive
+    /// elements have been replaced by their bounds, and where any newtypes in the positive elements
     /// have been replaced by their concrete base types.
-    pub(crate) fn with_expanded_typevars_and_newtypes(self, db: &'db dyn Db) -> Type<'db> {
-        expand_intersection_typevars_and_newtypes(db, self.positive(db), self.negative(db))
+    pub(crate) fn with_expanded_newtypes_and_self_typevars(self, db: &'db dyn Db) -> Type<'db> {
+        expand_intersection_typevars_and_newtypes(db, self.positive(db), self.negative(db), false)
+    }
+
+    /// Return a version that also replaces ordinary type variables with their bounds or
+    /// constraints. This is only valid for assignability relations, since a dynamic
+    /// specialization is assignable to the type variable's bound.
+    pub(crate) fn with_expanded_typevars_and_newtypes_for_assignability(
+        self,
+        db: &'db dyn Db,
+    ) -> Type<'db> {
+        expand_intersection_typevars_and_newtypes(db, self.positive(db), self.negative(db), true)
     }
 
     pub fn iter_positive(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
@@ -955,22 +965,6 @@ impl<'db> IntersectionType<'db> {
 }
 
 fn expand_intersection_typevars_and_newtypes<'db>(
-    db: &'db dyn Db,
-    positive: &FxOrderSet<Type<'db>>,
-    negative: &NegativeIntersectionElements<'db>,
-) -> Type<'db> {
-    expand_intersection(db, positive, negative, true)
-}
-
-fn expand_intersection_newtypes_and_self_typevars<'db>(
-    db: &'db dyn Db,
-    positive: &FxOrderSet<Type<'db>>,
-    negative: &NegativeIntersectionElements<'db>,
-) -> Type<'db> {
-    expand_intersection(db, positive, negative, false)
-}
-
-fn expand_intersection<'db>(
     db: &'db dyn Db,
     positive: &FxOrderSet<Type<'db>>,
     negative: &NegativeIntersectionElements<'db>,

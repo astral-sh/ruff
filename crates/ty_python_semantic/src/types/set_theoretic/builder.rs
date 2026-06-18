@@ -38,7 +38,7 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
-use crate::types::set_theoretic::expand_intersection_newtypes_and_self_typevars;
+use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
@@ -1703,8 +1703,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::TypeVar(tvar) => tvar.typevar(db).is_self(db),
             _ => false,
         }) {
-            let speculative =
-                expand_intersection_newtypes_and_self_typevars(db, &self.positive, &self.negative);
+            let speculative = expand_intersection_typevars_and_newtypes(
+                db,
+                &self.positive,
+                &self.negative,
+                false,
+            );
             if speculative.is_never() {
                 return Type::Never;
             }

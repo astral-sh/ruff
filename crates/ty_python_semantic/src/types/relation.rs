@@ -1070,10 +1070,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .positive(db)
                 .iter()
                 .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                    Type::TypeVar(tvar) => {
+                        !tvar.is_inferable(db, self.inferable)
+                            && (self.relation.is_assignability() || tvar.typevar(db).is_self(db))
+                    }
                     Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
                     _ => false,
                 })
+        };
+
+        let expand_intersection = |intersection: IntersectionType<'db>| {
+            if self.relation.is_assignability() {
+                intersection.with_expanded_typevars_and_newtypes_for_assignability(db)
+            } else {
+                intersection.with_expanded_newtypes_and_self_typevars(db)
+            }
         };
 
         match (source, target) {
@@ -1379,10 +1390,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // A typevar is assignable to its upper bound, or to something similar to the union of
             // its constraints. It is not generally a subtype of or redundant with those types,
-            // because it can be explicitly specialized to a dynamic type. `object` is the one
-            // exception and is handled above.
+            // because it can be explicitly specialized to a dynamic type. `Self` cannot be
+            // explicitly specialized, so it retains those relations with its upper bound.
+            // `object` is the other exception and is handled above.
             (Type::TypeVar(bound_typevar), _)
-                if self.is_eager_assignability()
+                if (self.is_eager_assignability() || bound_typevar.typevar(db).is_self(db))
                     && !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
@@ -1492,17 +1504,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
                     // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
-                    // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
-                    // constraints that exposes a union; this requires special handling.
+                    // `Self` (possibly inside an intersection) to widen to a bound that exposes a
+                    // union. Ordinary typevars can also widen under assignability. These cases
+                    // require special handling.
                     match source {
                         Type::Intersection(intersection)
                             if should_expand_intersection(intersection) =>
                         {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
+                            self.check_type_pair(db, expand_intersection(intersection), target)
                         }
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
@@ -1640,11 +1649,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
                     .or(db, self.constraints, || {
                         if should_expand_intersection(intersection) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
+                            self.check_type_pair(db, expand_intersection(intersection), target)
                         } else {
                             self.never()
                         }

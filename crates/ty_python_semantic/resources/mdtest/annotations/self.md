@@ -9,6 +9,25 @@ python-version = "3.13"
 
 `typing.Self` is only available in Python 3.11 and later.
 
+## Upper-bound relations
+
+Unlike an ordinary type variable, `Self` cannot be explicitly specialized to a dynamic type, so it
+retains subtype and redundancy relationships with its upper bound:
+
+```py
+from typing import Self
+from ty_extensions import is_subtype_of, static_assert
+
+class Base: ...
+
+class Child(Base):
+    def method(self) -> None:
+        static_assert(is_subtype_of(Self, Base))
+
+        def _(value: Self | Base) -> None:
+            reveal_type(value)  # revealed: Base
+```
+
 ## Methods
 
 ```py
