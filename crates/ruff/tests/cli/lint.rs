@@ -4236,7 +4236,7 @@ fn preview_default_rules() -> Result<()> {
     	str-or-repr-defined-in-stub (PYI029),
     	unnecessary-literal-union (PYI030),
     	any-eq-ne-annotation (PYI032),
-    	type-comment-in-stub (PYI033),
+    	legacy-type-comment (PYI033),
     	non-self-return-type (PYI034),
     	unassigned-special-variable-in-stub (PYI035),
     	bad-exit-annotation (PYI036),
