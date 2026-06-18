@@ -1,16 +1,16 @@
-use crate::edit::ToRangeExt;
+use crate::edit::{RangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
 use lsp_types::{self as types, HoverRequest};
-use regex::Regex;
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::suppression::rule_identifier_range_at_offset;
 use ruff_python_ast::SourceType;
-use ruff_source_file::OneIndexed;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_parser::parse_unchecked_source;
+use ruff_text_size::Ranged;
 use std::fmt::Write;
-use std::sync::LazyLock;
 
 pub(crate) struct Hover;
 
@@ -47,7 +47,7 @@ pub(crate) fn hover(
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
     // Don't show noqa hover for non-Python documents (e.g., markdown files).
-    let SourceType::Python(_) = snapshot.query().source_type_for_lint() else {
+    let SourceType::Python(source_type) = snapshot.query().source_type_for_lint() else {
         return None;
     };
 
@@ -56,63 +56,19 @@ pub(crate) fn hover(
         .as_single_document()
         .context("Failed to get text document for the hover request")
         .unwrap();
-    let line_number: usize = position
-        .position
-        .line
-        .try_into()
-        .expect("line number should fit within a usize");
-    let line_range = document.index().line_range(
-        OneIndexed::from_zero_indexed(line_number),
-        document.contents(),
-    );
-
-    let line = &document.contents()[line_range];
-
-    // Get the list of rule identifiers from a `noqa` or Ruff suppression comment.
-    static NOQA_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap()
-    });
-    static SUPPRESSION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"(?x)
-        \#\s*ruff\s*:\s*(?:disable|enable|file-ignore|ignore)\s*\[\s*
-        (?P<codes>(?:[A-Z]+[0-9]+|[a-z][a-z0-9-]*)(?:\s*,\s*(?:[A-Z]+[0-9]+|[a-z][a-z0-9-]*))*\s*,?)
-        \s*\]",
-        )
-        .unwrap()
-    });
-    static IDENTIFIER_REGEX: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"[A-Z]+[0-9]+|[a-z][a-z0-9-]*").unwrap());
-
-    let cursor: usize = position
-        .position
-        .character
-        .try_into()
-        .expect("column number should fit within a usize");
-    let identifiers_match = NOQA_REGEX
-        .captures(line)
-        .and_then(|captures| captures.name("codes"))
-        .into_iter()
-        .chain(
-            SUPPRESSION_REGEX
-                .captures_iter(line)
-                .filter_map(|captures| captures.name("codes")),
-        )
-        .find(|identifiers| cursor >= identifiers.start() && cursor < identifiers.end())?;
-    let identifiers_start = identifiers_match.start();
-    let identifier = IDENTIFIER_REGEX
-        .find_iter(identifiers_match.as_str())
-        .find(|identifier| {
-            cursor >= (identifier.start() + identifiers_start)
-                && cursor < (identifier.end() + identifiers_start)
-        })?;
-    let identifier_range = TextRange::at(
-        line_range.start() + TextSize::try_from(identifiers_start + identifier.start()).ok()?,
-        TextSize::try_from(identifier.len()).ok()?,
-    );
+    let cursor = types::Range::new(position.position, position.position)
+        .to_text_range(document.contents(), document.index(), snapshot.encoding())
+        .start();
+    let parsed = parse_unchecked_source(document.contents(), source_type);
+    let comment = parsed
+        .tokens()
+        .at_offset(cursor)
+        .find(|token| token.kind() == TokenKind::Comment)?;
+    let identifier_range =
+        rule_identifier_range_at_offset(document.contents(), comment.range(), cursor)?;
 
     // Get the rule for the identifier under the cursor.
-    let identifier = identifier.as_str();
+    let identifier = &document.contents()[identifier_range];
     let rule = Rule::from_code(identifier)
         .ok()
         .or_else(|| Rule::from_name(identifier).ok());

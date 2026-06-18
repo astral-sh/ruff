@@ -63,6 +63,30 @@ fn hover_for_python_noqa() -> Result<()> {
 }
 
 #[test]
+fn hover_for_file_level_noqa() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    server.open_text_document("test.py", "# ruff: noqa: F401\n", 1);
+
+    let result = server
+        .hover_request(
+            "test.py",
+            Position {
+                line: 0,
+                character: 15,
+            },
+        )
+        .expect("Expected hover information for a file-level `noqa` directive");
+
+    let lsp_types::Contents::MarkupContent(markup) = result.contents else {
+        panic!("Expected Markdown hover contents");
+    };
+    assert!(markup.value.starts_with("# unused-import (F401)"));
+
+    Ok(())
+}
+
+#[test]
 fn hover_for_ruff_suppression_comments() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 
@@ -124,14 +148,14 @@ preview = true
         )?
         .build();
 
-    server.open_text_document("test.py", "import os  # ruff: ignore[unused-import]\n", 1);
+    server.open_text_document("test.py", "éééé = 1  # ruff: ignore[unused-import]\n", 1);
 
     let result = server
         .hover_request(
             "test.py",
             Position {
                 line: 0,
-                character: 29,
+                character: 26,
             },
         )
         .expect("Expected hover information for a human-readable rule name");
@@ -145,14 +169,37 @@ preview = true
         Some(Range {
             start: Position {
                 line: 0,
-                character: 26,
+                character: 25,
             },
             end: Position {
                 line: 0,
-                character: 39,
+                character: 38,
             },
         })
     );
+
+    Ok(())
+}
+
+#[test]
+fn no_hover_for_suppression_text_in_string() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    server.open_text_document(
+        "test.py",
+        "\"\"\"\nnot a comment # ruff:ignore[unused-import]\n\"\"\"\n",
+        1,
+    );
+
+    let result = server.hover_request(
+        "test.py",
+        Position {
+            line: 1,
+            character: 31,
+        },
+    );
+
+    assert!(result.is_none());
 
     Ok(())
 }
