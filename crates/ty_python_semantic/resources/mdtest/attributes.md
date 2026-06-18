@@ -3870,6 +3870,23 @@ class ProjectionThreeWayRotation:
         reveal_type(self.x)  # revealed: list[tuple[int, str, bytes]] | list[tuple[int | bytes | str, int | bytes | str, int | bytes | str]]
 ```
 
+Some recursive projections are still inferred conservatively when narrowing is involved:
+
+```py
+class ProjectionNarrowedCrossDependency:
+    def __init__(self, value: int | None) -> None:
+        self.x = [(value, "")]
+
+    def read(self) -> None:
+        for maybe_number, text in self.x:
+            if maybe_number is not None:
+                self.x = [(text, maybe_number)]
+
+        # TODO: Ideally, this would be
+        # `list[tuple[int | None, str]] | list[tuple[int | str, int | str]]`.
+        reveal_type(self.x)  # revealed: list[tuple[int | None, str]] | list[tuple[int | None | str, int | str]] | list[tuple[int | str, int | str]]
+```
+
 Several recursive attributes can exchange projected values:
 
 ```py
