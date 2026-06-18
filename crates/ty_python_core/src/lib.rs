@@ -681,13 +681,9 @@ impl<'db> SemanticIndex<'db> {
             .copied()
     }
 
-    /// Returns the [`unpack::Unpack`] ingredient for a list or tuple assignment target.
-    #[track_caller]
-    pub fn expect_unpack(&self, target: impl Into<ExpressionNodeKey>) -> unpack::Unpack<'db> {
-        self.unpacks_by_target
-            .get(&target.into())
-            .copied()
-            .expect("unpacking target should be present in the semantic index")
+    /// Returns the [`unpack::Unpack`] ingredient for an unpacking target, if any.
+    pub fn try_unpack(&self, target: impl Into<ExpressionNodeKey>) -> Option<unpack::Unpack<'db>> {
+        self.unpacks_by_target.get(&target.into()).copied()
     }
 
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {

@@ -2471,11 +2471,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         for target in targets {
-            if matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)) {
+            if let Some(unpack) = self.index.try_unpack(target) {
                 // Infer the standalone expression here to include its diagnostics in this region.
                 self.infer_standalone_expression(value, TypeContext::default());
 
-                let unpacked = infer_unpack_types(self.db(), self.index.expect_unpack(target));
+                let unpacked = infer_unpack_types(self.db(), unpack);
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
