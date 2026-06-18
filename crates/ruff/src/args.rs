@@ -19,6 +19,7 @@ use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
+use ruff_linter::rule_selector::{RuleSelectorSource, ValueSourceGuard};
 use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
@@ -980,6 +981,8 @@ impl TypedValueParser for ConfigArgumentParser {
                 return Ok(SingleConfigArgument::FilePath(path_to_config_file));
             }
         }
+
+        let _guard = ValueSourceGuard::new(RuleSelectorSource::Cli, false);
 
         let config_parse_error = match toml::Table::from_str(value) {
             Ok(table) => match table.try_into::<Options>() {

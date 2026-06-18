@@ -5,7 +5,9 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use ruff_linter::{UnresolvedRuleSelector, line_width::LineLength};
+use ruff_linter::{
+    UnresolvedRuleSelector, line_width::LineLength, rule_selector::RuleSelectorSource,
+};
 
 use crate::{
     format::FormatBackend,
@@ -163,7 +165,7 @@ impl ClientOptions {
     fn unresolved_rules(rules: Vec<String>) -> Vec<UnresolvedRuleSelector> {
         rules
             .into_iter()
-            .map(UnresolvedRuleSelector::from_selector)
+            .map(|selector| UnresolvedRuleSelector::new(selector, RuleSelectorSource::Editor))
             .collect()
     }
 
@@ -755,8 +757,8 @@ mod tests {
                     format_preview: None,
                     format_backend: None,
                     select: Some(vec![
-                        UnresolvedRuleSelector::from_selector("F"),
-                        UnresolvedRuleSelector::from_selector("I"),
+                        UnresolvedRuleSelector::new("F"),
+                        UnresolvedRuleSelector::new("I"),
                     ]),
                     extend_select: None,
                     ignore: None,
@@ -793,8 +795,8 @@ mod tests {
                     format_preview: None,
                     format_backend: None,
                     select: Some(vec![
-                        UnresolvedRuleSelector::from_selector("F"),
-                        UnresolvedRuleSelector::from_selector("I"),
+                        UnresolvedRuleSelector::new("F"),
+                        UnresolvedRuleSelector::new("I"),
                     ]),
                     extend_select: None,
                     ignore: None,
@@ -895,7 +897,7 @@ mod tests {
                     format_backend: None,
                     select: None,
                     extend_select: None,
-                    ignore: Some(vec![UnresolvedRuleSelector::from_selector("RUF001")]),
+                    ignore: Some(vec![UnresolvedRuleSelector::new("RUF001")]),
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,
@@ -976,9 +978,7 @@ mod tests {
                         line_length: Some(LineLength::try_from(100).unwrap()),
                         lint: Some(LintOptions {
                             common: LintCommonOptions {
-                                extend_select: Some(vec![UnresolvedRuleSelector::from_selector(
-                                    "I001",
-                                )]),
+                                extend_select: Some(vec![UnresolvedRuleSelector::new("I001",)]),
                                 ..Default::default()
                             },
                             ..Default::default()
@@ -989,7 +989,7 @@ mod tests {
                         }),
                         ..Default::default()
                     }))),
-                    extend_select: Some(vec![UnresolvedRuleSelector::from_selector("RUF001")]),
+                    extend_select: Some(vec![UnresolvedRuleSelector::new("RUF001")]),
                     ..Default::default()
                 }
             }

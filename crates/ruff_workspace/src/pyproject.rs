@@ -1,10 +1,12 @@
 //! Utilities for locating (and extracting configuration from) a pyproject.toml.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
+use ruff_linter::rule_selector::{RuleSelectorSource, ValueSourceGuard};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -43,6 +45,10 @@ impl Pyproject {
 
 fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
     let path = path.as_ref();
+
+    let _guard =
+        ValueSourceGuard::new(RuleSelectorSource::File(Arc::new(path.to_path_buf())), true);
+
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -270,9 +276,12 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::PathBuf;
     use std::str::FromStr;
+    use std::sync::Arc;
 
     use anyhow::{Context, Result};
+    use ruff_linter::rule_selector::ValueSourceGuard;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
@@ -285,6 +294,12 @@ mod tests {
 
     #[test]
     fn deserialize() -> Result<()> {
+        let _guard = ValueSourceGuard::new(
+            ruff_linter::rule_selector::RuleSelectorSource::File(Arc::new(PathBuf::from(
+                "<filename>",
+            ))),
+            true,
+        );
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
 
@@ -355,7 +370,7 @@ select = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            select: Some(vec![UnresolvedRuleSelector::from_selector("E501")]),
+                            select: Some(vec![UnresolvedRuleSelector::new("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -379,10 +394,8 @@ ignore = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            extend_select: Some(vec![UnresolvedRuleSelector::from_selector(
-                                "RUF100",
-                            )]),
-                            ignore: Some(vec![UnresolvedRuleSelector::from_selector("E501")]),
+                            extend_select: Some(vec![UnresolvedRuleSelector::new("RUF100",)]),
+                            ignore: Some(vec![UnresolvedRuleSelector::new("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -562,7 +575,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
                     common: LintCommonOptions {
                         per_file_ignores: Some(FxHashMap::from_iter([(
                             "__init__.py".to_string(),
-                            vec![UnresolvedRuleSelector::from_selector("F401")]
+                            vec![UnresolvedRuleSelector::new("F401")]
                         )])),
                         ..LintCommonOptions::default()
                     },

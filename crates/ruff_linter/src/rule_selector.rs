@@ -1,8 +1,13 @@
+use std::cell::RefCell;
+use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use ruff_text_size::{TextRange, TextSize};
+use serde::{Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use toml::Spanned;
 
 use crate::codes::RuleIter;
 use crate::codes::{RuleCodePrefix, RuleGroup};
@@ -11,10 +16,50 @@ use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
 use crate::warn_user_once_by_message;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+thread_local! {
+    /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
+    /// but we want to associate each deserialized [`RelativePath`] with the source from
+    /// which it originated. We use a thread local variable to work around this limitation.
+    ///
+    /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
+    /// deserialization code. It ensures that the thread local variable gets cleaned up
+    /// once deserialization is done (once the guard gets dropped).
+    static VALUE_SOURCE: RefCell<Option<(RuleSelectorSource, bool)>> = const { RefCell::new(None) };
+}
+
+/// Guard to safely change the [`VALUE_SOURCE`] for the current thread.
+#[must_use]
+pub struct ValueSourceGuard {
+    prev_value: Option<(RuleSelectorSource, bool)>,
+}
+
+impl ValueSourceGuard {
+    pub fn new(source: RuleSelectorSource, is_toml: bool) -> Self {
+        let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
+        Self { prev_value: prev }
+    }
+}
+
+impl Drop for ValueSourceGuard {
+    fn drop(&mut self) {
+        VALUE_SOURCE.set(self.prev_value.take());
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(transparent)]
 pub struct UnresolvedRuleSelector {
     selector: String,
+
+    #[serde(skip)]
+    source: RuleSelectorSource,
+
+    /// The byte range of `value` in `source`.
+    ///
+    /// Can be `None` because not all sources support a range.
+    /// For example, arguments provided on the CLI won't have a range attached.
+    #[serde(skip)]
+    range: Option<TextRange>,
 }
 
 impl UnresolvedRuleSelector {
@@ -32,11 +77,58 @@ impl UnresolvedRuleSelector {
         })
     }
 
-    pub fn from_selector(selector: impl Into<String>) -> Self {
+    pub fn new(selector: impl Into<String>, source: RuleSelectorSource) -> Self {
         Self {
             selector: selector.into(),
+            source,
+            range: None,
         }
     }
+
+    pub fn with_range(
+        selector: impl Into<String>,
+        source: RuleSelectorSource,
+        range: TextRange,
+    ) -> Self {
+        Self {
+            selector: selector.into(),
+            source,
+            range: Some(range),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for UnresolvedRuleSelector {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        VALUE_SOURCE.with_borrow(|source| {
+            let (source, has_span) = source.clone().unwrap();
+
+            if has_span {
+                let spanned: Spanned<String> = Spanned::deserialize(deserializer)?;
+                let span = spanned.span();
+                let range = TextRange::new(
+                    TextSize::try_from(span.start)
+                        .expect("Configuration file to be smaller than 4GB"),
+                    TextSize::try_from(span.end)
+                        .expect("Configuration file to be smaller than 4GB"),
+                );
+
+                Ok(Self::with_range(spanned.into_inner(), source, range))
+            } else {
+                Ok(Self::new(String::deserialize(deserializer)?, source))
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+pub enum RuleSelectorSource {
+    File(Arc<PathBuf>),
+    Cli,
+    Editor,
 }
 
 #[derive(Debug)]
@@ -427,7 +519,7 @@ pub mod clap_completion {
     use crate::{
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
-        rule_selector::{UnresolvedRuleSelector, is_single_rule_selector},
+        rule_selector::{RuleSelectorSource, UnresolvedRuleSelector, is_single_rule_selector},
     };
 
     #[derive(Clone)]
@@ -454,7 +546,7 @@ pub mod clap_completion {
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            Ok(UnresolvedRuleSelector::from_selector(value))
+            Ok(UnresolvedRuleSelector::new(value, RuleSelectorSource::Cli))
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {

@@ -3,6 +3,7 @@ use std::path::Path;
 use js_sys::Error;
 use ruff_db::diagnostic;
 use ruff_linter::preview::is_human_readable_names_enabled;
+use ruff_linter::rule_selector::{RuleSelectorSource, ValueSourceGuard};
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
@@ -278,6 +279,7 @@ impl Workspace {
 
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
+        let _guard = ValueSourceGuard::new(RuleSelectorSource::Cli, false);
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -315,7 +317,7 @@ impl Workspace {
                             .iter()
                             .map(|selector| {
                                 let (prefix, code) = selector.prefix_and_code();
-                                UnresolvedRuleSelector::from_selector(format!("{prefix}{code}"))
+                                UnresolvedRuleSelector::new(format!("{prefix}{code}"))
                             })
                             .collect(),
                     ),

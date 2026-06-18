@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use camino::Utf8Path;
 
@@ -8,6 +11,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
+use ruff_linter::rule_selector::{RuleSelectorSource, ValueSourceGuard};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
 use ruff_workspace::configuration::Configuration;
@@ -199,5 +203,9 @@ fn parse<'s>(
     short_title: &'s str,
     source: &'s str,
 ) -> anyhow::Result<parser::MarkdownTestSuite<'s, Options>> {
+    let _guard = ValueSourceGuard::new(
+        RuleSelectorSource::File(Arc::new(PathBuf::from(short_title))),
+        false,
+    );
     parser::parse::<Options>(short_title, source, |_| Ok(()))
 }

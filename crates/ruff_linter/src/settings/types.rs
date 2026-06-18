@@ -21,7 +21,7 @@ use ruff_python_ast::{self as ast, PySourceType, SourceType};
 use crate::Applicability;
 use crate::preview::is_warn_on_unknown_selectors_enabled;
 use crate::registry::RuleSet;
-use crate::rule_selector::UnresolvedRuleSelector;
+use crate::rule_selector::{RuleSelectorSource, UnresolvedRuleSelector};
 use crate::{display_settings, fs};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
@@ -392,7 +392,7 @@ impl FromStr for PatternPrefixPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let pattern = pattern_str.into();
-        let prefix = UnresolvedRuleSelector::from_selector(code_string);
+        let prefix = UnresolvedRuleSelector::new(code_string, RuleSelectorSource::Cli);
         Ok(Self { pattern, prefix })
     }
 }
