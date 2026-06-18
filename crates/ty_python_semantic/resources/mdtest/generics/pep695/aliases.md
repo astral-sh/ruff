@@ -278,15 +278,13 @@ type A[T = A] = A[int]
 An explicit alias specialization overrides the alias type parameter's default:
 
 ```py
-from typing import Generic
-from typing_extensions import TypeVar
+type ExplicitAlias[
+    FirstT = ExplicitAlias[int, str],
+    SecondT = FirstT,
+] = list[SecondT]
 
-ExplicitT = TypeVar("ExplicitT", default="ExplicitAlias[int]")
-type ExplicitAlias[AliasT = ExplicitT] = list[AliasT]
-
-class ExplicitContainer(Generic[ExplicitT]): ...
-
-reveal_type(ExplicitContainer())  # revealed: ExplicitContainer[ExplicitAlias[int]]
+def explicit_alias_default(x: ExplicitAlias):
+    reveal_type(x)  # revealed: list[ExplicitAlias[int, str]]
 ```
 
 A self-referential default that does not reference itself in the alias body should also not crash,
