@@ -6590,6 +6590,32 @@ mod tests {
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
     }
 
+    type RenderedSolutions = Vec<Vec<(String, String)>>;
+
+    fn render_solutions<'db>(db: &'db dyn Db, solutions: Solutions<'db>) -> RenderedSolutions {
+        match solutions {
+            Solutions::Unsatisfiable => vec![vec![("<unsatisfiable>".to_string(), String::new())]],
+            Solutions::Unconstrained => vec![vec![("<unconstrained>".to_string(), String::new())]],
+            Solutions::Constrained(solutions) => solutions
+                .into_iter()
+                .map(|mut solution| {
+                    solution.sort_by_key(|binding| {
+                        binding.bound_typevar.identity(db).display(db).to_string()
+                    });
+                    solution
+                        .into_iter()
+                        .map(|binding| {
+                            (
+                                binding.bound_typevar.identity(db).display(db).to_string(),
+                                binding.solution.display(db).to_string(),
+                            )
+                        })
+                        .collect()
+                })
+                .collect(),
+        }
+    }
+
     #[test]
     fn constraint_implications_are_cached() {
         let db = setup_db();
@@ -6643,6 +6669,268 @@ mod tests {
         let expected = expected.trim_end();
         let actual = set.node.display_graph(db, builder, &"").to_string();
         assert_eq!(expected, actual);
+    }
+
+    fn solve_lower_bounds_after_preinterning<'db>(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        preintern_order: [KnownClass; 2],
+    ) -> (usize, usize, RenderedSolutions) {
+        let builder = ConstraintSetBuilder::new();
+        for bound in preintern_order {
+            ConstraintId::new_with_bounds(db, &builder, typevar, Some(bound.to_instance(db)), None);
+        }
+
+        let int_constraint = ConstraintId::new_with_bounds(
+            db,
+            &builder,
+            typevar,
+            Some(KnownClass::Int.to_instance(db)),
+            None,
+        );
+        let str_constraint = ConstraintId::new_with_bounds(
+            db,
+            &builder,
+            typevar,
+            Some(KnownClass::Str.to_instance(db)),
+            None,
+        );
+        let int_lower = ConstraintSet::constrain_typevar_lower_bound(
+            db,
+            &builder,
+            typevar,
+            KnownClass::Int.to_instance(db),
+        );
+        let str_lower = ConstraintSet::constrain_typevar_lower_bound(
+            db,
+            &builder,
+            typevar,
+            KnownClass::Str.to_instance(db),
+        );
+        let set = int_lower.and(db, &builder, || str_lower);
+
+        (
+            int_constraint.index(),
+            str_constraint.index(),
+            render_solutions(db, set.solutions(db, &builder)),
+        )
+    }
+
+    #[test]
+    fn solved_lower_bound_unions_follow_source_order_not_bdd_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+
+        // Display/graph order is allowed to change, but solved type order should not. Pre-intern
+        // the same constraints in opposite orders so that the BDD variable ordering changes while
+        // the logical/source order of the final constraint set stays `int` then `str`.
+        let (source_int_index, source_str_index, source_order_solutions) =
+            solve_lower_bounds_after_preinterning(&db, t, [KnownClass::Int, KnownClass::Str]);
+        let (reversed_int_index, reversed_str_index, reversed_order_solutions) =
+            solve_lower_bounds_after_preinterning(&db, t, [KnownClass::Str, KnownClass::Int]);
+
+        assert!(source_int_index < source_str_index);
+        assert!(reversed_int_index > reversed_str_index);
+        assert_eq!(source_order_solutions, reversed_order_solutions);
+        assert_eq!(
+            source_order_solutions,
+            vec![vec![("T".to_string(), "int | str".to_string())]],
+        );
+    }
+
+    fn solve_upper_bounds_after_preinterning<'db>(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        preintern_order: [KnownClass; 2],
+    ) -> (usize, usize, RenderedSolutions) {
+        let builder = ConstraintSetBuilder::new();
+        for bound in preintern_order {
+            ConstraintId::new_with_bounds(db, &builder, typevar, None, Some(bound.to_instance(db)));
+        }
+
+        let iterable_constraint = ConstraintId::new_with_bounds(
+            db,
+            &builder,
+            typevar,
+            None,
+            Some(KnownClass::Iterable.to_instance(db)),
+        );
+        let awaitable_constraint = ConstraintId::new_with_bounds(
+            db,
+            &builder,
+            typevar,
+            None,
+            Some(KnownClass::Awaitable.to_instance(db)),
+        );
+        let iterable_upper = ConstraintSet::constrain_typevar_upper_bound(
+            db,
+            &builder,
+            typevar,
+            KnownClass::Iterable.to_instance(db),
+        );
+        let awaitable_upper = ConstraintSet::constrain_typevar_upper_bound(
+            db,
+            &builder,
+            typevar,
+            KnownClass::Awaitable.to_instance(db),
+        );
+        let set = iterable_upper.and(db, &builder, || awaitable_upper);
+
+        (
+            iterable_constraint.index(),
+            awaitable_constraint.index(),
+            render_solutions(db, set.solutions(db, &builder)),
+        )
+    }
+
+    #[test]
+    fn solved_upper_bound_intersections_follow_source_order_not_bdd_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+
+        // This mirrors the lower-bound test above for upper-bound intersections. The source order
+        // of the final constraint set is `Iterable` then `Awaitable`, even when the BDD variable
+        // order is reversed by pre-interning.
+        let (source_iterable_index, source_awaitable_index, source_order_solutions) =
+            solve_upper_bounds_after_preinterning(
+                &db,
+                t,
+                [KnownClass::Iterable, KnownClass::Awaitable],
+            );
+        let (reversed_iterable_index, reversed_awaitable_index, reversed_order_solutions) =
+            solve_upper_bounds_after_preinterning(
+                &db,
+                t,
+                [KnownClass::Awaitable, KnownClass::Iterable],
+            );
+
+        assert!(source_iterable_index < source_awaitable_index);
+        assert!(reversed_iterable_index > reversed_awaitable_index);
+        assert_eq!(source_order_solutions, reversed_order_solutions);
+        assert_eq!(source_order_solutions.len(), 1);
+        assert_eq!(source_order_solutions[0].len(), 1);
+        assert_eq!(source_order_solutions[0][0].0, "T");
+        let solution = &source_order_solutions[0][0].1;
+        let iterable_index = solution.find("Iterable").unwrap_or_else(|| {
+            panic!("solution should include the first source-order upper bound: {solution}")
+        });
+        let awaitable_index = solution.find("Awaitable").unwrap_or_else(|| {
+            panic!("solution should include the second source-order upper bound: {solution}")
+        });
+        assert!(iterable_index < awaitable_index);
+    }
+
+    #[test]
+    fn solved_types_ignore_redundant_uncertain_wrapper_constraints() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+
+        let u_lower_str = ConstraintSet::constrain_typevar_lower_bound(
+            &db,
+            &builder,
+            u,
+            KnownClass::Str.to_instance(&db),
+        );
+        let t_upper_int = ConstraintId::new_with_bounds(
+            &db,
+            &builder,
+            t,
+            None,
+            Some(KnownClass::Int.to_instance(&db)),
+        );
+        let wrapped = ConstraintSet::from_node(
+            &builder,
+            NodeId::with_uncertain(
+                &builder,
+                t_upper_int,
+                ALWAYS_FALSE,
+                u_lower_str.node,
+                ALWAYS_FALSE,
+                2,
+            ),
+        );
+
+        // A future local reduction can drop the outer `T ≤ int` node entirely: its true and false
+        // branches are both `never`, so this TDD is semantically just the uncertain branch. That
+        // graph-shape change must not affect solved types.
+        assert_eq!(
+            render_solutions(&db, u_lower_str.solutions(&db, &builder)),
+            render_solutions(&db, wrapped.solutions(&db, &builder)),
+        );
+    }
+
+    enum MutualConstraint {
+        Equal,
+        UpperInt,
+    }
+
+    fn solve_mutual_constraints_after_preinterning<'db>(
+        db: &'db dyn Db,
+        t: BoundTypeVarInstance<'db>,
+        u: BoundTypeVarInstance<'db>,
+        preintern_order: [MutualConstraint; 2],
+    ) -> RenderedSolutions {
+        let builder = ConstraintSetBuilder::new();
+        for constraint in preintern_order {
+            match constraint {
+                MutualConstraint::Equal => {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        &builder,
+                        t,
+                        Type::TypeVar(u),
+                        Type::TypeVar(u),
+                    );
+                }
+                MutualConstraint::UpperInt => {
+                    ConstraintSet::constrain_typevar_upper_bound(
+                        db,
+                        &builder,
+                        u,
+                        KnownClass::Int.to_instance(db),
+                    );
+                }
+            }
+        }
+
+        let equal =
+            ConstraintSet::constrain_typevar(db, &builder, t, Type::TypeVar(u), Type::TypeVar(u));
+        let u_upper_int = ConstraintSet::constrain_typevar_upper_bound(
+            db,
+            &builder,
+            u,
+            KnownClass::Int.to_instance(db),
+        );
+        let set = equal.and(db, &builder, || u_upper_int);
+
+        render_solutions(db, set.solutions(db, &builder))
+    }
+
+    #[test]
+    fn solved_mutual_constraints_are_stable_across_builder_ordering() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+
+        // Mutually constrained typevars are sensitive to both typevar ordering and sequent-derived
+        // relationships. Reversing the pre-interning order exercises those implementation details
+        // without changing the source order of the final `T = U` then `U ≤ int` constraint set.
+        let source_order_solutions = solve_mutual_constraints_after_preinterning(
+            &db,
+            t,
+            u,
+            [MutualConstraint::Equal, MutualConstraint::UpperInt],
+        );
+        let reversed_order_solutions = solve_mutual_constraints_after_preinterning(
+            &db,
+            t,
+            u,
+            [MutualConstraint::UpperInt, MutualConstraint::Equal],
+        );
+
+        assert_eq!(source_order_solutions, reversed_order_solutions);
     }
 
     #[test]

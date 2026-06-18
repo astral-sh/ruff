@@ -104,7 +104,7 @@ Deliverables:
 
 - `PLAN.md` with decisions, risks, and revision-sized phases.
 
-### [ ] Phase 1 — Add characterization tests for solved-type stability
+### [x] Phase 1 — Add characterization tests for solved-type stability
 
 Revision purpose: establish green guardrails before changing reduction behavior.
 
@@ -116,18 +116,17 @@ Testing focus:
 - Cover both lower-bound union construction and upper-bound intersection construction in solved types.
 - Include mutually constrained typevars / sequent-derived relationships, because these are sensitive to constraint ordering.
 
-Suggested approaches:
+Completed details:
 
-- Unit tests in `constraints.rs` that build two `ConstraintSetBuilder`s, pre-intern constraints in different orders, then build the same logical constraint set and compare `Solutions` or rendered solved types.
-- Where useful, mdtests that repeat the same scenario with generic parameters in different orders, similar to existing order-independence coverage in `resources/mdtest/type_properties/implies_subtype_of.md`.
+- Added unit tests in `constraints.rs` that render `Solutions` and compare solved-type results, avoiding graph-shape assertions.
+- Added lower-bound union coverage with `int` then `str` source order and reversed BDD variable order from pre-interning.
+- Added upper-bound intersection coverage with `Iterable` then `Awaitable` source order and reversed BDD variable order from pre-interning.
+- Added a redundant uncertain-wrapper test (`n ? never : U-lower-str : never`) to verify that solved types are unaffected when a future local reduction drops the wrapper node.
+- Added mutually constrained typevar coverage for `T = U` and `U ≤ int`, with reversed pre-interning to exercise typevar/constraint ordering and sequent-derived relationships.
 
-Green-revision rule:
+Validation:
 
-- If a desired invariant is not currently true, assert the current behavior and add a TODO/xfail-style comment explaining the desired future behavior. Fix it in a later focused revision.
-
-Documentation updates in this phase:
-
-- Test comments should state the invariant: constraint-set display order may change, but solved type order must remain stable across BDD variable-order differences.
+- `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- constraints`
 
 ### [ ] Phase 2 — Route standalone node constructors through the central constructor
 
