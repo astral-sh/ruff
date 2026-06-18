@@ -20,7 +20,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  ECOSYSTEM_ANALYZER_COMMIT: 8ecef7e9eaead321d0b2f509cd5355a6bd37797d
+  ECOSYSTEM_ANALYZER_COMMIT: e2c5b76149b147fae104a7d8fa0997a9eb7f7754
 
 jobs:
   ty-ecosystem-report:
