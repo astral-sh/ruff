@@ -202,7 +202,7 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, equality_truthiness, infer_narrowing_constraints,
+        enum_metadata, equality_truthiness, expand_type, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
         singleton_pattern_type,
     },
@@ -475,7 +475,11 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
+    let coverage_subject_ty = expand_type(db, subject_ty)
+        .map(|types| UnionType::from_elements(db, types))
+        .unwrap_or(subject_ty);
+    let narrowed_subject_ty =
+        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed

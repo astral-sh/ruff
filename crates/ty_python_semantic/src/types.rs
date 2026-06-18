@@ -50,6 +50,7 @@ pub use self::set_theoretic::{
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
+pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
@@ -154,6 +155,7 @@ mod subclass_of;
 pub(crate) mod tests;
 mod tuple;
 mod type_alias;
+mod type_expansion;
 mod type_form;
 mod typed_dict;
 mod typevar;

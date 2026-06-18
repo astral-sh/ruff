@@ -300,16 +300,14 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
         case _:
             assert_never(value)
 
-def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:  # error: [invalid-return-type]
+def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
         case [int()]:
             return 42
         case [str()]:
             return 42
         case _:
-            # TODO: The previous cases are exhaustive, so this should simplify
-            # to `tuple[Never]`, and therefore `Never`.
-            # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
+            # revealed: Never
             reveal_type(x)
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
