@@ -1016,6 +1016,38 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
+## Assigning methods on class objects
+
+Methods accessed from class-literal types retain their precise function-literal type. Assignments to
+those methods are checked against the function's callable signature, however, so that a method can
+be replaced by a different function with the same signature.
+
+```py
+class Foo:
+    def method(self) -> None:
+        pass
+
+    def add(self, x: int, y: int, /) -> int:
+        return x + y
+
+def method_replacement(self) -> None:
+    pass
+
+def add_replacement(self: Foo, x: int, y: int, /) -> int:
+    return x * y
+
+reveal_type(Foo.method)  # revealed: def method(self) -> None
+reveal_type(Foo.add)  # revealed: def add(self, x: int, y: int, /) -> int
+
+Foo.method = method_replacement
+Foo.add = add_replacement
+
+def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
+    return x + y
+
+Foo.add = incompatible_replacement  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
