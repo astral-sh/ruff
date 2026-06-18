@@ -292,12 +292,9 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_type_returns_none() {
+    fn provide_module_type() {
         let test = ProvideTypeTest::with_source("import sys\nvalue = <START>sys<END>");
-        assert_debug_snapshot!(
-            provide_type(&test.db, test.file, test.range),
-            @"None"
-        );
+        assert_snapshot!(test.provided_type(), @"Module[sys]");
     }
 
     struct ProvideTypeTest {

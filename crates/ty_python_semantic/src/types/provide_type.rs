@@ -31,6 +31,8 @@
 //!   retain their metadata.
 //! - `TypeIs` and `TypeGuard` are printed as their public annotations without ty's internal
 //!   narrowed-parameter binding.
+//! - Parameter defaults without a single known literal value are printed as `...`. This includes
+//!   defaults represented by the abstract `LiteralString` type.
 //! - An unspecialized runtime PEP 695 alias object is printed as the canonical `TypeAliasType`
 //!   class. A specialized alias object is printed as the canonical `GenericAlias` class, matching
 //!   its runtime class.
@@ -59,6 +61,7 @@
 //! primary       ::= name
 //!                 | free_typevar
 //!                 | "None"
+//!                 | "Module[" name "]"
 //!                 | name "[" subscript_arguments "]"
 //!                 | "(" type ")"
 //!                 | callable
@@ -81,10 +84,10 @@
 //! ```
 //!
 //! Python syntax and precedence are used where possible. The experimental extensions are
-//! callable expressions, overload groups, exact runtime-value `TypeOf` expressions, scoped free
-//! type variables, the `Divergent` cycle marker, truthiness types, intersections, and negation.
-//! Their precedence is `~`, then `&`, then `|`. The printer inserts parentheses whenever a nested
-//! expression would otherwise change meaning.
+//! module literals, callable expressions, overload groups, exact runtime-value `TypeOf`
+//! expressions, scoped free type variables, the `Divergent` cycle marker, truthiness types,
+//! intersections, and negation. Their precedence is `~`, then `&`, then `|`. The printer inserts
+//! parentheses whenever a nested expression would otherwise change meaning.
 //!
 //! Named classes, aliases, functions, type variables, and `NewType`s are resolved by semantic
 //! declaration identity. Lexical ordinals distinguish declarations that would otherwise have the
@@ -129,8 +132,6 @@ pub enum UnsupportedTypeKind {
     InternalCallable,
     /// An anonymous callable whose kind is not regular.
     NonRegularAnonymousCallable,
-    /// A specific module object.
-    ModuleLiteral,
     /// An anonymous synthesized protocol.
     SynthesizedProtocol,
     /// A runtime object from the typing system.
@@ -153,8 +154,6 @@ pub enum UnsupportedTypeKind {
     EmptyCallable,
     /// A callable with the internal top parameter set.
     TopCallableParameters,
-    /// A `LiteralString` default whose value is not known.
-    NonLiteralLiteralString,
     /// A nominal type used only internally.
     InternalNominal,
 }
@@ -166,7 +165,6 @@ impl fmt::Display for UnsupportedTypeKind {
             Self::InternalBoundMethod => "internal bound method",
             Self::InternalCallable => "internal callable type",
             Self::NonRegularAnonymousCallable => "non-regular anonymous callable",
-            Self::ModuleLiteral => "module type",
             Self::SynthesizedProtocol => "synthesized protocol",
             Self::RuntimeTypingObject => "runtime typing object",
             Self::PropertyInstance => "property instance",
@@ -178,7 +176,6 @@ impl fmt::Display for UnsupportedTypeKind {
             Self::SyntheticTypeVariable => "synthetic type variable",
             Self::EmptyCallable => "empty callable",
             Self::TopCallableParameters => "top callable parameters",
-            Self::NonLiteralLiteralString => "non-literal LiteralString value",
             Self::InternalNominal => "internal nominal type",
         })
     }
@@ -188,12 +185,14 @@ impl fmt::Display for UnsupportedTypeKind {
 pub enum PrintTypeError {
     /// The type has no supported provide-type spelling.
     ///
-    /// For example, module objects have no supported provide-type spelling:
+    /// For example, property descriptor objects have no supported provide-type spelling:
     ///
     /// ```python
-    /// import sys
+    /// class C:
+    ///     @property
+    ///     def value(self) -> int: ...
     ///
-    /// value = sys
+    /// descriptor = C.value
     /// ```
     #[error("type `{kind}` cannot be printed")]
     UnsupportedType { kind: UnsupportedTypeKind },
@@ -323,8 +322,10 @@ impl<'db> PrintType<'db> {
                 }
                 self.print_callable(callable.signatures(self.db), None, false)?;
             }
-            Type::ModuleLiteral(_) => {
-                return Self::unsupported(UnsupportedTypeKind::ModuleLiteral);
+            Type::ModuleLiteral(module) => {
+                self.push_str("Module[");
+                self.push_str(module.module(self.db).name(self.db));
+                self.push(']');
             }
             Type::ClassLiteral(class) => {
                 self.print_intrinsic("ty_extensions", "TypeOf");
@@ -1014,7 +1015,7 @@ impl<'db> PrintType<'db> {
                 );
             }
             LiteralValueTypeKind::LiteralString => {
-                return Self::unsupported(UnsupportedTypeKind::NonLiteralLiteralString);
+                self.push_str("...");
             }
             LiteralValueTypeKind::Enum(value) => {
                 self.print_class_literal(value.enum_class(self.db))?;
@@ -1184,6 +1185,7 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_python_ast::AnyNodeRef;
     use ruff_python_ast::find_node::covering_node;
+    use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -1281,6 +1283,19 @@ mod tests {
     }
 
     #[test]
+    fn module_literals_use_module_syntax() {
+        assert_snapshot!(
+            print_marked(
+                r#"
+                import xml.etree
+                <START>xml.etree<END>
+                "#,
+            ),
+            @"Module[xml.etree]"
+        );
+    }
+
+    #[test]
     fn generic_binders_use_local_type_variable_names() {
         assert_snapshot!(
             print_marked(
@@ -1358,6 +1373,28 @@ mod tests {
                 "#,
             ),
             @"def foo.defaults(value: Unknown, count: Unknown = 1) -> builtins.int: ..."
+        );
+    }
+
+    #[test]
+    fn literal_string_default_with_unknown_value_uses_ellipsis() {
+        let db = setup_db();
+        let callable = Type::single_callable(
+            &db,
+            Signature::new(
+                Parameters::new(
+                    &db,
+                    [Parameter::positional_or_keyword(Name::new_static("value"))
+                        .with_annotated_type(Type::literal_string())
+                        .with_default_type(Type::literal_string())],
+                ),
+                Type::none(&db),
+            ),
+        );
+
+        assert_snapshot!(
+            printed(print_type(&db, callable)),
+            @"(value: typing.LiteralString = ...) -> None"
         );
     }
 

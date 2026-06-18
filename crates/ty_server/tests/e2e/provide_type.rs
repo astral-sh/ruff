@@ -40,7 +40,7 @@ sys
         ProvideTypeResponse {
             types: vec![
                 Some("ty_extensions.TypeOf[foo.A]".to_string()),
-                None,
+                Some("Module[sys]".to_string()),
                 Some("builtins.float".to_string()),
             ],
         }
