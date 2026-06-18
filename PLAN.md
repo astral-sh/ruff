@@ -128,25 +128,20 @@ Validation:
 
 - `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- constraints`
 
-### [ ] Phase 2 — Route standalone node constructors through the central constructor
+### [x] Phase 2 — Route standalone node constructors through the central constructor
 
 Revision purpose: preparatory refactor with little/no intended behavior change.
 
-Implementation sketch:
+Implementation completed:
 
-- Update `Node::new_constraint` and `Node::new_satisfied_constraint` to call `NodeId::with_uncertain` instead of directly interning `InteriorNodeData`.
-- Keep existing quasi-reduction semantics in `NodeId::with_uncertain` for this phase unless a tiny local helper is introduced with the existing behavior only.
+- Updated `Node::new_constraint` and `Node::new_satisfied_constraint` to call `NodeId::with_uncertain` instead of directly interning `InteriorNodeData`.
+- Kept existing quasi-reduction semantics in `NodeId::with_uncertain`; no local reduction helper was introduced yet.
+- No extra tests were needed: existing graph/semantic tests, plus the Phase 1 solved-type stability tests, cover the standalone constructor behavior and remained green.
 
-Why this is useful:
+Validation:
 
-- Ensures all future reduction rules are applied consistently.
-- Keeps the eventual behavior-changing reduction revision smaller and easier to review.
-
-Tests/docs:
-
-- Keep existing tests green.
-- Add/adjust a small test if needed to prove standalone positive/negative/unconstrained constraints still have the same behavior.
-- Do not rely on exact graph display more than necessary.
+- `cargo fmt --check`
+- `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- constraints`
 
 ### [ ] Phase 3 — Implement conservative local node reductions
 

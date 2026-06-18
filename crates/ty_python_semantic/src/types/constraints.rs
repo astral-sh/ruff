@@ -1811,14 +1811,14 @@ impl Node {
         constraint: ConstraintId,
         source_order: usize,
     ) -> NodeId {
-        builder.intern_interior_node(InteriorNodeData {
+        NodeId::with_uncertain(
+            builder,
             constraint,
-            if_true: ALWAYS_TRUE,
-            if_uncertain: ALWAYS_FALSE,
-            if_false: ALWAYS_FALSE,
+            ALWAYS_TRUE,
+            ALWAYS_FALSE,
+            ALWAYS_FALSE,
             source_order,
-            max_source_order: source_order,
-        })
+        )
     }
 
     /// Creates a new BDD node for a positive, negative, or unconstrained individual constraint.
@@ -1832,39 +1832,35 @@ impl Node {
         source_order: usize,
     ) -> NodeId {
         match constraint {
-            ConstraintAssignment::Positive(constraint) => {
-                builder.intern_interior_node(InteriorNodeData {
-                    constraint,
-                    if_true: ALWAYS_TRUE,
-                    if_uncertain: ALWAYS_FALSE,
-                    if_false: ALWAYS_FALSE,
-                    source_order,
-                    max_source_order: source_order,
-                })
-            }
-            ConstraintAssignment::Negative(constraint) => {
-                builder.intern_interior_node(InteriorNodeData {
-                    constraint,
-                    if_true: ALWAYS_FALSE,
-                    if_uncertain: ALWAYS_FALSE,
-                    if_false: ALWAYS_TRUE,
-                    source_order,
-                    max_source_order: source_order,
-                })
-            }
+            ConstraintAssignment::Positive(constraint) => NodeId::with_uncertain(
+                builder,
+                constraint,
+                ALWAYS_TRUE,
+                ALWAYS_FALSE,
+                ALWAYS_FALSE,
+                source_order,
+            ),
+            ConstraintAssignment::Negative(constraint) => NodeId::with_uncertain(
+                builder,
+                constraint,
+                ALWAYS_FALSE,
+                ALWAYS_FALSE,
+                ALWAYS_TRUE,
+                source_order,
+            ),
             ConstraintAssignment::Unconstrained(constraint) => {
                 // The result holds regardless of the constraint's truth value, so only
                 // `if_uncertain` needs to be `ALWAYS_TRUE` — `n? 0: 1: 0`. It would also be
                 // correct to use `n? 1: 1: 1` (i.e., `ALWAYS_TRUE` for all outgoing edges), but
                 // that would throw away some of the efficiency gains this representation gives us.
-                builder.intern_interior_node(InteriorNodeData {
+                NodeId::with_uncertain(
+                    builder,
                     constraint,
-                    if_true: ALWAYS_FALSE,
-                    if_uncertain: ALWAYS_TRUE,
-                    if_false: ALWAYS_FALSE,
+                    ALWAYS_FALSE,
+                    ALWAYS_TRUE,
+                    ALWAYS_FALSE,
                     source_order,
-                    max_source_order: source_order,
-                })
+                )
             }
         }
     }
