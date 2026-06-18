@@ -764,6 +764,14 @@ impl<'db> Type<'db> {
         })
     }
 
+    fn mentions_foreign_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::Divergent(divergent) => !divergent.same_marker(root),
+            Type::Projection(projection) => !projection.root(db).same_marker(root),
+            _ => false,
+        })
+    }
+
     fn mentions_matching_projection(
         self,
         db: &'db dyn Db,
@@ -776,6 +784,19 @@ impl<'db> Type<'db> {
             }
             _ => false,
         })
+    }
+
+    fn is_matching_projection(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        path: &ProjectionPath<'db>,
+    ) -> bool {
+        matches!(
+            self,
+            Type::Projection(projection)
+                if projection.root(db).same_marker(root) && projection.path(db).eq(path)
+        )
     }
 
     fn matching_projection_narrowing_var(
@@ -1371,8 +1392,9 @@ impl<'db> ProjectionContainer<'db> {
 ///
 /// Each [`ProjectionPath`] is a variable `A_p = Projection_p(root)`. Equations contain only
 /// query-free facts collected from container arms: closed productive terms and flat dependencies on
-/// other projection variables. Constructor-guarded recursion is rejected by construction.
+/// other projection variables. Constructor-guarded recursion is filled with `Divergent`.
 struct ProjectionSystem<'db> {
+    root: DivergentType,
     equations: FxIndexMap<ProjectionPath<'db>, ProjectionEquation<'db>>,
 }
 
@@ -1391,12 +1413,12 @@ impl<'db> ProjectionSystem<'db> {
             equations.insert(path.clone(), equation);
         }
 
-        Some(Self { equations })
+        Some(Self { root, equations })
     }
 
     fn solve(self, db: &'db dyn Db) -> Option<FxIndexMap<ProjectionPath<'db>, Type<'db>>> {
-        let Self { equations } = self;
-        if equations.is_empty() || equations.values().any(|equation| equation.guarded) {
+        let Self { root, equations } = self;
+        if equations.is_empty() || equations.values().any(|equation| equation.unsupported) {
             return None;
         }
 
@@ -1418,14 +1440,28 @@ impl<'db> ProjectionSystem<'db> {
         let sccs = strongly_connected_components(&graph);
         let mut solutions = vec![None; paths.len()];
         for scc in sccs {
-            let mut base = Vec::new();
             let wrap_in_list = equations[&paths[scc[0]]].wrap_in_list;
             for &index in &scc {
-                let equation = &equations[&paths[index]];
-                if equation.wrap_in_list != wrap_in_list {
+                if equations[&paths[index]].wrap_in_list != wrap_in_list {
                     return None;
                 }
+            }
 
+            if scc.iter().any(|&index| equations[&paths[index]].divergent) {
+                let solved = if wrap_in_list {
+                    KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
+                } else {
+                    Type::Divergent(root)
+                };
+                for index in scc {
+                    solutions[index] = Some(solved);
+                }
+                continue;
+            }
+
+            let mut base = Vec::new();
+            for &index in &scc {
+                let equation = &equations[&paths[index]];
                 base.extend(equation.productive.iter().copied());
                 for dependency in &equation.dependencies {
                     let dependency_index = path_indices[dependency];
@@ -1466,7 +1502,8 @@ impl<'db> ProjectionSystem<'db> {
 struct ProjectionEquation<'db> {
     productive: Vec<Type<'db>>,
     dependencies: FxIndexSet<ProjectionPath<'db>>,
-    guarded: bool,
+    divergent: bool,
+    unsupported: bool,
     wrap_in_list: bool,
 }
 
@@ -1495,6 +1532,10 @@ impl<'db> ProjectionEquation<'db> {
                     && let Some(projected) =
                         ProjectionContainer::project_type_path(db, term, root, None, path)
                 {
+                    if projected.ty(db).is_matching_projection(db, root, path) {
+                        self.divergent = true;
+                        return Some(());
+                    }
                     return self.add_projection_term(db, root, path, projected);
                 }
 
@@ -1533,8 +1574,16 @@ impl<'db> ProjectionEquation<'db> {
             }
         }
 
-        if term.mentions_any_cycle_artifact(db) {
-            self.guarded = true;
+        if term.mentions_foreign_cycle_artifact(db, root) {
+            self.unsupported = true;
+            return Some(());
+        }
+
+        if term.mentions_cycle_artifact(db, root) {
+            // A same-root occurrence below a constructor is a true recursive shape, not a flat
+            // self-reference. Use the cycle root as the widening point instead of handing the
+            // growing constructor chain back to fixed-point iteration.
+            self.divergent = true;
             return Some(());
         }
 

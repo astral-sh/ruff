@@ -3945,6 +3945,21 @@ class ProjectionGuardedList:
         self.x = [[x]]
 
         reveal_type(self.x)  # revealed: list[Divergent]
+
+class ProjectionGuardedTuple:
+    def __init__(self) -> None:
+        self.x = (0,)
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = ((x,),)
+
+        # This reads the local attribute binding after the assignment above definitely ran.
+        # The growing inner shape is represented by `Divergent`.
+        reveal_type(self.x)  # revealed: tuple[tuple[int | Divergent]]
+
+    def _(self) -> None:
+        reveal_type(self.x)  # revealed: tuple[int] | tuple[Divergent]
 ```
 
 Recursive aliases with repeated subscripting still converge:

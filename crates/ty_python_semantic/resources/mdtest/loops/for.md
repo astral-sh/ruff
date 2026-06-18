@@ -1844,6 +1844,16 @@ def tuple_projection_with_side_containers() -> None:
 Recursive updates through tuple entries should not introduce the tuple itself into an element type.
 
 ```py
+recursive_tuple_growth = (int(),)
+
+for _recursive_tuple_growth_index in range(10):
+    (recursive_tuple_item,) = recursive_tuple_growth
+    recursive_tuple_growth = ((recursive_tuple_item,),)
+
+# The loop result includes the initial seed and the recursive update shape; the growing
+# inner tuple is represented by `Divergent`.
+reveal_type(recursive_tuple_growth)  # revealed: tuple[int] | tuple[tuple[int | Divergent]]
+
 import copy as recursive_pair_copy
 
 def recursive_pair_unknown():
