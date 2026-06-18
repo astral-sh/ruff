@@ -2221,8 +2221,8 @@ class ThisFails:
 ThisFails().x
 ```
 
-`__getattribute__` is also checked against assignments to protocols, to make sure all fields
-are compatible. In the following `Person.name` can't be an `int` so this should fail: 
+`__getattribute__` is also checked against assignments to protocols, to make sure all fields are
+compatible. In the following `Person.name` can't be an `int` so this should fail:
 
 ```py
 from typing import Protocol
@@ -2240,7 +2240,7 @@ def get_name_as_int(person: IntName) -> int:
 get_name_as_int(Person())
 ```
 
-This can be used with literal type arguments to construct the necessary fields names later: 
+This can be used with literal type arguments to construct the necessary fields names later:
 
 ```toml
 [environment]

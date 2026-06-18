@@ -743,7 +743,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .place
                     && obj_definition == definition
                 {
-                    return self.type_satisfies_protocol_getattribute(db, method, ty);
+                    return self.type_satisfies_protocol_getattribute(db, *method, ty);
                 }
 
                 // TODO: Instances of `typing.Self` in the protocol member should specialize to the
@@ -817,7 +817,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn type_satisfies_protocol_getattribute(
         &self,
         db: &'db dyn Db,
-        method: &CallableType<'db>,
+        method: CallableType<'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // `__getattr__` can also be used by `__getattribute__`, so we need to copy the overloads
@@ -834,7 +834,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             None
         }
         .into_iter()
-        .flat_map(|s| s.overloads.iter().map(|s| s.clone()));
+        .flat_map(|s| s.overloads.iter().cloned());
 
         // Construct an overload per field mapping each field to what resultant value is expected
         let signature = CallableSignature::from_overloads(
@@ -864,11 +864,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::ExplicitReturn,
         );
-        let constraints = self.check_callable_pair(db, synthetic_getattr, *method);
+        let constraints = self.check_callable_pair(db, synthetic_getattr, method);
         if constraints.is_never_satisfied(db) {
             self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
                 member_name: "__getattribute__".into(),
-            })
+            });
         }
         constraints
     }
