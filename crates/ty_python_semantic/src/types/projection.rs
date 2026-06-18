@@ -270,37 +270,32 @@ impl<'db> Type<'db> {
             .map(|element| {
                 let mentions_root = element.mentions_cycle_artifact_direct(db, *root);
                 let direct_container = ProjectionContainer::from_direct_type(db, element);
-                let needs_evidence = direct_container
-                    .as_ref()
-                    .is_some_and(ProjectionContainer::needs_evidence_for_projection);
 
-                if !mentions_root && direct_container.is_none() {
-                    return None;
-                }
-
-                if mentions_root
-                    && let Some(container @ ProjectionContainer::Tuple { .. }) =
-                        direct_container.as_ref()
-                {
-                    // Project recursive tuple arms structurally. Calling the normal projection
-                    // path here would reenter cycle recovery through tuple subscript handling.
-                    return container.project_path(db, *root, None, &path);
-                }
-
-                if mentions_root && needs_evidence {
-                    // Avoid reentering method or iteration inference for recursive generic arms.
-                    // Subscript has a projection-suppressed path that can still expose the
-                    // recursive element type without extending the projection cycle.
-                    return match op {
-                        ProjectionOp::Subscript(_) => {
-                            ProjectionContainer::infer_projection_op(db, element, op)
+                let term = match (mentions_root, direct_container.as_ref()) {
+                    (false, None) => return None,
+                    (true, Some(container @ ProjectionContainer::Tuple { .. })) => {
+                        // Project recursive tuple arms structurally. Calling the normal projection
+                        // path here would reenter cycle recovery through tuple subscript handling.
+                        container.project_path(db, *root, None, &path)?
+                    }
+                    (true, Some(ProjectionContainer::Generic(_))) => {
+                        // Avoid reentering method or iteration inference for recursive generic
+                        // arms. Subscript has a projection-suppressed path that can still expose
+                        // the recursive element type without extending the projection cycle.
+                        match op {
+                            ProjectionOp::Subscript(_) => {
+                                ProjectionContainer::infer_projection_op(db, element, op)?
+                            }
+                            _ => return None,
                         }
-                        _ => None,
-                    };
-                }
+                    }
+                    _ => project_non_cycle(element)?,
+                };
 
-                let term = project_non_cycle(element)?;
-                if !mentions_root && needs_evidence && !term.is_ambiguous(db) {
+                if !mentions_root
+                    && matches!(direct_container, Some(ProjectionContainer::Generic(_)))
+                    && !term.is_ambiguous(db)
+                {
                     projection_evidence.push_projection_fact(ProjectionEvidenceFact {
                         root: *root,
                         arm: element,
@@ -725,19 +720,13 @@ impl<'db> Type<'db> {
         ty: Type<'db>,
         paths: &mut Vec<ProjectionPath<'db>>,
     ) {
-        let paths = RefCell::new(paths);
-        any_over_type(db, ty, false, |nested| {
-            if let Type::Projection(projection) = nested
-                && projection.root(db).same_marker(root)
-            {
-                let mut paths = paths.borrow_mut();
-                let path = projection.path(db);
-                if !paths.contains(&path) {
-                    paths.push(path);
-                }
+        let mut demands = Vec::new();
+        Self::collect_projection_demands(db, ty, &mut demands);
+        for (candidate_root, path) in demands {
+            if candidate_root.same_marker(root) && !paths.contains(&path) {
+                paths.push(path);
             }
-            false
-        });
+        }
     }
 
     fn collect_projection_demands(
@@ -962,14 +951,8 @@ impl<'db> ProjectionResult<'db> {
 /// A container shape that can explain projections of a cycle root.
 #[derive(Debug, Clone)]
 enum ProjectionContainer<'db> {
-    Tuple {
-        spec: TupleSpec<'db>,
-    },
-    Generic {
-        class: StaticClassLiteral<'db>,
-        arguments: Vec<Type<'db>>,
-        arm: Type<'db>,
-    },
+    Tuple { spec: TupleSpec<'db> },
+    Generic(ProjectionContainerFact<'db>),
 }
 
 impl<'db> ProjectionContainer<'db> {
@@ -981,15 +964,8 @@ impl<'db> ProjectionContainer<'db> {
             });
         }
 
-        if let Some((class, specialization)) = ty.direct_class_specialization(db) {
-            let arguments = specialization.types(db);
-            if !arguments.is_empty() {
-                return Some(Self::Generic {
-                    class,
-                    arguments: arguments.to_vec(),
-                    arm: ty,
-                });
-            }
+        if let Some(fact) = ProjectionContainerFact::from_direct_type(db, ty) {
+            return Some(Self::Generic(fact));
         }
 
         None
@@ -1004,11 +980,7 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<Self> {
         Self::from_direct_type(db, ty).or_else(|| {
             let fact = evidence?.container_fact_for_arm(db, root, ty)?;
-            Some(Self::Generic {
-                class: fact.class,
-                arguments: fact.arguments.to_vec(),
-                arm: ty,
-            })
+            Some(Self::Generic(fact.clone()))
         })
     }
 
@@ -1034,15 +1006,11 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
-            Self::Generic { arm, .. } => {
-                return evidence?.project_generic_path(db, root, *arm, path);
+            Self::Generic(fact) => {
+                return evidence?.project_generic_path(db, root, fact.arm, path);
             }
         };
         Self::project_type_path(db, ty, root, evidence, path)
-    }
-
-    const fn needs_evidence_for_projection(&self) -> bool {
-        matches!(self, Self::Generic { .. })
     }
 
     fn project_type_path(
@@ -1343,17 +1311,16 @@ impl<'db> ProjectionContainer<'db> {
                     Some(Type::tuple(TupleType::mixed(db, prefix, variable, suffix)))
                 }
             },
-            Self::Generic {
-                class, arguments, ..
-            } => {
-                let arguments = arguments
-                    .into_iter()
+            Self::Generic(fact) => {
+                let arguments = fact
+                    .arguments
+                    .iter()
                     .map(|argument| {
-                        argument.replace_solved_projection_artifacts(db, root, solved_ops)
+                        (*argument).replace_solved_projection_artifacts(db, root, solved_ops)
                     })
                     .collect::<Option<Vec<_>>>()?;
 
-                Type::from(class.apply_specialization(db, |generic_context| {
+                Type::from(fact.class.apply_specialization(db, |generic_context| {
                     generic_context.specialize(db, arguments)
                 }))
                 .to_instance(db)
@@ -1498,24 +1465,6 @@ impl<'db> ProjectionContainer<'db> {
         let element = ty.try_iterate(db).ok()?.homogeneous_element_type(db);
         Some(Self::star_unpack_homogeneous(element, position))
     }
-
-    /// Inference-time only: uses the full specialization view, which may trigger queries.
-    fn build_container_fact(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> Option<ProjectionContainerFact<'db>> {
-        if ty.exact_tuple_instance_spec(db).is_some() {
-            return None;
-        }
-
-        let (class, specialization) = ty.class_specialization(db)?;
-        let arguments = specialization.types(db);
-        (!arguments.is_empty()).then(|| ProjectionContainerFact {
-            arm: ty,
-            class,
-            arguments: arguments.to_vec().into_boxed_slice(),
-        })
-    }
 }
 
 /// The result of applying one projection path to one container arm.
@@ -1582,16 +1531,7 @@ struct ProjectionEvidenceBuilder<'db> {
 }
 
 impl<'db> ProjectionEvidenceBuilder<'db> {
-    fn extend_from_types(
-        &mut self,
-        db: &'db dyn Db,
-        should_collect: bool,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) {
-        if !should_collect {
-            return;
-        }
-
+    fn extend_from_types(&mut self, db: &'db dyn Db, types: impl IntoIterator<Item = Type<'db>>) {
         for ty in types {
             let mut demands = Vec::new();
             Type::collect_projection_demands(db, ty, &mut demands);
@@ -1646,7 +1586,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
             return;
         }
 
-        let Some(container_fact) = ProjectionContainer::build_container_fact(db, arm) else {
+        let Some(container_fact) = ProjectionContainerFact::from_inference_type(db, arm) else {
             return;
         };
 
@@ -1681,7 +1621,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
         let mut builder = ProjectionEvidenceBuilder::default();
-        builder.extend_from_types(db, true, types);
+        builder.extend_from_types(db, types);
         builder.finish(db)
     }
 
@@ -1764,7 +1704,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     ) {
         let facts = RefCell::new(facts);
         any_over_type(db, ty, false, |nested| {
-            if let Some(fact) = ProjectionContainer::build_container_fact(db, nested) {
+            if let Some(fact) = ProjectionContainerFact::from_inference_type(db, nested) {
                 facts.borrow_mut().insert(fact);
             }
             false
@@ -1847,6 +1787,40 @@ struct ProjectionContainerFact<'db> {
     arm: Type<'db>,
     class: StaticClassLiteral<'db>,
     arguments: Box<[Type<'db>]>,
+}
+
+impl<'db> ProjectionContainerFact<'db> {
+    fn from_parts(
+        arm: Type<'db>,
+        class: StaticClassLiteral<'db>,
+        arguments: &[Type<'db>],
+    ) -> Option<Self> {
+        (!arguments.is_empty()).then(|| Self {
+            arm,
+            class,
+            arguments: arguments.to_vec().into_boxed_slice(),
+        })
+    }
+
+    /// Recovery-time shape check: uses only direct class structure.
+    fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        if ty.exact_tuple_instance_spec(db).is_some() {
+            return None;
+        }
+
+        let (class, specialization) = ty.direct_class_specialization(db)?;
+        Self::from_parts(ty, class, specialization.types(db))
+    }
+
+    /// Inference-time shape check: may expand aliases, bounds, and fallbacks.
+    fn from_inference_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        if ty.exact_tuple_instance_spec(db).is_some() {
+            return None;
+        }
+
+        let (class, specialization) = ty.class_specialization(db)?;
+        Self::from_parts(ty, class, specialization.types(db))
+    }
 }
 
 /// A projected view of a cycle root produced while recovering recursive inference.
