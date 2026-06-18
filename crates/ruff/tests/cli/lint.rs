@@ -756,46 +756,36 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     Ok(())
 }
 
-#[test]
-fn unknown_rule_selectors_warn() -> Result<()> {
+#[test_case::test_case(&["--select", "F481"])]
+#[test_case::test_case(&["--extend-select", "F481"])]
+#[test_case::test_case(&["--ignore", "F481"])]
+#[test_case::test_case(&["--fixable", "F481"])]
+#[test_case::test_case(&["--extend-fixable", "F481"])]
+#[test_case::test_case(&["--unfixable", "F481"])]
+#[test_case::test_case(&["--config", "lint.ignore=['F481']"])]
+#[test_case::test_case(&["--config", "lint.extend-safe-fixes=['F481']"])]
+#[test_case::test_case(&["--config", "lint.extend-unsafe-fixes=['F481']"])]
+#[test_case::test_case(&["--per-file-ignores", "test.py:F481"])]
+#[test_case::test_case(&["--extend-per-file-ignores", "test.py:F481"])]
+#[test_case::test_case(&["--config", "lint.per-file-ignores={'test.py'=['F481']}"])]
+#[test_case::test_case(&["--config", "lint.extend-per-file-ignores={'test.py'=['F481']}"])]
+fn unknown_rule_selectors_warn(args: &[&str]) -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file("test.py", "import os\n")?;
 
-    for args in [
-        ["--select", "F481"],
-        ["--extend-select", "F481"],
-        ["--ignore", "F481"],
-        ["--fixable", "F481"],
-        ["--extend-fixable", "F481"],
-        ["--unfixable", "F481"],
-        ["--config", "lint.ignore=['F481']"],
-        ["--config", "lint.extend-safe-fixes=['F481']"],
-        ["--config", "lint.extend-unsafe-fixes=['F481']"],
-        ["--per-file-ignores", "test.py:F481"],
-        ["--extend-per-file-ignores", "test.py:F481"],
-        ["--config", "lint.per-file-ignores={'test.py'=['F481']}"],
-        [
-            "--config",
-            "lint.extend-per-file-ignores={'test.py'=['F481']}",
-        ],
-    ] {
-        let output = fixture
-            .check_command()
-            .args(["--select", "F401"])
-            .args(args)
-            .arg("test.py")
-            .output()?;
-        assert_eq!(output.status.code(), Some(1), "arguments: {args:?}");
-        assert!(
-            str::from_utf8(&output.stdout)?.contains("F401"),
-            "arguments: {args:?}"
-        );
-        assert_eq!(
-            str::from_utf8(&output.stderr)?,
-            "warning: Invalid rule selector: `F481`\n",
-            "arguments: {args:?}"
-        );
-    }
+    let output = fixture
+        .check_command()
+        .args(["--select", "F401"])
+        .args(args)
+        .arg("test.py")
+        .output()?;
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(str::from_utf8(&output.stdout)?.contains("F401"));
+    assert_eq!(
+        str::from_utf8(&output.stderr)?,
+        "warning: Invalid rule selector: `F481`\n"
+    );
 
     Ok(())
 }
