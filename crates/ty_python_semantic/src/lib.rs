@@ -227,4 +227,4 @@ impl IOErrorDiagnostic {
 /// values that will soon converge, but where unioning in the early value causes an
 /// unrecoverable loss of precision. This constant controls how many iterations
 /// are considered likely to produce "tainted" results that should be discarded.
-pub(crate) const TAINTED_CYCLES: u32 = 1;
+pub(crate) const TAINTED_CYCLES: u32 = 3;
