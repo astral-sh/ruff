@@ -143,56 +143,48 @@ Validation:
 - `cargo fmt --check`
 - `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- constraints`
 
-### [ ] Phase 3 — Implement conservative local node reductions
+### [x] Phase 3 — Implement conservative local node reductions
 
 Revision purpose: main behavior change for this feature slice.
 
-Implementation sketch:
+Implementation completed:
 
-- Centralize local reduction in `NodeId::with_uncertain`, preferably via a small helper such as `local_reduction(...) -> Option<NodeId>`.
-- Apply only the sound local rules listed above.
-- Perform reduction before computing `max_source_order` and before interning an `InteriorNodeData`.
-- Keep `source_order` as part of identity for nodes that are still interned.
-- Add a TODO near the `if_true == if_false` handling noting the possible follow-up reduction to return `if_true ∪ if_uncertain`.
-
-Tests/docs:
-
-- Add unit tests for each local reduction rule.
-- Update comments that currently say constraint-set BDD/TDD nodes are quasi-reduced.
-- Update affected graph-shape tests in the same revision. Display graph changes are acceptable; test expectations should avoid implying that remembered redundant constraints are semantically important.
-- Re-run Phase 1 solved-type stability tests.
-
-Watch items:
-
-- Numeric `max_source_order` values may change when nodes are reduced away. This is acceptable if relative ordering among retained constraints remains stable and solved types do not churn.
-- Dropped constraints should not affect solved types. Retained constraints must keep deterministic relative ordering.
-
-### [ ] Phase 4 — Audit/fix solver and caller fallout in focused revisions
-
-Revision purpose: handle any behavioral fallout exposed by Phase 3, one focused concern per revision where practical.
-
-Possible outcomes:
-
-- No caller changes are needed; Phase 1/3 tests pass and this phase is a documented no-op.
-- A small caller adjustment is needed and can be included in the reduction revision if it is clearly part of making the reduction correct.
-- A larger semantic issue is exposed; keep the reduction revision green with TODO/xfail-style expectations, then fix the issue in one or more separate revisions.
-
-Specific concerns to investigate:
-
-- Does losing semantically redundant constraints ever remove typevars that should still be considered by solving?
-- Do `remove_noninferable` or `exists_one` rely on redundant graph nodes to discover typevars or derived constraints?
-- Do sequent-derived constraints still appear when needed if a redundant origin node disappears?
-- Do callers distinguish `Solutions::Unconstrained` from an empty constrained solution in a way that changes type inference?
-
-Potential fix directions if needed:
-
-- Add an explicit solution domain/provenance mechanism for typevars that must be considered independently of graph shape.
-- Adjust solution extraction to accept a caller-provided domain of typevars.
-- If stable solved ordering is hard to preserve with `source_order`, block this work and do the source-order-removal/replacement feature first.
+- Centralized local reduction in `NodeId::with_uncertain` via `local_reduction(...) -> Option<NodeId>`.
+- Applied only the sound local rules listed above.
+- Performed reduction before computing `max_source_order` and before interning an `InteriorNodeData`.
+- Kept `source_order` as part of identity for nodes that are still interned.
+- Added a TODO near the remaining `if_true == if_false` case noting the possible follow-up reduction to return `if_true ∪ if_uncertain`.
+- Updated comments that described constraint-set nodes as quasi-reduced.
 
 Tests/docs:
 
-- Each fix revision should include a targeted regression test and a comment explaining why the reduced graph no longer carries the old redundant evidence.
+- Added unit tests covering each local reduction rule.
+- Existing graph-shape tests did not need expectation updates.
+- Re-ran the Phase 1 solved-type stability tests as part of the targeted `constraints` run.
+
+Validation:
+
+- `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- constraints`
+
+### [x] Phase 4 — Audit/fix solver and caller fallout in focused revisions
+
+Revision purpose: handle behavioral fallout exposed by Phase 3.
+
+Completed details:
+
+- A full `ty_python_semantic` test run exposed one solver fallout through TypedDict protocol inference: reduced TDDs no longer retained a redundant path that had let constrained-TypeVar solving pick a compatible concrete constraint for `get_value(ValueA | ValueB)`.
+- Fixed this in `PathBounds::default_solve` instead of sandboxing callers. When a concrete path satisfies multiple declared constraints for a constrained TypeVar, the solver now picks the first compatible declared constraint in the TypeVar's constraint order rather than depending on semantically redundant BDD paths to provide one exact constraint.
+- Preserved TypeVar-to-TypeVar relationships: if the bounds for such an ambiguous constrained-TypeVar path still mention another TypeVar, the solver leaves the specialization unresolved instead of replacing the relationship with an arbitrary concrete constraint.
+- Added focused unit tests for ambiguous constrained-TypeVar solving, including stability across TypeVar constraint order.
+- Removed the temporary `GenericContextSpecializationBuilder::common_typed_dict_protocol_constraints` throwaway-builder workaround; `generics.rs` has no remaining change for this feature.
+- Updated the `typed_dict.md` expectation for `get_value(ValueA | ValueB)` to reveal `int` while still rejecting `str`, matching the first-compatible constrained-TypeVar choice.
+
+Validation:
+
+- `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- constraints`
+- Focused `typed_dict.md` mdtest run for the rejected common-constraint probe case.
+- `MDTEST_TEST_FILTER='Passing a constrained TypeVar' CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -- mdtest::generics/legacy/functions.md mdtest::generics/pep695/functions.md`
+- `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic`
 
 ### [ ] Phase 5 — Broaden order-independence coverage as issues are found
 

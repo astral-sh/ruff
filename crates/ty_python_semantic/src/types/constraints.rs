@@ -1702,10 +1702,10 @@ impl ConstraintId {
 /// construction, interior nodes can only refer to nodes with smaller indexes (since the nodes that
 /// outgoing edges point at must already exist).
 ///
-/// BDD nodes are _quasi-reduced_, which means that there are no duplicate nodes (which we handle
-/// via Salsa interning). Unlike the typical BDD representation, which is (fully) reduced, we do
-/// allow redundant nodes, with `if_true` and `if_false` edges that point at the same node. That
-/// means that our BDDs "remember" all of the individual constraints that they were created with.
+/// TDD nodes are locally reduced when they are created. We remove duplicate nodes (via Salsa
+/// interning) and collapse several sound, local redundant-edge shapes. This is not yet a fully
+/// reduced TDD representation: for example, a node whose `if_true` and `if_false` branches match
+/// but whose `if_uncertain` branch is non-empty would require computing a union to reduce further.
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstraintId::ordering`] defines the variable
@@ -1736,7 +1736,7 @@ enum Node {
 }
 
 impl NodeId {
-    /// Creates a new BDD node, ensuring that it is quasi-reduced.
+    /// Creates a new BDD node, applying local TDD reductions.
     fn new(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
@@ -1754,8 +1754,7 @@ impl NodeId {
         )
     }
 
-    /// Creates a new TDD node with an explicit `if_uncertain` branch, ensuring that it is
-    /// quasi-reduced.
+    /// Creates a new TDD node with an explicit `if_uncertain` branch, applying local reductions.
     fn with_uncertain(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
@@ -1785,8 +1784,8 @@ impl NodeId {
                     root_constraint.ordering() > constraint.ordering()
                 })
         );
-        if if_true == ALWAYS_FALSE && if_uncertain == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
-            return ALWAYS_FALSE;
+        if let Some(reduced) = Self::local_reduction(if_true, if_uncertain, if_false) {
+            return reduced;
         }
         let max_source_order = source_order
             .max(if_true.max_source_order(builder))
@@ -1800,6 +1799,38 @@ impl NodeId {
             source_order,
             max_source_order,
         })
+    }
+
+    fn local_reduction(if_true: NodeId, if_uncertain: NodeId, if_false: NodeId) -> Option<NodeId> {
+        if if_uncertain == ALWAYS_TRUE {
+            return Some(ALWAYS_TRUE);
+        }
+
+        if if_true == if_false {
+            if if_true == if_uncertain {
+                return Some(if_true);
+            }
+            if if_true == ALWAYS_FALSE {
+                return Some(if_uncertain);
+            }
+            if if_uncertain == ALWAYS_FALSE {
+                return Some(if_true);
+            }
+
+            // TODO: A future reduction can handle this remaining `if_true == if_false` case by
+            // returning `if_true ∪ if_uncertain`. That needs an `OR` computation, but only after
+            // the local equality check has already engaged.
+        }
+
+        if if_true == if_uncertain && if_false == ALWAYS_FALSE {
+            return Some(if_uncertain);
+        }
+
+        if if_false == if_uncertain && if_true == ALWAYS_FALSE {
+            return Some(if_uncertain);
+        }
+
+        None
     }
 }
 
@@ -1937,10 +1968,11 @@ impl NodeId {
         // BDD can only represent a single conjunction if there is precisely one path from the root
         // node to the `always` terminal.
         //
-        // We can take advantage of quasi-reduction. We never create an interior node with both
-        // outgoing edges leading to `never`; those are collapsed to `never`. That means that if we
-        // ever encounter a node with both outgoing edges pointing to something other than `never`,
-        // that node must have at least two paths to the `always` terminal.
+        // We can take advantage of local reductions. We never create an interior node whose true
+        // and false branches both lead to `never` while the uncertain branch also contributes
+        // nothing. That means that if we ever encounter a node with both true and false branches
+        // pointing to something other than `never`, that node must have at least two paths to the
+        // `always` terminal.
         let mut current = self.node();
         loop {
             match current {
@@ -3413,34 +3445,50 @@ impl<'db> PathBounds<'db> {
 
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 // Filter out the typevar constraints that aren't satisfied by this path.
-                let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
-                    let constraint_lower = constraint.bottom_materialization(db);
-                    let constraint_upper = constraint.top_materialization(db);
-                    let when_lower =
-                        lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
-                    let when_upper =
-                        constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
-                    let when = builder
-                        .load(db, &when_lower)
-                        .and(db, builder, || builder.load(db, &when_upper));
-                    !when.is_never_satisfied(db)
-                });
+                let compatible_constraints = constraints
+                    .elements(db)
+                    .iter()
+                    .filter(|constraint| {
+                        let constraint_lower = constraint.bottom_materialization(db);
+                        let constraint_upper = constraint.top_materialization(db);
+                        let when_lower =
+                            lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
+                        let when_upper =
+                            constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
+                        let when = builder
+                            .load(db, &when_lower)
+                            .and(db, builder, || builder.load(db, &when_upper));
+                        !when.is_never_satisfied(db)
+                    })
+                    .copied()
+                    .collect::<Vec<_>>();
 
-                // If only one constraint remains, that's our specialization for this path.
-                match compatible_constraints.at_most_one() {
-                    Ok(None) => {
-                        // This path does not satisfy any of the constraints, and is
-                        // therefore not a valid specialization.
+                match compatible_constraints.as_slice() {
+                    [] => {
+                        // This path does not satisfy any of the constraints, and is therefore not
+                        // a valid specialization.
                         Err(())
                     }
-
-                    Ok(Some(compatible_constraint)) => Ok(Some(*compatible_constraint)),
-
-                    Err(_) => {
-                        // This path satisfies multiple constraints. For now, don't
-                        // prefer any of them, and fall back on the default
-                        // specialization for this typevar.
-                        Ok(None)
+                    [compatible_constraint] => Ok(Some(*compatible_constraint)),
+                    [compatible_constraint, ..] => {
+                        if bounds
+                            .lower
+                            .is_some_and(|lower| lower.has_typevar_or_typevar_instance(db))
+                            || bounds
+                                .upper
+                                .is_some_and(|upper| upper.has_typevar_or_typevar_instance(db))
+                        {
+                            // This ambiguous path still carries a typevar relationship. Keep
+                            // that relationship intact instead of replacing it with an arbitrary
+                            // concrete constraint.
+                            Ok(None)
+                        } else {
+                            // A constrained TypeVar must solve to exactly one of its declared
+                            // constraints. If reduced TDDs leave us with multiple compatible
+                            // choices on a path, pick the first one in the TypeVar's declared
+                            // constraint order for stability.
+                            Ok(Some(*compatible_constraint))
+                        }
                     }
                 }
             }
@@ -6569,11 +6617,30 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use crate::db::tests::setup_db;
+    use crate::types::typevar::TypeVarConstraints;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
+    }
+
+    fn create_constrained_typevar<'db>(
+        db: &'db dyn Db,
+        name: &'static str,
+        constraints: impl IntoIterator<Item = KnownClass>,
+    ) -> BoundTypeVarInstance<'db> {
+        create_typevar(db, name).map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(
+                    db,
+                    constraints
+                        .into_iter()
+                        .map(|constraint| constraint.to_instance(db))
+                        .collect::<Box<_>>(),
+                ),
+            ))
+        })
     }
 
     fn create_constraint<'db, 'c>(
@@ -6665,6 +6732,115 @@ mod tests {
         let expected = expected.trim_end();
         let actual = set.node.display_graph(db, builder, &"").to_string();
         assert_eq!(expected, actual);
+    }
+
+    fn local_reduction_fixture<'db>(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> (ConstraintId, NodeId) {
+        let u = create_typevar(db, "U");
+        let branch_constraint = ConstraintId::new(
+            db,
+            builder,
+            u,
+            KnownClass::Str.to_instance(db),
+            KnownClass::Str.to_instance(db),
+        );
+        let branch = Node::new_constraint(builder, branch_constraint, 1);
+
+        let t = create_typevar(db, "T");
+        let root_constraint = ConstraintId::new(
+            db,
+            builder,
+            t,
+            KnownClass::Int.to_instance(db),
+            KnownClass::Int.to_instance(db),
+        );
+
+        (root_constraint, branch)
+    }
+
+    #[test]
+    fn local_reduction_uncertain_true_is_always_true() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let (root_constraint, _) = local_reduction_fixture(&db, &builder);
+
+        let result = NodeId::with_uncertain(
+            &builder,
+            root_constraint,
+            ALWAYS_FALSE,
+            ALWAYS_TRUE,
+            ALWAYS_FALSE,
+            2,
+        );
+
+        assert!(result == ALWAYS_TRUE);
+    }
+
+    #[test]
+    fn local_reduction_all_edges_equal_is_shared_node() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let (root_constraint, branch) = local_reduction_fixture(&db, &builder);
+
+        let result = NodeId::with_uncertain(&builder, root_constraint, branch, branch, branch, 2);
+
+        assert!(result == branch);
+    }
+
+    #[test]
+    fn local_reduction_never_uncertain_never_is_uncertain_branch() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let (root_constraint, branch) = local_reduction_fixture(&db, &builder);
+
+        let result = NodeId::with_uncertain(
+            &builder,
+            root_constraint,
+            ALWAYS_FALSE,
+            branch,
+            ALWAYS_FALSE,
+            2,
+        );
+
+        assert!(result == branch);
+    }
+
+    #[test]
+    fn local_reduction_uncertain_never_with_matching_definite_branches() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let (root_constraint, branch) = local_reduction_fixture(&db, &builder);
+
+        let result =
+            NodeId::with_uncertain(&builder, root_constraint, branch, ALWAYS_FALSE, branch, 2);
+
+        assert!(result == branch);
+    }
+
+    #[test]
+    fn local_reduction_true_uncertain_with_false_branch_never() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let (root_constraint, branch) = local_reduction_fixture(&db, &builder);
+
+        let result =
+            NodeId::with_uncertain(&builder, root_constraint, branch, branch, ALWAYS_FALSE, 2);
+
+        assert!(result == branch);
+    }
+
+    #[test]
+    fn local_reduction_false_uncertain_with_true_branch_never() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let (root_constraint, branch) = local_reduction_fixture(&db, &builder);
+
+        let result =
+            NodeId::with_uncertain(&builder, root_constraint, ALWAYS_FALSE, branch, branch, 2);
+
+        assert!(result == branch);
     }
 
     fn solve_lower_bounds_after_preinterning<'db>(
@@ -6927,6 +7103,58 @@ mod tests {
         );
 
         assert_eq!(source_order_solutions, reversed_order_solutions);
+    }
+
+    fn solve_ambiguous_constrained_typevar<'db>(
+        db: &'db dyn Db,
+        constraints: impl IntoIterator<Item = KnownClass>,
+    ) -> String {
+        let builder = ConstraintSetBuilder::new();
+        let t = create_constrained_typevar(db, "T", constraints);
+
+        PathBounds::default_solve(
+            db,
+            &builder,
+            t,
+            ConstraintBounds::new(Some(KnownClass::Int.to_instance(db)), Some(Type::object())),
+        )
+        .expect("the path should satisfy the constrained TypeVar")
+        .expect("the ambiguous path should solve to the first compatible constraint")
+        .display(db)
+        .to_string()
+    }
+
+    #[test]
+    fn constrained_typevar_ambiguous_concrete_bounds_use_constraint_order() {
+        let db = setup_db();
+
+        assert_eq!(
+            solve_ambiguous_constrained_typevar(&db, [KnownClass::Int, KnownClass::Object]),
+            "int",
+        );
+        assert_eq!(
+            solve_ambiguous_constrained_typevar(&db, [KnownClass::Object, KnownClass::Int]),
+            "object",
+        );
+    }
+
+    #[test]
+    fn constrained_typevar_ambiguous_typevar_path_preserves_relationship() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let t = create_constrained_typevar(&db, "T", [KnownClass::Int, KnownClass::Str]);
+        let s = create_constrained_typevar(&db, "S", [KnownClass::Int, KnownClass::Str]);
+        let actual = Type::TypeVar(s);
+
+        let solution = PathBounds::default_solve(
+            &db,
+            &builder,
+            t,
+            ConstraintBounds::new(Some(actual), Some(actual)),
+        )
+        .expect("the path should satisfy the constrained TypeVar");
+
+        assert!(solution.is_none());
     }
 
     #[test]
