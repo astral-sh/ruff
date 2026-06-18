@@ -30,6 +30,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
+use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
@@ -3672,6 +3673,24 @@ impl<'db> Parameters<'db> {
             .iter()
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
+
+        if let ([parameter], [mapped_parameter]) = (self.data.value.as_ref(), value.as_ref())
+            && parameter.is_variadic()
+            && parameter.has_starred_annotation()
+            && matches!(
+                parameter.annotated_type(),
+                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+            )
+            && let Some(tuple) = mapped_parameter
+                .annotated_type()
+                .exact_tuple_instance_spec(db)
+            && let Tuple::Variable(variable) = tuple.as_ref()
+            && variable.prefix_elements().is_empty()
+            && variable.variable().is_unknown()
+            && variable.suffix_elements().is_empty()
+        {
+            return Self::unknown();
+        }
 
         Self::from_parts(value, self.data.kind)
     }

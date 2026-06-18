@@ -49,3 +49,19 @@ reveal_type(collect())  # revealed: tuple[Unknown, ...]
 reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
 reveal_type(mixed(1, "a"))  # revealed: tuple[Literal[1], *tuple[Unknown, ...]]
 ```
+
+## Callable parameters
+
+An unsolved pack in a callable parameter list is gradual and does not reject a callable solely
+because its arity was not inferred.
+
+```py
+from typing import Callable
+
+def accepts[*Ts](callback: Callable[[*Ts], None]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def target(first: int, second: str) -> None: ...
+
+reveal_type(accepts(target))  # revealed: tuple[Unknown, ...]
+```
