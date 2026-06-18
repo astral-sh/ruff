@@ -1049,7 +1049,9 @@ Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
 Replacing a `staticmethod` or `classmethod` with a plain function is invalid even if their
-signatures match. The replacement would not preserve the descriptor's binding behavior.
+signatures match. The replacement would not preserve the descriptor's binding behavior. Callable
+objects that expose the same interface through class and instance access are valid, as are functions
+wrapped in the matching descriptor.
 
 ```py
 class DescriptorMethods:
@@ -1066,6 +1068,17 @@ def static_replacement(x: int) -> str:
 
 def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
     return str(x)
+
+class CallableMock:
+    def __call__(self, x: int) -> str:
+        return str(x)
+
+mock = CallableMock()
+DescriptorMethods.static = mock
+DescriptorMethods.class_ = mock
+
+DescriptorMethods.static = staticmethod(static_replacement)
+DescriptorMethods.class_ = classmethod(class_replacement)
 
 DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]

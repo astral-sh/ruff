@@ -2649,10 +2649,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> bool {
         let db = self.db();
 
+        // A replacement for a staticmethod or classmethod must expose the same callable interface
+        // through both class and instance access. Once the descriptor protocol has been applied,
+        // normalize the resulting callables because their descriptor kinds are no longer relevant.
+        let descriptor_callable = |ty: Type<'db>, instance: Option<Type<'db>>| {
+            ty.try_call_dunder_get(db, instance, object_ty)
+                .map_or(ty, |(ty, _)| ty)
+                .try_upcast_to_callable(db)
+                .map(|callables| {
+                    callables
+                        .map(|callable| callable.into_regular(db))
+                        .into_type(db)
+                })
+        };
+
+        let descriptor_assignment_is_valid =
+            |value_ty: Type<'db>, attr_ty: Type<'db>| -> Option<bool> {
+                let Type::FunctionLiteral(function) = attr_ty else {
+                    return None;
+                };
+                if !matches!(object_ty, Type::ClassLiteral(_))
+                    || !matches!(
+                        function.callable_type_kind(db),
+                        CallableTypeKind::StaticMethodLike | CallableTypeKind::ClassMethodLike
+                    )
+                {
+                    return None;
+                }
+
+                let instance_ty = object_ty.to_instance(db)?;
+                Some([None, Some(instance_ty)].into_iter().all(|instance| {
+                    let Some(target_ty) = descriptor_callable(attr_ty, instance) else {
+                        return false;
+                    };
+                    let Some(value_ty) = descriptor_callable(value_ty, instance) else {
+                        return false;
+                    };
+                    value_ty.is_assignable_to(db, target_ty)
+                }))
+            };
+
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
         let ensure_assignable_to =
             |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
                 let assignable = value_ty.is_assignable_to(db, attr_ty);
+                if !assignable && emit_diagnostics {
+                    report_invalid_attribute_assignment(
+                        &builder.context,
+                        target.range(),
+                        attr_ty,
+                        value_ty,
+                        attribute,
+                    );
+                }
+                assignable
+            };
+
+        let ensure_assignable_to_class_attribute =
+            |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
+                let assignable = descriptor_assignment_is_valid(value_ty, attr_ty)
+                    .unwrap_or_else(|| value_ty.is_assignable_to(db, attr_ty));
                 if !assignable && emit_diagnostics {
                     report_invalid_attribute_assignment(
                         &builder.context,
@@ -3233,7 +3289,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let value_ty = infer_value_ty
                                     .infer_silent(self, TypeContext::new(Some(class_attr_ty)));
                                 (
-                                    ensure_assignable_to(self, value_ty, class_attr_ty),
+                                    ensure_assignable_to_class_attribute(
+                                        self,
+                                        value_ty,
+                                        class_attr_ty,
+                                    ),
                                     class_attr_boundness,
                                 )
                             } else {
@@ -3292,7 +3352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 );
                             }
 
-                            ensure_assignable_to(self, value_ty, class_attr_ty)
+                            ensure_assignable_to_class_attribute(self, value_ty, class_attr_ty)
                         } else {
                             infer_value_ty(self, TypeContext::default());
 
