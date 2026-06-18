@@ -698,8 +698,8 @@ class FooSubclassOfAny:
 
 static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
 
-# An `Any` base could provide `__get__`, but that does not make `SubclassOfAny` a descriptor. We
-# preserve the declared type of `x`, which is not assignable to `int`.
+# `SubclassOfAny` does not declare `__get__`, so `x` keeps its declared type instead of being read
+# as `Any`.
 static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
