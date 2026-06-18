@@ -255,8 +255,9 @@ impl<'db> InferableTypeVars<'db> {
         db: &'db dyn Db,
         mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
     ) -> Self {
-        // TypeVarTuple inference is intentionally deferred. Explicit specializations still map a
-        // pack to a tuple value, while unsolved packs fall back to a gradual tuple.
+        // TODO: Include TypeVarTuples once pack inference is implemented. Explicit
+        // specializations still map a pack to a tuple value, while unsolved packs temporarily
+        // fall back to a gradual tuple.
         typevars.retain(|typevar| !typevar.is_typevartuple(db));
 
         if typevars.is_empty() {

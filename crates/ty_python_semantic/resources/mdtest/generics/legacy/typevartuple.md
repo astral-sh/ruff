@@ -41,3 +41,24 @@ reveal_type(Between[int, bool, bytes, str]().value)  # revealed: tuple[int, bool
 reveal_type(Between[int, *tuple[bool, ...], str]().value)  # revealed: tuple[int, *tuple[bool, ...], str]
 reveal_type(Between().value)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
+
+## Unsolved packs in generic inheritance
+
+Distinct unsolved packs are gradual during assignability checks.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[Any, ...]])
+
+class Base(Generic[Unpack[Ts]]):
+    def __init__(self, other: Base) -> None: ...
+
+class Derived(Base[Unpack[Ts]]):
+    pass
+
+def construct(value: Base) -> None:
+    Derived(value)
+```

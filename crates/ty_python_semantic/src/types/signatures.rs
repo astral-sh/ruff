@@ -3674,6 +3674,7 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
+        // TODO: Remove this temporary fallback once callable TypeVarTuple inference is supported.
         if let ([parameter], [mapped_parameter]) = (self.data.value.as_ref(), value.as_ref())
             && parameter.is_variadic()
             && parameter.has_starred_annotation()

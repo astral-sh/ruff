@@ -1093,6 +1093,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
+            // TODO: Remove these temporary gradual compatibility rules once TypeVarTuple
+            // inference can relate unsolved packs across generic contexts.
+            (Type::TypeVar(source_typevar), Type::TypeVar(target_typevar))
+                if self.is_eager_assignability()
+                    && !source_typevar.is_inferable(db, self.inferable)
+                    && !target_typevar.is_inferable(db, self.inferable)
+                    && source_typevar.is_typevartuple(db)
+                    && target_typevar.is_typevartuple(db) =>
+            {
+                self.always()
+            }
+
+            (Type::TypeVar(typevar), tuple) | (tuple, Type::TypeVar(typevar))
+                if self.is_eager_assignability()
+                    && !typevar.is_inferable(db, self.inferable)
+                    && typevar.is_typevartuple(db)
+                    && tuple.exact_tuple_instance_spec(db).is_some() =>
+            {
+                self.always()
+            }
+
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
