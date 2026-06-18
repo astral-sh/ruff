@@ -614,15 +614,25 @@ impl<'db> PartialApplication<'db> {
     /// Returns `true` if the parameter at `parameter_index` is removed from the reduced signature
     /// because it was already supplied positionally to `functools.partial(...)`.
     pub(crate) fn is_positionally_bound(&self, parameter_index: usize) -> bool {
-        self.positionally_bound[parameter_index]
+        // TODO: Map partial-application metadata when a TypeVarTuple expands into fixed parameters.
+        self.positionally_bound
+            .get(parameter_index)
+            .copied()
+            .unwrap_or(false)
     }
 
     fn keyword_default(&self, parameter_index: usize) -> Option<Type<'db>> {
-        self.keyword_defaults[parameter_index]
+        self.keyword_defaults
+            .get(parameter_index)
+            .copied()
+            .flatten()
     }
 
     fn is_keyword_bound(&self, parameter_index: usize) -> bool {
-        self.keyword_bound[parameter_index]
+        self.keyword_bound
+            .get(parameter_index)
+            .copied()
+            .unwrap_or(false)
     }
 }
 

@@ -121,3 +121,24 @@ homogeneous(C[int, int]())
 def mixed(source: C[int, int, bool]) -> None:
     target: C[*tuple[int, ...], bool] = source
 ```
+
+## Partial application
+
+Expanding a specialized pack in a partially applied callable does not invalidate its binding
+metadata.
+
+```py
+from collections.abc import Callable
+from functools import partial
+
+def wrapper[*Ts](func: Callable[[*Ts], None], *args: *Ts) -> None:
+    func(*args)
+
+def decorate[*Ts](func: Callable[[*Ts], None]) -> Callable[[*Ts], None]:
+    return partial(wrapper, func)
+
+def target(value: int, label: str) -> None: ...
+
+decorated = decorate(target)
+decorated(1, "label")
+```
