@@ -75,12 +75,7 @@ impl FixSafetyTable {
                 safety_override_map
                     .entry(rule)
                     .and_modify(|existing| {
-                        // More specific selectors take precedence. Unsafe overrides take
-                        // precedence when both selectors have the same specificity.
-                        if specificity > existing.0
-                            || (specificity == existing.0
-                                && matches!(safety_override, Override::Unsafe))
-                        {
+                        if specificity >= existing.0 {
                             *existing = (specificity, safety_override);
                         }
                     })
