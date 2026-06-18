@@ -2829,8 +2829,19 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-for-statement>
     /// - <https://docs.python.org/3/reference/compound_stmts.html#coroutine-function-definition>
     fn parse_async_statement(&mut self) -> Stmt {
-        let async_start = self.node_start();
+        let mut async_start = self.node_start();
         self.bump(TokenKind::Async);
+
+        // Consume repeated invalid `async` prefixes iteratively. This is the only
+        // invalid-async recovery shape that can recurse without bound.
+        while self.at(TokenKind::Async) {
+            self.add_error(
+                ParseErrorType::UnexpectedTokenAfterAsync(TokenKind::Async),
+                self.current_token_range(),
+            );
+            async_start = self.node_start();
+            self.bump(TokenKind::Async);
+        }
 
         match self.current_token_kind() {
             // test_ok async_function_definition
@@ -2868,24 +2879,9 @@ impl<'src> Parser<'src> {
                 );
 
                 // Although this statement is not a valid `async` statement,
-                // we still parse it. Guard the recursive recovery path so
-                // `async async async ...` cannot overflow the parser stack.
-                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
-                    stmt
-                } else {
-                    let range = self.node_range(async_start);
-                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
-                    Stmt::Expr(ast::StmtExpr {
-                        range,
-                        value: Box::new(Expr::Name(ast::ExprName {
-                            range,
-                            id: Name::new_static("async"),
-                            ctx: ExprContext::Invalid,
-                            node_index: AtomicNodeIndex::NONE,
-                        })),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
-                }
+                // we still parse it. Repeated `async` recovery was handled
+                // iteratively above so this path cannot recurse without bound.
+                self.parse_statement()
             }
         }
     }
@@ -3124,17 +3120,10 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_list_into_thin_vec(
-                RecoveryContextKind::BlockStatements,
-                Parser::parse_statement,
-            )
-        }) {
-            statements
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            Suite::new()
-        };
+        let statements = self.parse_list_into_thin_vec(
+            RecoveryContextKind::BlockStatements,
+            Parser::parse_statement,
+        );
 
         self.expect(TokenKind::Dedent);
 

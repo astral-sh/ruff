@@ -302,22 +302,7 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    let right = if new_precedence.is_right_associative() {
-                        // For right-associative operators (`**`), the right
-                        // operand recursion is unbounded in `a**a**a**...`,
-                        // and it bypasses the guard in `parse_lhs_expression`
-                        // (that scope is exited once the atom is parsed).
-                        if let Some(right) = self.with_recursion(|parser| {
-                            parser.parse_binary_expression_or_higher(new_precedence, context)
-                        }) {
-                            right
-                        } else {
-                            self.report_recursion_limit_exceeded(self.current_token_range());
-                            self.recursion_recovery_expr()
-                        }
-                    } else {
-                        self.parse_binary_expression_or_higher(new_precedence, context)
-                    };
+                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
                     Expr::BinOp(ast::ExprBinOp {
                         left: Box::new(left.expr),
@@ -348,51 +333,7 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        if !Self::token_starts_recursive_lhs(token) {
-            return self.parse_lhs_expression_inner(left_precedence, context, token);
-        }
-
-        if let Some(result) = self.with_recursion(|parser| {
-            parser.parse_lhs_expression_inner(left_precedence, context, token)
-        }) {
-            result
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        }
-    }
-
-    /// Returns whether parsing an expression that starts with `token` can
-    /// immediately recurse through another expression parse.
-    #[inline]
-    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
-        token.as_unary_operator().is_some()
-            || matches!(
-                token,
-                TokenKind::Star
-                    | TokenKind::Await
-                    | TokenKind::Lambda
-                    | TokenKind::Yield
-                    | TokenKind::FStringStart
-                    | TokenKind::TStringStart
-                    | TokenKind::Lpar
-                    | TokenKind::Lsqb
-                    | TokenKind::Lbrace
-            )
-    }
-
-    /// The standard expression-recovery node returned when the recursion
-    /// limit is exceeded: an empty `Name` with the `Invalid` context.
-    fn recursion_recovery_expr(&mut self) -> ParsedExpr {
-        ParsedExpr {
-            expr: Expr::Name(ast::ExprName {
-                range: self.missing_node_range(),
-                id: Name::empty(),
-                ctx: ExprContext::Invalid,
-                node_index: AtomicNodeIndex::NONE,
-            }),
-            is_parenthesized: false,
-        }
+        self.parse_lhs_expression_inner(left_precedence, context, token)
     }
 
     fn parse_lhs_expression_inner(
@@ -711,10 +652,10 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                return self.parse_parenthesized_expression();
+                return self.with_grown_stack(Self::parse_parenthesized_expression);
             }
-            TokenKind::Lsqb => self.parse_list_like_expression(),
-            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
+            TokenKind::Lsqb => self.with_grown_stack(Self::parse_list_like_expression),
+            TokenKind::Lbrace => self.with_grown_stack(Self::parse_set_or_dict_like_expression),
 
             kind => {
                 if kind.is_keyword() {
@@ -745,26 +686,30 @@ impl<'src> Parser<'src> {
     /// This method does nothing if the current token is not a candidate for a postfix expression.
     pub(super) fn parse_postfix_expression(
         &mut self,
+        lhs: Expr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> Expr {
+        if !matches!(
+            self.current_token_kind(),
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot
+        ) {
+            return lhs;
+        }
+
+        self.with_grown_stack(|parser| parser.parse_postfix_expression_inner(lhs, start, context))
+    }
+
+    fn parse_postfix_expression_inner(
+        &mut self,
         mut lhs: Expr,
         start: TextSize,
         context: ExpressionContext,
     ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Call(self.parse_call_expression(lhs, start))
-                }
-                TokenKind::Lsqb => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Subscript(self.parse_subscript_expression(lhs, start))
-                }
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
@@ -1182,11 +1127,36 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::from(op));
 
-        let operand = self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
+        // Consecutive unary operators at the same precedence can be consumed
+        // iteratively and rebuilt after parsing the operand. Operators at
+        // differing precedences must retain the recursive path so binary
+        // expression binding and its diagnostics remain unchanged.
+        let precedence = OperatorPrecedence::from(op);
+        let mut nested_operators = Vec::new();
+        while let Some(nested_op) = self.current_token_kind().as_unary_operator()
+            && OperatorPrecedence::from(nested_op) == precedence
+        {
+            nested_operators.push((nested_op, self.node_start()));
+            self.bump(TokenKind::from(nested_op));
+        }
+
+        let operand = self.parse_binary_expression_or_higher(precedence, context);
+        let operand =
+            nested_operators
+                .into_iter()
+                .rev()
+                .fold(operand.expr, |operand, (op, start)| {
+                    Expr::UnaryOp(ast::ExprUnaryOp {
+                        op,
+                        operand: Box::new(operand),
+                        range: self.node_range(start),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                });
 
         ast::ExprUnaryOp {
             op,
-            operand: Box::new(operand.expr),
+            operand: Box::new(operand),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1903,18 +1873,13 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = if let Some(elements) = self.with_recursion(|parser| {
+            let elements = self.with_grown_stack(|parser| {
                 parser.parse_interpolated_string_elements(
                     flags,
                     InterpolatedStringElementsKind::FormatSpec(string_kind),
                     string_kind,
                 )
-            }) {
-                elements
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                ast::InterpolatedStringElements::from(vec![])
-            };
+            });
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -3003,15 +2968,7 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
-        // `lambda: lambda: lambda: ...` recurses through the lambda body at
-        // the conditional layer, bypassing the `parse_lhs_expression` guard.
-        let body =
-            if let Some(body) = self.with_recursion(Self::parse_conditional_expression_or_higher) {
-                body
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                self.recursion_recovery_expr()
-            };
+        let body = self.parse_conditional_expression_or_higher();
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -3035,17 +2992,8 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through `orelse` at the
-        // conditional layer, which is not covered by the `parse_lhs_expression`
-        // guard (that scope is released once each atom is parsed). Guard here.
-        let orelse = if let Some(orelse) =
-            self.with_recursion(Self::parse_conditional_expression_or_higher)
-        {
-            orelse
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        };
+        // `a if b else a if b else ...` recurses through the `orelse` expression.
+        let orelse = self.with_grown_stack(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {
             body: Box::new(body),
