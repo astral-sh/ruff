@@ -2543,8 +2543,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
             // be specialized to the same type. (This is an important difference between typevars
-            // and `Any`!) Different typevars might be disjoint, depending on their bounds and
-            // constraints, which are handled below.
+            // and `Any`!)
             (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
                 if !left_tvar.is_inferable(db, self.inferable)
                     && left_tvar.is_same_typevar_as(db, right_tvar) =>
@@ -2560,25 +2559,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // An unbounded typevar is never disjoint from any other type, since it might be
-            // specialized to any type. A bounded typevar is not disjoint from its bound, and is
-            // only disjoint from other types if its bound is. A constrained typevar is disjoint
-            // from a type if all of its constraints are.
+            // A typevar is never disjoint from another type based only on its bound or
+            // constraints, because it can be explicitly specialized to a dynamic type. `Self` is
+            // the exception: it cannot be explicitly specialized, so its bound remains usable.
             (Type::TypeVar(tvar), other) | (other, Type::TypeVar(tvar))
                 if !tvar.is_inferable(db, self.inferable) =>
             {
-                match tvar.typevar(db).bound_or_constraints(db) {
-                    None => self.never(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.check_type_pair(db, bound, other)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
-                        typevar_constraints.elements(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |constraint| self.check_type_pair(db, *constraint, other),
-                        )
-                    }
+                if tvar.typevar(db).is_self(db) {
+                    tvar.typevar(db)
+                        .upper_bound(db)
+                        .when_none_or(db, self.constraints, |bound| {
+                            self.check_type_pair(db, bound, other)
+                        })
+                } else {
+                    self.never()
                 }
             }
 

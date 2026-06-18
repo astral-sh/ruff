@@ -959,10 +959,27 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     positive: &FxOrderSet<Type<'db>>,
     negative: &NegativeIntersectionElements<'db>,
 ) -> Type<'db> {
+    expand_intersection(db, positive, negative, true)
+}
+
+fn expand_intersection_newtypes_and_self_typevars<'db>(
+    db: &'db dyn Db,
+    positive: &FxOrderSet<Type<'db>>,
+    negative: &NegativeIntersectionElements<'db>,
+) -> Type<'db> {
+    expand_intersection(db, positive, negative, false)
+}
+
+fn expand_intersection<'db>(
+    db: &'db dyn Db,
+    positive: &FxOrderSet<Type<'db>>,
+    negative: &NegativeIntersectionElements<'db>,
+    expand_non_self_typevars: bool,
+) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db);
     for &element in positive {
         match element {
-            Type::TypeVar(tvar) => {
+            Type::TypeVar(tvar) if expand_non_self_typevars || tvar.typevar(db).is_self(db) => {
                 match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         builder = builder.add_positive(bound);

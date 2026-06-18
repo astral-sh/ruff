@@ -761,9 +761,9 @@ def unbounded_unconstrained[T](t: T) -> None:
         reveal_type(x)  # revealed: T@unbounded_unconstrained & Any
 ```
 
-The intersection of a bounded typevar with another type cannot be simplified based on subtyping
-relationships with its bound. The intersection of a bounded typevar with a type that is disjoint
-from its bound is `Never`.
+The intersection of a bounded typevar with another type cannot be simplified based on subtyping or
+disjointness relationships with its bound. The typevar can be explicitly specialized to a dynamic
+type, which may overlap with a type that is disjoint from the bound.
 
 ```py
 def bounded[T: Base](t: T) -> None:
@@ -777,10 +777,21 @@ def bounded[T: Base](t: T) -> None:
         reveal_type(x)  # revealed: T@bounded & Sub
 
     def _(x: Intersection[T, None]) -> None:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: T@bounded & None
 
     def _(x: Intersection[T, Any]) -> None:
         reveal_type(x)  # revealed: T@bounded & Any
+```
+
+This also means that we must preserve the typevar until a generic alias is specialized:
+
+```py
+type StrPart[T: int] = Intersection[T, str]
+
+def accept_str_part(value: StrPart[Any]) -> None:
+    reveal_type(value)  # revealed: Any & str
+
+accept_str_part("")
 ```
 
 Constrained typevars can be modeled using a hypothetical `OneOf` connector, where the typevar must
@@ -792,11 +803,10 @@ runtime objects. This is one reason we have not actually added this connector to
 Nevertheless, describing constrained typevars this way helps explain how we simplify intersections
 involving them.
 
-This means that when intersecting a constrained typevar with a type `T`, constraints that are
-supertypes of `T` can be simplified to `T`, since intersection distributes over `OneOf`. Moreover,
-constraints that are disjoint from `T` are no longer valid specializations of the typevar, since
-`Never` is an identity for `OneOf`. Even if only one compatible constraint remains, we preserve the
-typevar itself in the intersection so other occurrences of the same typevar stay correlated.
+Without dynamic specializations, intersecting a constrained typevar with a type `T` could eliminate
+constraints that are disjoint from `T`. However, the typevar can be explicitly specialized to a
+dynamic type, so the intersection must preserve both the typevar and `T` even when all declared
+constraints are disjoint from `T`.
 
 ```py
 def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
@@ -811,21 +821,21 @@ def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
         reveal_type(x)  # revealed: T@constrained & Sub
 
     def _(x: Intersection[T, None]) -> None:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: T@constrained & None
 
     def _(x: Intersection[T, Any]) -> None:
         reveal_type(x)  # revealed: T@constrained & Any
 ```
 
-We can simplify the intersection similarly when removing a type from a constrained typevar, since
-this is modeled internally as an intersection with a negation.
+For the same reason, removing a type from a constrained typevar cannot be simplified based only on
+the declared constraints.
 
 ```py
 from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
-        reveal_type(x)  # revealed: T@remove_constraint & str
+        reveal_type(x)  # revealed: T@remove_constraint & ~int
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]
@@ -835,10 +845,10 @@ def remove_constraint[T: (int, str, bool)](t: T) -> None:
         reveal_type(x)  # revealed: T@remove_constraint & ~bool
 
     def _(x: Intersection[T, Not[int], Not[str]]) -> None:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: T@remove_constraint & ~int & ~str
 
     def _(x: Intersection[T, Not[None]]) -> None:
-        reveal_type(x)  # revealed: T@remove_constraint
+        reveal_type(x)  # revealed: T@remove_constraint & ~None
 
     def _(x: Intersection[T, Not[Any]]) -> None:
         reveal_type(x)  # revealed: T@remove_constraint & Any
@@ -930,7 +940,7 @@ class SomeClass[T: (int, str)]:
     def narrowed1(self) -> None:
         narrowed: int | str
         assert not isinstance(self.field, int)
-        reveal_type(self.field)  # revealed: T@SomeClass & str
+        reveal_type(self.field)  # revealed: T@SomeClass & ~int
         narrowed = self.field
 
     def narrowed2(self) -> None:
@@ -954,14 +964,14 @@ def f[T: (P, Q)](t: T) -> None:
         reveal_type(t)  # revealed: T@f & P
         p: P = t
     else:
-        reveal_type(t)  # revealed: T@f & Q & ~P
+        reveal_type(t)  # revealed: T@f & ~P
         q: Q = t
 
     if isinstance(t, Q):
         reveal_type(t)  # revealed: T@f & Q
         q: Q = t
     else:
-        reveal_type(t)  # revealed: T@f & P & ~Q
+        reveal_type(t)  # revealed: T@f & ~Q
         p: P = t
 
 def g[T: (P, Q, R)](t: T) -> None:
@@ -972,7 +982,7 @@ def g[T: (P, Q, R)](t: T) -> None:
         reveal_type(t)  # revealed: T@g & Q & ~P
         q: Q = t
     else:
-        reveal_type(t)  # revealed: T@g & R & ~P & ~Q
+        reveal_type(t)  # revealed: T@g & ~P & ~Q
         r: R = t
 
     if isinstance(t, P):
@@ -988,7 +998,8 @@ def g[T: (P, Q, R)](t: T) -> None:
         reveal_type(t)  # revealed: Never
 ```
 
-If the constraints are disjoint, simplification does eliminate the redundant negative:
+Even if the constraints are disjoint, we preserve the negative element because the typevar may be
+explicitly specialized to a dynamic type:
 
 ```py
 def h[T: (P, None)](t: T) -> None:
@@ -996,7 +1007,7 @@ def h[T: (P, None)](t: T) -> None:
         reveal_type(t)  # revealed: T@h & None
         p: None = t
     else:
-        reveal_type(t)  # revealed: T@h & P
+        reveal_type(t)  # revealed: T@h & ~None
         p: P = t
 ```
 

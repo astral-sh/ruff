@@ -179,7 +179,7 @@ class B:
 
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`. Bounds and
 constraints make `type[T]` assignable to the corresponding class-object types, but do not make it a
-subtype because `T` can be explicitly specialized to a dynamic type.
+subtype or disjoint from `T` because `T` can be explicitly specialized to a dynamic type.
 
 ```py
 from typing import Any, Callable, Protocol
@@ -209,7 +209,7 @@ def _[T](_: T):
 def _[T: int](_: T):
     static_assert(not is_subtype_of(type[T], T))
     static_assert(not is_subtype_of(T, type[T]))
-    static_assert(is_disjoint_from(type[T], T))
+    static_assert(not is_disjoint_from(type[T], T))
 
     static_assert(not is_subtype_of(type[T], int))
     static_assert(not is_subtype_of(int, type[T]))
@@ -247,7 +247,7 @@ def _[T: int](_: T):
 def _[T: (int, str)](_: T):
     static_assert(not is_subtype_of(type[T], T))
     static_assert(not is_subtype_of(T, type[T]))
-    static_assert(is_disjoint_from(type[T], T))
+    static_assert(not is_disjoint_from(type[T], T))
 
     static_assert(is_subtype_of(type[T], type[T]))
     static_assert(not is_disjoint_from(type[T], type[T]))
