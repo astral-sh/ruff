@@ -391,6 +391,26 @@ impl<'db> TypeVarInstance<'db> {
                 return false;
             }
 
+            if let Some(specialization) = type_alias.specialization(state.db) {
+                if specialization
+                    .types(state.db)
+                    .iter()
+                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
+                {
+                    return true;
+                }
+            } else if let Some(generic_context) = type_alias.generic_context(state.db)
+                && generic_context.variables(state.db).any(|typevar| {
+                    typevar_default_is_self_referential(
+                        state,
+                        typevar.typevar(state.db),
+                        self_identity,
+                    )
+                })
+            {
+                return true;
+            }
+
             type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
         }
 
@@ -1440,17 +1460,6 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     match (previous_default, default) {
-        // A type alias is opaque to recursive type normalization. If its provisional raw value
-        // depends on the active cycle, keep the previous approximation until alias inference
-        // resolves that dependency.
-        (Some(previous), Some(Type::TypeAlias(alias)))
-            if any_over_type(db, alias.raw_value_type(db), false, |ty| {
-                ty == Type::divergent(cycle.id())
-                    || cycle.head_ids().any(|id| ty == Type::divergent(id))
-            }) =>
-        {
-            Some(*previous)
-        }
         (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
         (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
         (_, None) => None,
