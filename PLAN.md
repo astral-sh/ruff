@@ -173,11 +173,12 @@ Revision purpose: handle behavioral fallout exposed by Phase 3.
 Completed details:
 
 - A full `ty_python_semantic` test run exposed one solver fallout through TypedDict protocol inference: reduced TDDs no longer retained a redundant path that had let constrained-TypeVar solving pick a compatible concrete constraint for `get_value(ValueA | ValueB)`.
-- Fixed this in `PathBounds::default_solve` instead of sandboxing callers. When a concrete path satisfies multiple declared constraints for a constrained TypeVar, the solver now picks the first compatible declared constraint in the TypeVar's constraint order rather than depending on semantically redundant BDD paths to provide one exact constraint.
+- Fixed this in `PathBounds::default_solve` instead of sandboxing callers. When a concrete path satisfies multiple declared constraints for a constrained TypeVar, the solver now scans all compatible declared constraints and picks a stable best match rather than depending on semantically redundant BDD paths to provide one exact constraint.
+- Ecosystem analysis showed that first-compatible declaration order was not enough: broad constraints can appear before narrow ones (`str | bytes` before `str`, `CryptoAsset` before `EvmToken`, `Index[Any]` before `IndexHierarchy`). The current best-match rule prefers the most specific compatible constraint when there is explicit lower-bound evidence, prefers the most general compatible constraint for upper-bound-only evidence, and preserves declaration order for equivalent or incomparable candidates.
 - Preserved TypeVar-to-TypeVar relationships: if either explicit bound for a constrained-TypeVar path is itself a TypeVar, the solver first verifies that at least one declared constraint is compatible and then solves to that TypeVar instead of replacing the relationship with an arbitrary concrete constraint.
-- Added focused unit tests for ambiguous constrained-TypeVar solving, including stability across TypeVar constraint order.
+- Added focused unit tests for ambiguous constrained-TypeVar solving, including stability across TypeVar constraint order, broad-before-narrow union constraints, and upper-bound-only solving.
 - Removed the temporary `GenericContextSpecializationBuilder::common_typed_dict_protocol_constraints` throwaway-builder workaround; `generics.rs` has no remaining change for this feature.
-- Updated the `typed_dict.md` expectation for `get_value(ValueA | ValueB)` to reveal `int` while still rejecting `str`, matching the first-compatible constrained-TypeVar choice.
+- Updated the `typed_dict.md` expectation for `get_value(ValueA | ValueB)` to reveal `int` while still rejecting `str`, matching the best-compatible constrained-TypeVar choice.
 
 Validation:
 

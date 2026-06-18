@@ -3444,21 +3444,44 @@ impl<'db> PathBounds<'db> {
             }
 
             TypeVarBoundOrConstraints::Constraints(constraints) => {
+                let is_better_solution = |candidate: Type<'db>, current_best: Type<'db>| {
+                    // Lower-bound evidence asks for the narrowest compatible declared constraint
+                    // above the lower bound. With only upper-bound evidence, ask for the widest
+                    // compatible declared constraint below the upper bound. If the candidates are
+                    // equivalent or incomparable, keep the current best to preserve the TypeVar's
+                    // declared constraint order.
+                    if bounds.lower.is_some() {
+                        candidate.is_subtype_of(db, current_best)
+                            && !current_best.is_subtype_of(db, candidate)
+                    } else {
+                        current_best.is_subtype_of(db, candidate)
+                            && !candidate.is_subtype_of(db, current_best)
+                    }
+                };
+
                 // Filter out the typevar constraints that aren't satisfied by this path.
-                let Some(compatible_constraint) =
-                    constraints.elements(db).iter().copied().find(|constraint| {
-                        let constraint_lower = constraint.bottom_materialization(db);
-                        let constraint_upper = constraint.top_materialization(db);
-                        let when_lower =
-                            lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
-                        let when_upper =
-                            constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
-                        let when = builder
-                            .load(db, &when_lower)
-                            .and(db, builder, || builder.load(db, &when_upper));
-                        !when.is_never_satisfied(db)
-                    })
-                else {
+                let mut compatible_constraint = None;
+                for constraint in constraints.elements(db).iter().copied() {
+                    let constraint_lower = constraint.bottom_materialization(db);
+                    let constraint_upper = constraint.top_materialization(db);
+                    let when_lower =
+                        lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
+                    let when_upper =
+                        constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
+                    let when = builder
+                        .load(db, &when_lower)
+                        .and(db, builder, || builder.load(db, &when_upper));
+                    if when.is_never_satisfied(db) {
+                        continue;
+                    }
+
+                    if compatible_constraint.is_none_or(|best| is_better_solution(constraint, best))
+                    {
+                        compatible_constraint = Some(constraint);
+                    }
+                }
+
+                let Some(compatible_constraint) = compatible_constraint else {
                     // This path does not satisfy any of the constraints, and is therefore not a
                     // valid specialization.
                     return Err(());
@@ -3480,9 +3503,9 @@ impl<'db> PathBounds<'db> {
                 // choices on one path and compatible choices spread across multiple paths both
                 // represent multiple exact candidate specializations; callers should not collapse
                 // those candidates via union. A future solver should handle the declared
-                // constraint choices at the whole-set level, preserving the TypeVar's declared
-                // constraint order. Until then, pick the first compatible declared constraint on
-                // this path.
+                // constraint choices at the whole-set level. Until then, pick the best compatible
+                // declared constraint on this path, preserving the TypeVar's declared constraint
+                // order for equivalent or incomparable candidates.
                 Ok(Some(compatible_constraint))
             }
         }
@@ -6623,15 +6646,23 @@ mod tests {
         name: &'static str,
         constraints: impl IntoIterator<Item = KnownClass>,
     ) -> BoundTypeVarInstance<'db> {
+        create_constrained_typevar_from_types(
+            db,
+            name,
+            constraints
+                .into_iter()
+                .map(|constraint| constraint.to_instance(db)),
+        )
+    }
+
+    fn create_constrained_typevar_from_types<'db>(
+        db: &'db dyn Db,
+        name: &'static str,
+        constraints: impl IntoIterator<Item = Type<'db>>,
+    ) -> BoundTypeVarInstance<'db> {
         create_typevar(db, name).map_bound_or_constraints(db, |_| {
             Some(TypeVarBoundOrConstraints::Constraints(
-                TypeVarConstraints::new(
-                    db,
-                    constraints
-                        .into_iter()
-                        .map(|constraint| constraint.to_instance(db))
-                        .collect::<Box<_>>(),
-                ),
+                TypeVarConstraints::new(db, constraints.into_iter().collect::<Box<_>>()),
             ))
         })
     }
@@ -7098,35 +7129,82 @@ mod tests {
         assert_eq!(source_order_solutions, reversed_order_solutions);
     }
 
-    fn solve_ambiguous_constrained_typevar(
-        db: &dyn Db,
-        constraints: impl IntoIterator<Item = KnownClass>,
+    fn solve_constrained_typevar_bounds<'db>(
+        db: &'db dyn Db,
+        constraints: impl IntoIterator<Item = Type<'db>>,
+        bounds: ConstraintBounds<'db>,
     ) -> String {
         let builder = ConstraintSetBuilder::new();
-        let t = create_constrained_typevar(db, "T", constraints);
+        let t = create_constrained_typevar_from_types(db, "T", constraints);
 
-        PathBounds::default_solve(
-            db,
-            &builder,
-            t,
-            ConstraintBounds::new(Some(KnownClass::Int.to_instance(db)), Some(Type::object())),
-        )
-        .expect("the path should satisfy the constrained TypeVar")
-        .expect("the ambiguous path should solve to the first compatible constraint")
-        .display(db)
-        .to_string()
+        PathBounds::default_solve(db, &builder, t, bounds)
+            .expect("the path should satisfy the constrained TypeVar")
+            .expect("the ambiguous path should solve to the best compatible constraint")
+            .display(db)
+            .to_string()
     }
 
     #[test]
-    fn constrained_typevar_ambiguous_concrete_bounds_use_constraint_order() {
+    fn constrained_typevar_ambiguous_lower_bounds_use_most_specific_constraint() {
         let db = setup_db();
+        let int = KnownClass::Int.to_instance(&db);
+        let object = Type::object();
 
         assert_eq!(
-            solve_ambiguous_constrained_typevar(&db, [KnownClass::Int, KnownClass::Object]),
+            solve_constrained_typevar_bounds(
+                &db,
+                [int, object],
+                ConstraintBounds::new(Some(int), Some(object)),
+            ),
             "int",
         );
         assert_eq!(
-            solve_ambiguous_constrained_typevar(&db, [KnownClass::Object, KnownClass::Int]),
+            solve_constrained_typevar_bounds(
+                &db,
+                [object, int],
+                ConstraintBounds::new(Some(int), Some(object)),
+            ),
+            "int",
+        );
+    }
+
+    #[test]
+    fn constrained_typevar_ambiguous_lower_bounds_prefer_narrow_union_member() {
+        let db = setup_db();
+        let str_ty = KnownClass::Str.to_instance(&db);
+        let bytes_ty = KnownClass::Bytes.to_instance(&db);
+        let str_or_bytes = UnionType::from_elements(&db, [str_ty, bytes_ty]);
+
+        assert_eq!(
+            solve_constrained_typevar_bounds(
+                &db,
+                [str_or_bytes, str_ty, bytes_ty],
+                ConstraintBounds::new(Some(str_ty), Some(Type::object())),
+            ),
+            "str",
+        );
+    }
+
+    #[test]
+    fn constrained_typevar_ambiguous_upper_bounds_use_most_general_constraint() {
+        let db = setup_db();
+        let int = KnownClass::Int.to_instance(&db);
+        let object = Type::object();
+
+        assert_eq!(
+            solve_constrained_typevar_bounds(
+                &db,
+                [int, object],
+                ConstraintBounds::new(None, Some(object)),
+            ),
+            "object",
+        );
+        assert_eq!(
+            solve_constrained_typevar_bounds(
+                &db,
+                [object, int],
+                ConstraintBounds::new(None, Some(object)),
+            ),
             "object",
         );
     }
