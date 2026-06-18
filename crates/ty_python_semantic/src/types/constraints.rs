@@ -789,14 +789,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         self,
         f: impl for<'c> FnOnce(&'c Self) -> ConstraintSet<'db, 'c>,
     ) -> OwnedConstraintSet<'db> {
-        fn trim_unused_tail<I: Idx>(used: &mut IndexVec<I, bool>) {
-            let len = used
-                .iter()
-                .rposition(|used| *used)
-                .map_or(0, |index| index + 1);
-            used.truncate(len);
-        }
-
         // NOTE: We do not store any of the builder's memoization caches in the result. Owned
         // constraint sets can only be used by adding them to a new builder. Operation caches from
         // the original builder aren't relevant to the new builder, and don't need to be retained.
@@ -807,37 +799,37 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
 
         let mut storage = self.storage.into_inner();
-        let mut used_nodes = IndexVec::from_raw(vec![false; storage.nodes.len()]);
-        let mut used_constraints = IndexVec::from_raw(vec![false; storage.constraints.len()]);
+        let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
+        let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
         let mut stack = vec![node];
         while let Some(node) = stack.pop() {
-            if node.is_terminal() || used_nodes[node] {
+            if node.is_terminal() || used_nodes[node.index()] {
                 continue;
             }
             let interior = storage.nodes[node];
-            used_nodes[node] = true;
-            used_constraints[interior.constraint] = true;
+            used_nodes.set(node.index(), true);
+            used_constraints.set(interior.constraint.index(), true);
             stack.push(interior.if_true);
             stack.push(interior.if_uncertain);
             stack.push(interior.if_false);
         }
-        trim_unused_tail(&mut used_nodes);
-        trim_unused_tail(&mut used_constraints);
+        used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
+        used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
 
-        let node_indices = Box::new(RankBitBox::from_bits(used_nodes.iter().copied()));
-        let constraint_indices = Box::new(RankBitBox::from_bits(used_constraints.iter().copied()));
         let nodes = storage
             .nodes
             .into_iter()
-            .zip(used_nodes)
+            .zip(&used_nodes)
             .filter_map(|(node, used)| used.then_some(node))
             .collect();
+        let node_indices = Box::new(RankBitBox::from_bits(used_nodes));
         let constraints = storage
             .constraints
             .into_iter()
-            .zip(used_constraints)
+            .zip(&used_constraints)
             .filter_map(|(constraint, used)| used.then_some(constraint))
             .collect();
+        let constraint_indices = Box::new(RankBitBox::from_bits(used_constraints));
         storage.typevars.shrink_to_fit();
 
         OwnedConstraintSet {

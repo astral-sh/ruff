@@ -1,6 +1,6 @@
 //! A boxed bit slice that supports a constant-time `rank` operation.
 
-use bitvec::prelude::{BitBox, Msb0};
+use bitvec::prelude::{BitBox, BitVec, Msb0, bitvec};
 use get_size2::GetSize;
 
 /// A boxed bit slice that supports a constant-time `rank` operation.
@@ -26,11 +26,14 @@ use get_size2::GetSize;
 #[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize)]
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
-    bits: BitBox<Chunk, Msb0>,
+    bits: RankBitBoxStorage,
     chunk_ranks: Box<[u32]>,
 }
 
-fn bit_box_size(bits: &BitBox<Chunk, Msb0>) -> usize {
+pub type RankBitBoxStorage = BitBox<Chunk, Msb0>;
+pub type RankBitBoxVec = BitVec<Chunk, Msb0>;
+
+fn bit_box_size(bits: &RankBitBoxStorage) -> usize {
     bits.as_raw_slice().get_heap_size()
 }
 
@@ -56,8 +59,11 @@ unsafe impl salsa::Update for RankBitBox {
 }
 
 impl RankBitBox {
-    pub fn from_bits(iter: impl Iterator<Item = bool>) -> Self {
-        let bits: BitBox<Chunk, Msb0> = iter.collect();
+    pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {
+        bitvec![Chunk, Msb0; 0; cap]
+    }
+
+    pub fn from_bits(bits: RankBitBoxVec) -> Self {
         let chunk_ranks = bits
             .as_raw_slice()
             .iter()
@@ -67,6 +73,7 @@ impl RankBitBox {
                 Some(result)
             })
             .collect();
+        let bits = bits.into();
         Self { bits, chunk_ranks }
     }
 
