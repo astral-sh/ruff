@@ -4619,6 +4619,8 @@ dependencies = [
  "rustc-hash",
  "salsa",
  "smallvec",
+ "strum",
+ "strum_macros",
  "tracing",
  "ty_module_resolver",
  "ty_project",
