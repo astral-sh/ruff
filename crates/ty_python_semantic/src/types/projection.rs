@@ -441,15 +441,7 @@ impl<'db> Type<'db> {
             container.collect_projection_terms(db, root, evidence, &mut terms_by_op)?;
         }
 
-        let solved_ops = terms_by_op
-            .iter()
-            .map(|(path, terms)| {
-                Some((
-                    path.clone(),
-                    Self::solve_projection_terms(db, root, path, terms)?,
-                ))
-            })
-            .collect::<Option<FxIndexMap<_, _>>>()?;
+        let solved_ops = ProjectionSystem::from_terms_by_op(db, root, &terms_by_op)?.solve(db)?;
 
         let elements = elements
             .into_iter()
@@ -584,175 +576,17 @@ impl<'db> Type<'db> {
     }
 
     /// Solves the candidate terms for one projection path.
-    ///
-    /// Exact and homogeneous terms may absorb a flat self-reference or self-narrowing. Recursive
-    /// artifacts under another constructor are not solved here, because dropping them can
-    /// under-approximate an expanding recursive type. Star-unpack rest terms solve to `list[T]`,
-    /// so they cannot be mixed with scalar projection terms.
     fn solve_projection_terms(
         db: &'db dyn Db,
         root: DivergentType,
         path: &ProjectionPath<'db>,
         terms: &[ProjectionTerm<'db>],
     ) -> Option<Self> {
-        let mut saw_self_reference = false;
-        let mut productive_terms = Vec::new();
-        let wrap_in_list = terms
-            .iter()
-            .any(|term| matches!(term, ProjectionTerm::List(_)));
-
-        if wrap_in_list
-            && terms
-                .iter()
-                .any(|term| !matches!(term, ProjectionTerm::List(_)))
-        {
-            return None;
-        }
-
-        for term in terms {
-            match *term {
-                ProjectionTerm::Exact(term) => {
-                    // The term may still be an unprojected recursive candidate like
-                    // `tuple[Projection_{path}(D), T]`; project it before collecting
-                    // productive parts for `Projection_{path}(D)`.
-                    if term.mentions_matching_projection(db, root, path)
-                        && let Some(projected) =
-                            ProjectionContainer::project_type_path(db, term, root, None, path)
-                    {
-                        match projected {
-                            ProjectionTerm::Exact(projected) => {
-                                Self::collect_projection_component_terms(
-                                    db,
-                                    root,
-                                    Some(path),
-                                    projected,
-                                    true,
-                                    &mut saw_self_reference,
-                                    &mut productive_terms,
-                                )?;
-                            }
-                            ProjectionTerm::Homogeneous(projected) => {
-                                Self::collect_projection_component_terms(
-                                    db,
-                                    root,
-                                    Some(path),
-                                    projected,
-                                    true,
-                                    &mut saw_self_reference,
-                                    &mut productive_terms,
-                                )?;
-                            }
-                            ProjectionTerm::List(projected) => {
-                                Self::collect_projection_component_terms(
-                                    db,
-                                    root,
-                                    None,
-                                    projected,
-                                    false,
-                                    &mut saw_self_reference,
-                                    &mut productive_terms,
-                                )?;
-                            }
-                        }
-                        continue;
-                    }
-
-                    Self::collect_projection_component_terms(
-                        db,
-                        root,
-                        Some(path),
-                        term,
-                        true,
-                        &mut saw_self_reference,
-                        &mut productive_terms,
-                    )?;
-                }
-                ProjectionTerm::Homogeneous(term) => {
-                    Self::collect_projection_component_terms(
-                        db,
-                        root,
-                        Some(path),
-                        term,
-                        true,
-                        &mut saw_self_reference,
-                        &mut productive_terms,
-                    )?;
-                }
-                ProjectionTerm::List(term) => {
-                    Self::collect_projection_component_terms(
-                        db,
-                        root,
-                        None,
-                        term,
-                        false,
-                        &mut saw_self_reference,
-                        &mut productive_terms,
-                    )?;
-                }
-            }
-        }
-
-        if productive_terms.is_empty() {
-            return (!saw_self_reference).then(|| {
-                if wrap_in_list {
-                    KnownClass::List.to_specialized_instance(db, &[Type::Never])
-                } else {
-                    Type::Never
-                }
-            });
-        }
-
-        let solved = match productive_terms.as_slice() {
-            [term] => *term,
-            _ => UnionType::from_elements_cycle_recovery(db, productive_terms),
-        };
-
-        Some(if wrap_in_list {
-            KnownClass::List.to_specialized_instance(db, &[solved])
-        } else {
-            solved
-        })
-    }
-
-    fn collect_projection_component_terms(
-        db: &'db dyn Db,
-        root: DivergentType,
-        path: Option<&ProjectionPath<'db>>,
-        term: Type<'db>,
-        allow_self_reference: bool,
-        saw_self_reference: &mut bool,
-        productive_terms: &mut Vec<Type<'db>>,
-    ) -> Option<()> {
-        if let Type::Union(union) = term {
-            for element in union.elements(db) {
-                Self::collect_projection_component_terms(
-                    db,
-                    root,
-                    path,
-                    *element,
-                    allow_self_reference,
-                    saw_self_reference,
-                    productive_terms,
-                )?;
-            }
-            return Some(());
-        }
-
-        if allow_self_reference
-            && let Some(path) = path
-            && (term.is_matching_projection_var(db, root, path)
-                || term.is_matching_projection_narrowing(db, root, path))
-        {
-            *saw_self_reference = true;
-            return Some(());
-        }
-
-        if term.mentions_any_cycle_artifact(db) {
-            return None;
-        }
-
-        productive_terms.push(term);
-        Some(())
+        let mut terms_by_op = FxIndexMap::default();
+        terms_by_op.insert(path.clone(), terms.to_vec());
+        ProjectionSystem::from_terms_by_op(db, root, &terms_by_op)?
+            .solve(db)?
+            .shift_remove(path)
     }
 
     fn collect_projection_ops(
@@ -944,45 +778,39 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn is_matching_projection_var(
+    fn matching_projection_narrowing_var(
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        path: &ProjectionPath<'db>,
-    ) -> bool {
-        matches!(
-            self,
-            Type::Projection(projection)
-                if projection.root(db).same_marker(root) && projection.path(db).eq(path)
-        )
-    }
-
-    fn is_matching_projection_narrowing(
-        self,
-        db: &'db dyn Db,
-        root: DivergentType,
-        path: &ProjectionPath<'db>,
-    ) -> bool {
+    ) -> Option<ProjectionPath<'db>> {
         let Type::Intersection(intersection) = self else {
-            return false;
+            return None;
         };
 
-        let mut saw_self_reference = false;
+        let mut dependency = None;
         for positive in intersection.positive(db) {
-            if positive.is_matching_projection_var(db, root, path) {
-                saw_self_reference = true;
+            if let Type::Projection(projection) = positive
+                && projection.root(db).same_marker(root)
+            {
+                if dependency
+                    .as_ref()
+                    .is_some_and(|path| path != &projection.path(db))
+                {
+                    return None;
+                }
+                dependency = Some(projection.path(db));
             } else if positive.mentions_any_cycle_artifact(db) {
-                return false;
+                return None;
             }
         }
 
         for negative in intersection.negative(db) {
             if negative.mentions_any_cycle_artifact(db) {
-                return false;
+                return None;
             }
         }
 
-        saw_self_reference
+        dependency
     }
 
     fn mentions_any_cycle_artifact(self, db: &'db dyn Db) -> bool {
@@ -1537,6 +1365,250 @@ impl<'db> ProjectionContainer<'db> {
         let element = ty.try_iterate(db).ok()?.homogeneous_element_type(db);
         Some(Self::star_unpack_homogeneous(element, position))
     }
+}
+
+/// Cycle-recovery-time equation system for projection variables.
+///
+/// Each [`ProjectionPath`] is a variable `A_p = Projection_p(root)`. Equations contain only
+/// query-free facts collected from container arms: closed productive terms and flat dependencies on
+/// other projection variables. Constructor-guarded recursion is rejected by construction.
+struct ProjectionSystem<'db> {
+    equations: FxIndexMap<ProjectionPath<'db>, ProjectionEquation<'db>>,
+}
+
+impl<'db> ProjectionSystem<'db> {
+    fn from_terms_by_op(
+        db: &'db dyn Db,
+        root: DivergentType,
+        terms_by_op: &FxIndexMap<ProjectionPath<'db>, Vec<ProjectionTerm<'db>>>,
+    ) -> Option<Self> {
+        let mut equations = FxIndexMap::default();
+        for (path, terms) in terms_by_op {
+            let mut equation = ProjectionEquation::default();
+            for term in terms {
+                equation.add_projection_term(db, root, path, *term)?;
+            }
+            equations.insert(path.clone(), equation);
+        }
+
+        Some(Self { equations })
+    }
+
+    fn solve(self, db: &'db dyn Db) -> Option<FxIndexMap<ProjectionPath<'db>, Type<'db>>> {
+        let Self { equations } = self;
+        if equations.is_empty() || equations.values().any(|equation| equation.guarded) {
+            return None;
+        }
+
+        let paths = equations.keys().cloned().collect::<Vec<_>>();
+        let path_indices = paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| (path.clone(), index))
+            .collect::<FxIndexMap<_, _>>();
+
+        let mut graph = vec![Vec::new(); paths.len()];
+        for (path, equation) in &equations {
+            let source = path_indices[path];
+            for dependency in &equation.dependencies {
+                graph[source].push(*path_indices.get(dependency)?);
+            }
+        }
+
+        let sccs = strongly_connected_components(&graph);
+        let mut solutions = vec![None; paths.len()];
+        for scc in sccs {
+            let mut base = Vec::new();
+            let wrap_in_list = equations[&paths[scc[0]]].wrap_in_list;
+            for &index in &scc {
+                let equation = &equations[&paths[index]];
+                if equation.wrap_in_list != wrap_in_list {
+                    return None;
+                }
+
+                base.extend(equation.productive.iter().copied());
+                for dependency in &equation.dependencies {
+                    let dependency_index = path_indices[dependency];
+                    if !scc.contains(&dependency_index) {
+                        base.push(solutions[dependency_index]?);
+                    }
+                }
+            }
+
+            if base.is_empty() {
+                return None;
+            }
+
+            let solved = match base.as_slice() {
+                [term] => *term,
+                _ => UnionType::from_elements_cycle_recovery(db, base),
+            };
+            let solved = if wrap_in_list {
+                KnownClass::List.to_specialized_instance(db, &[solved])
+            } else {
+                solved
+            };
+            for index in scc {
+                solutions[index] = Some(solved);
+            }
+        }
+
+        paths
+            .into_iter()
+            .enumerate()
+            .map(|(index, path)| Some((path, solutions[index]?)))
+            .collect()
+    }
+}
+
+/// One projection equation `A_p = productive | dependencies`.
+#[derive(Default)]
+struct ProjectionEquation<'db> {
+    productive: Vec<Type<'db>>,
+    dependencies: FxIndexSet<ProjectionPath<'db>>,
+    guarded: bool,
+    wrap_in_list: bool,
+}
+
+impl<'db> ProjectionEquation<'db> {
+    fn add_projection_term(
+        &mut self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        path: &ProjectionPath<'db>,
+        term: ProjectionTerm<'db>,
+    ) -> Option<()> {
+        let wrap_in_list = matches!(term, ProjectionTerm::List(_));
+        if self.wrap_in_list != wrap_in_list
+            && (!self.productive.is_empty() || !self.dependencies.is_empty())
+        {
+            return None;
+        }
+        self.wrap_in_list = wrap_in_list;
+
+        match term {
+            ProjectionTerm::Exact(term) => {
+                // The term may still be an unprojected recursive candidate like
+                // `tuple[Projection_{path}(D), T]`; project it before collecting
+                // productive parts for `Projection_{path}(D)`.
+                if term.mentions_matching_projection(db, root, path)
+                    && let Some(projected) =
+                        ProjectionContainer::project_type_path(db, term, root, None, path)
+                {
+                    return self.add_projection_term(db, root, path, projected);
+                }
+
+                self.add_type_term(db, root, term, true)
+            }
+            ProjectionTerm::Homogeneous(term) => self.add_type_term(db, root, term, true),
+            ProjectionTerm::List(term) => self.add_type_term(db, root, term, false),
+        }
+    }
+
+    fn add_type_term(
+        &mut self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        term: Type<'db>,
+        allow_dependencies: bool,
+    ) -> Option<()> {
+        if let Type::Union(union) = term {
+            for element in union.elements(db) {
+                self.add_type_term(db, root, *element, allow_dependencies)?;
+            }
+            return Some(());
+        }
+
+        if allow_dependencies {
+            if let Type::Projection(projection) = term
+                && projection.root(db).same_marker(root)
+            {
+                self.dependencies.insert(projection.path(db));
+                return Some(());
+            }
+
+            if let Some(path) = term.matching_projection_narrowing_var(db, root) {
+                self.dependencies.insert(path);
+                return Some(());
+            }
+        }
+
+        if term.mentions_any_cycle_artifact(db) {
+            self.guarded = true;
+            return Some(());
+        }
+
+        self.productive.push(term);
+        Some(())
+    }
+}
+
+fn strongly_connected_components(graph: &[Vec<usize>]) -> Vec<Vec<usize>> {
+    struct SccState<'a> {
+        graph: &'a [Vec<usize>],
+        next_index: usize,
+        indices: Vec<Option<usize>>,
+        lowlinks: Vec<usize>,
+        stack: Vec<usize>,
+        on_stack: Vec<bool>,
+        components: Vec<Vec<usize>>,
+    }
+
+    impl SccState<'_> {
+        fn connect(&mut self, node: usize) {
+            let index = self.next_index;
+            self.next_index += 1;
+            self.indices[node] = Some(index);
+            self.lowlinks[node] = index;
+            self.stack.push(node);
+            self.on_stack[node] = true;
+
+            for &dependency in &self.graph[node] {
+                if self.indices[dependency].is_none() {
+                    self.connect(dependency);
+                    self.lowlinks[node] = self.lowlinks[node].min(self.lowlinks[dependency]);
+                } else if self.on_stack[dependency]
+                    && let Some(dependency_index) = self.indices[dependency]
+                {
+                    self.lowlinks[node] = self.lowlinks[node].min(dependency_index);
+                }
+            }
+
+            let Some(node_index) = self.indices[node] else {
+                return;
+            };
+
+            if self.lowlinks[node] == node_index {
+                let mut component = Vec::new();
+                while let Some(dependency) = self.stack.pop() {
+                    self.on_stack[dependency] = false;
+                    component.push(dependency);
+                    if dependency == node {
+                        break;
+                    }
+                }
+                self.components.push(component);
+            }
+        }
+    }
+
+    let mut state = SccState {
+        graph,
+        next_index: 0,
+        indices: vec![None; graph.len()],
+        lowlinks: vec![0; graph.len()],
+        stack: Vec::new(),
+        on_stack: vec![false; graph.len()],
+        components: Vec::new(),
+    };
+
+    for node in 0..graph.len() {
+        if state.indices[node].is_none() {
+            state.connect(node);
+        }
+    }
+
+    state.components
 }
 
 /// The result of applying one projection path to one container arm.

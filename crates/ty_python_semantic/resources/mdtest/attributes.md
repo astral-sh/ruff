@@ -3832,6 +3832,30 @@ class ProjectionNestedForUnpack:
         reveal_type(self.x)  # revealed: list[tuple[int, str]]
 ```
 
+Projection recovery solves flat dependencies between different projection paths:
+
+```py
+class ProjectionSwap:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        for x, y in self.x:
+            self.x = [(y, x)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[int | str, int | str]]
+
+class ProjectionChain:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        for x, y in self.x:
+            self.x = [(y, y)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[str, str]]
+```
+
 Deeply nested projections are inferred correctly:
 
 ```py
