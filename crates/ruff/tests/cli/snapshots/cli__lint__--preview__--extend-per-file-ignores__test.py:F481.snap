@@ -1,0 +1,25 @@
+---
+source: crates/ruff/tests/cli/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--select"
+    - F401
+    - "--preview"
+    - "--extend-per-file-ignores"
+    - "test.py:F481"
+    - test.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+test.py:1:8: unused-import: [*] `os` imported but unused
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+
+----- stderr -----
+warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI

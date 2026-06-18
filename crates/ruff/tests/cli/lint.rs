@@ -769,6 +769,19 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
 #[test_case::test_case(&["--extend-per-file-ignores", "test.py:F481"])]
 #[test_case::test_case(&["--config", "lint.per-file-ignores={'test.py'=['F481']}"])]
 #[test_case::test_case(&["--config", "lint.extend-per-file-ignores={'test.py'=['F481']}"])]
+#[test_case::test_case(&["--preview", "--select", "F481"])]
+#[test_case::test_case(&["--preview", "--extend-select", "F481"])]
+#[test_case::test_case(&["--preview", "--ignore", "F481"])]
+#[test_case::test_case(&["--preview", "--fixable", "F481"])]
+#[test_case::test_case(&["--preview", "--extend-fixable", "F481"])]
+#[test_case::test_case(&["--preview", "--unfixable", "F481"])]
+#[test_case::test_case(&["--preview", "--config", "lint.ignore=['F481']"])]
+#[test_case::test_case(&["--preview", "--config", "lint.extend-safe-fixes=['F481']"])]
+#[test_case::test_case(&["--preview", "--config", "lint.extend-unsafe-fixes=['F481']"])]
+#[test_case::test_case(&["--preview", "--per-file-ignores", "test.py:F481"])]
+#[test_case::test_case(&["--preview", "--extend-per-file-ignores", "test.py:F481"])]
+#[test_case::test_case(&["--preview", "--config", "lint.per-file-ignores={'test.py'=['F481']}"])]
+#[test_case::test_case(&["--preview", "--config", "lint.extend-per-file-ignores={'test.py'=['F481']}"])]
 fn unknown_rule_selectors_warn(args: &[&str]) -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file("test.py", "import os\n")?;
