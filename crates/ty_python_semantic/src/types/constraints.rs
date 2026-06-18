@@ -295,8 +295,9 @@ impl<'db> OwnedConstraintSet<'db> {
 impl OwnedConstraintSetInner<'_> {
     fn retained_node_index(&self, id: NodeId) -> usize {
         let index = id.index();
-        debug_assert!(
-            self.node_indices.get_bit(index) == Some(true),
+        debug_assert_eq!(
+            self.node_indices.get_bit(index),
+            Some(true),
             "should not access constraint set node that was marked unused",
         );
         self.node_indices.rank(index) as usize
@@ -304,8 +305,9 @@ impl OwnedConstraintSetInner<'_> {
 
     fn retained_constraint_index(&self, id: ConstraintId) -> usize {
         let index = id.index();
-        debug_assert!(
-            self.constraint_indices.get_bit(index) == Some(true),
+        debug_assert_eq!(
+            self.constraint_indices.get_bit(index),
+            Some(true),
             "should not access constraint set constraint that was marked unused",
         );
         self.constraint_indices.rank(index) as usize
@@ -1871,6 +1873,8 @@ impl Node {
 impl NodeId {
     fn from_usize(value: usize) -> Self {
         assert!(value <= (SMALLEST_TERMINAL.0 as usize));
+        // Safe due to the assertion immediately above:
+        // `SMALLEST_TERMINAL.0` is one less than the largest possible u32
         #[expect(clippy::cast_possible_truncation)]
         Self(value as u32)
     }
