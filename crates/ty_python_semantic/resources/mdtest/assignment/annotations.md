@@ -515,13 +515,26 @@ python-version = "3.13"
 A function's arguments are also inferred using the type context:
 
 ```py
-from typing import Callable, TypedDict
+from typing import Callable, Sequence, TypedDict
 
 class TD(TypedDict):
     x: int
 
 def first[T](x: list[T]) -> T:
     return x[0]
+
+def singleton[T](x: T) -> list[T]:
+    return [x]
+
+def as_sequence[T](x: T, y: list[T], z: list[T]) -> Sequence[T]:
+    return [x]
+
+def _(x: int, z: list[int]):
+    narrow: Sequence[int] = as_sequence(x, singleton(x), z)
+
+    # TODO: A covariant return context should not reject a narrower valid specialization. We
+    # currently use the return context while inferring nested calls and do not retry without it.
+    wide: Sequence[int | str] = as_sequence(x, singleton(x), z)  # error: [invalid-argument-type]
 
 type ObjectCallback = Callable[[object], None]
 type IntCallback = Callable[[int], None]
@@ -615,43 +628,43 @@ def two_dicts_default(x: dict[U | int, Any], y: dict[U | str, Any]) -> U:
     raise NotImplementedError
 
 def _():
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x1 = two_lists(reveal_type(lst(X())), reveal_type(lst(X())))
     reveal_type(x1)  # revealed: X
 
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x2 = two_lists(reveal_type([X()]), reveal_type([X()]))
     reveal_type(x2)  # revealed: X
 
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x3 = two_lists_default(reveal_type(lst(X())), reveal_type(lst(X())))
     reveal_type(x3)  # revealed: X
 
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x4 = two_lists_default(reveal_type([X()]), reveal_type([X()]))
     reveal_type(x4)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x5 = two_dicts(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
     reveal_type(x5)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x6 = two_dicts(reveal_type({X(): X()}), reveal_type({X(): X()}))
     reveal_type(x6)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x7 = two_dicts_default(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
     reveal_type(x7)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x8 = two_dicts_default(reveal_type({X(): X()}), reveal_type({X(): X()}))
     reveal_type(x8)  # revealed: X
 ```

@@ -64,7 +64,8 @@ use crate::types::{
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, any_over_type, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -786,6 +787,43 @@ impl<'db> Bindings<'db> {
                 downstream.visit_type_context_callables(visit);
             }
         }
+    }
+
+    /// Returns whether any overload is generic and the source argument indices whose type context
+    /// can change when that generic call is specialized.
+    pub(crate) fn generic_context_arguments(
+        &self,
+        db: &'db dyn Db,
+        argument_count: usize,
+    ) -> (bool, SmallVec<[usize; 4]>) {
+        let mut generic_arguments = SmallVec::<[bool; 8]>::with_capacity(argument_count);
+        generic_arguments.resize(argument_count, false);
+        let mut has_generic_context = false;
+
+        self.visit_type_context_callables(&mut |binding| {
+            has_generic_context |= binding
+                .overloads()
+                .iter()
+                .any(|overload| overload.signature.generic_context.is_some());
+            for (_, overload) in binding.matching_overloads() {
+                if overload.signature.generic_context.is_none() {
+                    continue;
+                }
+                for (argument_index, is_generic) in generic_arguments.iter_mut().enumerate() {
+                    *is_generic |=
+                        overload.has_generic_argument_type_context(db, binding, argument_index);
+                }
+            }
+        });
+
+        (
+            has_generic_context,
+            generic_arguments
+                .into_iter()
+                .enumerate()
+                .filter_map(|(index, is_generic)| is_generic.then_some(index))
+                .collect(),
+        )
     }
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
@@ -5598,7 +5636,7 @@ impl<'db> MatchedArgument<'db> {
 }
 
 /// The type context to use when inferring a call-site argument.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ArgumentTypeContext<'db> {
     Standard {
         /// The raw parameter type from the overload signature.
@@ -5714,6 +5752,25 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
     call_expression_tcx: TypeContext<'db>,
 }
 
+fn collect_typevar_variances<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> FxHashMap<BoundTypeVarIdentity<'db>, TypeVarVariance> {
+    let mut variances = FxHashMap::default();
+    ty.visit_specialization(db, |ty, variance| {
+        let Type::TypeVar(typevar) = ty else {
+            return;
+        };
+        variances
+            .entry(typevar.identity(db))
+            .and_modify(|current: &mut TypeVarVariance| {
+                *current = current.join(variance);
+            })
+            .or_insert(variance);
+    });
+    variances
+}
+
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug, Clone)]
 pub(crate) struct Binding<'db> {
@@ -5794,6 +5851,53 @@ impl<'db> Binding<'db> {
             .get(argument_index + usize::from(binding.bound_type.is_some()))
     }
 
+    /// Returns whether specializing this overload can change the type context for the given source
+    /// argument.
+    fn has_generic_argument_type_context(
+        &self,
+        db: &'db dyn Db,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+    ) -> bool {
+        let Some(generic_context) = self.signature.generic_context else {
+            return false;
+        };
+        let Some(argument_match) = self.matched_argument_for_call_argument(binding, argument_index)
+        else {
+            return false;
+        };
+
+        let inferable_typevars = generic_context.inferable_typevars(db);
+        for parameter in &argument_match.parameters {
+            let parameter_type = self.signature.parameters()[parameter.index].annotated_type();
+
+            if let Type::TypeVar(typevar) = parameter_type
+                && !typevar.is_paramspec(db)
+            {
+                if typevar.identity(db).is_inferable(db, inferable_typevars) {
+                    return true;
+                }
+                continue;
+            }
+
+            if any_over_type(db, parameter_type, false, |ty| {
+                let Type::TypeVar(typevar) = ty else {
+                    return false;
+                };
+                let identity = if typevar.is_paramspec(db) {
+                    typevar.without_paramspec_attr(db).identity(db)
+                } else {
+                    typevar.identity(db)
+                };
+                identity.is_inferable(db, inferable_typevars)
+            }) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Returns source argument indices matched to the `ParamSpec` component.
     ///
     /// The returned indices are relative to the original call site, excluding any synthetic bound
@@ -5848,6 +5952,14 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<CallableType<'db>> {
+        if let Some(Type::Callable(callable)) = self
+            .specialization
+            .and_then(|specialization| specialization.get(db, paramspec))
+            && callable.kind(db) == CallableTypeKind::ParamSpecValue
+        {
+            return Some(callable);
+        }
+
         let mut specialized_binding =
             CallableBinding::from_overloads(self.signature_type, [self.signature.clone()]);
         if let Some(bound_type) = binding.bound_type {
@@ -5914,7 +6026,10 @@ impl<'db> Binding<'db> {
             self.signature_type,
             callable.signatures(db).iter().cloned(),
         );
-        let sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        let mut sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        // The current argument is being re-inferred from this projected parameter. Treating its
+        // previous-round type as an input can reject the sub-call before its context is available.
+        sub_arguments.clear_types(sub_argument_index);
         let mut specialized_bindings =
             Bindings::from(specialized_binding).match_parameters(db, &sub_arguments);
         let _ = specialized_bindings.check_types_impl(
@@ -6051,12 +6166,14 @@ impl<'db> Binding<'db> {
                 None
             };
 
+            let return_ty = self
+                .normalized_constructor_return(db)
+                .unwrap_or(self.signature.return_ty);
+            let mut return_typevar_variances = None;
+
             let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
                 FxHashMap::default();
             if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                let return_ty = self
-                    .normalized_constructor_return(db)
-                    .unwrap_or(self.signature.return_ty);
                 let path_bounds = return_ty.assignable_solutions_with_inferable(
                     db,
                     declared_return_ty,
@@ -6095,10 +6212,40 @@ impl<'db> Binding<'db> {
             let specialization = generic_context.specialize_recursive(
                 db,
                 generic_context.variables(db).map(|typevar| {
+                    let identity = typevar.identity(db);
+                    let return_type_solution = return_type_solutions.get(&identity).copied();
+                    // This is the specialization inferred from the argument types during the
+                    // previous fixpoint round. Preserve it when it is a compatible covariant
+                    // refinement of the declared return type. For non-covariant occurrences, the
+                    // declared return type specialization must take precedence.
+                    let inferred_solution = self
+                        .specialization
+                        .and_then(|specialization| specialization.get(db, typevar))
+                        .filter(|ty| !ty.has_dynamic(db))
+                        .map(|ty| ty.promote(db));
+
+                    if let Some(return_solution) = return_type_solution
+                        && let Some(inferred_solution) = inferred_solution
+                        && inferred_solution.is_assignable_to(db, return_solution)
+                    {
+                        let variances = return_typevar_variances
+                            .get_or_insert_with(|| collect_typevar_variances(db, return_ty));
+                        if variances
+                            .get(&identity)
+                            .is_some_and(|variance| variance.is_covariant())
+                        {
+                            return Some(inferred_solution);
+                        }
+                    }
+
+                    // A successful previous-round specialization already includes a
+                    // non-covariant return solution. It can be absent on the first round, or when
+                    // checking retried without the declared type after finding incompatible
+                    // arguments. For example, `result: list[int] = f("a")` retries with `T = str`,
+                    // but the return context still supplies `T = int` for the diagnostic pass.
                     Some(
-                        return_type_solutions
-                            .get(&typevar.identity(db))
-                            .copied()
+                        return_type_solution
+                            .or(inferred_solution)
                             .unwrap_or(unspecialized),
                     )
                 }),
