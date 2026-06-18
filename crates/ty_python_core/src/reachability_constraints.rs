@@ -146,7 +146,7 @@ pub struct ReachabilityConstraints {
     /// index of that node in the `used_interiors` vector.
     ///
     /// If all interior nodes were retained, the original ID can be used directly instead.
-    used_indices: Option<Box<RankBitBox>>,
+    used_indices: Option<RankBitBox>,
 }
 
 impl ReachabilityConstraints {
@@ -208,7 +208,7 @@ impl ReachabilityConstraintsBuilder {
             let used_indices = RankBitBox::from_bits(self.interior_used);
             ReachabilityConstraints {
                 used_interiors,
-                used_indices: Some(Box::new(used_indices)),
+                used_indices: Some(used_indices),
             }
         }
     }

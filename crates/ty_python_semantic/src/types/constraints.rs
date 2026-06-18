@@ -248,10 +248,10 @@ pub struct OwnedConstraintSet<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 struct OwnedConstraintSetInner<'db> {
     constraints: Box<[Constraint<'db>]>,
-    constraint_indices: Box<RankBitBox>,
+    constraint_indices: RankBitBox,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: Box<[InteriorNodeData]>,
-    node_indices: Box<RankBitBox>,
+    node_indices: RankBitBox,
 }
 
 impl Default for OwnedConstraintSet<'_> {
@@ -822,14 +822,14 @@ impl<'db> ConstraintSetBuilder<'db> {
             .zip(&used_nodes)
             .filter_map(|(node, used)| used.then_some(node))
             .collect();
-        let node_indices = Box::new(RankBitBox::from_bits(used_nodes));
+        let node_indices = RankBitBox::from_bits(used_nodes);
         let constraints = storage
             .constraints
             .into_iter()
             .zip(&used_constraints)
             .filter_map(|(constraint, used)| used.then_some(constraint))
             .collect();
-        let constraint_indices = Box::new(RankBitBox::from_bits(used_constraints));
+        let constraint_indices = RankBitBox::from_bits(used_constraints);
         storage.typevars.shrink_to_fit();
 
         OwnedConstraintSet {

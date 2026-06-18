@@ -93,7 +93,7 @@ pub struct InteriorNode {
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct NarrowingConstraints {
     used_interiors: Box<[InteriorNode]>,
-    used_indices: Option<Box<RankBitBox>>,
+    used_indices: Option<RankBitBox>,
 }
 
 impl NarrowingConstraints {
@@ -148,7 +148,7 @@ impl NarrowingConstraintsBuilder {
             let used_indices = RankBitBox::from_bits(self.interior_used);
             NarrowingConstraints {
                 used_interiors,
-                used_indices: Some(Box::new(used_indices)),
+                used_indices: Some(used_indices),
             }
         }
     }
