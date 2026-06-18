@@ -1841,6 +1841,27 @@ def tuple_projection_with_side_containers() -> None:
     reveal_type(out)  # revealed: list[object]
 ```
 
+Recursive updates through tuple entries should not introduce the tuple itself into an element type.
+
+```py
+import copy as recursive_pair_copy
+
+def recursive_pair_unknown():
+    pass
+
+recursive_pair_items = []
+
+for _recursive_pair_index in range(10):
+    recursive_pair_copied = recursive_pair_copy.copy(recursive_pair_items)
+    for recursive_pair in recursive_pair_copied:
+        reveal_type(recursive_pair)  # revealed: tuple[Unknown, Unknown]
+        reveal_type(recursive_pair[0])  # revealed: Unknown
+        recursive_pair_items.append((recursive_pair[0], recursive_pair_unknown()))
+    recursive_pair_items.append((recursive_pair_unknown(), recursive_pair_unknown()))
+
+reveal_type(recursive_pair_items)  # revealed: list[tuple[Unknown, Unknown]]
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the
