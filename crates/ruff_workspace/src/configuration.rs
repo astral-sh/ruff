@@ -96,6 +96,7 @@ pub enum RuleSelectorKind {
 impl RuleSelection {
     fn resolve(&self, preview: PreviewMode) -> Result<ResolvedRuleSelection, RuleResolutionError> {
         fn resolve(
+            setting: &str,
             selectors: &[UnresolvedRuleSelector],
             preview: PreviewMode,
         ) -> Result<Vec<RuleSelector>, RuleResolutionError> {
@@ -105,7 +106,7 @@ impl RuleSelection {
                     Ok(selector) => Some(Ok(selector)),
                     Err(err) => {
                         if is_warn_on_unknown_selectors_enabled(preview) {
-                            err.log_warning();
+                            err.log_warning(setting, selector.source());
                             None
                         } else {
                             Some(Err(err))
@@ -119,17 +120,17 @@ impl RuleSelection {
             select: self
                 .select
                 .as_deref()
-                .map(|selectors| resolve(selectors, preview))
+                .map(|selectors| resolve("select", selectors, preview))
                 .transpose()?,
-            ignore: resolve(&self.ignore, preview)?,
-            extend_select: resolve(&self.extend_select, preview)?,
+            ignore: resolve("ignore", &self.ignore, preview)?,
+            extend_select: resolve("extend-select", &self.extend_select, preview)?,
             fixable: self
                 .fixable
                 .as_deref()
-                .map(|selectors| resolve(selectors, preview))
+                .map(|selectors| resolve("fixable", selectors, preview))
                 .transpose()?,
-            unfixable: resolve(&self.unfixable, preview)?,
-            extend_fixable: resolve(&self.extend_fixable, preview)?,
+            unfixable: resolve("unfixable", &self.unfixable, preview)?,
+            extend_fixable: resolve("extend-fixable", &self.extend_fixable, preview)?,
         })
     }
 }

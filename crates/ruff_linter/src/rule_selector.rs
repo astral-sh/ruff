@@ -111,6 +111,10 @@ impl UnresolvedRuleSelector {
             range: Some(range),
         }
     }
+
+    pub fn source(&self) -> &RuleSelectorSource {
+        &self.source
+    }
 }
 
 impl<'de> Deserialize<'de> for UnresolvedRuleSelector {
@@ -146,6 +150,16 @@ pub enum RuleSelectorSource {
     Editor,
 }
 
+impl std::fmt::Display for RuleSelectorSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuleSelectorSource::File(path) => write!(f, "{}", path.display()),
+            RuleSelectorSource::Cli => write!(f, "the CLI"),
+            RuleSelectorSource::Editor => write!(f, "the editor configuration"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum RuleResolutionError {
     Removed { selector: String },
@@ -153,8 +167,8 @@ pub enum RuleResolutionError {
 }
 
 impl RuleResolutionError {
-    pub fn log_warning(&self) {
-        warn_user_once_by_message!("{}", self);
+    pub fn log_warning(&self, setting: &str, source: &RuleSelectorSource) {
+        warn_user_once_by_message!("{} in `{setting}` from {source}", self);
     }
 }
 

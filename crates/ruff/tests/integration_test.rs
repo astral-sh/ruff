@@ -1428,7 +1428,7 @@ fn preview_group_selector() {
     All checks passed!
 
     ----- stderr -----
-    warning: Removed selector `PREVIEW`
+    warning: Removed selector `PREVIEW` in `select` from the CLI
     ");
 }
 

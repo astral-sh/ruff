@@ -931,7 +931,7 @@ impl CompiledPerFileIgnoreList {
                     Ok(selector) => Some(selector),
                     Err(err) => {
                         if is_warn_on_unknown_selectors_enabled(preview) {
-                            err.log_warning();
+                            err.log_warning("per-file-ignores", selector.source());
                         } else {
                             resolution_error.get_or_insert(err);
                         }

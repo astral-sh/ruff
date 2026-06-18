@@ -60,19 +60,19 @@ impl FixSafetyTable {
             FxHashMap::default();
         let selectors = extend_safe_fixes
             .iter()
-            .map(|selector| (selector, Override::Safe))
+            .map(|selector| ("extend-safe-fixes", selector, Override::Safe))
             .chain(
                 extend_unsafe_fixes
                     .iter()
-                    .map(|selector| (selector, Override::Unsafe)),
+                    .map(|selector| ("extend-unsafe-fixes", selector, Override::Unsafe)),
             );
 
-        for (selector, safety_override) in selectors {
+        for (setting, selector, safety_override) in selectors {
             let selector = match selector.resolve(preview_options.mode) {
                 Ok(selector) => selector,
                 Err(err) => {
                     if is_warn_on_unknown_selectors_enabled(preview_options.mode) {
-                        err.log_warning();
+                        err.log_warning(setting, selector.source());
                         continue;
                     }
                     return Err(err);
