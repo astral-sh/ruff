@@ -797,7 +797,11 @@ Intro paragraph.
 Intervening prose.
 
 :param second: Second parameter.
-    Continued.
+    Continued::
+
+        literal block
+
+Trailing prose.
 ";
         let parsed = Docstring::parse(docstring);
 
@@ -809,7 +813,7 @@ Intervening prose.
 
         let second = &parsed.field_lists[1];
         assert_eq!(second.start_line, 6);
-        assert_eq!(second.end_line, 8);
+        assert_eq!(second.end_line, 10);
 
         assert_snapshot!(field_list_ranges(docstring, &parsed.field_lists), @r"
         | Intro paragraph.
@@ -821,8 +825,13 @@ Intervening prose.
         |
         | :param second: Second parameter.
         | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        |     Continued.
-        | ^^^^^^^^^^^^^^
+        |     Continued::
+        | ^^^^^^^^^^^^^^^
+        |
+        |         literal block
+        | ^^^^^^^^^^^^^^^^^^^^^
+        |
+        | Trailing prose.
         ");
     }
 
@@ -879,6 +888,39 @@ Intervening prose.
         first: First line.
           :param fake: This is continuation text, not a new field.
         second: Real second parameter.
+        ");
+    }
+
+    #[test]
+    fn parameter_documentation_recovers_sibling_fields_after_missing_literal_block() {
+        let param_docs = parameter_documentation(
+            "\
+:param quoted: Example::
+
+:param sample: This is sample input.
+:returns: This is still sample input.
+
+:param real: Real parameter.",
+        );
+
+        assert_snapshot!(param_docs, @r"
+        quoted: Example::
+        sample: This is sample input.
+        real: Real parameter.
+        ");
+    }
+
+    #[test]
+    fn parameter_documentation_requires_blank_line_before_field_body_literal_block() {
+        let param_docs = parameter_documentation(
+            "\
+:param first: Explanation::
+:param second: Second parameter.",
+        );
+
+        assert_snapshot!(param_docs, @r"
+        first: Explanation::
+        second: Second parameter.
         ");
     }
 
