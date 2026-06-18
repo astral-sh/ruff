@@ -1143,6 +1143,31 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Adds an inherited generic context to callable elements of this type.
+    fn with_inherited_generic_context(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Self {
+        match self {
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.with_inherited_generic_context(db, generic_context))
+            }
+            Type::Callable(callable) => Type::Callable(CallableType::new(
+                db,
+                callable
+                    .signatures(db)
+                    .with_inherited_generic_context(db, generic_context),
+                callable.kind(db),
+                callable.provenance(db),
+            )),
+            Type::Union(union) => union.map(db, |element| {
+                element.with_inherited_generic_context(db, generic_context)
+            }),
+            _ => self,
+        }
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))
@@ -3013,8 +3038,16 @@ impl<'db> Type<'db> {
                         Some((ty, AttributeKind::NormalOrNonDataDescriptor))
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
-                            // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance(db).unwrap_or(owner)
+                            // Preserve a bare generic owner so call arguments can infer its
+                            // specialization after the classmethod-like callable is bound.
+                            if callable.is_classmethod_like(db)
+                                && let Type::ClassLiteral(class) = owner
+                                && class.generic_context(db).is_some()
+                            {
+                                Type::from(class.identity_specialization(db))
+                            } else {
+                                owner.to_instance(db).unwrap_or(owner)
+                            }
                         });
 
                         Some((
@@ -3047,6 +3080,16 @@ impl<'db> Type<'db> {
                     // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
                     // we should emit a diagnostic here instead of silently ignoring the error.
                     .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+                // Assignment-form staticmethods retain their wrapper until descriptor invocation,
+                // so propagate the bare owner's generic context to the unwrapped callable here.
+                let return_ty = if ty.is_instance_of(db, KnownClass::Staticmethod)
+                    && let Type::ClassLiteral(class) = owner
+                    && let Some(generic_context) = class.generic_context(db)
+                {
+                    return_ty.with_inherited_generic_context(db, generic_context)
+                } else {
+                    return_ty
+                };
 
                 let descriptor_kind = if ty.is_data_descriptor(db) {
                     AttributeKind::DataDescriptor
@@ -4163,9 +4206,32 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
+                let binding_self_type = bound_method.binding_self_type(db);
+                if binding_self_type == bound_method.self_instance(db) {
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                        .with_bound_type(binding_self_type)
+                        .into()
+                } else if signature
+                    .overloads
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+                {
+                    // Replacing `Self` exposes the bare class's type variables directly to
+                    // argument inference while retaining an explicit receiver for validation
+                    // and inference.
+                    let signature = signature.apply_self(db, bound_method.typing_self_type(db));
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                        .with_bound_type(binding_self_type)
+                        .into()
+                } else {
+                    // An implicit receiver does not constrain the call. Bind it before overload
+                    // resolution so it does not participate in overload precedence.
+                    CallableBinding::from_overloads(
+                        self,
+                        bound_method.bound_signatures(db).iter().cloned(),
+                    )
                     .into()
+                }
             }
 
             Type::KnownBoundMethod(method) => {
