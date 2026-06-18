@@ -773,8 +773,10 @@ fn unknown_rule_selectors_warn(args: &[&str]) -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file("test.py", "import os\n")?;
 
+    let name = args.join("__");
+
     assert_cmd_snapshot!(
-        args[0],
+        name,
         fixture
             .check_command()
             .args(["--select", "F401"])

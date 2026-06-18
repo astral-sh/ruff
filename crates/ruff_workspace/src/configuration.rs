@@ -13,6 +13,7 @@ use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use log::debug;
 use regex::Regex;
+use ruff_linter::preview::is_warn_on_unknown_selectors_enabled;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -23,7 +24,7 @@ use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
-use ruff_linter::rule_selector::{PreviewOptions, Specificity};
+use ruff_linter::rule_selector::{PreviewOptions, RuleResolutionError, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
@@ -93,31 +94,43 @@ pub enum RuleSelectorKind {
 }
 
 impl RuleSelection {
-    fn resolve(&self, preview: PreviewMode) -> ResolvedRuleSelection {
+    fn resolve(&self, preview: PreviewMode) -> Result<ResolvedRuleSelection, RuleResolutionError> {
         fn resolve(
             selectors: &[UnresolvedRuleSelector],
             preview: PreviewMode,
-        ) -> Vec<RuleSelector> {
+        ) -> Result<Vec<RuleSelector>, RuleResolutionError> {
             selectors
                 .iter()
-                .filter_map(|selector| selector.resolve(preview))
+                .filter_map(|selector| match selector.resolve(preview) {
+                    Ok(selector) => Some(Ok(selector)),
+                    Err(err) => {
+                        if is_warn_on_unknown_selectors_enabled(preview) {
+                            err.log_warning();
+                            None
+                        } else {
+                            Some(Err(err))
+                        }
+                    }
+                })
                 .collect()
         }
 
-        ResolvedRuleSelection {
+        Ok(ResolvedRuleSelection {
             select: self
                 .select
                 .as_deref()
-                .map(|selectors| resolve(selectors, preview)),
-            ignore: resolve(&self.ignore, preview),
-            extend_select: resolve(&self.extend_select, preview),
+                .map(|selectors| resolve(selectors, preview))
+                .transpose()?,
+            ignore: resolve(&self.ignore, preview)?,
+            extend_select: resolve(&self.extend_select, preview)?,
             fixable: self
                 .fixable
                 .as_deref()
-                .map(|selectors| resolve(selectors, preview)),
-            unfixable: resolve(&self.unfixable, preview),
-            extend_fixable: resolve(&self.extend_fixable, preview),
-        }
+                .map(|selectors| resolve(selectors, preview))
+                .transpose()?,
+            unfixable: resolve(&self.unfixable, preview)?,
+            extend_fixable: resolve(&self.extend_fixable, preview)?,
+        })
     }
 }
 
@@ -378,7 +391,7 @@ impl Configuration {
                         mode: lint_preview,
                         require_explicit: false,
                     },
-                ),
+                )?,
                 src: self
                     .src
                     .unwrap_or_else(|| vec![project_root.to_path_buf(), project_root.join("src")]),
@@ -905,7 +918,7 @@ impl LintConfiguration {
             .rule_selections
             .iter()
             .map(|selection| selection.resolve(preview.mode))
-            .collect::<Vec<_>>();
+            .collect::<std::result::Result<Vec<_>, RuleResolutionError>>()?;
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`

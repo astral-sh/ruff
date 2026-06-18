@@ -3,6 +3,8 @@ use std::fmt::{Debug, Display, Formatter};
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
 
+use crate::preview::is_warn_on_unknown_selectors_enabled;
+use crate::rule_selector::RuleResolutionError;
 use crate::{Applicability, UnresolvedRuleSelector};
 use crate::{
     display_settings,
@@ -47,7 +49,7 @@ impl FixSafetyTable {
         extend_safe_fixes: &[UnresolvedRuleSelector],
         extend_unsafe_fixes: &[UnresolvedRuleSelector],
         preview_options: &PreviewOptions,
-    ) -> Self {
+    ) -> Result<Self, RuleResolutionError> {
         #[derive(Copy, Clone)]
         enum Override {
             Safe,
@@ -66,8 +68,15 @@ impl FixSafetyTable {
             );
 
         for (selector, safety_override) in selectors {
-            let Some(selector) = selector.resolve(preview_options.mode) else {
-                continue;
+            let selector = match selector.resolve(preview_options.mode) {
+                Ok(selector) => selector,
+                Err(err) => {
+                    if is_warn_on_unknown_selectors_enabled(preview_options.mode) {
+                        err.log_warning();
+                        continue;
+                    }
+                    return Err(err);
+                }
             };
             let specificity = selector.specificity();
 
@@ -83,7 +92,7 @@ impl FixSafetyTable {
             }
         }
 
-        FixSafetyTable {
+        Ok(FixSafetyTable {
             forced_safe: safety_override_map
                 .iter()
                 .filter_map(|(rule, (_, o))| match o {
@@ -98,7 +107,7 @@ impl FixSafetyTable {
                     Override::Safe => None,
                 })
                 .collect(),
-        }
+        })
     }
 }
 
@@ -170,6 +179,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             &PreviewOptions::default(),
         )
+        .expect("Expected valid rule selectors")
     }
 
     fn assert_rules_safety(

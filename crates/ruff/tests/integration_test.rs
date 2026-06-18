@@ -1428,7 +1428,7 @@ fn preview_group_selector() {
     All checks passed!
 
     ----- stderr -----
-    warning: Invalid rule selector: `PREVIEW`
+    warning: Removed selector `PREVIEW`
     ");
 }
 

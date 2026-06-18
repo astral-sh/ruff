@@ -19,6 +19,7 @@ use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType, SourceType};
 
 use crate::Applicability;
+use crate::preview::is_warn_on_unknown_selectors_enabled;
 use crate::registry::RuleSet;
 use crate::rule_selector::UnresolvedRuleSelector;
 use crate::{display_settings, fs};
@@ -929,29 +930,44 @@ impl CompiledPerFileIgnoreList {
     ///
     /// Returns an error if either of the glob patterns cannot be parsed.
     pub fn resolve(per_file_ignores: Vec<PerFileIgnore>, preview: PreviewMode) -> Result<Self> {
-        Ok(Self(CompiledPerFileList::resolve(
-            per_file_ignores.into_iter().map(|ignore| {
-                let PerFile {
-                    basename,
-                    absolute,
-                    negated,
-                    data: selectors,
-                } = ignore.0;
-                // Rules in preview are included here even if preview mode is disabled; it's safe to
-                // ignore disabled rules.
-                let data = selectors
-                    .iter()
-                    .filter_map(|selector| selector.resolve(preview))
-                    .flat_map(|selector| selector.all_rules())
-                    .collect();
-                PerFile {
-                    basename,
-                    absolute,
-                    negated,
-                    data,
-                }
-            }),
-        )?))
+        let mut resolution_error = None;
+        let list = CompiledPerFileList::resolve(per_file_ignores.into_iter().map(|ignore| {
+            let PerFile {
+                basename,
+                absolute,
+                negated,
+                data: selectors,
+            } = ignore.0;
+            // Rules in preview are included here even if preview mode is disabled; it's safe to
+            // ignore disabled rules.
+            let data: RuleSet = selectors
+                .iter()
+                .filter_map(|selector| match selector.resolve(preview) {
+                    Ok(selector) => Some(selector),
+                    Err(err) => {
+                        if is_warn_on_unknown_selectors_enabled(preview) {
+                            err.log_warning();
+                        } else {
+                            resolution_error.get_or_insert(err);
+                        }
+                        None
+                    }
+                })
+                .flat_map(|selector| selector.all_rules())
+                .collect();
+            PerFile {
+                basename,
+                absolute,
+                negated,
+                data,
+            }
+        }))?;
+
+        if let Some(error) = resolution_error {
+            return Err(error.into());
+        }
+
+        Ok(Self(list))
     }
 }
 

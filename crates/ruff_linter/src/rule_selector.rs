@@ -18,17 +18,48 @@ pub struct UnresolvedRuleSelector {
 }
 
 impl UnresolvedRuleSelector {
-    pub fn resolve(&self, _preview: PreviewMode) -> Option<RuleSelector> {
-        RuleSelector::from_str(&self.selector)
-            .inspect_err(|_| {
-                warn_user_once_by_message!("Invalid rule selector: `{}`", self.selector);
-            })
-            .ok()
+    pub fn resolve(&self, _preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
+        RuleSelector::from_str(&self.selector).map_err(|_| {
+            if self.selector == "PREVIEW" {
+                RuleResolutionError::Removed {
+                    selector: self.selector.clone(),
+                }
+            } else {
+                RuleResolutionError::Unknown {
+                    selector: self.selector.clone(),
+                }
+            }
+        })
     }
 
     pub fn from_selector(selector: impl Into<String>) -> Self {
         Self {
             selector: selector.into(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum RuleResolutionError {
+    Removed { selector: String },
+    Unknown { selector: String },
+}
+
+impl RuleResolutionError {
+    pub fn log_warning(&self) {
+        warn_user_once_by_message!("{}", self);
+    }
+}
+
+impl std::error::Error for RuleResolutionError {}
+
+impl std::fmt::Display for RuleResolutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuleResolutionError::Removed { selector } => write!(f, "Removed selector `{selector}`"),
+            RuleResolutionError::Unknown { selector } => {
+                write!(f, "Unknown rule selector `{selector}`")
+            }
         }
     }
 }
