@@ -45,6 +45,8 @@ type Chunk = u32;
 
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
+// SAFETY: This is the standard pattern for implementing salsa::Update. Salsa ensures that the
+// `old_pointer` we are provided can safely be used as a mutable reference to the old value.
 #[expect(unsafe_code)]
 unsafe impl salsa::Update for RankBitBox {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
