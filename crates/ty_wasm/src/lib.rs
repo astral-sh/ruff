@@ -938,6 +938,16 @@ impl Diagnostic {
         Severity::from(self.inner.severity())
     }
 
+    #[wasm_bindgen]
+    pub fn tags(&self) -> Vec<DiagnosticTag> {
+        self.inner
+            .primary_tags()
+            .unwrap_or_default()
+            .iter()
+            .map(DiagnosticTag::from)
+            .collect()
+    }
+
     #[wasm_bindgen(js_name = "textRange")]
     pub fn text_range(&self) -> Option<TextRange> {
         self.inner
@@ -1202,6 +1212,22 @@ impl From<diagnostic::Severity> for Severity {
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,
             diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for DiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
         }
     }
 }
