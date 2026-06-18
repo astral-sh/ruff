@@ -38,6 +38,17 @@ impl ValueSourceGuard {
         let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
         Self { prev_value: prev }
     }
+
+    pub fn without_spans() -> Self {
+        let source = VALUE_SOURCE.with_borrow(|current| {
+            current
+                .as_ref()
+                .expect("value source to be set before disabling spans")
+                .0
+                .clone()
+        });
+        Self::new(source, false)
+    }
 }
 
 impl Drop for ValueSourceGuard {

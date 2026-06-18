@@ -15,6 +15,7 @@ use ruff_graph::Direction;
 use ruff_linter::RUFF_PKG_VERSION;
 
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::rule_selector::ValueSourceGuard;
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -592,9 +593,20 @@ pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize)]
 #[serde(transparent)]
 pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
+
+impl<'de> Deserialize<'de> for DeprecatedTopLevelLintOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Temporarily disable span information because the flattened values don't retain spans.
+        let _guard = ValueSourceGuard::without_spans();
+        LintCommonOptions::deserialize(deserializer).map(Self)
+    }
+}
 
 impl OptionsMetadata for DeprecatedTopLevelLintOptions {
     fn record(_visit: &mut dyn Visit) {
