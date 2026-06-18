@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use lsp_types::{
     DidOpenTextDocumentNotification, DidOpenTextDocumentParams, FileChangeType, FileEvent,
     LanguageKind, Message, Position, PublishDiagnosticsNotification, Range,
@@ -486,19 +486,39 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     let foo = server.file_path(foo);
+    let foo_uri = server.file_uri(&foo);
 
     server.open_text_document(&foo, "", 1);
 
     let _open_diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
+    let mut notebook = NotebookBuilder::virtual_file("src/notebook.ipynb");
+    let first_cell = notebook.add_python_cell("x = 1\n");
+    let second_cell = notebook.add_python_cell("x\n");
+    notebook.open(&mut server);
+    server.collect_publish_diagnostic_notifications(2);
+
     std::fs::write(&foo, foo_content)?;
 
     server.did_change_watched_files(vec![FileEvent {
-        uri: server.file_uri(foo),
+        uri: foo_uri.clone(),
         kind: FileChangeType::Changed,
     }]);
 
-    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    let mut diagnostics = collect_publish_diagnostic_notifications_with_versions(&mut server, 3);
+    assert_eq!(diagnostics[&first_cell].version, Some(0));
+    assert_eq!(diagnostics[&second_cell].version, Some(0));
+
+    let extra_diagnostics = server
+        .try_await_notification::<PublishDiagnosticsNotification>(Some(Duration::from_millis(100)));
+    assert!(
+        extra_diagnostics.is_err(),
+        "Server should publish diagnostics once per open document"
+    );
+
+    let diagnostics = diagnostics
+        .remove(&foo_uri)
+        .with_context(|| format!("Expected diagnostics for {foo_uri}"))?;
 
     // Note how ty reports no diagnostics here. This is because
     // the contents received by didOpen/didChange take precedence over the file
