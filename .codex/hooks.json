@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/ibraheem/code/oss/ruff-tree/ruff-generic-call-fixpoint/.codex/hooks/session-start.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

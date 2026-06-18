@@ -64,7 +64,8 @@ use crate::types::{
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, any_over_type, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -781,6 +782,30 @@ impl<'db> Bindings<'db> {
                 downstream.visit_type_context_callables(visit);
             }
         }
+    }
+
+    /// Returns the source argument indices whose type context can change when a generic call is
+    /// specialized.
+    pub(crate) fn generic_context_argument_indices(
+        &self,
+        db: &'db dyn Db,
+        argument_count: usize,
+    ) -> Vec<usize> {
+        let mut argument_indices = FxHashSet::default();
+
+        self.visit_type_context_callables(&mut |binding| {
+            for (_, overload) in binding.matching_overloads() {
+                for argument_index in 0..argument_count {
+                    if overload.has_generic_argument_type_context(db, binding, argument_index) {
+                        argument_indices.insert(argument_index);
+                    }
+                }
+            }
+        });
+
+        let mut argument_indices: Vec<_> = argument_indices.into_iter().collect();
+        argument_indices.sort_unstable();
+        argument_indices
     }
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
@@ -5785,6 +5810,39 @@ impl<'db> Binding<'db> {
             .get(argument_index + usize::from(binding.bound_type.is_some()))
     }
 
+    /// Returns `true` if specializing this overload can change the type context for the given
+    /// source argument.
+    fn has_generic_argument_type_context(
+        &self,
+        db: &'db dyn Db,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+    ) -> bool {
+        let Some(generic_context) = self.signature.generic_context else {
+            return false;
+        };
+        let Some(argument_match) = self.matched_argument_for_call_argument(binding, argument_index)
+        else {
+            return false;
+        };
+
+        let inferable_typevars = generic_context.inferable_typevars(db);
+        argument_match.parameters.iter().any(|parameter| {
+            let parameter_type = self.signature.parameters()[parameter.index].annotated_type();
+            any_over_type(db, parameter_type, false, |ty| {
+                let Type::TypeVar(typevar) = ty else {
+                    return false;
+                };
+                let identity = if typevar.is_paramspec(db) {
+                    typevar.without_paramspec_attr(db).identity(db)
+                } else {
+                    typevar.identity(db)
+                };
+                identity.is_inferable(db, inferable_typevars)
+            })
+        })
+    }
+
     /// Returns source argument indices matched to the `ParamSpec` component.
     ///
     /// The returned indices are relative to the original call site, excluding any synthetic bound
@@ -5839,6 +5897,14 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<CallableType<'db>> {
+        if let Some(Type::Callable(callable)) = self
+            .specialization
+            .and_then(|specialization| specialization.get(db, paramspec))
+            && callable.kind(db) == CallableTypeKind::ParamSpecValue
+        {
+            return Some(callable);
+        }
+
         let mut specialized_binding =
             CallableBinding::from_overloads(self.signature_type, [self.signature.clone()]);
         if let Some(bound_type) = binding.bound_type {
@@ -5905,7 +5971,10 @@ impl<'db> Binding<'db> {
             self.signature_type,
             callable.signatures(db).iter().cloned(),
         );
-        let sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        let mut sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        // The current argument is being re-inferred from this projected parameter. Treating its
+        // previous-round type as an input can reject the sub-call before its context is available.
+        sub_arguments.clear_types(sub_argument_index);
         let mut specialized_bindings =
             Bindings::from(specialized_binding).match_parameters(db, &sub_arguments);
         let _ = specialized_bindings.check_types_impl(
@@ -6042,12 +6111,25 @@ impl<'db> Binding<'db> {
                 None
             };
 
+            let return_ty = self
+                .normalized_constructor_return(db)
+                .unwrap_or(self.signature.return_ty);
+            let mut return_typevar_variance = FxHashMap::default();
+            return_ty.visit_specialization(db, |ty, variance| {
+                let Type::TypeVar(typevar) = ty else {
+                    return;
+                };
+                return_typevar_variance
+                    .entry(typevar.identity(db))
+                    .and_modify(|current: &mut TypeVarVariance| {
+                        *current = current.join(variance);
+                    })
+                    .or_insert(variance);
+            });
+
             let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
                 FxHashMap::default();
             if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                let return_ty = self
-                    .normalized_constructor_return(db)
-                    .unwrap_or(self.signature.return_ty);
                 let path_bounds = return_ty.assignable_solutions_with_inferable(
                     db,
                     declared_return_ty,
@@ -6086,12 +6168,32 @@ impl<'db> Binding<'db> {
             let specialization = generic_context.specialize_recursive(
                 db,
                 generic_context.variables(db).map(|typevar| {
-                    Some(
-                        return_type_solutions
-                            .get(&typevar.identity(db))
-                            .copied()
-                            .unwrap_or(unspecialized),
-                    )
+                    let identity = typevar.identity(db);
+                    let return_type_solution = return_type_solutions.get(&identity).copied();
+                    // This is the specialization inferred from the argument types during the
+                    // previous fixpoint round. Preserve it when it is a compatible covariant
+                    // refinement of the declared return type. For non-covariant occurrences, the
+                    // declared return type specialization must take precedence.
+                    let inferred_solution = self
+                        .specialization
+                        .and_then(|specialization| specialization.get(db, typevar))
+                        .filter(|ty| !ty.has_dynamic(db))
+                        .map(|ty| ty.promote(db));
+
+                    if let Some(return_ty) = return_type_solution {
+                        let inferred_is_covariant_refinement =
+                            inferred_solution.is_some_and(|inferred_ty| {
+                                return_typevar_variance
+                                    .get(&identity)
+                                    .is_some_and(|variance| variance.is_covariant())
+                                    && inferred_ty.is_assignable_to(db, return_ty)
+                            });
+                        if !inferred_is_covariant_refinement {
+                            return Some(return_ty);
+                        }
+                    }
+
+                    Some(inferred_solution.unwrap_or(unspecialized))
                 }),
             );
 

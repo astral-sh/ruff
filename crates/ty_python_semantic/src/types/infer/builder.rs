@@ -5538,6 +5538,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
+        let baseline_argument_types = argument_types.clone();
 
         let has_generic_context = bindings
             .iter_flat()
@@ -5573,13 +5574,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut speculative_bindings = bindings.clone();
             let mut speculative_builder = self.speculate();
+            let mut speculative_argument_types = baseline_argument_types.clone();
 
             // Attempt to infer the argument types using the narrowed type context.
-            speculative_builder.infer_all_argument_types(
+            speculative_builder.infer_argument_types_to_fixpoint(
                 ast_arguments.clone(),
-                argument_types,
+                &mut speculative_argument_types,
                 infer_argument_ty,
-                bindings,
+                &speculative_bindings,
                 narrowed_tcx,
             );
 
@@ -5588,7 +5590,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .check_types_impl(
                     db,
                     &constraints,
-                    argument_types,
+                    &speculative_argument_types,
                     narrowed_tcx,
                     &self.dataclass_field_specifiers,
                 )
@@ -5611,6 +5613,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Successfully narrowed to an element of the union.
             self.extend(speculative_builder);
+            argument_types.clone_from(&speculative_argument_types);
             Some(bindings.check_types_impl(
                 db,
                 &constraints,
@@ -5641,11 +5644,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Infer against the entire union as a fallback.
-        //
-        // TODO: We could also attempt an inference without type context, but this
-        // leads to similar performance issues.
-        self.infer_all_argument_types(
+        argument_types.clone_from(&baseline_argument_types);
+        self.infer_argument_types_to_fixpoint(
             ast_arguments,
             argument_types,
             infer_argument_ty,
@@ -5662,6 +5662,87 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
+    /// Infer all call arguments, using speculative whole-call inference to propagate generic
+    /// specializations until the inferred argument types reach a fixed point.
+    fn infer_argument_types_to_fixpoint(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &Bindings<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        let db = self.db();
+        let baseline_argument_types = argument_types.clone();
+        let reinferable_arguments: Vec<_> = ast_arguments
+            .clone()
+            .map(|argument| !argument.is_variadic())
+            .collect();
+        let mut generic_argument_indices =
+            bindings.generic_context_argument_indices(db, argument_types.len());
+        generic_argument_indices
+            .retain(|&index| reinferable_arguments.get(index).copied().unwrap_or(false));
+
+        if generic_argument_indices.is_empty() {
+            self.infer_all_argument_types(
+                ast_arguments,
+                argument_types,
+                &baseline_argument_types,
+                infer_argument_ty,
+                bindings,
+                call_expression_tcx,
+            );
+            return;
+        }
+
+        let mut context_argument_types = baseline_argument_types.clone();
+        let mut context_bindings = bindings.clone();
+        let mut speculative_builder = self.speculate();
+        speculative_builder.setup_expression_cache();
+
+        for _ in 0..=generic_argument_indices.len() {
+            let mut next_argument_types = baseline_argument_types.clone();
+            let mut round_builder = speculative_builder.speculate();
+            round_builder.infer_all_argument_types(
+                ast_arguments.clone(),
+                &mut next_argument_types,
+                &context_argument_types,
+                infer_argument_ty,
+                &context_bindings,
+                call_expression_tcx,
+            );
+
+            let mut next_bindings = bindings.clone();
+            let constraints = ConstraintSetBuilder::new();
+            let _ = next_bindings.check_types_impl(
+                db,
+                &constraints,
+                &next_argument_types,
+                call_expression_tcx,
+                &self.dataclass_field_specifiers,
+            );
+
+            let converged = next_argument_types
+                .inferred_types_equal_at(&context_argument_types, &generic_argument_indices);
+            context_argument_types = next_argument_types;
+            context_bindings = next_bindings;
+
+            if converged {
+                break;
+            }
+        }
+
+        argument_types.clone_from(&baseline_argument_types);
+        self.infer_all_argument_types(
+            ast_arguments,
+            argument_types,
+            &context_argument_types,
+            infer_argument_ty,
+            &context_bindings,
+            call_expression_tcx,
+        );
+    }
+
     /// Infer the argument types for all bindings.
     ///
     /// Note that this method may infer the type of a given argument expression multiple times with
@@ -5671,6 +5752,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
         arguments_types: &mut CallArguments<'_, 'db>,
+        context_argument_types: &CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         bindings: &'bindings Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
@@ -5756,7 +5838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     &constraints,
                     binding,
-                    arguments_types,
+                    context_argument_types,
                     argument_index,
                     call_expression_tcx,
                 )
