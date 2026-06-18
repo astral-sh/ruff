@@ -3867,7 +3867,8 @@ class ProjectionThreeWayRotation:
         for number, text, data in self.x:
             self.x = [(text, data, number)]
 
-        reveal_type(self.x)  # revealed: list[tuple[int, str, bytes]] | list[tuple[int | bytes | str, int | bytes | str, int | bytes | str]]
+        # revealed: list[tuple[int, str, bytes]] | list[tuple[int | bytes | str, int | bytes | str, int | bytes | str]]
+        reveal_type(self.x)
 ```
 
 Some recursive projections are still inferred conservatively when narrowing is involved:
@@ -3884,7 +3885,8 @@ class ProjectionNarrowedCrossDependency:
 
         # TODO: Ideally, this would be
         # `list[tuple[int | None, str]] | list[tuple[int | str, int | str]]`.
-        reveal_type(self.x)  # revealed: list[tuple[int | None, str]] | list[tuple[int | None | str, int | str]] | list[tuple[int | str, int | str]]
+        # revealed: list[tuple[int | None, str]] | list[tuple[int | None | str, int | str]] | list[tuple[int | str, int | str]]
+        reveal_type(self.x)
 ```
 
 Several recursive attributes can exchange projected values:
@@ -3915,7 +3917,8 @@ class ProjectionCorrelatedAttributeCycle:
                 self.left = [(left_text, right_text)]
                 self.right = [(right_number, left_number)]
 
-        reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[str, str | int]] | list[tuple[str | int, str | int]]
+        # revealed: list[tuple[int, str]] | list[tuple[str, str | int]] | list[tuple[str | int, str | int]]
+        reveal_type(self.left)
         reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[int | str, str | int]]
 ```
 

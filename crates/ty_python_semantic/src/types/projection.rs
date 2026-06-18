@@ -397,12 +397,14 @@ impl<'db> Type<'db> {
     ///    `terms_by_op`.
     ///    * `containers = [tuple[int], tuple[Projection_{Subscript[0]}(D)]]`
     ///    * `terms_by_op = [(Subscript[0], [Exact(int), Exact(Projection_{Subscript[0]}(D))])]`
-    /// 3. Solve each path from the terms produced by those containers, dropping
-    ///    recursive self references and unioning the remaining productive terms.
-    ///    In the example, the self reference is discarded and `Subscript[0]`
-    ///    is solved as `int`, producing `solved_ops = {Subscript[0]: int}`.
+    /// 3. Lower projected terms into an equation system. Each projection path
+    ///    is a variable; closed terms become productive bases, flat projection
+    ///    occurrences become graph dependencies, and same-root occurrences
+    ///    below constructors mark the equation as divergent.
+    ///    In the example, `Subscript[0]` has one productive base `int` and a
+    ///    flat self dependency on `Subscript[0]`.
     /// 4. Rebuild the original top-level arms with every cycle artifact replaced
-    ///    by its solved projection type.
+    ///    by the SCC solution for its projection path.
     ///    Rebuilding turns `tuple[Projection_{Subscript[0]}(D)]` into
     ///    `tuple[int]`, so the candidate normalizes to `tuple[int]`.
     ///
@@ -1393,6 +1395,9 @@ impl<'db> ProjectionContainer<'db> {
 /// Each [`ProjectionPath`] is a variable `A_p = Projection_p(root)`. Equations contain only
 /// query-free facts collected from container arms: closed productive terms and flat dependencies on
 /// other projection variables. Constructor-guarded recursion is filled with `Divergent`.
+///
+/// The system is solved only for the paths collected from the candidate type. If replay exposes a
+/// dependency on a path outside that set, solving fails closed.
 struct ProjectionSystem<'db> {
     root: DivergentType,
     equations: FxIndexMap<ProjectionPath<'db>, ProjectionEquation<'db>>,
@@ -1437,17 +1442,20 @@ impl<'db> ProjectionSystem<'db> {
             }
         }
 
-        let sccs = strongly_connected_components(&graph);
+        let sccs = dependency_first_strongly_connected_components(&graph);
         let mut solutions = vec![None; paths.len()];
         for scc in sccs {
-            let wrap_in_list = equations[&paths[scc[0]]].wrap_in_list;
+            let wrap_in_list = equations[&paths[scc[0]]].wrap_in_list?;
             for &index in &scc {
-                if equations[&paths[index]].wrap_in_list != wrap_in_list {
+                if equations[&paths[index]].wrap_in_list != Some(wrap_in_list) {
                     return None;
                 }
             }
 
             if scc.iter().any(|&index| equations[&paths[index]].divergent) {
+                // This deliberately loses productive terms in the SCC. Keeping them would require
+                // representing recursive solutions such as `A = int | list[A]`; `Divergent` is the
+                // conservative widening value that avoids under-approximating the shape as `int`.
                 let solved = if wrap_in_list {
                     KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
                 } else {
@@ -1504,7 +1512,7 @@ struct ProjectionEquation<'db> {
     dependencies: FxIndexSet<ProjectionPath<'db>>,
     divergent: bool,
     unsupported: bool,
-    wrap_in_list: bool,
+    wrap_in_list: Option<bool>,
 }
 
 impl<'db> ProjectionEquation<'db> {
@@ -1516,12 +1524,11 @@ impl<'db> ProjectionEquation<'db> {
         term: ProjectionTerm<'db>,
     ) -> Option<()> {
         let wrap_in_list = matches!(term, ProjectionTerm::List(_));
-        if self.wrap_in_list != wrap_in_list
-            && (!self.productive.is_empty() || !self.dependencies.is_empty())
-        {
-            return None;
+        match self.wrap_in_list {
+            Some(existing) if existing != wrap_in_list => return None,
+            None => self.wrap_in_list = Some(wrap_in_list),
+            Some(_) => {}
         }
-        self.wrap_in_list = wrap_in_list;
 
         match term {
             ProjectionTerm::Exact(term) => {
@@ -1569,6 +1576,8 @@ impl<'db> ProjectionEquation<'db> {
             }
 
             if let Some(path) = term.matching_projection_narrowing_var(db, root) {
+                // Recovery treats `A & C` as the dependency `A`. This is a safe widening; retaining
+                // `C` would require recovery-only intersection simplification.
                 self.dependencies.insert(path);
                 return Some(());
             }
@@ -1592,7 +1601,9 @@ impl<'db> ProjectionEquation<'db> {
     }
 }
 
-fn strongly_connected_components(graph: &[Vec<usize>]) -> Vec<Vec<usize>> {
+/// Returns strongly connected components (SCC) in dependency-first order for a graph whose edges point
+/// from a projection variable to the variables it depends on.
+fn dependency_first_strongly_connected_components(graph: &[Vec<usize>]) -> Vec<Vec<usize>> {
     struct SccState<'a> {
         graph: &'a [Vec<usize>],
         next_index: usize,

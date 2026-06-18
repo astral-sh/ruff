@@ -1844,32 +1844,30 @@ def tuple_projection_with_side_containers() -> None:
 Recursive updates through tuple entries should not introduce the tuple itself into an element type.
 
 ```py
-recursive_tuple_growth = (int(),)
+import copy
 
-for _recursive_tuple_growth_index in range(10):
-    (recursive_tuple_item,) = recursive_tuple_growth
-    recursive_tuple_growth = ((recursive_tuple_item,),)
+growing_tuple = (int(),)
 
-# The loop result includes the initial seed and the recursive update shape; the growing
-# inner tuple is represented by `Divergent`.
-reveal_type(recursive_tuple_growth)  # revealed: tuple[int] | tuple[tuple[int | Divergent]]
+for _ in range(10):
+    (item,) = growing_tuple
+    growing_tuple = ((item,),)
 
-import copy as recursive_pair_copy
+reveal_type(growing_tuple)  # revealed: tuple[int] | tuple[tuple[int | Divergent]]
 
-def recursive_pair_unknown():
+def unknown():
     pass
 
-recursive_pair_items = []
+pair_items = []
 
-for _recursive_pair_index in range(10):
-    recursive_pair_copied = recursive_pair_copy.copy(recursive_pair_items)
-    for recursive_pair in recursive_pair_copied:
+for _ in range(10):
+    pairs_copied = copy.copy(pair_items)
+    for recursive_pair in pairs_copied:
         reveal_type(recursive_pair)  # revealed: tuple[Unknown, Unknown]
         reveal_type(recursive_pair[0])  # revealed: Unknown
-        recursive_pair_items.append((recursive_pair[0], recursive_pair_unknown()))
-    recursive_pair_items.append((recursive_pair_unknown(), recursive_pair_unknown()))
+        pair_items.append((recursive_pair[0], unknown()))
+    pair_items.append((unknown(), unknown()))
 
-reveal_type(recursive_pair_items)  # revealed: list[tuple[Unknown, Unknown]]
+reveal_type(pair_items)  # revealed: list[tuple[Unknown, Unknown]]
 ```
 
 ### `global` and `nonlocal` keywords in a loop
