@@ -1645,30 +1645,49 @@ impl<'db> ProjectionEvidenceSet<'db> {
         Self::new(db, projection_facts, container_facts)
     }
 
+    pub(crate) fn from_types_if_needed(
+        db: &'db dyn Db,
+        should_collect: bool,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> Option<Self> {
+        should_collect
+            .then(|| Self::from_types(db, types))
+            .flatten()
+    }
+
     pub(crate) fn merged(
         db: &'db dyn Db,
         current: Option<Self>,
         previous: Option<Self>,
     ) -> Option<Self> {
-        let mut projection_facts = FxIndexSet::default();
-        for fact in current
-            .into_iter()
-            .chain(previous)
-            .flat_map(|evidence| evidence.projection_facts(db).iter().cloned())
-        {
-            Self::push_projection_fact(&mut projection_facts, fact);
-        }
+        match (current, previous) {
+            (None, None) => None,
+            (Some(evidence), None) | (None, Some(evidence)) => Some(evidence),
+            (Some(current), Some(previous)) if current == previous => Some(current),
+            (Some(current), Some(previous)) => {
+                let mut projection_facts = FxIndexSet::default();
+                for fact in current
+                    .projection_facts(db)
+                    .iter()
+                    .chain(previous.projection_facts(db))
+                    .cloned()
+                {
+                    Self::push_projection_fact(&mut projection_facts, fact);
+                }
 
-        let mut container_facts = FxIndexSet::default();
-        for fact in current
-            .into_iter()
-            .chain(previous)
-            .flat_map(|evidence| evidence.container_facts(db).iter().cloned())
-        {
-            Self::push_container_fact(&mut container_facts, fact);
-        }
+                let mut container_facts = FxIndexSet::default();
+                for fact in current
+                    .container_facts(db)
+                    .iter()
+                    .chain(previous.container_facts(db))
+                    .cloned()
+                {
+                    Self::push_container_fact(&mut container_facts, fact);
+                }
 
-        Self::new(db, projection_facts, container_facts)
+                Self::new(db, projection_facts, container_facts)
+            }
+        }
     }
 
     fn push_projection_fact(

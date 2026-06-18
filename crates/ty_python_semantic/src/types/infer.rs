@@ -766,6 +766,9 @@ struct ScopeInferenceExtra<'db> {
     /// Projection facts computed during inference for cycle recovery.
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
 
+    /// Whether final types from this region may need projection evidence collection.
+    needs_projection_evidence_from_types: bool,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -823,6 +826,18 @@ impl<'db> ScopeInference<'db> {
         if let Some(projection_evidence) = projection_evidence {
             let extra = self.extra.get_or_insert_default();
             extra.projection_evidence = Some(projection_evidence);
+        }
+        let needs_projection_evidence_from_types = self
+            .extra
+            .as_deref()
+            .is_some_and(|extra| extra.needs_projection_evidence_from_types)
+            || previous_inference
+                .extra
+                .as_deref()
+                .is_some_and(|extra| extra.needs_projection_evidence_from_types);
+        if needs_projection_evidence_from_types {
+            let extra = self.extra.get_or_insert_default();
+            extra.needs_projection_evidence_from_types = true;
         }
 
         self
@@ -1232,6 +1247,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Projection facts computed during inference for cycle recovery.
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
 
+    /// Whether final types from this region may need projection evidence collection.
+    needs_projection_evidence_from_types: bool,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -1314,6 +1332,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
         match self {
             Self::Other(extra) => extra.projection_evidence.as_ref(),
             _ => None,
+        }
+    }
+
+    fn needs_projection_evidence_from_types(&self) -> bool {
+        match self {
+            Self::Other(extra) => extra.needs_projection_evidence_from_types,
+            _ => false,
         }
     }
 }
@@ -1409,7 +1434,19 @@ impl<'db> DefinitionInference<'db> {
             .flatten()
             .filter(|constraints| !constraints.is_empty());
 
-        if previous_constraints.is_some() || projection_evidence.is_some() {
+        let needs_projection_evidence_from_types = self
+            .extra
+            .as_deref()
+            .is_some_and(DefinitionInferenceExtra::needs_projection_evidence_from_types)
+            || previous_inference
+                .extra
+                .as_deref()
+                .is_some_and(DefinitionInferenceExtra::needs_projection_evidence_from_types);
+
+        if previous_constraints.is_some()
+            || projection_evidence.is_some()
+            || needs_projection_evidence_from_types
+        {
             let mut extra = self
                 .extra
                 .take()
@@ -1425,6 +1462,7 @@ impl<'db> DefinitionInference<'db> {
             if let Some(projection_evidence) = projection_evidence {
                 extra.projection_evidence = Some(projection_evidence);
             }
+            extra.needs_projection_evidence_from_types |= needs_projection_evidence_from_types;
             self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
         }
 
@@ -1617,6 +1655,9 @@ struct ExpressionInferenceExtra<'db> {
     /// Projection facts computed during inference for cycle recovery.
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
 
+    /// Whether final types from this region may need projection evidence collection.
+    needs_projection_evidence_from_types: bool,
+
     /// The types of every binding in this expression region.
     ///
     /// Only very few expression regions have bindings (around 0.1%).
@@ -1707,6 +1748,18 @@ impl<'db> ExpressionInference<'db> {
         if let Some(projection_evidence) = projection_evidence {
             let extra = self.extra.get_or_insert_default();
             extra.projection_evidence = Some(projection_evidence);
+        }
+        let needs_projection_evidence_from_types = self
+            .extra
+            .as_deref()
+            .is_some_and(|extra| extra.needs_projection_evidence_from_types)
+            || previous
+                .extra
+                .as_deref()
+                .is_some_and(|extra| extra.needs_projection_evidence_from_types);
+        if needs_projection_evidence_from_types {
+            let extra = self.extra.get_or_insert_default();
+            extra.needs_projection_evidence_from_types = true;
         }
 
         self
@@ -1837,6 +1890,9 @@ struct StatementInferenceInnerExtra<'db> {
     /// Projection facts computed during inference for cycle recovery.
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
 
+    /// Whether final types from this region may need projection evidence collection.
+    needs_projection_evidence_from_types: bool,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -1952,6 +2008,18 @@ impl<'db> StatementInferenceInner<'db> {
         if let Some(projection_evidence) = projection_evidence {
             let extra = self.extra.get_or_insert_default();
             extra.projection_evidence = Some(projection_evidence);
+        }
+        let needs_projection_evidence_from_types = self
+            .extra
+            .as_deref()
+            .is_some_and(|extra| extra.needs_projection_evidence_from_types)
+            || previous_inference
+                .extra
+                .as_deref()
+                .is_some_and(|extra| extra.needs_projection_evidence_from_types);
+        if needs_projection_evidence_from_types {
+            let extra = self.extra.get_or_insert_default();
+            extra.needs_projection_evidence_from_types = true;
         }
 
         self

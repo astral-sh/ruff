@@ -16,13 +16,14 @@ use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
-use super::projection::ProjectionEvidenceSet;
+use super::projection::{ProjectionEvidenceSet, ProjectionResult};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+    needs_projection_evidence_from_types: bool,
 }
 
 /// Records an `Unknown` type for every expression in a malformed unpack target subtree.
@@ -47,6 +48,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             context: InferContext::new(db, target_scope, module),
             targets: FxHashMap::default(),
             projection_evidence: None,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -61,6 +63,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     fn extend_projection_evidence(&mut self, other: Option<ProjectionEvidenceSet<'db>>) {
         self.projection_evidence =
             ProjectionEvidenceSet::merged(self.db(), self.projection_evidence, other);
+    }
+
+    fn extend_projection_result(&mut self, result: ProjectionResult<'db>) {
+        self.needs_projection_evidence_from_types = true;
+        self.extend_projection_evidence(result.projection_evidence());
     }
 
     /// Unpack the value to the target expression.
@@ -99,7 +106,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 if let Some(projected) =
                     value_type.try_iter_projection_result_with_mode(self.db(), mode)
                 {
-                    self.extend_projection_evidence(projected.projection_evidence());
+                    self.extend_projection_result(projected);
                     projected.ty()
                 } else {
                     value_type
@@ -119,7 +126,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 if let Some(projected) =
                     value_type.try_context_enter_projection_result(self.db(), mode)
                 {
-                    self.extend_projection_evidence(projected.projection_evidence());
+                    self.extend_projection_result(projected);
                     projected.ty()
                 } else {
                     value_type
@@ -399,6 +406,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         projection_evidence,
                         projected.projection_evidence(),
                     );
+                    self.needs_projection_evidence_from_types = true;
                     projected_tys.push(projected.ty());
                 }
                 self.extend_projection_evidence(projection_evidence);
@@ -415,6 +423,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         projection_evidence,
                         projected.projection_evidence(),
                     );
+                    self.needs_projection_evidence_from_types = true;
                     projected_tys.push(projected.ty());
                 }
                 self.extend_projection_evidence(projection_evidence);
@@ -452,13 +461,18 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         let projection_evidence = ProjectionEvidenceSet::merged(
             self.db(),
             self.projection_evidence,
-            ProjectionEvidenceSet::from_types(self.db(), self.targets.values().copied()),
+            ProjectionEvidenceSet::from_types_if_needed(
+                self.db(),
+                self.needs_projection_evidence_from_types,
+                self.targets.values().copied(),
+            ),
         );
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
             projection_evidence,
+            needs_projection_evidence_from_types: self.needs_projection_evidence_from_types,
         }
     }
 }
@@ -475,6 +489,10 @@ pub(crate) struct UnpackResult<'db> {
 
     /// Projection facts computed during inference for cycle recovery.
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+
+    /// Whether unpacking produced a projection result whose enclosing inference
+    /// region may need to collect evidence from its final types.
+    needs_projection_evidence_from_types: bool,
 }
 
 impl<'db> UnpackResult<'db> {
@@ -512,12 +530,17 @@ impl<'db> UnpackResult<'db> {
         self.projection_evidence
     }
 
+    pub(crate) const fn needs_projection_evidence_from_types(&self) -> bool {
+        self.needs_projection_evidence_from_types
+    }
+
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FrozenMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
             projection_evidence: None,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -542,6 +565,8 @@ impl<'db> UnpackResult<'db> {
             );
         }
         self.projection_evidence = projection_evidence;
+        self.needs_projection_evidence_from_types |=
+            previous_cycle_result.needs_projection_evidence_from_types;
 
         self
     }
