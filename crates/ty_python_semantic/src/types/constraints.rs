@@ -3445,56 +3445,45 @@ impl<'db> PathBounds<'db> {
 
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 // Filter out the typevar constraints that aren't satisfied by this path.
-                let mut compatible_constraints =
-                    constraints
-                        .elements(db)
-                        .iter()
-                        .copied()
-                        .filter(|constraint| {
-                            let constraint_lower = constraint.bottom_materialization(db);
-                            let constraint_upper = constraint.top_materialization(db);
-                            let when_lower =
-                                lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
-                            let when_upper =
-                                constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
-                            let when = builder
-                                .load(db, &when_lower)
-                                .and(db, builder, || builder.load(db, &when_upper));
-                            !when.is_never_satisfied(db)
-                        });
-
-                let Some(compatible_constraint) = compatible_constraints.next() else {
+                let Some(compatible_constraint) =
+                    constraints.elements(db).iter().copied().find(|constraint| {
+                        let constraint_lower = constraint.bottom_materialization(db);
+                        let constraint_upper = constraint.top_materialization(db);
+                        let when_lower =
+                            lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
+                        let when_upper =
+                            constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
+                        let when = builder
+                            .load(db, &when_lower)
+                            .and(db, builder, || builder.load(db, &when_upper));
+                        !when.is_never_satisfied(db)
+                    })
+                else {
                     // This path does not satisfy any of the constraints, and is therefore not a
                     // valid specialization.
                     return Err(());
                 };
 
-                if compatible_constraints.next().is_none() {
-                    return Ok(Some(compatible_constraint));
+                if let (Some(ty @ Type::TypeVar(_)), _) | (_, Some(ty @ Type::TypeVar(_))) =
+                    (bounds.lower, bounds.upper)
+                {
+                    // This path relates two TypeVars, such as passing `S` to a parameter typed as
+                    // `T: (int, str)`. The compatibility check above has verified that at least
+                    // one of `T`'s declared constraints can satisfy the path, but choosing a
+                    // concrete constraint here would break the relationship between `T` and `S`.
+                    // Keep that relationship as the solution instead.
+                    return Ok(Some(ty));
                 }
 
-                if bounds
-                    .lower
-                    .is_some_and(|lower| lower.has_typevar_or_typevar_instance(db))
-                    || bounds
-                        .upper
-                        .is_some_and(|upper| upper.has_typevar_or_typevar_instance(db))
-                {
-                    // This ambiguous path still carries a typevar relationship. Keep that
-                    // relationship intact instead of replacing it with an arbitrary concrete
-                    // constraint.
-                    Ok(None)
-                } else {
-                    // TODO: This is a stable half-punt. A constrained TypeVar must solve to
-                    // exactly one of its declared constraints, not a union of them. Multiple
-                    // compatible choices on one path and compatible choices spread across multiple
-                    // paths both represent multiple exact candidate specializations; callers
-                    // should not collapse those candidates via union. A future solver should
-                    // handle the declared constraint choices at the whole-set level, preserving the
-                    // TypeVar's declared constraint order. Until then, pick the first compatible
-                    // declared constraint on this concrete ambiguous path.
-                    Ok(Some(compatible_constraint))
-                }
+                // TODO: This is a stable half-punt. A constrained TypeVar must solve to exactly
+                // one of its declared constraints, not a union of them. Multiple compatible
+                // choices on one path and compatible choices spread across multiple paths both
+                // represent multiple exact candidate specializations; callers should not collapse
+                // those candidates via union. A future solver should handle the declared
+                // constraint choices at the whole-set level, preserving the TypeVar's declared
+                // constraint order. Until then, pick the first compatible declared constraint on
+                // this path.
+                Ok(Some(compatible_constraint))
             }
         }
     }
@@ -7109,8 +7098,8 @@ mod tests {
         assert_eq!(source_order_solutions, reversed_order_solutions);
     }
 
-    fn solve_ambiguous_constrained_typevar<'db>(
-        db: &'db dyn Db,
+    fn solve_ambiguous_constrained_typevar(
+        db: &dyn Db,
         constraints: impl IntoIterator<Item = KnownClass>,
     ) -> String {
         let builder = ConstraintSetBuilder::new();
@@ -7158,7 +7147,7 @@ mod tests {
         )
         .expect("the path should satisfy the constrained TypeVar");
 
-        assert!(solution.is_none());
+        assert_eq!(solution, Some(actual));
     }
 
     #[test]
