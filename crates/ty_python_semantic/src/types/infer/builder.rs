@@ -1192,6 +1192,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::ParamSpec(paramspec) => {
                 self.infer_paramspec_deferred(paramspec.node(self.module()));
             }
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                self.infer_typevartuple_deferred(typevartuple.node(self.module()));
+            }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(
                     assignment.target(self.module()),
@@ -1818,6 +1821,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
+            post_inference::type_param_validation::check_single_typevar_tuple_pep695(
+                &self.context,
+                type_params,
+            );
             post_inference::type_param_validation::check_no_default_after_typevar_tuple_pep695(
                 &self.context,
                 type_params,
@@ -2030,11 +2037,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             for (index, element) in tuple_spec.all_elements().iter().enumerate() {
                 builder = builder.add(
-                    if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db()).expect(
-                            "`Type::to_instance()` should always return `Some()` \
-                                if called on a type assignable to `type[BaseException]`",
-                        )
+                    if element.is_assignable_to(self.db(), type_base_exception)
+                        && let Some(instance) = element.to_instance(self.db())
+                    {
+                        instance
                     } else {
                         invalid_elements.push((index, element));
                         Type::unknown()
@@ -2069,6 +2075,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.exception_handler_symbol_ty_from_valid_ty(node_ty, type_base_exception)
         {
             symbol_ty
+        } else if is_typevartuple_type_or_instance(self.db(), node_ty) {
+            if let Some(node) = node {
+                report_invalid_exception_caught(&self.context, node, node_ty);
+            }
+            Type::unknown()
         } else if node_ty.is_assignable_to(
             self.db(),
             UnionType::from_two_elements(
@@ -2106,16 +2117,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty: Type<'db>,
         type_base_exception: Type<'db>,
     ) -> Option<Type<'db>> {
+        if is_typevartuple_type_or_instance(self.db(), ty) {
+            return None;
+        }
+
         if let Some(tuple_spec) = ty.tuple_instance_spec(self.db()) {
             // `except (ValueError, TypeError) as e:`
             UnionType::try_from_elements(
                 self.db(),
                 tuple_spec.all_elements().iter().map(|element| {
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        Some(element.to_instance(self.db()).expect(
-                            "`Type::to_instance()` should always return `Some()` \
-                                if called on a type assignable to `type[BaseException]`",
-                        ))
+                        element.to_instance(self.db())
                     } else {
                         None
                     }
@@ -2123,10 +2135,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if ty.is_assignable_to(self.db(), type_base_exception) {
             // `except ValueError as e:`
-            Some(ty.to_instance(self.db()).expect(
-                "`Type::to_instance()` should always return `Some()` \
-                    if called on a type assignable to `type[BaseException]`",
-            ))
+            ty.to_instance(self.db())
         } else if ty.is_assignable_to(
             self.db(),
             Type::homogeneous_tuple(self.db(), type_base_exception),
@@ -3779,6 +3788,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 definition,
                                 paramspec_class,
                             ),
+                            Some(
+                                typevartuple_class @ (KnownClass::TypeVarTuple
+                                | KnownClass::ExtensionsTypeVarTuple),
+                            ) => self.infer_legacy_typevartuple(
+                                target,
+                                call_expr,
+                                definition,
+                                typevartuple_class,
+                            ),
                             Some(KnownClass::NewType) => {
                                 self.infer_newtype_expression(target, call_expr, definition)
                             }
@@ -4060,6 +4078,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && function.is_known(self.db(), KnownFunction::NewClass)
         {
             self.infer_new_class_deferred(definition, value);
+            return;
+        }
+        if matches!(
+            known_class,
+            Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+        ) {
+            if let Some(default) = arguments.find_keyword("default") {
+                self.infer_typevartuple_default(&default.value, None);
+            }
             return;
         }
         let mut constraint_tys = Vec::new();
@@ -8695,6 +8722,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 }
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVarTuple` definition must be a simple variable assignment",
+                        );
+                    }
+                }
                 Some(KnownClass::NewType) => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_NEWTYPE, call_expression)
@@ -8933,6 +8970,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = iterable_type
+            && typevar.is_typevartuple(db)
+            && let Some(bound_typevar) = bind_typevar(
+                db,
+                self.index,
+                self.scope().file_scope_id(db),
+                self.typevar_binding_context,
+                typevar,
+            )
+        {
+            return Type::tuple(TupleType::new(
+                db,
+                &TupleSpecBuilder::with_capacity(0)
+                    .concat_variadic_typevar(db, bound_typevar)
+                    .build(),
+            ));
+        }
+        if let Type::TypeVar(typevar) = iterable_type
+            && typevar.is_typevartuple(db)
+        {
+            return Type::tuple(TupleType::new(
+                db,
+                &TupleSpecBuilder::with_capacity(0)
+                    .concat_variadic_typevar(db, typevar)
+                    .build(),
+            ));
+        }
         iterable_type
             .try_iterate(db)
             .map(|spec| Type::tuple(TupleType::new(db, &spec)))
@@ -11774,6 +11838,14 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         .zip(safe_mutable_class.generic_origin(db))
                         .is_some_and(|(l, r)| l == r)
             })
+    }
+}
+
+fn is_typevartuple_type_or_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::TypeVar(typevar) => typevar.is_typevartuple(db),
+        Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar.is_typevartuple(db),
+        _ => false,
     }
 }
 
