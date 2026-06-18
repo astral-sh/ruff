@@ -102,7 +102,7 @@ pub(crate) fn hover(
         })?;
     let identifier_range = TextRange::at(
         line_range.start() + TextSize::try_from(identifiers_start + identifier.start()).ok()?,
-        TextSize::try_from(identifier.end) - identifiers_start).ok()?,
+        TextSize::try_from(identifier.len()).ok()?,
     );
 
     // Get the rule for the identifier under the cursor.
