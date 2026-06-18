@@ -129,6 +129,46 @@ reveal_type(Pentagon().sides)  # revealed: int
 reveal_type(Hexagon().area)  # revealed: int | float
 ```
 
+## User stub overlay for an installed stub package
+
+User-provided stubs on an extra path can fill gaps in an installed stub package without having to
+duplicate the installed package's `__init__.pyi`. The user stub directory is intentionally a
+namespace package so that imports not supplied by the overlay still fall back to the installed
+stubs.
+
+```toml
+[environment]
+python = "/.venv"
+extra-paths = ["/stubs"]
+```
+
+`/stubs/PyInstaller/archive/readers.pyi`:
+
+```pyi
+class Reader: ...
+```
+
+`/.venv/<path-to-site-packages>/PyInstaller-stubs/__init__.pyi`:
+
+```pyi
+class Analysis: ...
+```
+
+`/.venv/<path-to-site-packages>/PyInstaller-stubs/py.typed`:
+
+```text
+```
+
+`main.py`:
+
+```py
+from PyInstaller import Analysis
+from PyInstaller.archive.readers import Reader
+
+reveal_type(Reader)  # revealed: <class 'Reader'>
+reveal_type(Analysis)  # revealed: <class 'Analysis'>
+```
+
 ## Inconsistent stub packages
 
 Stub packages where one is a namespace package and the other is a regular package. Module resolution

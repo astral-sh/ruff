@@ -1071,18 +1071,48 @@ struct ModuleResolutionCandidate {
     path: ModulePath,
     module: ResolvedModule,
     py_typed: PyTyped,
-    /// Whether this candidate originated from a stub package. Stub packages
-    /// have priority over runtime packages regardless of search path ordering.
-    is_stub_package: bool,
+    precedence: CandidatePrecedence,
+}
+
+/// Where a candidate sits in the typing specification's module-resolution order.
+///
+/// Variants are declared from highest to lowest precedence so that derived ordering can be used
+/// when traversing candidates.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum CandidatePrecedence {
+    UserSearchPath,
+    StubPackage,
+    Runtime,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum ResolutionPriority {
+    Concrete(CandidatePrecedence),
+    Namespace(CandidatePrecedence),
+}
+
+impl CandidatePrecedence {
+    fn with_stub_package(self) -> Self {
+        match self {
+            Self::UserSearchPath => Self::UserSearchPath,
+            Self::StubPackage | Self::Runtime => Self::StubPackage,
+        }
+    }
 }
 
 impl ModuleResolutionCandidate {
-    fn root(search_path: &SearchPath) -> Self {
+    fn root(search_path: &SearchPath, mode: ModuleResolveMode) -> Self {
+        let precedence = if mode.stubs_allowed() && search_path.is_extra() {
+            CandidatePrecedence::UserSearchPath
+        } else {
+            CandidatePrecedence::Runtime
+        };
+
         Self {
             path: search_path.to_module_path(),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
-            is_stub_package: false,
+            precedence,
         }
     }
 
@@ -1093,6 +1123,15 @@ impl ModuleResolutionCandidate {
             ResolvedModule::LegacyNamespacePackage(_) => true,
             ResolvedModule::RegularPackage(_) => false,
             ResolvedModule::Module(_) => false,
+        }
+    }
+
+    /// Orders candidates once the requested module has been resolved.
+    fn resolution_priority(&self) -> ResolutionPriority {
+        if self.is_any_namespace_package() {
+            ResolutionPriority::Namespace(self.precedence)
+        } else {
+            ResolutionPriority::Concrete(self.precedence)
         }
     }
 
@@ -1176,7 +1215,7 @@ fn resolve_stub_package_in_search_path(
     search_path: &SearchPath,
     stub_name: &str,
 ) -> Option<ModuleResolutionCandidate> {
-    let mut candidate = ModuleResolutionCandidate::root(search_path);
+    let mut candidate = ModuleResolutionCandidate::root(search_path, context.mode);
     if !candidate_may_exist(context, &candidate, stub_name) {
         return None;
     }
@@ -1190,7 +1229,7 @@ fn resolve_stub_package_in_search_path(
         );
         None
     } else {
-        candidate.is_stub_package = true;
+        candidate.precedence = candidate.precedence.with_stub_package();
         Some(candidate)
     }
 }
@@ -1223,7 +1262,7 @@ fn resolve_name_impl<'a>(
         pending_stub_paths.extend(after_stdlib.iter().filter(|search_path| {
             candidate_may_exist(
                 &context,
-                &ModuleResolutionCandidate::root(search_path),
+                &ModuleResolutionCandidate::root(search_path, mode),
                 stub_name,
             )
         }));
@@ -1243,7 +1282,7 @@ fn resolve_name_impl<'a>(
         // A terminal candidate can stop the search unless a matching post-stdlib stub package
         // could still override it. A terminal stdlib candidate always stops the search.
         let can_stop = is_stdlib || pending_stub_paths.is_empty();
-        let mut candidate = ModuleResolutionCandidate::root(search_path);
+        let mut candidate = ModuleResolutionCandidate::root(search_path, mode);
         let terminal = if candidate_may_exist(&context, &candidate, root_component) {
             let resolved =
                 resolve_name_in_search_path(&context, &mut candidate, root_component).is_ok();
@@ -1275,9 +1314,7 @@ fn resolve_name_impl<'a>(
         return None;
     }
 
-    // Stub packages have priority over runtime packages regardless of
-    // search path ordering.
-    cur_candidates.sort_by_key(|candidate| !candidate.is_stub_package);
+    cur_candidates.sort_by_key(|candidate| candidate.precedence);
 
     let mut next_candidates = Vec::new();
 
@@ -1306,15 +1343,14 @@ fn resolve_name_impl<'a>(
             return None;
         }
 
-        // Stub packages have priority over runtime packages regardless of
-        // search path ordering.
-        next_candidates.sort_by_key(|c| !c.is_stub_package);
+        next_candidates.sort_by_key(|candidate| candidate.precedence);
 
         // Advance to the next level of candidates while reusing allocations
         // (we used `drain` so cur_candidates is empty)
         std::mem::swap(&mut cur_candidates, &mut next_candidates);
     }
 
+    cur_candidates.sort_by_key(ModuleResolutionCandidate::resolution_priority);
     Some(cur_candidates)
 }
 
@@ -1322,25 +1358,19 @@ fn discard_shadowed_namespace_candidates(
     db: &dyn Db,
     candidates: &mut Vec<ModuleResolutionCandidate>,
 ) {
-    // Now that we have several candidates, we need to reject candidates
-    // that are shadowed. There are only two valid situations where we
-    // could proceed into the next iteration with multiple candidates:
-    //
-    // * All candidates are namespace packages.
-    // * At least one candidate is a stub package.
-    //
-    // The existence of a single non-namespace package will shadow
-    // all namespace packages *regardless of search-path order*.
-    //
-    // This is implemented with the `retain` that follows.
+    // A concrete candidate shadows namespace candidates at the same or lower precedence. A
+    // higher-precedence namespace remains as an overlay while resolution descends into child
+    // components.
     //
     // We can't do this "delete all namespace packages" eagerly because we want a
     // `PyTyped::Partial` regular package to shadow namespace packages after it.
     // (FIXME: I guess we could just set a flag not to add them...)
 
-    let found_non_namespace = candidates
+    let best_concrete_precedence = candidates
         .iter()
-        .any(|candidate| !candidate.is_any_namespace_package());
+        .filter(|candidate| !candidate.is_any_namespace_package())
+        .map(|candidate| candidate.precedence)
+        .min();
 
     // Note that we intentionally do *not* filter out non-stub
     // candidates when a stub package is found. Even when a
@@ -1362,9 +1392,10 @@ fn discard_shadowed_namespace_candidates(
         // regular packages/modules). In that case, this logic currently
         // retains both candidates.
 
-        // Regular packages and modules both shadow namespace packages
-        // independent of search path order.
-        if found_non_namespace && candidate.is_any_namespace_package() {
+        let namespace_is_shadowed =
+            best_concrete_precedence.is_some_and(|precedence| precedence <= candidate.precedence);
+
+        if namespace_is_shadowed && candidate.is_any_namespace_package() {
             tracing::trace!(
                 "Discarding namespace package `{}` because a non-namespace entry of the same name \
                  was found",
