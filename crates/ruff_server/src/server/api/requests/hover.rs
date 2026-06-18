@@ -5,7 +5,6 @@ use anyhow::Context;
 use lsp_types::{self as types, HoverRequest};
 use regex::Regex;
 use ruff_linter::FixAvailability;
-use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_python_ast::SourceType;
 use ruff_source_file::OneIndexed;
@@ -107,13 +106,9 @@ pub(crate) fn hover(
 
     // Get the rule for the identifier under the cursor.
     let identifier = identifier.as_str();
-    let rule = Rule::from_code(identifier).ok().or_else(|| {
-        if is_human_readable_names_enabled(snapshot.query().settings().linter.preview) {
-            Rule::from_name(identifier).ok()
-        } else {
-            None
-        }
-    });
+    let rule = Rule::from_code(identifier)
+        .ok()
+        .or_else(|| Rule::from_name(identifier).ok());
     let output = if let Some(rule) = rule {
         format_rule_text(rule)
     } else {
