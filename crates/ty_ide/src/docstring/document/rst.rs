@@ -6,7 +6,7 @@ use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
 
-use super::super::preformatted::PreformattedBlockScanner;
+use super::preformatted::PreformattedBlockScanner;
 
 /// Represents a parsed restructured text (reST) docstring.
 pub(super) struct Docstring {
