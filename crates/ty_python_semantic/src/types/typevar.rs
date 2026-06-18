@@ -1413,7 +1413,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1439,9 +1439,11 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     default: Option<Type<'db>>,
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    // Normalize the default to ensure cycle convergence.
     match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
+        // A type alias is opaque to recursive type normalization. Keep the cycle marker until
+        // alias inference either resolves or rejects a self-referential default.
+        (Some(previous), Some(Type::TypeAlias(_))) if previous.is_divergent() => Some(*previous),
+        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
         (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
         (_, None) => None,
     }
