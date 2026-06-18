@@ -317,6 +317,9 @@ pub struct SemanticIndex<'db> {
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Map from an unpacking target to its [`unpack::Unpack`] ingredient.
+    unpacks_by_target: FrozenMap<ExpressionNodeKey, unpack::Unpack<'db>>,
+
     /// Map from a standalone statement to its [`Statement`] ingredient.
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
 
@@ -676,6 +679,15 @@ impl<'db> SemanticIndex<'db> {
         self.expressions_by_node
             .get(&expression_key.into())
             .copied()
+    }
+
+    /// Returns the [`unpack::Unpack`] ingredient for a list or tuple assignment target.
+    #[track_caller]
+    pub fn expect_unpack(&self, target: impl Into<ExpressionNodeKey>) -> unpack::Unpack<'db> {
+        self.unpacks_by_target
+            .get(&target.into())
+            .copied()
+            .expect("unpacking target should be present in the semantic index")
     }
 
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {

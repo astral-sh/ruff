@@ -231,6 +231,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -285,6 +286,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
             enclosing_lambda_statements: FxHashMap::default(),
@@ -2430,7 +2432,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     } else {
                         self.current_scope()
                     };
-                let unpack = Some(Unpack::new(
+                let unpack = Unpack::new(
                     self.db,
                     self.file,
                     value_file_scope,
@@ -2438,8 +2440,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Note `target` belongs to the `self.module` tree
                     AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
-                ));
-                Some(unpackable.as_current_assignment(unpack))
+                );
+                self.unpacks_by_target.insert(target.into(), unpack);
+                Some(unpackable.as_current_assignment(Some(unpack)))
             }
             ast::Expr::Name(_)
             | ast::Expr::Starred(_)
@@ -2503,6 +2506,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
+            unpacks_by_target: FrozenMap::from(self.unpacks_by_target),
             statements_by_node: self.statements_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,

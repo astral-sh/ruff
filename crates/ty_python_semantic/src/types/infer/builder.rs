@@ -95,6 +95,7 @@ use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
+use crate::types::unpacker::UnpackResult;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
     DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
@@ -2470,9 +2471,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value, &|builder, tcx| {
-                builder.infer_standalone_expression(value, tcx)
-            });
+            if matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)) {
+                // Infer the standalone expression here to include its diagnostics in this region.
+                self.infer_standalone_expression(value, TypeContext::default());
+
+                let unpacked = infer_unpack_types(self.db(), self.index.expect_unpack(target));
+                self.context.extend(unpacked.diagnostics());
+                self.infer_unpacked_assignment_target(target, value, unpacked);
+            } else {
+                self.infer_target(target, value, &|builder, tcx| {
+                    builder.infer_standalone_expression(value, tcx)
+                });
+            }
+        }
+    }
+
+    fn infer_unpacked_assignment_target(
+        &mut self,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        unpacked: &UnpackResult<'db>,
+    ) {
+        match target {
+            ast::Expr::Starred(ast::ExprStarred { value: target, .. }) => {
+                self.infer_unpacked_assignment_target(target, value, unpacked);
+            }
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for target in elts {
+                    self.infer_unpacked_assignment_target(target, value, unpacked);
+                }
+            }
+            _ => {
+                let assigned_ty = unpacked.expression_type(target);
+                self.infer_target_impl(target, value, Some(&|_, _| assigned_ty));
+            }
         }
     }
 
@@ -3653,14 +3686,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
 
         let mut target_ty = match assignment.target_kind() {
-            TargetKind::Sequence(unpack_position, unpack) => {
+            TargetKind::Sequence(_, unpack) => {
+                // The assignment statement owns unpacking diagnostics so that targets without a
+                // name definition are still checked, and each diagnostic is reported only once.
                 let unpacked = infer_unpack_types(self.db(), unpack);
-                // Only copy the diagnostics if this is the first assignment to avoid duplicating the
-                // unpack assignments.
-                if unpack_position == UnpackPosition::First {
-                    self.context.extend(unpacked.diagnostics());
-                }
-
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
