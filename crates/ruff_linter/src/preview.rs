@@ -54,7 +54,7 @@ pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSet
 }
 
 // https://github.com/astral-sh/ruff/issues/4460
-pub(crate) const fn is_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
