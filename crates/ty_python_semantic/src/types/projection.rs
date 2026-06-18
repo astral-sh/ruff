@@ -213,8 +213,7 @@ impl<'db> Type<'db> {
             });
 
         let mut elements = Vec::new();
-        let mut projection_facts = FxIndexSet::default();
-        let mut container_facts = FxIndexSet::default();
+        let mut facts = FxIndexSet::default();
         let path = ProjectionPath::from_op(op);
 
         for element in union.elements(db).iter().copied() {
@@ -223,13 +222,12 @@ impl<'db> Type<'db> {
             }
 
             let term = project_non_cycle(element)?;
-            if let Some(container_fact) = ProjectionContainer::build_container_fact(db, element)
+            if ProjectionContainer::is_generic_container_for_inference(db, element)
                 && !term.is_ambiguous(db)
             {
-                ProjectionEvidenceSet::push_container_fact(&mut container_facts, container_fact);
                 for root in &roots {
-                    ProjectionEvidenceSet::push_projection_fact(
-                        &mut projection_facts,
+                    ProjectionEvidenceSet::push_fact(
+                        &mut facts,
                         ProjectionEvidenceFact {
                             root: *root,
                             arm: element,
@@ -241,7 +239,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        let projection_evidence = ProjectionEvidenceSet::new(db, projection_facts, container_facts);
+        let projection_evidence = ProjectionEvidenceSet::new(db, facts);
 
         for element in union.elements(db).iter().copied() {
             if let Some(projected) = element.try_projection_result(db, op) {
@@ -271,7 +269,7 @@ impl<'db> Type<'db> {
         };
 
         let elements = self.top_level_projection_union_elements(db);
-        let mut projection_facts = FxIndexSet::default();
+        let mut facts = FxIndexSet::default();
         let path = ProjectionPath::from_op(op);
         let terms = elements
             .into_iter()
@@ -309,8 +307,8 @@ impl<'db> Type<'db> {
 
                 let term = project_non_cycle(element)?;
                 if !mentions_root && needs_evidence && !term.is_ambiguous(db) {
-                    ProjectionEvidenceSet::push_projection_fact(
-                        &mut projection_facts,
+                    ProjectionEvidenceSet::push_fact(
+                        &mut facts,
                         ProjectionEvidenceFact {
                             root: *root,
                             arm: element,
@@ -326,11 +324,7 @@ impl<'db> Type<'db> {
         let ty = Self::solve_projection_terms(db, *root, &path, &terms)?;
         Some(ProjectionResult {
             ty,
-            projection_evidence: ProjectionEvidenceSet::new(
-                db,
-                projection_facts,
-                FxIndexSet::default(),
-            ),
+            projection_evidence: ProjectionEvidenceSet::new(db, facts),
         })
     }
 
@@ -430,7 +424,9 @@ impl<'db> Type<'db> {
                 continue;
             }
 
-            let container = ProjectionContainer::from_recovery_type(db, root, *element, evidence)?;
+            let container = ProjectionContainer::from_direct_type(db, *element).or_else(|| {
+                evidence.map(|_| ProjectionContainer::EvidenceOnly { arm: *element })
+            })?;
             containers.push(container);
         }
 
@@ -985,6 +981,10 @@ enum ProjectionContainer<'db> {
         arguments: Vec<Type<'db>>,
         arm: Type<'db>,
     },
+    /// A recovery-time arm whose projections must come from inference-time evidence.
+    EvidenceOnly {
+        arm: Type<'db>,
+    },
 }
 
 impl<'db> ProjectionContainer<'db> {
@@ -1010,23 +1010,6 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
-    /// Builds a recovery-time container shape from direct structure or inference-time evidence.
-    fn from_recovery_type(
-        db: &'db dyn Db,
-        root: DivergentType,
-        ty: Type<'db>,
-        evidence: Option<&ProjectionEvidenceSet<'db>>,
-    ) -> Option<Self> {
-        Self::from_direct_type(db, ty).or_else(|| {
-            let fact = evidence?.container_fact_for_arm(db, root, ty)?;
-            Some(Self::Generic {
-                class: fact.class,
-                arguments: fact.arguments.to_vec(),
-                arm: ty,
-            })
-        })
-    }
-
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
@@ -1049,7 +1032,7 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
-            Self::Generic { arm, .. } => {
+            Self::Generic { arm, .. } | Self::EvidenceOnly { arm } => {
                 return evidence?.project_generic_path(db, root, *arm, path);
             }
         };
@@ -1057,7 +1040,7 @@ impl<'db> ProjectionContainer<'db> {
     }
 
     const fn needs_evidence_for_projection(&self) -> bool {
-        matches!(self, Self::Generic { .. })
+        matches!(self, Self::Generic { .. } | Self::EvidenceOnly { .. })
     }
 
     fn project_type_path(
@@ -1373,6 +1356,7 @@ impl<'db> ProjectionContainer<'db> {
                 }))
                 .to_instance(db)
             }
+            Self::EvidenceOnly { .. } => None,
         }
     }
 
@@ -1514,22 +1498,12 @@ impl<'db> ProjectionContainer<'db> {
         Some(Self::star_unpack_homogeneous(element, position))
     }
 
-    /// Inference-time only: uses the full specialization view, which may trigger queries.
-    fn build_container_fact(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> Option<ProjectionContainerFact<'db>> {
-        if ty.exact_tuple_instance_spec(db).is_some() {
-            return None;
-        }
-
-        let (class, specialization) = ty.class_specialization(db)?;
-        let arguments = specialization.types(db);
-        (!arguments.is_empty()).then(|| ProjectionContainerFact {
-            arm: ty,
-            class,
-            arguments: arguments.to_vec().into_boxed_slice(),
-        })
+    /// Inference-time evidence collection may use the full specialization view.
+    fn is_generic_container_for_inference(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.exact_tuple_instance_spec(db).is_none()
+            && ty
+                .class_specialization(db)
+                .is_some_and(|(_, specialization)| !specialization.types(db).is_empty())
     }
 }
 
@@ -1595,8 +1569,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let mut projection_facts = FxIndexSet::default();
-        let mut container_facts = FxIndexSet::default();
+        let mut facts = FxIndexSet::default();
 
         for ty in types {
             let mut demands = Vec::new();
@@ -1605,11 +1578,9 @@ impl<'db> ProjectionEvidenceSet<'db> {
                 continue;
             }
 
-            let mut generic_containers = FxIndexSet::default();
-            Self::collect_generic_containers(db, ty, &mut generic_containers);
-            for container_fact in generic_containers {
-                let arm = container_fact.arm;
-                let mut has_projection_fact = false;
+            let mut arms = FxIndexSet::default();
+            Self::collect_generic_arms(db, ty, &mut arms);
+            for arm in arms {
                 for (root, path) in &demands {
                     if arm.same_divergent_marker(db, Type::Divergent(*root)) {
                         continue;
@@ -1624,9 +1595,8 @@ impl<'db> ProjectionEvidenceSet<'db> {
                         if term.is_ambiguous(db) {
                             continue;
                         }
-                        has_projection_fact = true;
-                        Self::push_projection_fact(
-                            &mut projection_facts,
+                        Self::push_fact(
+                            &mut facts,
                             ProjectionEvidenceFact {
                                 root: *root,
                                 arm,
@@ -1636,13 +1606,10 @@ impl<'db> ProjectionEvidenceSet<'db> {
                         );
                     }
                 }
-                if has_projection_fact {
-                    Self::push_container_fact(&mut container_facts, container_fact);
-                }
             }
         }
 
-        Self::new(db, projection_facts, container_facts)
+        Self::new(db, facts)
     }
 
     pub(crate) fn merged(
@@ -1650,103 +1617,46 @@ impl<'db> ProjectionEvidenceSet<'db> {
         current: Option<Self>,
         previous: Option<Self>,
     ) -> Option<Self> {
-        let mut projection_facts = FxIndexSet::default();
+        let mut facts = FxIndexSet::default();
         for fact in current
             .into_iter()
             .chain(previous)
-            .flat_map(|evidence| evidence.projection_facts(db).iter().cloned())
+            .flat_map(|evidence| evidence.facts(db).iter().cloned())
         {
-            Self::push_projection_fact(&mut projection_facts, fact);
+            Self::push_fact(&mut facts, fact);
         }
 
-        let mut container_facts = FxIndexSet::default();
-        for fact in current
-            .into_iter()
-            .chain(previous)
-            .flat_map(|evidence| evidence.container_facts(db).iter().cloned())
-        {
-            Self::push_container_fact(&mut container_facts, fact);
-        }
-
-        Self::new(db, projection_facts, container_facts)
+        Self::new(db, facts)
     }
 
-    fn push_projection_fact(
+    fn push_fact(
         facts: &mut FxIndexSet<ProjectionEvidenceFact<'db>>,
         fact: ProjectionEvidenceFact<'db>,
     ) {
         facts.insert(fact);
     }
 
-    fn push_container_fact(
-        facts: &mut FxIndexSet<ProjectionContainerFact<'db>>,
-        fact: ProjectionContainerFact<'db>,
-    ) {
-        facts.insert(fact);
-    }
-
-    fn new(
-        db: &'db dyn Db,
-        projection_facts: FxIndexSet<ProjectionEvidenceFact<'db>>,
-        container_facts: FxIndexSet<ProjectionContainerFact<'db>>,
-    ) -> Option<Self> {
-        (!projection_facts.is_empty() || !container_facts.is_empty()).then(|| {
+    fn new(db: &'db dyn Db, facts: FxIndexSet<ProjectionEvidenceFact<'db>>) -> Option<Self> {
+        (!facts.is_empty()).then(|| {
             Self(ProjectionEvidenceSetInterned::new(
                 db,
-                projection_facts
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-                container_facts
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                facts.into_iter().collect::<Vec<_>>().into_boxed_slice(),
             ))
         })
     }
 
-    fn projection_facts(self, db: &'db dyn Db) -> &'db [ProjectionEvidenceFact<'db>] {
-        self.0.projection_facts(db)
+    fn facts(self, db: &'db dyn Db) -> &'db [ProjectionEvidenceFact<'db>] {
+        self.0.facts(db)
     }
 
-    fn container_facts(self, db: &'db dyn Db) -> &'db [ProjectionContainerFact<'db>] {
-        self.0.container_facts(db)
-    }
-
-    fn collect_generic_containers(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        facts: &mut FxIndexSet<ProjectionContainerFact<'db>>,
-    ) {
-        let facts = RefCell::new(facts);
+    fn collect_generic_arms(db: &'db dyn Db, ty: Type<'db>, arms: &mut FxIndexSet<Type<'db>>) {
+        let arms = RefCell::new(arms);
         any_over_type(db, ty, false, |nested| {
-            if let Some(fact) = ProjectionContainer::build_container_fact(db, nested) {
-                Self::push_container_fact(&mut facts.borrow_mut(), fact);
+            if ProjectionContainer::is_generic_container_for_inference(db, nested) {
+                arms.borrow_mut().insert(nested);
             }
             false
         });
-    }
-
-    fn container_fact_for_arm(
-        self,
-        db: &'db dyn Db,
-        root: DivergentType,
-        arm: Type<'db>,
-    ) -> Option<&'db ProjectionContainerFact<'db>> {
-        let normalized_arm = arm
-            .replace_projection_artifacts_with_root(db, root)
-            .unwrap_or(arm);
-        self.container_facts(db).iter().find(|fact| {
-            if fact.arm == arm {
-                return true;
-            }
-
-            let fact_arm = fact
-                .arm
-                .replace_projection_artifacts_with_root(db, root)
-                .unwrap_or(fact.arm);
-            fact_arm == normalized_arm
-        })
     }
 
     fn project_generic_path(
@@ -1759,7 +1669,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         let normalized_arm = arm
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
-        self.projection_facts(db).iter().find_map(|fact| {
+        self.facts(db).iter().find_map(|fact| {
             if !fact.root.same_marker(root) || fact.path != *path {
                 return None;
             }
@@ -1780,9 +1690,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ProjectionEvidenceSetInterned<'db> {
     #[returns(deref)]
-    projection_facts: Box<[ProjectionEvidenceFact<'db>]>,
-    #[returns(deref)]
-    container_facts: Box<[ProjectionContainerFact<'db>]>,
+    facts: Box<[ProjectionEvidenceFact<'db>]>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1795,14 +1703,6 @@ struct ProjectionEvidenceFact<'db> {
     arm: Type<'db>,
     path: ProjectionPath<'db>,
     term: ProjectionTerm<'db>,
-}
-
-/// A generic container specialization computed during inference.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct ProjectionContainerFact<'db> {
-    arm: Type<'db>,
-    class: StaticClassLiteral<'db>,
-    arguments: Box<[Type<'db>]>,
 }
 
 /// A projected view of a cycle root produced while recovering recursive inference.
