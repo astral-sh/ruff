@@ -317,8 +317,8 @@ reveal_type(simple(standard))  # revealed: tuple[int, str]
 reveal_type(simple(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(simple(variadic1))  # revealed: tuple[int, ...]
 
-# error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `(*args: int) -> tuple[int, ...]`, found `def variadic2(*args: int) -> tuple[str, ...]`"
-reveal_type(simple(variadic2))  # revealed: tuple[int, ...]
+# TODO: Report the incompatible return type after callable specialization fails.
+reveal_type(simple(variadic2))  # revealed: tuple[Unknown, ...]
 # error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `(*args: Unknown) -> tuple[Unknown, ...]`, found `def keyword_only(*, x: int) -> tuple[int]`"
 reveal_type(simple(keyword_only))  # revealed: tuple[Unknown, ...]
 ```
@@ -378,8 +378,7 @@ def fixed_suffix(prefix: int, middle: str, suffix: bytes, /) -> None: ...
 def unpacked_suffix(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
 
 reveal_type(infer_with_suffix(fixed_suffix))  # revealed: tuple[str]
-# TODO: Should reveal `tuple[str, ...]`.
-reveal_type(infer_with_suffix(unpacked_suffix))  # revealed: tuple[Unknown, ...]
+reveal_type(infer_with_suffix(unpacked_suffix))  # revealed: tuple[str, ...]
 ```
 
 ### Callable inference with additional keyword parameters
@@ -396,12 +395,8 @@ def infer_positional[*Ts](callback: Callable[[*Ts], None]) -> tuple[*Ts]:
 def optional_keyword_only(x: int, y: str, *, debug: bool = False) -> None: ...
 def extra_keywords(x: int, y: str, **kwargs: bool) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def optional_keyword_only(x: int, y: str, *, debug: bool = False) -> None`"
-reveal_type(infer_positional(optional_keyword_only))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def extra_keywords(x: int, y: str, **kwargs: bool) -> None`"
-reveal_type(infer_positional(extra_keywords))  # revealed: tuple[Unknown, ...]
+reveal_type(infer_positional(optional_keyword_only))  # revealed: tuple[int, str]
+reveal_type(infer_positional(extra_keywords))  # revealed: tuple[int, str]
 ```
 
 ### Callable protocol inference

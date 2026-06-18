@@ -32,7 +32,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::tuple::Tuple;
+use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
@@ -2114,6 +2114,96 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.current_target.into_iter().chain(self.target_iter),
                 )
             }
+        }
+
+        // An unpacked `TypeVarTuple` represents the positional portion of a callable signature.
+        // Infer that tuple first, then substitute it into a temporary target so that the ordinary
+        // signature relation can validate the complete parameter and return types.
+        if self.typevar_evaluation == TypeVarEvaluation::Lazy
+            && let Some((typevartuple_index, typevartuple_parameter)) =
+                target.parameters.iter().find_position(|parameter| {
+                    parameter.is_variadic() && parameter.has_starred_annotation()
+                })
+            && let Type::TypeVar(typevartuple) = typevartuple_parameter.annotated_type()
+            && typevartuple.is_typevartuple(db)
+            && target.parameters.as_slice()[..typevartuple_index]
+                .iter()
+                .chain(&target.parameters.as_slice()[typevartuple_index + 1..])
+                .all(Parameter::is_positional)
+        {
+            let source_parameters = source
+                .parameters
+                .clone()
+                .expand_starred_variadic_annotations(db);
+            let source_positional_len = source_parameters
+                .iter()
+                .take_while(|parameter| parameter.is_positional() || parameter.is_variadic())
+                .count();
+            let source_positional = &source_parameters.as_slice()[..source_positional_len];
+            let prefix_len = typevartuple_index;
+            let suffix_len = target.parameters.len() - typevartuple_index - 1;
+
+            let inferred_tuple = if let Some(source_variadic_index) =
+                source_positional.iter().position(Parameter::is_variadic)
+            {
+                let source_prefix = &source_positional[..source_variadic_index];
+                let source_suffix = &source_positional[source_variadic_index + 1..];
+                if source_prefix.len() < prefix_len || source_suffix.len() < suffix_len {
+                    return self.never();
+                }
+
+                let source_variadic = &source_positional[source_variadic_index];
+                let inferred_prefix = &source_prefix[prefix_len..];
+                let inferred_suffix = &source_suffix[..source_suffix.len() - suffix_len];
+                let inferred_spec = TupleSpecBuilder::Variable {
+                    prefix: inferred_prefix
+                        .iter()
+                        .map(Parameter::annotated_type)
+                        .collect(),
+                    variable: source_variadic.annotated_type(),
+                    suffix: inferred_suffix
+                        .iter()
+                        .map(Parameter::annotated_type)
+                        .collect(),
+                }
+                .build();
+                Type::tuple(TupleType::new(db, &inferred_spec))
+            } else {
+                let Some(middle_end) = source_positional.len().checked_sub(suffix_len) else {
+                    return self.never();
+                };
+                if middle_end < prefix_len {
+                    return self.never();
+                }
+
+                Type::heterogeneous_tuple(
+                    db,
+                    source_positional[prefix_len..middle_end]
+                        .iter()
+                        .map(Parameter::annotated_type),
+                )
+            };
+
+            let expanded_source = source.clone().with_parameters(source_parameters);
+            let type_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                typevartuple,
+                inferred_tuple,
+            ));
+            let rewritten_target = target.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            );
+            let typevartuple_matches = ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                self.constraints,
+                typevartuple,
+                inferred_tuple,
+            );
+            return typevartuple_matches.and(db, self.constraints, || {
+                self.check_signature_pair_inner(db, &expanded_source, &rewritten_target)
+            });
         }
 
         // Fast path: if the target accepts positional calls that the source cannot accept, reject

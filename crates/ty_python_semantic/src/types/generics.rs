@@ -6,7 +6,6 @@ use std::fmt::Display;
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
-use smallvec::SmallVec;
 
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
@@ -20,9 +19,7 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -2511,7 +2508,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
         for solution in solutions {
             for binding in solution {
-                self.insert_hash_map_type_mapping(binding.bound_typevar, binding.solution);
+                let solution = self.remove_inferable_typevar_artifacts_from_solution(
+                    binding.bound_typevar,
+                    binding.solution,
+                );
+                self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
             }
         }
         Ok(())
@@ -2616,79 +2617,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .then_some(mapping_when)
     }
 
-    fn infer_typevartuple_from_callable_parameters(
-        &mut self,
-        formal_signature: &Signature<'db>,
-        variadic_index: usize,
-        typevartuple: BoundTypeVarInstance<'db>,
-        actual_signature: &Signature<'db>,
-    ) {
-        let formal_parameters = formal_signature.parameters().as_slice();
-        let suffix_len = formal_parameters.len() - variadic_index - 1;
-        if !formal_parameters[..variadic_index]
-            .iter()
-            .chain(&formal_parameters[variadic_index + 1..])
-            .all(Parameter::is_positional)
-        {
-            return;
-        }
-
-        let actual_parameters = actual_signature.parameters().as_slice();
-        if !actual_parameters
-            .iter()
-            .all(|parameter| parameter.is_positional() || parameter.is_variadic())
-        {
-            return;
-        }
-
-        let tuple = if let Some(actual_variadic_index) =
-            actual_parameters.iter().position(Parameter::is_variadic)
-        {
-            // An actual variadic parameter can only satisfy the open-ended portion of the formal
-            // callable. It cannot provide a fixed suffix because callers are not required to pass
-            // any arguments to it.
-            if suffix_len > 0
-                || actual_variadic_index < variadic_index
-                || actual_variadic_index + 1 != actual_parameters.len()
-            {
-                return;
-            }
-
-            Type::tuple(TupleType::new(
-                self.db,
-                &TupleSpecBuilder::Variable {
-                    prefix: actual_parameters[variadic_index..actual_variadic_index]
-                        .iter()
-                        .map(Parameter::annotated_type)
-                        .collect(),
-                    variable: actual_parameters[actual_variadic_index].annotated_type(),
-                    suffix: vec![],
-                }
-                .build(),
-            ))
-        } else {
-            if actual_parameters.len() < variadic_index + suffix_len {
-                return;
-            }
-
-            let middle_end = actual_parameters.len() - suffix_len;
-            Type::heterogeneous_tuple(
-                self.db,
-                actual_parameters[variadic_index..middle_end]
-                    .iter()
-                    .map(Parameter::annotated_type),
-            )
-        };
-        self.add_type_mapping(typevartuple, tuple, TypeVarVariance::Contravariant);
-
-        let _ = self.infer_map_impl(
-            formal_signature.return_ty,
-            actual_signature.return_ty,
-            TypeVarVariance::Covariant,
-            &mut FxHashSet::default(),
-        );
-    }
-
     /// Infer type mappings by comparing formal callable signatures against actual callables.
     fn infer_from_callable_signature(
         &mut self,
@@ -2696,33 +2624,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         actual_callables: &CallableTypes<'db>,
     ) -> Result<(), ()> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
-
-        let typevartuple_formal_overloads: SmallVec<[_; 1]> = if formal_is_single_paramspec {
-            SmallVec::new()
-        } else {
-            formal_signature
-                .iter()
-                .filter_map(|formal_overload| {
-                    formal_overload
-                        .parameters()
-                        .as_slice()
-                        .iter()
-                        .find_position(|parameter| {
-                            parameter.is_variadic() && parameter.has_starred_annotation()
-                        })
-                        .and_then(|(index, parameter)| {
-                            let Type::TypeVar(typevartuple) = parameter.annotated_type() else {
-                                return None;
-                            };
-                            typevartuple.is_typevartuple(self.db).then_some((
-                                formal_overload,
-                                index,
-                                typevartuple,
-                            ))
-                        })
-                })
-                .collect()
-        };
 
         for actual_callable in actual_callables.as_slice() {
             if formal_is_single_paramspec {
@@ -2742,17 +2643,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .overloads
                     .iter()
                     .filter_map(|actual_signature| {
-                        for (formal_overload, variadic_index, typevartuple) in
-                            &typevartuple_formal_overloads
-                        {
-                            self.infer_typevartuple_from_callable_parameters(
-                                formal_overload,
-                                *variadic_index,
-                                *typevartuple,
-                                actual_signature,
-                            );
-                        }
-
                         let when = actual_signature.when_constraint_set_assignable_to_signatures(
                             db,
                             formal_signature,
