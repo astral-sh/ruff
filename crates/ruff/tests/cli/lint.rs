@@ -794,18 +794,24 @@ fn unknown_rule_selectors_warn(args: &[&str]) -> Result<()> {
 fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
+        .args([".", "--config", "extend-selection=['F401']"]),  // No such option as extend-selection!
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
-    All checks passed!
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
-      - 'extend-select' -> 'lint.extend-select'
-    warning: Invalid rule selector: `F481`
-    warning: No Python files found under the given path(s)
+    error: invalid value 'extend-selection=['F401']' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    Could not parse the supplied argument as a `ruff.toml` configuration option:
+
+    unknown field `extend-selection`
+
+    For more information, try '--help'.
     ");
 }
 
