@@ -3724,6 +3724,9 @@ impl<'db> Parameters<'db> {
                         return Self::concatenate(db, prefix, ConcatenateTail::Gradual);
                     }
                 }
+                Tuple::Variable(variable) if variable.variable().is_unknown() => {
+                    return Self::unknown();
+                }
                 Tuple::Variable(_) => {}
             }
         }

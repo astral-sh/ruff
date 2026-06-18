@@ -83,6 +83,22 @@ def target(value: int) -> None: ...
 Callback(target)
 ```
 
+When fixed parameters follow an unsolved pack, the callable becomes fully gradual because that shape
+cannot be represented by `Concatenate`.
+
+```py
+from typing import Callable
+
+def accepts[*Ts, T](callback: Callable[[int, *Ts, T], tuple[T, *Ts]]) -> tuple[*Ts, T]:
+    raise NotImplementedError
+
+def target(first: int, second: str, third: int, last: complex) -> tuple[complex, str, int]:
+    raise NotImplementedError
+
+# TODO: Infer `Ts` and `T` from `target` instead of using gradual callable parameters.
+accepts(target)
+```
+
 ## Explicitly specialized callable packs
 
 Concrete packs expand to ordinary callable parameters, and an empty pack contributes no parameters.
