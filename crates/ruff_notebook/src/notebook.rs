@@ -255,27 +255,27 @@ impl Notebook {
         // the last marker used to update the offsets and check if it's still
         // the closest marker to the current offset.
         let mut last_marker: Option<&SourceMarker> = None;
-        let markers = source_map.markers();
 
         // The first offset is always going to be at 0, so skip it.
         for (index, offset) in self.cell_offsets.iter_mut().skip(1).rev().enumerate() {
             let closest_marker = match last_marker {
                 Some(marker) if marker.source() < *offset => marker,
                 _ => {
-                    // An internal offset is also the start of the following cell, so prefer the
-                    // marker before an insertion. The final offset is only a cell end.
-                    let marker_index = markers.partition_point(|marker| {
-                        marker.source() < *offset || (index == 0 && marker.source() == *offset)
-                    });
-                    let (before, after) = markers.split_at(marker_index);
-                    let Some(marker) = after
-                        .first()
-                        .filter(|marker| marker.source() == *offset)
-                        .or_else(|| before.last())
-                    else {
+                    let mut markers = source_map.markers().iter().rev();
+                    let Some(marker) = markers.find(|marker| marker.source() <= *offset) else {
                         // There are no markers above the current offset, so we can
                         // stop here.
                         break;
+                    };
+                    // An internal offset is also the start of the following cell, so prefer the
+                    // first marker at that offset. The final offset is only a cell end.
+                    let marker = if index > 0 && marker.source() == *offset {
+                        markers
+                            .take_while(|marker| marker.source() == *offset)
+                            .last()
+                            .unwrap_or(marker)
+                    } else {
+                        marker
                     };
                     last_marker = Some(marker);
                     marker
