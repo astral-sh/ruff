@@ -1,7 +1,11 @@
+use std::sync::{Arc, OnceLock};
+
 use lsp_types::{
     LanguageKind, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
     TextDocumentContentChangeWholeDocument,
 };
+use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_parser::{Parsed, parse_unchecked_source};
 use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
@@ -25,6 +29,22 @@ pub struct TextDocument {
     version: DocumentVersion,
     /// The language ID of the document as provided by the client.
     language_id: Option<LanguageId>,
+    /// A lazily parsed module for hover requests.
+    parsed_module: OnceLock<Arc<ParsedModule>>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedModule {
+    source_type: PySourceType,
+    parsed: Parsed<ModModule>,
+}
+
+impl std::ops::Deref for ParsedModule {
+    type Target = Parsed<ModModule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.parsed
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -52,6 +72,7 @@ impl TextDocument {
             index,
             version,
             language_id: None,
+            parsed_module: OnceLock::new(),
         }
     }
 
@@ -81,12 +102,33 @@ impl TextDocument {
         self.language_id
     }
 
+    pub(crate) fn parsed_module(&self, source_type: PySourceType) -> Arc<ParsedModule> {
+        fn parse(contents: &str, source_type: PySourceType) -> Arc<ParsedModule> {
+            Arc::new(ParsedModule {
+                source_type,
+                parsed: parse_unchecked_source(contents, source_type),
+            })
+        }
+
+        let parsed = self
+            .parsed_module
+            .get_or_init(|| parse(self.contents(), source_type));
+
+        if parsed.source_type == source_type {
+            Arc::clone(parsed)
+        } else {
+            parse(self.contents(), source_type)
+        }
+    }
+
     pub fn apply_changes(
         &mut self,
         changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) {
+        self.parsed_module.take();
+
         if let [
             TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
                 TextDocumentContentChangeWholeDocument { text },
@@ -159,7 +201,11 @@ impl TextDocument {
 #[cfg(test)]
 mod tests {
     use crate::{PositionEncoding, TextDocument};
-    use lsp_types::{Position, TextDocumentContentChangeEvent, TextDocumentContentChangePartial};
+    use lsp_types::{
+        Position, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+        TextDocumentContentChangeWholeDocument,
+    };
+    use ruff_python_ast::PySourceType;
 
     #[test]
     fn redo_edit() {
@@ -222,5 +268,28 @@ def interface():
     pass
 "#
         );
+    }
+
+    #[test]
+    fn parsed_module_cache_invalidation() {
+        let mut document = TextDocument::new("x = 1\n".to_string(), 1);
+
+        let parsed = document.parsed_module(PySourceType::Python);
+        assert_eq!(parsed.syntax().body.len(), 1);
+
+        document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument {
+                        text: "x = 1\ny = 2\n".to_string(),
+                    },
+                ),
+            ],
+            2,
+            PositionEncoding::UTF16,
+        );
+
+        let updated = document.parsed_module(PySourceType::Python);
+        assert_eq!(updated.syntax().body.len(), 2);
     }
 }
