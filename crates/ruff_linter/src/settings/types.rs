@@ -11,7 +11,7 @@ use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
 use ruff_db::diagnostic::DiagnosticFormat;
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Deserializer, Serialize, de};
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
@@ -378,21 +378,6 @@ pub struct PatternPrefixPair {
 
 impl PatternPrefixPair {
     const EXPECTED_PATTERN: &'static str = "<FilePattern>:<RuleCode> pattern";
-}
-
-impl<'de> Deserialize<'de> for PatternPrefixPair {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let str_result = String::deserialize(deserializer)?;
-        Self::from_str(str_result.as_str()).map_err(|_| {
-            de::Error::invalid_value(
-                de::Unexpected::Str(str_result.as_str()),
-                &Self::EXPECTED_PATTERN,
-            )
-        })
-    }
 }
 
 impl FromStr for PatternPrefixPair {
