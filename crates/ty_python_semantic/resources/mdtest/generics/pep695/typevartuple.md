@@ -611,15 +611,9 @@ def f(
     suffix: tuple[*tuple[str, ...], bytes],
     mixed: tuple[int, *tuple[str, ...], bytes],
 ) -> None:
-    # TODO: Should reveal `tuple[int, *tuple[str, ...]]`.
-    # error: [invalid-argument-type] "Argument to function `preserve` is incorrect: Expected `tuple[int, ...]`, found `tuple[int, *tuple[str, ...]]`"
-    reveal_type(preserve(prefix))  # revealed: tuple[int, ...]
-    # TODO: Should reveal `tuple[*tuple[str, ...], bytes]`.
-    # error: [invalid-argument-type] "Argument to function `preserve` is incorrect: Expected `tuple[str, ...]`, found `tuple[*tuple[str, ...], bytes]`"
-    reveal_type(preserve(suffix))  # revealed: tuple[str, ...]
-    # TODO: Should reveal `tuple[int, *tuple[str, ...], bytes]`.
-    # error: [invalid-argument-type] "Argument to function `preserve` is incorrect: Expected `tuple[int, ...]`, found `tuple[int, *tuple[str, ...], bytes]`"
-    reveal_type(preserve(mixed))  # revealed: tuple[int, ...]
+    reveal_type(preserve(prefix))  # revealed: tuple[int, *tuple[str, ...]]
+    reveal_type(preserve(suffix))  # revealed: tuple[*tuple[str, ...], bytes]
+    reveal_type(preserve(mixed))  # revealed: tuple[int, *tuple[str, ...], bytes]
 ```
 
 A tuple containing an unpacked tuple can precisely describe heterogeneous positional arguments,
