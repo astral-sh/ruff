@@ -585,12 +585,10 @@ impl<'db> Type<'db> {
 
     /// Solves the candidate terms for one projection path.
     ///
-    /// Exact terms are checked for incompatible nested projections, while
-    /// homogeneous and list terms only contribute element types. Recursive
-    /// references to the same root are ignored when at least one non-recursive
-    /// term remains. If a path has no productive term, it solves to `Never`
-    /// only when it is not purely self-recursive. Star-unpack rest terms solve
-    /// to `list[T]`, so they cannot be mixed with scalar projection terms.
+    /// Exact and homogeneous terms may absorb a flat self-reference or self-narrowing. Recursive
+    /// artifacts under another constructor are not solved here, because dropping them can
+    /// under-approximate an expanding recursive type. Star-unpack rest terms solve to `list[T]`,
+    /// so they cannot be mixed with scalar projection terms.
     fn solve_projection_terms(
         db: &'db dyn Db,
         root: DivergentType,
@@ -628,17 +626,29 @@ impl<'db> Type<'db> {
                                     root,
                                     Some(path),
                                     projected,
+                                    true,
                                     &mut saw_self_reference,
                                     &mut productive_terms,
                                 )?;
                             }
-                            ProjectionTerm::Homogeneous(projected)
-                            | ProjectionTerm::List(projected) => {
+                            ProjectionTerm::Homogeneous(projected) => {
+                                Self::collect_projection_component_terms(
+                                    db,
+                                    root,
+                                    Some(path),
+                                    projected,
+                                    true,
+                                    &mut saw_self_reference,
+                                    &mut productive_terms,
+                                )?;
+                            }
+                            ProjectionTerm::List(projected) => {
                                 Self::collect_projection_component_terms(
                                     db,
                                     root,
                                     None,
                                     projected,
+                                    false,
                                     &mut saw_self_reference,
                                     &mut productive_terms,
                                 )?;
@@ -652,16 +662,29 @@ impl<'db> Type<'db> {
                         root,
                         Some(path),
                         term,
+                        true,
                         &mut saw_self_reference,
                         &mut productive_terms,
                     )?;
                 }
-                ProjectionTerm::Homogeneous(term) | ProjectionTerm::List(term) => {
+                ProjectionTerm::Homogeneous(term) => {
+                    Self::collect_projection_component_terms(
+                        db,
+                        root,
+                        Some(path),
+                        term,
+                        true,
+                        &mut saw_self_reference,
+                        &mut productive_terms,
+                    )?;
+                }
+                ProjectionTerm::List(term) => {
                     Self::collect_projection_component_terms(
                         db,
                         root,
                         None,
                         term,
+                        false,
                         &mut saw_self_reference,
                         &mut productive_terms,
                     )?;
@@ -696,6 +719,7 @@ impl<'db> Type<'db> {
         root: DivergentType,
         path: Option<&ProjectionPath<'db>>,
         term: Type<'db>,
+        allow_self_reference: bool,
         saw_self_reference: &mut bool,
         productive_terms: &mut Vec<Type<'db>>,
     ) -> Option<()> {
@@ -706,6 +730,7 @@ impl<'db> Type<'db> {
                     root,
                     path,
                     *element,
+                    allow_self_reference,
                     saw_self_reference,
                     productive_terms,
                 )?;
@@ -713,15 +738,17 @@ impl<'db> Type<'db> {
             return Some(());
         }
 
-        if let Some(path) = path
-            && term.mentions_nonmatching_projection(db, root, path)
+        if allow_self_reference
+            && let Some(path) = path
+            && (term.is_matching_projection_var(db, root, path)
+                || term.is_matching_projection_narrowing(db, root, path))
         {
-            return None;
+            *saw_self_reference = true;
+            return Some(());
         }
 
         if term.mentions_any_cycle_artifact(db) {
-            *saw_self_reference = true;
-            return Some(());
+            return None;
         }
 
         productive_terms.push(term);
@@ -917,23 +944,50 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn mentions_any_cycle_artifact(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |ty| {
-            matches!(ty, Type::Divergent(_) | Type::Projection(_))
-        })
-    }
-
-    fn mentions_nonmatching_projection(
+    fn is_matching_projection_var(
         self,
         db: &'db dyn Db,
         root: DivergentType,
         path: &ProjectionPath<'db>,
     ) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
-            Type::Projection(projection) => {
-                projection.root(db).same_marker(root) && projection.path(db).ne(path)
+        matches!(
+            self,
+            Type::Projection(projection)
+                if projection.root(db).same_marker(root) && projection.path(db).eq(path)
+        )
+    }
+
+    fn is_matching_projection_narrowing(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        path: &ProjectionPath<'db>,
+    ) -> bool {
+        let Type::Intersection(intersection) = self else {
+            return false;
+        };
+
+        let mut saw_self_reference = false;
+        for positive in intersection.positive(db) {
+            if positive.is_matching_projection_var(db, root, path) {
+                saw_self_reference = true;
+            } else if positive.mentions_any_cycle_artifact(db) {
+                return false;
             }
-            _ => false,
+        }
+
+        for negative in intersection.negative(db) {
+            if negative.mentions_any_cycle_artifact(db) {
+                return false;
+            }
+        }
+
+        saw_self_reference
+    }
+
+    fn mentions_any_cycle_artifact(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| {
+            matches!(ty, Type::Divergent(_) | Type::Projection(_))
         })
     }
 }

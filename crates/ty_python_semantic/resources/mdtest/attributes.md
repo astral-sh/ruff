@@ -3846,6 +3846,20 @@ class ProjectionDeepPath:
         reveal_type(self.x)  # revealed: list[tuple[tuple[tuple[tuple[tuple[int]]]]]]
 ```
 
+Projection recovery does not collapse recursive values that are wrapped under another container:
+
+```py
+class ProjectionGuardedList:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = [[x]]
+
+        reveal_type(self.x)  # revealed: list[Divergent]
+```
+
 Recursive aliases with repeated subscripting still converge:
 
 ```py
