@@ -19,7 +19,7 @@ use crate::warn_user_once_by_message;
 
 thread_local! {
     /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
-    /// but we want to associate each deserialized [`RelativePath`] with the source from
+    /// but we want to associate each deserialized [`UnresolvedRuleSelector`] with the source from
     /// which it originated. We use a thread local variable to work around this limitation.
     ///
     /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
@@ -30,11 +30,11 @@ thread_local! {
 
 /// Guard to safely change the [`VALUE_SOURCE`] for the current thread.
 #[must_use]
-pub struct ValueSourceGuard {
+pub struct RuleSelectorSourceGuard {
     prev_value: Option<(RuleSelectorSource, bool)>,
 }
 
-impl ValueSourceGuard {
+impl RuleSelectorSourceGuard {
     pub fn new(source: RuleSelectorSource, is_toml: bool) -> Self {
         let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
         Self { prev_value: prev }
@@ -52,7 +52,7 @@ impl ValueSourceGuard {
     }
 }
 
-impl Drop for ValueSourceGuard {
+impl Drop for RuleSelectorSourceGuard {
     fn drop(&mut self) {
         VALUE_SOURCE.set(self.prev_value.take());
     }

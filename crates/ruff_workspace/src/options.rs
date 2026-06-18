@@ -15,7 +15,7 @@ use ruff_graph::Direction;
 use ruff_linter::RUFF_PKG_VERSION;
 
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::rule_selector::ValueSourceGuard;
+use ruff_linter::rule_selector::RuleSelectorSourceGuard;
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
@@ -603,7 +603,7 @@ impl<'de> Deserialize<'de> for DeprecatedTopLevelLintOptions {
         D: Deserializer<'de>,
     {
         // Temporarily disable span information because the flattened values don't retain spans.
-        let _guard = ValueSourceGuard::without_spans();
+        let _guard = RuleSelectorSourceGuard::without_spans();
         LintCommonOptions::deserialize(deserializer).map(Self)
     }
 }

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
-use ruff_linter::rule_selector::{RuleSelectorSource, ValueSourceGuard};
+use ruff_linter::rule_selector::{RuleSelectorSource, RuleSelectorSourceGuard};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -47,7 +47,7 @@ fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str])
     let path = path.as_ref();
 
     let _guard =
-        ValueSourceGuard::new(RuleSelectorSource::File(Arc::new(path.to_path_buf())), true);
+        RuleSelectorSourceGuard::new(RuleSelectorSource::File(Arc::new(path.to_path_buf())), true);
 
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
@@ -281,7 +281,7 @@ mod tests {
     use std::sync::Arc;
 
     use anyhow::{Context, Result};
-    use ruff_linter::rule_selector::ValueSourceGuard;
+    use ruff_linter::rule_selector::RuleSelectorSourceGuard;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn deserialize() -> Result<()> {
-        let _guard = ValueSourceGuard::new(
+        let _guard = RuleSelectorSourceGuard::new(
             ruff_linter::rule_selector::RuleSelectorSource::File(Arc::new(PathBuf::from(
                 "<filename>",
             ))),
