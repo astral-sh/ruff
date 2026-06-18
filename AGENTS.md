@@ -87,7 +87,7 @@ cargo run --bin ty -- check path/to/file.py
 
 ## Working on ty
 
-The guidance in this section applies to edits to `ty*` crates.
+The guidance in this section applies to edits to `ty*` crates, reviews of ty PRs, or other work when the ty type checker has been specifically mentioned by the user.
 
 ### Related skills
 
