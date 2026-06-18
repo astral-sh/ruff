@@ -5130,15 +5130,34 @@ bar(o<CURSOR>
     // Regression test for https://github.com/astral-sh/ty/issues/3803
     #[test]
     fn call_keyword_only_argument_between_variadic_parameters() {
-        for parameters in ["arg1, *arg2, special, **kw", "*args, special, **kw"] {
-            let source = format!("def func({parameters}): ...\n\nfunc(sp<CURSOR>\n");
-            completion_test_builder(&source)
-                .skip_keywords()
-                .skip_builtins()
-                .skip_auto_import()
-                .build()
-                .contains("special");
-        }
+        completion_test_builder(
+            "\
+def func(*args, special, **kw): ...
+
+func(sp<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("special");
+    }
+
+    #[test]
+    fn call_keyword_only_argument_between_variadic_parameters_after_positional_argument() {
+        completion_test_builder(
+            "\
+def func(arg1, *arg2, special, **kw): ...
+
+func(sp<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("special");
     }
 
     #[test]
