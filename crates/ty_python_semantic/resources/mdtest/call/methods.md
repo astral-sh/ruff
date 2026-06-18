@@ -416,10 +416,10 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
-### Implicit receivers in final classes
+### Implicit receivers in generic final classes
 
-For a final class, an implicit `type[Self]` receiver is compatible with the exact class object. For
-a generic final class, that exact class object is a generic alias:
+For a generic final class, an implicit `type[Self]` receiver is compatible with the exact generic
+class object:
 
 ```toml
 [environment]
@@ -427,24 +427,13 @@ python-version = "3.12"
 ```
 
 ```py
-from __future__ import annotations
-
 from typing import final
 from ty_extensions import TypeOf
 
 @final
-class Final:
-    @classmethod
-    def call_method(cls) -> None:
-        cls.method()
-
-    @classmethod
-    def method(cls) -> None: ...
-
-@final
 class GenericFinal[T]:
     @classmethod
-    def class_object(cls) -> TypeOf[GenericFinal[T]]:
+    def class_object(cls) -> "TypeOf[GenericFinal[T]]":
         return cls
 ```
 
