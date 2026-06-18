@@ -3856,6 +3856,24 @@ class ProjectionChain:
         reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[str, str]]
 ```
 
+Several recursive attributes can exchange projected values:
+
+```py
+class ProjectionCorrelatedAttributes:
+    def __init__(self) -> None:
+        self.left = [(0, "")]
+        self.right = [("", 0)]
+
+    def read(self) -> None:
+        for left_number, left_text in self.left:
+            for right_text, right_number in self.right:
+                self.left = [(right_text, right_number)]
+                self.right = [(left_text, left_number)]
+
+        reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[int | str, str | int]]
+        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
+```
+
 Deeply nested projections are inferred correctly:
 
 ```py
