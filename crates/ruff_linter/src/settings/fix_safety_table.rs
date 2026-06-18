@@ -171,11 +171,11 @@ mod tests {
         FixSafetyTable::from_rule_selectors(
             &safe_fixes
                 .iter()
-                .map(|s| UnresolvedRuleSelector::new(*s))
+                .map(|s| UnresolvedRuleSelector::cli(*s))
                 .collect::<Vec<_>>(),
             &unsafe_fixes
                 .iter()
-                .map(|s| UnresolvedRuleSelector::new(*s))
+                .map(|s| UnresolvedRuleSelector::cli(*s))
                 .collect::<Vec<_>>(),
             &PreviewOptions::default(),
         )

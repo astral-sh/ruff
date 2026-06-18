@@ -1857,8 +1857,8 @@ mod tests {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![
-                    UnresolvedRuleSelector::new("E"),
-                    UnresolvedRuleSelector::new("W"),
+                    UnresolvedRuleSelector::cli("E"),
+                    UnresolvedRuleSelector::cli("W"),
                 ]),
                 ..RuleSelection::default()
             }],
@@ -1900,7 +1900,7 @@ mod tests {
     fn select_one_char_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("W")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("W")]),
                 ..RuleSelection::default()
             }],
             None,
@@ -1922,7 +1922,7 @@ mod tests {
     fn select_two_char_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("W6")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("W6")]),
                 ..RuleSelection::default()
             }],
             None,
@@ -1936,8 +1936,8 @@ mod tests {
     fn select_prefix_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("W")]),
-                ignore: vec![UnresolvedRuleSelector::new("W292")],
+                select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                ignore: vec![UnresolvedRuleSelector::cli("W292")],
                 ..RuleSelection::default()
             }],
             None,
@@ -1957,8 +1957,8 @@ mod tests {
     fn select_code_ignore_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("W292")]),
-                ignore: vec![UnresolvedRuleSelector::new("W")],
+                select: Some(vec![UnresolvedRuleSelector::cli("W292")]),
+                ignore: vec![UnresolvedRuleSelector::cli("W")],
                 ..RuleSelection::default()
             }],
             None,
@@ -1972,8 +1972,8 @@ mod tests {
     fn select_code_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("W605")]),
-                ignore: vec![UnresolvedRuleSelector::new("W605")],
+                select: Some(vec![UnresolvedRuleSelector::cli("W605")]),
+                ignore: vec![UnresolvedRuleSelector::cli("W605")],
                 ..RuleSelection::default()
             }],
             None,
@@ -1988,12 +1988,12 @@ mod tests {
         let actual = resolve_rules(
             [
                 RuleSelection {
-                    select: Some(vec![UnresolvedRuleSelector::new("W")]),
-                    ignore: vec![UnresolvedRuleSelector::new("W292")],
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    extend_select: vec![UnresolvedRuleSelector::new("W292")],
+                    extend_select: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
             ],
@@ -2016,13 +2016,13 @@ mod tests {
         let actual = resolve_rules(
             [
                 RuleSelection {
-                    select: Some(vec![UnresolvedRuleSelector::new("W")]),
-                    ignore: vec![UnresolvedRuleSelector::new("W292")],
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    extend_select: vec![UnresolvedRuleSelector::new("W292")],
-                    ignore: vec![UnresolvedRuleSelector::new("W")],
+                    extend_select: vec![UnresolvedRuleSelector::cli("W292")],
+                    ignore: vec![UnresolvedRuleSelector::cli("W")],
                     ..RuleSelection::default()
                 },
             ],
@@ -2039,11 +2039,11 @@ mod tests {
             [
                 RuleSelection {
                     select: Some(vec![]),
-                    ignore: vec![UnresolvedRuleSelector::new("W292")],
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    select: Some(vec![UnresolvedRuleSelector::new("W")]),
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
                     ..RuleSelection::default()
                 },
             ],
@@ -2066,12 +2066,12 @@ mod tests {
             [
                 RuleSelection {
                     select: Some(vec![]),
-                    ignore: vec![UnresolvedRuleSelector::new("W292")],
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    select: Some(vec![UnresolvedRuleSelector::new("W")]),
-                    ignore: vec![UnresolvedRuleSelector::new("W505")],
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                    ignore: vec![UnresolvedRuleSelector::cli("W505")],
                     ..RuleSelection::default()
                 },
             ],
@@ -2091,7 +2091,7 @@ mod tests {
     fn select_all_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("ALL")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("ALL")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2103,7 +2103,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("ALL")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("ALL")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2120,7 +2120,7 @@ mod tests {
     fn select_linter_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("CPY")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2133,7 +2133,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("CPY")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2150,7 +2150,7 @@ mod tests {
     fn select_prefix_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("CPY0")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2163,7 +2163,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("CPY0")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2181,7 +2181,7 @@ mod tests {
         // Test inclusion when toggling preview on and off
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("FURB145")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("FURB145")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2194,7 +2194,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("FURB145")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("FURB145")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2208,7 +2208,7 @@ mod tests {
         // Test inclusion when preview is on but explicit codes are required
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::new("FURB145")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("FURB145")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2259,8 +2259,8 @@ mod tests {
             Ok(())
         }
 
-        let d41 = UnresolvedRuleSelector::new("D41");
-        let d417 = UnresolvedRuleSelector::new("D417");
+        let d41 = UnresolvedRuleSelector::cli("D41");
+        let d417 = UnresolvedRuleSelector::cli("D417");
 
         // D417 does not appear when D41 is provided...
         assert_override(

@@ -757,8 +757,8 @@ mod tests {
                     format_preview: None,
                     format_backend: None,
                     select: Some(vec![
-                        UnresolvedRuleSelector::new("F"),
-                        UnresolvedRuleSelector::new("I"),
+                        UnresolvedRuleSelector::cli("F"),
+                        UnresolvedRuleSelector::cli("I"),
                     ]),
                     extend_select: None,
                     ignore: None,
@@ -795,8 +795,8 @@ mod tests {
                     format_preview: None,
                     format_backend: None,
                     select: Some(vec![
-                        UnresolvedRuleSelector::new("F"),
-                        UnresolvedRuleSelector::new("I"),
+                        UnresolvedRuleSelector::cli("F"),
+                        UnresolvedRuleSelector::cli("I"),
                     ]),
                     extend_select: None,
                     ignore: None,
@@ -897,7 +897,7 @@ mod tests {
                     format_backend: None,
                     select: None,
                     extend_select: None,
-                    ignore: Some(vec![UnresolvedRuleSelector::new("RUF001")]),
+                    ignore: Some(vec![UnresolvedRuleSelector::cli("RUF001")]),
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,
@@ -978,7 +978,7 @@ mod tests {
                         line_length: Some(LineLength::try_from(100).unwrap()),
                         lint: Some(LintOptions {
                             common: LintCommonOptions {
-                                extend_select: Some(vec![UnresolvedRuleSelector::new("I001",)]),
+                                extend_select: Some(vec![UnresolvedRuleSelector::cli("I001",)]),
                                 ..Default::default()
                             },
                             ..Default::default()
@@ -989,7 +989,7 @@ mod tests {
                         }),
                         ..Default::default()
                     }))),
-                    extend_select: Some(vec![UnresolvedRuleSelector::new("RUF001")]),
+                    extend_select: Some(vec![UnresolvedRuleSelector::cli("RUF001")]),
                     ..Default::default()
                 }
             }

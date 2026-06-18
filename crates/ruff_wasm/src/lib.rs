@@ -317,7 +317,7 @@ impl Workspace {
                             .iter()
                             .map(|selector| {
                                 let (prefix, code) = selector.prefix_and_code();
-                                UnresolvedRuleSelector::new(format!("{prefix}{code}"))
+                                UnresolvedRuleSelector::cli(format!("{prefix}{code}"))
                             })
                             .collect(),
                     ),

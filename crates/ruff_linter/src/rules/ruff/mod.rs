@@ -591,7 +591,7 @@ mod tests {
         settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(
             vec![PerFileIgnore::new(
                 "RUF100_2.py".to_string(),
-                vec![UnresolvedRuleSelector::new("F401")],
+                vec![UnresolvedRuleSelector::cli("F401")],
                 None,
             )],
             PreviewMode::Disabled,
@@ -696,8 +696,8 @@ mod tests {
                     vec![PerFileIgnore::new(
                         "ruff_per_file_ignores.py".to_string(),
                         vec![
-                            UnresolvedRuleSelector::new("F401"),
-                            UnresolvedRuleSelector::new("RUF100"),
+                            UnresolvedRuleSelector::cli("F401"),
+                            UnresolvedRuleSelector::cli("RUF100"),
                         ],
                         None,
                     )],
@@ -719,7 +719,7 @@ mod tests {
                 per_file_ignores: CompiledPerFileIgnoreList::resolve(
                     vec![PerFileIgnore::new(
                         "ruff_per_file_ignores.py".to_string(),
-                        vec![UnresolvedRuleSelector::new("RUF100")],
+                        vec![UnresolvedRuleSelector::cli("RUF100")],
                         None,
                     )],
                     PreviewMode::Disabled,

@@ -96,6 +96,10 @@ impl UnresolvedRuleSelector {
         }
     }
 
+    pub fn cli(selector: impl Into<String>) -> Self {
+        Self::new(selector, RuleSelectorSource::Cli)
+    }
+
     pub fn with_range(
         selector: impl Into<String>,
         source: RuleSelectorSource,
@@ -530,7 +534,7 @@ pub mod clap_completion {
     use crate::{
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
-        rule_selector::{RuleSelectorSource, UnresolvedRuleSelector, is_single_rule_selector},
+        rule_selector::{UnresolvedRuleSelector, is_single_rule_selector},
     };
 
     #[derive(Clone)]
@@ -557,7 +561,7 @@ pub mod clap_completion {
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            Ok(UnresolvedRuleSelector::new(value, RuleSelectorSource::Cli))
+            Ok(UnresolvedRuleSelector::cli(value))
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {

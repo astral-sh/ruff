@@ -370,7 +370,7 @@ select = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            select: Some(vec![UnresolvedRuleSelector::new("E501")]),
+                            select: Some(vec![UnresolvedRuleSelector::cli("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -394,8 +394,8 @@ ignore = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            extend_select: Some(vec![UnresolvedRuleSelector::new("RUF100",)]),
-                            ignore: Some(vec![UnresolvedRuleSelector::new("E501")]),
+                            extend_select: Some(vec![UnresolvedRuleSelector::cli("RUF100",)]),
+                            ignore: Some(vec![UnresolvedRuleSelector::cli("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -575,7 +575,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
                     common: LintCommonOptions {
                         per_file_ignores: Some(FxHashMap::from_iter([(
                             "__init__.py".to_string(),
-                            vec![UnresolvedRuleSelector::new("F401")]
+                            vec![UnresolvedRuleSelector::cli("F401")]
                         )])),
                         ..LintCommonOptions::default()
                     },
