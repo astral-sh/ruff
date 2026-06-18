@@ -3674,23 +3674,48 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        // TODO: Remove this temporary fallback once callable TypeVarTuple inference is supported.
-        if let ([parameter], [mapped_parameter]) = (self.data.value.as_ref(), value.as_ref())
-            && parameter.is_variadic()
-            && parameter.has_starred_annotation()
-            && matches!(
-                parameter.annotated_type(),
-                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-            )
-            && let Some(tuple) = mapped_parameter
-                .annotated_type()
-                .exact_tuple_instance_spec(db)
-            && let Tuple::Variable(variable) = tuple.as_ref()
-            && variable.prefix_elements().is_empty()
-            && variable.variable().is_unknown()
-            && variable.suffix_elements().is_empty()
+        let typevartuple_index = self.data.value.iter().position(|parameter| {
+            parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && matches!(
+                    parameter.annotated_type(),
+                    Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                )
+        });
+        if let Some(index) = typevartuple_index
+            && let Some(tuple) = value[index].annotated_type().exact_tuple_instance_spec(db)
         {
-            return Self::unknown();
+            match tuple.as_ref() {
+                Tuple::Fixed(tuple) => {
+                    let mut expanded = Vec::with_capacity(
+                        value.len().saturating_sub(1) + tuple.elements_slice().len(),
+                    );
+                    expanded.extend_from_slice(&value[..index]);
+                    expanded.extend(tuple.iter_all_elements().map(|element| {
+                        Parameter::positional_only(None).with_annotated_type(element)
+                    }));
+                    expanded.extend_from_slice(&value[index + 1..]);
+                    return Self::new(db, expanded);
+                }
+                // TODO: Infer callable TypeVarTuples instead of replacing an unsolved pack with
+                // a gradual tail. Fixed parameters are retained so that supported information is
+                // not discarded while pack inference is deferred.
+                Tuple::Variable(variable)
+                    if variable.variable().is_unknown()
+                        && variable.suffix_elements().is_empty()
+                        && value[index + 1..].is_empty() =>
+                {
+                    let mut prefix = Vec::with_capacity(index + variable.prefix_elements().len());
+                    prefix.extend_from_slice(&value[..index]);
+                    prefix.extend(variable.iter_prefix_elements().map(|element| {
+                        Parameter::positional_only(None).with_annotated_type(element)
+                    }));
+                    if prefix.iter().all(Parameter::is_positional) {
+                        return Self::concatenate(db, prefix, ConcatenateTail::Gradual);
+                    }
+                }
+                _ => {}
+            }
         }
 
         Self::from_parts(value, self.data.kind)

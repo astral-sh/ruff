@@ -62,3 +62,28 @@ class Derived(Base[Unpack[Ts]]):
 def construct(value: Base) -> None:
     Derived(value)
 ```
+
+## Constrained type variables
+
+An unspecialized variadic constraint satisfies the corresponding method's `Self` upper bound.
+
+```py
+from typing import Any, Generic, TypeVar, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
+
+class C(Generic[Unpack[Ts]]):
+    def method(self) -> None: ...
+
+class D(Generic[Unpack[Us]]):
+    def method(self) -> None: ...
+
+T = TypeVar("T", C[Unpack[tuple[Any, ...]]], D[Unpack[tuple[Any, ...]]])
+
+class Interface(Generic[T]):
+    def call(self, value: T) -> None:
+        # TODO: Remove the temporary constrained-Self fallback once TypeVarTuple solving is
+        # implemented.
+        value.method()
+```

@@ -2698,10 +2698,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             );
                             return Ok(());
                         }
-                        if !ty
+                        let satisfies_bound = ty
                             .when_assignable_to(self.db, bound, self.constraints, self.inferable)
-                            .is_always_satisfied(self.db)
-                        {
+                            .is_always_satisfied(self.db);
+
+                        // TODO: Remove this fallback once TypeVarTuple solving can bind a
+                        // constrained receiver to the matching variadic `Self` specialization.
+                        let constrained_receiver_satisfies_variadic_self = bound_typevar
+                            .typevar(self.db)
+                            .is_self(self.db)
+                            && bound.class_specialization(self.db).is_some_and(
+                                |(_, specialization)| {
+                                    specialization
+                                        .generic_context(self.db)
+                                        .variables(self.db)
+                                        .any(|typevar| typevar.is_typevartuple(self.db))
+                                },
+                            )
+                            && matches!(ty, Type::TypeVar(actual) if actual
+                                .typevar(self.db)
+                                .constraints(self.db)
+                                .is_some_and(|constraints| constraints.iter().any(|constraint| constraint
+                                    .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                                    .is_always_satisfied(self.db))));
+
+                        if !satisfies_bound && !constrained_receiver_satisfies_variadic_self {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,

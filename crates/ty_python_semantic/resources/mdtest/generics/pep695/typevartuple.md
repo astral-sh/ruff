@@ -65,3 +65,59 @@ def target(first: int, second: str) -> None: ...
 
 reveal_type(accepts(target))  # revealed: tuple[Unknown, ...]
 ```
+
+## Fixed parameters before an unsolved pack
+
+Until callable pack inference is implemented, the unsolved tail is gradual while the fixed
+parameters remain known.
+
+```py
+from typing import Callable
+
+class Callback[*Ts]:
+    def __init__(self, callback: Callable[[int, *Ts], None]) -> None: ...
+
+def target(value: int) -> None: ...
+
+# TODO: Infer `Ts` from `target` instead of using a gradual callable tail.
+Callback(target)
+```
+
+## Explicitly specialized callable packs
+
+Concrete packs expand to ordinary callable parameters, and an empty pack contributes no parameters.
+
+```py
+from collections.abc import Awaitable, Callable
+
+class Signal[*Ts](list[Callable[[*Ts], Awaitable[object]]]):
+    pass
+
+async def callback(value: int) -> None: ...
+
+Signal[int]().append(callback)
+
+class Callback[*Ts]:
+    def __init__(self, callback: Callable[[int, *Ts], int]) -> None: ...
+
+def target(value: int) -> int:
+    return value
+
+Callback[()](target)
+```
+
+## Specialization relations
+
+Variadic specializations are related using the structure of their tuple arguments.
+
+```py
+class C[*Ts]:
+    pass
+
+def homogeneous(value: C[*tuple[int, ...]]) -> None: ...
+
+homogeneous(C[int, int]())
+
+def mixed(source: C[int, int, bool]) -> None:
+    target: C[*tuple[int, ...], bool] = source
+```
