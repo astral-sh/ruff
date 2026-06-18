@@ -739,9 +739,8 @@ print("after empty cells")
         Ok(())
     }
 
-    #[test]
-    fn update_keeps_insertion_at_cell_start_in_that_cell() -> Result<(), NotebookError> {
-        let mut notebook = Notebook::from_source_code(
+    fn two_cell_notebook() -> Result<Notebook, NotebookError> {
+        Notebook::from_source_code(
             r##"{
  "cells": [
   {
@@ -763,7 +762,12 @@ print("after empty cells")
  "nbformat": 4,
  "nbformat_minor": 4
 }"##,
-        )?;
+        )
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_cell_start_in_that_cell() -> Result<(), NotebookError> {
+        let mut notebook = two_cell_notebook()?;
 
         let mut source_map = SourceMap::default();
         source_map.push_marker(6.into(), 6.into());
@@ -780,6 +784,30 @@ print("after empty cells")
         assert_eq!(
             notebook.cell_offsets().as_ref(),
             &[0.into(), 6.into(), 33.into()]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_end_in_non_final_cell() -> Result<(), NotebookError> {
+        let mut notebook = two_cell_notebook()?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(5.into(), 5.into());
+        source_map.push_marker(5.into(), 16.into());
+        notebook.update(
+            &source_map,
+            "x = 1  # comment\nx.method(inplace=True)\n".to_string(),
+        );
+
+        assert_eq!(
+            notebook.source_code(),
+            "x = 1  # comment\nx.method(inplace=True)\n"
+        );
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 17.into(), 40.into()]
         );
 
         Ok(())
