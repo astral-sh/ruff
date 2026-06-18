@@ -4554,7 +4554,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
 enum CurrentAssignment<'ast, 'db> {
     Assign {
         node: &'ast ast::StmtAssign,
-        unpack: Option<(UnpackPosition, Unpack<'db>)>,
+        unpack: Option<Unpack<'db>>,
     },
     AnnAssign(&'ast ast::StmtAnnAssign),
     AugAssign(&'ast ast::StmtAugAssign),
@@ -4578,11 +4578,10 @@ enum CurrentAssignment<'ast, 'db> {
 impl CurrentAssignment<'_, '_> {
     fn unpack_position_mut(&mut self) -> Option<&mut UnpackPosition> {
         match self {
-            Self::Assign { unpack, .. }
-            | Self::For { unpack, .. }
+            Self::For { unpack, .. }
             | Self::WithItem { unpack, .. }
             | Self::Comprehension { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
-            Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
+            Self::Assign { .. } | Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
         }
     }
 }
@@ -4674,19 +4673,22 @@ impl<'ast> Unpackable<'ast> {
         &self,
         unpack: Option<Unpack<'db>>,
     ) -> CurrentAssignment<'ast, 'db> {
-        let unpack = unpack.map(|unpack| (UnpackPosition::First, unpack));
+        let positioned = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
             Unpackable::Assign(stmt) => CurrentAssignment::Assign { node: stmt, unpack },
-            Unpackable::For(stmt) => CurrentAssignment::For { node: stmt, unpack },
+            Unpackable::For(stmt) => CurrentAssignment::For {
+                node: stmt,
+                unpack: positioned,
+            },
             Unpackable::WithItem { item, is_async } => CurrentAssignment::WithItem {
                 item,
                 is_async: *is_async,
-                unpack,
+                unpack: positioned,
             },
             Unpackable::Comprehension { node, first } => CurrentAssignment::Comprehension {
                 node,
                 first: *first,
-                unpack,
+                unpack: positioned,
             },
         }
     }

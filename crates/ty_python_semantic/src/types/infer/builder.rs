@@ -3685,14 +3685,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value = assignment.value(self.module());
         let target = assignment.target(self.module());
 
-        let mut target_ty = match assignment.target_kind() {
-            TargetKind::Sequence(_, unpack) => {
+        let mut target_ty = match assignment.unpack() {
+            Some(unpack) => {
                 // The assignment statement owns unpacking diagnostics so that targets without a
                 // name definition are still checked, and each diagnostic is reported only once.
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 unpacked.expression_type(target)
             }
-            TargetKind::Single => {
+            None => {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
                 // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
                 // order to bind `T` to `OptionalList`.

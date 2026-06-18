@@ -2365,8 +2365,8 @@ impl<'db> StaticClassLiteral<'db> {
                         // nothing to do here.
                         None
                     }
-                    DefinitionKind::Assignment(assign) => match assign.target_kind() {
-                        TargetKind::Sequence(_, unpack) => {
+                    DefinitionKind::Assignment(assign) => match assign.unpack() {
+                        Some(unpack) => {
                             // We found an unpacking assignment like:
                             //
                             //     .., self.name, .. = <value>
@@ -2376,7 +2376,7 @@ impl<'db> StaticClassLiteral<'db> {
                             let unpacked = infer_unpack_types(db, unpack);
                             Some(unpacked.expression_type(assign.target(&module)))
                         }
-                        TargetKind::Single => {
+                        None => {
                             // We found an un-annotated attribute assignment of the form:
                             //
                             //     self.name = <value>
