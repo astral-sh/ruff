@@ -242,6 +242,7 @@
 use std::collections::hash_map::Entry;
 use std::ops::Index;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
@@ -552,6 +553,43 @@ enum InternedEnclosingSnapshotId {
     Bindings(InternedBindingsId),
 }
 
+/// Lookup tables needed to evaluate reachability and narrowing constraints.
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct ConstraintTables<'db> {
+    predicates: Predicates<'db>,
+    reachability_constraints: ReachabilityConstraints,
+    narrowing_constraints: NarrowingConstraints,
+}
+
+/// Fields that are empty in most use-def maps.
+///
+/// These fields share an allocation to avoid storing four collection headers in every
+/// [`UseDefMap`]. They are not otherwise semantically related.
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct UseDefMapExtra {
+    /// [`Bindings`] reaching a [`ScopedUseId`].
+    bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+
+    /// [`Bindings`] for each member reaching a [`ScopedUseId`].
+    ///
+    /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
+    /// is empty.
+    multi_bindings_by_use: MultiBindingsByUse,
+
+    /// Retained [`PlaceState`] values for each member.
+    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates<InternedPlaceStateId>>,
+
+    /// Snapshots of bindings used to resolve references from nested scopes.
+    enclosing_snapshots: FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
+}
+
+static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
+    LazyLock::new(|| ConstraintTables {
+        predicates: IndexVec::new().into(),
+        reachability_constraints: ReachabilityConstraintsBuilder::default().build(),
+        narrowing_constraints: NarrowingConstraintsBuilder::default().build(),
+    });
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct UseDefMap<'db> {
@@ -564,28 +602,14 @@ pub struct UseDefMap<'db> {
     /// This uses the same index as `all_definitions`.
     used_bindings: FrozenIndexVec<ScopedDefinitionId, bool>,
 
-    /// Array of predicates in this scope.
-    predicates: Predicates<'db>,
-
-    /// Array of reachability constraints in this scope.
-    reachability_constraints: ReachabilityConstraints,
-
-    /// Array of narrowing constraints in this scope.
-    narrowing_constraints: NarrowingConstraints,
+    /// Constraint lookup tables, absent when all retained constraints are built-in terminal
+    /// values that require no table lookup.
+    constraint_tables: Option<Box<ConstraintTables<'db>>>,
 
     /// Interned [`Bindings`] values.
     interned_bindings: RetainedBindings,
     /// Interned [`Declarations`] values.
     interned_declarations: RetainedDeclarations,
-
-    /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
-
-    /// [`Bindings`] for each member reaching a [`ScopedUseId`].
-    ///
-    /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
-    /// is empty.
-    multi_bindings_by_use: MultiBindingsByUse,
 
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
@@ -613,12 +637,8 @@ pub struct UseDefMap<'db> {
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
 
-    /// Retained [`PlaceState`] values for each member.
-    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates<InternedPlaceStateId>>,
-
-    /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
-    /// scope.
-    enclosing_snapshots: FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
+    /// Collection fields omitted when they would all be empty.
+    extra: Option<Box<UseDefMapExtra>>,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -674,16 +694,28 @@ pub enum ApplicableConstraints<'map, 'db> {
 }
 
 impl<'db> UseDefMap<'db> {
+    fn constraint_tables(&self) -> &ConstraintTables<'db> {
+        self.constraint_tables
+            .as_deref()
+            .map_or(&EMPTY_CONSTRAINT_TABLES, |tables| tables)
+    }
+
+    fn extra(&self) -> &UseDefMapExtra {
+        self.extra
+            .as_deref()
+            .expect("bindings and member states should have been retained")
+    }
+
     pub fn reachability_constraints(&self) -> &ReachabilityConstraints {
-        &self.reachability_constraints
+        &self.constraint_tables().reachability_constraints
     }
 
     pub fn narrowing_constraints(&self) -> &NarrowingConstraints {
-        &self.narrowing_constraints
+        &self.constraint_tables().narrowing_constraints
     }
 
     pub fn predicates(&self) -> &Predicates<'db> {
-        &self.predicates
+        &self.constraint_tables().predicates
     }
 
     pub fn range_reachability(
@@ -707,7 +739,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.bindings_by_use[use_id];
+        let bindings_id = self.extra().bindings_by_use[use_id];
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -718,8 +750,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
-        self.multi_bindings_by_use
-            .get(use_id)
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.multi_bindings_by_use.get(use_id))
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
                     self.bindings_iterator(
@@ -743,8 +776,7 @@ impl<'db> UseDefMap<'db> {
             ConstraintKey::NarrowingConstraint(constraint) => {
                 ApplicableConstraints::UnboundBinding(NarrowingEvaluator {
                     constraint,
-                    predicates: &self.predicates,
-                    narrowing_constraints: &self.narrowing_constraints,
+                    constraint_tables: self.constraint_tables(),
                 })
             }
             ConstraintKey::NestedScope(nested_scope) => {
@@ -773,8 +805,7 @@ impl<'db> UseDefMap<'db> {
     ) -> NarrowingEvaluator<'_, 'db> {
         NarrowingEvaluator {
             constraint,
-            predicates: &self.predicates,
-            narrowing_constraints: &self.narrowing_constraints,
+            constraint_tables: self.constraint_tables(),
         }
     }
 
@@ -811,7 +842,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].end_of_scope;
+        let place_state_id = self.extra().member_states[member].end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -841,7 +872,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].reachable;
+        let place_state_id = self.extra().member_states[member].reachable;
         let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
@@ -858,7 +889,11 @@ impl<'db> UseDefMap<'db> {
             BoundnessAnalysis::AssumeBound
         };
 
-        match self.enclosing_snapshots.get(snapshot_id) {
+        let Some(extra) = self.extra.as_deref() else {
+            return EnclosingSnapshotResult::NotFound;
+        };
+
+        match extra.enclosing_snapshots.get(snapshot_id) {
             Some(InternedEnclosingSnapshotId::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
@@ -921,7 +956,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.member_states[member].end_of_scope;
+        let place_state_id = self.extra().member_states[member].end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -939,7 +974,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].reachable;
+        let place_state_id = self.extra().member_states[member].reachable;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
@@ -999,9 +1034,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
-            predicates: &self.predicates,
-            narrowing_constraints: &self.narrowing_constraints,
-            reachability_constraints: &self.reachability_constraints,
+            constraint_tables: self.constraint_tables(),
             boundness_analysis,
             inner: bindings.iter(),
         }
@@ -1014,8 +1047,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
-            predicates: &self.predicates,
-            reachability_constraints: &self.reachability_constraints,
+            constraint_tables: self.constraint_tables(),
             boundness_analysis,
             inner: declarations.iter(),
         }
@@ -1055,20 +1087,18 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 #[derive(Clone, Debug)]
 pub struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
-    predicates: &'map Predicates<'db>,
-    narrowing_constraints: &'map NarrowingConstraints,
-    reachability_constraints: &'map ReachabilityConstraints,
+    constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     inner: LiveBindingsIterator<'map>,
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
     pub const fn predicates(&self) -> &'map Predicates<'db> {
-        self.predicates
+        &self.constraint_tables.predicates
     }
 
     pub const fn reachability_constraints(&self) -> &'map ReachabilityConstraints {
-        self.reachability_constraints
+        &self.constraint_tables.reachability_constraints
     }
 
     pub const fn boundness_analysis(&self) -> BoundnessAnalysis {
@@ -1080,9 +1110,6 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
     type Item = BindingWithConstraints<'map, 'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let predicates = self.predicates;
-        let narrowing_constraints = self.narrowing_constraints;
-
         self.inner
             .next()
             .map(|live_binding| BindingWithConstraints {
@@ -1090,8 +1117,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                 binding_order: live_binding.binding(),
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: live_binding.narrowing_constraint(),
-                    predicates,
-                    narrowing_constraints,
+                    constraint_tables: self.constraint_tables,
                 },
                 reachability_constraint: live_binding.reachability_constraint(),
             })
@@ -1110,8 +1136,7 @@ pub struct BindingWithConstraints<'map, 'db> {
 
 pub struct NarrowingEvaluator<'map, 'db> {
     constraint: ScopedNarrowingConstraint,
-    predicates: &'map Predicates<'db>,
-    narrowing_constraints: &'map NarrowingConstraints,
+    constraint_tables: &'map ConstraintTables<'db>,
 }
 
 impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
@@ -1120,30 +1145,29 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
     }
 
     pub fn predicates(&self) -> &'map Predicates<'db> {
-        self.predicates
+        &self.constraint_tables.predicates
     }
 
     pub fn narrowing_constraints(&self) -> &'map NarrowingConstraints {
-        self.narrowing_constraints
+        &self.constraint_tables.narrowing_constraints
     }
 }
 
 #[derive(Clone)]
 pub struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
-    predicates: &'map Predicates<'db>,
-    reachability_constraints: &'map ReachabilityConstraints,
+    constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     inner: LiveDeclarationsIterator<'map>,
 }
 
 impl<'map, 'db> DeclarationsIterator<'map, 'db> {
     pub const fn predicates(&self) -> &'map Predicates<'db> {
-        self.predicates
+        &self.constraint_tables.predicates
     }
 
     pub const fn reachability_constraints(&self) -> &'map ReachabilityConstraints {
-        self.reachability_constraints
+        &self.constraint_tables.reachability_constraints
     }
 
     pub const fn boundness_analysis(&self) -> BoundnessAnalysis {
@@ -2414,22 +2438,40 @@ impl<'db> UseDefMapBuilder<'db> {
         let member_states =
             Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
+        let extra = (!bindings_by_use.is_empty()
+            || !member_states.is_empty()
+            || !enclosing_snapshots.is_empty())
+        .then(|| {
+            Box::new(UseDefMapExtra {
+                bindings_by_use: bindings_by_use.into(),
+                multi_bindings_by_use,
+                member_states,
+                enclosing_snapshots: enclosing_snapshots.into(),
+            })
+        });
+        let predicates = self.predicates.build();
+        let reachability_constraints = self.reachability_constraints.build();
+        let narrowing_constraints = self.narrowing_constraints.build();
+        let constraint_tables = (!reachability_constraints.used_interiors().is_empty()
+            || !narrowing_constraints.is_empty())
+        .then(|| {
+            Box::new(ConstraintTables {
+                predicates,
+                reachability_constraints,
+                narrowing_constraints,
+            })
+        });
 
         UseDefMap {
             all_definitions: self.all_definitions.into(),
             used_bindings: self.used_bindings.into(),
-            predicates: self.predicates.build(),
-            reachability_constraints: self.reachability_constraints.build(),
-            narrowing_constraints: self.narrowing_constraints.build(),
+            constraint_tables,
             interned_bindings,
             interned_declarations,
-            bindings_by_use: bindings_by_use.into(),
-            multi_bindings_by_use,
             range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
-            member_states,
             definitions_by_definition,
-            enclosing_snapshots: enclosing_snapshots.into(),
+            extra,
             end_of_scope_reachability: self.reachability,
         }
     }

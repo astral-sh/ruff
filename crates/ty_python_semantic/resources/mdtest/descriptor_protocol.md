@@ -243,6 +243,166 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 C2().attr = 1
 ```
 
+### Classes with unknown bases are not automatically descriptors
+
+When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written
+on the class still makes it a descriptor, but we do not assume that `Unknown` supplies `__set__` or
+`__delete__`. A `__set__` method written on the class still makes it a data descriptor:
+
+```py
+from typing import Literal
+from unknown_module import UnknownBase  # error: [unresolved-import]
+
+class NotADescriptor(UnknownBase): ...
+
+class NonDataDescriptor(UnknownBase):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+
+class DataDescriptor(UnknownBase):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class C:
+    plain: NotADescriptor
+    non_data: NonDataDescriptor
+    data: DataDescriptor
+
+reveal_type(C().plain)  # revealed: NotADescriptor
+reveal_type(C().non_data)  # revealed: Literal["non-data"] | NonDataDescriptor
+reveal_type(C().data)  # revealed: Literal["data"]
+```
+
+An `Any` base follows the same rule. A `__get__` method written on the class still makes it a
+descriptor, but we do not assume that `Any` supplies `__set__` or `__delete__`. A `__set__` method
+written on the class still makes it a data descriptor:
+
+```py
+from typing import Any, Literal
+
+class NotADescriptor(Any): ...
+
+class NonDataDescriptor(Any):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+
+class DataDescriptor(Any):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class C:
+    plain: NotADescriptor
+    non_data: NonDataDescriptor
+    data: DataDescriptor
+
+reveal_type(C().plain)  # revealed: NotADescriptor
+reveal_type(C().non_data)  # revealed: Literal["non-data"] | NonDataDescriptor
+reveal_type(C().data)  # revealed: Literal["data"]
+
+class OptionalAttribute:
+    value: NotADescriptor | None
+
+optional_attribute = OptionalAttribute()
+optional_attribute.value = NotADescriptor()
+
+# The assignment can narrow because `NotADescriptor` has no concrete `__set__` or `__delete__`
+# method.
+reveal_type(optional_attribute.value)  # revealed: NotADescriptor
+```
+
+An `Any` base that appears before another base class may override that class's `__get__` method at
+runtime. We still use the later method to determine that the class is a descriptor, but its return
+type must account for the earlier `Any` base:
+
+```py
+class DynamicBase:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["dynamic"]:
+        return "dynamic"
+
+class ConcreteBase:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["concrete"]:
+        return "concrete"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+AnyBase: Any = DynamicBase
+
+class Descriptor(AnyBase, ConcreteBase): ...
+
+class DescriptorOwner:
+    attribute: Descriptor = Descriptor()
+
+reveal_type(DescriptorOwner().attribute)  # revealed: Literal["concrete"] & Any
+```
+
+### Dynamically typed metaclass attributes
+
+A metaclass attribute typed as `Any` could itself be a data descriptor. When the attribute is read
+on a class, it therefore takes precedence over a class attribute with the same name. The same
+applies when `Any` is one arm of a union:
+
+```py
+from typing import Any, Literal
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["descriptor"]:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class Meta(type):
+    attribute: Any = DataDescriptor()
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+reveal_type(C.attribute)  # revealed: Any
+
+class UnionMeta(type):
+    attribute: Any | DataDescriptor = DataDescriptor()
+
+class UnionC(metaclass=UnionMeta):
+    attribute: int = 1
+
+reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
+```
+
+### Class objects with unknown metaclasses
+
+A `type[Any]` value could contain a class whose metaclass implements the descriptor protocol. We
+therefore preserve the possibility that an attribute typed as `type[Any]` is a data descriptor, both
+when reading the attribute and after assigning to it:
+
+```py
+from typing import Any
+
+class DescriptorMeta(type):
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class Descriptor(metaclass=DescriptorMeta): ...
+
+class C:
+    attribute: type[Any] = Descriptor
+
+c = C()
+reveal_type(c.attribute)  # revealed: Any
+
+c.attribute = int
+reveal_type(c.attribute)  # revealed: Any
+```
+
 ### Descriptors only work when used as class variables
 
 Descriptors only work when used as class variables. When put in instances, they have no effect.

@@ -558,7 +558,89 @@ arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow
 In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
 rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
 
-More examples follow.
+A final subclass with inherited builtin equality can compare equal to a literal despite being
+disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
+
+```py
+from typing import Final, final
+
+@final
+class FinalPatternInt(int): ...
+
+class PatternValues:
+    ONE: Final = 1
+
+def _(value: FinalPatternInt):
+    match value:
+        case 1 as captured:
+            reveal_type(value)  # revealed: FinalPatternInt
+            reveal_type(captured)  # revealed: @Todo(`match` pattern definition types)
+
+    match value:
+        case PatternValues.ONE:
+            reveal_type(value)  # revealed: FinalPatternInt
+```
+
+Some precisely modeled objects compare equal to themselves, so an equivalent value pattern is
+exhaustive:
+
+```py
+from types import FunctionType
+from typing import NewType, TypeVar
+
+T = TypeVar("T")
+UserId = NewType("UserId", int)
+
+class ReflexivePatternValues:
+    LIST_INT = list[int]
+    TYPE_VAR = T
+    NEW_TYPE = UserId
+
+def generic_alias_value_pattern() -> int:
+    match list[int]:
+        case ReflexivePatternValues.LIST_INT:
+            return 1
+
+def type_var_value_pattern() -> int:
+    match T:
+        case ReflexivePatternValues.TYPE_VAR:
+            return 1
+
+def new_type_value_pattern() -> int:
+    match UserId:
+        case ReflexivePatternValues.NEW_TYPE:
+            return 1
+
+def helper() -> None: ...
+def wrapper_descriptor_value_pattern() -> int:
+    match FunctionType.__get__:
+        case FunctionType.__get__:
+            return 1
+
+def bound_method_value_pattern() -> int:
+    match helper.__get__:
+        case helper.__get__:
+            return 1
+```
+
+Two calls that construct equivalent objects need not produce equal values. For example, separate
+`partial` objects do not compare equal, so this match is not exhaustive:
+
+```py
+from functools import partial
+
+def target(value: int) -> int:
+    return value
+
+class PartialPatternValues:
+    VALUE = partial(target, 1)
+
+# error: [invalid-return-type]
+def partial_value_pattern() -> int:
+    match partial(target, 1):
+        case PartialPatternValues.VALUE:
+            return 1
+```
 
 ```py
 from typing import Literal
@@ -580,6 +662,107 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
             reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
         case _:
             reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
+```
+
+## Enum equality semantics
+
+Enum value patterns use the enum class's actual `__eq__` implementation. Members of an enum whose
+`__eq__` resolves to `object.__eq__` compare by identity and cannot equal `None`. `StrEnum` members
+compare equal to string literals with the same value. Matching a member against itself is exhaustive
+whenever its comparison behavior is known, even if its underlying value is not:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, IntEnum, StrEnum, auto
+from typing import Literal, assert_never
+
+class Color(StrEnum):
+    RED = "r"
+    GREEN = "g"
+    BLUE = "b"
+
+def test_literal_as_enum(x: Literal["g"]) -> None:
+    match x:
+        case Color.RED:
+            assert_never(x)
+        case Color.GREEN:
+            reveal_type(x)  # revealed: Literal["g"]
+        case Color.BLUE:
+            assert_never(x)
+        case _:
+            assert_never(x)
+
+def test_enum_as_literal(y: Literal[Color.BLUE]) -> None:
+    match y:
+        case "r":
+            assert_never(y)
+        case "g":
+            assert_never(y)
+        case "b":
+            reveal_type(y)  # revealed: Literal[Color.BLUE]
+        case _:
+            assert_never(y)
+
+class Direction(Enum):
+    NORTH = "north"
+    SOUTH = "south"
+
+def enum_member_excludes_none(direction: Direction | None) -> None:
+    match direction:
+        case Direction.NORTH:
+            reveal_type(direction)  # revealed: Literal[Direction.NORTH]
+
+class Status(IntEnum):
+    READY = 1
+
+def exact_int_enum_member_is_exhaustive(status: Literal[Status.READY]) -> int:
+    match status:
+        case Status.READY:
+            return 1
+
+class First(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class Second(IntEnum):
+    ONE = 1
+    TWO = 2
+
+def cross_int_enum_members(value: First | Second) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
+        case _:
+            reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
+
+class Automatic(StrEnum):
+    GENERATED = auto()
+
+def auto_member_value_is_known(value: Literal["generated"]) -> None:
+    match value:
+        case Automatic.GENERATED:
+            return
+    assert_never(value)
+
+class AlwaysEqual(Enum):
+    RED = "r"
+    GREEN = "g"
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_eq(value: AlwaysEqual) -> None:
+    match value:
+        case AlwaysEqual.RED:
+            reveal_type(value)  # revealed: AlwaysEqual
+        case AlwaysEqual.GREEN:
+            reveal_type(value)  # revealed: AlwaysEqual
+        case _:
+            reveal_type(value)  # revealed: AlwaysEqual
 ```
 
 ## Value patterns with guard

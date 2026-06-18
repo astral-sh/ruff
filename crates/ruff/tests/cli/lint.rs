@@ -2731,7 +2731,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    foo/bar/baz/__init__.py:1:1: error[implicit-namespace-package] File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+    foo/bar/baz/__init__.py:1:1: implicit-namespace-package: File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
     Found 1 error.
 
     ----- stderr -----
@@ -3121,7 +3121,7 @@ class Foo[_T, __T]:
         pass
 
     ----- stderr -----
-    test.py:2:14: error[private-type-parameter] Generic class uses private type parameters
+    test.py:2:14: private-type-parameter: Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
     "
     );
@@ -3267,7 +3267,7 @@ class A(Generic[T]):
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:6:9: error[non-pep695-generic-class] Generic class `A` uses `Generic` subclass instead of type parameters
+    test.py:6:9: non-pep695-generic-class: Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -3409,7 +3409,7 @@ match 2:
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
@@ -3435,7 +3435,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -3448,7 +3448,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: error[invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -3556,8 +3556,8 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
-    main.py:1:20: error[undefined-name] Undefined name `foo`
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    main.py:1:20: undefined-name: Undefined name `foo`
 
     ----- stderr -----
     "
@@ -3570,8 +3570,8 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
-    main.py:1:20: error[undefined-name] Undefined name `foo`
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    main.py:1:20: undefined-name: Undefined name `foo`
 
     ----- stderr -----
     "
@@ -3588,7 +3588,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:3: error[invalid-syntax] assignment expression cannot rebind comprehension variable
+    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     Found 1 error.
 
     ----- stderr -----
@@ -3826,7 +3826,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unused-import][*]: `math` imported but unused
+    unused-import: [*] `math` imported but unused
      --> -:1:8
       |
     1 | import math
@@ -3857,13 +3857,13 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    normal.py:1:1: error[stable-test-rule] Hey this is a stable test rule.
-    normal.py:1:1: error[stable-test-rule-safe-fix] [*] Hey this is a stable test rule with a safe fix.
-    normal.py:1:1: error[stable-test-rule-unsafe-fix] Hey this is a stable test rule with an unsafe fix.
-    normal.py:1:1: error[stable-test-rule-display-only-fix] Hey this is a stable test rule with a display only fix.
-    normal.py:1:1: error[preview-test-rule] Hey this is a preview test rule.
-    normal.py:1:1: error[redirected-to-test-rule] Hey this is a test rule that was redirected from another.
-    panic.py: fatal[panic] Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    normal.py:1:1: stable-test-rule: Hey this is a stable test rule.
+    normal.py:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    normal.py:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: preview-test-rule: Hey this is a preview test rule.
+    normal.py:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -3892,27 +3892,27 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    error[stable-test-rule]: Hey this is a stable test rule.
+    stable-test-rule: Hey this is a stable test rule.
     --> normal.py:1:1
 
-    error[stable-test-rule-safe-fix][*]: Hey this is a stable test rule with a safe fix.
+    stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
 
-    error[stable-test-rule-unsafe-fix]: Hey this is a stable test rule with an unsafe fix.
+    stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
 
-    error[stable-test-rule-display-only-fix]: Hey this is a stable test rule with a display only fix.
+    stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
 
-    error[preview-test-rule]: Hey this is a preview test rule.
+    preview-test-rule: Hey this is a preview test rule.
     --> normal.py:1:1
 
-    error[redirected-to-test-rule]: Hey this is a test rule that was redirected from another.
+    redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     --> normal.py:1:1
 
-    error[panic]: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
+    panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> panic.py:1:1
     info: This indicates a bug in Ruff.
     info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
@@ -4081,10 +4081,10 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    src/thing.ipynb:cell 1:1:8: error[unused-import] [*] `os` imported but unused
-    src/thing.py:1:8: error[unused-import] [*] `os` imported but unused
-    src/thing.pyi:1:8: error[unused-import] [*] `os` imported but unused
-    src/thing.pyw:1:8: error[unused-import] [*] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: unused-import: [*] `os` imported but unused
+    src/thing.py:1:8: unused-import: [*] `os` imported but unused
+    src/thing.pyi:1:8: unused-import: [*] `os` imported but unused
+    src/thing.pyw:1:8: unused-import: [*] `os` imported but unused
     Found 4 errors.
     [*] 4 fixable with the `--fix` option.
 

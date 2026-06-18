@@ -258,6 +258,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         .expect("missing-override-decorator is a known lint rule");
     selection.disable(missing_override_decorator);
 
+    // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+    // negation types in our tests for better readability.
+    let experimental_syntax = registry
+        .get("experimental-syntax")
+        .expect("experimental-syntax is a known lint rule");
+    selection.disable(experimental_syntax);
+
     if let Some(rules) = rules {
         let set_lint_level =
             |selection: &mut RuleSelection, lint, level| match Severity::try_from(level) {

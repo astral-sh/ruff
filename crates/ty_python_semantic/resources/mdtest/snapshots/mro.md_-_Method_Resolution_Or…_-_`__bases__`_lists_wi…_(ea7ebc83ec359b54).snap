@@ -71,31 +71,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 56 |     A,
 57 | ): ...
 58 | 
-59 | class C(
+59 | class C(  # error: [duplicate-base]
 60 |     A,
 61 |     A
-62 | ):  # type: ignore[ty:duplicate-base]
-63 |     x: int
-64 | 
-65 | # fmt: on
-66 | # fmt: off
-67 | 
-68 | # error: [duplicate-base]
-69 | class D(
-70 |     A,
-71 |     # error: [unused-type-ignore-comment]
-72 |     A,  # type: ignore[ty:duplicate-base]
-73 | ): ...
-74 | 
-75 | # error: [duplicate-base]
-76 | class E(
-77 |     A,
-78 |     A
-79 | ):
-80 |     # error: [unused-type-ignore-comment]
-81 |     x: int  # type: ignore[ty:duplicate-base]
-82 | 
-83 | # fmt: on
+62 | # error: [unused-type-ignore-comment]
+63 | ):  # type: ignore[ty:duplicate-base]
+64 |     x: int
+65 | 
+66 | # fmt: on
 ```
 
 # Diagnostics
@@ -105,16 +88,11 @@ error[duplicate-base]: Duplicate base class `str`
  --> src/mdtest_snippet.py:3:7
   |
 3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
-  |       ^^^^^^^^^^^^^
-  |
-info: The definition of class `Foo` will raise `TypeError` at runtime
- --> src/mdtest_snippet.py:3:11
-  |
-3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
-  |           ---  ^^^ Class `str` later repeated here
+  |       ^^^ ---  ^^^ Class `str` later repeated here
   |           |
   |           Class `str` first included in bases list here
   |
+info: Definition of class `Foo` will raise `TypeError` at runtime
 
 ```
 
@@ -122,20 +100,9 @@ info: The definition of class `Foo` will raise `TypeError` at runtime
 error[duplicate-base]: Duplicate base class `Eggs`
   --> src/mdtest_snippet.py:16:7
    |
-16 |   class Ham(
-   |  _______^
-17 | |     Spam,
-18 | |     Eggs,
-19 | |     Bar,
-20 | |     Baz,
-21 | |     Spam,
-22 | |     Eggs,
-23 | | ): ...
-   | |_^
-   |
-info: The definition of class `Ham` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:18:5
-   |
+16 | class Ham(
+   |       ^^^
+17 |     Spam,
 18 |     Eggs,
    |     ---- Class `Eggs` first included in bases list here
 19 |     Bar,
@@ -144,6 +111,7 @@ info: The definition of class `Ham` will raise `TypeError` at runtime
 22 |     Eggs,
    |     ^^^^ Class `Eggs` later repeated here
    |
+info: Definition of class `Ham` will raise `TypeError` at runtime
 
 ```
 
@@ -151,20 +119,8 @@ info: The definition of class `Ham` will raise `TypeError` at runtime
 error[duplicate-base]: Duplicate base class `Spam`
   --> src/mdtest_snippet.py:16:7
    |
-16 |   class Ham(
-   |  _______^
-17 | |     Spam,
-18 | |     Eggs,
-19 | |     Bar,
-20 | |     Baz,
-21 | |     Spam,
-22 | |     Eggs,
-23 | | ): ...
-   | |_^
-   |
-info: The definition of class `Ham` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:17:5
-   |
+16 | class Ham(
+   |       ^^^
 17 |     Spam,
    |     ---- Class `Spam` first included in bases list here
 18 |     Eggs,
@@ -173,6 +129,7 @@ info: The definition of class `Ham` will raise `TypeError` at runtime
 21 |     Spam,
    |     ^^^^ Class `Spam` later repeated here
    |
+info: Definition of class `Ham` will raise `TypeError` at runtime
 
 ```
 
@@ -181,16 +138,11 @@ error[duplicate-base]: Duplicate base class `Mushrooms`
   --> src/mdtest_snippet.py:30:7
    |
 30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-info: The definition of class `Omelette` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:30:28
-   |
-30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
-   |                            ---------  ^^^^^^^^^ Class `Mushrooms` later repeated here
+   |       ^^^^^^^^             ---------  ^^^^^^^^^ Class `Mushrooms` later repeated here
    |                            |
    |                            Class `Mushrooms` first included in bases list here
    |
+info: Definition of class `Omelette` will raise `TypeError` at runtime
 
 ```
 
@@ -198,23 +150,8 @@ info: The definition of class `Omelette` will raise `TypeError` at runtime
 error[duplicate-base]: Duplicate base class `Eggs`
   --> src/mdtest_snippet.py:37:7
    |
-37 |   class VeryEggyOmelette(
-   |  _______^
-38 | |     Eggs,
-39 | |     Ham,
-40 | |     Spam,
-41 | |     Eggs,
-42 | |     Mushrooms,
-43 | |     Bar,
-44 | |     Eggs,
-45 | |     Baz,
-46 | |     Eggs,
-47 | | ): ...
-   | |_^
-   |
-info: The definition of class `VeryEggyOmelette` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:38:5
-   |
+37 | class VeryEggyOmelette(
+   |       ^^^^^^^^^^^^^^^^
 38 |     Eggs,
    |     ---- Class `Eggs` first included in bases list here
 39 |     Ham,
@@ -229,88 +166,40 @@ info: The definition of class `VeryEggyOmelette` will raise `TypeError` at runti
 46 |     Eggs,
    |     ^^^^ Class `Eggs` later repeated here
    |
+info: Definition of class `VeryEggyOmelette` will raise `TypeError` at runtime
 
 ```
 
 ```
 error[duplicate-base]: Duplicate base class `A`
-  --> src/mdtest_snippet.py:69:7
+  --> src/mdtest_snippet.py:59:7
    |
-69 |   class D(
-   |  _______^
-70 | |     A,
-71 | |     # error: [unused-type-ignore-comment]
-72 | |     A,  # type: ignore[ty:duplicate-base]
-73 | | ): ...
-   | |_^
-   |
-info: The definition of class `D` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:70:5
-   |
-70 |     A,
+59 | class C(  # error: [duplicate-base]
+   |       ^
+60 |     A,
    |     - Class `A` first included in bases list here
-71 |     # error: [unused-type-ignore-comment]
-72 |     A,  # type: ignore[ty:duplicate-base]
+61 |     A
    |     ^ Class `A` later repeated here
    |
+info: Definition of class `C` will raise `TypeError` at runtime
 
 ```
 
 ```
 warning[unused-type-ignore-comment]: Unused `type: ignore` directive
-  --> src/mdtest_snippet.py:72:9
+  --> src/mdtest_snippet.py:63:5
    |
-72 |     A,  # type: ignore[ty:duplicate-base]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-help: Remove the unused suppression comment
-69 | class D(
-70 |     A,
-71 |     # error: [unused-type-ignore-comment]
-   -     A,  # type: ignore[ty:duplicate-base]
-72 +     A,
-73 | ): ...
-74 |
-75 | # error: [duplicate-base]
-
-```
-
-```
-error[duplicate-base]: Duplicate base class `A`
-  --> src/mdtest_snippet.py:76:7
-   |
-76 |   class E(
-   |  _______^
-77 | |     A,
-78 | |     A
-79 | | ):
-   | |_^
-   |
-info: The definition of class `E` will raise `TypeError` at runtime
-  --> src/mdtest_snippet.py:77:5
-   |
-77 |     A,
-   |     - Class `A` first included in bases list here
-78 |     A
-   |     ^ Class `A` later repeated here
-   |
-
-```
-
-```
-warning[unused-type-ignore-comment]: Unused `type: ignore` directive
-  --> src/mdtest_snippet.py:81:13
-   |
-81 |     x: int  # type: ignore[ty:duplicate-base]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+63 | ):  # type: ignore[ty:duplicate-base]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Remove the unused suppression comment
-78 |     A
-79 | ):
-80 |     # error: [unused-type-ignore-comment]
-   -     x: int  # type: ignore[ty:duplicate-base]
-81 +     x: int
-82 |
-83 | # fmt: on
+60 |     A,
+61 |     A
+62 | # error: [unused-type-ignore-comment]
+   - ):  # type: ignore[ty:duplicate-base]
+63 + ):
+64 |     x: int
+65 |
+66 | # fmt: on
 
 ```

@@ -4745,6 +4745,60 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
+Enum literals are also supported as tags:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def _(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    if u["tag"] == Tag.A:
+        reveal_type(u)  # revealed: WithEnumTagA
+    elif u["tag"] == Tag.B:
+        reveal_type(u)  # revealed: WithEnumTagB
+    else:
+        reveal_type(u)  # revealed: WithEnumTagC
+```
+
+Explicit enum aliases resolve to their canonical member:
+
+```py
+class AliasTag(Enum):
+    A = 1
+    ALSO_A = A
+    B = 2
+
+class WithAliasTagA(TypedDict):
+    tag: Literal[AliasTag.A]
+    a: int
+
+class WithAliasTagAlsoA(TypedDict):
+    tag: Literal[AliasTag.ALSO_A]
+    also_a: int
+
+class WithAliasTagB(TypedDict):
+    tag: Literal[AliasTag.B]
+
+def _(u: WithAliasTagA | WithAliasTagAlsoA | WithAliasTagB):
+    if u["tag"] == AliasTag.A:
+        reveal_type(u)  # revealed: WithAliasTagA | WithAliasTagAlsoA
+    else:
+        reveal_type(u)  # revealed: WithAliasTagB
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -5060,6 +5114,35 @@ def match_statements(u: Foo | Bar | Baz | Bing):
             reveal_type(u)  # revealed: Bing
 ```
 
+Enum literal tags are also supported in match statements:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    match u["tag"]:
+        case Tag.A:
+            reveal_type(u)  # revealed: WithEnumTagA
+        case Tag.B:
+            reveal_type(u)  # revealed: WithEnumTagB
+        case _:
+            reveal_type(u)  # revealed: WithEnumTagC
+```
+
 We can also narrow a single `TypedDict` type to `Never`:
 
 ```py
@@ -5127,6 +5210,30 @@ def match_with_dict(u: Foo | Bar | dict[Any, Any]):
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
             # false negative in `is_disjoint_impl`.
             reveal_type(u)  # revealed: Foo | (dict[Any, Any] & ~<TypedDict with items 'tag'>)
+```
+
+Loop variables over literal collections preserve literal key types for `TypedDict` subscripting:
+
+```py
+class EDict(TypedDict):
+    path: str
+
+def equality_key(example: EDict):
+    for key in ["path"]:
+        if key == "path":
+            reveal_type(key)  # revealed: Literal["path"]
+            reveal_type(example[key])  # revealed: str
+
+def match_key(example: EDict):
+    for key in ["path"]:
+        match key:
+            case "path":
+                reveal_type(key)  # revealed: Literal["path"]
+                reveal_type(example[key])  # revealed: str
+
+def comprehension_key(example: EDict):
+    values = [example[key] for key in ["path"]]
+    reveal_type(values)  # revealed: list[str]
 ```
 
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases

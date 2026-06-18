@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use super::super::document::preformatted::MarkdownFence;
+
 /// Applies whole-docstring Markdown escaping and code-fence handling.
 ///
 /// This function assumes the input has had its whitespace normalized by `documentation_trim`,
@@ -109,7 +111,7 @@ pub(super) fn render(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see a markdown codefence, start one
-        if !in_any_code && let Some(fence) = super::MarkdownFence::find(trimmed_source_line) {
+        if !in_any_code && let Some(fence) = MarkdownFence::find(trimmed_source_line) {
             // Unlike other blocks we don't need to emit fences because it's already markdown
             block_indent = line_indent;
             in_any_code = true;

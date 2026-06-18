@@ -693,6 +693,12 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    /// Return `true` if this is the standard-library `Hashable` protocol.
+    pub(super) fn is_hashable(self, db: &'db dyn Db) -> bool {
+        self.to_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Hashable))
+    }
+
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
     // instances is through the `Type::instance` constructor function.
     fn from_class(class: ProtocolClass<'db>) -> Self {

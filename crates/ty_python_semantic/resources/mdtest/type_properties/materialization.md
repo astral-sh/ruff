@@ -396,25 +396,25 @@ def _(
 
 All positions in an intersection are covariant.
 
-```py
+```pyi
 from typing import Any
 from typing_extensions import Never
-from ty_extensions import Intersection, Unknown, Bottom, Top, static_assert, is_equivalent_to
+from ty_extensions import Unknown, Bottom, Top, static_assert, is_equivalent_to
 
-static_assert(is_equivalent_to(Top[Intersection[Any, int]], int))
-static_assert(is_equivalent_to(Bottom[Intersection[Any, int]], Never))
+static_assert(is_equivalent_to(Top[Any & int], int))
+static_assert(is_equivalent_to(Bottom[Any & int], Never))
 
 # Here, the top materialization of `Any | int` is `object` and the intersection of it with tuple
-static_assert(is_equivalent_to(Top[Intersection[Any | int, tuple[str, Unknown]]], tuple[str, object]))
-static_assert(is_equivalent_to(Bottom[Intersection[Any | int, tuple[str, Unknown]]], Never))
+static_assert(is_equivalent_to(Top[(Any | int) & tuple[str, Unknown]], tuple[str, object]))
+static_assert(is_equivalent_to(Bottom[(Any | int) & tuple[str, Unknown]], Never))
 
 class Foo: ...
 
-static_assert(is_equivalent_to(Bottom[Intersection[Any | Foo, tuple[str]]], Intersection[Foo, tuple[str]]))
+static_assert(is_equivalent_to(Bottom[(Any | Foo) & tuple[str]], Foo & tuple[str]))
 
 def _(
-    top: Top[Intersection[list[Any], list[int]]],
-    bottom: Bottom[Intersection[list[Any], list[int]]],
+    top: Top[list[Any] & list[int]],
+    bottom: Bottom[list[Any] & list[int]],
 ):
     # Top[list[Any] & list[int]] = Top[list[Any]] & list[int] = list[int]
     reveal_type(top)  # revealed: list[int]
@@ -422,23 +422,23 @@ def _(
     reveal_type(bottom)  # revealed: Bottom[list[Any]]
 ```
 
-## Negation (via `Not`)
+## Negation
 
 All positions in a negation are contravariant.
 
-```py
+```pyi
 from typing import Any
 from typing_extensions import Never
-from ty_extensions import Not, Unknown, Bottom, Top, static_assert, is_equivalent_to
+from ty_extensions import Unknown, Bottom, Top, static_assert, is_equivalent_to
 
 # ~Any is still Any, so the top materialization is object
-static_assert(is_equivalent_to(Top[Not[Any]], object))
-static_assert(is_equivalent_to(Bottom[Not[Any]], Never))
+static_assert(is_equivalent_to(Top[~Any], object))
+static_assert(is_equivalent_to(Bottom[~Any], Never))
 
 # tuple[Any, int] is in a contravariant position, so the
 # top materialization is Never and the negation of it
-static_assert(is_equivalent_to(Top[Not[tuple[Any, int]]], object))
-static_assert(is_equivalent_to(Bottom[Not[tuple[Any, int]]], Not[tuple[object, int]]))
+static_assert(is_equivalent_to(Top[~tuple[Any, int]], object))
+static_assert(is_equivalent_to(Bottom[~tuple[Any, int]], ~tuple[object, int]))
 ```
 
 ## `type`
@@ -635,27 +635,27 @@ static_assert(is_equivalent_to(Top[Bottom[list[Any]]], Bottom[list[Any]]))
 Any `list[T]` is a subtype of `Top[list[Any]]`, but with more restrictive gradual types, not all
 other specializations are subtypes.
 
-```py
+```pyi
 from typing import Any, Literal
-from ty_extensions import is_subtype_of, static_assert, Top, Intersection, Bottom
+from ty_extensions import is_subtype_of, static_assert, Top, Bottom
 
 # None and Top
 static_assert(is_subtype_of(list[int], Top[list[Any]]))
 static_assert(not is_subtype_of(Top[list[Any]], list[int]))
-static_assert(is_subtype_of(list[bool], Top[list[Intersection[int, Any]]]))
-static_assert(is_subtype_of(list[int], Top[list[Intersection[int, Any]]]))
-static_assert(not is_subtype_of(list[int | str], Top[list[Intersection[int, Any]]]))
-static_assert(not is_subtype_of(list[object], Top[list[Intersection[int, Any]]]))
-static_assert(not is_subtype_of(list[str], Top[list[Intersection[int, Any]]]))
-static_assert(not is_subtype_of(list[str | bool], Top[list[Intersection[int, Any]]]))
+static_assert(is_subtype_of(list[bool], Top[list[int & Any]]))
+static_assert(is_subtype_of(list[int], Top[list[int & Any]]))
+static_assert(not is_subtype_of(list[int | str], Top[list[int & Any]]))
+static_assert(not is_subtype_of(list[object], Top[list[int & Any]]))
+static_assert(not is_subtype_of(list[str], Top[list[int & Any]]))
+static_assert(not is_subtype_of(list[str | bool], Top[list[int & Any]]))
 
 # Top and Top
 static_assert(is_subtype_of(Top[list[int | Any]], Top[list[Any]]))
 static_assert(not is_subtype_of(Top[list[Any]], Top[list[int | Any]]))
-static_assert(is_subtype_of(Top[list[Intersection[int, Any]]], Top[list[Any]]))
-static_assert(not is_subtype_of(Top[list[Any]], Top[list[Intersection[int, Any]]]))
-static_assert(not is_subtype_of(Top[list[Intersection[int, Any]]], Top[list[int | Any]]))
-static_assert(not is_subtype_of(Top[list[int | Any]], Top[list[Intersection[int, Any]]]))
+static_assert(is_subtype_of(Top[list[int & Any]], Top[list[Any]]))
+static_assert(not is_subtype_of(Top[list[Any]], Top[list[int & Any]]))
+static_assert(not is_subtype_of(Top[list[int & Any]], Top[list[int | Any]]))
+static_assert(not is_subtype_of(Top[list[int | Any]], Top[list[int & Any]]))
 static_assert(not is_subtype_of(Top[list[str | Any]], Top[list[int | Any]]))
 static_assert(is_subtype_of(Top[list[str | int | Any]], Top[list[int | Any]]))
 static_assert(not is_subtype_of(Top[list[int | Any]], Top[list[str | int | Any]]))
@@ -665,8 +665,8 @@ static_assert(is_subtype_of(Bottom[list[Any]], Top[list[Any]]))
 static_assert(is_subtype_of(Bottom[list[Any]], Top[list[int | Any]]))
 static_assert(is_subtype_of(Bottom[list[int | Any]], Top[list[Any]]))
 static_assert(is_subtype_of(Bottom[list[int | Any]], Top[list[int | str]]))
-static_assert(is_subtype_of(Bottom[list[Intersection[int, Any]]], Top[list[Intersection[str, Any]]]))
-static_assert(not is_subtype_of(Bottom[list[Intersection[int, bool | Any]]], Bottom[list[Intersection[str, Literal["x"] | Any]]]))
+static_assert(is_subtype_of(Bottom[list[int & Any]], Top[list[str & Any]]))
+static_assert(not is_subtype_of(Bottom[list[int & (bool | Any)]], Bottom[list[str & (Literal["x"] | Any)]]))
 
 # None and None
 static_assert(not is_subtype_of(list[int], list[Any]))
@@ -683,7 +683,7 @@ static_assert(is_subtype_of(Top[list[int]], list[int]))
 # Bottom and None
 static_assert(is_subtype_of(Bottom[list[Any]], list[object]))
 static_assert(is_subtype_of(Bottom[list[int | Any]], list[str | int]))
-static_assert(not is_subtype_of(Bottom[list[str | Any]], list[Intersection[int, bool | Any]]))
+static_assert(not is_subtype_of(Bottom[list[str | Any]], list[int & (bool | Any)]))
 
 # None and Bottom
 static_assert(not is_subtype_of(list[int], Bottom[list[Any]]))
@@ -710,29 +710,29 @@ static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[Any]]))
 Assignability is the same as subtyping for top and bottom materializations, because those are fully
 static types, but some gradual types are assignable even if they are not subtypes.
 
-```py
+```pyi
 from typing import Any, Literal
-from ty_extensions import is_assignable_to, static_assert, Top, Intersection, Bottom
+from ty_extensions import is_assignable_to, static_assert, Top, Bottom
 
 # None and Top
 static_assert(is_assignable_to(list[Any], Top[list[Any]]))
 static_assert(is_assignable_to(list[int], Top[list[Any]]))
 static_assert(not is_assignable_to(Top[list[Any]], list[int]))
-static_assert(is_assignable_to(list[bool], Top[list[Intersection[int, Any]]]))
-static_assert(is_assignable_to(list[int], Top[list[Intersection[int, Any]]]))
-static_assert(is_assignable_to(list[Any], Top[list[Intersection[int, Any]]]))
-static_assert(not is_assignable_to(list[int | str], Top[list[Intersection[int, Any]]]))
-static_assert(not is_assignable_to(list[object], Top[list[Intersection[int, Any]]]))
-static_assert(not is_assignable_to(list[str], Top[list[Intersection[int, Any]]]))
-static_assert(not is_assignable_to(list[str | bool], Top[list[Intersection[int, Any]]]))
+static_assert(is_assignable_to(list[bool], Top[list[int & Any]]))
+static_assert(is_assignable_to(list[int], Top[list[int & Any]]))
+static_assert(is_assignable_to(list[Any], Top[list[int & Any]]))
+static_assert(not is_assignable_to(list[int | str], Top[list[int & Any]]))
+static_assert(not is_assignable_to(list[object], Top[list[int & Any]]))
+static_assert(not is_assignable_to(list[str], Top[list[int & Any]]))
+static_assert(not is_assignable_to(list[str | bool], Top[list[int & Any]]))
 
 # Top and Top
 static_assert(is_assignable_to(Top[list[int | Any]], Top[list[Any]]))
 static_assert(not is_assignable_to(Top[list[Any]], Top[list[int | Any]]))
-static_assert(is_assignable_to(Top[list[Intersection[int, Any]]], Top[list[Any]]))
-static_assert(not is_assignable_to(Top[list[Any]], Top[list[Intersection[int, Any]]]))
-static_assert(not is_assignable_to(Top[list[Intersection[int, Any]]], Top[list[int | Any]]))
-static_assert(not is_assignable_to(Top[list[int | Any]], Top[list[Intersection[int, Any]]]))
+static_assert(is_assignable_to(Top[list[int & Any]], Top[list[Any]]))
+static_assert(not is_assignable_to(Top[list[Any]], Top[list[int & Any]]))
+static_assert(not is_assignable_to(Top[list[int & Any]], Top[list[int | Any]]))
+static_assert(not is_assignable_to(Top[list[int | Any]], Top[list[int & Any]]))
 static_assert(not is_assignable_to(Top[list[str | Any]], Top[list[int | Any]]))
 static_assert(is_assignable_to(Top[list[str | int | Any]], Top[list[int | Any]]))
 static_assert(not is_assignable_to(Top[list[int | Any]], Top[list[str | int | Any]]))
@@ -741,10 +741,8 @@ static_assert(not is_assignable_to(Top[list[int | Any]], Top[list[str | int | An
 static_assert(is_assignable_to(Bottom[list[Any]], Top[list[Any]]))
 static_assert(is_assignable_to(Bottom[list[Any]], Top[list[int | Any]]))
 static_assert(is_assignable_to(Bottom[list[int | Any]], Top[list[Any]]))
-static_assert(is_assignable_to(Bottom[list[Intersection[int, Any]]], Top[list[Intersection[str, Any]]]))
-static_assert(
-    not is_assignable_to(Bottom[list[Intersection[int, bool | Any]]], Bottom[list[Intersection[str, Literal["x"] | Any]]])
-)
+static_assert(is_assignable_to(Bottom[list[int & Any]], Top[list[str & Any]]))
+static_assert(not is_assignable_to(Bottom[list[int & (bool | Any)]], Bottom[list[str & (Literal["x"] | Any)]]))
 
 # None and None
 static_assert(is_assignable_to(list[int], list[Any]))
@@ -761,7 +759,7 @@ static_assert(is_assignable_to(Top[list[int]], list[int]))
 # Bottom and None
 static_assert(is_assignable_to(Bottom[list[Any]], list[object]))
 static_assert(is_assignable_to(Bottom[list[int | Any]], Top[list[str | int]]))
-static_assert(not is_assignable_to(Bottom[list[str | Any]], list[Intersection[int, bool | Any]]))
+static_assert(not is_assignable_to(Bottom[list[str | Any]], list[int & (bool | Any)]))
 
 # None and Bottom
 static_assert(is_assignable_to(list[Any], Bottom[list[Any]]))

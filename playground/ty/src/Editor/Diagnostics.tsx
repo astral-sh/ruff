@@ -1,6 +1,7 @@
 import { SubDiagnosticSeverity } from "ty_wasm";
 import type {
   DiagnosticAnnotation,
+  DiagnosticTag,
   Severity,
   Range,
   SubDiagnostic,
@@ -178,6 +179,7 @@ export interface Diagnostic {
   annotations: DiagnosticAnnotation[];
   subDiagnostics: SubDiagnostic[];
   severity: Severity;
+  tags: DiagnosticTag[];
   range: Range | null;
   textRange: TextRange | null;
   raw: TyDiagnostic;

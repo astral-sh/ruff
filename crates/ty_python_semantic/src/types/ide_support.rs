@@ -9,7 +9,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownUnion, Type, TypeContext, UnionType,
+    KnownUnion, Type, TypeContext,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -157,11 +157,13 @@ pub fn definitions_for_name<'db>(
         // a type annotation position and `float` or `complex` otherwise.
         //
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-        if matches!(name_str, "float" | "complex")
-            && let Some(expr) = node.expr_name()
+        if let Some(expr) = node.expr_name()
             && let Some(ty) = expr.inferred_type(model)
             && let Some(union) = ty.as_union()
-            && is_float_or_complex_annotation(db, union, name_str)
+            && matches!(
+                (name_str, union.known(db)),
+                ("float", Some(KnownUnion::Float)) | ("complex", Some(KnownUnion::Complex))
+            )
         {
             return union
                 .elements(db)
@@ -193,17 +195,6 @@ pub fn definitions_for_name<'db>(
     } else {
         resolved_definitions
     }
-}
-
-fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {
-    let float_or_complex_ty = match name {
-        "float" => KnownUnion::Float.to_type(db),
-        "complex" => KnownUnion::Complex.to_type(db),
-        _ => return false,
-    }
-    .expect_union();
-
-    ty == float_or_complex_ty
 }
 
 /// Returns all resolved definitions for an attribute expression `x.y`.

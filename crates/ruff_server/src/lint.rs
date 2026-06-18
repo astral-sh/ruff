@@ -22,7 +22,8 @@ use ruff_linter::{
     linter::check_path,
     package::PackageRoot,
     packaging::detect_package_root,
-    settings::flags,
+    preview::is_human_readable_names_enabled,
+    settings::{LinterSettings, flags},
     source_kind::SourceKind,
     suppression::Suppressions,
 };
@@ -171,6 +172,7 @@ pub(crate) fn check(
         document_uri: &document_uri,
         notebook,
         supports_related_information,
+        settings: &settings.linter,
     };
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -256,6 +258,7 @@ struct LspDiagnosticContext<'a> {
     document_uri: &'a lsp_types::Uri,
     notebook: Option<&'a NotebookDocument>,
     supports_related_information: bool,
+    settings: &'a LinterSettings,
 }
 
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
@@ -328,7 +331,13 @@ fn to_lsp_diagnostic(
     }
 
     let (severity, code) = if let Some(code) = code {
-        (severity(code), code.to_string())
+        let severity = severity(code);
+        let code = if is_human_readable_names_enabled(context.settings.preview) {
+            name.to_string()
+        } else {
+            code.to_string()
+        };
+        (severity, code)
     } else {
         (
             match diagnostic.severity() {
@@ -337,7 +346,7 @@ fn to_lsp_diagnostic(
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,
                 ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::Error,
             },
-            diagnostic.secondary_code_or_id().to_string(),
+            diagnostic.id().to_string(),
         )
     };
 
@@ -559,6 +568,7 @@ mod tests {
         };
         let index = LineIndex::from_source_text(source);
         let uri = lsp_types::Uri::parse("file:///test.py").expect("URI to be valid");
+        let settings = LinterSettings::default();
         let context = LspDiagnosticContext {
             source_kind: &source_kind,
             index: &index,
@@ -567,6 +577,7 @@ mod tests {
             document_uri: &uri,
             notebook: None,
             supports_related_information: true,
+            settings: &settings,
         };
         let (_, lsp_diagnostic) = to_lsp_diagnostic(&diagnostic, None, &context);
 

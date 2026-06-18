@@ -951,8 +951,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// Can we check `target`s relation to a `type[T]` in either the metaclass-instance domain (it
     /// must pass `is_metaclass_instance`) or the regular instance domain (it must have Some
     /// `.to_instance()`)?
-    fn can_check_typevar_subclass_relation_to_target(db: &'db dyn Db, target: Type<'db>) -> bool {
-        Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some()
+    ///
+    /// Do not use instance subtyping for an exact class object. For `T: (Y, Z)` where `Z` extends
+    /// `Y`, doing so would incorrectly simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and
+    /// `Z` instances are subtypes of `Y`, but only the class object `Y` satisfies `klass is Y`.
+    ///
+    /// The exception is a type variable whose upper bound normalizes to this exact class object.
+    /// That can only happen for a final class, so the exact object is the only valid
+    /// specialization of the type variable.
+    fn can_check_typevar_subclass_relation_to_target(
+        db: &'db dyn Db,
+        source_subclass: SubclassOfType<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let is_exact_upper_bound = source_subclass.into_type_var().is_some_and(|source_i| {
+            source_i.typevar(db).upper_bound(db).and_then(|bound| {
+                SubclassOfType::try_from_instance(db, bound.resolve_type_alias(db))
+            }) == Some(target)
+        });
+
+        (!matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_)) || is_exact_upper_bound)
+            && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
     }
 
     /// Check the relation between a `type[T]` and a target type `A` when `A` can either be
@@ -971,9 +990,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// the metaclass of the upper bound of `T`, and compare in the metaclass-instance domain
     /// directly.
     ///
-    /// If `A` has no `.to_instance()` projection and is not a metaclass instance type, it won't
-    /// pass the `can_check_typevar_subclass_relation_to_target` guard, and this helper does not
-    /// decide the relation; it will fall through to other type-pair branches.
+    /// Exact class objects, and types that have no `.to_instance()` projection and are not
+    /// metaclass instances, do not pass the `can_check_typevar_subclass_relation_to_target` guard.
+    /// This helper does not decide their relation; they fall through to other type-pair branches.
     fn check_typevar_subclass_relation_to_target(
         &self,
         db: &'db dyn Db,
@@ -1337,7 +1356,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // precise representation for "all instances of any classes with a given metaclass").
             (Type::SubclassOf(subclass_of), _)
                 if subclass_of.is_type_var()
-                    && Self::can_check_typevar_subclass_relation_to_target(db, target) =>
+                    && Self::can_check_typevar_subclass_relation_to_target(
+                        db,
+                        subclass_of,
+                        target,
+                    ) =>
             {
                 self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
             }

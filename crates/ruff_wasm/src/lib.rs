@@ -2,6 +2,7 @@ use std::path::Path;
 
 use js_sys::Error;
 use ruff_db::diagnostic;
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
@@ -32,6 +33,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    tags: DiagnosticTag[];
     annotations: DiagnosticAnnotation[];
     subDiagnostics: SubDiagnostic[];
     start_location: {
@@ -57,6 +59,8 @@ export interface Diagnostic {
         }[];
     } | null;
 }
+
+export type DiagnosticTag = "unnecessary" | "deprecated";
 
 export interface DiagnosticAnnotation {
     primary: boolean;
@@ -95,6 +99,7 @@ export interface DiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    pub tags: Vec<ExpandedDiagnosticTag>,
     pub annotations: Vec<ExpandedDiagnosticAnnotation>,
     #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
@@ -176,6 +181,22 @@ struct ExpandedEdit {
     location: Location,
     end_location: Location,
     content: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpandedDiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for ExpandedDiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
 }
 
 /// Perform global constructor initialization.
@@ -398,9 +419,23 @@ impl Workspace {
                     })
                     .collect();
 
+                let code = if !is_human_readable_names_enabled(self.settings.linter.preview)
+                    && let Some(code) = msg.secondary_code()
+                {
+                    code.as_str()
+                } else {
+                    msg.id().as_str()
+                };
+
                 ExpandedMessage {
-                    code: msg.secondary_code_or_id().to_string(),
+                    code: code.to_string(),
                     message: msg.concise_message().to_string(),
+                    tags: msg
+                        .primary_tags()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(ExpandedDiagnosticTag::from)
+                        .collect(),
                     annotations,
                     sub_diagnostics,
                     start_location: source_code

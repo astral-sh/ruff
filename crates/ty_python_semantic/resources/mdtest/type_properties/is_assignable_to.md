@@ -392,9 +392,9 @@ While a homogeneous tuple type is not assignable to any heterogeneous tuple type
 tuple type can be assignable to a homogeneous tuple type, and homogeneous tuple types can be
 assignable to `Sequence`:
 
-```py
+```pyi
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
+from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy
 
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[Literal[2], ...]]))
@@ -405,7 +405,7 @@ static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[*tuple[str, 
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
-static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[~AlwaysFalsy, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], Sequence[int]))
 static_assert(is_assignable_to(tuple[int, ...], Sequence[int]))
 static_assert(is_assignable_to(tuple[int, ...], Sequence[Any]))
@@ -414,7 +414,7 @@ static_assert(is_assignable_to(tuple[Any, ...], Sequence[int]))
 static_assert(is_assignable_to(tuple[()], tuple[Literal[1, 2], ...]))
 static_assert(is_assignable_to(tuple[()], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[()], tuple[int | str, ...]))
-static_assert(is_assignable_to(tuple[()], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_assignable_to(tuple[()], tuple[~AlwaysFalsy, ...]))
 static_assert(is_assignable_to(tuple[()], Sequence[int]))
 
 static_assert(not is_assignable_to(tuple[int, int], tuple[str, ...]))
@@ -429,7 +429,7 @@ python-version = "3.12"
 
 ```py
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
+from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy
 
 static_assert(
     is_assignable_to(
@@ -679,8 +679,8 @@ static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] |
 
 ## Intersection types
 
-```py
-from ty_extensions import static_assert, is_assignable_to, Intersection, Not, AlwaysTruthy, AlwaysFalsy
+```pyi
+from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Any, Literal, final, LiteralString
 
 class Parent: ...
@@ -689,74 +689,74 @@ class Child2(Parent): ...
 class Grandchild(Child1, Child2): ...
 class Unrelated: ...
 
-static_assert(is_assignable_to(Intersection[Child1, Child2], Child1))
-static_assert(is_assignable_to(Intersection[Child1, Child2], Child2))
-static_assert(is_assignable_to(Intersection[Child1, Child2], Parent))
-static_assert(is_assignable_to(Intersection[Child1, Parent], Parent))
+static_assert(is_assignable_to(Child1 & Child2, Child1))
+static_assert(is_assignable_to(Child1 & Child2, Child2))
+static_assert(is_assignable_to(Child1 & Child2, Parent))
+static_assert(is_assignable_to(Child1 & Parent, Parent))
 
-static_assert(is_assignable_to(Intersection[Parent, Unrelated], Parent))
-static_assert(is_assignable_to(Intersection[Child1, Unrelated], Child1))
-static_assert(is_assignable_to(Intersection[Child1, Unrelated, Child2], Intersection[Child1, Unrelated]))
+static_assert(is_assignable_to(Parent & Unrelated, Parent))
+static_assert(is_assignable_to(Child1 & Unrelated, Child1))
+static_assert(is_assignable_to(Child1 & Unrelated & Child2, Child1 & Unrelated))
 
-static_assert(is_assignable_to(Intersection[Child1, Not[Child2]], Child1))
-static_assert(is_assignable_to(Intersection[Child1, Not[Child2]], Parent))
-static_assert(is_assignable_to(Intersection[Child1, Not[Grandchild]], Parent))
+static_assert(is_assignable_to(Child1 & ~Child2, Child1))
+static_assert(is_assignable_to(Child1 & ~Child2, Parent))
+static_assert(is_assignable_to(Child1 & ~Grandchild, Parent))
 
-static_assert(is_assignable_to(Intersection[Child1, Child2], Intersection[Child1, Child2]))
-static_assert(is_assignable_to(Intersection[Child1, Child2], Intersection[Child2, Child1]))
-static_assert(is_assignable_to(Grandchild, Intersection[Child1, Child2]))
-static_assert(not is_assignable_to(Intersection[Child1, Child2], Intersection[Parent, Unrelated]))
+static_assert(is_assignable_to(Child1 & Child2, Child1 & Child2))
+static_assert(is_assignable_to(Child1 & Child2, Child2 & Child1))
+static_assert(is_assignable_to(Grandchild, Child1 & Child2))
+static_assert(not is_assignable_to(Child1 & Child2, Parent & Unrelated))
 
-static_assert(not is_assignable_to(Parent, Intersection[Parent, Unrelated]))
-static_assert(not is_assignable_to(int, Intersection[int, Not[Literal[1]]]))
+static_assert(not is_assignable_to(Parent, Parent & Unrelated))
+static_assert(not is_assignable_to(int, int & ~Literal[1]))
 # The literal `1` is not assignable to `Parent`, so the intersection of int and Parent is definitely an int that is not `1`
-static_assert(is_assignable_to(Intersection[int, Parent], Intersection[int, Not[Literal[1]]]))
-static_assert(not is_assignable_to(int, Not[int]))
-static_assert(not is_assignable_to(int, Not[Literal[1]]))
+static_assert(is_assignable_to(int & Parent, int & ~Literal[1]))
+static_assert(not is_assignable_to(int, ~int))
+static_assert(not is_assignable_to(int, ~Literal[1]))
 
-static_assert(is_assignable_to(Not[Parent], Not[Child1]))
-static_assert(not is_assignable_to(Not[Parent], Parent))
-static_assert(not is_assignable_to(Intersection[Unrelated, Not[Parent]], Parent))
+static_assert(is_assignable_to(~Parent, ~Child1))
+static_assert(not is_assignable_to(~Parent, Parent))
+static_assert(not is_assignable_to(Unrelated & ~Parent, Parent))
 
 # Intersection with `Any` dominates the left hand side of intersections
-static_assert(is_assignable_to(Intersection[Any, Parent], Parent))
-static_assert(is_assignable_to(Intersection[Any, Child1], Parent))
-static_assert(is_assignable_to(Intersection[Any, Child2, Not[Child1]], Parent))
-static_assert(is_assignable_to(Intersection[Any, Parent], Unrelated))
-static_assert(is_assignable_to(Intersection[Any, Parent], Intersection[Parent, Unrelated]))
-static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Parent))
-static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Parent, Unrelated]))
+static_assert(is_assignable_to(Any & Parent, Parent))
+static_assert(is_assignable_to(Any & Child1, Parent))
+static_assert(is_assignable_to(Any & Child2 & ~Child1, Parent))
+static_assert(is_assignable_to(Any & Parent, Unrelated))
+static_assert(is_assignable_to(Any & Parent, Parent & Unrelated))
+static_assert(is_assignable_to(Any & Parent & Unrelated, Parent))
+static_assert(is_assignable_to(Any & Parent & Unrelated, Parent & Unrelated))
 
-# Even Any & Not[Parent] is assignable to Parent, since it could be Never
-static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Parent))
-static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Not[Parent]))
+# Even Any & ~Parent is assignable to Parent, since it could be Never
+static_assert(is_assignable_to(Any & ~Parent, Parent))
+static_assert(is_assignable_to(Any & ~Parent, ~Parent))
 
 # Intersection with `Any` is effectively ignored on the right hand side for the sake of assignment
-static_assert(is_assignable_to(Parent, Intersection[Any, Parent]))
-static_assert(is_assignable_to(Parent, Parent | Intersection[Any, Unrelated]))
-static_assert(is_assignable_to(Child1, Intersection[Any, Parent]))
-static_assert(not is_assignable_to(Literal[1], Intersection[Any, Parent]))
-static_assert(not is_assignable_to(Unrelated, Intersection[Any, Parent]))
+static_assert(is_assignable_to(Parent, Any & Parent))
+static_assert(is_assignable_to(Parent, Parent | Any & Unrelated))
+static_assert(is_assignable_to(Child1, Any & Parent))
+static_assert(not is_assignable_to(Literal[1], Any & Parent))
+static_assert(not is_assignable_to(Unrelated, Any & Parent))
 
 # Intersections with Any on both sides combine the above logic - the LHS dominates and Any is ignored on the right hand side
-static_assert(is_assignable_to(Intersection[Any, Parent], Intersection[Any, Parent]))
-static_assert(is_assignable_to(Intersection[Any, Unrelated], Intersection[Any, Parent]))
-static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Any, Parent, Unrelated]))
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
-static_assert(is_assignable_to(Intersection[Literal[1], Any], Intersection[Unrelated, Not[Any]]))
+static_assert(is_assignable_to(Any & Parent, Any & Parent))
+static_assert(is_assignable_to(Any & Unrelated, Any & Parent))
+static_assert(is_assignable_to(Any & Parent & Unrelated, Any & Parent & Unrelated))
+static_assert(is_assignable_to(Unrelated & Any, Unrelated & ~Any))
+static_assert(is_assignable_to(Literal[1] & Any, Unrelated & ~Any))
 
 # TODO: No errors
 # The condition `is_assignable_to(T & U, U)` should still be satisfied after the following transformations:
 # `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
+static_assert(is_assignable_to(LiteralString & ~Literal[""], AlwaysTruthy))
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
+static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], AlwaysTruthy))
 # `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(LiteralString & ~Literal[""], ~AlwaysFalsy))
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], ~AlwaysFalsy))
 ```
 
 ## Callable types with Unknown/missing return type
@@ -768,18 +768,18 @@ of `~type`, the intersection should be assignable to `~type`.
 The root cause was that we failed to properly materialize a `Callable[..., Unknown]` type when the
 `Unknown` return type originated from a missing annotation.
 
-```py
-from ty_extensions import static_assert, is_assignable_to, Intersection, Not, Unknown, RegularCallableTypeOf
+```pyi
+from ty_extensions import static_assert, is_assignable_to, Unknown, RegularCallableTypeOf
 from typing import Callable
 
 # `Callable[..., Unknown]` has explicit Unknown return type
-static_assert(is_assignable_to(Intersection[Not[type], Not[Callable[..., Unknown]]], Not[type]))
+static_assert(is_assignable_to(~type & ~Callable[..., Unknown], ~type))
 
 # Function with no return annotation (has implicit Unknown return type internally)
 def no_return_annotation(*args, **kwargs): ...
 
 # `RegularCallableTypeOf[no_return_annotation]` has `returns: None` internally (no annotation)
-static_assert(is_assignable_to(Intersection[Not[type], Not[RegularCallableTypeOf[no_return_annotation]]], Not[type]))
+static_assert(is_assignable_to(~type & ~RegularCallableTypeOf[no_return_annotation], ~type))
 ```
 
 ## Intersections with non-fully-static negated elements
@@ -789,21 +789,21 @@ materialization of that type is disjoint from the _bottom_ materialization of al
 in the intersection. This differs from subtyping, which should do the disjointness check against the
 _top_ materialization of the negated elements.
 
-```py
+```pyi
 from typing_extensions import Any, Never, Sequence
-from ty_extensions import Not, is_assignable_to, static_assert
+from ty_extensions import is_assignable_to, static_assert
 
 # The bottom materialization of `tuple[Any]` is `tuple[Never]`,
 # which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
 # both assignable to `~tuple[Any]`
-static_assert(is_assignable_to(tuple[int], Not[tuple[Any]]))
-static_assert(is_assignable_to(tuple[()], Not[tuple[Any]]))
+static_assert(is_assignable_to(tuple[int], ~tuple[Any]))
+static_assert(is_assignable_to(tuple[()], ~tuple[Any]))
 
 # But the bottom materialization of `tuple[Any, ...]` is `tuple[Never, ...]`,
 # which simplifies to `tuple[()]`, so `tuple[int]` is still assignable to
 # `~tuple[Any, ...]`, but `tuple[()]` is not
-static_assert(is_assignable_to(tuple[int], Not[tuple[Any, ...]]))
-static_assert(not is_assignable_to(tuple[()], Not[tuple[Any, ...]]))
+static_assert(is_assignable_to(tuple[int], ~tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[()], ~tuple[Any, ...]))
 
 # Similarly, the bottom materialization of `Sequence[Any]` is `Sequence[Never]`,
 # so `tuple[()]` is not assignable to `~Sequence[Any]`, and nor is `list[Never]`,
@@ -816,15 +816,15 @@ static_assert(not is_assignable_to(tuple[()], Not[tuple[Any, ...]]))
 # Other `list` and `tuple` specializations *are* assignable to `~Sequence[Any]`,
 # however, since there are many fully static materializations of `Sequence[Any]`
 # that would be disjoint from a given `list` or `tuple` specialization.
-static_assert(not is_assignable_to(tuple[()], Not[Sequence[Any]]))
-static_assert(not is_assignable_to(list[Never], Not[Sequence[Any]]))
-static_assert(not is_assignable_to(tuple[int, ...], Not[Sequence[Any]]))
+static_assert(not is_assignable_to(tuple[()], ~Sequence[Any]))
+static_assert(not is_assignable_to(list[Never], ~Sequence[Any]))
+static_assert(not is_assignable_to(tuple[int, ...], ~Sequence[Any]))
 
 # TODO: should pass (`tuple[int]` should be considered disjoint from `Sequence[Never]`)
-static_assert(is_assignable_to(tuple[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(tuple[int], ~Sequence[Any]))  # error: [static-assert-error]
 
 # TODO: should pass (`list[int]` should be considered disjoint from `Sequence[Never]`)
-static_assert(is_assignable_to(list[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(list[int], ~Sequence[Any]))  # error: [static-assert-error]
 
 # If the left-hand side is also not fully static,
 # the left-hand side will be assignable to the right if the bottom materialization
@@ -834,21 +834,21 @@ static_assert(is_assignable_to(list[int], Not[Sequence[Any]]))  # error: [static
 # `tuple[Any, ...]` cannot be assignable to `~tuple[Any, ...]`,
 # because the bottom materialization of `tuple[Any, ...]` is
 # `tuple[()]`, and `tuple[()]` is not disjoint from itself
-static_assert(not is_assignable_to(tuple[Any, ...], Not[tuple[Any, ...]]))
+static_assert(not is_assignable_to(tuple[Any, ...], ~tuple[Any, ...]))
 
 # but `tuple[Any]` is assignable to `~tuple[Any]`,
 # as the bottom materialization of `tuple[Any]` is `Never`,
 # and `Never` *is* disjoint from itself
-static_assert(is_assignable_to(tuple[Any], Not[tuple[Any]]))
+static_assert(is_assignable_to(tuple[Any], ~tuple[Any]))
 
 # The same principle applies for non-fully-static `list` specializations.
 # TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
-static_assert(is_assignable_to(list[Any], Not[list[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(list[Any], ~list[Any]))  # error: [static-assert-error]
 
 # `Bottom[list[Any]]` is `Never`, which is disjoint from `Bottom[Sequence[Any]]`
 # (which is `Sequence[Never]`).
 # TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
-static_assert(is_assignable_to(list[Any], Not[Sequence[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(list[Any], ~Sequence[Any]))  # error: [static-assert-error]
 ```
 
 ## General properties
@@ -929,15 +929,15 @@ static_assert(is_assignable_to(Never, type[Any]))
 `Any` and `Unknown` are gradual types. They could materialize to any given type at runtime,
 including `Never`.
 
-```py
-from ty_extensions import static_assert, is_assignable_to, Unknown, Intersection
+```pyi
+from ty_extensions import static_assert, is_assignable_to, Unknown
 from typing_extensions import Never, Any
 
 static_assert(is_assignable_to(Any, Never))
 static_assert(is_assignable_to(Unknown, Never))
 static_assert(is_assignable_to(Any | Unknown, Never))
-static_assert(is_assignable_to(Intersection[Any, int], Never))
-static_assert(is_assignable_to(Intersection[Unknown, int], Never))
+static_assert(is_assignable_to(Any & int, Never))
+static_assert(is_assignable_to(Unknown & int, Never))
 static_assert(not is_assignable_to(Any | int, Never))
 static_assert(not is_assignable_to(Unknown | int, Never))
 ```

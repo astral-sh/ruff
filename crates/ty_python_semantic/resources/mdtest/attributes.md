@@ -335,7 +335,6 @@ reveal_type(c_instance.d2)  # revealed: str
 ```py
 class C:
     def __init__(self) -> None:
-        # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `b` of type `list[Literal[2, 3]]`"
         self.a, *self.b = (1, 2, 3)
 
 c_instance = C()
@@ -2617,8 +2616,11 @@ mod.global_symbol = 1
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 _, mod.global_symbol = (..., 1)
 
-# TODO: this should be an error, but we do not understand list unpackings yet.
-[_, mod.global_symbol] = [1, 2]
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
+[_, mod.global_symbol] = [
+    1,
+    2,
+]
 
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
 for mod.global_symbol in range(3):

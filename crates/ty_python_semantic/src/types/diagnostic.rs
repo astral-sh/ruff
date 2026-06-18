@@ -72,6 +72,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
     registry.register_lint(&EMPTY_BODY);
+    registry.register_lint(&EXPERIMENTAL_SYNTAX);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -174,6 +175,15 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/experimental-syntax.md")]
+    pub(crate) static EXPERIMENTAL_SYNTAX = {
+        summary: "detects experimental syntax",
+        status: LintStatus::stable("0.0.50"),
+        default_level: Level::Warn,
+    }
 }
 
 declare_lint! {
@@ -2857,7 +2867,7 @@ pub(crate) fn report_duplicate_bases(
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.focus_range(db)) else {
         return;
     };
 
@@ -2872,28 +2882,23 @@ pub(crate) fn report_duplicate_bases(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
-    let mut sub_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!(
-            "The definition of class `{}` will raise `TypeError` at runtime",
-            class.name(db)
-        ),
-    );
+    diagnostic.info(format_args!(
+        "Definition of class `{}` will raise `TypeError` at runtime",
+        class.name(db)
+    ));
+
     let first_base = bases_list[*first_index].source_node();
-    sub_diagnostic.annotate(
-        Annotation::secondary(context.span(first_base)).message(format_args!(
-            "Class `{duplicate_name}` first included in bases list here"
-        )),
-    );
+    diagnostic.annotate(context.secondary(first_base).message(format_args!(
+        "Class `{duplicate_name}` first included in bases list here"
+    )));
+
     for index in later_indices {
         let repeated_base = bases_list[*index].source_node();
-        sub_diagnostic.annotate(
+        diagnostic.annotate(
             Annotation::primary(context.span(repeated_base))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }
-
-    diagnostic.sub(sub_diagnostic);
 }
 
 pub(crate) fn report_invalid_or_unsupported_base(
