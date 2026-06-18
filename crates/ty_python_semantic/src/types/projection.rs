@@ -23,6 +23,7 @@ use crate::types::visitor::any_over_type;
 use crate::{Db, FxIndexMap, FxIndexSet};
 
 impl<'db> Type<'db> {
+    /// Inference-time API: projects an iterable value while recording cycle projection evidence.
     pub(crate) fn try_iter_projection_result_with_mode(
         self,
         db: &'db dyn Db,
@@ -38,6 +39,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects one target of an exact unpack operation.
     pub(crate) fn try_unpack_projection_result(
         self,
         db: &'db dyn Db,
@@ -50,6 +52,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects one fixed prefix target of a starred unpack operation.
     pub(crate) fn try_star_unpack_prefix_projection_result(
         self,
         db: &'db dyn Db,
@@ -67,6 +70,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects the list-valued rest target of a starred unpack operation.
     pub(crate) fn try_star_unpack_rest_projection_result(
         self,
         db: &'db dyn Db,
@@ -83,6 +87,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects one fixed suffix target of a starred unpack operation.
     pub(crate) fn try_star_unpack_suffix_projection_result(
         self,
         db: &'db dyn Db,
@@ -100,6 +105,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects a subscript operation without returning replay evidence.
     pub(crate) fn try_subscript_projection(
         self,
         db: &'db dyn Db,
@@ -109,6 +115,7 @@ impl<'db> Type<'db> {
             .map(ProjectionResult::ty)
     }
 
+    /// Inference-time API: projects a subscript operation while recording cycle projection evidence.
     pub(crate) fn try_subscript_projection_result(
         self,
         db: &'db dyn Db,
@@ -126,6 +133,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects a zero-argument method call.
     pub(crate) fn try_method_call_projection_result(
         self,
         db: &'db dyn Db,
@@ -138,6 +146,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects a context-manager enter operation without replay evidence.
     pub(crate) fn try_context_enter_projection(
         self,
         db: &'db dyn Db,
@@ -147,6 +156,7 @@ impl<'db> Type<'db> {
             .map(ProjectionResult::ty)
     }
 
+    /// Inference-time API: projects a context-manager enter operation.
     pub(crate) fn try_context_enter_projection_result(
         self,
         db: &'db dyn Db,
@@ -162,6 +172,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: projects the result of awaiting a value.
     pub(crate) fn try_await_projection_result(
         self,
         db: &'db dyn Db,
@@ -187,6 +198,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Inference-time helper for applying an operation to a type that may contain cycle markers.
     fn try_projection_with_non_cycle_result(
         self,
         db: &'db dyn Db,
@@ -250,6 +262,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time helper for projection artifacts nested below a top-level non-cycle shape.
     fn try_nested_cycle_projection_result(
         self,
         db: &'db dyn Db,
@@ -348,6 +361,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Cycle-recovery-time API: tries to solve projections rooted at the current cycle.
     pub(crate) fn try_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
@@ -363,7 +377,7 @@ impl<'db> Type<'db> {
         self.try_container_projection_cycle_normalized(db, root, &paths, evidence)
     }
 
-    /// Solves all projections of `root` that can be explained by top-level containers.
+    /// Cycle-recovery-time API: solves projections explainable by top-level containers.
     ///
     /// The solver works in four steps:
     ///
@@ -924,7 +938,7 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A projection result and the inference-time facts needed to replay it during recovery.
+/// Inference-time result of a projection, plus facts needed to replay it during recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ProjectionResult<'db> {
     ty: Type<'db>,
@@ -956,7 +970,7 @@ enum ProjectionContainer<'db> {
 }
 
 impl<'db> ProjectionContainer<'db> {
-    /// Builds a recovery-time container shape without expanding aliases, bounds, or fallbacks.
+    /// Cycle-recovery-time API: builds a container shape from direct structure only.
     fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             return Some(Self::Tuple {
@@ -971,7 +985,7 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
-    /// Builds a recovery-time container shape from direct structure or inference-time evidence.
+    /// Cycle-recovery-time API: builds a container from direct structure or stored evidence.
     fn from_recovery_type(
         db: &'db dyn Db,
         root: DivergentType,
@@ -984,6 +998,7 @@ impl<'db> ProjectionContainer<'db> {
         })
     }
 
+    /// Cycle-recovery-time API: replays all demanded paths against this container.
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
@@ -997,6 +1012,7 @@ impl<'db> ProjectionContainer<'db> {
         Some(())
     }
 
+    /// Cycle-recovery-time API: replays one projection path against this container.
     fn project_path(
         &self,
         db: &'db dyn Db,
@@ -1013,6 +1029,7 @@ impl<'db> ProjectionContainer<'db> {
         Self::project_type_path(db, ty, root, evidence, path)
     }
 
+    /// Cycle-recovery-time API: structurally replays a projection path against a type.
     fn project_type_path(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1113,6 +1130,7 @@ impl<'db> ProjectionContainer<'db> {
         }
     }
 
+    /// Cycle-recovery-time API: structurally replays one projection operation.
     fn project_op(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1531,6 +1549,7 @@ struct ProjectionEvidenceBuilder<'db> {
 }
 
 impl<'db> ProjectionEvidenceBuilder<'db> {
+    /// Inference-time API: records facts needed by projection cycle recovery.
     fn extend_from_types(&mut self, db: &'db dyn Db, types: impl IntoIterator<Item = Type<'db>>) {
         for ty in types {
             let mut demands = Vec::new();
@@ -1574,6 +1593,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
         }
     }
 
+    /// Inference-time API: records the observed result of projecting a non-cycle arm.
     fn record_projected_container_arm(
         &mut self,
         db: &'db dyn Db,
@@ -1615,7 +1635,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
 }
 
 impl<'db> ProjectionEvidenceSet<'db> {
-    /// Collects projection evidence during normal inference for later cycle recovery.
+    /// Inference-time API: collects projection evidence for later cycle recovery.
     pub(crate) fn from_types(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
@@ -1625,6 +1645,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         builder.finish(db)
     }
 
+    /// Inference-time API: conditionally collects projection evidence.
     pub(crate) fn from_types_if_needed(
         db: &'db dyn Db,
         should_collect: bool,
@@ -1697,6 +1718,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         self.0.container_facts(db)
     }
 
+    /// Inference-time API: finds generic containers that may need recovery-time replay.
     fn collect_generic_containers(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1711,6 +1733,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         });
     }
 
+    /// Cycle-recovery-time API: looks up a previously collected container fact.
     fn container_fact_for_arm(
         self,
         db: &'db dyn Db,
@@ -1733,6 +1756,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         })
     }
 
+    /// Cycle-recovery-time API: replays a generic projection from inference-time evidence.
     fn project_generic_path(
         self,
         db: &'db dyn Db,
@@ -1802,7 +1826,7 @@ impl<'db> ProjectionContainerFact<'db> {
         })
     }
 
-    /// Recovery-time shape check: uses only direct class structure.
+    /// Cycle-recovery-time API: builds a fact using only direct class structure.
     fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         if ty.exact_tuple_instance_spec(db).is_some() {
             return None;
@@ -1812,7 +1836,9 @@ impl<'db> ProjectionContainerFact<'db> {
         Self::from_parts(ty, class, specialization.types(db))
     }
 
-    /// Inference-time shape check: may expand aliases, bounds, and fallbacks.
+    /// Inference-time API: builds a fact from the full specialization view.
+    ///
+    /// This may expand aliases, bounds, and fallbacks.
     fn from_inference_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         if ty.exact_tuple_instance_spec(db).is_some() {
             return None;
