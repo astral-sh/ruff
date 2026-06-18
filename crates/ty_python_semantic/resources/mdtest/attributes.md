@@ -3856,6 +3856,20 @@ class ProjectionChain:
         reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[str, str]]
 ```
 
+Projection recovery can follow a dependency cycle through several unpacked positions:
+
+```py
+class ProjectionThreeWayRotation:
+    def __init__(self) -> None:
+        self.x = [(0, "", b"")]
+
+    def read(self) -> None:
+        for number, text, data in self.x:
+            self.x = [(text, data, number)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str, bytes]] | list[tuple[int | bytes | str, int | bytes | str, int | bytes | str]]
+```
+
 Several recursive attributes can exchange projected values:
 
 ```py
@@ -3872,6 +3886,20 @@ class ProjectionCorrelatedAttributes:
 
         reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[int | str, str | int]]
         reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
+
+class ProjectionCorrelatedAttributeCycle:
+    def __init__(self) -> None:
+        self.left = [(0, "")]
+        self.right = [("", 0)]
+
+    def read(self) -> None:
+        for left_number, left_text in self.left:
+            for right_text, right_number in self.right:
+                self.left = [(left_text, right_text)]
+                self.right = [(right_number, left_number)]
+
+        reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[str, str | int]] | list[tuple[str | int, str | int]]
+        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[int | str, str | int]]
 ```
 
 Deeply nested projections are inferred correctly:
