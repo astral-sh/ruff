@@ -1783,13 +1783,13 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        Unknown
+        def foo() -> Unknown
         ---------------------------------------------
         Foo documentation
 
         ---------------------------------------------
         ```python
-        Unknown
+        def foo() -> Unknown
         ```
         ---
         Foo documentation

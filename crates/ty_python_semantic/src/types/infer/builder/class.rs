@@ -529,35 +529,35 @@ fn type_retains_original_class<'db>(
     }
 }
 
-/// Return true if an unknown class-decorator result should leave the current class type in place.
+/// Return true if an unknown decorator result should leave the decorated type in place.
 ///
 /// This handles both direct decorators and decorator factories:
 /// ```python
-/// def decorator(cls):
-///     return cls
+/// def decorator(value):
+///     return value
 ///
 /// def decorator_factory():
 ///     return decorator
 ///
 /// @decorator_factory()
-/// class C: ...
+/// def decorated(): ...
 /// ```
 ///
 /// The factory case needs the type of the call target, because the type of
 /// `@decorator_factory()` is the returned decorator, while the expression type of
 /// `decorator_factory` carries the static information that tells us whether an unknown result can
 /// be preserved.
-fn preserve_binding_for_unknown_result<'db>(
+pub(super) fn preserve_binding_for_unknown_result<'db>(
     db: &'db dyn crate::Db,
     decorator_ty: Type<'db>,
     decorator_call_ty: Option<Type<'db>>,
     decorator_result_ty: Type<'db>,
 ) -> bool {
-    ClassDecoratorUnknownResultPolicy::from_decorator(db, decorator_ty, decorator_result_ty)
-        == ClassDecoratorUnknownResultPolicy::PreserveBinding
+    DecoratorUnknownResultPolicy::from_decorator(db, decorator_ty, decorator_result_ty)
+        == DecoratorUnknownResultPolicy::PreserveBinding
         || decorator_call_ty.is_some_and(|ty| {
-            ClassDecoratorUnknownResultPolicy::from_decorator(db, ty, decorator_result_ty)
-                == ClassDecoratorUnknownResultPolicy::PreserveBinding
+            DecoratorUnknownResultPolicy::from_decorator(db, ty, decorator_result_ty)
+                == DecoratorUnknownResultPolicy::PreserveBinding
         })
 }
 
@@ -590,24 +590,24 @@ fn is_unknown_class_object_decorator_result<'db>(db: &'db dyn crate::Db, ty: Typ
         .is_some_and(|dynamic| Type::Dynamic(dynamic).is_unknown())
 }
 
-/// Policy for class decorators whose application result is unknown.
+/// Policy for decorators whose application result is unknown.
 ///
 /// This is only consulted after applying the decorator produced no useful replacement type. If the
 /// decorator itself statically suggests an unannotated identity-preserving shape, we keep the
-/// current class binding; if it explicitly promises a replacement type, or if the decorator is
-/// unknown, we let the unknown result replace the binding.
+/// current binding; if it explicitly promises a replacement type, or if the decorator is unknown,
+/// we let the unknown result replace the binding.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum ClassDecoratorUnknownResultPolicy {
-    /// Preserve the current class binding when the decorator result is unknown.
+enum DecoratorUnknownResultPolicy {
+    /// Preserve the current binding when the decorator result is unknown.
     PreserveBinding,
     /// Use the unknown decorator result as the public binding.
     ReplaceBinding,
 }
 
-impl ClassDecoratorUnknownResultPolicy {
+impl DecoratorUnknownResultPolicy {
     /// Infer the unknown-result policy from the decorator's own type.
     ///
-    /// Unannotated function and method decorators are treated as class-preserving when their
+    /// Unannotated function and method decorators are treated as identity-preserving when their
     /// application result is unknown. Explicit return annotations are trusted as replacement
     /// intent.
     fn from_decorator<'db>(
@@ -623,23 +623,23 @@ impl ClassDecoratorUnknownResultPolicy {
             .unwrap_or(Self::ReplaceBinding)
     }
 
-    /// Return the known preservation policy for a class decorator, if one can be read statically.
+    /// Return the known preservation policy for a decorator, if one can be read statically.
     ///
     /// For unknown decorator results, unannotated functions are treated as likely
     /// identity-preserving:
     /// ```python
-    /// def decorator(cls):
-    ///     return cls
+    /// def decorator(value):
+    ///     return value
     /// ```
     ///
     /// Explicit return annotations are trusted instead:
     /// ```python
-    /// def decorator(cls) -> object:
+    /// def decorator(value) -> object:
     ///     return object()
     /// ```
     ///
     /// Callable instances and protocols delegate the decision to their `__call__` member, because
-    /// the decorator value itself is not the function that receives the class.
+    /// the decorator value itself is not the function that receives the decorated value.
     fn known_from_decorator<'db>(
         db: &'db dyn crate::Db,
         decorator_ty: Type<'db>,
@@ -695,21 +695,21 @@ impl ClassDecoratorUnknownResultPolicy {
                     .unwrap_or(Self::ReplaceBinding),
             ),
             Type::Callable(callable) => Some(match callable.provenance(db) {
-                // An unannotated function preserves the class binding when applying it loses the
+                // An unannotated function preserves the binding when applying it loses the
                 // concrete return type:
                 // ```python
-                // decorator = lambda cls: cls
+                // decorator = lambda value: value
                 //
                 // @decorator
-                // class C: ...
+                // def decorated(): ...
                 // ```
                 CallableFunctionProvenance::ImplicitReturn => Self::PreserveBinding,
-                // An explicit return annotation can intentionally replace the class binding:
+                // An explicit return annotation can intentionally replace the binding:
                 // ```python
-                // def decorator[T](cls) -> T: ...
+                // def decorator[T](value) -> T: ...
                 //
                 // @decorator
-                // class C: ...
+                // def decorated(): ...
                 // ```
                 CallableFunctionProvenance::ExplicitReturn => Self::ReplaceBinding,
                 // Generic class-preserving decorator factories can lose the concrete class in

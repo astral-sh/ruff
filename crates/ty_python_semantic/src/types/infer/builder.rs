@@ -5518,6 +5518,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bindings.return_type(self.db())
             });
 
+        // Untyped decorators are assumed to preserve a function's type when applying them loses
+        // all type information. For decorator factories, inspect the call target because the
+        // decorator expression itself has already become `Unknown`.
+        if return_ty.is_unknown()
+            && class::preserve_binding_for_unknown_result(
+                self.db(),
+                decorator_ty,
+                match &decorator_node.expression {
+                    ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
+                    _ => None,
+                },
+                return_ty,
+            )
+        {
+            return decorated_ty;
+        }
+
         // TODO: Remove this special case once the new constraint solver can preserve
         // per-overload ParamSpec/return correlations for `Callable[P, R] -> Callable[P, R]`.
         if decorator_call_succeeded

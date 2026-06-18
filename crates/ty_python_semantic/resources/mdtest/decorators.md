@@ -179,15 +179,75 @@ class Foo:
 reveal_type(Foo().foo)  # revealed: str
 ```
 
-## Lambdas as decorators
+## Untyped decorators
+
+If applying an untyped decorator produces `Unknown`, we assume that the decorator preserves the type
+of the decorated function. This heuristic is not always sound, but it preserves useful type
+information for the common case where an untyped decorator returns the original function or a
+wrapper with the same signature. This matches Pyright's behavior.
 
 ```py
+def untyped_decorator(func):
+    return func
+
+@untyped_decorator
+def direct(x: int) -> str:
+    return str(x)
+
+reveal_type(direct)  # revealed: def direct(x: int) -> str
+
+def decorator_factory(_):
+    def decorator(func):
+        return func
+    return decorator
+
+@decorator_factory(0)
+def factory_decorated() -> str:
+    return ""
+
+reveal_type(factory_decorated)  # revealed: def factory_decorated() -> str
+
+def expects_float() -> float:
+    return factory_decorated()  # error: [invalid-return-type]
+
+registered: list[object] = []
+
+def register(func):
+    registered.append(func)
+    return func
+
+@register
+def registered_direct(x: int) -> str:
+    return str(x)
+
+reveal_type(registered_direct)  # revealed: def registered_direct(x: int) -> str
+
+def wrapper_decorator(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+@wrapper_decorator
+def wrapped(x: int) -> str:
+    return str(x)
+
+reveal_type(wrapped)  # revealed: def wrapped(x: int) -> str
+
 @lambda f: f
-def g(x: int) -> str:
+def lambda_decorated(x: int) -> str:
     return "a"
 
-# TODO: This should be `Literal[g]` or `(int, /) -> str`
-reveal_type(g)  # revealed: Unknown
+reveal_type(lambda_decorated)  # revealed: def lambda_decorated(x: int) -> str
+
+class UntypedCallableDecorator:
+    def __call__(self, func):
+        return func
+
+@UntypedCallableDecorator()
+def callable_decorated(x: int) -> str:
+    return str(x)
+
+reveal_type(callable_decorated)  # revealed: def callable_decorated(x: int) -> str
 ```
 
 ## Error cases
