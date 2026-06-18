@@ -284,19 +284,26 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
-## Final upper bounds
+## Type aliases in final upper bounds
 
-A type variable with a final upper bound has only one possible class object:
+A type variable whose upper bound resolves to a final class has only one possible class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import final
 from ty_extensions import TypeOf
 
 @final
-class Final: ...
+class FinalClass: ...
 
-def accepts_exact(cls: TypeOf[Final]) -> None: ...
-def bounded[T: Final](cls: type[T]) -> None:
+type Alias = FinalClass
+
+def accepts_exact(cls: TypeOf[FinalClass]) -> None: ...
+def bounded[T: Alias](cls: type[T]) -> None:
     accepts_exact(cls)
 ```
 
