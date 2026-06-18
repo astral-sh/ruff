@@ -827,9 +827,8 @@ def overloaded_put_object(*, TagSet: object, func: object = None) -> None: ...
 to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=overloaded_put_object)  # revealed: list[Tag]
 ```
 
-ParamSpec forwarding should not use raw unspecialized parameter types from a wrapped generic
-callable as argument context. The forwarded list literals should be inferred the same way as in the
-equivalent direct generic call, not with a raw `list[T]` context from the wrapped callable.
+Generic callable arguments participate in fixpoint inference, allowing the inferred type of sibling
+`ParamSpec` arguments to constrain the type of the callable.
 
 ```py
 from typing import Callable
@@ -845,14 +844,22 @@ def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.k
 # TODO: This should not error once the call-expression type context specializes the generic
 # wrapped callable before we infer forwarded `ParamSpec` arguments.
 # error: [invalid-assignment]
-union_list_result: list[int | str] = to_thread_like(generic_identity_list, reveal_type([1]))  # revealed: list[int]
+union_list_result: list[int | str] = to_thread_like(
+    generic_identity_list,
+    reveal_type([1]),  # revealed: list[int]
+)
 
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-to_thread_like(generic_pair, [1], reveal_type([""]))  # revealed: list[str]
+to_thread_like(
+    generic_pair,
+    reveal_type([1]),  # revealed: list[str | int]
+    reveal_type([""]),  # revealed: list[int | str]
+)
 
-# error: [invalid-argument-type]
-to_thread_like(generic_pair_with_container, 1, reveal_type([""]))  # revealed: list[str]
+to_thread_like(
+    generic_pair_with_container,
+    1,
+    reveal_type([""]),  # revealed: list[Literal[1] | str]
+)
 ```
 
 ### Specializing `ParamSpec` with another `ParamSpec`
