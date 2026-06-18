@@ -12,7 +12,6 @@ mod constructor;
 mod enum_property;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -56,8 +55,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, rebind_return_callables};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
@@ -69,64 +67,10 @@ use crate::types::{
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
+use ty_python_core::definition::DefinitionKind;
 use ty_python_core::semantic_index;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
-
-fn generic_contexts_mentioned_in_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> FxOrderSet<GenericContext<'db>> {
-    struct GenericContextCollector<'db> {
-        generic_contexts: RefCell<FxOrderSet<GenericContext<'db>>>,
-        recursion_guard: TypeCollector<'db>,
-    }
-
-    impl<'db> GenericContextCollector<'db> {
-        fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
-            if let Some(generic_context) = signature.generic_context {
-                self.generic_contexts.borrow_mut().insert(generic_context);
-            }
-            for parameter in signature.parameters() {
-                self.visit_type(db, parameter.annotated_type());
-                if let Some(default_ty) = parameter.default_type() {
-                    self.visit_type(db, default_ty);
-                }
-            }
-            self.visit_type(db, signature.return_ty);
-        }
-    }
-
-    impl<'db> TypeVisitor<'db> for GenericContextCollector<'db> {
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-            for signature in &callable.signatures(db).overloads {
-                self.visit_signature(db, signature);
-            }
-        }
-
-        fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
-            for signature in &function.signature(db).overloads {
-                self.visit_signature(db, signature);
-            }
-            self.visit_signature(db, function.last_definition_signature(db));
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-        }
-    }
-
-    let collector = GenericContextCollector {
-        generic_contexts: RefCell::default(),
-        recursion_guard: TypeCollector::default(),
-    };
-    collector.visit_type(db, ty);
-    collector.generic_contexts.into_inner()
-}
 
 fn freshen_generic_contexts_in_type<'db>(
     db: &'db dyn Db,
@@ -2567,13 +2511,13 @@ impl<'db> Bindings<'db> {
                         let ty_a = freshen_generic_contexts_in_type(
                             db,
                             ty_a,
-                            generic_contexts_mentioned_in_type(db, ty_a),
+                            ty_a.mentioned_generic_contexts(db),
                             &nonce_generator,
                         );
                         let ty_b = freshen_generic_contexts_in_type(
                             db,
                             ty_b,
-                            generic_contexts_mentioned_in_type(db, ty_b),
+                            ty_b.mentioned_generic_contexts(db),
                             &nonce_generator,
                         );
 
@@ -4708,6 +4652,10 @@ struct ArgumentTypeChecker<'a, 'db> {
     errors: &'a mut Vec<BindingError<'db>>,
 
     inferable_typevars: InferableTypeVars<'db>,
+    /// Typevars that can appear in a specialization via generic callable arguments. Treat these as
+    /// inferable while checking the post-specialization argument types, otherwise valid higher-order
+    /// calls like `partial(partial, drop)` can fail against a too-concrete fallback specialization.
+    argument_check_inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
@@ -4786,6 +4734,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return_ty,
             errors,
             inferable_typevars: InferableTypeVars::None,
+            argument_check_inferable_typevars: InferableTypeVars::None,
             specialization: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
@@ -5079,9 +5028,45 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 maybe_promote(typevar, bounds)
             };
 
+        // Capture this immediately before `build_with` so it reflects the final pending
+        // constraint set used to solve this call's specialization.
+        let returned_callable_rescoping_candidates =
+            builder.returned_callable_rescoping_candidates();
+        self.argument_check_inferable_typevars = returned_callable_rescoping_candidates;
         let specialization = builder.build_with(generic_context, choose_solution);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
+        if !matches!(
+            returned_callable_rescoping_candidates,
+            InferableTypeVars::None
+        ) {
+            // A bound receiver is outside of the call result. If its class typevars also appear in
+            // the result, they represent the receiver specialization and should not become local to
+            // a returned callable.
+            let synthetic_argument_types =
+                self.enumerate_argument_types()
+                    .filter_map(|(_, _, argument, argument_types)| {
+                        if matches!(argument, Argument::Synthetic) {
+                            argument_types.get_default()
+                        } else {
+                            None
+                        }
+                    });
+            let (return_ty, _) = rebind_return_callables(
+                self.db,
+                synthetic_argument_types,
+                self.return_ty,
+                |typevar| {
+                    typevar.is_inferable(self.db, returned_callable_rescoping_candidates)
+                        && !typevar.binding_context(self.db).definition().is_some_and(
+                            |definition| {
+                                matches!(definition.kind(self.db), DefinitionKind::Class(_))
+                            },
+                        )
+                },
+            );
+            self.return_ty = return_ty;
+        }
         self.specialization = Some(specialization);
     }
 
@@ -5161,10 +5146,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // building them in an earlier separate step.
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
+        let argument_check_inferable_typevars = self
+            .inferable_typevars
+            .merge(self.db, self.argument_check_inferable_typevars);
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
             && argument_type
-                .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
+                .when_assignable_to(
+                    self.db,
+                    expected_ty,
+                    constraints,
+                    argument_check_inferable_typevars,
+                )
                 .is_never_satisfied(self.db)
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
@@ -6078,27 +6071,34 @@ impl<'db> Binding<'db> {
                 }
             }
 
-            // Default specialize any type variables to a marker type, which will be ignored
-            // during argument inference, allowing the concrete subset of the parameter
-            // type to still affect argument inference.
-            //
-            // TODO: Eventually, we want to "tie together" the typevars of the two calls
-            // so that we can infer their specializations at the same time — or at least, for
-            // the specialization of one to influence the specialization of the other. It's
-            // not yet clear how we're going to do that. (We might have to start inferring
-            // constraint sets for each expression, instead of simple types?)
-            let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
-            let specialization = generic_context.specialize_recursive(
-                db,
-                generic_context.variables(db).map(|typevar| {
-                    Some(
-                        return_type_solutions
-                            .get(&typevar.identity(db))
-                            .copied()
-                            .unwrap_or(unspecialized),
-                    )
-                }),
-            );
+            // A retry pass can use the specialization solved from the first argument-inference
+            // pass to provide precise context for collection literals and other bidirectional
+            // expressions.
+            let specialization = if let Some(specialization) = self.specialization {
+                specialization
+            } else {
+                // Default specialize any type variables to a marker type, which will be ignored
+                // during argument inference, allowing the concrete subset of the parameter
+                // type to still affect argument inference.
+                //
+                // TODO: Eventually, we want to "tie together" the typevars of the two calls
+                // so that we can infer their specializations at the same time — or at least, for
+                // the specialization of one to influence the specialization of the other. It's
+                // not yet clear how we're going to do that. (We might have to start inferring
+                // constraint sets for each expression, instead of simple types?)
+                let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+                generic_context.specialize_recursive(
+                    db,
+                    generic_context.variables(db).map(|typevar| {
+                        Some(
+                            return_type_solutions
+                                .get(&typevar.identity(db))
+                                .copied()
+                                .unwrap_or(unspecialized),
+                        )
+                    }),
+                )
+            };
 
             // A `P.args`/`P.kwargs` parameter has a useful context only after another
             // argument, usually a `Callable[P, R]`, specializes `P`.
