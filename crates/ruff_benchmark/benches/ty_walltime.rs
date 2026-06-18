@@ -2,7 +2,7 @@ use divan::{Bencher, bench};
 use std::fmt::{Display, Formatter};
 
 use rayon::ThreadPoolBuilder;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
+use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
@@ -93,8 +93,8 @@ static ALTAIR: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "altair",
         repository: "https://github.com/vega/altair",
-        commit: "d1f4a1ef89006e5f6752ef1f6df4b7a509336fba",
-        paths: &["altair"],
+        commit: "a9765713566095349cb1cfbbe85d6ad258c84245",
+        paths: &["altair", "tests"],
         dependencies: &[
             "jinja2",
             "narwhals",
@@ -106,17 +106,17 @@ static ALTAIR: Benchmark = Benchmark::new(
             "scipy-stubs",
             "types-jsonschema",
         ],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py312,
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    950,
+    3,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "colour-science",
         repository: "https://github.com/colour-science/colour",
-        commit: "a17e2335c29e7b6f08080aa4c93cfa9b61f84757",
+        commit: "4ee3b72a2c6205c1d0cd964075621ec19290d571",
         paths: &["colour"],
         dependencies: &[
             "matplotlib",
@@ -125,18 +125,18 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
             "pytest",
             "scipy-stubs",
         ],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py310,
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    350,
+    450,
 );
 
 static FREQTRADE: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "freqtrade",
         repository: "https://github.com/freqtrade/freqtrade",
-        commit: "2d842ea129e56575852ee0c45383c8c3f706be19",
-        paths: &["freqtrade"],
+        commit: "9fca9c818529c51ba19a1e76bc9428cf3ad56e4b",
+        paths: &["freqtrade", "scripts"],
         dependencies: &[
             "numpy",
             "pandas-stubs",
@@ -145,20 +145,20 @@ static FREQTRADE: Benchmark = Benchmark::new(
             "types-cachetools",
             "types-filelock",
             "types-python-dateutil",
-            "types-requests",
+            "requests",
             "types-tabulate",
         ],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py312,
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    650,
+    717,
 );
 
 static PANDAS: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "pandas",
         repository: "https://github.com/pandas-dev/pandas",
-        commit: "5909621e2267eb67943a95ef5e895e8484c53432",
+        commit: "19b0ecf5d5b7fa0b8391a6d2cc1e2a7d1ea5f660",
         paths: &["pandas"],
         dependencies: &[
             "numpy",
@@ -168,70 +168,65 @@ static PANDAS: Benchmark = Benchmark::new(
             "types-setuptools",
             "pytest",
         ],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py312,
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    5500,
+    6700,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "pydantic",
         repository: "https://github.com/pydantic/pydantic",
-        commit: "0c4a22b64b23dfad27387750cf07487efc45eb05",
+        commit: "7974d591c7d22d6667ea9d09831ba9caddcbb373",
         paths: &["pydantic"],
-        dependencies: &[
-            "annotated-types",
-            "pydantic-core",
-            "typing-extensions",
-            "typing-inspection",
-        ],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py39,
+        dependencies: &["annotated-types", "pydantic-core", "typing-inspection"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    3200,
+    1600,
 );
 
 static SYMPY: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "sympy",
         repository: "https://github.com/sympy/sympy",
-        commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
+        commit: "8381f0c42956f60caed72aedb2ca4e82420b9992",
         paths: &["sympy"],
         dependencies: &["mpmath"],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py312,
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    14250,
+    16500,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "tanjun",
         repository: "https://github.com/FasterSpeeding/Tanjun",
-        commit: "69f40db188196bc59516b6c69849c2d85fbc2f4a",
+        commit: "88d43a267a5bcd995d4929f62b14fbe5c18e59de",
         paths: &["tanjun"],
         dependencies: &["hikari", "alluka"],
-        max_dep_date: "2025-06-17",
-        python_version: SupportedPythonVersion::Py312,
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
     },
-    120,
+    110,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(
     RealWorldProject {
         name: "static-frame",
         repository: "https://github.com/static-frame/static-frame",
-        commit: "34962b41baca5e7f98f5a758d530bff02748a421",
+        commit: "0b1e2fc2e819cde1b9b99be7cc57be08ee43d8de",
         paths: &["static_frame"],
         // N.B. `arraykit` is installed as a dependency during ecosystem runs,
         // but it takes much longer to be installed in a Codspeed run
         // (seems to be built from source on the Codspeed CI runners for some reason).
         dependencies: &["numpy"],
-        max_dep_date: "2025-08-09",
+        max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    1810,
+    1950,
 );
 
 #[track_caller]

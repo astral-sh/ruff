@@ -2867,7 +2867,7 @@ pub(crate) fn report_duplicate_bases(
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.focus_range(db)) else {
         return;
     };
 
@@ -2882,28 +2882,23 @@ pub(crate) fn report_duplicate_bases(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
-    let mut sub_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!(
-            "The definition of class `{}` will raise `TypeError` at runtime",
-            class.name(db)
-        ),
-    );
+    diagnostic.info(format_args!(
+        "Definition of class `{}` will raise `TypeError` at runtime",
+        class.name(db)
+    ));
+
     let first_base = bases_list[*first_index].source_node();
-    sub_diagnostic.annotate(
-        Annotation::secondary(context.span(first_base)).message(format_args!(
-            "Class `{duplicate_name}` first included in bases list here"
-        )),
-    );
+    diagnostic.annotate(context.secondary(first_base).message(format_args!(
+        "Class `{duplicate_name}` first included in bases list here"
+    )));
+
     for index in later_indices {
         let repeated_base = bases_list[*index].source_node();
-        sub_diagnostic.annotate(
+        diagnostic.annotate(
             Annotation::primary(context.span(repeated_base))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }
-
-    diagnostic.sub(sub_diagnostic);
 }
 
 pub(crate) fn report_invalid_or_unsupported_base(

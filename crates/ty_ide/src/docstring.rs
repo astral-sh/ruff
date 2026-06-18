@@ -6,11 +6,9 @@
 //! There are no formal specifications for any of these formats, so the parsing
 //! logic needs to be tolerant of variations.
 
-mod formats;
+mod document;
 mod markdown;
-mod preformatted;
 
-use formats::Formats;
 use indexmap::IndexMap;
 use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
@@ -80,7 +78,7 @@ impl Docstring {
         param_docs.extend(extract_numpy_style_params(&self.0));
 
         // reST/Sphinx-style docstrings
-        param_docs.extend(Formats::parse(&self.0).parameter_documentation());
+        param_docs.extend(document::parameter_documentation(&self.0));
 
         param_docs
     }

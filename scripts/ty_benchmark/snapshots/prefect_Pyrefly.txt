@@ -64,6 +64,8 @@ ERROR src/prefect/server/models/block_documents.py:789:12-27: Object of class `R
 ERROR src/prefect/server/models/block_schemas.py:265:13-41: Object of class `dict` has no attribute `replace` [missing-attribute]
 ERROR src/prefect/server/models/block_schemas.py:269:30-54: Object of class `dict` has no attribute `replace` [missing-attribute]
 ERROR src/prefect/server/models/block_schemas.py:311:8-23: Object of class `Result` has no attribute `rowcount` [missing-attribute]
+ERROR src/prefect/server/models/block_schemas.py:621:21-85: Object of class `dict` has no attribute `append` [missing-attribute]
+ERROR src/prefect/server/models/block_schemas.py:630:81-633:22: Cannot set item in `dict[str | None, dict[str, str]]` [unsupported-operation]
 ERROR src/prefect/server/models/block_types.py:28:16-51: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
 ERROR src/prefect/server/models/block_types.py:30:60-70: Argument `datetime` is not assignable to parameter `occurred` with type `DateTime` in function `prefect.server.events.schemas.lifecycle.block_type_created_event` [bad-argument-type]
 ERROR src/prefect/server/models/block_types.py:36:16-51: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
@@ -169,7 +171,7 @@ ERROR src/prefect/server/models/workers.py:575:61-71: Argument `datetime` is not
 ERROR src/prefect/server/models/workers.py:831:15-30: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:907:16-51: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
 ERROR src/prefect/server/models/workers.py:910:66-76: Argument `datetime` is not assignable to parameter `occurred` with type `DateTime` in function `prefect.server.models.events.work_queue_deleted_event` [bad-argument-type]
-ERROR src/prefect/server/models/workers.py:1021:55-81: `int` is not assignable to TypedDict key `heartbeat_interval_seconds` with type `WorkerStatus | datetime` [bad-typed-dict-key]
+ERROR src/prefect/server/models/workers.py:1021:55-81: `int` is not assignable to dict key `heartbeat_interval_seconds` with type `WorkerStatus | datetime` [bad-assignment]
 ERROR src/prefect/server/models/workers.py:1036:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:1107:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:1161:9-1172:35: Returned type `Label[Any]` is not assignable to declared return type `ScalarSelect[Unknown]` [bad-return]
@@ -184,4 +186,4 @@ ERROR src/prefect/server/models/workers.py:1375:16-51: Cannot use `PrefectServer
 ERROR src/prefect/server/models/workers.py:1377:73-83: Argument `datetime` is not assignable to parameter `occurred` with type `DateTime` in function `prefect.server.models.events.work_pool_deleted_event` [bad-argument-type]
 ERROR src/prefect/server/models/workers.py:1390:16-43: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 185 errors (16 suppressed, 6 warnings not shown)
+ INFO 187 errors (16 suppressed, 7 warnings not shown)

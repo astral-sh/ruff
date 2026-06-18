@@ -27,16 +27,11 @@ error[duplicate-base]: Duplicate base class `int`
  --> src/mdtest_snippet.py:2:7
   |
 2 | class InlineTupleDuplicateBases(*(int, int)): ...
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-info: The definition of class `InlineTupleDuplicateBases` will raise `TypeError` at runtime
- --> src/mdtest_snippet.py:2:35
-  |
-2 | class InlineTupleDuplicateBases(*(int, int)): ...
-  |                                   ---  ^^^ Class `int` later repeated here
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^   ---  ^^^ Class `int` later repeated here
   |                                   |
   |                                   Class `int` first included in bases list here
   |
+info: Definition of class `InlineTupleDuplicateBases` will raise `TypeError` at runtime
 
 ```
 

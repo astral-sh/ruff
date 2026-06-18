@@ -1,8 +1,8 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
 use ruff_benchmark::real_world_projects::{
-    InstalledProject, RealWorldProject, copy_directory_recursive, get_project_cache_dir,
-    install_dependencies_to_cache,
+    InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, copy_directory_recursive,
+    get_project_cache_dir, install_dependencies_to_cache,
 };
 
 use std::fmt::Write;
@@ -243,7 +243,7 @@ fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> 
             dependencies,
             &venv_path,
             SupportedPythonVersion::Py312,
-            "2025-06-17",
+            TY_ECOSYSTEM_PIN,
         )
         .expect("Failed to install dependencies");
 
@@ -1438,13 +1438,13 @@ fn hydra(criterion: &mut Criterion) {
         RealWorldProject {
             name: "hydra-zen",
             repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-            commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-            paths: &["src"],
+            commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
+            paths: &["src", "tests/annotations"],
             dependencies: &["pydantic", "beartype", "hydra-core"],
-            max_dep_date: "2025-06-17",
-            python_version: SupportedPythonVersion::Py313,
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        100,
+        510,
     );
 
     bench_project(&benchmark, criterion);
@@ -1455,13 +1455,13 @@ fn attrs(criterion: &mut Criterion) {
         RealWorldProject {
             name: "attrs",
             repository: "https://github.com/python-attrs/attrs",
-            commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-            paths: &["src"],
+            commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
+            paths: &["src/attrs", "src/attr", "typing-examples"],
             dependencies: &[],
-            max_dep_date: "2025-06-17",
-            python_version: SupportedPythonVersion::Py313,
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        120,
+        102,
     );
 
     bench_project(&benchmark, criterion);
@@ -1472,13 +1472,13 @@ fn anyio(criterion: &mut Criterion) {
         RealWorldProject {
             name: "anyio",
             repository: "https://github.com/agronholm/anyio",
-            commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
+            commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
             paths: &["src"],
-            dependencies: &[],
-            max_dep_date: "2025-06-17",
-            python_version: SupportedPythonVersion::Py313,
+            dependencies: &["exceptiongroup", "idna", "pytest"],
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        150,
+        110,
     );
 
     bench_project(&benchmark, criterion);
@@ -1489,13 +1489,13 @@ fn datetype(criterion: &mut Criterion) {
         RealWorldProject {
             name: "DateType",
             repository: "https://github.com/glyph/DateType",
-            commit: "57c9c93cf2468069f72945fc04bf27b64100dad8",
+            commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
             paths: &["src"],
             dependencies: &[],
-            max_dep_date: "2025-07-04",
-            python_version: SupportedPythonVersion::Py313,
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        10,
+        17,
     );
 
     bench_project(&benchmark, criterion);

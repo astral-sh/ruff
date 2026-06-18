@@ -14,7 +14,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import { FileHandle, Hint, Workspace } from "ty_wasm";
+import { type DiagnosticTag, FileHandle, Hint, Workspace } from "ty_wasm";
 import {
   Panel,
   Group as PanelGroup,
@@ -333,6 +333,7 @@ function useCheckResult(
         annotations: diagnostic.annotations(workspace),
         subDiagnostics: diagnostic.subDiagnostics(workspace),
         severity: diagnostic.severity(),
+        tags: diagnostic.tags() as DiagnosticTag[],
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,
         raw: diagnostic,
