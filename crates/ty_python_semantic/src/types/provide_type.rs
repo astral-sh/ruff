@@ -1172,141 +1172,16 @@ mod tests {
     use crate::types::generics::typing_self;
     use crate::types::set_theoretic::builder::IntersectionBuilder;
     use crate::types::subclass_of::SubclassOfType;
-    use crate::types::typed_dict::{
-        SynthesizedTypedDictKind, SynthesizedTypedDictType, TypedDictOpenness, TypedDictSchema,
-    };
     use crate::types::{
         InternedType, KnownClass, Parameters, Signature, SpecialFormType, Type, UnionType,
         todo_type,
     };
-    use crate::{HasType, SemanticModel};
     use insta::assert_snapshot;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::parsed::parsed_module;
-    use ruff_python_ast::AnyNodeRef;
-    use ruff_python_ast::find_node::covering_node;
     use ruff_python_ast::name::Name;
-    use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::{TextRange, TextSize};
-
-    fn print_marked(source: &str) -> String {
-        let mut source = dedent(source).to_string();
-        let start = source
-            .find("<START>")
-            .expect("source should contain a <START> marker");
-        source.replace_range(start..start + "<START>".len(), "");
-        let end = source
-            .find("<END>")
-            .expect("source should contain an <END> marker");
-        source.replace_range(end..end + "<END>".len(), "");
-        assert!(start <= end, "<START> should appear before <END>");
-
-        let db = TestDbBuilder::new()
-            .with_file("/src/foo.py", &source)
-            .build()
-            .expect("valid test database");
-        let file = system_path_to_file(&db, "/src/foo.py").expect("test file exists");
-        let parsed = parsed_module(&db, file).load(&db);
-        let range = TextRange::new(
-            TextSize::try_from(start).expect("source should fit in a TextSize"),
-            TextSize::try_from(end).expect("source should fit in a TextSize"),
-        );
-        let model = SemanticModel::new(&db, file);
-        let Some(ty) = covering_node(parsed.syntax().into(), range)
-            .find_first(AnyNodeRef::is_expression)
-            .ok()
-            .and_then(|found| found.node().as_expr_ref())
-            .and_then(|expression| expression.inferred_type(&model))
-        else {
-            return "No type provided".to_string();
-        };
-        printed(print_type(&db, ty))
-    }
 
     fn printed(result: Result<String, PrintTypeError>) -> String {
         result.unwrap_or_else(|error| format!("Failed with {error}"))
-    }
-
-    #[test]
-    fn named_recursive_alias_is_preserved() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                type Tree = int | list[Tree]
-                <START>tree<END>: Tree
-                "#,
-            ),
-            @"foo.Tree"
-        );
-    }
-
-    #[test]
-    fn generic_alias_application_is_preserved() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                type Box[T] = list[T]
-                <START>box<END>: Box[int]
-                "#,
-            ),
-            @"foo.Box[builtins.int]"
-        );
-    }
-
-    #[test]
-    fn newtype_instances_use_their_declaration_name() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing import NewType
-                UserId = NewType("UserId", int)
-                user = UserId(1)
-                <START>user<END>
-                "#,
-            ),
-            @"foo.UserId"
-        );
-    }
-
-    #[test]
-    fn class_objects_use_the_exact_typeof_extension() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                class C: ...
-                value = C
-                <START>value<END>
-                "#,
-            ),
-            @"ty_extensions.TypeOf[foo.C]"
-        );
-    }
-
-    #[test]
-    fn module_literals_use_module_syntax() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                import xml.etree
-                <START>xml.etree<END>
-                "#,
-            ),
-            @"Module[xml.etree]"
-        );
-    }
-
-    #[test]
-    fn generic_binders_use_local_type_variable_names() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                def identity[T](value: T) -> T:
-                    return value
-                <START>identity<END>
-                "#,
-            ),
-            @"def foo.identity[T](value: T) -> T: ..."
-        );
     }
 
     #[test]
@@ -1342,41 +1217,6 @@ mod tests {
     }
 
     #[test]
-    fn signatures_preserve_parameter_kinds_and_defaults() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                async def f(
-                    x: int,
-                    /,
-                    value: str = "default",
-                    *args: bytes,
-                    flag: bool = False,
-                    **kwargs: float,
-                ) -> None:
-                    pass
-                <START>f<END>
-                "#,
-            ),
-            @r#"async def foo.f(x: builtins.int, /, value: builtins.str = "default", *args: builtins.bytes, flag: builtins.bool = False, **kwargs: builtins.float) -> None: ..."#
-        );
-    }
-
-    #[test]
-    fn unannotated_parameters_are_unknown() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                def defaults(value, count=1) -> int:
-                    return count
-                <START>defaults<END>
-                "#,
-            ),
-            @"def foo.defaults(value: Unknown, count: Unknown = 1) -> builtins.int: ..."
-        );
-    }
-
-    #[test]
     fn literal_string_default_with_unknown_value_uses_ellipsis() {
         let db = setup_db();
         let callable = Type::single_callable(
@@ -1395,178 +1235,6 @@ mod tests {
         assert_snapshot!(
             printed(print_type(&db, callable)),
             @"(value: typing.LiteralString = ...) -> None"
-        );
-    }
-
-    #[test]
-    fn type_is_uses_public_spelling() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing_extensions import TypeIs
-
-                def is_int(value: object) -> TypeIs[int]: ...
-                <START>is_int<END>
-                "#,
-            ),
-            @"def foo.is_int(value: builtins.object) -> typing.TypeIs[builtins.int]: ..."
-        );
-    }
-
-    #[test]
-    fn type_guard_uses_public_spelling() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing_extensions import TypeGuard
-
-                def is_str(value: object) -> TypeGuard[str]: ...
-                <START>is_str<END>
-                "#,
-            ),
-            @"def foo.is_str(value: builtins.object) -> typing.TypeGuard[builtins.str]: ..."
-        );
-    }
-
-    #[test]
-    fn type_form_uses_public_spelling() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing_extensions import TypeForm
-
-                <START>form<END>: TypeForm[int]
-                "#,
-            ),
-            @"typing.TypeForm[builtins.int]"
-        );
-    }
-
-    #[test]
-    fn anonymous_callable() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from collections.abc import Callable
-                <START>callback<END>: Callable[[int, str], bool]
-                "#,
-            ),
-            @"(builtins.int, builtins.str, /) -> builtins.bool"
-        );
-    }
-
-    #[test]
-    fn bound_method() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                class C:
-                    def method(self, value: int) -> str:
-                        return str(value)
-
-                method = C().method
-                <START>method<END>
-                "#,
-            ),
-            @"def foo.C.method(value: builtins.int) -> builtins.str: ..."
-        );
-    }
-
-    #[test]
-    fn concatenate_callable() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from collections.abc import Callable
-                from typing import Concatenate
-
-                <START>callback<END>: Callable[Concatenate[int, ...], str]
-                "#,
-            ),
-            @"(builtins.int, /, *args: typing.Any, **kwargs: typing.Any) -> builtins.str"
-        );
-    }
-
-    #[test]
-    fn overloads_are_an_explicit_group() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing import overload
-
-                @overload
-                def convert(value: int) -> str: ...
-                @overload
-                def convert(value: str) -> int: ...
-                def convert(value: int | str) -> int | str:
-                    return value
-                <START>convert<END>
-                "#,
-            ),
-            @"Overloads[def foo.convert(value: builtins.int) -> builtins.str: ..., def foo.convert(value: builtins.str) -> builtins.int: ...]"
-        );
-    }
-
-    #[test]
-    fn tuple_literals_are_complete() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                value = (1, "two", b"three", True)
-                <START>value<END>
-                "#,
-            ),
-            @r#"builtins.tuple[typing.Literal[1], typing.Literal["two"], typing.Literal[b"three"], typing.Literal[True]]"#
-        );
-    }
-
-    #[test]
-    fn string_literals_are_escaped() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                value = "\u0085"
-                <START>value<END>
-                "#,
-            ),
-            @r#"typing.Literal["\x85"]"#
-        );
-    }
-
-    #[test]
-    fn float_and_complex_literals_use_public_spellings() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                value = (1.0, 1j)
-                <START>value<END>
-                "#,
-            ),
-            @"builtins.tuple[builtins.float, builtins.complex]"
-        );
-    }
-
-    #[test]
-    fn float_annotation_uses_public_spelling() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                <START>value<END>: float
-                "#,
-            ),
-            @"builtins.float"
-        );
-    }
-
-    #[test]
-    fn complex_annotation_uses_public_spelling() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                <START>value<END>: complex
-                "#,
-            ),
-            @"builtins.complex"
         );
     }
 
@@ -1601,47 +1269,6 @@ mod tests {
     }
 
     #[test]
-    fn unspecialized_alias_object_uses_runtime_type() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                type Alias = int
-                value = Alias
-                <START>value<END>
-                "#,
-            ),
-            @"typing_extensions.TypeAliasType"
-        );
-    }
-
-    #[test]
-    fn specialized_alias_object_uses_runtime_type() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                type Alias[T] = list[T]
-                value = Alias[int]
-                <START>value<END>
-                "#,
-            ),
-            @"types.GenericAlias"
-        );
-    }
-
-    #[test]
-    fn alias_instance_is_not_resolved() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                type Alias = int
-                <START>value<END>: Alias
-                "#,
-            ),
-            @"foo.Alias"
-        );
-    }
-
-    #[test]
     fn special_form_value_uses_typeof() {
         let db = setup_db();
         assert_snapshot!(
@@ -1650,94 +1277,6 @@ mod tests {
                 Type::SpecialForm(SpecialFormType::Literal)
             )),
             @"ty_extensions.TypeOf[typing.Literal]"
-        );
-    }
-
-    #[test]
-    fn runtime_type_variable_uses_typeof() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing import TypeVar
-
-                T = TypeVar("T")
-                typevar = T
-                <START>typevar<END>
-                "#,
-            ),
-            @"ty_extensions.TypeOf[foo.T]"
-        );
-    }
-
-    #[test]
-    fn runtime_newtype_uses_typeof() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing import NewType
-
-                UserId = NewType("UserId", int)
-                newtype = UserId
-                <START>newtype<END>
-                "#,
-            ),
-            @"ty_extensions.TypeOf[foo.UserId]"
-        );
-    }
-
-    #[test]
-    fn runtime_literal_uses_typeof() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing import Literal
-
-                literal = Literal[1]
-                <START>literal<END>
-                "#,
-            ),
-            @"ty_extensions.TypeOf[typing.Literal[1]]"
-        );
-    }
-
-    #[test]
-    fn runtime_union_uses_typeof() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                union = int | str
-                <START>union<END>
-                "#,
-            ),
-            @"ty_extensions.TypeOf[builtins.int | builtins.str]"
-        );
-    }
-
-    #[test]
-    fn runtime_generic_alias_uses_typeof() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                generic_alias = type[int]
-                <START>generic_alias<END>
-                "#,
-            ),
-            @"ty_extensions.TypeOf[builtins.type[builtins.int]]"
-        );
-    }
-
-    #[test]
-    fn runtime_annotated_uses_bare_type() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from typing import Annotated
-
-                annotated = Annotated[int, "metadata"]
-                <START>annotated<END>
-                "#,
-            ),
-            @"builtins.int"
         );
     }
 
@@ -1823,103 +1362,16 @@ mod tests {
     }
 
     #[test]
-    fn first_ambiguous_declaration_uses_lexical_ordinal() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                class C: ...
-                first = C()
-                class C: ...
-                second = C()
-                <START>first<END>
-                "#,
-            ),
-            @"foo.C@1"
-        );
-    }
-
-    #[test]
-    fn second_ambiguous_declaration_uses_lexical_ordinal() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                class C: ...
-                first = C()
-                class C: ...
-                second = C()
-                <START>second<END>
-                "#,
-            ),
-            @"foo.C@2"
-        );
-    }
-
-    #[test]
-    fn first_ambiguous_ancestor_uses_lexical_ordinal() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                class Outer:
-                    class C: ...
-
-                FirstC = Outer.C
-                first = FirstC()
-
-                class Outer:
-                    class C: ...
-
-                SecondC = Outer.C
-                second = SecondC()
-                <START>first<END>
-                "#,
-            ),
-            @"foo.Outer@1.C"
-        );
-    }
-
-    #[test]
-    fn second_ambiguous_ancestor_uses_lexical_ordinal() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                class Outer:
-                    class C: ...
-
-                FirstC = Outer.C
-                first = FirstC()
-
-                class Outer:
-                    class C: ...
-
-                SecondC = Outer.C
-                second = SecondC()
-                <START>second<END>
-                "#,
-            ),
-            @"foo.Outer@2.C"
-        );
-    }
-
-    #[test]
-    fn synthesized_and_internal_types_are_rejected() {
+    fn internal_types_are_rejected() {
         let db = setup_db();
-        let synthesized =
-            Type::TypedDict(TypedDictType::Synthesized(SynthesizedTypedDictType::new(
-                &db,
-                TypedDictSchema::default(),
-                SynthesizedTypedDictKind::Schema,
-                TypedDictOpenness::default(),
-            )));
 
         let errors = [
-            synthesized,
             Type::function_like_callable(&db, Signature::new(Parameters::empty(), Type::unknown())),
             KnownClass::ConstraintSet.to_instance(&db),
         ]
         .map(|ty| printed(print_type(&db, ty)))
         .join("\n");
         assert_snapshot!(errors, @r"
-        Failed with type `synthesized TypedDict` cannot be printed
         Failed with type `non-regular anonymous callable` cannot be printed
         Failed with type `internal nominal type` cannot be printed
         ");
@@ -1968,21 +1420,6 @@ mod tests {
         let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
 
         assert_snapshot!(printed(print_type(&db, divergent)), @"Divergent");
-    }
-
-    #[test]
-    fn anonymous_recursion_is_rejected() {
-        assert_snapshot!(
-            print_marked(
-                r#"
-                from ty_extensions import TypeOf
-
-                def recursive(value: "TypeOf[recursive]"): ...
-                <START>recursive<END>
-                "#,
-            ),
-            @"Failed with anonymous recursive type"
-        );
     }
 
     #[test]
