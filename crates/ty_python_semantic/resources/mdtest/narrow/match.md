@@ -739,6 +739,44 @@ def cross_int_enum_members(value: First | Second) -> None:
         case _:
             reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
 
+class Warning(Enum):
+    W1 = auto()
+
+class Verdict(Enum):
+    V0 = auto()
+    V1 = auto()
+    V2 = auto()
+    V3 = auto()
+    V4 = auto()
+    V5 = auto()
+    V6 = auto()
+    V7 = auto()
+    V8 = auto()
+    V9 = auto()
+    V10 = auto()
+    V11 = auto()
+
+def many_cross_enum_cases(value: Warning | Verdict) -> None:
+    match value:
+        case Verdict.V0:
+            return
+        case Verdict.V1:
+            return
+        case Verdict.V2:
+            return
+        case Verdict.V3:
+            return
+        case Verdict.V4:
+            return
+        case Verdict.V5:
+            return
+        case Verdict.V6:
+            return
+        case Verdict.V7:
+            return
+        case _:
+            reveal_type(value)  # revealed: Warning | Literal[Verdict.V8, Verdict.V9, Verdict.V10, Verdict.V11]
+
 class Automatic(StrEnum):
     GENERATED = auto()
 

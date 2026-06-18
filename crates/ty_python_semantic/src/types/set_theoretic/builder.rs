@@ -1108,6 +1108,17 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
+    /// Add DNF branches, dropping those that have already collapsed to `Never` so that later
+    /// union distribution does not multiply dead branches.
+    fn extend(&mut self, other: Self) {
+        self.intersections.extend(
+            other
+                .intersections
+                .into_iter()
+                .filter(|intersection| !intersection.contains_never()),
+        );
+    }
+
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
         self.add_positive_impl(ty, &mut vec![])
     }
@@ -1144,7 +1155,7 @@ impl<'db> IntersectionBuilder<'db> {
                     .iter()
                     .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     })
             }
@@ -1232,7 +1243,7 @@ impl<'db> IntersectionBuilder<'db> {
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     },
                 )
@@ -1278,6 +1289,10 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    fn contains_never(&self) -> bool {
+        self.positive.contains(&Type::Never)
+    }
+
     /// Return `true` when an intersection excludes every member of an enum class.
     ///
     /// This recognizes enum complements that have become empty, such as
@@ -1900,6 +1915,23 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(&db).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn build_intersection_discards_never_dnf_branches() {
+        let db = setup_db();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+
+        let int_or_str = UnionType::from_elements(&db, [int, str]);
+        let int_or_bytes = UnionType::from_elements(&db, [int, bytes]);
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(int_or_str)
+            .add_positive(int_or_bytes);
+
+        assert_eq!(intersection.intersections.len(), 1);
+        assert_eq!(intersection.build(), int);
     }
 
     #[test]
