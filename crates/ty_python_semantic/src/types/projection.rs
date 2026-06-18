@@ -430,7 +430,7 @@ impl<'db> Type<'db> {
                 continue;
             }
 
-            let container = ProjectionContainer::from_recovery_type(db, root, *element, evidence)?;
+            let container = ProjectionContainer::from_type(db, *element)?;
             containers.push(container);
         }
 
@@ -877,7 +877,7 @@ impl<'db> Type<'db> {
             return Some(UnionType::from_elements_cycle_recovery(db, elements));
         }
 
-        if let Some(container) = ProjectionContainer::from_direct_type(db, self) {
+        if let Some(container) = ProjectionContainer::from_type(db, self) {
             return container.into_type(db, root, solved_ops);
         }
 
@@ -988,15 +988,28 @@ enum ProjectionContainer<'db> {
 }
 
 impl<'db> ProjectionContainer<'db> {
-    /// Builds a recovery-time container shape without expanding aliases, bounds, or fallbacks.
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        Self::from_type_impl(db, ty, false)
+    }
+
     fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        Self::from_type_impl(db, ty, true)
+    }
+
+    fn from_type_impl(db: &'db dyn Db, ty: Type<'db>, direct: bool) -> Option<Self> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             return Some(Self::Tuple {
                 spec: spec.as_ref().clone(),
             });
         }
 
-        if let Some((class, specialization)) = ty.direct_class_specialization(db) {
+        let class_specialization = if direct {
+            ty.direct_class_specialization(db)
+        } else {
+            ty.class_specialization(db)
+        };
+
+        if let Some((class, specialization)) = class_specialization {
             let arguments = specialization.types(db);
             if !arguments.is_empty() {
                 return Some(Self::Generic {
@@ -1008,23 +1021,6 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         None
-    }
-
-    /// Builds a recovery-time container shape from direct structure or inference-time evidence.
-    fn from_recovery_type(
-        db: &'db dyn Db,
-        root: DivergentType,
-        ty: Type<'db>,
-        evidence: Option<&ProjectionEvidenceSet<'db>>,
-    ) -> Option<Self> {
-        Self::from_direct_type(db, ty).or_else(|| {
-            let fact = evidence?.container_fact_for_arm(db, root, ty)?;
-            Some(Self::Generic {
-                class: fact.class,
-                arguments: fact.arguments.to_vec(),
-                arm: ty,
-            })
-        })
     }
 
     fn collect_projection_terms(
@@ -1531,6 +1527,13 @@ impl<'db> ProjectionContainer<'db> {
             arguments: arguments.to_vec().into_boxed_slice(),
         })
     }
+
+    fn is_generic_container(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.exact_tuple_instance_spec(db).is_none()
+            && ty
+                .class_specialization(db)
+                .is_some_and(|(_, specialization)| !specialization.types(db).is_empty())
+    }
 }
 
 /// The result of applying one projection path to one container arm.
@@ -1727,28 +1730,6 @@ impl<'db> ProjectionEvidenceSet<'db> {
         });
     }
 
-    fn container_fact_for_arm(
-        self,
-        db: &'db dyn Db,
-        root: DivergentType,
-        arm: Type<'db>,
-    ) -> Option<&'db ProjectionContainerFact<'db>> {
-        let normalized_arm = arm
-            .replace_projection_artifacts_with_root(db, root)
-            .unwrap_or(arm);
-        self.container_facts(db).iter().find(|fact| {
-            if fact.arm == arm {
-                return true;
-            }
-
-            let fact_arm = fact
-                .arm
-                .replace_projection_artifacts_with_root(db, root)
-                .unwrap_or(fact.arm);
-            fact_arm == normalized_arm
-        })
-    }
-
     fn project_generic_path(
         self,
         db: &'db dyn Db,
@@ -1756,6 +1737,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
+        ProjectionContainer::is_generic_container(db, arm).then_some(())?;
         let normalized_arm = arm
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
