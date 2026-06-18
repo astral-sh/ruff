@@ -146,6 +146,7 @@ mod tests {
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_3.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_4.py"))]
+    #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview_{}_{}",
