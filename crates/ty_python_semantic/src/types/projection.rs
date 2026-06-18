@@ -15,12 +15,12 @@ use super::{
     DivergentType, DynamicType, KnownClass, MemberLookupPolicy, StaticClassLiteral, TupleSpec,
     Type, UnionBuilder, UnionType, call::CallArguments, instance::SliceLiteral,
 };
-use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
+use crate::{Db, FxIndexMap, FxIndexSet};
 
 impl<'db> Type<'db> {
     pub(crate) fn try_iter_projection_result_with_mode(
@@ -213,8 +213,8 @@ impl<'db> Type<'db> {
             });
 
         let mut elements = Vec::new();
-        let mut projection_facts = Vec::new();
-        let mut container_facts = Vec::new();
+        let mut projection_facts = FxIndexSet::default();
+        let mut container_facts = FxIndexSet::default();
         let path = ProjectionPath::from_op(op);
 
         for element in union.elements(db).iter().copied() {
@@ -223,8 +223,7 @@ impl<'db> Type<'db> {
             }
 
             let term = project_non_cycle(element)?;
-            if let Some(container_fact) =
-                ProjectionContainer::build_container_fact(db, element)
+            if let Some(container_fact) = ProjectionContainer::build_container_fact(db, element)
                 && !term.is_ambiguous(db)
             {
                 ProjectionEvidenceSet::push_container_fact(&mut container_facts, container_fact);
@@ -272,7 +271,7 @@ impl<'db> Type<'db> {
         };
 
         let elements = self.top_level_projection_union_elements(db);
-        let mut projection_facts = Vec::new();
+        let mut projection_facts = FxIndexSet::default();
         let path = ProjectionPath::from_op(op);
         let terms = elements
             .into_iter()
@@ -327,7 +326,11 @@ impl<'db> Type<'db> {
         let ty = Self::solve_projection_terms(db, *root, &path, &terms)?;
         Some(ProjectionResult {
             ty,
-            projection_evidence: ProjectionEvidenceSet::new(db, projection_facts, Vec::new()),
+            projection_evidence: ProjectionEvidenceSet::new(
+                db,
+                projection_facts,
+                FxIndexSet::default(),
+            ),
         })
     }
 
@@ -396,14 +399,14 @@ impl<'db> Type<'db> {
     ///    result depends on member or call inference are not recomputed here.
     ///    Here, both tuple arms become `containers`: projecting the first arm
     ///    by `Subscript[0]` yields `int`, while projecting the second yields
-    ///    `Projection_{Subscript[0]}(D)`. These terms are stored in
+    ///    `Projection_{Subscript[0]}(D)`. These terms are stored by path in
     ///    `terms_by_op`.
     ///    * `containers = [tuple[int], tuple[Projection_{Subscript[0]}(D)]]`
     ///    * `terms_by_op = [(Subscript[0], [Exact(int), Exact(Projection_{Subscript[0]}(D))])]`
     /// 3. Solve each path from the terms produced by those containers, dropping
     ///    recursive self references and unioning the remaining productive terms.
     ///    In the example, the self reference is discarded and `Subscript[0]`
-    ///    is solved as `int`, producing `solved_ops = [(Subscript[0], int)]`.
+    ///    is solved as `int`, producing `solved_ops = {Subscript[0]: int}`.
     /// 4. Rebuild the original top-level arms with every cycle artifact replaced
     ///    by its solved projection type.
     ///    Rebuilding turns `tuple[Projection_{Subscript[0]}(D)]` into
@@ -439,7 +442,7 @@ impl<'db> Type<'db> {
             .iter()
             .cloned()
             .map(|path| (path, Vec::new()))
-            .collect::<Vec<_>>();
+            .collect::<FxIndexMap<_, _>>();
         for container in &containers {
             container.collect_projection_terms(db, root, evidence, &mut terms_by_op)?;
         }
@@ -452,7 +455,7 @@ impl<'db> Type<'db> {
                     Self::solve_projection_terms(db, root, path, terms)?,
                 ))
             })
-            .collect::<Option<Vec<_>>>()?;
+            .collect::<Option<FxIndexMap<_, _>>>()?;
 
         let elements = elements
             .into_iter()
@@ -843,19 +846,17 @@ impl<'db> Type<'db> {
     }
 
     fn solved_projection_type(
-        solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
+        solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
         path: &ProjectionPath<'db>,
     ) -> Option<Self> {
-        solved_ops
-            .iter()
-            .find_map(|(candidate, ty)| (candidate == path).then_some(*ty))
+        solved_ops.get(path).copied()
     }
 
     fn replace_solved_projection_artifacts(
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
+        solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
     ) -> Option<Self> {
         if !self.mentions_cycle_artifact(db, root) {
             return Some(self);
@@ -902,7 +903,7 @@ impl<'db> Type<'db> {
         let solved_ops = paths
             .into_iter()
             .map(|path| (path, Type::Divergent(root)))
-            .collect::<Vec<_>>();
+            .collect::<FxIndexMap<_, _>>();
         self.replace_solved_projection_artifacts(db, root, &solved_ops)
     }
 
@@ -1031,7 +1032,7 @@ impl<'db> ProjectionContainer<'db> {
         db: &'db dyn Db,
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
-        terms_by_op: &mut [(ProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
+        terms_by_op: &mut FxIndexMap<ProjectionPath<'db>, Vec<ProjectionTerm<'db>>>,
     ) -> Option<()> {
         for (path, terms) in terms_by_op {
             terms.push(self.project_path(db, root, evidence, path)?);
@@ -1323,7 +1324,7 @@ impl<'db> ProjectionContainer<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        solved_ops: &[(ProjectionPath<'db>, Type<'db>)],
+        solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
     ) -> Option<Type<'db>> {
         match self {
             Self::Tuple { spec } => match spec {
@@ -1594,8 +1595,8 @@ impl<'db> ProjectionEvidenceSet<'db> {
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let mut projection_facts = Vec::new();
-        let mut container_facts = Vec::new();
+        let mut projection_facts = FxIndexSet::default();
+        let mut container_facts = FxIndexSet::default();
 
         for ty in types {
             let mut demands = Vec::new();
@@ -1604,7 +1605,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
                 continue;
             }
 
-            let mut generic_containers = Vec::new();
+            let mut generic_containers = FxIndexSet::default();
             Self::collect_generic_containers(db, ty, &mut generic_containers);
             for container_fact in generic_containers {
                 let arm = container_fact.arm;
@@ -1623,10 +1624,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
                         if term.is_ambiguous(db) {
                             continue;
                         }
-                        if !has_projection_fact {
-                            Self::push_container_fact(&mut container_facts, container_fact.clone());
-                            has_projection_fact = true;
-                        }
+                        has_projection_fact = true;
                         Self::push_projection_fact(
                             &mut projection_facts,
                             ProjectionEvidenceFact {
@@ -1637,6 +1635,9 @@ impl<'db> ProjectionEvidenceSet<'db> {
                             },
                         );
                     }
+                }
+                if has_projection_fact {
+                    Self::push_container_fact(&mut container_facts, container_fact);
                 }
             }
         }
@@ -1649,7 +1650,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         current: Option<Self>,
         previous: Option<Self>,
     ) -> Option<Self> {
-        let mut projection_facts = Vec::new();
+        let mut projection_facts = FxIndexSet::default();
         for fact in current
             .into_iter()
             .chain(previous)
@@ -1658,7 +1659,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
             Self::push_projection_fact(&mut projection_facts, fact);
         }
 
-        let mut container_facts = Vec::new();
+        let mut container_facts = FxIndexSet::default();
         for fact in current
             .into_iter()
             .chain(previous)
@@ -1671,33 +1672,35 @@ impl<'db> ProjectionEvidenceSet<'db> {
     }
 
     fn push_projection_fact(
-        facts: &mut Vec<ProjectionEvidenceFact<'db>>,
+        facts: &mut FxIndexSet<ProjectionEvidenceFact<'db>>,
         fact: ProjectionEvidenceFact<'db>,
     ) {
-        if !facts.iter().any(|existing| existing == &fact) {
-            facts.push(fact);
-        }
+        facts.insert(fact);
     }
 
     fn push_container_fact(
-        facts: &mut Vec<ProjectionContainerFact<'db>>,
+        facts: &mut FxIndexSet<ProjectionContainerFact<'db>>,
         fact: ProjectionContainerFact<'db>,
     ) {
-        if !facts.iter().any(|existing| existing == &fact) {
-            facts.push(fact);
-        }
+        facts.insert(fact);
     }
 
     fn new(
         db: &'db dyn Db,
-        projection_facts: Vec<ProjectionEvidenceFact<'db>>,
-        container_facts: Vec<ProjectionContainerFact<'db>>,
+        projection_facts: FxIndexSet<ProjectionEvidenceFact<'db>>,
+        container_facts: FxIndexSet<ProjectionContainerFact<'db>>,
     ) -> Option<Self> {
         (!projection_facts.is_empty() || !container_facts.is_empty()).then(|| {
             Self(ProjectionEvidenceSetInterned::new(
                 db,
-                projection_facts.into_boxed_slice(),
-                container_facts.into_boxed_slice(),
+                projection_facts
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                container_facts
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
             ))
         })
     }
@@ -1713,7 +1716,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     fn collect_generic_containers(
         db: &'db dyn Db,
         ty: Type<'db>,
-        facts: &mut Vec<ProjectionContainerFact<'db>>,
+        facts: &mut FxIndexSet<ProjectionContainerFact<'db>>,
     ) {
         let facts = RefCell::new(facts);
         any_over_type(db, ty, false, |nested| {
@@ -1734,6 +1737,10 @@ impl<'db> ProjectionEvidenceSet<'db> {
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
         self.container_facts(db).iter().find(|fact| {
+            if fact.arm == arm {
+                return true;
+            }
+
             let fact_arm = fact
                 .arm
                 .replace_projection_artifacts_with_root(db, root)
@@ -1753,12 +1760,18 @@ impl<'db> ProjectionEvidenceSet<'db> {
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
         self.projection_facts(db).iter().find_map(|fact| {
+            if !fact.root.same_marker(root) || fact.path != *path {
+                return None;
+            }
+            if fact.arm == arm {
+                return Some(fact.term);
+            }
+
             let fact_arm = fact
                 .arm
                 .replace_projection_artifacts_with_root(db, root)
                 .unwrap_or(fact.arm);
-            (fact.root.same_marker(root) && fact_arm == normalized_arm && fact.path == *path)
-                .then_some(fact.term)
+            (fact_arm == normalized_arm).then_some(fact.term)
         })
     }
 }
