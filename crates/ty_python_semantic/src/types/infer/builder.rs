@@ -2665,15 +2665,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let descriptor_assignment_is_valid =
             |value_ty: Type<'db>, attr_ty: Type<'db>| -> Option<bool> {
-                let Type::FunctionLiteral(function) = attr_ty else {
-                    return None;
-                };
-                if !matches!(object_ty, Type::ClassLiteral(_))
-                    || !matches!(
+                let target_is_method_like = match attr_ty {
+                    Type::FunctionLiteral(function) => matches!(
                         function.callable_type_kind(db),
-                        CallableTypeKind::StaticMethodLike | CallableTypeKind::ClassMethodLike
-                    )
-                {
+                        CallableTypeKind::FunctionLike
+                            | CallableTypeKind::StaticMethodLike
+                            | CallableTypeKind::ClassMethodLike
+                    ),
+                    Type::Callable(callable) => callable.is_method_like(db),
+                    _ => false,
+                };
+                if !matches!(object_ty, Type::ClassLiteral(_)) || !target_is_method_like {
                     return None;
                 }
 

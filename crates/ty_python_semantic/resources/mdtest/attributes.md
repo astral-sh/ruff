@@ -1084,6 +1084,37 @@ DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
+Method-like callable targets also preserve their descriptor behavior, including through transparent
+decorators.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def transparent(function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class DecoratedMethods:
+    @transparent
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    @staticmethod
+    @transparent
+    def static(x: int) -> str:
+        return str(x)
+
+class MethodMock:
+    def __call__(self, instance: DecoratedMethods, x: int, /) -> str:
+        return str(x)
+
+DecoratedMethods.method = MethodMock()  # error: [invalid-assignment]
+DecoratedMethods.static = static_replacement  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
