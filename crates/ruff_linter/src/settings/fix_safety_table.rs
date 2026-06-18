@@ -65,7 +65,7 @@ impl FixSafetyTable {
                     .map(|selector| (selector, Override::Unsafe)),
             );
 
-        for (selector, o) in selectors {
+        for (selector, safety_override) in selectors {
             let Some(selector) = selector.resolve(preview_options.mode) else {
                 continue;
             };
@@ -78,12 +78,13 @@ impl FixSafetyTable {
                         // More specific selectors take precedence. Unsafe overrides take
                         // precedence when both selectors have the same specificity.
                         if specificity > existing.0
-                            || (specificity == existing.0 && matches!(o, Override::Unsafe))
+                            || (specificity == existing.0
+                                && matches!(safety_override, Override::Unsafe))
                         {
-                            *existing = (specificity, o);
+                            *existing = (specificity, safety_override);
                         }
                     })
-                    .or_insert((specificity, o));
+                    .or_insert((specificity, safety_override));
             }
         }
 
