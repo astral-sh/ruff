@@ -130,6 +130,10 @@ impl UnresolvedRuleSelector {
     pub fn source(&self) -> &RuleSelectorSource {
         &self.source
     }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.range
+    }
 }
 
 impl<'de> Deserialize<'de> for UnresolvedRuleSelector {
