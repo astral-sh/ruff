@@ -8,43 +8,35 @@ use ruff_text_size::{TextRange, TextSize};
 
 use super::preformatted::PreformattedBlockScanner;
 
-/// Represents a parsed restructured text (reST) docstring.
-pub(super) struct Docstring {
-    field_lists: Vec<FieldList>,
+/// Parses all reST field lists in a docstring.
+pub(in crate::docstring) fn field_lists(raw: &str) -> Vec<FieldList> {
+    FieldList::parse_all(raw)
 }
 
-impl Docstring {
-    /// Constructs a parsed representation from a raw docstring.
-    pub(super) fn parse(raw: &str) -> Self {
-        let field_lists = FieldList::parse_all(raw);
-        Self { field_lists }
-    }
+/// Returns the parameter documentation recognized in a reST docstring.
+pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
+    let mut parameters = IndexMap::new();
 
-    /// Returns the parameter documentation that we were able to recognize in a docstring.
-    pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
-        let mut parameters = IndexMap::new();
+    for field_list in field_lists(raw) {
+        for field in field_list.fields {
+            let Field::Parameter {
+                lookup_name,
+                description,
+                ..
+            } = field
+            else {
+                continue;
+            };
 
-        for field_list in &self.field_lists {
-            for field in &field_list.fields {
-                let Field::Parameter {
-                    lookup_name,
-                    description,
-                    ..
-                } = field
-                else {
-                    continue;
-                };
-
-                if description.is_empty() {
-                    continue;
-                }
-
-                parameters.insert(lookup_name.clone(), description.clone());
+            if description.is_empty() {
+                continue;
             }
-        }
 
-        parameters
+            parameters.insert(lookup_name, description);
+        }
     }
+
+    parameters
 }
 
 /// Cursor over docstring lines and their line numbers.
@@ -96,7 +88,7 @@ impl<'a> DocstringLine<'a> {
 ///
 /// <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#field-lists>
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FieldList {
+pub(in crate::docstring) struct FieldList {
     start_line: usize,
     end_line: usize,
     range: TextRange,
@@ -554,7 +546,7 @@ impl<'a> FieldKind<'a> {
 
 /// Represents the reST fields captured by the parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Field {
+pub(in crate::docstring) enum Field {
     Parameter {
         display_name: CompactString,
         lookup_name: String,
@@ -610,7 +602,7 @@ mod tests {
 
     use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use super::{Docstring, FieldList, Lines};
+    use super::{Field, FieldList, Lines, field_lists};
 
     #[test]
     fn parameter_documentation_extracts_rest_parameters() {
@@ -658,14 +650,14 @@ mod tests {
 
     #[test]
     fn parser_supports_complex_inline_parameter_types() {
-        let parsed = Docstring::parse(
+        let parsed = field_lists(
             "\
 :param list[str] items: Item descriptions.
 :param dict[str, list[int | None]] mapping: Mapping description.
 :param Callable[[int, str], bool] callback: Callback description.",
         );
 
-        assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
+        assert_debug_snapshot!(&parsed[0].fields, @r#"
         [
             Parameter {
                 display_name: "items",
@@ -728,16 +720,15 @@ mod tests {
 :raises ValueError: Error description.
 :meta private:
 :unknown with argument: Unknown description.";
-        let parsed = Docstring::parse(docstring);
+        let parsed = field_lists(docstring);
 
-        assert_eq!(parsed.field_lists[0].start_line, 0);
-        assert_eq!(parsed.field_lists[0].end_line, 9);
+        assert_eq!(parsed[0].start_line, 0);
+        assert_eq!(parsed[0].end_line, 9);
         assert_eq!(
-            &docstring[parsed.field_lists[0].range.start().to_usize()
-                ..parsed.field_lists[0].range.end().to_usize()],
+            &docstring[parsed[0].range.start().to_usize()..parsed[0].range.end().to_usize()],
             docstring
         );
-        assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
+        assert_debug_snapshot!(&parsed[0].fields, @r#"
         [
             Parameter {
                 display_name: "*args",
@@ -803,19 +794,27 @@ Intervening prose.
 
 Trailing prose.
 ";
-        let parsed = Docstring::parse(docstring);
+        let parsed = field_lists(docstring);
 
-        assert_eq!(parsed.field_lists.len(), 2);
+        assert_eq!(parsed.len(), 2);
 
-        let first = &parsed.field_lists[0];
+        let first = &parsed[0];
         assert_eq!(first.start_line, 2);
         assert_eq!(first.end_line, 3);
 
-        let second = &parsed.field_lists[1];
+        let second = &parsed[1];
         assert_eq!(second.start_line, 6);
         assert_eq!(second.end_line, 10);
+        let second_description = second.fields.iter().find_map(|field| match field {
+            Field::Parameter { description, .. } => Some(description),
+            _ => None,
+        });
+        assert_eq!(
+            second_description.map(String::as_str),
+            Some("Second parameter.\nContinued::\n\n    literal block")
+        );
 
-        assert_snapshot!(field_list_ranges(docstring, &parsed.field_lists), @r"
+        assert_snapshot!(field_list_ranges(docstring, &parsed), @r"
         | Intro paragraph.
         |
         | :param first: First parameter.
@@ -1005,7 +1004,7 @@ Section::
     }
 
     fn parameter_documentation(docstring: &str) -> String {
-        let parameters = Docstring::parse(docstring).parameter_documentation();
+        let parameters = super::parameter_documentation(docstring);
         let mut rendered = String::new();
 
         for (name, description) in parameters {
