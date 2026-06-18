@@ -2985,11 +2985,9 @@ impl<'db> Type<'db> {
     fn dynamic_descriptor_type(self) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) => Some(self),
-            Type::SubclassOf(subclass_of) => subclass_of
-                .subclass_of()
-                .into_dynamic()
-                .filter(|dynamic| dynamic.is_gradual())
-                .map(Type::Dynamic),
+            Type::SubclassOf(subclass_of) => {
+                subclass_of.subclass_of().into_dynamic().map(Type::Dynamic)
+            }
             _ => None,
         }
     }
@@ -7610,17 +7608,6 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
-    pub(crate) const fn is_gradual(self) -> bool {
-        matches!(
-            self,
-            Self::Any
-                | Self::Unknown
-                | Self::UnknownGeneric(_)
-                | Self::InvalidConcatenateUnknown
-                | Self::AmbiguousOverload
-        )
-    }
-
     fn recursive_type_normalized(self) -> Self {
         self
     }

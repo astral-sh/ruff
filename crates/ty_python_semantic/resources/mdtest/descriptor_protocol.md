@@ -245,24 +245,35 @@ C2().attr = 1
 
 ### Classes with unknown bases are not automatically descriptors
 
-When we cannot determine a class's base, we treat that base as `Unknown`. We should not assume the
-class is a descriptor just because the unknown base could define `__get__`:
+When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written
+on the class still makes it a descriptor, but we do not assume that `Unknown` supplies `__set__` or
+`__delete__`. A `__set__` method written on the class still makes it a data descriptor:
 
 ```py
-import random
+from typing import Literal
+from unknown_module import UnknownBase  # error: [unresolved-import]
 
-class A: ...
-class B: ...
+class NotADescriptor(UnknownBase): ...
 
-Base = A if random.random() > 0.5 else B
+class NonDataDescriptor(UnknownBase):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
 
-class ClassWithUnknownBase(Base):  # error: [unsupported-base]
-    ...
+class DataDescriptor(UnknownBase):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
 
-class Wrapper:
-    value: ClassWithUnknownBase
+    def __set__(self, instance: object, value: object) -> None:
+        pass
 
-reveal_type(Wrapper().value)  # revealed: ClassWithUnknownBase
+class C:
+    plain: NotADescriptor
+    non_data: NonDataDescriptor
+    data: DataDescriptor
+
+reveal_type(C().plain)  # revealed: NotADescriptor
+reveal_type(C().non_data)  # revealed: Literal["non-data"] | NonDataDescriptor
+reveal_type(C().data)  # revealed: Literal["data"]
 ```
 
 An `Any` base follows the same rule. A `__get__` method written on the class still makes it a
@@ -293,6 +304,16 @@ class C:
 reveal_type(C().plain)  # revealed: NotADescriptor
 reveal_type(C().non_data)  # revealed: Literal["non-data"] | NonDataDescriptor
 reveal_type(C().data)  # revealed: Literal["data"]
+
+class OptionalAttribute:
+    value: NotADescriptor | None
+
+optional_attribute = OptionalAttribute()
+optional_attribute.value = NotADescriptor()
+
+# The assignment can narrow because `NotADescriptor` has no concrete `__set__` or `__delete__`
+# method.
+reveal_type(optional_attribute.value)  # revealed: NotADescriptor
 ```
 
 An `Any` base that appears before another base class may override that class's `__get__` method at
@@ -321,11 +342,11 @@ class DescriptorOwner:
 reveal_type(DescriptorOwner().attribute)  # revealed: Literal["concrete"] & Any
 ```
 
-### Dynamically typed descriptor values
+### Dynamically typed metaclass attributes
 
-An attribute value typed as `Any` could itself be a data descriptor. It therefore takes precedence
-over an attribute with the same name on the class. The same applies when `Any` is one arm of a
-union:
+A metaclass attribute typed as `Any` could itself be a data descriptor. When the attribute is read
+on a class, it therefore takes precedence over a class attribute with the same name. The same
+applies when `Any` is one arm of a union:
 
 ```py
 from typing import Any, Literal

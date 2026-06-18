@@ -698,8 +698,8 @@ class FooSubclassOfAny:
 
 static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
 
-# `SubclassOfAny` does not declare `__get__`, so `x` keeps its declared type instead of being read
-# as `Any`.
+# `FooSubclassOfAny` does not declare `__get__`, so `x` keeps its declared type instead of being
+# read as `Any`.
 static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
@@ -3256,7 +3256,7 @@ def _(r: Recursive):
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
-    reveal_type(r.subtype_of)  # revealed: type[@Todo(type[T] for protocols)]
+    reveal_type(r.subtype_of)  # revealed: @Todo(type[T] for protocols)
     reveal_type(r.generic)  # revealed: GenericC[Recursive]
     reveal_type(r.method(r))  # revealed: Recursive
     reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
