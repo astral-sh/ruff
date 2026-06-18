@@ -620,39 +620,6 @@ impl<'db> Type<'db> {
         for term in terms {
             match *term {
                 ProjectionTerm::Exact(term) => {
-                    // The term may still be an unprojected recursive candidate like
-                    // `tuple[Projection_{path}(D), T]`; project it before collecting
-                    // productive parts for `Projection_{path}(D)`.
-                    if term.mentions_matching_projection(db, root, path)
-                        && let Some(projected) =
-                            ProjectionContainer::project_type_path(db, term, root, None, path)
-                    {
-                        match projected {
-                            ProjectionTerm::Exact(projected) => {
-                                Self::collect_projection_component_terms(
-                                    db,
-                                    root,
-                                    Some(path),
-                                    projected,
-                                    &mut saw_self_reference,
-                                    &mut productive_terms,
-                                )?;
-                            }
-                            ProjectionTerm::Homogeneous(projected)
-                            | ProjectionTerm::List(projected) => {
-                                Self::collect_projection_component_terms(
-                                    db,
-                                    root,
-                                    None,
-                                    projected,
-                                    &mut saw_self_reference,
-                                    &mut productive_terms,
-                                )?;
-                            }
-                        }
-                        continue;
-                    }
-
                     Self::collect_projection_component_terms(
                         db,
                         root,
@@ -725,7 +692,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        if term.mentions_any_cycle_artifact(db) {
+        if term.mentions_cycle_artifact(db, root) {
             *saw_self_reference = true;
             return Some(());
         }
@@ -912,26 +879,6 @@ impl<'db> Type<'db> {
             Type::Divergent(divergent) => divergent.same_marker(root),
             Type::Projection(projection) => projection.root(db).same_marker(root),
             _ => false,
-        })
-    }
-
-    fn mentions_matching_projection(
-        self,
-        db: &'db dyn Db,
-        root: DivergentType,
-        path: &ProjectionPath<'db>,
-    ) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
-            Type::Projection(projection) => {
-                projection.root(db).same_marker(root) && projection.path(db).eq(path)
-            }
-            _ => false,
-        })
-    }
-
-    fn mentions_any_cycle_artifact(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |ty| {
-            matches!(ty, Type::Divergent(_) | Type::Projection(_))
         })
     }
 
