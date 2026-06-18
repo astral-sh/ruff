@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -57,7 +58,7 @@ impl Drop for ValueSourceGuard {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
 pub struct UnresolvedRuleSelector {
     selector: String,
@@ -71,6 +72,20 @@ pub struct UnresolvedRuleSelector {
     /// For example, arguments provided on the CLI won't have a range attached.
     #[serde(skip)]
     range: Option<TextRange>,
+}
+
+impl PartialEq for UnresolvedRuleSelector {
+    fn eq(&self, other: &Self) -> bool {
+        self.selector == other.selector
+    }
+}
+
+impl Eq for UnresolvedRuleSelector {}
+
+impl Hash for UnresolvedRuleSelector {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.selector.hash(state);
+    }
 }
 
 impl UnresolvedRuleSelector {
