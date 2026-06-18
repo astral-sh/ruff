@@ -222,7 +222,9 @@ impl<'db> Type<'db> {
             }
 
             let term = project_non_cycle(element)?;
-            if ProjectionContainer::is_generic_container(db, element) && !term.is_ambiguous(db) {
+            if ProjectionContainer::is_generic_container_for_inference(db, element)
+                && !term.is_ambiguous(db)
+            {
                 for root in &roots {
                     ProjectionEvidenceSet::push_fact(
                         &mut facts,
@@ -422,7 +424,9 @@ impl<'db> Type<'db> {
                 continue;
             }
 
-            let container = ProjectionContainer::from_type(db, *element)?;
+            let container = ProjectionContainer::from_direct_type(db, *element).or_else(|| {
+                evidence.map(|_| ProjectionContainer::EvidenceOnly { arm: *element })
+            })?;
             containers.push(container);
         }
 
@@ -871,7 +875,7 @@ impl<'db> Type<'db> {
             return Some(UnionType::from_elements_cycle_recovery(db, elements));
         }
 
-        if let Some(container) = ProjectionContainer::from_type(db, self) {
+        if let Some(container) = ProjectionContainer::from_direct_type(db, self) {
             return container.into_type(db, root, solved_ops);
         }
 
@@ -979,31 +983,22 @@ enum ProjectionContainer<'db> {
         arguments: Vec<Type<'db>>,
         arm: Type<'db>,
     },
+    /// A recovery-time arm whose projections must come from inference-time evidence.
+    EvidenceOnly {
+        arm: Type<'db>,
+    },
 }
 
 impl<'db> ProjectionContainer<'db> {
-    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        Self::from_type_impl(db, ty, false)
-    }
-
+    /// Builds a recovery-time container shape without expanding aliases, bounds, or fallbacks.
     fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        Self::from_type_impl(db, ty, true)
-    }
-
-    fn from_type_impl(db: &'db dyn Db, ty: Type<'db>, direct: bool) -> Option<Self> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             return Some(Self::Tuple {
                 spec: spec.as_ref().clone(),
             });
         }
 
-        let class_specialization = if direct {
-            ty.direct_class_specialization(db)
-        } else {
-            ty.class_specialization(db)
-        };
-
-        if let Some((class, specialization)) = class_specialization {
+        if let Some((class, specialization)) = ty.direct_class_specialization(db) {
             let arguments = specialization.types(db);
             if !arguments.is_empty() {
                 return Some(Self::Generic {
@@ -1039,7 +1034,7 @@ impl<'db> ProjectionContainer<'db> {
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
-            Self::Generic { arm, .. } => {
+            Self::Generic { arm, .. } | Self::EvidenceOnly { arm } => {
                 return evidence?.project_generic_path(db, root, *arm, path);
             }
         };
@@ -1047,7 +1042,7 @@ impl<'db> ProjectionContainer<'db> {
     }
 
     const fn needs_evidence_for_projection(&self) -> bool {
-        matches!(self, Self::Generic { .. })
+        matches!(self, Self::Generic { .. } | Self::EvidenceOnly { .. })
     }
 
     fn project_type_path(
@@ -1363,6 +1358,7 @@ impl<'db> ProjectionContainer<'db> {
                 }))
                 .to_instance(db)
             }
+            Self::EvidenceOnly { .. } => None,
         }
     }
 
@@ -1504,7 +1500,8 @@ impl<'db> ProjectionContainer<'db> {
         Some(Self::star_unpack_homogeneous(element, position))
     }
 
-    fn is_generic_container(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    /// Inference-time evidence collection may use the full specialization view.
+    fn is_generic_container_for_inference(db: &'db dyn Db, ty: Type<'db>) -> bool {
         ty.exact_tuple_instance_spec(db).is_none()
             && ty
                 .class_specialization(db)
@@ -1655,7 +1652,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     fn collect_generic_arms(db: &'db dyn Db, ty: Type<'db>, arms: &mut Vec<Type<'db>>) {
         let arms = RefCell::new(arms);
         any_over_type(db, ty, false, |nested| {
-            if ProjectionContainer::is_generic_container(db, nested) {
+            if ProjectionContainer::is_generic_container_for_inference(db, nested) {
                 let mut arms = arms.borrow_mut();
                 if !arms.contains(&nested) {
                     arms.push(nested);
@@ -1672,7 +1669,6 @@ impl<'db> ProjectionEvidenceSet<'db> {
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
-        ProjectionContainer::is_generic_container(db, arm).then_some(())?;
         let normalized_arm = arm
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
