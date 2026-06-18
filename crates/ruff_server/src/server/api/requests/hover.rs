@@ -10,6 +10,7 @@ use ruff_python_ast::SourceType;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextRange, TextSize};
 use std::fmt::Write;
+use std::sync::LazyLock;
 
 pub(crate) struct Hover;
 
@@ -68,32 +69,38 @@ pub(crate) fn hover(
     let line = &document.contents()[line_range];
 
     // Get the list of rule identifiers from a `noqa` or Ruff suppression comment.
-    let noqa_regex = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
-    let suppression_regex = Regex::new(
-        r"(?x)
+    static NOQA_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap()
+    });
+    static SUPPRESSION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?x)
         \#\s*ruff\s*:\s*(?:disable|enable|file-ignore|ignore)\s*\[\s*
         (?P<codes>(?:[A-Z]+[0-9]+|[a-z][a-z0-9-]*)(?:\s*,\s*(?:[A-Z]+[0-9]+|[a-z][a-z0-9-]*))*\s*,?)
         \s*\]",
-    )
-    .unwrap();
+        )
+        .unwrap()
+    });
+    static IDENTIFIER_REGEX: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"[A-Z]+[0-9]+|[a-z][a-z0-9-]*").unwrap());
+
     let cursor: usize = position
         .position
         .character
         .try_into()
         .expect("column number should fit within a usize");
-    let identifiers_match = noqa_regex
+    let identifiers_match = NOQA_REGEX
         .captures(line)
         .and_then(|captures| captures.name("codes"))
         .into_iter()
         .chain(
-            suppression_regex
+            SUPPRESSION_REGEX
                 .captures_iter(line)
                 .filter_map(|captures| captures.name("codes")),
         )
         .find(|identifiers| cursor >= identifiers.start() && cursor < identifiers.end())?;
     let identifiers_start = identifiers_match.start();
-    let identifier_regex = Regex::new(r"[A-Z]+[0-9]+|[a-z][a-z0-9-]*").unwrap();
-    let identifier = identifier_regex
+    let identifier = IDENTIFIER_REGEX
         .find_iter(identifiers_match.as_str())
         .find(|identifier| {
             cursor >= (identifier.start() + identifiers_start)
