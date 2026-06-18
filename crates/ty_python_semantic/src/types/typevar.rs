@@ -391,7 +391,7 @@ impl<'db> TypeVarInstance<'db> {
                 return false;
             }
 
-            if let Some(specialization) = type_alias.specialization(state.db) {
+            let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
                 if specialization
                     .types(state.db)
                     .iter()
@@ -399,6 +399,7 @@ impl<'db> TypeVarInstance<'db> {
                 {
                     return true;
                 }
+                type_alias.value_type(state.db)
             } else if let Some(generic_context) = type_alias.generic_context(state.db)
                 && generic_context.variables(state.db).any(|typevar| {
                     typevar_default_is_self_referential(
@@ -409,9 +410,11 @@ impl<'db> TypeVarInstance<'db> {
                 })
             {
                 return true;
-            }
+            } else {
+                type_alias.raw_value_type(state.db)
+            };
 
-            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
+            type_is_self_referential_impl(state, value_type, self_identity)
         }
 
         fn type_is_self_referential_impl<'db>(

@@ -275,6 +275,20 @@ Self-referential defaults should not crash type inference:
 type A[T = A] = A[int]
 ```
 
+An explicit alias specialization overrides the alias type parameter's default:
+
+```py
+from typing import Generic
+from typing_extensions import TypeVar
+
+ExplicitT = TypeVar("ExplicitT", default="ExplicitAlias[int]")
+type ExplicitAlias[AliasT = ExplicitT] = list[AliasT]
+
+class ExplicitContainer(Generic[ExplicitT]): ...
+
+reveal_type(ExplicitContainer())  # revealed: ExplicitContainer[ExplicitAlias[int]]
+```
+
 A self-referential default that does not reference itself in the alias body should also not crash,
 even when the default is evaluated (e.g., by omitting the type argument):
 
