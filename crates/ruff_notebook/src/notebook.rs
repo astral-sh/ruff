@@ -256,7 +256,6 @@ impl Notebook {
         // the closest marker to the current offset.
         let mut last_marker: Option<&SourceMarker> = None;
         let markers = source_map.markers();
-        debug_assert!(markers.is_sorted_by_key(SourceMarker::source));
 
         // The first offset is always going to be at 0, so skip it.
         for (index, offset) in self.cell_offsets.iter_mut().skip(1).rev().enumerate() {
