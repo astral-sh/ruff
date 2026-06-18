@@ -204,14 +204,13 @@ impl<'db> ClassBase<'db> {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
                 KnownInstanceType::Annotated(ty) => {
-                    // Unions are not supported in this position, so we only need to support
-                    // something like `class C(Annotated[Base, "metadata"]): ...`, which we
-                    // can do by turning the instance type (`Base` in this example) back into
-                    // a class.
-                    let annotated_ty = ty.inner(db);
-                    let instance_ty = annotated_ty.as_nominal_instance()?;
-
-                    Some(Self::Class(instance_ty.class(db)))
+                    match ty.inner(db) {
+                        Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+                        Type::NominalInstance(instance) => {
+                            Some(Self::Class(instance.class(db)))
+                        }
+                        _ => None,
+                    }
                 }
             },
 
