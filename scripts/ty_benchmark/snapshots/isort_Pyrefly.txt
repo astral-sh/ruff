@@ -1,6 +1,8 @@
+ERROR isort/_vendored/tomli/_parser.py:161:64-67: `set` may be uninitialized [unbound-name]
 ERROR isort/_vendored/tomli/_re.py:7:5-41: Cannot find module `tomli._parser` [missing-import]
 ERROR isort/api.py:157:17-82: `Path | str` is not assignable to variable `extension` with type `str | None` [bad-assignment]
 ERROR isort/api.py:210:23-32: Argument `str | None` is not assignable to parameter `extension` with type `str` in function `isort.core.process` [bad-argument-type]
 ERROR isort/api.py:562:12-15: `key` may be uninitialized [unbound-name]
+ERROR isort/output.py:769:35-47: No matching overload found for function `str.__new__` called with arguments: (type[_LineWithComments], Any) [no-matching-overload]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 4 errors (20 suppressed, 14 warnings not shown)
+ INFO 6 errors (21 suppressed, 14 warnings not shown)

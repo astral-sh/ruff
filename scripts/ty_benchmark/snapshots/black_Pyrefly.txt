@@ -1,7 +1,6 @@
 ERROR src/black/__init__.py:1018:13-21: Object of class `AnsiToWin32` has no attribute `detach` [missing-attribute]
 ERROR src/black/__init__.py:1072:9-17: Object of class `AnsiToWin32` has no attribute `detach` [missing-attribute]
 ERROR src/black/cache.py:144:59-146:18: `dict[str, tuple[float | int | str, ...]]` is not assignable to `dict[str, tuple[float, int, str]]` [bad-assignment]
-ERROR src/black/files.py:258:41-46: Argument `list[str]` is not assignable to parameter `lines` with type `Iterable[TypeVar[pathspec._typing.AnyStr] | TypeVar[typing.AnyStr]]` in function `pathspec.gitignore.GitIgnoreSpec.from_lines` [bad-argument-type]
 ERROR src/black/files.py:435:16-85: Returned type `StreamWrapper | TextIOWrapper` is not assignable to declared return type `AnsiToWin32 | TextIOWrapper` [bad-return]
 ERROR src/black/handle_ipynb_magics.py:108:5-77: Cannot find module `tokenize_rt` [missing-import]
 ERROR src/black/handle_ipynb_magics.py:132:5-77: Cannot find module `tokenize_rt` [missing-import]
@@ -13,4 +12,4 @@ ERROR src/blib2to3/pytree.py:669:24-34: `newcontent` may be uninitialized [unbou
 ERROR src/blib2to3/pytree.py:755:24-39: `wrapped_content` may be uninitialized [unbound-name]
 ERROR src/blib2to3/pytree.py:846:34-45: `save_stderr` may be uninitialized [unbound-name]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 14 errors (2 suppressed, 14 warnings not shown)
+ INFO 13 errors (2 suppressed, 14 warnings not shown)
