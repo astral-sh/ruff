@@ -529,13 +529,16 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Iterate over this class's explicit bases, filtering out any bases that are not class
-    /// objects, and applying default specialization to any unspecialized generic class literals.
+    /// Iterate over this class's explicit bases, resolving them in the same way as MRO
+    /// construction, filtering out any bases that are not fully static class objects.
     fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
         self.explicit_bases(db)
             .iter()
             .copied()
-            .filter_map(|ty| ty.to_class_type(db))
+            .filter_map(move |ty| {
+                ClassBase::try_from_type(db, ty, Some(ClassLiteral::Static(self)))
+                    .and_then(ClassBase::into_class)
+            })
     }
 
     /// Determine if this class is a protocol.
