@@ -2400,6 +2400,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // https://typing.python.org/en/latest/spec/generics.html#type-variable-tuple-equality
                         let accumulator = entry.get_mut();
                         let existing = accumulator.get_or_build(self.db);
+                        if existing == ty {
+                            return;
+                        }
                         let Some(existing_tuple) = existing.exact_tuple_instance_spec(self.db)
                         else {
                             return;
@@ -3260,41 +3263,96 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     if let TupleSpec::Variable(formal_variable) = formal_tuple.as_ref()
                         && let Type::TypeVar(typevartuple) = formal_variable.variable()
                         && typevartuple.is_typevartuple(self.db)
-                        && let TupleSpec::Fixed(actual_fixed) = actual_tuple.as_ref()
                     {
-                        let prefix_len = formal_variable.prefix_elements().len();
-                        let suffix_len = formal_variable.suffix_elements().len();
-                        let actual_len = actual_fixed.len();
-                        let Some(middle_end) = actual_len.checked_sub(suffix_len) else {
-                            return Ok(());
-                        };
-                        if middle_end < prefix_len {
-                            return Ok(());
-                        }
-
-                        let actual_elements = actual_fixed.elements_slice();
+                        let formal_prefix_len = formal_variable.prefix_elements().len();
+                        let formal_suffix_len = formal_variable.suffix_elements().len();
                         let variance = TypeVarVariance::Covariant.compose(polarity);
-                        for (formal_element, actual_element) in formal_variable
-                            .prefix_elements()
-                            .iter()
-                            .zip(&actual_elements[..prefix_len])
-                        {
-                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
-                        }
-                        for (formal_element, actual_element) in formal_variable
-                            .suffix_elements()
-                            .iter()
-                            .zip(&actual_elements[middle_end..])
-                        {
-                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
-                        }
 
-                        let packed = Type::heterogeneous_tuple(
-                            self.db,
-                            actual_elements[prefix_len..middle_end].iter().copied(),
-                        );
-                        self.add_type_mapping(typevartuple, packed, variance);
-                        return Ok(());
+                        let mapping = match actual_tuple.as_ref() {
+                            TupleSpec::Fixed(actual_fixed) => {
+                                let actual_len = actual_fixed.len();
+                                let Some(middle_end) = actual_len.checked_sub(formal_suffix_len)
+                                else {
+                                    return Ok(());
+                                };
+                                if middle_end < formal_prefix_len {
+                                    return Ok(());
+                                }
+
+                                let actual_elements = actual_fixed.elements_slice();
+                                let packed = Type::heterogeneous_tuple(
+                                    self.db,
+                                    actual_elements[formal_prefix_len..middle_end]
+                                        .iter()
+                                        .copied(),
+                                );
+                                Some((
+                                    &actual_elements[..formal_prefix_len],
+                                    &actual_elements[middle_end..],
+                                    packed,
+                                ))
+                            }
+                            TupleSpec::Variable(actual_variable) => {
+                                let actual_prefix_elements = actual_variable.prefix_elements();
+                                let actual_suffix_elements = actual_variable.suffix_elements();
+                                let both_homogeneous = formal_prefix_len == 0
+                                    && formal_suffix_len == 0
+                                    && actual_prefix_elements.is_empty()
+                                    && actual_suffix_elements.is_empty();
+                                // The generic path below already handles two homogeneous variadic
+                                // tuples without losing information.
+                                if both_homogeneous {
+                                    None
+                                } else {
+                                    if actual_prefix_elements.len() < formal_prefix_len
+                                        || actual_suffix_elements.len() < formal_suffix_len
+                                    {
+                                        return Ok(());
+                                    }
+
+                                    let packed = TupleSpecBuilder::Variable {
+                                        prefix: actual_prefix_elements[formal_prefix_len..]
+                                            .to_vec(),
+                                        variable: actual_variable.variable(),
+                                        suffix: actual_suffix_elements
+                                            [..actual_suffix_elements.len() - formal_suffix_len]
+                                            .to_vec(),
+                                    }
+                                    .build();
+                                    Some((
+                                        &actual_prefix_elements[..formal_prefix_len],
+                                        &actual_suffix_elements
+                                            [actual_suffix_elements.len() - formal_suffix_len..],
+                                        Type::tuple(TupleType::new(self.db, &packed)),
+                                    ))
+                                }
+                            }
+                        };
+
+                        if let Some((actual_prefix, actual_suffix, packed)) = mapping {
+                            for (formal_element, actual_element) in
+                                formal_variable.prefix_elements().iter().zip(actual_prefix)
+                            {
+                                self.infer_map_impl(
+                                    *formal_element,
+                                    *actual_element,
+                                    variance,
+                                    seen,
+                                )?;
+                            }
+                            for (formal_element, actual_element) in
+                                formal_variable.suffix_elements().iter().zip(actual_suffix)
+                            {
+                                self.infer_map_impl(
+                                    *formal_element,
+                                    *actual_element,
+                                    variance,
+                                    seen,
+                                )?;
+                            }
+                            self.add_type_mapping(typevartuple, packed, variance);
+                            return Ok(());
+                        }
                     }
 
                     let Some(most_precise_length) =
