@@ -1113,6 +1113,40 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
+    ///
+    /// Known argument mismatches are not merged because doing so would be unsound for invariant
+    /// type variables; the caller must retain the outer semantic union in that case.
+    pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        if self.generic_context(db) != previous.generic_context(db)
+            || self.materialization_kind(db) != previous.materialization_kind(db)
+            || self.tuple_inner(db) != previous.tuple_inner(db)
+        {
+            return None;
+        }
+
+        let types: Box<[_]> = previous
+            .types(db)
+            .iter()
+            .zip(self.types(db))
+            .map(|(previous, current)| match (*previous, *current) {
+                (previous, current) if previous == current => Some(current),
+                (previous, current) if previous.is_unknown() || current.is_unknown() => {
+                    Some(Type::unknown())
+                }
+                _ => None,
+            })
+            .collect::<Option<Box<[_]>>>()?;
+
+        Some(Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        ))
+    }
+
     /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
     /// type is unchanged and [`Cow::Owned`] otherwise.
     fn map_types(

@@ -42,6 +42,32 @@ fn typing_vs_typeshed_no_default() {
     );
 }
 
+#[test]
+fn generic_alias_cycle_recovery_preserves_class_identity() {
+    let db = setup_db();
+    let previous = KnownClass::List
+        .to_specialized_class_type(&db, &[KnownClass::Int.to_instance(&db)])
+        .unwrap()
+        .into_generic_alias()
+        .unwrap();
+    let current = KnownClass::List
+        .to_specialized_class_type(&db, &[Type::unknown()])
+        .unwrap()
+        .into_generic_alias()
+        .unwrap();
+
+    let merged = current.merge_cycle_recovery(&db, previous).unwrap();
+    assert_eq!(merged.origin(&db), current.origin(&db));
+    assert_eq!(merged.specialization(&db).types(&db), &[Type::unknown()]);
+
+    let known = KnownClass::List
+        .to_specialized_class_type(&db, &[KnownClass::Str.to_instance(&db)])
+        .unwrap()
+        .into_generic_alias()
+        .unwrap();
+    assert!(known.merge_cycle_recovery(&db, previous).is_none());
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
