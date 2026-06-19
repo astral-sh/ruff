@@ -1784,9 +1784,35 @@ impl NodeId {
                     root_constraint.ordering() > constraint.ordering()
                 })
         );
-        if let Some(reduced) = Self::local_reduction(if_true, if_uncertain, if_false) {
-            return reduced;
+
+        if if_uncertain == ALWAYS_TRUE {
+            return ALWAYS_TRUE;
         }
+
+        if if_true == if_false {
+            if if_true == if_uncertain {
+                return if_true;
+            }
+            if if_true == ALWAYS_FALSE {
+                return if_uncertain;
+            }
+            if if_uncertain == ALWAYS_FALSE {
+                return if_true;
+            }
+
+            // TODO: A future reduction can handle this remaining `if_true == if_false` case by
+            // returning `if_true ∪ if_uncertain`. That needs an `OR` computation, but only after
+            // the local equality check has already engaged.
+        }
+
+        if if_true == if_uncertain && if_false == ALWAYS_FALSE {
+            return if_uncertain;
+        }
+
+        if if_false == if_uncertain && if_true == ALWAYS_FALSE {
+            return if_uncertain;
+        }
+
         let max_source_order = source_order
             .max(if_true.max_source_order(builder))
             .max(if_uncertain.max_source_order(builder))
@@ -1799,38 +1825,6 @@ impl NodeId {
             source_order,
             max_source_order,
         })
-    }
-
-    fn local_reduction(if_true: NodeId, if_uncertain: NodeId, if_false: NodeId) -> Option<NodeId> {
-        if if_uncertain == ALWAYS_TRUE {
-            return Some(ALWAYS_TRUE);
-        }
-
-        if if_true == if_false {
-            if if_true == if_uncertain {
-                return Some(if_true);
-            }
-            if if_true == ALWAYS_FALSE {
-                return Some(if_uncertain);
-            }
-            if if_uncertain == ALWAYS_FALSE {
-                return Some(if_true);
-            }
-
-            // TODO: A future reduction can handle this remaining `if_true == if_false` case by
-            // returning `if_true ∪ if_uncertain`. That needs an `OR` computation, but only after
-            // the local equality check has already engaged.
-        }
-
-        if if_true == if_uncertain && if_false == ALWAYS_FALSE {
-            return Some(if_uncertain);
-        }
-
-        if if_false == if_uncertain && if_true == ALWAYS_FALSE {
-            return Some(if_uncertain);
-        }
-
-        None
     }
 }
 
