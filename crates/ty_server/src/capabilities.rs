@@ -1,9 +1,9 @@
 use lsp_types::{
     self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
     DiagnosticOptions, DiagnosticProvider, InlayHintOptions, MarkupKind, NotebookCellLanguage,
-    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, SemanticTokensLegend,
-    SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions, TextDocumentSyncKind,
-    TextDocumentSyncOptions, WorkDoneProgressOptions,
+    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, Save, SaveOptions,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
 
@@ -416,6 +416,9 @@ pub(crate) fn server_capabilities(
             TextDocumentSyncOptions {
                 open_close: Some(true),
                 change: Some(TextDocumentSyncKind::Incremental),
+                save: Some(Save::SaveOptions(SaveOptions {
+                    include_text: Some(false),
+                })),
                 ..Default::default()
             }
             .into(),
