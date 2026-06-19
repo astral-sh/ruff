@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::{
-    Expr, ExprBinOp, ExprSubscript, ExprTuple, Operator, ParameterWithDefault, Parameters, Stmt,
-    StmtClassDef, StmtFunctionDef, TypeParam, TypeParams,
+    Expr, ExprBinOp, ExprName, ExprSubscript, ExprTuple, Operator, ParameterWithDefault,
+    Parameters, Stmt, StmtClassDef, StmtFunctionDef, TypeParam, TypeParams,
 };
 use smallvec::SmallVec;
 
@@ -214,6 +214,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         &non_self_positional_args,
         func_kind,
         type_params,
+        parent_class_def,
     );
 }
 
@@ -261,6 +262,7 @@ fn check_positional_args_for_non_overloaded_method(
     non_self_positional_params: &[&ParameterWithDefault],
     kind: FuncKind,
     type_params: Option<&TypeParams>,
+    class_def: &StmtClassDef,
 ) {
     // For each argument, define the predicate against which to check the annotation.
     type AnnotationValidator<'a> = &'a dyn Fn(&Expr) -> bool;
@@ -269,11 +271,11 @@ fn check_positional_args_for_non_overloaded_method(
 
     let validations: [(ErrorKind, AnnotationValidator); 3] = [
         (ErrorKind::FirstArgBadAnnotation, &|expr| {
-            is_base_exception_type(expr, semantic, type_params)
+            is_base_exception_type(expr, semantic, type_params, class_def)
         }),
         (ErrorKind::SecondArgBadAnnotation, &|expr| {
             semantic.match_builtin_expr(expr, "BaseException")
-                || is_base_exception_bound_type_var(expr, semantic, type_params)
+                || is_base_exception_bound_type_var(expr, semantic, type_params, class_def)
         }),
         (ErrorKind::ThirdArgBadAnnotation, &|expr| {
             is_traceback_type(expr, semantic)
@@ -423,13 +425,18 @@ fn check_positional_args_for_overloaded_method(
     // Now check the second:
     if parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[0],
-        |annotation| is_base_exception_type(annotation, semantic, type_params),
+        |annotation| is_base_exception_type(annotation, semantic, type_params, parent_class_def),
         semantic,
     ) && parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[1],
         |annotation| {
             semantic.match_builtin_expr(annotation, "BaseException")
-                || is_base_exception_bound_type_var(annotation, semantic, type_params)
+                || is_base_exception_bound_type_var(
+                    annotation,
+                    semantic,
+                    type_params,
+                    parent_class_def,
+                )
         },
         semantic,
     ) && parameter_annotation_loosely_matches_predicate(
@@ -534,6 +541,7 @@ fn is_base_exception_type(
     expr: &Expr,
     semantic: &SemanticModel,
     type_params: Option<&TypeParams>,
+    class_def: &StmtClassDef,
 ) -> bool {
     let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr else {
         return false;
@@ -541,43 +549,56 @@ fn is_base_exception_type(
 
     if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
         semantic.match_builtin_expr(slice, "BaseException")
-            || is_base_exception_bound_type_var(slice, semantic, type_params)
+            || is_base_exception_bound_type_var(slice, semantic, type_params, class_def)
     } else {
         false
     }
 }
 
-/// Return `true` if the [`Expr`] is a `TypeVar` that is bound to `BaseException`.
+/// Return `true` if the [`Expr`] is a `TypeVar` that makes the *method* generic and
+/// is bound to `BaseException`.
 ///
 /// Both PEP 695-style type parameters (e.g. `def __exit__[T: BaseException](...)`)
 /// and "old-style" `TypeVar`s (e.g. `T = TypeVar("T", bound=BaseException)`) are
 /// recognized. Annotating an `__exit__`/`__aexit__` argument with such a `TypeVar`
 /// is equivalent to annotating it with `BaseException` directly.
+///
+/// A *class*-scoped type parameter (e.g. `class C(Generic[T])` or `class C[T]`) is
+/// **not** accepted: the class can be specialized to a type narrower than
+/// `BaseException`, which would make the annotation unsound.
 fn is_base_exception_bound_type_var(
     expr: &Expr,
     semantic: &SemanticModel,
     type_params: Option<&TypeParams>,
+    class_def: &StmtClassDef,
 ) -> bool {
     let Expr::Name(name) = expr else {
         return false;
     };
 
-    // PEP 695 type parameter, e.g. `def __exit__[T: BaseException](...)`.
+    // A class-scoped type parameter does not make the method generic, so reject it.
+    if is_class_type_parameter(name, class_def) {
+        return false;
+    }
+
+    // A PEP 695 type parameter declared on the method itself shadows any outer binding
+    // of the same name, so only its own bound is considered.
     //
-    // Names in annotations are resolved lazily, so `resolve_name` is not reliable
-    // here; instead, match the name directly against the enclosing type parameter
-    // list, which is what the runtime binding would resolve to.
-    if let Some(bound) = type_params.and_then(|type_params| {
+    // Names in annotations are resolved lazily, so `resolve_name` is not reliable here;
+    // match the name directly against the enclosing type-parameter list instead.
+    if let Some(type_var) = type_params.and_then(|type_params| {
         type_params
             .iter()
             .filter_map(TypeParam::as_type_var)
             .find(|type_var| type_var.name.id == name.id)
-            .and_then(|type_var| type_var.bound.as_deref())
     }) {
-        return semantic.match_builtin_expr(bound, "BaseException");
+        return type_var
+            .bound
+            .as_deref()
+            .is_some_and(|bound| semantic.match_builtin_expr(bound, "BaseException"));
     }
 
-    // "Old-style" `TypeVar`, e.g. `T = TypeVar("T", bound=BaseException)`.
+    // Otherwise, an "old-style" free `TypeVar`, e.g. `T = TypeVar("T", bound=BaseException)`.
     if !semantic.seen_typing() {
         return false;
     }
@@ -597,4 +618,41 @@ fn is_base_exception_bound_type_var(
         .filter(|call| semantic.match_typing_expr(&call.func, "TypeVar"))
         .and_then(|call| call.arguments.find_keyword("bound"))
         .is_some_and(|keyword| semantic.match_builtin_expr(&keyword.value, "BaseException"))
+}
+
+/// Return `true` if `name` refers to a type parameter of `class_def` itself, i.e. a
+/// PEP 695 class type parameter (`class C[T]`) or an "old-style" generic-class
+/// parameter (`class C(Generic[T])`).
+fn is_class_type_parameter(name: &ExprName, class_def: &StmtClassDef) -> bool {
+    // PEP 695 class type parameters, e.g. `class C[T]: ...`.
+    if let Some(type_params) = &class_def.type_params {
+        if type_params
+            .iter()
+            .filter_map(TypeParam::as_type_var)
+            .any(|type_var| type_var.name.id == name.id)
+        {
+            return true;
+        }
+    }
+
+    // "Old-style" generic classes, e.g. `class C(Generic[T]): ...`.
+    class_def.bases().iter().any(|base| {
+        matches!(
+            base,
+            Expr::Subscript(ExprSubscript { slice, .. }) if subscript_mentions_name(slice, name)
+        )
+    })
+}
+
+/// Return `true` if `slice` is `name` or a tuple of subscript elements containing `name`,
+/// e.g. the `T` in `Generic[T]` or `Generic[T, U]`.
+fn subscript_mentions_name(slice: &Expr, name: &ExprName) -> bool {
+    match slice {
+        Expr::Name(other) => other.id == name.id,
+        Expr::Tuple(tuple) => tuple
+            .elts
+            .iter()
+            .any(|element| matches!(element, Expr::Name(other) if other.id == name.id)),
+        _ => false,
+    }
 }

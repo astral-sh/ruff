@@ -238,3 +238,63 @@ PYI036 The second argument in `__exit__` should be annotated with `object` or `B
     |                                              ^^^^^^^^
 189 |     ) -> bool: ...  # PYI036 (the TypeVar bound is narrower than `BaseException`)
     |
+
+PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   --> PYI036.py:196:25
+    |
+194 | class UnacceptablePep695ClassGeneric[T: BaseException]:
+195 |     def __exit__(
+196 |         self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    |                         ^^^^^^^^^^^^^^
+197 |     ) -> bool: ...  # PYI036 (`T` is a class type parameter, not a method one)
+    |
+
+PYI036 The second argument in `__exit__` should be annotated with `object` or `BaseException | None`
+   --> PYI036.py:196:46
+    |
+194 | class UnacceptablePep695ClassGeneric[T: BaseException]:
+195 |     def __exit__(
+196 |         self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    |                                              ^^^^^^^^
+197 |     ) -> bool: ...  # PYI036 (`T` is a class type parameter, not a method one)
+    |
+
+PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   --> PYI036.py:201:25
+    |
+199 | class UnacceptableOldStyleClassGeneric(typing.Generic[_ExcT]):
+200 |     def __exit__(
+201 |         self, exc_type: type[_ExcT] | None, exc: _ExcT | None, tb: TracebackType | None
+    |                         ^^^^^^^^^^^^^^^^^^
+202 |     ) -> bool: ...  # PYI036 (`_ExcT` parametrizes the class, not the method)
+    |
+
+PYI036 The second argument in `__exit__` should be annotated with `object` or `BaseException | None`
+   --> PYI036.py:201:50
+    |
+199 | class UnacceptableOldStyleClassGeneric(typing.Generic[_ExcT]):
+200 |     def __exit__(
+201 |         self, exc_type: type[_ExcT] | None, exc: _ExcT | None, tb: TracebackType | None
+    |                                                  ^^^^^^^^^^^^
+202 |     ) -> bool: ...  # PYI036 (`_ExcT` parametrizes the class, not the method)
+    |
+
+PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   --> PYI036.py:210:25
+    |
+208 | class UnacceptableShadowedTypeVar:
+209 |     def __exit__[_ExcT2](
+210 |         self, exc_type: type[_ExcT2] | None, exc: _ExcT2 | None, tb: TracebackType | None, /
+    |                         ^^^^^^^^^^^^^^^^^^^
+211 |     ) -> bool: ...  # PYI036 (the method's own `_ExcT2` is unbounded)
+    |
+
+PYI036 The second argument in `__exit__` should be annotated with `object` or `BaseException | None`
+   --> PYI036.py:210:51
+    |
+208 | class UnacceptableShadowedTypeVar:
+209 |     def __exit__[_ExcT2](
+210 |         self, exc_type: type[_ExcT2] | None, exc: _ExcT2 | None, tb: TracebackType | None, /
+    |                                                   ^^^^^^^^^^^^^
+211 |     ) -> bool: ...  # PYI036 (the method's own `_ExcT2` is unbounded)
+    |

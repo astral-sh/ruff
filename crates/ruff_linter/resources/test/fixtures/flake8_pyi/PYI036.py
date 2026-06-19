@@ -187,3 +187,25 @@ class UnacceptableNarrowBoundGeneric:
     def __exit__[T: ValueError](
         self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
     ) -> bool: ...  # PYI036 (the TypeVar bound is narrower than `BaseException`)
+
+# A class-scoped type parameter does not make the method generic: the class could be
+# specialized to a type narrower than `BaseException`, so this is not equivalent to
+# annotating with `BaseException` directly.
+class UnacceptablePep695ClassGeneric[T: BaseException]:
+    def __exit__(
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # PYI036 (`T` is a class type parameter, not a method one)
+
+class UnacceptableOldStyleClassGeneric(typing.Generic[_ExcT]):
+    def __exit__(
+        self, exc_type: type[_ExcT] | None, exc: _ExcT | None, tb: TracebackType | None
+    ) -> bool: ...  # PYI036 (`_ExcT` parametrizes the class, not the method)
+
+# A method-scoped PEP 695 type parameter shadows an outer `TypeVar` of the same name,
+# so only its own (here, missing) bound is considered.
+_ExcT2 = typing.TypeVar("_ExcT2", bound=BaseException)
+
+class UnacceptableShadowedTypeVar:
+    def __exit__[_ExcT2](
+        self, exc_type: type[_ExcT2] | None, exc: _ExcT2 | None, tb: TracebackType | None, /
+    ) -> bool: ...  # PYI036 (the method's own `_ExcT2` is unbounded)
