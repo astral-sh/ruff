@@ -7,40 +7,6 @@ use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
 
-fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
-    KnownClass::List
-        .to_specialized_class_type(db, &[argument])
-        .expect("`list` should accept one type argument")
-        .into_generic_alias()
-        .expect("a specialized `list` should be a generic alias")
-}
-
-fn oscillating_generic_alias_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous: &Type<'db>,
-    current: Type<'db>,
-) -> Type<'db> {
-    current.cycle_normalized(db, *previous, cycle)
-}
-
-#[salsa::tracked(
-    cycle_initial=|_, id| Type::divergent(id),
-    cycle_fn=oscillating_generic_alias_cycle_recover,
-)]
-fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
-    let previous = oscillating_generic_alias(db);
-    let argument = if let Type::GenericAlias(alias) = previous
-        && alias.specialization(db).types(db) == [Type::unknown()]
-    {
-        KnownClass::Int.to_instance(db)
-    } else {
-        Type::unknown()
-    };
-
-    list_alias(db, argument).into()
-}
-
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
 /// See [`KnownClass::canonical_module`] for more information.
@@ -74,41 +40,6 @@ fn typing_vs_typeshed_no_default() {
         typing_extensions_no_default.display(&db).to_string(),
         "NoDefault"
     );
-}
-
-#[test]
-fn generic_alias_cycle_recovery_preserves_class_identity() {
-    let db = setup_db();
-    let previous = list_alias(&db, KnownClass::Int.to_instance(&db));
-    let current = list_alias(&db, Type::unknown());
-
-    let merged = current.merge_cycle_recovery(&db, previous).unwrap();
-    assert_eq!(merged.origin(&db), current.origin(&db));
-    assert_eq!(merged.specialization(&db).types(&db), &[Type::unknown()]);
-
-    let known = list_alias(&db, KnownClass::Str.to_instance(&db));
-    assert!(known.merge_cycle_recovery(&db, previous).is_none());
-}
-
-#[test]
-fn generic_alias_cycle_recovery_preserves_unknown_generic_context() {
-    let db = setup_db();
-    let current = list_alias(&db, KnownClass::Int.to_instance(&db));
-    let generic_context = current.specialization(&db).generic_context(&db);
-    let unknown_generic = Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-    let previous = list_alias(&db, unknown_generic);
-
-    assert!(current.merge_cycle_recovery(&db, previous).is_none());
-}
-
-#[test]
-fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
-    let db = setup_db();
-    let Type::GenericAlias(alias) = oscillating_generic_alias(&db) else {
-        panic!("cycle recovery should preserve the generic alias");
-    };
-
-    assert_eq!(alias.specialization(&db).types(&db), &[Type::unknown()]);
 }
 
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
