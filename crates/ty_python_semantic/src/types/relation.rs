@@ -1095,7 +1095,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
-        match (source, target) {
+        let result = match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -1312,16 +1312,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     },
                 },
             ),
-
-            // Nominal targets are handled by `check_class_pair`, which already walks the source
-            // MRO. For all other targets, defer this check until after the common fast paths above.
-            (Type::NominalInstance(source), _)
-                if !matches!(target, Type::NominalInstance(_))
-                    && self.relation.is_assignability()
-                    && source.class(db).class_literal(db).inherits_from_any(db) =>
-            {
-                self.always()
-            }
 
             // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -2006,13 +1996,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::NominalInstance(_), Type::LiteralValue(literal)) if literal.is_enum() => {
                 let target_enum_literal = literal.as_enum().unwrap();
                 if target_enum_literal.enum_class_instance(db) != source {
-                    return self.never();
+                    self.never()
+                } else {
+                    ConstraintSet::from_bool(
+                        self.constraints,
+                        is_single_member_enum(db, target_enum_literal.enum_class(db)),
+                    )
                 }
-
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    is_single_member_enum(db, target_enum_literal.enum_class(db)),
-                )
             }
 
             // Except for the special `BytesLiteral`, `LiteralString`, and string literal cases above,
@@ -2216,6 +2206,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
             (Type::NominalInstance(_), _) => self.never(),
+        };
+
+        if !result.is_always_satisfied(db)
+            && let Type::NominalInstance(source) = source
+            && !matches!(target, Type::NominalInstance(_))
+            && self.relation.is_assignability()
+            && let class = source.class(db).class_literal(db)
+            && class.has_explicit_bases(db)
+            && class.inherits_from_any(db)
+        {
+            self.always()
+        } else {
+            result
         }
     }
 

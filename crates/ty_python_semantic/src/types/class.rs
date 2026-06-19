@@ -336,6 +336,7 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+#[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -395,20 +396,23 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
+    pub(crate) fn has_explicit_bases(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static(literal) => literal.has_explicit_bases(db),
+            Self::Dynamic(literal) => !literal.explicit_bases(db).is_empty(),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::DynamicEnum(literal) => !literal.explicit_bases(db).is_empty(),
+        }
+    }
+
     /// Return whether this class directly or indirectly inherits from the `Any` special form.
     ///
     /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
     /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
     /// arbitrary types.
+    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Static(literal) if !literal.has_explicit_bases(db) => false,
-            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => false,
-            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
-            Self::Static(_) | Self::Dynamic(_) | Self::DynamicEnum(_) => {
-                self.iter_mro(db).any(|base| base == ClassBase::Any)
-            }
-        }
+        self.has_explicit_bases(db) && self.iter_mro(db).any(|base| base == ClassBase::Any)
     }
 
     /// Returns the metaclass of this class.
@@ -2191,18 +2195,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.constraints,
                     self.relation.is_assignability() || target.is_object(db),
                 ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
-                    match self.relation {
-                        TypeRelation::Subtyping
-                        | TypeRelation::Redundancy { .. }
-                        | TypeRelation::SubtypingAssuming => {
-                            ConstraintSet::from_bool(self.constraints, target.is_object(db))
-                        }
-                        TypeRelation::Assignability => {
-                            ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                        }
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                    TypeRelation::Subtyping
+                    | TypeRelation::Redundancy { .. }
+                    | TypeRelation::SubtypingAssuming => {
+                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
                     }
-                }
+                    TypeRelation::Assignability => {
+                        ConstraintSet::from_bool(self.constraints, !target.is_final(db))
+                    }
+                },
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
                 ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => self.never(),
