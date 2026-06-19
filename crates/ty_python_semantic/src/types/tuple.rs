@@ -970,6 +970,114 @@ impl<T> VariableLengthTuple<T> {
     }
 }
 
+/// How to approximate a static slice into a variable-length tuple.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum VariableTupleSlicePlan {
+    /// The slice is always empty, e.g. `t[5:2]` or a forward slice from the suffix
+    /// to a non-negative stop in the prefix.
+    Empty,
+    /// A positive-step slice whose selected front positions are fixed in number, e.g. `t[:3]`.
+    /// Individual positions can still be unions when the variable part might be empty.
+    FixedFromFront {
+        start: usize,
+        stop: usize,
+        step: usize,
+    },
+    /// A negative-step slice that stays inside the fixed prefix, e.g. `t[1::-1]`.
+    FixedFromPrefix {
+        start: i32,
+        stop: Option<i32>,
+        step: i32,
+    },
+    /// A slice that stays inside the fixed suffix, e.g. `t[-3:]` or `t[-1:-3:-1]`.
+    FixedFromSuffix {
+        start: i32,
+        stop: Option<i32>,
+        step: i32,
+    },
+    /// A step-1 tail slice that starts in the prefix or at the variable part, e.g. `t[1:]`.
+    MixedTail { prefix_start: usize },
+    /// A step-1 slice from the prefix or variable part to the suffix, e.g. `t[1:-1]`.
+    MixedPrefixToSuffix {
+        prefix_start: usize,
+        suffix_stop: usize,
+    },
+    /// A step-1 tail slice that starts after the prefix, e.g. `t[3:]`.
+    /// Prefix elements cannot appear, but the exact shape depends on the variable length.
+    HomogeneousVariableAndSuffix,
+    /// Fallback for slices whose exact result would require a union of tuple shapes.
+    Homogeneous,
+}
+
+impl VariableTupleSlicePlan {
+    fn into_type<'db>(
+        self,
+        db: &'db dyn Db,
+        tuple: &VariableLengthTuple<Type<'db>>,
+    ) -> Result<Type<'db>, StepSizeZeroError> {
+        match self {
+            VariableTupleSlicePlan::Empty => Ok(Type::heterogeneous_tuple(
+                db,
+                std::iter::empty::<Type<'db>>(),
+            )),
+
+            VariableTupleSlicePlan::FixedFromFront { start, stop, step } => {
+                let elements = (start..stop)
+                    .step_by(step)
+                    .map(|index| tuple.type_at_nonnegative_index(db, index))
+                    .collect::<Option<Vec<_>>>();
+                Ok(elements.map_or_else(
+                    || tuple.homogeneous_type(db),
+                    |elements| Type::heterogeneous_tuple(db, elements),
+                ))
+            }
+
+            VariableTupleSlicePlan::FixedFromPrefix { start, stop, step } => {
+                Ok(Type::heterogeneous_tuple(
+                    db,
+                    tuple
+                        .prefix_elements()
+                        .py_slice(db, Some(start), stop, Some(step))?,
+                ))
+            }
+
+            VariableTupleSlicePlan::FixedFromSuffix { start, stop, step } => {
+                Ok(Type::heterogeneous_tuple(
+                    db,
+                    tuple
+                        .suffix_elements()
+                        .py_slice(db, Some(start), stop, Some(step))?,
+                ))
+            }
+
+            VariableTupleSlicePlan::MixedTail { prefix_start } => {
+                Ok(Type::tuple(TupleType::mixed(
+                    db,
+                    tuple.iter_prefix_elements().skip(prefix_start),
+                    tuple.variable(),
+                    tuple.iter_suffix_elements(),
+                )))
+            }
+
+            VariableTupleSlicePlan::MixedPrefixToSuffix {
+                prefix_start,
+                suffix_stop,
+            } => Ok(Type::tuple(TupleType::mixed(
+                db,
+                tuple.iter_prefix_elements().skip(prefix_start),
+                tuple.variable(),
+                tuple.iter_suffix_elements().take(suffix_stop),
+            ))),
+
+            VariableTupleSlicePlan::HomogeneousVariableAndSuffix => {
+                Ok(tuple.homogeneous_variable_and_suffix_type(db))
+            }
+
+            VariableTupleSlicePlan::Homogeneous => Ok(tuple.homogeneous_type(db)),
+        }
+    }
+}
+
 impl<'db> VariableLengthTuple<Type<'db>> {
     /// Returns a sound static slice result for a mixed tuple.
     ///
@@ -989,163 +1097,204 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             return Err(StepSizeZeroError);
         }
 
-        let prefix_len = self.prefix_len();
-        let suffix_len = self.suffix_len();
+        self.py_slice_plan(start, stop, step).into_type(db, self)
+    }
 
-        let nonnegative_index = |index: Option<i32>| {
-            index
-                .filter(|index| *index >= 0)
-                .and_then(|index| usize::try_from(index).ok())
-        };
-
-        let suffix_index = |index: Option<i32>| {
-            let index = index?;
-            if index >= 0 {
-                return None;
-            }
-            let distance_from_end = usize::try_from(index.checked_neg()?).ok()?;
-            if distance_from_end <= suffix_len {
-                i32::try_from(suffix_len - distance_from_end).ok()
-            } else {
-                None
-            }
-        };
-
-        let element_at_nonnegative_index = |index: usize| {
-            if let Some(element) = self.prefix_elements().get(index) {
-                return Some(*element);
-            }
-
-            let suffix_end = index.checked_sub(prefix_len)?;
-            if suffix_end >= suffix_len {
-                return None;
-            }
-
-            Some(UnionType::from_elements_leave_aliases(
-                db,
-                std::iter::once(self.variable())
-                    .chain(self.suffix_elements().iter().take(suffix_end + 1).copied()),
-            ))
-        };
-
+    fn py_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> VariableTupleSlicePlan {
         if step > 0 {
-            if let Some(stop) = nonnegative_index(stop) {
-                let start = match start {
-                    None => Some(0),
-                    Some(_) => nonnegative_index(start),
-                };
-                if let Some(start) = start {
-                    if start >= stop {
-                        return Ok(Type::heterogeneous_tuple(
-                            db,
-                            std::iter::empty::<Type<'db>>(),
-                        ));
-                    }
-
-                    if stop <= prefix_len + suffix_len
-                        && let Ok(step) = usize::try_from(step)
-                    {
-                        let elements = (start..stop)
-                            .step_by(step)
-                            .map(element_at_nonnegative_index)
-                            .collect::<Option<Vec<_>>>();
-                        if let Some(elements) = elements {
-                            return Ok(Type::heterogeneous_tuple(db, elements));
-                        }
-                    }
-                }
-            }
-
-            if suffix_index(start).is_some()
-                && nonnegative_index(stop).is_some_and(|stop| stop <= prefix_len)
-            {
-                return Ok(Type::heterogeneous_tuple(
-                    db,
-                    std::iter::empty::<Type<'db>>(),
-                ));
-            }
-
-            if let Some(start) = suffix_index(start) {
-                let stop = match stop {
-                    None => Some(None),
-                    Some(_) => suffix_index(stop).map(Some),
-                };
-                if let Some(stop) = stop {
-                    return Ok(Type::heterogeneous_tuple(
-                        db,
-                        self.suffix_elements()
-                            .py_slice(db, Some(start), stop, Some(step))?,
-                    ));
-                }
-            }
+            self.forward_slice_plan(start, stop, step)
         } else {
-            if let Some(start) = nonnegative_index(start)
-                && start < prefix_len
-                && let Some(start) = i32::try_from(start).ok()
-                && (stop.is_none() || nonnegative_index(stop).is_some_and(|stop| stop < prefix_len))
-            {
-                return Ok(Type::heterogeneous_tuple(
-                    db,
-                    self.prefix_elements()
-                        .py_slice(db, Some(start), stop, Some(step))?,
-                ));
+            self.backward_slice_plan(start, stop, step)
+        }
+    }
+
+    fn forward_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> VariableTupleSlicePlan {
+        self.fixed_forward_slice_plan(start, stop, step)
+            .or_else(|| self.suffix_forward_slice_plan(start, stop, step))
+            .or_else(|| self.step_one_forward_slice_plan(start, stop, step))
+            .unwrap_or(VariableTupleSlicePlan::Homogeneous)
+    }
+
+    fn fixed_forward_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> Option<VariableTupleSlicePlan> {
+        if let Some(stop) = Self::nonnegative_slice_index(stop)
+            && let Some(start) = Self::front_start_index(start)
+        {
+            if start >= stop {
+                return Some(VariableTupleSlicePlan::Empty);
             }
 
-            if let Some(start) = suffix_index(start)
-                && let Some(stop) = suffix_index(stop)
+            let minimum_len = self.prefix_len() + self.suffix_len();
+            if stop <= minimum_len
+                && let Ok(step) = usize::try_from(step)
             {
-                return Ok(Type::heterogeneous_tuple(
-                    db,
-                    self.suffix_elements()
-                        .py_slice(db, Some(start), Some(stop), Some(step))?,
-                ));
+                return Some(VariableTupleSlicePlan::FixedFromFront { start, stop, step });
             }
         }
 
-        if step == 1
-            && stop.is_none()
+        None
+    }
+
+    fn suffix_forward_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> Option<VariableTupleSlicePlan> {
+        if self.suffix_slice_index(start).is_some()
+            && Self::nonnegative_slice_index(stop).is_some_and(|stop| stop <= self.prefix_len())
+        {
+            return Some(VariableTupleSlicePlan::Empty);
+        }
+
+        if let Some(start) = self.suffix_slice_index(start) {
+            let stop = match stop {
+                None => Some(None),
+                Some(_) => self.suffix_slice_index(stop).map(Some),
+            };
+            if let Some(stop) = stop {
+                return Some(VariableTupleSlicePlan::FixedFromSuffix { start, stop, step });
+            }
+        }
+
+        None
+    }
+
+    fn step_one_forward_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> Option<VariableTupleSlicePlan> {
+        if step != 1 {
+            return None;
+        }
+        if stop.is_none()
             && let Ok(start) = usize::try_from(start.unwrap_or(0))
         {
-            if start <= prefix_len {
-                return Ok(Type::tuple(TupleType::mixed(
-                    db,
-                    self.iter_prefix_elements().skip(start),
-                    self.variable(),
-                    self.iter_suffix_elements(),
-                )));
+            if start <= self.prefix_len() {
+                return Some(VariableTupleSlicePlan::MixedTail {
+                    prefix_start: start,
+                });
             }
-
-            let element = UnionType::from_elements_leave_aliases(
-                db,
-                std::iter::once(self.variable()).chain(self.iter_suffix_elements()),
-            );
-            return Ok(Type::homogeneous_tuple(db, element));
+            return Some(VariableTupleSlicePlan::HomogeneousVariableAndSuffix);
         }
 
-        if step == 1
-            && let Some(start) = match start {
-                None => Some(0),
-                Some(start) => nonnegative_index(Some(start)),
-            }
-            && start <= prefix_len
-            && let Some(stop) = suffix_index(stop)
+        if let Some(start) = Self::front_start_index(start)
+            && start <= self.prefix_len()
+            && let Some(stop) = self.suffix_slice_index(stop)
             && let Ok(stop) = usize::try_from(stop)
         {
-            return Ok(Type::tuple(TupleType::mixed(
-                db,
-                self.iter_prefix_elements().skip(start),
-                self.variable(),
-                self.iter_suffix_elements().take(stop),
-            )));
+            return Some(VariableTupleSlicePlan::MixedPrefixToSuffix {
+                prefix_start: start,
+                suffix_stop: stop,
+            });
         }
 
+        None
+    }
+
+    fn backward_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> VariableTupleSlicePlan {
+        if let Some(start) = Self::nonnegative_slice_index(start)
+            && start < self.prefix_len()
+            && let Some(start) = i32::try_from(start).ok()
+            && (stop.is_none()
+                || Self::nonnegative_slice_index(stop).is_some_and(|stop| stop < self.prefix_len()))
+        {
+            return VariableTupleSlicePlan::FixedFromPrefix { start, stop, step };
+        }
+
+        if let Some(start) = self.suffix_slice_index(start)
+            && let Some(stop) = self.suffix_slice_index(stop)
+        {
+            return VariableTupleSlicePlan::FixedFromSuffix {
+                start,
+                stop: Some(stop),
+                step,
+            };
+        }
+
+        VariableTupleSlicePlan::Homogeneous
+    }
+
+    fn nonnegative_slice_index(index: Option<i32>) -> Option<usize> {
+        index
+            .filter(|index| *index >= 0)
+            .and_then(|index| usize::try_from(index).ok())
+    }
+
+    fn front_start_index(start: Option<i32>) -> Option<usize> {
+        match start {
+            None => Some(0),
+            Some(_) => Self::nonnegative_slice_index(start),
+        }
+    }
+
+    fn suffix_slice_index(&self, index: Option<i32>) -> Option<i32> {
+        let index = index?;
+        if index >= 0 {
+            return None;
+        }
+        let distance_from_end = usize::try_from(index.checked_neg()?).ok()?;
+        if distance_from_end <= self.suffix_len() {
+            i32::try_from(self.suffix_len() - distance_from_end).ok()
+        } else {
+            None
+        }
+    }
+
+    fn type_at_nonnegative_index(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
+        if let Some(element) = self.prefix_elements().get(index) {
+            return Some(*element);
+        }
+
+        let suffix_end = index.checked_sub(self.prefix_len())?;
+        if suffix_end >= self.suffix_len() {
+            return None;
+        }
+
+        Some(UnionType::from_elements_leave_aliases(
+            db,
+            std::iter::once(self.variable())
+                .chain(self.suffix_elements().iter().take(suffix_end + 1).copied()),
+        ))
+    }
+
+    fn homogeneous_type(&self, db: &'db dyn Db) -> Type<'db> {
         let element = UnionType::from_elements_leave_aliases(
             db,
             self.iter_prefix_elements()
                 .chain(std::iter::once(self.variable()))
                 .chain(self.iter_suffix_elements()),
         );
-        Ok(Type::homogeneous_tuple(db, element))
+        Type::homogeneous_tuple(db, element)
+    }
+
+    fn homogeneous_variable_and_suffix_type(&self, db: &'db dyn Db) -> Type<'db> {
+        let element = UnionType::from_elements_leave_aliases(
+            db,
+            std::iter::once(self.variable()).chain(self.iter_suffix_elements()),
+        );
+        Type::homogeneous_tuple(db, element)
     }
 
     /// Returns the prefix of the prenormalization of this tuple.
