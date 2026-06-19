@@ -312,6 +312,9 @@ def variadic2(*args: int) -> tuple[str, ...]:
 def keyword_only(*, x: int) -> tuple[int]:
     raise NotImplementedError
 
+def gradual(callback: Callable[..., tuple[int, ...]]) -> None:
+    reveal_type(simple(callback))  # revealed: tuple[Any, ...]
+
 reveal_type(simple(positional_only))  # revealed: tuple[int, str]
 reveal_type(simple(standard))  # revealed: tuple[int, str]
 reveal_type(simple(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
