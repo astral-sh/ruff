@@ -3883,9 +3883,7 @@ class ProjectionNarrowedCrossDependency:
             if maybe_number is not None:
                 self.x = [(text, maybe_number)]
 
-        # TODO: Ideally, this would be
-        # `list[tuple[int | None, str]] | list[tuple[int | str, int | str]]`.
-        # revealed: list[tuple[int | None, str]] | list[tuple[int | None | str, int | str]] | list[tuple[int | str, int | str]]
+        # revealed: list[tuple[int | None, str]] | list[tuple[str | int, int | str]]
         reveal_type(self.x)
 ```
 
@@ -3917,9 +3915,9 @@ class ProjectionCorrelatedAttributeCycle:
                 self.left = [(left_text, right_text)]
                 self.right = [(right_number, left_number)]
 
-        # revealed: list[tuple[int, str]] | list[tuple[str, str | int]] | list[tuple[str | int, str | int]]
+        # revealed: list[tuple[int, str]] | list[tuple[int | str, int | str]]
         reveal_type(self.left)
-        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[int | str, str | int]]
+        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
 ```
 
 Deeply nested projections are inferred correctly:
