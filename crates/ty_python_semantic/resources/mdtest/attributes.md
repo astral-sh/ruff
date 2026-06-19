@@ -1022,11 +1022,15 @@ An ordinary method can be replaced directly on a class by another function with 
 signature. The replacement remains an ordinary function, so Python binds it to instances in the same
 way as the original method.
 
-After the assignment, reading the method still returns the original method's precise inferred type,
-even though the runtime value is a different function. This is intentionally unsound, but the
-replacement has the same call signature and instance-binding behavior.
+A function-literal type identifies a specific function, not just its signature. This makes
+identity-sensitive code unsound: after the assignment below, `requires_original_add(Foo.add)` is
+accepted even though the function only allows the original `add`. Its assertion fails at runtime
+because `Foo.add` is now `add_replacement`. Calls to the method itself remain safe because both
+functions have compatible signatures and the same instance-binding behavior.
 
 ```py
+from ty_extensions import TypeOf
+
 class Foo:
     def add(self, x: int, y: int, /) -> int:
         return x + y
@@ -1034,9 +1038,13 @@ class Foo:
 def add_replacement(self: Foo, x: int, y: int, /) -> int:
     return x * y
 
-Foo.add = add_replacement
+original_add = Foo.add
 
-reveal_type(Foo.add)  # revealed: def add(self, x: int, y: int, /) -> int
+def requires_original_add(method: TypeOf[original_add]) -> None:
+    assert method is original_add
+
+Foo.add = add_replacement
+requires_original_add(Foo.add)  # accepted; assertion fails at runtime
 
 def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
     return x + y
@@ -1044,9 +1052,13 @@ def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
 Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
-`staticmethod` and `classmethod` attributes cannot yet be replaced this way. A plain function is
-rejected even if its signature matches because it would bind arguments differently. Supporting these
-assignments requires replacements with the corresponding decorator.
+`staticmethod` and `classmethod` attributes cannot yet be replaced this way. If `static` were
+replaced with a plain function, `DescriptorMethods.static(1)` would pass only `1`, as before, but
+`DescriptorMethods().static(1)` would also pass the instance as the first argument. If `class_` were
+replaced, `DescriptorMethods.class_(1)` would stop passing `DescriptorMethods` as the first
+argument, while `DescriptorMethods().class_(1)` would pass the instance instead of the class.
+Supporting these assignments requires replacements with the corresponding decorator (for example,
+`staticmethod(static_replacement)` or `classmethod(class_replacement)`).
 
 ```py
 class DescriptorMethods:
