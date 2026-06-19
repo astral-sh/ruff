@@ -1313,6 +1313,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 },
             ),
 
+            // Nominal targets are handled by `check_class_pair`, which already walks the source
+            // MRO. For all other targets, defer this check until after the common fast paths above.
+            (Type::NominalInstance(source), _)
+                if !matches!(target, Type::NominalInstance(_))
+                    && self.relation.is_assignability()
+                    && source.class(db).class_literal(db).inherits_from_any(db) =>
+            {
+                self.always()
+            }
+
             // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.

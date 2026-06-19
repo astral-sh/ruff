@@ -395,6 +395,22 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
+    /// Return whether this class directly or indirectly inherits from the `Any` special form.
+    ///
+    /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
+    /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
+    /// arbitrary types.
+    pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static(literal) if !literal.has_explicit_bases(db) => false,
+            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => false,
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::Static(_) | Self::Dynamic(_) | Self::DynamicEnum(_) => {
+                self.iter_mro(db).any(|base| base == ClassBase::Any)
+            }
+        }
+    }
+
     /// Returns the metaclass of this class.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         match self {
