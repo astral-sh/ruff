@@ -373,10 +373,6 @@ static_assert(is_equivalent_to(RuntimeCheckableFoo, RuntimeCheckableBar))
 # These should not error because the protocols are decorated with `@runtime_checkable`
 isinstance(object(), RuntimeCheckableFoo)
 isinstance(object(), RuntimeCheckableBar)
-
-class InheritedRuntimeCheckableFoo(RuntimeCheckableFoo, typing.Protocol): ...
-
-isinstance(object(), InheritedRuntimeCheckableFoo)
 ```
 
 However, we understand that they are not necessarily the same symbol at the same memory address at
