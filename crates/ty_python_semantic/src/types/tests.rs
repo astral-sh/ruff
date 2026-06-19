@@ -7,6 +7,14 @@ use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
 
+fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
+    KnownClass::List
+        .to_specialized_class_type(db, &[argument])
+        .expect("`list` should accept one type argument")
+        .into_generic_alias()
+        .expect("a specialized `list` should be a generic alias")
+}
+
 fn oscillating_generic_alias_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -30,10 +38,7 @@ fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
         Type::unknown()
     };
 
-    KnownClass::List
-        .to_specialized_class_type(db, &[argument])
-        .expect("`list` should be a generic class")
-        .into()
+    list_alias(db, argument).into()
 }
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -74,47 +79,24 @@ fn typing_vs_typeshed_no_default() {
 #[test]
 fn generic_alias_cycle_recovery_preserves_class_identity() {
     let db = setup_db();
-    let previous = KnownClass::List
-        .to_specialized_class_type(&db, &[KnownClass::Int.to_instance(&db)])
-        .unwrap()
-        .into_generic_alias()
-        .unwrap();
-    let current = KnownClass::List
-        .to_specialized_class_type(&db, &[Type::unknown()])
-        .unwrap()
-        .into_generic_alias()
-        .unwrap();
+    let previous = list_alias(&db, KnownClass::Int.to_instance(&db));
+    let current = list_alias(&db, Type::unknown());
 
     let merged = current.merge_cycle_recovery(&db, previous).unwrap();
     assert_eq!(merged.origin(&db), current.origin(&db));
     assert_eq!(merged.specialization(&db).types(&db), &[Type::unknown()]);
 
-    let known = KnownClass::List
-        .to_specialized_class_type(&db, &[KnownClass::Str.to_instance(&db)])
-        .unwrap()
-        .into_generic_alias()
-        .unwrap();
+    let known = list_alias(&db, KnownClass::Str.to_instance(&db));
     assert!(known.merge_cycle_recovery(&db, previous).is_none());
 }
 
 #[test]
 fn generic_alias_cycle_recovery_preserves_unknown_generic_context() {
     let db = setup_db();
-    let list = KnownClass::List
-        .try_to_class_literal(&db)
-        .expect("`list` should resolve to a class");
-    let generic_context = list.generic_context(&db).expect("`list` should be generic");
+    let current = list_alias(&db, KnownClass::Int.to_instance(&db));
+    let generic_context = current.specialization(&db).generic_context(&db);
     let unknown_generic = Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-    let previous = KnownClass::List
-        .to_specialized_class_type(&db, &[unknown_generic])
-        .expect("`list` should accept one type argument")
-        .into_generic_alias()
-        .expect("a specialized `list` should be a generic alias");
-    let current = KnownClass::List
-        .to_specialized_class_type(&db, &[KnownClass::Int.to_instance(&db)])
-        .expect("`list` should accept one type argument")
-        .into_generic_alias()
-        .expect("a specialized `list` should be a generic alias");
+    let previous = list_alias(&db, unknown_generic);
 
     assert!(current.merge_cycle_recovery(&db, previous).is_none());
 }

@@ -237,13 +237,14 @@ impl<'db> GenericAlias<'db> {
     /// A semantic union of these class objects is not a valid class base. Keep the shared class
     /// identity and merge the approximations inside its specialization instead.
     pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
-        if self.origin(db) != previous.origin(db) {
+        let origin = self.origin(db);
+        if origin != previous.origin(db) {
             return None;
         }
 
         Some(Self::new(
             db,
-            self.origin(db),
+            origin,
             self.specialization(db)
                 .merge_cycle_recovery(db, previous.specialization(db))?,
         ))
