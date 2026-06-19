@@ -1890,101 +1890,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        // An unpacked `TypeVarTuple` represents the positional portion of a callable signature.
-        // Infer that tuple first, then substitute it into a temporary target so that the ordinary
-        // signature relation can validate the complete parameter and return types.
-        if self.typevar_evaluation == TypeVarEvaluation::Lazy
-            && let Some((typevartuple_index, typevartuple_parameter)) =
-                target.parameters.iter().find_position(|parameter| {
-                    parameter.is_variadic() && parameter.has_starred_annotation()
-                })
-            && let Type::TypeVar(typevartuple) = typevartuple_parameter.annotated_type()
-            && typevartuple.is_typevartuple(db)
-            && target.parameters.as_slice()[..typevartuple_index]
-                .iter()
-                .chain(&target.parameters.as_slice()[typevartuple_index + 1..])
-                .all(Parameter::is_positional)
-        {
-            let source_parameters = source
-                .parameters
-                .clone()
-                .expand_starred_variadic_annotations(db);
-            let source_positional_len = source_parameters
-                .iter()
-                .take_while(|parameter| parameter.is_positional() || parameter.is_variadic())
-                .count();
-            let source_positional = &source_parameters.as_slice()[..source_positional_len];
-            let prefix_len = typevartuple_index;
-            let suffix_len = target.parameters.len() - typevartuple_index - 1;
-
-            let inferred_tuple = if let Some(source_variadic_index) =
-                source_positional.iter().position(Parameter::is_variadic)
-            {
-                let source_prefix = &source_positional[..source_variadic_index];
-                let source_suffix = &source_positional[source_variadic_index + 1..];
-                if source_prefix.len() < prefix_len || source_suffix.len() < suffix_len {
-                    return self.never();
+        let target_typevartuple = if self.typevar_evaluation == TypeVarEvaluation::Lazy {
+            target.parameters.variadic().and_then(|(_, parameter)| {
+                if parameter.has_starred_annotation()
+                    && let Type::TypeVar(typevartuple) = parameter.annotated_type()
+                    && typevartuple.is_typevartuple(db)
+                {
+                    Some(typevartuple)
+                } else {
+                    None
                 }
-
-                let source_variadic = &source_positional[source_variadic_index];
-                let inferred_prefix = &source_prefix[prefix_len..];
-                let inferred_suffix = &source_suffix[..source_suffix.len() - suffix_len];
-                let inferred_spec = TupleSpecBuilder::Variable {
-                    prefix: inferred_prefix
-                        .iter()
-                        .map(Parameter::annotated_type)
-                        .collect(),
-                    variable: source_variadic.annotated_type(),
-                    suffix: inferred_suffix
-                        .iter()
-                        .map(Parameter::annotated_type)
-                        .collect(),
-                }
-                .build();
-                Type::tuple(TupleType::new(db, &inferred_spec))
-            } else {
-                let Some(middle_end) = source_positional.len().checked_sub(suffix_len) else {
-                    return self.never();
-                };
-                if middle_end < prefix_len {
-                    return self.never();
-                }
-
-                Type::heterogeneous_tuple(
-                    db,
-                    source_positional[prefix_len..middle_end]
-                        .iter()
-                        .map(Parameter::annotated_type),
-                )
-            };
-
-            let expanded_source = source.clone().with_parameters(source_parameters);
-            let type_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                typevartuple,
-                inferred_tuple,
-            ));
-            let rewritten_target = target.apply_type_mapping_impl(
-                db,
-                &type_mapping,
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
-            );
-            let typevartuple_matches = ConstraintSet::constrain_typevar_upper_bound(
-                db,
-                self.constraints,
-                typevartuple,
-                inferred_tuple,
-            );
-            return typevartuple_matches.and(db, self.constraints, || {
-                self.check_signature_pair_inner(db, &expanded_source, &rewritten_target)
-            });
-        }
+            })
+        } else {
+            None
+        };
 
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
         // without checking return types or individual parameter types. The full parameter
         // comparison below reaches the same result, but only after doing work that is expensive for
         // large overload sets.
-        if source.parameters.is_standard()
+        if target_typevartuple.is_none()
+            && source.parameters.is_standard()
             && target.parameters.is_standard()
             && source.parameters.variadic().is_none()
         {
@@ -2015,21 +1941,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
-        let return_type_checks = !result
-            .intersect(db, self.constraints, return_type_constraints)
-            .is_never_satisfied(db);
-        if !return_type_checks {
-            self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
-                source: source.return_ty,
-                target: target.return_ty,
-            });
-        }
+        // An unpacked TypeVarTuple is inferred from the positional parameters below. Defer the
+        // return check until then so that each use of the TypeVarTuple is replaced by the same
+        // packed tuple instead of being related as individual tuple elements.
+        let return_type_checks = if target_typevartuple.is_some() {
+            true
+        } else {
+            let return_type_constraints =
+                self.check_type_pair(db, source.return_ty, target.return_ty);
+            let return_type_checks = !result
+                .intersect(db, self.constraints, return_type_constraints)
+                .is_never_satisfied(db);
+            if !return_type_checks {
+                self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
+                    source: source.return_ty,
+                    target: target.return_ty,
+                });
+            }
+            return_type_checks
+        };
 
-        let mut check_types = |target_ty: Type<'db>,
-                               source_ty: Type<'db>,
-                               target_name: Option<&Name>,
-                               target_index: usize| {
+        let check_types = |result: &mut ConstraintSet<'db, 'c>,
+                           target_ty: Type<'db>,
+                           source_ty: Type<'db>,
+                           target_name: Option<&Name>,
+                           target_index: usize| {
             match (target_ty, source_ty) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
@@ -2195,6 +2131,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     return self.never();
                                 }
                                 if !check_types(
+                                    &mut result,
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
                                     target_param.name(),
@@ -2226,6 +2163,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     return self.never();
                                 }
                                 if !check_types(
+                                    &mut result,
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
                                     target_param.name(),
@@ -2378,6 +2316,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             return self.never();
                                         }
                                         if !check_types(
+                                            &mut result,
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
@@ -2405,6 +2344,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             return self.never();
                                         }
                                         if !check_types(
+                                            &mut result,
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
@@ -2420,6 +2360,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         | ParameterKind::PositionalOrKeyword { .. },
                                     ) => {
                                         if !check_types(
+                                            &mut result,
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
@@ -2431,6 +2372,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         while let Some(target_param) = parameters.peek_target() {
                                             target_index += 1;
                                             if !check_types(
+                                                &mut result,
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
@@ -2539,6 +2481,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 return self.never();
                                             }
                                             if !check_types(
+                                                &mut result,
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
@@ -2567,6 +2510,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 return self.never();
                                             }
                                             if !check_types(
+                                                &mut result,
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
@@ -2641,7 +2585,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
-        if source.parameters.is_gradual() || target.parameters.is_gradual() {
+        if target_typevartuple.is_none()
+            && (source.parameters.is_gradual() || target.parameters.is_gradual())
+        {
             match (source.parameters.kind(), target.parameters.kind()) {
                 // Both parameter lists are `Concatenate` with gradual forms. All prefix parameters
                 // are going to be positional-only.
@@ -2660,6 +2606,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .enumerate()
                     {
                         if !check_types(
+                            &mut result,
                             target_param.annotated_type(),
                             source_param.annotated_type(),
                             target_param.name(),
@@ -2711,6 +2658,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         return self.never();
                                     }
                                     if !check_types(
+                                        &mut result,
                                         target_param.annotated_type(),
                                         source_param.annotated_type(),
                                         target_param.name(),
@@ -2772,6 +2720,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             return self.never();
                                         }
                                         if !check_types(
+                                            &mut result,
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
@@ -2782,6 +2731,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     }
                                     ParameterKind::Variadic { .. } => {
                                         if !check_types(
+                                            &mut result,
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
@@ -2793,6 +2743,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         while let Some(target_param) = parameters.peek_target() {
                                             target_index += 1;
                                             if !check_types(
+                                                &mut result,
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
@@ -2832,10 +2783,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
         }
 
+        let source_parameters = if target_typevartuple.is_some() {
+            source
+                .parameters
+                .clone()
+                .expand_starred_variadic_annotations(db)
+        } else {
+            source.parameters.clone()
+        };
         let mut parameters = ParametersZip {
             current_source: None,
             current_target: None,
-            source_iter: source.parameters.iter(),
+            source_iter: source_parameters.iter(),
             target_iter: target.parameters.iter(),
         };
 
@@ -2845,6 +2804,129 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut target_index = 0usize;
 
         loop {
+            // A TypeVarTuple can consume zero or more parameters, so inspect the target before
+            // advancing the source iterator. The ordinary zip below always advances both sides.
+            if let Some(typevartuple) = target_typevartuple
+                && let Some(target_parameter) = parameters.peek_target()
+                && target_parameter.is_variadic()
+                && target_parameter.has_starred_annotation()
+                && target_parameter.annotated_type() == Type::TypeVar(typevartuple)
+            {
+                let reused_source_variadic = parameters
+                    .current_source
+                    .filter(|parameter| parameter.is_variadic());
+                let source_positional: Vec<_> = reused_source_variadic
+                    .into_iter()
+                    .chain(parameters.source_iter.clone())
+                    .take_while(|parameter| parameter.is_positional() || parameter.is_variadic())
+                    .collect();
+                let target_suffix_len = parameters
+                    .target_iter
+                    .clone()
+                    .skip(1)
+                    .take_while(|parameter| parameter.is_positional())
+                    .count();
+
+                let (inferred_tuple, consumed_source_len) = if let Some(source_variadic_index) =
+                    source_positional
+                        .iter()
+                        .position(|parameter| parameter.is_variadic())
+                {
+                    let source_prefix = &source_positional[..source_variadic_index];
+                    let source_variadic = source_positional[source_variadic_index];
+                    let source_suffix = &source_positional[source_variadic_index + 1..];
+                    if source_suffix.len() < target_suffix_len {
+                        return self.never();
+                    }
+
+                    let inferred_suffix_len = source_suffix.len() - target_suffix_len;
+                    let inferred_spec = TupleSpecBuilder::Variable {
+                        prefix: source_prefix
+                            .iter()
+                            .map(|parameter| parameter.annotated_type())
+                            .collect(),
+                        variable: source_variadic.annotated_type(),
+                        suffix: source_suffix[..inferred_suffix_len]
+                            .iter()
+                            .map(|parameter| parameter.annotated_type())
+                            .collect(),
+                    }
+                    .build();
+                    (
+                        Type::tuple(TupleType::new(db, &inferred_spec)),
+                        source_variadic_index + 1 + inferred_suffix_len,
+                    )
+                } else {
+                    let Some(middle_end) = source_positional.len().checked_sub(target_suffix_len)
+                    else {
+                        return self.never();
+                    };
+                    (
+                        Type::heterogeneous_tuple(
+                            db,
+                            source_positional[..middle_end]
+                                .iter()
+                                .map(|parameter| parameter.annotated_type()),
+                        ),
+                        middle_end,
+                    )
+                };
+
+                let consumed_from_source_iter = consumed_source_len
+                    .saturating_sub(usize::from(reused_source_variadic.is_some()));
+                for _ in 0..consumed_from_source_iter {
+                    parameters.next_source();
+                }
+                parameters.next_target();
+                target_index += 1;
+
+                let typevartuple_matches = ConstraintSet::constrain_typevar_upper_bound(
+                    db,
+                    self.constraints,
+                    typevartuple,
+                    inferred_tuple,
+                );
+                if result
+                    .intersect(db, self.constraints, typevartuple_matches)
+                    .is_never_satisfied(db)
+                {
+                    return result;
+                }
+
+                let type_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                    typevartuple,
+                    inferred_tuple,
+                ));
+                let rewritten_target_return = target.return_ty.apply_type_mapping_impl(
+                    db,
+                    &type_mapping,
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::default(),
+                );
+                let return_type_constraints =
+                    self.check_type_pair(db, source.return_ty, rewritten_target_return);
+                if result
+                    .intersect(db, self.constraints, return_type_constraints)
+                    .is_never_satisfied(db)
+                {
+                    self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
+                        source: source.return_ty,
+                        target: rewritten_target_return,
+                    });
+                    return result;
+                }
+
+                if source.parameters.is_gradual() {
+                    return match self.relation {
+                        TypeRelation::Assignability => result,
+                        TypeRelation::Subtyping
+                        | TypeRelation::SubtypingAssuming
+                        | TypeRelation::Redundancy { .. } => self.never(),
+                    };
+                }
+                continue;
+            }
+
             let Some(next_parameter) = parameters.next() else {
                 if target_keywords.is_empty() {
                     // All parameters have been checked or both the parameter lists were empty.
@@ -2914,6 +2996,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 return self.never();
                             }
                             if !check_types(
+                                &mut result,
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
@@ -2945,6 +3028,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 return self.never();
                             }
                             if !check_types(
+                                &mut result,
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
@@ -2960,6 +3044,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
                             if !check_types(
+                                &mut result,
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
@@ -2986,6 +3071,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // checked against the variadic parameter in `source`. This loop does
                             // that by only moving the `other` iterator forward.
                             while let Some(target_parameter) = parameters.peek_target() {
+                                if target_typevartuple.is_some()
+                                    && target_parameter.is_variadic()
+                                    && target_parameter.has_starred_annotation()
+                                {
+                                    break;
+                                }
                                 match target_parameter.kind() {
                                     ParameterKind::PositionalOrKeyword { .. } => {
                                         target_keywords.push(target_parameter);
@@ -3000,6 +3091,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                                 target_index += 1;
                                 if !check_types(
+                                    &mut result,
                                     target_parameter.annotated_type(),
                                     source_param.annotated_type(),
                                     target_parameter.name(),
@@ -3013,6 +3105,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
                             if !check_types(
+                                &mut result,
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
@@ -3127,6 +3220,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     return self.never();
                                 }
                                 if !check_types(
+                                    &mut result,
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
                                     target_param.name(),
@@ -3141,6 +3235,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                     } else if let Some(source_keyword_variadic) = source_keyword_variadic {
                         if !check_types(
+                            &mut result,
                             target_param.annotated_type(),
                             source_keyword_variadic,
                             target_param.name(),
@@ -3159,6 +3254,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     };
                     if !check_types(
+                        &mut result,
                         target_param.annotated_type(),
                         source_keyword_variadic,
                         target_param.name(),
