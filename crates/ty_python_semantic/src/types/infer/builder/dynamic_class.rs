@@ -198,7 +198,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {}
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {}
             }
         }
 
