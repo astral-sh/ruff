@@ -2672,6 +2672,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        let classmethod_receiver_is_valid = |ty: Type<'db>| {
+            let receiver_is_valid = |ty: Type<'db>| {
+                if let Some(specialization) = ty.known_specialization(db, KnownClass::Classmethod) {
+                    let Some(receiver_ty) = specialization.types(db).first() else {
+                        return false;
+                    };
+                    return object_ty
+                        .to_instance(db)
+                        .is_some_and(|instance_ty| instance_ty.is_assignable_to(db, *receiver_ty));
+                }
+
+                let signatures = match ty {
+                    Type::FunctionLiteral(function) if function.is_classmethod(db) => {
+                        Some(function.signature(db))
+                    }
+                    Type::Callable(callable) if callable.is_classmethod_like(db) => {
+                        Some(callable.signatures(db))
+                    }
+                    _ => None,
+                };
+                signatures.is_none_or(|signatures| {
+                    signatures
+                        .iter()
+                        .any(|signature| signature.can_bind_self_to(db, object_ty))
+                })
+            };
+
+            match ty {
+                Type::Union(union) => union.elements(db).iter().copied().all(receiver_is_valid),
+                _ => receiver_is_valid(ty),
+            }
+        };
+
         let descriptor_assignment_is_valid =
             |value_ty: Type<'db>, attr_ty: Type<'db>| -> Option<bool> {
                 let target_is_method_like = match attr_ty {
@@ -2686,6 +2719,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if !matches!(object_ty, Type::ClassLiteral(_)) || !target_is_method_like {
                     return None;
+                }
+                if !classmethod_receiver_is_valid(value_ty) {
+                    return Some(false);
                 }
 
                 let instance_ty = object_ty.to_instance(db)?;

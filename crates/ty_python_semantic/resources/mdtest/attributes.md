@@ -1126,6 +1126,17 @@ def replace_static(flag: bool) -> None:
     DescriptorMethods.static = replacement  # error: [invalid-assignment]
 ```
 
+The receiver of a classmethod replacement must accept the class to which it is assigned.
+
+```py
+class Other: ...
+
+def incompatible_class_replacement(cls: type[Other], x: int) -> str:
+    return str(x)
+
+DescriptorMethods.class_ = classmethod(incompatible_class_replacement)  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
