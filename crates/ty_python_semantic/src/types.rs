@@ -8002,21 +8002,6 @@ impl<'db> InvalidTypeExpression<'db> {
     }
 }
 
-/// Whether a given type originates from value expression inference or type expression inference.
-/// For example, the symbol `int` would be inferred as `<class 'int'>` in value expression context,
-/// and as `int` (i.e. an instance of the class `int`) in type expression context.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
-pub enum InferredAs {
-    ValueExpression,
-    TypeExpression,
-}
-
-impl InferredAs {
-    pub const fn type_expression(self) -> bool {
-        matches!(self, InferredAs::TypeExpression)
-    }
-}
-
 /// Error returned if a type is not awaitable.
 #[derive(Debug)]
 enum AwaitError<'db> {
