@@ -4,47 +4,62 @@ use compact_str::{CompactString, ToCompactString};
 use indexmap::IndexMap;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::preformatted::PreformattedBlockScanner;
 
-/// Represents a parsed restructured text (reST) docstring.
-pub(super) struct Docstring {
-    field_lists: Vec<FieldList>,
+/// Parses all reST field lists in a docstring.
+fn field_lists(raw: &str) -> Vec<FieldList> {
+    FieldList::parse_all(raw)
 }
 
-impl Docstring {
-    /// Constructs a parsed representation from a raw docstring.
-    pub(super) fn parse(raw: &str) -> Self {
-        let field_lists = FieldList::parse_all(raw);
-        Self { field_lists }
-    }
+/// Returns top-level field lists that begin at a reST block boundary.
+///
+/// `source` must have already undergone PEP-257 trimming and universal newline
+/// normalization (typically via `docstring::documentation_trim`).
+pub(in crate::docstring) fn top_level_field_lists(
+    source: &str,
+) -> impl Iterator<Item = FieldList> + '_ {
+    field_lists(source).into_iter().filter(|field_list| {
+        field_list.indent == TextSize::default()
+            && starts_at_block_boundary(source, field_list.range.start())
+    })
+}
 
-    /// Returns the parameter documentation that we were able to recognize in a docstring.
-    pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
-        let mut parameters = IndexMap::new();
+/// Returns the parameter documentation recognized in a reST docstring.
+pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
+    let mut parameters = IndexMap::new();
+    let source = crate::docstring::documentation_trim(raw);
 
-        for field_list in &self.field_lists {
-            for field in &field_list.fields {
-                let Field::Parameter {
-                    lookup_name,
-                    description,
-                    ..
-                } = field
-                else {
-                    continue;
-                };
+    for field_list in top_level_field_lists(&source) {
+        for field in field_list.fields {
+            let Field::Parameter {
+                lookup_name,
+                description,
+                ..
+            } = field
+            else {
+                continue;
+            };
 
-                if description.is_empty() {
-                    continue;
-                }
-
-                parameters.insert(lookup_name.clone(), description.clone());
+            if description.is_empty() {
+                continue;
             }
-        }
 
-        parameters
+            parameters.insert(lookup_name, description);
+        }
     }
+
+    parameters
+}
+
+fn starts_at_block_boundary(source: &str, start: TextSize) -> bool {
+    source.get(..start.to_usize()).is_some_and(|prefix| {
+        prefix
+            .lines()
+            .next_back()
+            .is_none_or(|line| line.trim().is_empty())
+    })
 }
 
 /// Cursor over docstring lines and their line numbers.
@@ -96,7 +111,7 @@ impl<'a> DocstringLine<'a> {
 ///
 /// <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#field-lists>
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FieldList {
+pub(in crate::docstring) struct FieldList {
     start_line: usize,
     end_line: usize,
     range: TextRange,
@@ -105,6 +120,10 @@ struct FieldList {
 }
 
 impl FieldList {
+    pub(in crate::docstring) fn fields(&self) -> &[Field] {
+        &self.fields
+    }
+
     /// Parse all the field lists in the given lines of a docstring.
     fn parse_all(raw: &str) -> Vec<Self> {
         let mut field_lists = Vec::new();
@@ -134,7 +153,7 @@ impl FieldList {
         let line = lines.peek()?;
         let start_line = line.index;
         let range_start = line.range.start();
-        let header = FieldHeader::parse(line.text)?;
+        let header = FieldHeader::parse_list_member(line.text)?;
         lines.next();
 
         let field_list_indent = header.indent;
@@ -151,10 +170,14 @@ impl FieldList {
                     break;
                 }
 
-                current.lines.push(line.text);
-                lines.next();
-                end_line = line.index + 1;
-                range_end = line.range.end();
+                while let Some(blank_line) = lines.peek()
+                    && blank_line.text.trim().is_empty()
+                {
+                    current.lines.push(blank_line.text);
+                    lines.next();
+                    end_line = blank_line.index + 1;
+                    range_end = blank_line.range.end();
+                }
                 continue;
             }
 
@@ -237,10 +260,15 @@ impl FieldList {
     }
 }
 
+impl Ranged for FieldList {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Constructs new instances of the model for a reST field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct FieldBuilder<'a> {
-    indent: TextSize,
     kind: FieldKind<'a>,
     body: &'a str,
     lines: Vec<&'a str>,
@@ -250,7 +278,6 @@ impl<'a> FieldBuilder<'a> {
     /// Initializes a builder object for a new field instance.
     fn new(header: FieldHeader<'a>) -> Self {
         Self {
-            indent: header.indent,
             kind: header.kind,
             body: header.body,
             lines: vec![header.raw],
@@ -294,7 +321,7 @@ impl<'a> FieldBuilder<'a> {
                 exception: exception.map(|exception| exception.to_compact_string()),
                 description: body,
             },
-            FieldKind::Metadata => Field::Metadata,
+            FieldKind::Metadata => Field::Metadata { body },
             FieldKind::Unknown { name, argument } => Field::Unknown {
                 name: name.to_compact_string(),
                 argument: argument.to_compact_string(),
@@ -360,11 +387,16 @@ struct FieldHeader<'a> {
 }
 
 impl<'a> FieldHeader<'a> {
+    /// Parses either a valid field header or a malformed header for a supported field.
+    fn parse_list_member(line: &'a str) -> Option<Self> {
+        Self::parse(line).or_else(|| Self::parse_malformed_supported_field(line))
+    }
+
     /// Finds the start of a reST field (if any) on the given line and at the
     /// given indentation level.
     fn at_indent(line: &'a str, indent: TextSize) -> Option<Self> {
         (Self::indentation(line) == indent)
-            .then(|| Self::parse(line))
+            .then(|| Self::parse_list_member(line))
             .flatten()
     }
 
@@ -396,6 +428,10 @@ impl<'a> FieldHeader<'a> {
         let trimmed = line.trim_start();
         let after_opening_colon = trimmed.strip_prefix(':')?;
         let (name_and_argument, body) = after_opening_colon.split_once(':')?;
+        // Escaped colons belong to the field name, not the field marker.
+        if name_and_argument.ends_with('\\') {
+            return None;
+        }
         if body
             .chars()
             .next()
@@ -404,16 +440,7 @@ impl<'a> FieldHeader<'a> {
             return None;
         }
 
-        let name_and_argument = name_and_argument.trim();
-        if name_and_argument.is_empty() {
-            return None;
-        }
-
-        let name_end = name_and_argument
-            .find(char::is_whitespace)
-            .unwrap_or(name_and_argument.len());
-        let name = &name_and_argument[..name_end];
-        let argument = name_and_argument[name_end..].trim();
+        let (name, argument) = Self::split_name_and_argument(name_and_argument)?;
 
         Some(Self {
             indent: Self::indentation(line),
@@ -421,6 +448,34 @@ impl<'a> FieldHeader<'a> {
             body: body.trim_start(),
             raw: line,
         })
+    }
+
+    /// Recognizes malformed syntax for a supported field so it remains part of
+    /// the surrounding field list and prevents partial structured rendering.
+    fn parse_malformed_supported_field(line: &'a str) -> Option<Self> {
+        let after_opening_colon = line.trim_start().strip_prefix(':')?;
+        let name_and_argument = after_opening_colon
+            .split_once(':')
+            .map_or(after_opening_colon, |(header, _)| header);
+        let (name, argument) = Self::split_name_and_argument(name_and_argument)?;
+        FieldKind::parse_supported(name, argument)?;
+
+        Some(Self {
+            indent: Self::indentation(line),
+            kind: FieldKind::Unknown { name, argument },
+            body: "",
+            raw: line,
+        })
+    }
+
+    fn split_name_and_argument(value: &'a str) -> Option<(&'a str, &'a str)> {
+        let value = value.trim();
+        if value.is_empty() {
+            return None;
+        }
+
+        let name_end = value.find(char::is_whitespace).unwrap_or(value.len());
+        Some((&value[..name_end], value[name_end..].trim()))
     }
 
     /// Returns the leading indentation of the given source line.
@@ -464,7 +519,13 @@ enum FieldKind<'a> {
 impl<'a> FieldKind<'a> {
     /// Categorizes a parsed field as a supported field or an unknown field.
     fn parse(name: &'a str, argument: &'a str) -> Self {
-        match name {
+        Self::parse_supported(name, argument).unwrap_or(Self::Unknown { name, argument })
+    }
+
+    /// Categorizes a supported field, returning `None` only for an unknown field name.
+    fn parse_supported(name: &'a str, argument: &'a str) -> Option<Self> {
+        let normalized_name = name.to_ascii_lowercase();
+        let kind = match normalized_name.as_str() {
             "param" | "parameter" | "arg" | "argument" | "key" | "keyword" | "kwarg"
             | "kwparam" => Self::parse_parameter_argument(argument)
                 .map(|(ty, name)| Self::Parameter {
@@ -473,7 +534,7 @@ impl<'a> FieldKind<'a> {
                     ty,
                 })
                 .unwrap_or(Self::Unknown { name, argument }),
-            "type" | "paramtype" => Self::parse_parameter_name(argument)
+            "type" | "paramtype" | "kwtype" => Self::parse_parameter_name(argument)
                 .map(|name| Self::ParameterType {
                     lookup_name: name.lookup,
                 })
@@ -492,16 +553,19 @@ impl<'a> FieldKind<'a> {
             "return" | "returns" => Self::Returns {
                 name: Self::parse_parameter_name(argument).map(|name| name.lookup),
             },
-            "rtype" => Self::ReturnType,
+            "rtype" if argument.is_empty() => Self::ReturnType,
+            "rtype" => Self::Unknown { name, argument },
             "raises" | "raise" | "except" | "exception" => {
                 let exception = argument.trim();
                 Self::Raises {
                     exception: (!exception.is_empty()).then_some(exception),
                 }
             }
-            "meta" => Self::Metadata,
-            _ => Self::Unknown { name, argument },
-        }
+            "meta" if !argument.is_empty() => Self::Metadata,
+            "meta" => Self::Unknown { name, argument },
+            _ => return None,
+        };
+        Some(kind)
     }
 
     /// Parses a parameter name and an optional parameter type from a raw field argument.
@@ -554,7 +618,7 @@ impl<'a> FieldKind<'a> {
 
 /// Represents the reST fields captured by the parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Field {
+pub(in crate::docstring) enum Field {
     Parameter {
         display_name: CompactString,
         lookup_name: String,
@@ -585,7 +649,9 @@ enum Field {
         exception: Option<CompactString>,
         description: String,
     },
-    Metadata,
+    Metadata {
+        body: String,
+    },
     Unknown {
         name: CompactString,
         argument: CompactString,
@@ -610,7 +676,10 @@ mod tests {
 
     use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use super::{Docstring, FieldList, Lines};
+    use super::{
+        Field, FieldList, Lines, field_lists,
+        parameter_documentation as extract_parameter_documentation,
+    };
 
     #[test]
     fn parameter_documentation_extracts_rest_parameters() {
@@ -631,6 +700,42 @@ mod tests {
           This is a continuation of param2 description.
         kwargs: Extra keyword arguments.
         ");
+    }
+
+    #[test]
+    fn parameter_documentation_ignores_fields_in_block_quotes() {
+        let parameters = extract_parameter_documentation(
+            "\
+Summary.
+
+    :param example: Quoted example.
+
+:param real: Real parameter.",
+        );
+
+        assert!(!parameters.contains_key("example"));
+        assert_eq!(
+            parameters.get("real").map(String::as_str),
+            Some("Real parameter.")
+        );
+    }
+
+    #[test]
+    fn parameter_documentation_ignores_fields_continuing_paragraphs() {
+        let parameters = extract_parameter_documentation(
+            "\
+Summary.
+:param example: Paragraph text.
+Continuation.
+
+:param real: Real parameter.",
+        );
+
+        assert!(!parameters.contains_key("example"));
+        assert_eq!(
+            parameters.get("real").map(String::as_str),
+            Some("Real parameter.")
+        );
     }
 
     #[test]
@@ -658,14 +763,14 @@ mod tests {
 
     #[test]
     fn parser_supports_complex_inline_parameter_types() {
-        let parsed = Docstring::parse(
+        let parsed = field_lists(
             "\
 :param list[str] items: Item descriptions.
 :param dict[str, list[int | None]] mapping: Mapping description.
 :param Callable[[int, str], bool] callback: Callback description.",
         );
 
-        assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
+        assert_debug_snapshot!(&parsed[0].fields, @r#"
         [
             Parameter {
                 display_name: "items",
@@ -728,16 +833,15 @@ mod tests {
 :raises ValueError: Error description.
 :meta private:
 :unknown with argument: Unknown description.";
-        let parsed = Docstring::parse(docstring);
+        let parsed = field_lists(docstring);
 
-        assert_eq!(parsed.field_lists[0].start_line, 0);
-        assert_eq!(parsed.field_lists[0].end_line, 9);
+        assert_eq!(parsed[0].start_line, 0);
+        assert_eq!(parsed[0].end_line, 9);
         assert_eq!(
-            &docstring[parsed.field_lists[0].range.start().to_usize()
-                ..parsed.field_lists[0].range.end().to_usize()],
+            &docstring[parsed[0].range.start().to_usize()..parsed[0].range.end().to_usize()],
             docstring
         );
-        assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
+        assert_debug_snapshot!(&parsed[0].fields, @r#"
         [
             Parameter {
                 display_name: "*args",
@@ -777,7 +881,9 @@ mod tests {
                 ),
                 description: "Error description.",
             },
-            Metadata,
+            Metadata {
+                body: "",
+            },
             Unknown {
                 name: "unknown",
                 argument: "with argument",
@@ -803,19 +909,27 @@ Intervening prose.
 
 Trailing prose.
 ";
-        let parsed = Docstring::parse(docstring);
+        let parsed = field_lists(docstring);
 
-        assert_eq!(parsed.field_lists.len(), 2);
+        assert_eq!(parsed.len(), 2);
 
-        let first = &parsed.field_lists[0];
+        let first = &parsed[0];
         assert_eq!(first.start_line, 2);
         assert_eq!(first.end_line, 3);
 
-        let second = &parsed.field_lists[1];
+        let second = &parsed[1];
         assert_eq!(second.start_line, 6);
         assert_eq!(second.end_line, 10);
+        let second_description = second.fields.iter().find_map(|field| match field {
+            Field::Parameter { description, .. } => Some(description),
+            _ => None,
+        });
+        assert_eq!(
+            second_description.map(String::as_str),
+            Some("Second parameter.\nContinued::\n\n    literal block")
+        );
 
-        assert_snapshot!(field_list_ranges(docstring, &parsed.field_lists), @r"
+        assert_snapshot!(field_list_ranges(docstring, &parsed), @r"
         | Intro paragraph.
         |
         | :param first: First parameter.
@@ -837,8 +951,7 @@ Trailing prose.
 
     #[test]
     fn parser_recovers_from_partial_and_malformed_fields() {
-        let param_docs = parameter_documentation(
-            "\
+        let docstring = "\
 :param first: Parsed before malformed input.
 :param missing-space:This is malformed because body text must be separated by whitespace.
 :param:
@@ -846,8 +959,10 @@ Trailing prose.
 :param empty:
 :param list[str] second: Parsed after malformed and partial fields.
 :param
-:param third: Parsed after an incomplete field marker.",
-        );
+:param third: Parsed after an incomplete field marker.";
+
+        assert_eq!(field_lists(docstring).len(), 1);
+        let param_docs = parameter_documentation(docstring);
 
         assert_snapshot!(param_docs, @r"
         first: Parsed before malformed input.
@@ -863,12 +978,14 @@ Trailing prose.
 :param value:
   First paragraph.
 
+
   Second paragraph.
 :param other: Other parameter.",
         );
 
         assert_snapshot!(param_docs, @r"
         value: First paragraph.
+
 
           Second paragraph.
         other: Other parameter.
@@ -984,10 +1101,7 @@ Section::
 
         let param_docs = parameter_documentation(docstring);
 
-        assert_snapshot!(param_docs, @r"
-        value: Value parameter.
-        next: Next parameter.
-        ");
+        assert_snapshot!(param_docs, @"next: Next parameter.");
     }
 
     #[test]
@@ -1005,7 +1119,7 @@ Section::
     }
 
     fn parameter_documentation(docstring: &str) -> String {
-        let parameters = Docstring::parse(docstring).parameter_documentation();
+        let parameters = super::parameter_documentation(docstring);
         let mut rendered = String::new();
 
         for (name, description) in parameters {
