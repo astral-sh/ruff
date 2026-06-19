@@ -277,6 +277,20 @@ def __(t: HeterogeneousTupleSubclass, m: int, n: int):
     reveal_type(tuple_slice)  # revealed: tuple[I0 | I1 | I2 | I3, ...]
 ```
 
+## Slices into mixed tuples
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def mixed_static_tail(t: tuple[int, *tuple[str, ...], bytes]) -> None:
+    reveal_type(t[:])  # revealed: tuple[int, *tuple[str, ...], bytes]
+    reveal_type(t[1:])  # revealed: tuple[*tuple[str, ...], bytes]
+    reveal_type(t[2:])  # revealed: tuple[str | bytes, ...]
+```
+
 ## Indexes into homogeneous and mixed tuples
 
 ```toml

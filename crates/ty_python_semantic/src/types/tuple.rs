@@ -971,6 +971,52 @@ impl<T> VariableLengthTuple<T> {
 }
 
 impl<'db> VariableLengthTuple<Type<'db>> {
+    /// Returns a sound static slice result for a mixed tuple.
+    ///
+    /// We preserve fixed prefix elements that are definitely part of the result. For cases whose
+    /// exact result would require a union of tuple shapes, we fall back to a homogeneous tuple over
+    /// all elements that could remain after applying the slice.
+    fn py_slice_type(
+        &self,
+        db: &'db dyn Db,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: Option<i32>,
+    ) -> Result<Type<'db>, StepSizeZeroError> {
+        let step = step.unwrap_or(1);
+        if step == 0 {
+            return Err(StepSizeZeroError);
+        }
+
+        if step == 1
+            && stop.is_none()
+            && let Ok(start) = usize::try_from(start.unwrap_or(0))
+        {
+            if start <= self.prefix_len() {
+                return Ok(Type::tuple(TupleType::mixed(
+                    db,
+                    self.iter_prefix_elements().skip(start),
+                    self.variable(),
+                    self.iter_suffix_elements(),
+                )));
+            }
+
+            let element = UnionType::from_elements_leave_aliases(
+                db,
+                std::iter::once(self.variable()).chain(self.iter_suffix_elements()),
+            );
+            return Ok(Type::homogeneous_tuple(db, element));
+        }
+
+        let element = UnionType::from_elements_leave_aliases(
+            db,
+            self.iter_prefix_elements()
+                .chain(std::iter::once(self.variable()))
+                .chain(self.iter_suffix_elements()),
+        );
+        Ok(Type::homogeneous_tuple(db, element))
+    }
+
     /// Returns the prefix of the prenormalization of this tuple.
     ///
     /// This is used in our subtyping and equivalence checks below to handle different tuple types
@@ -1305,6 +1351,26 @@ impl<T> Tuple<T> {
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements_leave_aliases(db, self.all_elements())
+    }
+
+    /// Returns the type of a static slice into this tuple.
+    ///
+    /// Fixed-length tuples produce an exact heterogeneous tuple. Variable-length tuples preserve
+    /// exact shape where it is cheap to do so, and otherwise use a sound homogeneous approximation.
+    pub(crate) fn py_slice_type(
+        &self,
+        db: &'db dyn Db,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: Option<i32>,
+    ) -> Result<Type<'db>, StepSizeZeroError> {
+        match self {
+            Tuple::Fixed(tuple) => Ok(Type::heterogeneous_tuple(
+                db,
+                tuple.py_slice(db, start, stop, step)?,
+            )),
+            Tuple::Variable(tuple) => tuple.py_slice_type(db, start, stop, step),
+        }
     }
 
     /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
