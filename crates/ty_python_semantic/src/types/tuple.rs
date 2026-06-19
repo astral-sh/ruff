@@ -973,9 +973,10 @@ impl<T> VariableLengthTuple<T> {
 impl<'db> VariableLengthTuple<Type<'db>> {
     /// Returns a sound static slice result for a mixed tuple.
     ///
-    /// We preserve fixed-only slices and simple step-1 mixed slices exactly. For cases whose exact
-    /// result would require a union of tuple shapes, we fall back to a homogeneous tuple over all
-    /// possible element types in the original tuple.
+    /// We preserve fixed-length results exactly, unioning each output position when it can come
+    /// from multiple tuple segments. For cases whose exact result would require a union of tuple
+    /// shapes, we fall back to a homogeneous tuple over all possible element types in the original
+    /// tuple.
     fn py_slice_type(
         &self,
         db: &'db dyn Db,
@@ -1010,25 +1011,48 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             }
         };
 
+        let element_at_nonnegative_index = |index: usize| {
+            if let Some(element) = self.prefix_elements().get(index) {
+                return Some(*element);
+            }
+
+            let suffix_end = index.checked_sub(prefix_len)?;
+            if suffix_end >= suffix_len {
+                return None;
+            }
+
+            Some(UnionType::from_elements_leave_aliases(
+                db,
+                std::iter::once(self.variable())
+                    .chain(self.suffix_elements().iter().take(suffix_end + 1).copied()),
+            ))
+        };
+
         if step > 0 {
             if let Some(stop) = nonnegative_index(stop) {
                 let start = match start {
                     None => Some(0),
                     Some(_) => nonnegative_index(start),
                 };
-                if let Some(start) = start
-                    && stop <= prefix_len
-                    && (start <= prefix_len || start >= stop)
-                {
-                    return Ok(Type::heterogeneous_tuple(
-                        db,
-                        self.prefix_elements().py_slice(
+                if let Some(start) = start {
+                    if start >= stop {
+                        return Ok(Type::heterogeneous_tuple(
                             db,
-                            i32::try_from(start).ok(),
-                            i32::try_from(stop).ok(),
-                            Some(step),
-                        )?,
-                    ));
+                            std::iter::empty::<Type<'db>>(),
+                        ));
+                    }
+
+                    if stop <= prefix_len + suffix_len
+                        && let Ok(step) = usize::try_from(step)
+                    {
+                        let elements = (start..stop)
+                            .step_by(step)
+                            .map(element_at_nonnegative_index)
+                            .collect::<Option<Vec<_>>>();
+                        if let Some(elements) = elements {
+                            return Ok(Type::heterogeneous_tuple(db, elements));
+                        }
+                    }
                 }
             }
 
