@@ -230,6 +230,32 @@ min(Y)
 T = f()
 ```
 
+## Type replacement with a lazy function signature
+
+Type replacement during cycle recovery must not evaluate a function's lazy signature. Doing so can
+introduce a new dependency on the reachability of a loop header while recovering from a different
+cycle, which Salsa rejects.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+lambda: name_4
+for name_5 in (lambda: (name_4 for unique_name_0 in name_5),):  # error: [not-iterable]
+    match 0:
+        case unique_name_2():  # error: [unresolved-reference]
+            async def name_4():
+                pass
+
+        case name_5():  # error: [invalid-match-pattern]
+            pass
+        case 0:
+            async def name_4():
+                pass
+```
+
 ## Lazy cached property behind `hasattr`
 
 This pattern used to panic with "too many cycle iterations".
