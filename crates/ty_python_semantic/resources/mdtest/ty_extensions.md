@@ -494,7 +494,7 @@ def foo(x: "TypeOf[foo]"):
 ```
 
 A `TypeOf` self-reference nested in a nominal specialization forms a recursive type. Cycle recovery
-preserves the nominal structure and replaces the recursive argument with `Divergent`:
+preserves the outer nominal structure and replaces the recursive argument with `Divergent`:
 
 ```toml
 [environment]
@@ -515,6 +515,10 @@ reveal_type(x)  # revealed: list[Divergent]
 nested: list[tuple[TypeOf[nested]]]
 nested = [(1,)]
 reveal_type(nested)  # revealed: list[Divergent]
+
+optional: list[TypeOf[optional]] | None
+optional = [1]
+reveal_type(optional)  # revealed: list[Divergent]
 
 class Container[T]: ...
 

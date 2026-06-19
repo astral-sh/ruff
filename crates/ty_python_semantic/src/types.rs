@@ -1212,7 +1212,8 @@ impl<'db> Type<'db> {
         .recursive_type_normalized(db, cycle)
     }
 
-    /// Normalizes a nominal type that wraps the previous cycle result in its own specialization.
+    /// Normalizes nominal growth that wraps the previous cycle result in a specialization, either
+    /// directly or beneath an unambiguous union wrapper.
     ///
     /// For example, an inference cycle can otherwise grow indefinitely as
     /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
@@ -1224,6 +1225,35 @@ impl<'db> Type<'db> {
         previous: Self,
         div: Self,
     ) -> Option<Self> {
+        if let (Type::Union(current), Type::Union(previous)) = (self, previous) {
+            // Only align unions when each iteration has exactly one changed arm. With multiple
+            // unmatched arms, pairing is ambiguous and can destabilize otherwise-convergent
+            // recursive cycles.
+            let current_element = current
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|element| !previous.elements(db).contains(element))
+                .exactly_one()
+                .ok()?;
+            let previous_element = previous
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|element| !current.elements(db).contains(element))
+                .exactly_one()
+                .ok()?;
+            let normalized_element =
+                current_element.recursive_nominal_growth_normalized(db, previous_element, div)?;
+            return Some(current.map_leave_aliases(db, |element| {
+                if *element == current_element {
+                    normalized_element
+                } else {
+                    *element
+                }
+            }));
+        }
+
         let (Type::NominalInstance(current), Type::NominalInstance(previous_instance)) =
             (self, previous)
         else {
