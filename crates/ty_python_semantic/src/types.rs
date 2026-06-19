@@ -4019,6 +4019,17 @@ impl<'db> Type<'db> {
                     ))
                     .into()
                 }
+                Type::TypeVar(typevar) => {
+                    let receiver = receiver.unwrap_or(this);
+                    let bound = typevar
+                        .typevar(db)
+                        .bound_or_constraints(db)
+                        .map_or_else(Type::object, |bound| bound.as_type(db));
+
+                    // Use the full lookup path because a TypeVar can be bounded by a class-object
+                    // type such as `type[A]`, not only by an instance-like type.
+                    bound.member_lookup_with_policy_and_receiver(db, name, policy, Some(receiver))
+                }
 
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
@@ -4084,7 +4095,6 @@ impl<'db> Type<'db> {
                 | Type::ProtocolInstance(..)
                 | Type::NewTypeInstance(..)
                 | Type::LiteralValue(..)
-                | Type::TypeVar(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)
                 | Type::PropertyInstance(..)
@@ -4140,6 +4150,9 @@ impl<'db> Type<'db> {
                 }
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
+                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
+                    let receiver = receiver.unwrap_or(this);
                     let enum_class = match this {
                         Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
@@ -4161,18 +4174,23 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = this
-                    .to_instance(db)
-                    .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
+                    let self_instance = receiver.to_instance(db).expect(
+                        "The receiver for a class-object lookup should always be instantiable",
+                    );
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                    let class_attr_fallback =
-                        Type::try_call_dunder_get_on_attribute(db, class_attr_plain, None, this).0;
+                    let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        class_attr_plain,
+                        None,
+                        receiver,
+                    )
+                    .0;
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        this,
+                        receiver,
                         name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
