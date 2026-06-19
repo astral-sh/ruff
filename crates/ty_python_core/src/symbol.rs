@@ -6,6 +6,8 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
+const LINEAR_SEARCH_THRESHOLD: usize = 16;
+
 /// Uniquely identifies a symbol in a given scope.
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
@@ -160,11 +162,8 @@ impl Symbol {
 #[derive(Default, get_size2::GetSize)]
 pub(super) struct SymbolTable {
     symbols: IndexVec<ScopedSymbolId, Symbol>,
-
-    /// Map from symbol name to its ID.
-    ///
-    /// Uses a hash table to avoid storing the name twice.
-    map: hashbrown::HashTable<ScopedSymbolId>,
+    /// Reverse lookup retained only when linear search would be expensive.
+    map: Option<Box<hashbrown::HashTable<ScopedSymbolId>>>,
 }
 
 impl SymbolTable {
@@ -188,9 +187,15 @@ impl SymbolTable {
 
     /// Look up the ID of a symbol by its name.
     pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.map
-            .find(Self::hash_name(name), |id| self.symbols[*id].name == name)
-            .copied()
+        if let Some(map) = self.map.as_deref() {
+            return map
+                .find(Self::hash_name(name), |id| self.symbols[*id].name == name)
+                .copied();
+        }
+
+        self.symbols
+            .iter_enumerated()
+            .find_map(|(id, symbol)| (symbol.name == name).then_some(id))
     }
 
     /// Iterate over the symbols in this symbol table.
@@ -223,13 +228,26 @@ impl std::fmt::Debug for SymbolTable {
 #[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {
     table: SymbolTable,
+    /// Map from symbol name to its ID.
+    ///
+    /// Uses a hash table to avoid storing the name twice. Small finished tables discard this map
+    /// and use linear lookup; large tables retain it.
+    map: hashbrown::HashTable<ScopedSymbolId>,
 }
 
 impl SymbolTableBuilder {
+    pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.map
+            .find(SymbolTable::hash_name(name), |id| {
+                self.table.symbols[*id].name == name
+            })
+            .copied()
+    }
+
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(symbol.name());
-        let entry = self.table.map.entry(
+        let entry = self.map.entry(
             hash,
             |id| &self.table.symbols[*id].name == symbol.name(),
             |id| SymbolTable::hash_name(&self.table.symbols[*id].name),
@@ -255,11 +273,14 @@ impl SymbolTableBuilder {
     }
 
     pub(super) fn build(self) -> SymbolTable {
-        let mut table = self.table;
+        let Self { mut table, mut map } = self;
         table.symbols.shrink_to_fit();
-        table
-            .map
-            .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
+
+        if table.symbols.len() > LINEAR_SEARCH_THRESHOLD {
+            map.shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
+            table.map = Some(Box::new(map));
+        }
+
         table
     }
 }

@@ -11,6 +11,8 @@ use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
+const LINEAR_SEARCH_THRESHOLD: usize = 16;
+
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct Member {
@@ -423,11 +425,8 @@ pub struct ScopedMemberId;
 #[derive(Default, get_size2::GetSize)]
 pub(super) struct MemberTable {
     members: IndexVec<ScopedMemberId, Member>,
-
-    /// Map from member path to its ID.
-    ///
-    /// Uses a hash table to avoid storing the path twice.
-    map: hashbrown::HashTable<ScopedMemberId>,
+    /// Reverse lookup retained only when linear search would be expensive.
+    map: Option<Box<hashbrown::HashTable<ScopedMemberId>>>,
 }
 
 impl MemberTable {
@@ -464,10 +463,17 @@ impl MemberTable {
         member: impl Into<MemberExprRef<'a>>,
     ) -> Option<ScopedMemberId> {
         let member = member.into();
-        let hash = Self::hash_member_expression_ref(&member);
-        self.map
-            .find(hash, |id| self.members[*id].expression == member)
-            .copied()
+
+        if let Some(map) = self.map.as_deref() {
+            let hash = Self::hash_member_expression_ref(&member);
+            return map
+                .find(hash, |id| self.members[*id].expression == member)
+                .copied();
+        }
+
+        self.members
+            .iter_enumerated()
+            .find_map(|(id, candidate)| (candidate.expression == member).then_some(id))
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
@@ -499,16 +505,31 @@ impl std::fmt::Debug for MemberTable {
 #[derive(Debug, Default)]
 pub(super) struct MemberTableBuilder {
     table: MemberTable,
+    /// Map from member path to its ID.
+    ///
+    /// Small finished tables discard this map and use linear lookup; large tables retain it.
+    map: hashbrown::HashTable<ScopedMemberId>,
 }
 
 impl MemberTableBuilder {
+    pub(super) fn member_id<'a>(
+        &self,
+        member: impl Into<MemberExprRef<'a>>,
+    ) -> Option<ScopedMemberId> {
+        let member = member.into();
+        let hash = MemberTable::hash_member_expression_ref(&member);
+        self.map
+            .find(hash, |id| self.table.members[*id].expression == member)
+            .copied()
+    }
+
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
         let member_ref = member.expression.as_ref();
         let hash = MemberTable::hash_member_expression_ref(&member_ref);
-        let entry = self.table.map.entry(
+        let entry = self.map.entry(
             hash,
             |id| self.table.members[*id].expression.as_ref() == member.expression.as_ref(),
             |id| {
@@ -538,12 +559,17 @@ impl MemberTableBuilder {
     }
 
     pub(super) fn build(self) -> MemberTable {
-        let mut table = self.table;
+        let Self { mut table, mut map } = self;
         table.members.shrink_to_fit();
-        table.map.shrink_to_fit(|id| {
-            let ref_expr = table.members[*id].expression.as_ref();
-            MemberTable::hash_member_expression_ref(&ref_expr)
-        });
+
+        if table.members.len() > LINEAR_SEARCH_THRESHOLD {
+            map.shrink_to_fit(|id| {
+                let ref_expr = table.members[*id].expression.as_ref();
+                MemberTable::hash_member_expression_ref(&ref_expr)
+            });
+            table.map = Some(Box::new(map));
+        }
+
         table
     }
 }
