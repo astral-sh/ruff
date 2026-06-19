@@ -2653,14 +2653,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // through both class and instance access. Once the descriptor protocol has been applied,
         // normalize the resulting callables because their descriptor kinds are no longer relevant.
         let descriptor_callable = |ty: Type<'db>, instance: Option<Type<'db>>| {
-            ty.try_call_dunder_get(db, instance, object_ty)
-                .map_or(ty, |(ty, _)| ty)
-                .try_upcast_to_callable(db)
-                .map(|callables| {
-                    callables
-                        .map(|callable| callable.into_regular(db))
-                        .into_type(db)
-                })
+            let descriptor_callable_element = |ty: Type<'db>| {
+                ty.try_call_dunder_get(db, instance, object_ty)
+                    .map_or(ty, |(ty, _)| ty)
+                    .try_upcast_to_callable(db)
+                    .map(|callables| {
+                        callables
+                            .map(|callable| callable.into_regular(db))
+                            .into_type(db)
+                    })
+            };
+
+            match ty {
+                Type::Union(union) => {
+                    union.try_map(db, |element| descriptor_callable_element(*element))
+                }
+                _ => descriptor_callable_element(ty),
+            }
         };
 
         let descriptor_assignment_is_valid =

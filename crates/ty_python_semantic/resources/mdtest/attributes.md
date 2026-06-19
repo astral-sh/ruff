@@ -1115,6 +1115,17 @@ DecoratedMethods.method = MethodMock()  # error: [invalid-assignment]
 DecoratedMethods.static = static_replacement  # error: [invalid-assignment]
 ```
 
+Descriptor behavior is checked for every element of a union-valued replacement.
+
+```py
+def other_static_replacement(x: int) -> str:
+    return str(x)
+
+def replace_static(flag: bool) -> None:
+    replacement = static_replacement if flag else other_static_replacement
+    DescriptorMethods.static = replacement  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
