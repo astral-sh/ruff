@@ -77,6 +77,8 @@ pub enum SpecialFormType {
     Never,
     /// The symbol `ty_extensions.Unknown`
     Unknown,
+    /// The symbol `ty_extensions.Divergent`
+    Divergent,
     /// The symbol `ty_extensions.AlwaysTruthy`
     AlwaysTruthy,
     /// The symbol `ty_extensions.AlwaysFalsy`
@@ -159,6 +161,7 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf
             | Self::Unknown
+            | Self::Divergent
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy => KnownClass::SpecialForm,
 
@@ -272,6 +275,7 @@ impl SpecialFormType {
             NoReturn,
             Never,
             Unknown,
+            Divergent,
             AlwaysTruthy,
             AlwaysFalsy,
             Not,
@@ -339,6 +343,7 @@ impl SpecialFormType {
                     SpecialFormType::TypingSelf => Self::TypingSelf,
                     SpecialFormType::Union => Self::Union,
                     SpecialFormType::Unknown => Self::Unknown,
+                    SpecialFormType::Divergent => Self::Divergent,
                     SpecialFormType::Generic => Self::Generic,
                     SpecialFormType::NamedTuple => Self::NamedTuple,
                     SpecialFormType::Any => Self::Any,
@@ -397,6 +402,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::TypingSelf => Self::TypingSelf,
                 SpecialFormTypeBuilder::Union => Self::Union,
                 SpecialFormTypeBuilder::Unknown => Self::Unknown,
+                SpecialFormTypeBuilder::Divergent => Self::Divergent,
                 SpecialFormTypeBuilder::Generic => Self::Generic,
                 SpecialFormTypeBuilder::NamedTuple => Self::NamedTuple,
                 SpecialFormTypeBuilder::Any => Self::Any,
@@ -471,6 +477,7 @@ impl SpecialFormType {
             }
 
             Self::Unknown
+            | Self::Divergent
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
@@ -534,6 +541,7 @@ impl SpecialFormType {
             | Self::NoReturn
             | Self::Never
             | Self::Unknown
+            | Self::Divergent
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
@@ -594,6 +602,7 @@ impl SpecialFormType {
             | Self::TypingSelf
             | Self::Union
             | Self::Unknown
+            | Self::Divergent
             | Self::TypeOf
             | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
             | Self::Unpack => false,
@@ -634,6 +643,7 @@ impl SpecialFormType {
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::ChainMap) => "ChainMap",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::OrderedDict) => "OrderedDict",
             SpecialFormType::Unknown => "Unknown",
+            SpecialFormType::Divergent => "Divergent",
             SpecialFormType::AlwaysTruthy => "AlwaysTruthy",
             SpecialFormType::AlwaysFalsy => "AlwaysFalsy",
             SpecialFormType::Not => "Not",
@@ -683,6 +693,7 @@ impl SpecialFormType {
             SpecialFormType::CollectionsAbcCallable => &[KnownModule::CollectionsAbc],
 
             SpecialFormType::Unknown
+            | SpecialFormType::Divergent
             | SpecialFormType::AlwaysTruthy
             | SpecialFormType::AlwaysFalsy
             | SpecialFormType::Not
@@ -728,6 +739,10 @@ impl SpecialFormType {
             Self::LiteralString => Ok(Type::literal_string()),
             Self::Any => Ok(Type::any()),
             Self::Unknown => Ok(Type::unknown()),
+            Self::Divergent => Err(InvalidTypeExpression::InvalidType(
+                Type::SpecialForm(self),
+                scope_id,
+            )),
             Self::AlwaysTruthy => Ok(Type::AlwaysTruthy),
             Self::AlwaysFalsy => Ok(Type::AlwaysFalsy),
 
