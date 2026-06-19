@@ -7,6 +7,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
+        call::FunctoolsPartialBoundArguments,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -50,6 +51,7 @@ impl<'db> InternedConstraintSet<'db> {
 pub struct FunctoolsPartialInstance<'db> {
     pub wrapped: InternedType<'db>,
     pub partial: CallableType<'db>,
+    pub bound_arguments: FunctoolsPartialBoundArguments<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -197,6 +199,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::FunctoolsPartial(partial)
         | KnownInstanceType::FunctoolsPartialCall(partial) => {
+            for argument_ty in partial.bound_arguments(db).iter_types() {
+                visitor.visit_type(db, argument_ty);
+            }
             visitor.visit_callable_type(db, partial.partial(db));
         }
     }
@@ -712,6 +717,8 @@ impl<'db> FunctoolsPartialInstance<'db> {
             ),
             self.partial(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
+            self.bound_arguments(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 
@@ -732,6 +739,8 @@ impl<'db> FunctoolsPartialInstance<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
             self.partial(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.bound_arguments(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
