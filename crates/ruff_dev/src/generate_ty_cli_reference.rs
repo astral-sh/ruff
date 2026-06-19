@@ -221,19 +221,32 @@ fn generate_command<'a>(output: &mut String, command: &'a Command, parents: &mut
                     output.push_str(&format!(", <code>-{short_alias}</code>"));
                 }
 
-                // Re-implements private `Arg::is_takes_value_set` used in `Command::get_opts`
-                if opt
-                    .get_num_args()
-                    .unwrap_or_else(|| 1.into())
-                    .takes_values()
+                // Re-implements private `Arg::is_takes_value_set` used in `Command::get_opts`.
+                let num_args = opt.get_num_args().unwrap_or_else(|| 1.into());
+                if num_args.takes_values()
+                    && let Some(values) = opt.get_value_names()
                 {
-                    if let Some(values) = opt.get_value_names() {
-                        for value in values {
-                            output.push_str(&format!(
-                                " <i>{}</i>",
-                                value.to_lowercase().replace('_', "-")
-                            ));
+                    let is_optional = num_args.min_values() == 0;
+                    let prefix = match (opt.is_require_equals_set(), is_optional) {
+                        (true, true) => "[=",
+                        (true, false) => "=",
+                        (false, true) => " [",
+                        (false, false) => " ",
+                    };
+                    output.push_str(prefix);
+
+                    for (index, value) in values.iter().enumerate() {
+                        if index > 0 {
+                            output.push(' ');
                         }
+                        output.push_str(&format!(
+                            "<i>{}</i>",
+                            value.to_lowercase().replace('_', "-")
+                        ));
+                    }
+
+                    if is_optional {
+                        output.push(']');
                     }
                 }
                 output.push_str("</dt>");
@@ -326,7 +339,14 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{Args, main};
+    use super::{Args, generate, main};
+
+    #[test]
+    fn optional_value_that_requires_equals_uses_equals() {
+        assert!(
+            generate().contains("<code>--error-on-warning</code></a>[=<i>error-on-warning</i>]")
+        );
+    }
 
     #[test]
     fn ty_cli_reference_is_up_to_date() -> Result<()> {

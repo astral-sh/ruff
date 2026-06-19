@@ -157,8 +157,16 @@ pub(crate) struct CheckCommand {
     #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
-    /// Use exit code 1 if there are any warning-level diagnostics.
-    #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
+    /// Use exit code 1, even if all diagnostics only had `warning` severity. Defaults to `true`.
+    #[arg(
+        long,
+        conflicts_with = "exit_zero",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        require_equals = true,
+        action = ArgAction::Set,
+        value_parser = clap::builder::BoolishValueParser::new()
+    )]
     pub(crate) error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
