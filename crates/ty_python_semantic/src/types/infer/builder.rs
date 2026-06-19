@@ -2680,6 +2680,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             attr_ty
         };
 
+        // Allow monkeypatching an ordinary method with a compatible function:
+        //
+        // ```python
+        // class C:
+        //     def method(self, value: int) -> str: ...
+        //
+        // def replacement(self: C, value: int) -> str: ...
+        // C.method = replacement
+        // ```
         let class_attribute_write_type = |attr_ty: Type<'db>| -> Type<'db> {
             if matches!(object_ty, Type::ClassLiteral(_))
                 && let Type::FunctionLiteral(function) = attr_ty
