@@ -2208,6 +2208,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::NominalInstance(_), _) => self.never(),
         };
 
+        // A nominal instance that inherits from an explicit `Any` base is assignable to any type.
+        // Nominal targets already handle `ClassBase::Any` while walking the source MRO, so only
+        // check failed relations to non-nominal targets here.
         if !result.is_always_satisfied(db)
             && let Type::NominalInstance(source) = source
             && !matches!(target, Type::NominalInstance(_))
@@ -2216,10 +2219,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && class.has_explicit_bases(db)
             && class.inherits_from_any(db)
         {
-            self.always()
-        } else {
-            result
+            return self.always();
         }
+
+        result
     }
 
     pub(super) fn check_property_instance_pair(
