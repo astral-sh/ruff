@@ -377,10 +377,6 @@ isinstance(object(), RuntimeCheckableBar)
 class InheritedRuntimeCheckableFoo(RuntimeCheckableFoo, typing.Protocol): ...
 
 isinstance(object(), InheritedRuntimeCheckableFoo)
-
-from typing import Coroutine
-
-isinstance(object(), Coroutine)
 ```
 
 However, we understand that they are not necessarily the same symbol at the same memory address at
