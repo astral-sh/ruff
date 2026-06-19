@@ -15,7 +15,7 @@ use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use std::sync::LazyLock;
 
-use crate::MarkupKind;
+use crate::{MarkdownRenderOptions, MarkupKind};
 
 // Static regex instances to avoid recompilation
 static GOOGLE_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -51,7 +51,7 @@ impl Docstring {
     pub fn render(&self, kind: MarkupKind) -> String {
         match kind {
             MarkupKind::PlainText => self.render_plaintext(),
-            MarkupKind::Markdown => self.render_markdown(),
+            MarkupKind::Markdown => self.render_markdown(MarkdownRenderOptions::new()),
         }
     }
 
@@ -60,10 +60,10 @@ impl Docstring {
         documentation_trim(&self.0)
     }
 
-    /// Render the docstring for markdown display
-    pub fn render_markdown(&self) -> String {
+    /// Render the docstring for Markdown display using the available capabilities.
+    pub fn render_markdown(&self, options: MarkdownRenderOptions) -> String {
         let trimmed = documentation_trim(&self.0);
-        markdown::render(&trimmed)
+        markdown::render(&trimmed, options)
     }
 
     /// Extract parameter documentation from popular docstring formats.
@@ -481,7 +481,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(render_markdown(&docstring), @r"
         Here \_this\_ and \_\_\_that\_\_ should be escaped<HB>
         Here *this* and **that** should be untouched<HB>
         Here `this` and ``that`` should be untouched<HB>
@@ -522,7 +522,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Parse a URL into 6 components:<HB>
         &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;<HB>
         <HB>
@@ -558,7 +558,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Check out this great example code:  <HB>
         ```````````python
             x_y = "hello"
@@ -597,7 +597,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Check out this great example code  <HB>
         ```````````python
             x_y = "hello"
@@ -637,7 +637,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Check out this great example code<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;  <HB>
         ```````````python
@@ -675,7 +675,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Check out this great example code:<HB>
         ```````````python
             x_y = "hello"
@@ -710,7 +710,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Check out this great example code:  <HB>
         ```````````python
             x_y = "hello"
@@ -748,7 +748,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         The thing you need to understand is that computers are hard.<HB>
         <HB>
         **Warning:**<HB>
@@ -788,7 +788,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         Some much-updated docs<HB>
         <HB>
         **Added in version 3.0:**<HB>
@@ -817,7 +817,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         **wow this is some changes Deprecated since version 1.2.3:**<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
         ");
@@ -840,7 +840,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         ```python
@@ -868,7 +868,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         `````python
@@ -895,7 +895,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         ~~~~~python
@@ -927,7 +927,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func...<HB>
         <HB>
         Returns:<HB>
@@ -962,7 +962,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func...<HB>
         <HB>
         Returns:<HB>
@@ -989,7 +989,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         ````python
@@ -1011,7 +1011,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         ~~~~~python
@@ -1035,7 +1035,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         ``````we still think this is a codefence```
@@ -1059,7 +1059,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         My cool func:<HB>
         <HB>
         ~~~~~~we still think this is a codefence~~~
@@ -1083,7 +1083,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Here's some code!<HB>
         <HB>
         <HB>
@@ -1110,7 +1110,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Here's some Rust code!<HB>
         <HB>
         <HB>
@@ -1133,7 +1133,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         wow this is some code<HB>
         ```````````abc
             x = 2
@@ -1156,7 +1156,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Here's some code!<HB>
         <HB>
         <HB>
@@ -1183,7 +1183,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Here's some Rust code!<HB>
         <HB>
         <HB>
@@ -1212,7 +1212,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description<HB>
         <HB>
         ```````````python
@@ -1242,7 +1242,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description<HB>
         <HB>
         ```````````python
@@ -1266,7 +1266,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         ```````````python
         >>> thing.do_thing()
         wow it did the thing
@@ -1293,7 +1293,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description:  <HB>
         ```````````python
             >>> thing.do_thing()
@@ -1318,7 +1318,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         And so you can see that<HB>
         ```````````python
             >>> thing.do_thing()
@@ -1369,7 +1369,7 @@ mod tests {
             str: The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
@@ -1441,7 +1441,7 @@ mod tests {
             The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.<HB>
         <HB>
         Parameters<HB>
@@ -1499,7 +1499,7 @@ mod tests {
         'This is the second line of the docstring.'
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(render_markdown(&docstring), @r"
         Insert an entry into the list of warnings filters (at the front).<HB>
         <HB>
         'param1' -- The first parameter description<HB>
@@ -1531,7 +1531,7 @@ mod tests {
 
         assert_snapshot!(docstring.render_plaintext(), @"This is a simple function description without parameter documentation.");
 
-        assert_snapshot!(docstring.render_markdown(), @"This is a simple function description without parameter documentation.");
+        assert_snapshot!(render_markdown(&docstring), @"This is a simple function description without parameter documentation.");
     }
 
     #[test]
@@ -1580,7 +1580,7 @@ mod tests {
             NumPy-style parameter
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
@@ -1603,7 +1603,7 @@ mod tests {
         let _snap = bind_docstring_snapshot_filters();
         let docstring = Docstring::new(":param value: First line.\n    Second line.".to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         ## Parameters
         **value**<HB>
         First line.
@@ -1654,7 +1654,7 @@ mod tests {
         :rtype: str
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.
 
         ## Parameters
@@ -1734,7 +1734,7 @@ mod tests {
             NumPy-style parameter
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
@@ -1815,7 +1815,7 @@ mod tests {
             The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.<HB>
         <HB>
         Parameters<HB>
@@ -1884,7 +1884,7 @@ mod tests {
                 A parameter without type annotation
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring), @"
         This is a function description.<HB>
         <HB>
         Parameters<HB>
@@ -1945,7 +1945,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_windows.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring_windows), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
@@ -1961,7 +1961,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_mac.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring_mac), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
@@ -1977,7 +1977,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_unix.render_markdown(), @"
+        assert_snapshot!(render_markdown(&docstring_unix), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
@@ -2015,7 +2015,7 @@ Done.
 
         // The blank line between foo() and bar() should be preserved inside the code block,
         // NOT cause the code block to end early with bar() rendered as regular text.
-        assert_snapshot!(docstring.render_markdown(), @r#"
+        assert_snapshot!(render_markdown(&docstring), @r#"
         Example:<HB>
         <HB>
         ```````````python
@@ -2033,5 +2033,9 @@ Done.
         ```````````
         Done.
         "#);
+    }
+
+    fn render_markdown(docstring: &Docstring) -> String {
+        docstring.render_markdown(MarkdownRenderOptions::new())
     }
 }

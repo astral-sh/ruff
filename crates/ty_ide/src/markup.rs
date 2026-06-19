@@ -7,6 +7,30 @@ pub enum MarkupKind {
     Markdown,
 }
 
+/// Capabilities available to the Markdown renderer.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct MarkdownRenderOptions {
+    html_ul: bool,
+}
+
+impl MarkdownRenderOptions {
+    /// Creates options that do not enable any renderer-generated HTML.
+    pub const fn new() -> Self {
+        Self { html_ul: false }
+    }
+
+    /// Enables renderer-generated HTML `<ul>` elements.
+    #[must_use]
+    pub const fn with_html_ul(mut self, supported: bool) -> Self {
+        self.html_ul = supported;
+        self
+    }
+
+    pub(crate) const fn supports_html_ul(self) -> bool {
+        self.html_ul
+    }
+}
+
 impl MarkupKind {
     pub(crate) const fn fenced_code_block<T>(
         self,

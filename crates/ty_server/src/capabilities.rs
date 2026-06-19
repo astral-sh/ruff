@@ -35,6 +35,7 @@ bitflags::bitflags! {
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
+        const MARKDOWN_HTML_UL_INDENTATION = 1 << 20;
     }
 }
 
@@ -189,11 +190,35 @@ impl ResolvedClientCapabilities {
         self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
+    pub(crate) const fn markdown_render_options(self) -> ty_ide::MarkdownRenderOptions {
+        ty_ide::MarkdownRenderOptions::new()
+            .with_html_ul(self.contains(Self::MARKDOWN_HTML_UL_INDENTATION))
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
         let workspace = client_capabilities.workspace.as_ref();
         let text_document = client_capabilities.text_document.as_ref();
+
+        let supports_html_ul = client_capabilities
+            .general
+            .as_ref()
+            .and_then(|general| general.markdown.as_ref())
+            .and_then(|markdown| markdown.allowed_tags.as_ref())
+            .is_some_and(|tags| tags.iter().any(|tag| tag.eq_ignore_ascii_case("ul")));
+        let supports_bare_ul_indentation = client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("ty"))
+            .and_then(|ty| ty.get("markdown"))
+            .and_then(|markdown| markdown.get("bareUlIndentation"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default();
+
+        if supports_html_ul && supports_bare_ul_indentation {
+            flags |= Self::MARKDOWN_HTML_UL_INDENTATION;
+        }
 
         if workspace
             .and_then(|workspace| workspace.diagnostics.as_ref()?.refresh_support)

@@ -236,7 +236,7 @@ impl<'a> SupplementalTypeFields<'a> {
 mod tests {
     use insta::{Settings, assert_snapshot};
 
-    use super::super::render_into;
+    use super::super::{MarkdownRenderOptions, render_into};
 
     #[test]
     fn render_parameters_with_inline_and_supplemental_types() {
@@ -818,7 +818,7 @@ Summary.
 
     fn render_docstring(raw: &str) -> String {
         let mut output = String::new();
-        render_into(&mut output, raw);
+        render_into(&mut output, raw, MarkdownRenderOptions::new());
         output
     }
 

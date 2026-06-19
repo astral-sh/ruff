@@ -629,6 +629,43 @@ fn documentation_supports_only_plain_text() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn structured_documentation_uses_html_list_indentation_when_supported() -> Result<()> {
+    let markdown = structured_completion_documentation(Some(vec!["ul".to_string()]), Some(true))?;
+
+    insta::assert_snapshot!(markdown, @"
+    Summary.
+
+    ## Parameters
+    <ul>
+
+    **value**: `str`  
+    The input value.
+
+    </ul>
+    ");
+    Ok(())
+}
+
+#[test]
+fn structured_documentation_avoids_html_list_indentation_without_support() -> Result<()> {
+    let markdown = structured_completion_documentation(None, None)?;
+
+    insta::assert_snapshot!(markdown, @"
+    Summary.
+
+    ## Parameters
+    **value**: `str`  
+    The input value.
+    ");
+
+    assert_eq!(
+        structured_completion_documentation(Some(vec!["ul".to_string()]), None)?,
+        markdown,
+    );
+    Ok(())
+}
+
 fn documentation_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
     let workspace_root = SystemPath::new("src");
     let document_path = SystemPath::new("src/foo.py");
@@ -665,4 +702,48 @@ foo_
     };
 
     Ok(markup.kind)
+}
+
+fn structured_completion_documentation(
+    allowed_tags: Option<Vec<String>>,
+    bare_ul_indentation: Option<bool>,
+) -> Result<String> {
+    let workspace_root = SystemPath::new("src");
+    let document_path = SystemPath::new("src/foo.py");
+    let document_content = r#"def documented(value: str) -> None:
+    """Summary.
+
+    :param str value: The input value.
+    """
+    ...
+
+docum
+"#;
+
+    let mut builder = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(document_path, document_content)?
+        .with_completion_documentation_format(vec![MarkupKind::Markdown]);
+    if let Some(allowed_tags) = allowed_tags {
+        builder = builder.with_markdown_allowed_tags(allowed_tags);
+    }
+    if let Some(supported) = bare_ul_indentation {
+        builder = builder.with_ty_markdown_bare_ul_indentation(supported);
+    }
+
+    let mut server = builder.build().wait_until_workspaces_are_initialized();
+    server.open_text_document(document_path, document_content, 1);
+
+    let completions =
+        server.completion_request(&server.file_uri(document_path), Position::new(7, 5));
+    let documentation = completions
+        .into_iter()
+        .find(|completion| completion.label == "documented")
+        .and_then(|completion| completion.documentation)
+        .expect("Expected documentation for function completion");
+    let Documentation::MarkupContent(markup) = documentation else {
+        panic!("Expected markup documentation");
+    };
+
+    Ok(markup.value)
 }

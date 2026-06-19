@@ -1,6 +1,6 @@
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
-use crate::{Db, MarkupKind, RangedValue};
+use crate::{Db, MarkdownRenderOptions, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -224,6 +224,7 @@ impl<'db> Hover<'db> {
             db,
             hover: self,
             kind,
+            markdown_options: MarkdownRenderOptions::new(),
         }
     }
 
@@ -254,6 +255,16 @@ pub struct DisplayHover<'db, 'a> {
     db: &'db dyn Db,
     hover: &'a Hover<'db>,
     kind: MarkupKind,
+    markdown_options: MarkdownRenderOptions,
+}
+
+impl DisplayHover<'_, '_> {
+    /// Configures the capabilities available to the Markdown renderer.
+    #[must_use]
+    pub const fn with_markdown_options(mut self, options: MarkdownRenderOptions) -> Self {
+        self.markdown_options = options;
+        self
+    }
 }
 
 impl fmt::Display for DisplayHover<'_, '_> {
@@ -264,7 +275,9 @@ impl fmt::Display for DisplayHover<'_, '_> {
                 self.kind.horizontal_line().fmt(f)?;
             }
 
-            content.display(self.db, self.kind).fmt(f)?;
+            content
+                .display(self.db, self.kind, self.markdown_options)
+                .fmt(f)?;
             first = false;
         }
 
@@ -300,11 +313,17 @@ pub enum HoverContent<'db> {
 }
 
 impl<'db> HoverContent<'db> {
-    fn display(&self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHoverContent<'_, 'db> {
+    fn display(
+        &self,
+        db: &'db dyn Db,
+        kind: MarkupKind,
+        markdown_options: MarkdownRenderOptions,
+    ) -> DisplayHoverContent<'_, 'db> {
         DisplayHoverContent {
             db,
             content: self,
             kind,
+            markdown_options,
         }
     }
 }
@@ -313,6 +332,7 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
+    markdown_options: MarkdownRenderOptions,
 }
 
 impl<'db> DisplayHoverContent<'_, 'db> {
@@ -387,7 +407,10 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fenced_code_block(format!("(key of {owner}) {key}: {ty_string}"), syntax)
                     .fmt(f)
             }
-            HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
+            HoverContent::Docstring(docstring) => match self.kind {
+                MarkupKind::PlainText => docstring.render_plaintext().fmt(f),
+                MarkupKind::Markdown => docstring.render_markdown(self.markdown_options).fmt(f),
+            },
             HoverContent::DocstringFragment(fragment) => fragment.render(self.kind).fmt(f),
         }
     }

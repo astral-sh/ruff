@@ -1378,6 +1378,29 @@ impl TestServerBuilder {
         self
     }
 
+    /// Set the HTML tags supported by the client's Markdown renderer.
+    pub(crate) fn with_markdown_allowed_tags(mut self, tags: Vec<String>) -> Self {
+        self.client_capabilities
+            .general
+            .get_or_insert_default()
+            .markdown
+            .get_or_insert_default()
+            .allowed_tags = Some(tags);
+        self
+    }
+
+    /// Opt into ty's bare `<ul>` Markdown indentation convention.
+    pub(crate) fn with_ty_markdown_bare_ul_indentation(mut self, supported: bool) -> Self {
+        self.client_capabilities.experimental = Some(serde_json::json!({
+            "ty": {
+                "markdown": {
+                    "bareUlIndentation": supported,
+                },
+            },
+        }));
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {

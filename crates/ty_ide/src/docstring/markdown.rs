@@ -2,14 +2,15 @@ mod general;
 mod structured;
 
 use super::DocstringFragment;
+use crate::MarkdownRenderOptions;
 
 /// Render Markdown for a source docstring.
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline
 /// normalization (typically via `docstring::documentation_trim`).
-pub(super) fn render(source: &str) -> String {
+pub(super) fn render(source: &str, options: MarkdownRenderOptions) -> String {
     let mut output = String::new();
-    structured::render_into(&mut output, source);
+    structured::render_into(&mut output, source, options);
     output
 }
 

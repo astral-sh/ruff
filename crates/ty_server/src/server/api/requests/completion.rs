@@ -68,6 +68,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         if completions.is_empty() {
             return Ok(None);
         }
+        let markdown_options = client_capabilities.markdown_render_options();
 
         // Safety: we just checked that completions is not empty.
         let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
@@ -113,7 +114,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .resolved_client_capabilities()
                         .prefers_markdown_in_completion()
                     {
-                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                        (
+                            lsp_types::MarkupKind::Markdown,
+                            docstring.render_markdown(markdown_options),
+                        )
                     } else {
                         (
                             lsp_types::MarkupKind::PlainText,

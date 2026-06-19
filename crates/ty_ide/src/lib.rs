@@ -49,7 +49,7 @@ pub use hover::hover;
 pub use inlay_hints::{
     InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
 };
-pub use markup::MarkupKind;
+pub use markup::{MarkdownRenderOptions, MarkupKind};
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
