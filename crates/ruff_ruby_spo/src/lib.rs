@@ -113,7 +113,26 @@ pub enum Declaration {
     Sti(StiInfo),
 }
 
-/// Top-level entry: walk a Rails `app/models/` tree and produce the IR.
+/// Top-level entry: walk a Rails `app/models/` tree and produce the IR
+/// tagged with the default [`NAMESPACE`] (`"openproject"`). Thin wrapper
+/// over [`extract_with`] for backward compatibility — every existing
+/// caller (`ogar-from-rails::extract`) keeps working unchanged.
+///
+/// New callers harvesting a non-OpenProject Rails curator (Redmine, Spree,
+/// Open-Source-Billing, …) should use [`extract_with`] to tag the produced
+/// `ModelGraph.namespace` correctly — otherwise downstream consumers see
+/// every harvest prefixed `"openproject:"` regardless of source.
+#[must_use]
+pub fn extract(source_tree: &Path) -> ModelGraph {
+    extract_with(source_tree, NAMESPACE)
+}
+
+/// Walk a Rails `app/models/` tree and produce the IR, tagging the
+/// resulting [`ModelGraph`] with the caller-supplied `namespace`. The
+/// namespace becomes the IRI prefix on every produced triple's subject /
+/// object, so the same parser handles any Rails curator (OpenProject,
+/// Redmine, Spree, Solidus, Open-Source-Billing, …) by simply passing the
+/// curator's namespace string.
 ///
 /// The unpacking is mechanical: each [`Declaration`] variant lands in
 /// its corresponding `Model::*` Vec field. Same-named [`RubyClass`]
@@ -123,9 +142,9 @@ pub enum Declaration {
 /// merged into a single [`Model`] in source-file order: Vec fields
 /// concatenate; `sti` is first-non-`None`-wins.
 #[must_use]
-pub fn extract(source_tree: &Path) -> ModelGraph {
+pub fn extract_with(source_tree: &Path, namespace: &str) -> ModelGraph {
     let classes = parse::parse_models(source_tree);
-    let mut graph = ModelGraph::new(NAMESPACE);
+    let mut graph = ModelGraph::new(namespace);
     graph.models = build_models(&classes);
     graph
 }
@@ -323,6 +342,34 @@ mod tests {
                 .iter()
                 .all(|t| { t.s.starts_with("openproject:") || t.s.starts_with("exc:") })
         );
+    }
+
+    /// `extract` (no-arg-namespace form) tags the graph with the default
+    /// [`NAMESPACE`] for back-compat — existing callers keep working.
+    #[test]
+    fn extract_defaults_to_openproject_namespace() {
+        // A non-existent path returns an empty `ModelGraph` (no panic);
+        // the namespace tag is still set correctly.
+        let g = extract(std::path::Path::new("/__nonexistent_for_ruff_test__"));
+        assert_eq!(g.namespace, NAMESPACE);
+        assert_eq!(g.namespace, "openproject");
+    }
+
+    /// `extract_with` tags the graph with the caller-supplied namespace,
+    /// so a Redmine / Spree / OSB harvest is not silently prefixed
+    /// `openproject:`. Pins the new API for the curator-namespace use case.
+    #[test]
+    fn extract_with_tags_caller_supplied_namespace() {
+        let g = extract_with(
+            std::path::Path::new("/__nonexistent_for_ruff_test__"),
+            "redmine",
+        );
+        assert_eq!(g.namespace, "redmine");
+        let g = extract_with(
+            std::path::Path::new("/__nonexistent_for_ruff_test__"),
+            "osb",
+        );
+        assert_eq!(g.namespace, "osb");
     }
 
     /// Unpacking lock: a fully-populated `RubyClass.declarations` list
