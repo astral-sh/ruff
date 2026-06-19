@@ -285,10 +285,45 @@ python-version = "3.11"
 ```
 
 ```py
-def mixed_static_tail(t: tuple[int, *tuple[str, ...], bytes]) -> None:
-    reveal_type(t[:])  # revealed: tuple[int, *tuple[str, ...], bytes]
-    reveal_type(t[1:])  # revealed: tuple[*tuple[str, ...], bytes]
-    reveal_type(t[2:])  # revealed: tuple[str | bytes, ...]
+class Prefix0: ...
+class Prefix1: ...
+class Variable: ...
+class Suffix0: ...
+class Suffix1: ...
+class Suffix2: ...
+
+def mixed_static_slices(
+    t: tuple[Prefix0, Prefix1, *tuple[Variable, ...], Suffix0, Suffix1, Suffix2],
+) -> None:
+    reveal_type(t[:])  # revealed: tuple[Prefix0, Prefix1, *tuple[Variable, ...], Suffix0, Suffix1, Suffix2]
+
+    reveal_type(t[:0])  # revealed: tuple[()]
+    reveal_type(t[:1])  # revealed: tuple[Prefix0]
+    reveal_type(t[:2])  # revealed: tuple[Prefix0, Prefix1]
+    reveal_type(t[:3])  # revealed: tuple[Prefix0 | Prefix1 | Variable | Suffix0 | Suffix1 | Suffix2, ...]
+    reveal_type(t[:-3])  # revealed: tuple[Prefix0, Prefix1, *tuple[Variable, ...]]
+    reveal_type(t[:-1])  # revealed: tuple[Prefix0, Prefix1, *tuple[Variable, ...], Suffix0, Suffix1]
+
+    reveal_type(t[0:])  # revealed: tuple[Prefix0, Prefix1, *tuple[Variable, ...], Suffix0, Suffix1, Suffix2]
+    reveal_type(t[1:])  # revealed: tuple[Prefix1, *tuple[Variable, ...], Suffix0, Suffix1, Suffix2]
+    reveal_type(t[2:])  # revealed: tuple[*tuple[Variable, ...], Suffix0, Suffix1, Suffix2]
+    reveal_type(t[3:])  # revealed: tuple[Variable | Suffix0 | Suffix1 | Suffix2, ...]
+    reveal_type(t[-3:])  # revealed: tuple[Suffix0, Suffix1, Suffix2]
+    reveal_type(t[-1:])  # revealed: tuple[Suffix2]
+
+    reveal_type(t[0:2])  # revealed: tuple[Prefix0, Prefix1]
+    reveal_type(t[1:2])  # revealed: tuple[Prefix1]
+    reveal_type(t[1:-1])  # revealed: tuple[Prefix1, *tuple[Variable, ...], Suffix0, Suffix1]
+    reveal_type(t[2:-1])  # revealed: tuple[*tuple[Variable, ...], Suffix0, Suffix1]
+    reveal_type(t[2:3])  # revealed: tuple[Prefix0 | Prefix1 | Variable | Suffix0 | Suffix1 | Suffix2, ...]
+    reveal_type(t[-3:-1])  # revealed: tuple[Suffix0, Suffix1]
+    reveal_type(t[-1:1])  # revealed: tuple[()]
+
+    reveal_type(t[0:2:2])  # revealed: tuple[Prefix0]
+    reveal_type(t[1:-1:2])  # revealed: tuple[Prefix0 | Prefix1 | Variable | Suffix0 | Suffix1 | Suffix2, ...]
+    reveal_type(t[::2])  # revealed: tuple[Prefix0 | Prefix1 | Variable | Suffix0 | Suffix1 | Suffix2, ...]
+    reveal_type(t[::-1])  # revealed: tuple[Prefix0 | Prefix1 | Variable | Suffix0 | Suffix1 | Suffix2, ...]
+    reveal_type(t[-1:-3:-1])  # revealed: tuple[Suffix2, Suffix1]
 ```
 
 ## Indexes into homogeneous and mixed tuples

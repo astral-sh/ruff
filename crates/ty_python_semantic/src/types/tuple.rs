@@ -973,9 +973,9 @@ impl<T> VariableLengthTuple<T> {
 impl<'db> VariableLengthTuple<Type<'db>> {
     /// Returns a sound static slice result for a mixed tuple.
     ///
-    /// We preserve fixed prefix elements that are definitely part of the result. For cases whose
-    /// exact result would require a union of tuple shapes, we fall back to a homogeneous tuple over
-    /// all elements that could remain after applying the slice.
+    /// We preserve fixed-only slices and simple step-1 mixed slices exactly. For cases whose exact
+    /// result would require a union of tuple shapes, we fall back to a homogeneous tuple over all
+    /// possible element types in the original tuple.
     fn py_slice_type(
         &self,
         db: &'db dyn Db,
@@ -988,11 +988,101 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             return Err(StepSizeZeroError);
         }
 
+        let prefix_len = self.prefix_len();
+        let suffix_len = self.suffix_len();
+
+        let nonnegative_index = |index: Option<i32>| {
+            index
+                .filter(|index| *index >= 0)
+                .and_then(|index| usize::try_from(index).ok())
+        };
+
+        let suffix_index = |index: Option<i32>| {
+            let index = index?;
+            if index >= 0 {
+                return None;
+            }
+            let distance_from_end = usize::try_from(index.checked_neg()?).ok()?;
+            if distance_from_end <= suffix_len {
+                i32::try_from(suffix_len - distance_from_end).ok()
+            } else {
+                None
+            }
+        };
+
+        if step > 0 {
+            if let Some(stop) = nonnegative_index(stop) {
+                let start = match start {
+                    None => Some(0),
+                    Some(_) => nonnegative_index(start),
+                };
+                if let Some(start) = start
+                    && stop <= prefix_len
+                    && (start <= prefix_len || start >= stop)
+                {
+                    return Ok(Type::heterogeneous_tuple(
+                        db,
+                        self.prefix_elements().py_slice(
+                            db,
+                            i32::try_from(start).ok(),
+                            i32::try_from(stop).ok(),
+                            Some(step),
+                        )?,
+                    ));
+                }
+            }
+
+            if suffix_index(start).is_some()
+                && nonnegative_index(stop).is_some_and(|stop| stop <= prefix_len)
+            {
+                return Ok(Type::heterogeneous_tuple(
+                    db,
+                    std::iter::empty::<Type<'db>>(),
+                ));
+            }
+
+            if let Some(start) = suffix_index(start) {
+                let stop = match stop {
+                    None => Some(None),
+                    Some(_) => suffix_index(stop).map(Some),
+                };
+                if let Some(stop) = stop {
+                    return Ok(Type::heterogeneous_tuple(
+                        db,
+                        self.suffix_elements()
+                            .py_slice(db, Some(start), stop, Some(step))?,
+                    ));
+                }
+            }
+        } else {
+            if let Some(start) = nonnegative_index(start)
+                && start < prefix_len
+                && let Some(start) = i32::try_from(start).ok()
+                && (stop.is_none() || nonnegative_index(stop).is_some_and(|stop| stop < prefix_len))
+            {
+                return Ok(Type::heterogeneous_tuple(
+                    db,
+                    self.prefix_elements()
+                        .py_slice(db, Some(start), stop, Some(step))?,
+                ));
+            }
+
+            if let Some(start) = suffix_index(start)
+                && let Some(stop) = suffix_index(stop)
+            {
+                return Ok(Type::heterogeneous_tuple(
+                    db,
+                    self.suffix_elements()
+                        .py_slice(db, Some(start), Some(stop), Some(step))?,
+                ));
+            }
+        }
+
         if step == 1
             && stop.is_none()
             && let Ok(start) = usize::try_from(start.unwrap_or(0))
         {
-            if start <= self.prefix_len() {
+            if start <= prefix_len {
                 return Ok(Type::tuple(TupleType::mixed(
                     db,
                     self.iter_prefix_elements().skip(start),
@@ -1006,6 +1096,23 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 std::iter::once(self.variable()).chain(self.iter_suffix_elements()),
             );
             return Ok(Type::homogeneous_tuple(db, element));
+        }
+
+        if step == 1
+            && let Some(start) = match start {
+                None => Some(0),
+                Some(start) => nonnegative_index(Some(start)),
+            }
+            && start <= prefix_len
+            && let Some(stop) = suffix_index(stop)
+            && let Ok(stop) = usize::try_from(stop)
+        {
+            return Ok(Type::tuple(TupleType::mixed(
+                db,
+                self.iter_prefix_elements().skip(start),
+                self.variable(),
+                self.iter_suffix_elements().take(stop),
+            )));
         }
 
         let element = UnionType::from_elements_leave_aliases(
