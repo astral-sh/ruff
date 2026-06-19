@@ -41,6 +41,59 @@ pub(crate) fn parse_models(source_tree: &Path) -> Vec<RubyClass> {
     classes
 }
 
+/// Walk a Rails application **including mounted engines** — the core
+/// `<source_tree>/app/models` plus every engine's `app/models`
+/// (OpenProject keeps ~half its domain in `modules/*/app/models`; generic
+/// Rails engines live in `engines/*/app/models`). All files feed one
+/// [`super::build_models`] pass, so the reopen-merge works across roots too.
+///
+/// Returns classes in deterministic order: path (ASCII sort) across all
+/// roots, then declaration order within a file.
+pub(crate) fn parse_models_with_engines(source_tree: &Path) -> Vec<RubyClass> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    for root in collect_model_roots(source_tree) {
+        walk_rb(&root, &mut files);
+    }
+    files.sort();
+    files.dedup();
+    let mut classes = Vec::with_capacity(files.len());
+    for path in files {
+        let Ok(src) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Some(ast) = parse_file(&src, &path) else {
+            continue;
+        };
+        collect_classes_from_node(&ast, &mut classes);
+    }
+    classes
+}
+
+/// Every Rails `app/models` root under `source_tree`: the core app plus
+/// each mounted engine. Bounded by convention (`modules/*`, `engines/*`)
+/// rather than a full-tree scan, so vendored gems and spec fixtures are
+/// never mistaken for application model roots.
+fn collect_model_roots(source_tree: &Path) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    let core = source_tree.join("app/models");
+    if core.is_dir() {
+        roots.push(core);
+    }
+    for engines_parent in ["modules", "engines"] {
+        let Ok(entries) = fs::read_dir(source_tree.join(engines_parent)) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let models = entry.path().join("app/models");
+            if models.is_dir() {
+                roots.push(models);
+            }
+        }
+    }
+    roots.sort();
+    roots
+}
+
 /// Recursively collect all `*.rb` paths under `dir`. Empty if `dir`
 /// doesn't exist or isn't readable.
 fn collect_rb_files(dir: &Path) -> Vec<PathBuf> {
