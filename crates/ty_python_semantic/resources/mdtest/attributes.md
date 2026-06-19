@@ -1023,13 +1023,13 @@ signature. The replacement remains an ordinary function, so Python binds it to i
 way as the original method.
 
 A function-literal type identifies a specific function, not just its signature. This makes
-identity-sensitive code unsound: after the assignment below, `requires_original_add(Foo.add)` is
-accepted even though the function only allows the original `add`. Its assertion fails at runtime
-because `Foo.add` is now `add_replacement`. Calls to the method itself remain safe because both
-functions have compatible signatures and the same instance-binding behavior.
+identity-sensitive code unsound: after the assignment below, `Foo.add is original_add` is inferred
+as `Literal[True]`, even though it evaluates to `False` at runtime and the assertion fails. Calls to
+the method itself remain safe because both functions have compatible signatures and the same
+instance-binding behavior.
 
 ```py
-from ty_extensions import TypeOf
+from typing import Literal
 
 class Foo:
     def add(self, x: int, y: int, /) -> int:
@@ -1040,11 +1040,11 @@ def add_replacement(self: Foo, x: int, y: int, /) -> int:
 
 original_add = Foo.add
 
-def requires_original_add(method: TypeOf[original_add]) -> None:
-    assert method is original_add
+def requires_true(value: Literal[True]) -> None:
+    assert value
 
 Foo.add = add_replacement
-requires_original_add(Foo.add)  # accepted; assertion fails at runtime
+requires_true(Foo.add is original_add)  # accepted; assertion fails at runtime
 
 def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
     return x + y
