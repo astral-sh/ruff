@@ -116,26 +116,83 @@ pub enum Declaration {
 /// Top-level entry: walk a Rails `app/models/` tree and produce the IR.
 ///
 /// The unpacking is mechanical: each [`Declaration`] variant lands in
-/// its corresponding `Model::*` Vec field. STI entries replace
-/// `Model::sti` (`None` if absent; last-wins if a class has multiple,
-/// which it shouldn't).
+/// its corresponding `Model::*` Vec field. Same-named [`RubyClass`]
+/// entries (Ruby's `class X` reopen idiom across multiple files —
+/// e.g. OpenProject's `WorkPackage` reopened from
+/// `app/models/work_package/inexistent_work_package.rb` etc.) are
+/// merged into a single [`Model`] in source-file order: Vec fields
+/// concatenate; `sti` is first-non-`None`-wins.
 #[must_use]
 pub fn extract(source_tree: &Path) -> ModelGraph {
     let classes = parse::parse_models(source_tree);
     let mut graph = ModelGraph::new(NAMESPACE);
-    for class in &classes {
-        let mut model = Model::new(&class.name);
-        model.fields = extract_fields(class);
+    graph.models = build_models(&classes);
+    graph
+}
+
+/// Build the deduplicated `Vec<Model>` from parsed [`RubyClass`]es —
+/// merging same-named reopens into a single Model.
+///
+/// Order: first occurrence of each name keeps its slot; later
+/// occurrences merge in-place (Vec fields concatenate in encounter
+/// order; `sti` is first-non-`None`-wins so empty reopens cannot
+/// overwrite a previously-set inheritance fact).
+fn build_models(classes: &[RubyClass]) -> Vec<Model> {
+    use std::collections::HashMap;
+    let mut models: Vec<Model> = Vec::with_capacity(classes.len());
+    let mut index: HashMap<String, usize> = HashMap::with_capacity(classes.len());
+    for class in classes {
+        let mut next = Model::new(&class.name);
+        next.fields = extract_fields(class);
         // D-AR-3.5: method-name + raise/reads/traverses extraction
         // already happened at parse time (see `parse.rs`). The class
         // carries a populated `Function` vec.
-        model.functions.clone_from(&class.functions);
+        next.functions.clone_from(&class.functions);
         for decl in &class.declarations {
-            unpack_declaration(&mut model, decl);
+            unpack_declaration(&mut next, decl);
         }
-        graph.models.push(model);
+        if let Some(&slot) = index.get(&class.name) {
+            merge_model(&mut models[slot], next);
+        } else {
+            index.insert(class.name.clone(), models.len());
+            models.push(next);
+        }
     }
-    graph
+    models
+}
+
+/// Merge `src` into `dst` in-place. Used by [`build_models`] when a
+/// later `class X` reopen extends an earlier definition: Vec fields
+/// concatenate (preserving source-file order); `sti` is
+/// first-non-`None`-wins (empty reopens cannot drop inheritance).
+fn merge_model(dst: &mut Model, src: Model) {
+    dst.fields.extend(src.fields);
+    dst.functions.extend(src.functions);
+    dst.associations.extend(src.associations);
+    dst.validations.extend(src.validations);
+    dst.callbacks.extend(src.callbacks);
+    dst.concerns.extend(src.concerns);
+    dst.attributes.extend(src.attributes);
+    dst.delegations.extend(src.delegations);
+    dst.scopes.extend(src.scopes);
+    dst.acts_as.extend(src.acts_as);
+    dst.dsl_calls.extend(src.dsl_calls);
+    dst.gem_dsl.extend(src.gem_dsl);
+    dst.dynamic_methods.extend(src.dynamic_methods);
+    dst.refinements.extend(src.refinements);
+    if dst.sti.is_none() {
+        dst.sti = src.sti;
+    }
+    // C++ sibling Vecs are populated only by `ruff_cpp_spo`; Ruby
+    // extraction always leaves them empty, so extending is a no-op in
+    // practice but keeps the merge total over the `Model` shape.
+    dst.bases.extend(src.bases);
+    dst.member_fields.extend(src.member_fields);
+    dst.methods.extend(src.methods);
+    dst.templates.extend(src.templates);
+    dst.friends.extend(src.friends);
+    dst.macro_uses.extend(src.macro_uses);
+    dst.static_asserts.extend(src.static_asserts);
 }
 
 /// Convenience: extract a single Ruby class from a source string. Used
@@ -896,6 +953,130 @@ end
         assert!(
             attrs.contains(&("no_type", None)),
             "untyped attribute must carry no type option",
+        );
+    }
+
+    // ───── reopen-merge tests (the OP `WorkPackage` regression) ─────
+
+    /// Two `class WorkPackage` declarations across files must produce ONE
+    /// `Model` whose Vec fields concatenate, not two duplicate entries.
+    /// Repro for the OpenProject case: an empty reopener (from
+    /// `app/models/work_package/inexistent_work_package.rb` etc.) was
+    /// being emitted as a separate `Model { name: "WorkPackage", … }`
+    /// alongside the rich one — and a naïve `.find(|c| c.name == "WorkPackage")`
+    /// would land on the empty side.
+    #[test]
+    fn build_models_merges_same_named_reopens_into_one() {
+        let empty_reopener = RubyClass {
+            name: "WorkPackage".to_string(),
+            declarations: Vec::new(),
+            functions: Vec::new(),
+        };
+        let rich = RubyClass {
+            name: "WorkPackage".to_string(),
+            declarations: vec![
+                Declaration::Association(AssocDecl {
+                    kind: AssocKind::BelongsTo,
+                    name: "project".to_string(),
+                    options: Vec::new(),
+                }),
+                Declaration::Concern(ConcernRef {
+                    kind: ConcernKind::Include,
+                    module: "WorkPackage::Validations".to_string(),
+                    body_ref: None,
+                }),
+                Declaration::Attribute(AttrDecl {
+                    kind: AttrKind::Attribute,
+                    name: "subject".to_string(),
+                    options: Vec::new(),
+                }),
+            ],
+            functions: Vec::new(),
+        };
+        let models = build_models(&[empty_reopener, rich]);
+
+        // Exactly one Model with the qualified name — not two.
+        assert_eq!(models.iter().filter(|m| m.name == "WorkPackage").count(), 1);
+        let wp = models.iter().find(|m| m.name == "WorkPackage").unwrap();
+        // Merged content from the rich reopener, undisturbed by the empty one.
+        assert_eq!(wp.associations.len(), 1);
+        assert_eq!(wp.associations[0].name, "project");
+        assert_eq!(wp.concerns.len(), 1);
+        assert_eq!(wp.attributes.len(), 1);
+    }
+
+    /// First-occurrence wins for the [`Model`] slot; later reopens append
+    /// in source-file order. Mirrors the directory walk that produces the
+    /// reopener BEFORE the main file alphabetically
+    /// (e.g. `work_package/inexistent_work_package.rb` sorts before
+    /// `work_package.rb`).
+    #[test]
+    fn build_models_preserves_first_occurrence_slot_and_source_order() {
+        let first = RubyClass {
+            name: "WorkPackage".to_string(),
+            declarations: vec![Declaration::Association(AssocDecl {
+                kind: AssocKind::BelongsTo,
+                name: "project".to_string(),
+                options: Vec::new(),
+            })],
+            functions: Vec::new(),
+        };
+        let second = RubyClass {
+            name: "Other".to_string(),
+            declarations: Vec::new(),
+            functions: Vec::new(),
+        };
+        let third = RubyClass {
+            name: "WorkPackage".to_string(),
+            declarations: vec![Declaration::Association(AssocDecl {
+                kind: AssocKind::BelongsTo,
+                name: "author".to_string(),
+                options: Vec::new(),
+            })],
+            functions: Vec::new(),
+        };
+        let models = build_models(&[first, second, third]);
+        // No duplicate slot for WorkPackage; "Other" sits between the two
+        // reopens in the input but the merged WorkPackage keeps the
+        // first-occurrence slot (index 0).
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0].name, "WorkPackage");
+        assert_eq!(models[1].name, "Other");
+        // Concatenation in encounter order: project, then author.
+        assert_eq!(
+            models[0]
+                .associations
+                .iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["project", "author"],
+        );
+    }
+
+    /// STI is first-non-`None`-wins so an empty reopener cannot strip
+    /// inheritance from a class that earlier declared it.
+    #[test]
+    fn build_models_sti_first_non_none_wins() {
+        let with_sti = RubyClass {
+            name: "Article".to_string(),
+            declarations: vec![Declaration::Sti(ruff_spo_triplet::StiInfo {
+                inherits_from: Some("ApplicationRecord".to_string()),
+                abstract_class: false,
+                inheritance_column: None,
+            })],
+            functions: Vec::new(),
+        };
+        let empty_reopen = RubyClass {
+            name: "Article".to_string(),
+            declarations: Vec::new(),
+            functions: Vec::new(),
+        };
+        let models = build_models(&[with_sti, empty_reopen]);
+        assert_eq!(models.len(), 1);
+        assert!(models[0].sti.is_some(), "STI must survive an empty reopen");
+        assert_eq!(
+            models[0].sti.as_ref().unwrap().inherits_from.as_deref(),
+            Some("ApplicationRecord"),
         );
     }
 }
