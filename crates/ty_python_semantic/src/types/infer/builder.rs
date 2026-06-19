@@ -2687,15 +2687,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Method monkeypatches are checked against the declared callable signature only. Erase
             // the callable kind so descriptor binding does not affect assignment compatibility.
-            match attr_ty {
-                Type::FunctionLiteral(function) => {
-                    Type::Callable(function.into_callable_type(db).into_regular(db))
-                }
-                Type::Callable(callable) if callable.is_method_like(db) => {
-                    Type::Callable(callable.into_regular(db))
-                }
-                _ => attr_ty,
-            }
+            let callable = match attr_ty {
+                Type::FunctionLiteral(function) => function.into_callable_type(db),
+                Type::Callable(callable) if callable.is_method_like(db) => callable,
+                _ => return attr_ty,
+            };
+            Type::Callable(callable.into_regular(db))
         };
 
         match object_ty {

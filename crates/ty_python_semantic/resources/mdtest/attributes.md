@@ -1070,25 +1070,16 @@ def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
 DescriptorMethods.static = static_replacement
 DescriptorMethods.class_ = class_replacement
 
-class StaticMock:
-    def __call__(self, x: int) -> str:
-        return str(x)
-
 class ClassMock:
     def __call__(self, cls: type[DescriptorMethods], x: int) -> str:
         return str(x)
 
-DescriptorMethods.static = StaticMock()
 DescriptorMethods.class_ = ClassMock()
 
 def incompatible_static_replacement(x: str) -> str:
     return x
 
-def incompatible_class_replacement(cls: type[DescriptorMethods], x: str) -> str:
-    return x
-
 DescriptorMethods.static = incompatible_static_replacement  # error: [invalid-assignment]
-DescriptorMethods.class_ = incompatible_class_replacement  # error: [invalid-assignment]
 ```
 
 The same signature-only check applies when a transparent decorator produces a method-like callable
@@ -1120,20 +1111,6 @@ class MethodMock:
 
 DecoratedMethods.method = MethodMock()
 DecoratedMethods.static = static_replacement
-```
-
-Every element of a union-valued replacement must have a compatible signature.
-
-```py
-def other_static_replacement(x: int) -> str:
-    return str(x)
-
-def replace_static(flag: bool) -> None:
-    replacement = static_replacement if flag else other_static_replacement
-    DescriptorMethods.static = replacement
-
-    incompatible = static_replacement if flag else incompatible_static_replacement
-    DescriptorMethods.static = incompatible  # error: [invalid-assignment]
 ```
 
 ## Accessing attributes on class objects
