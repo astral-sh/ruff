@@ -33,6 +33,14 @@ reveal_type(c)  # revealed: dict[str, int]
 d: dict[str, list[int | str]] = {"a": reveal_type([1, 2]), **{"b": reveal_type([3, 4])}}
 reveal_type(d)  # revealed: dict[str, list[int | str]]
 
+# An unpacked mapping is not a peer of an ordinary dictionary value.
+mixed = {**{"a": 1}, "b": {"c": "d"}}
+for value in mixed.values():
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: dict[str, str]
+        for nested_value in value.values():
+            nested_value.upper()
+
 class HasKeysAndGetItem:
     def keys(self) -> KeysView[str]:
         return {}.keys()

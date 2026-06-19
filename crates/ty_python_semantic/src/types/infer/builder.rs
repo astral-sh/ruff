@@ -7032,6 +7032,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             FxHashMap::default();
 
         for elts in elts {
+            // A dictionary-unpack row contains the mapping expression itself in the value slot,
+            // rather than an ordinary value expression. Its key and value types are inferred by
+            // the dedicated unpack path below.
+            if matches!(elts.as_slice(), [None, Some(_)]) {
+                continue;
+            }
+
             for (index, elt) in elts.iter().enumerate() {
                 if !slots.get(index).copied().unwrap_or(false) {
                     continue;
