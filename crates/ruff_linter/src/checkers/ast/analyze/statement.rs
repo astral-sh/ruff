@@ -107,6 +107,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &checker.semantic,
                 );
             }
+            if checker.is_rule_enabled(Rule::NonAsciiIdentifier) {
+                ruff::rules::non_ascii_identifier_function_def(checker, name);
+            }
             if checker.source_type.is_stub() {
                 if checker.is_rule_enabled(Rule::PassStatementStubBody) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
@@ -452,6 +455,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     name,
                     &checker.settings().pep8_naming.ignore_names,
                 );
+            }
+            if checker.is_rule_enabled(Rule::NonAsciiIdentifier) {
+                ruff::rules::non_ascii_identifier_class_def(checker, name);
             }
             if checker.is_rule_enabled(Rule::ErrorSuffixOnExceptionName) {
                 pep8_naming::rules::error_suffix_on_exception_name(

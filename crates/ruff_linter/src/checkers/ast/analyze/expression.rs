@@ -401,6 +401,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
+            if checker.is_rule_enabled(Rule::NonAsciiIdentifier) {
+                ruff::rules::non_ascii_identifier_name(checker, expr_name);
+            }
             if checker.is_rule_enabled(Rule::UndocumentedWarn) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
@@ -496,6 +499,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::NonAsciiIdentifier) {
+                ruff::rules::non_ascii_identifier_attribute(checker, attribute);
             }
             if checker.is_rule_enabled(Rule::DatetimeMinMax) {
                 flake8_datetimez::rules::datetime_min_max(checker, expr);

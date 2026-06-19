@@ -1,0 +1,69 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF077 Identifier `переменная` contains non-ASCII characters
+ --> RUF077.py:2:1
+  |
+1 | # Variables with non-ASCII names
+2 | переменная = 42  # Cyrillic variable name
+  | ^^^^^^^^^^
+3 | variable_ascii = 42  # OK
+  |
+
+RUF077 Identifier `метод` contains non-ASCII characters
+ --> RUF077.py:7:5
+  |
+5 | # Non-ASCII attribute access
+6 | class Bar:
+7 |     метод = "hello"
+  |     ^^^^^
+8 |
+9 | bar = Bar()
+  |
+
+RUF077 Identifier `метод` contains non-ASCII characters
+  --> RUF077.py:10:1
+   |
+ 9 | bar = Bar()
+10 | bar.метод  # Non-ASCII attribute access
+   | ^^^^^^^^^
+11 |
+12 | # Function with non-ASCII parameter
+   |
+
+RUF077 Identifier `параметр` contains non-ASCII characters
+  --> RUF077.py:13:10
+   |
+12 | # Function with non-ASCII parameter
+13 | def func(параметр):
+   |          ^^^^^^^^
+14 |     pass
+   |
+
+RUF077 Identifier `функция` contains non-ASCII characters
+  --> RUF077.py:17:5
+   |
+16 | # Non-ASCII function name
+17 | def функция():
+   |     ^^^^^^^
+18 |     pass
+   |
+
+RUF077 Identifier `Класс` contains non-ASCII characters
+  --> RUF077.py:21:7
+   |
+20 | # Non-ASCII class name
+21 | class Класс:
+   |       ^^^^^
+22 |     pass
+   |
+
+RUF077 Identifier `значение_変数` contains non-ASCII characters
+  --> RUF077.py:25:1
+   |
+24 | # Multiple non-ASCII scripts
+25 | значение_変数 = "test"  # Mix of Cyrillic and CJK
+   | ^^^^^^^^^^^^^
+26 |
+27 | # ASCII names (should NOT trigger)
+   |
