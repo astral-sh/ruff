@@ -995,6 +995,11 @@ enum VariableTupleSlicePlan {
         stop: Option<i32>,
         step: i32,
     },
+    /// A step -1 slice from the suffix through the variable part, e.g. `t[::-1]`.
+    MixedReverse {
+        suffix_start: Option<i32>,
+        prefix_stop: Option<i32>,
+    },
     /// A step-1 tail slice that starts in the prefix or at the variable part, e.g. `t[1:]`.
     MixedTail { prefix_start: usize },
     /// A step-1 slice from the prefix or variable part to the suffix, e.g. `t[1:-1]`.
@@ -1049,6 +1054,20 @@ impl VariableTupleSlicePlan {
                         .py_slice(db, Some(start), stop, Some(step))?,
                 ))
             }
+
+            VariableTupleSlicePlan::MixedReverse {
+                suffix_start,
+                prefix_stop,
+            } => Ok(Type::tuple(TupleType::mixed(
+                db,
+                tuple
+                    .suffix_elements()
+                    .py_slice(db, suffix_start, None, Some(-1))?,
+                tuple.variable(),
+                tuple
+                    .prefix_elements()
+                    .py_slice(db, None, prefix_stop, Some(-1))?,
+            ))),
 
             VariableTupleSlicePlan::MixedTail { prefix_start } => {
                 Ok(Type::tuple(TupleType::mixed(
@@ -1233,7 +1252,43 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             };
         }
 
+        if let Some(plan) = self.mixed_reverse_slice_plan(start, stop, step) {
+            return plan;
+        }
+
         VariableTupleSlicePlan::Homogeneous
+    }
+
+    fn mixed_reverse_slice_plan(
+        &self,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: i32,
+    ) -> Option<VariableTupleSlicePlan> {
+        if step != -1 {
+            return None;
+        }
+
+        let suffix_start = match start {
+            None => None,
+            Some(_) => Some(self.suffix_slice_index(start)?),
+        };
+
+        let prefix_stop = match stop {
+            None => None,
+            Some(_) => {
+                let stop = Self::nonnegative_slice_index(stop)?;
+                if stop >= self.prefix_len() {
+                    return None;
+                }
+                Some(i32::try_from(stop).ok()?)
+            }
+        };
+
+        Some(VariableTupleSlicePlan::MixedReverse {
+            suffix_start,
+            prefix_stop,
+        })
     }
 
     fn nonnegative_slice_index(index: Option<i32>) -> Option<usize> {
