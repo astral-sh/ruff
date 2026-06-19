@@ -1016,11 +1016,15 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
-## Replacing methods on classes
+## Allow replacing ordinary methods with compatible functions
 
-ty allows a method to be replaced directly on a class when the new value has a compatible callable
-signature. Reading the method still returns its precise inferred type; only the assignment uses this
-compatibility check.
+An ordinary method can be replaced directly on a class by another function with a compatible
+signature. The replacement remains an ordinary function, so Python binds it to instances in the same
+way as the original method.
+
+After the assignment, reading the method still returns the original method's precise inferred type,
+even though the runtime value is a different function. This is intentionally unsound, but the
+replacement has the same call signature and instance-binding behavior.
 
 ```py
 class Foo:
@@ -1030,9 +1034,9 @@ class Foo:
 def add_replacement(self: Foo, x: int, y: int, /) -> int:
     return x * y
 
-reveal_type(Foo.add)  # revealed: def add(self, x: int, y: int, /) -> int
-
 Foo.add = add_replacement
+
+reveal_type(Foo.add)  # revealed: def add(self, x: int, y: int, /) -> int
 
 def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
     return x + y
@@ -1040,12 +1044,11 @@ def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
 Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
-`staticmethod` and `classmethod` use the same signature check. This is intentionally unsound:
-replacing either descriptor with a plain function changes how Python binds arguments.
+`staticmethod` and `classmethod` attributes cannot yet be replaced this way. A plain function is
+rejected even if its signature matches because it would bind arguments differently. Supporting these
+assignments requires replacements with the corresponding decorator.
 
 ```py
-from unittest.mock import Mock
-
 class DescriptorMethods:
     @staticmethod
     def static(x: int) -> str:
@@ -1061,15 +1064,8 @@ def static_replacement(x: int) -> str:
 def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
     return str(x)
 
-DescriptorMethods.static = static_replacement
-DescriptorMethods().static(1)  # accepted by ty; raises `TypeError` at runtime
-
-DescriptorMethods.class_ = class_replacement
-DescriptorMethods.class_(1)  # accepted by ty; raises `TypeError` at runtime
-
-# `Mock` accepts arbitrary arguments, so it can replace both methods.
-DescriptorMethods.static = Mock()
-DescriptorMethods.class_ = Mock()
+DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
+DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
 ## Accessing attributes on class objects
