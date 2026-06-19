@@ -7017,6 +7017,111 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
+    /// Infers a shared type context for sibling collection literals from their combined contents.
+    ///
+    /// Inferring each literal independently would retain separate invariant types such as
+    /// `list[int] | list[str]`. Combining their contents first instead provides `list[int | str]`
+    /// as context for both literals. The inference is speculative because the real expressions
+    /// are inferred below with that shared context.
+    fn infer_collection_literal_peer_types<'expr, const N: usize>(
+        &mut self,
+        elts: &[[Option<&'expr ast::Expr>; N]],
+        slots: &[bool],
+    ) -> FxHashMap<(usize, KnownClass), Type<'db>> {
+        let mut groups: FxHashMap<(usize, KnownClass), Vec<&'expr ast::Expr>> =
+            FxHashMap::default();
+
+        for elts in elts {
+            for (index, elt) in elts.iter().enumerate() {
+                if !slots.get(index).copied().unwrap_or(false) {
+                    continue;
+                }
+
+                let Some(elt) = elt else { continue };
+                let Some(collection_class) = collection_literal_class(elt) else {
+                    continue;
+                };
+                groups
+                    .entry((index, collection_class))
+                    .or_default()
+                    .push(elt);
+            }
+        }
+
+        let mut peer_types = FxHashMap::default();
+        for index in 0..N {
+            for collection_class in [KnownClass::List, KnownClass::Set, KnownClass::Dict] {
+                let key = (index, collection_class);
+                if let Some(expressions) = groups.remove(&key)
+                    && expressions.len() > 1
+                    && let Some(ty) =
+                        self.infer_collection_literal_peer_type(collection_class, &expressions)
+                {
+                    peer_types.insert(key, ty);
+                }
+            }
+        }
+        peer_types
+    }
+
+    fn infer_collection_literal_peer_type<'expr>(
+        &mut self,
+        collection_class: KnownClass,
+        expressions: &[&'expr ast::Expr],
+    ) -> Option<Type<'db>> {
+        match collection_class {
+            KnownClass::List | KnownClass::Set => {
+                let elts = expressions
+                    .iter()
+                    .filter_map(|expression| match (collection_class, expression) {
+                        (KnownClass::List, ast::Expr::List(list)) => Some(list.elts.as_slice()),
+                        (KnownClass::Set, ast::Expr::Set(set)) => Some(set.elts.as_slice()),
+                        _ => None,
+                    })
+                    .flatten()
+                    .map(|elt| [Some(elt)])
+                    .collect_vec();
+                self.infer_collection_literal_peer_type_from_elements(collection_class, &elts)
+            }
+            KnownClass::Dict => {
+                let items = expressions
+                    .iter()
+                    .filter_map(|expression| {
+                        let ast::Expr::Dict(dict) = expression else {
+                            return None;
+                        };
+                        Some(
+                            dict.items
+                                .iter()
+                                .map(|item| [item.key.as_ref(), Some(&item.value)]),
+                        )
+                    })
+                    .flatten()
+                    .collect_vec();
+                self.infer_collection_literal_peer_type_from_elements(collection_class, &items)
+            }
+            _ => None,
+        }
+    }
+
+    fn infer_collection_literal_peer_type_from_elements<'expr, const N: usize>(
+        &mut self,
+        collection_class: KnownClass,
+        elts: &[[Option<&'expr ast::Expr>; N]],
+    ) -> Option<Type<'db>> {
+        let mut speculative_builder = self.speculate();
+        let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
+            builder.infer_expression(elt, tcx)
+        };
+        speculative_builder.infer_collection_literal(
+            collection_class,
+            None,
+            elts,
+            &mut infer_elt_ty,
+            TypeContext::default(),
+        )
+    }
+
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
@@ -7315,6 +7420,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             pre_inferred_elt_tys = Some(inferred_elts);
         }
 
+        let peer_context_slots = elt_tys
+            .clone()
+            .map(|elt_ty| {
+                allows_collection_literal_peer_context(TypeContext::new(
+                    elt_tcx_constraints
+                        .get(&elt_ty.identity(self.db()))
+                        .copied(),
+                ))
+            })
+            .collect_vec();
+        let peer_types = self.infer_collection_literal_peer_types(elts, &peer_context_slots);
+
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
@@ -7478,7 +7595,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_ref()
                     .and_then(|inferred_elts| inferred_elts[elts_index][i])
                     .unwrap_or_else(|| {
-                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
+                        let peer_ty = collection_literal_class(elt)
+                            .and_then(|collection_class| peer_types.get(&(i, collection_class)))
+                            .copied();
+                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx.or(peer_ty))))
                     });
 
                 // Simplify the inference based on a non-covariant declared type.
@@ -11518,10 +11638,16 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
 
 fn is_collection_literal(expression: &ast::Expr) -> bool {
-    matches!(
-        expression,
-        ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
-    )
+    collection_literal_class(expression).is_some()
+}
+
+fn collection_literal_class(expression: &ast::Expr) -> Option<KnownClass> {
+    match expression {
+        ast::Expr::List(_) => Some(KnownClass::List),
+        ast::Expr::Set(_) => Some(KnownClass::Set),
+        ast::Expr::Dict(_) => Some(KnownClass::Dict),
+        _ => None,
+    }
 }
 
 /// Returns `true` if applying type context to the given expression may be deferred after inference.

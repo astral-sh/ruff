@@ -38,6 +38,27 @@ reveal_type(x[0].__name__)  # revealed: str
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
+## Nested collection literals
+
+Sibling collection literals share their element types when inferring the outer collection. This
+avoids retaining a separate invariant collection type for every sibling.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3775>.
+
+```py
+reveal_type([[1], ["a"]])  # revealed: list[list[int | str]]
+reveal_type([[1], ["a"], [1, "a"]])  # revealed: list[list[int | str]]
+
+# Empty literals and singleton promotion are handled from the combined sibling contents.
+reveal_type([[], [1]])  # revealed: list[list[int]]
+reveal_type([[None], [1]])  # revealed: list[list[None | int]]
+
+# The same inference applies to other nested collection kinds.
+reveal_type([{1}, {"a"}])  # revealed: list[set[int | str]]
+reveal_type([{"a": 1}, {"b": "x"}])  # revealed: list[dict[str, int | str]]
+reveal_type({1: [1], 2: ["a"]})  # revealed: dict[int, list[int | str]]
+```
+
 ## None promotion
 
 `None` is promoted to `None | Unknown` in list literals when it is the only element type, so that
