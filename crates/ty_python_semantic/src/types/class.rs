@@ -336,7 +336,6 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
-#[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -394,23 +393,6 @@ impl<'db> ClassLiteral<'db> {
     /// Returns an iterator over the MRO.
     pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         MroIterator::new(db, self, None)
-    }
-
-    /// Return whether this class directly or indirectly inherits from the `Any` special form.
-    ///
-    /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
-    /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
-    /// arbitrary types.
-    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Static(literal) if !literal.has_explicit_bases(db) => false,
-            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => false,
-            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
-            Self::Static(_) | Self::Dynamic(_) | Self::DynamicEnum(_) => {
-                self.iter_mro(db).any(|base| base == ClassBase::Any)
-            }
-        }
     }
 
     /// Returns the metaclass of this class.
@@ -2189,7 +2171,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
-                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                ClassBase::Any => ConstraintSet::from_bool(
+                    self.constraints,
+                    self.relation.is_assignability() || target.is_object(db),
+                ),
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     match self.relation {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy { .. }
