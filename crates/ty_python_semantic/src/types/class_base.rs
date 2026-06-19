@@ -256,6 +256,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
+                | SpecialFormType::Divergent
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy
                 | SpecialFormType::TypeForm => None,
