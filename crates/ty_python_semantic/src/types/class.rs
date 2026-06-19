@@ -336,6 +336,7 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+#[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -400,6 +401,7 @@ impl<'db> ClassLiteral<'db> {
     /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
     /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
     /// arbitrary types.
+    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(literal) if !literal.has_explicit_bases(db) => false,
