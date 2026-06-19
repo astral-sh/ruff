@@ -332,7 +332,7 @@ def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
     static_assert(not is_assignable_to(TypeOf[Bar], int))
     static_assert(not is_assignable_to(TypeOf[Baz], int))
     static_assert(not is_assignable_to(TypeOf[Mixed], int))
-    static_assert(is_assignable_to(UnionDynamic, int))
+    static_assert(not is_assignable_to(TypeOf[UnionDynamic], int))
 ```
 
 A dynamically typed base could be `int` at runtime, making the new class a subclass of `int`. The

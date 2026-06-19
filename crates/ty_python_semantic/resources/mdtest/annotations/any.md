@@ -128,13 +128,29 @@ x: FinalClass = B()
 y: Literal[1] = B()
 ```
 
-A base expression whose inferred type is `Any` or `Unknown` does not count as explicitly inheriting
-from `Any`. The dynamic MRO entry makes instances assignable to non-final classes, but unlike an
-explicit `Any` base, not to final or literal types:
+This behavior is also preserved when the subclass inherits from a generic alias:
+
+```py
+from typing import Any, Generic, Literal, TypeVar, final
+
+T = TypeVar("T")
+
+class GenericSubclass(Any, Generic[T]): ...
+class SubclassOfGenericAlias(GenericSubclass[int]): ...
+
+@final
+class FinalClass: ...
+
+final: FinalClass = SubclassOfGenericAlias()
+literal: Literal[1] = SubclassOfGenericAlias()
+```
+
+A base expression whose inferred type is `Any` does not count as explicitly inheriting from `Any`.
+The dynamic MRO entry makes instances assignable to non-final classes, but unlike an explicit `Any`
+base, not to final or literal types:
 
 ```py
 from typing import Any, Literal, final
-from ty_extensions import Unknown
 
 class Arbitrary: ...
 
@@ -149,12 +165,28 @@ def check_dynamic_base(base: Any):
     ordinary: Arbitrary = IndirectSubclass()
     final: FinalClass = DynamicBase()  # error: [invalid-assignment]
     literal: Literal[1] = DynamicBase()  # error: [invalid-assignment]
+    indirect_final: FinalClass = IndirectSubclass()  # error: [invalid-assignment]
+    indirect_literal: Literal[1] = IndirectSubclass()  # error: [invalid-assignment]
+```
 
-class FromUnknown(Unknown): ...
+Similarly, inheriting from a name whose inferred type is `Unknown` makes instances assignable to
+non-final classes, but not to final classes:
 
-reveal_type(FromUnknown())  # revealed: FromUnknown
-ordinary_unknown: Arbitrary = FromUnknown()
-final_unknown: FinalClass = FromUnknown()  # error: [invalid-assignment]
+```py
+from typing import final
+
+from somewhere import UnknownBase  # error: [unresolved-import]
+
+class Arbitrary: ...
+
+@final
+class FinalClass: ...
+
+class FromUnknownBase(UnknownBase): ...
+
+reveal_type(FromUnknownBase())  # revealed: FromUnknownBase
+ordinary_unknown: Arbitrary = FromUnknownBase()
+final_unknown: FinalClass = FromUnknownBase()  # error: [invalid-assignment]
 ```
 
 A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:
