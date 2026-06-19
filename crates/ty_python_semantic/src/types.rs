@@ -1179,6 +1179,14 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(normalized) = cycle.head_ids().find_map(|id| {
+                self.recursive_nominal_growth_normalized(db, previous, Type::divergent(id))
+            })
+        {
+            return normalized.recursive_type_normalized(db, cycle);
+        }
+
         if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, self, false, |ty| {
@@ -1202,6 +1210,48 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
+    }
+
+    /// Normalizes a nominal type that wraps the previous cycle result in its own specialization.
+    ///
+    /// For example, an inference cycle can otherwise grow indefinitely as
+    /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
+    /// tainted cycles, replace the recursive type argument with the cycle's `Divergent` marker so
+    /// that the existing recursive-type normalization can converge on `C[Divergent]`.
+    fn recursive_nominal_growth_normalized(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        div: Self,
+    ) -> Option<Self> {
+        let (Type::NominalInstance(current), Type::NominalInstance(previous_instance)) =
+            (self, previous)
+        else {
+            return None;
+        };
+
+        let current_class = current.class(db);
+        if current_class.class_literal(db) != previous_instance.class_literal(db) {
+            return None;
+        }
+
+        let alias = current_class.into_generic_alias()?;
+        let original_specialization = alias.specialization(db);
+        let specialization = original_specialization.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceType {
+                from: previous,
+                to: div,
+            },
+        );
+        if specialization == original_specialization {
+            return None;
+        }
+
+        Some(Type::instance(
+            db,
+            ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
+        ))
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -6093,6 +6143,12 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
+        if let TypeMapping::ReplaceType { from, to } = type_mapping
+            && self == *from
+        {
+            return *to;
+        }
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -6348,6 +6404,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceType { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6364,6 +6421,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceType { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -7415,6 +7473,8 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
+    /// Replaces occurrences of one specific type with another.
+    ReplaceType { from: Type<'db>, to: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -7467,6 +7527,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::ReplaceType { .. }
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
@@ -7514,6 +7575,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceType { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
