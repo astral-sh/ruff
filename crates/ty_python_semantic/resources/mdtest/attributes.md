@@ -1016,30 +1016,22 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
-## Assigning methods on class objects
+## Replacing methods on classes
 
-Methods accessed from class-literal types retain their precise function-literal type. Assignments to
-those methods are checked against the function's callable signature, however, so that a method can
-be replaced by a different function with the same signature.
+ty allows a method to be replaced directly on a class when the new value has a compatible callable
+signature. Reading the method still returns its precise inferred type; only the assignment uses this
+compatibility check.
 
 ```py
 class Foo:
-    def method(self) -> None:
-        pass
-
     def add(self, x: int, y: int, /) -> int:
         return x + y
-
-def method_replacement(self) -> None:
-    pass
 
 def add_replacement(self: Foo, x: int, y: int, /) -> int:
     return x * y
 
-reveal_type(Foo.method)  # revealed: def method(self) -> None
 reveal_type(Foo.add)  # revealed: def add(self, x: int, y: int, /) -> int
 
-Foo.method = method_replacement
 Foo.add = add_replacement
 
 def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
@@ -1048,10 +1040,12 @@ def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
 Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
-This check deliberately compares only callable signatures. It does not require the replacement to
-preserve the original method's descriptor behavior when accessed through the class or an instance.
+`staticmethod` and `classmethod` use the same signature check. This is intentionally unsound:
+replacing either descriptor with a plain function changes how Python binds arguments.
 
 ```py
+from unittest.mock import Mock
+
 class DescriptorMethods:
     @staticmethod
     def static(x: int) -> str:
@@ -1068,49 +1062,14 @@ def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
     return str(x)
 
 DescriptorMethods.static = static_replacement
+DescriptorMethods().static(1)  # accepted by ty; raises `TypeError` at runtime
+
 DescriptorMethods.class_ = class_replacement
+DescriptorMethods.class_(1)  # accepted by ty; raises `TypeError` at runtime
 
-class ClassMock:
-    def __call__(self, cls: type[DescriptorMethods], x: int) -> str:
-        return str(x)
-
-DescriptorMethods.class_ = ClassMock()
-
-def incompatible_static_replacement(x: str) -> str:
-    return x
-
-DescriptorMethods.static = incompatible_static_replacement  # error: [invalid-assignment]
-```
-
-The same signature-only check applies when a transparent decorator produces a method-like callable
-type.
-
-```py
-from collections.abc import Callable
-from typing import ParamSpec, TypeVar
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-def transparent(function: Callable[P, R]) -> Callable[P, R]:
-    return function
-
-class DecoratedMethods:
-    @transparent
-    def method(self, x: int, /) -> str:
-        return str(x)
-
-    @staticmethod
-    @transparent
-    def static(x: int) -> str:
-        return str(x)
-
-class MethodMock:
-    def __call__(self, instance: DecoratedMethods, x: int, /) -> str:
-        return str(x)
-
-DecoratedMethods.method = MethodMock()
-DecoratedMethods.static = static_replacement
+# `Mock` accepts arbitrary arguments, so it can replace both methods.
+DescriptorMethods.static = Mock()
+DescriptorMethods.class_ = Mock()
 ```
 
 ## Accessing attributes on class objects

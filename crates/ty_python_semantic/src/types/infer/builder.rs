@@ -2681,18 +2681,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let class_attribute_write_type = |attr_ty: Type<'db>| -> Type<'db> {
-            if !matches!(object_ty, Type::ClassLiteral(_)) {
-                return attr_ty;
+            if matches!(object_ty, Type::ClassLiteral(_))
+                && let Type::FunctionLiteral(function) = attr_ty
+            {
+                // Compare method assignments by signature without considering descriptor binding.
+                Type::Callable(function.into_callable_type(db).into_regular(db))
+            } else {
+                attr_ty
             }
-
-            // Method monkeypatches are checked against the declared callable signature only. Erase
-            // the callable kind so descriptor binding does not affect assignment compatibility.
-            let callable = match attr_ty {
-                Type::FunctionLiteral(function) => function.into_callable_type(db),
-                Type::Callable(callable) if callable.is_method_like(db) => callable,
-                _ => return attr_ty,
-            };
-            Type::Callable(callable.into_regular(db))
         };
 
         match object_ty {
