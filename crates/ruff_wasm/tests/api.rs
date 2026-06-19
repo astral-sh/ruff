@@ -7,8 +7,9 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use ruff_linter::registry::Rule;
 use ruff_source_file::OneIndexed;
 use ruff_wasm::{
-    ExpandedDiagnosticAnnotation, ExpandedDiagnosticLocation, ExpandedMessage,
-    ExpandedSubDiagnostic, Location, PositionEncoding, SubDiagnosticSeverity, Workspace,
+    ExpandedDiagnosticAnnotation, ExpandedDiagnosticLocation, ExpandedDiagnosticTag,
+    ExpandedMessage, ExpandedSubDiagnostic, Location, PositionEncoding, SubDiagnosticSeverity,
+    Workspace,
 };
 
 macro_rules! check {
@@ -60,6 +61,7 @@ fn empty_config() {
         [ExpandedMessage {
             code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
+            tags: vec![],
             annotations: vec![primary_annotation(
                 Location {
                     row: OneIndexed::from_zero_indexed(0),
@@ -94,6 +96,7 @@ fn syntax_error() {
         [ExpandedMessage {
             code: "invalid-syntax".to_string(),
             message: "Expected an expression".to_string(),
+            tags: vec![],
             annotations: vec![primary_annotation(
                 Location {
                     row: OneIndexed::from_zero_indexed(0),
@@ -129,6 +132,7 @@ fn unsupported_syntax_error() {
             code: "invalid-syntax".to_string(),
             message: "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
                 .to_string(),
+            tags: vec![],
             annotations: vec![primary_annotation(
                 Location {
                     row: OneIndexed::from_zero_indexed(0),
@@ -172,6 +176,29 @@ fn sub_diagnostics() {
             message: "Remove unused import: `os`".to_string(),
             location: None,
         }]
+    );
+}
+
+#[wasm_bindgen_test]
+fn diagnostic_tags() {
+    ruff_wasm::before_main();
+
+    let config = js_sys::JSON::parse(r#"{"select": ["F401", "RUF071"], "preview": true}"#).unwrap();
+    let output = Workspace::new(config, PositionEncoding::Utf8)
+        .unwrap()
+        .check("import os\nimport sys\nos.path.commonprefix([])\n")
+        .unwrap();
+    let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
+
+    assert_eq!(
+        result
+            .into_iter()
+            .map(|diagnostic| diagnostic.tags)
+            .collect::<Vec<_>>(),
+        [
+            [ExpandedDiagnosticTag::Deprecated],
+            [ExpandedDiagnosticTag::Unnecessary],
+        ]
     );
 }
 

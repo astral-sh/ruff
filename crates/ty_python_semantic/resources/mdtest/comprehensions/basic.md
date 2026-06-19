@@ -128,9 +128,10 @@ The type of the expression being iterated over is immutable, and so should not b
 `Unknown` or through literal promotion:
 
 ```py
-# TODO: This should reveal `Literal["a", "b"]`
-# revealed: str
-x = [reveal_type(string) for string in ["a", "b"]]
+x = [
+    reveal_type(string)  # revealed: Literal["a", "b"]
+    for string in ["a", "b"]
+]
 ```
 
 ## Comprehension expression types

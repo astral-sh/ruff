@@ -202,8 +202,9 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        enum_metadata, equality_truthiness, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -980,7 +981,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
             if subject_ty.is_single_valued(db) {
-                Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
+                equality_truthiness(db, subject_ty, value_ty)
             } else {
                 Truthiness::Ambiguous
             }

@@ -391,7 +391,30 @@ impl<'db> TypeVarInstance<'db> {
                 return false;
             }
 
-            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
+            let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
+                if specialization
+                    .types(state.db)
+                    .iter()
+                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
+                {
+                    return true;
+                }
+                type_alias.value_type(state.db)
+            } else if let Some(generic_context) = type_alias.generic_context(state.db)
+                && generic_context.variables(state.db).any(|typevar| {
+                    typevar_default_is_self_referential(
+                        state,
+                        typevar.typevar(state.db),
+                        self_identity,
+                    )
+                })
+            {
+                return true;
+            } else {
+                type_alias.raw_value_type(state.db)
+            };
+
+            type_is_self_referential_impl(state, value_type, self_identity)
         }
 
         fn type_is_self_referential_impl<'db>(
@@ -638,7 +661,7 @@ impl<'db> TypeVarInstance<'db> {
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
         if !matches!(
             self.identity(db).kind(db),
-            TypeVarKind::Pep695 | TypeVarKind::Pep695ParamSpec
+            TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec
         ) {
             return None;
         }
@@ -945,7 +968,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             name,
             None, // definition
-            TypeVarKind::Pep695,
+            TypeVarKind::Pep695TypeVar,
         );
         let typevar = TypeVarInstance::new(
             db,
@@ -1234,13 +1257,13 @@ impl<'db> BoundTypeVarInstance<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
-    Legacy,
+    LegacyTypeVar,
     /// `def foo[T](x: T) -> T: ...`
-    Pep695,
+    Pep695TypeVar,
     /// `typing.Self`
     TypingSelf,
     /// `P = ParamSpec("P")`
-    ParamSpec,
+    LegacyParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
     /// `Alias: typing.TypeAlias = T`
@@ -1249,7 +1272,7 @@ pub enum TypeVarKind {
 
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
-        matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
+        matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }
 }
 
@@ -1413,7 +1436,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1433,13 +1456,17 @@ fn bound_typevar_default_type<'db>(
 
 #[expect(clippy::ref_option)]
 fn bound_typevar_default_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    _previous_default: &Option<Type<'db>>,
-    _default: Option<Type<'db>>,
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    match (previous_default, default) {
+        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (_, None) => None,
+    }
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.

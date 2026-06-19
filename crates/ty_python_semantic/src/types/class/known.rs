@@ -57,6 +57,7 @@ pub enum KnownClass {
     Property,
     BaseException,
     Exception,
+    Warning,
     BaseExceptionGroup,
     ExceptionGroup,
     Staticmethod,
@@ -112,6 +113,7 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
+    Hashable,
     SupportsIndex,
     Iterable,
     Iterator,
@@ -204,6 +206,7 @@ impl KnownClass {
 
             Self::BaseException
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Object
@@ -215,6 +218,7 @@ impl KnownClass {
             | Self::GenericAlias
             | Self::NewType
             | Self::StdlibAlias
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::Set
             | Self::Int
@@ -304,6 +308,7 @@ impl KnownClass {
             | KnownClass::BaseException
             | KnownClass::NotImplementedError
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -348,6 +353,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -405,6 +411,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -450,6 +457,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -507,6 +515,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -552,6 +561,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -599,7 +609,8 @@ impl KnownClass {
     /// 2. It's probably more performant.
     pub(crate) const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex
+            Self::Hashable
+            | Self::SupportsIndex
             | Self::Iterable
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
@@ -633,6 +644,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -726,6 +738,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -775,6 +788,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -827,6 +841,7 @@ impl KnownClass {
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
+            Self::Warning => "Warning",
             Self::NotImplementedError => "NotImplementedError",
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
@@ -859,6 +874,7 @@ impl KnownClass {
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
+            Self::Hashable => "Hashable",
             Self::SupportsIndex => "SupportsIndex",
             Self::ChainMap => "ChainMap",
             Self::Counter => "Counter",
@@ -1189,6 +1205,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -1235,6 +1252,7 @@ impl KnownClass {
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::ParamSpec
+            | Self::Hashable
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
@@ -1308,6 +1326,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -1332,6 +1351,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::VersionInfo
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeAliasType
@@ -1429,10 +1449,12 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::StdlibAlias
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -1518,6 +1540,7 @@ impl KnownClass {
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
+            "Warning" => &[Self::Warning],
             "NotImplementedError" => &[Self::NotImplementedError],
             "ExceptionGroup" => &[Self::ExceptionGroup],
             "staticmethod" => &[Self::Staticmethod],
@@ -1560,6 +1583,7 @@ impl KnownClass {
             "_Alias" => &[Self::StdlibAlias],
             "_SpecialForm" => &[Self::SpecialForm],
             "_NoDefaultType" => &[Self::NoDefaultType],
+            "Hashable" => &[Self::Hashable],
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
@@ -1635,6 +1659,7 @@ impl KnownClass {
             | Self::VersionInfo
             | Self::BaseException
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::EllipsisType
@@ -1690,6 +1715,7 @@ impl KnownClass {
             Self::SpecialForm
             | Self::TypeAliasType
             | Self::NoDefaultType
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs

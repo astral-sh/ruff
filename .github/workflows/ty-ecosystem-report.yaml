@@ -20,7 +20,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  ECOSYSTEM_ANALYZER_COMMIT: c455248318c19ddc5c95c7ac45e517b2184bb0c5
+  ECOSYSTEM_ANALYZER_COMMIT: e2c5b76149b147fae104a7d8fa0997a9eb7f7754
 
 jobs:
   ty-ecosystem-report:
@@ -36,7 +36,7 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
-          version: "0.11.19"
+          version: "0.11.21"
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:

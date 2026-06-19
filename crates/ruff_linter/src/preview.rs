@@ -53,6 +53,11 @@ pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/4460
+pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 /// <https://github.com/astral-sh/ruff/pull/19303>
 pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -340,11 +345,6 @@ pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
 // https://github.com/astral-sh/ruff/pull/23260
 pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/23845
-pub const fn is_warning_severity_enabled(preview: PreviewMode) -> bool {
-    preview.is_enabled()
 }
 
 // https://github.com/astral-sh/ruff/pull/24071

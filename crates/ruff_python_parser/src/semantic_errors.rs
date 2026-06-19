@@ -586,6 +586,7 @@ impl SemanticSyntaxChecker {
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
+                // lambda __debug__: 0  # lambda parameter name
                 Self::check_identifier(name, ctx);
                 if let Some(type_params) = type_params {
                     for type_param in type_params.iter() {
@@ -1012,6 +1013,9 @@ impl SemanticSyntaxChecker {
                 parameters: Some(parameters),
                 ..
             }) => {
+                for parameter in parameters {
+                    Self::check_identifier(parameter.name(), ctx);
+                }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
             _ => {}
@@ -1113,7 +1117,14 @@ impl SemanticSyntaxChecker {
         generators: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
+        // test_ok starred_comprehension_target
+        // [item for (*items,) in source]
+
+        // test_err starred_comprehension_target
+        // [item for *items in source]
         for (index, generator) in generators.iter().enumerate() {
+            Self::invalid_star_expression(&generator.target, ctx);
+
             for if_expr in &generator.ifs {
                 Self::check_rebound_variables(
                     if_expr,
@@ -2207,6 +2218,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [{"x": 1, "x": 2}]: ...
                         //     case Foo(x=1, y={"x": 1, "x": 2}): ...
                         //     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+                        //     case {2: 1, 2.0: 2}: ...
+                        //     case {9007199254740993: 1, 9007199254740993 + 0j: 2}: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),

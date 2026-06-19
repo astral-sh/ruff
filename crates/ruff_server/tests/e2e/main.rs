@@ -27,6 +27,7 @@
 
 mod code_action;
 mod custom_extension;
+mod diagnostics;
 mod hover;
 mod notebook;
 mod workspace;
@@ -1085,7 +1086,6 @@ impl TestServerBuilder {
         self
     }
 
-    #[expect(dead_code)]
     pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document

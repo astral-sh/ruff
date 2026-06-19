@@ -397,8 +397,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
     fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
-        let scope = self.body_scope(db);
-        scope.node(db).expect_class().node(module)
+        self.body_scope(db).node(db).expect_class().node(module)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
@@ -530,13 +529,16 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Iterate over this class's explicit bases, filtering out any bases that are not class
-    /// objects, and applying default specialization to any unspecialized generic class literals.
+    /// Iterate over this class's explicit bases, resolving them in the same way as MRO
+    /// construction, filtering out any bases that are not fully static class objects.
     fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
         self.explicit_bases(db)
             .iter()
             .copied()
-            .filter_map(|ty| ty.to_class_type(db))
+            .filter_map(move |ty| {
+                ClassBase::try_from_type(db, ty, Some(ClassLiteral::Static(self)))
+                    .and_then(ClassBase::into_class)
+            })
     }
 
     /// Determine if this class is a protocol.
@@ -2373,8 +2375,8 @@ impl<'db> StaticClassLiteral<'db> {
                         // nothing to do here.
                         None
                     }
-                    DefinitionKind::Assignment(assign) => match assign.target_kind() {
-                        TargetKind::Sequence(_, unpack) => {
+                    DefinitionKind::Assignment(assign) => match assign.unpack() {
+                        Some(unpack) => {
                             // We found an unpacking assignment like:
                             //
                             //     .., self.name, .. = <value>
@@ -2384,7 +2386,7 @@ impl<'db> StaticClassLiteral<'db> {
                             let unpacked = infer_unpack_types(db, unpack);
                             Some(unpacked.expression_type(assign.target(&module)))
                         }
-                        TargetKind::Single => {
+                        None => {
                             // We found an un-annotated attribute assignment of the form:
                             //
                             //     self.name = <value>
@@ -2841,7 +2843,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
         let module = parsed_module(db, class_scope.file(db)).load(db);
-        let class_node = class_scope.node(db).expect_class().node(&module);
+        let class_node = self.node(db, &module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),
@@ -2851,6 +2853,14 @@ impl<'db> StaticClassLiteral<'db> {
                 .map(Ranged::end)
                 .unwrap_or_else(|| class_name.end()),
         )
+    }
+
+    /// Returns the range of the class's name
+    pub(crate) fn focus_range(self, db: &'db dyn Db) -> TextRange {
+        let class_scope = self.body_scope(db);
+        let module = parsed_module(db, class_scope.file(db)).load(db);
+        let class_node = self.node(db, &module);
+        class_node.name.range()
     }
 }
 

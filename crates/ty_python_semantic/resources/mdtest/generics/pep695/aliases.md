@@ -275,6 +275,18 @@ Self-referential defaults should not crash type inference:
 type A[T = A] = A[int]
 ```
 
+An explicit alias specialization overrides the alias type parameter's default:
+
+```py
+type ExplicitAlias[
+    FirstT = ExplicitAlias[int, str],
+    SecondT = FirstT,
+] = list[SecondT]
+
+def explicit_alias_default(x: ExplicitAlias):
+    reveal_type(x)  # revealed: list[ExplicitAlias[int, str]]
+```
+
 A self-referential default that does not reference itself in the alias body should also not crash,
 even when the default is evaluated (e.g., by omitting the type argument):
 

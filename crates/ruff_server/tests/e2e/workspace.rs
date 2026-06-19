@@ -58,7 +58,7 @@ ignore = ["F401"]
             "href": "https://docs.astral.sh/ruff/rules/unused-import"
           },
           "source": "Ruff",
-          "message": "`os` imported but unused",
+          "message": "`os` imported but unused\n\nhelp: Remove unused import: `os`",
           "tags": [
             1
           ],

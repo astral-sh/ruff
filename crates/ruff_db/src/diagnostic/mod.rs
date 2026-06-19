@@ -1410,10 +1410,6 @@ pub struct DisplayDiagnosticConfig {
     /// they will be merged into a single annotation.
     merge_window: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
-    #[allow(
-        dead_code,
-        reason = "This is currently only used for JSON but will be needed soon for other formats"
-    )]
     preview: bool,
     /// Whether to hide the real `Severity` of diagnostics.
     ///
@@ -1493,6 +1489,10 @@ impl DisplayDiagnosticConfig {
             preview: yes,
             ..self
         }
+    }
+
+    pub fn preview_enabled(&self) -> bool {
+        self.preview
     }
 
     /// Whether to hide a diagnostic's severity or not.
