@@ -224,6 +224,38 @@ def takes_other_protocol(f: OtherProtocol): ...
 takes_other_protocol(SubclassOfAny())
 ```
 
+Error context from a failed structural check should be discarded when assignability succeeds due to
+an explicit `Any` base:
+
+```py
+from typing import Any, Callable
+
+class CallableSubclassOfAny(Any):
+    def __call__(self, x: int) -> str:
+        raise NotImplementedError
+
+class IncompatibleCallable:
+    def __call__(self, x: int) -> bytes:
+        raise NotImplementedError
+
+def check_callable_union(value1: CallableSubclassOfAny | IncompatibleCallable):
+    target1: Callable[[int], int] = value1  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
+   --> src/mdtest_snippet.py:141:14
+    |
+141 |     target1: Callable[[int], int] = value1  # snapshot
+    |              --------------------   ^^^^^^ Incompatible value of type `CallableSubclassOfAny | IncompatibleCallable`
+    |              |
+    |              Declared type
+    |
+info: element `IncompatibleCallable` of union `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
+info: └── type `IncompatibleCallable` has inferred callable type `(x: int) -> bytes`
+info:     └── incompatible return types: `bytes` is not assignable to `int`
+```
+
 A subclass of `Any` is also assignable to literal types through the dynamic element of its instance
 type:
 

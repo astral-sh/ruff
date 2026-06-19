@@ -412,7 +412,7 @@ impl<'db> ClassLiteral<'db> {
     /// arbitrary types.
     #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
-        self.has_explicit_bases(db) && self.iter_mro(db).any(|base| base == ClassBase::Any)
+        self.iter_mro(db).any(|base| base == ClassBase::Any)
     }
 
     /// Returns the metaclass of this class.
