@@ -1131,7 +1131,9 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .map(|(previous, current)| match (*previous, *current) {
                 (previous, current) if previous == current => Some(current),
-                (previous, current) if previous.is_unknown() || current.is_unknown() => {
+                (previous, current)
+                    if previous == Type::unknown() || current == Type::unknown() =>
+                {
                     Some(Type::unknown())
                 }
                 _ => None,
