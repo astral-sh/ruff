@@ -389,12 +389,14 @@ impl<'db> SubscriptErrorKind<'db> {
                             typed_dict.items(db),
                         );
                     } else {
-                        let expected_types_for_slice = bindings.expected_types_for_argument(0);
+                        let expected_types_for_slice = bindings.expected_types_for_argument(db, 0);
 
-                        if let Some(expected_types) = expected_types_for_slice.as_deref()
-                            && let Some(builder) =
+                        if let Some(expected_types) = expected_types_for_slice.as_deref() {
+                            let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, subscript)
-                        {
+                            else {
+                                return;
+                            };
                             let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
                             let term_of_art = if value_ty.is_redundant_with(
                                 db,

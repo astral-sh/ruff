@@ -1083,7 +1083,8 @@ impl<'db> Bindings<'db> {
     /// - If the called object is a union or intersection of callables
     /// - If any binding errors are not `InvalidArgumentType` errors
     /// - If any binding errors are related to a different argument index than the one
-    ///   passed into this method.
+    ///   passed into this method, after ignoring overloads that cannot accept a bound
+    ///   receiver.
     ///
     /// Future developers: if you're confident in your implementation and you have the
     /// need, feel free to expand this method to handle more situations!
@@ -1094,12 +1095,20 @@ impl<'db> Bindings<'db> {
     /// expected types for the same argument index.
     pub(crate) fn expected_types_for_argument(
         &self,
+        db: &'db dyn Db,
         argument_index: usize,
     ) -> Option<Vec<Type<'db>>> {
         let callable = self.single_element()?;
         let mut expected = FxIndexSet::default();
 
         for overload in &callable.overloads {
+            if callable
+                .bound_type
+                .is_some_and(|receiver| !overload.signature.can_bind_self_to(db, receiver))
+            {
+                continue;
+            }
+
             for error in &overload.errors {
                 let BindingError::InvalidArgumentType {
                     parameter: _,
