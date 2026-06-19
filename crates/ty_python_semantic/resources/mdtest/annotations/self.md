@@ -473,6 +473,21 @@ class Child(Parent):
 reveal_type(Child.create())  # revealed: Child
 ```
 
+An inherited classmethod should also preserve the method's `Self` type when accessed through `self`.
+
+```py
+from typing import Self, assert_type
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    def method(self) -> None:
+        assert_type(self.create(), Self)
+```
+
 ## Attributes
 
 ```py
