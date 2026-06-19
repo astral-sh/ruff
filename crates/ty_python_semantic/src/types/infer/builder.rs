@@ -2649,60 +2649,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> bool {
         let db = self.db();
 
-        // A replacement for a staticmethod or classmethod must expose the same callable interface
-        // through both class and instance access. Once the descriptor protocol has been applied,
-        // normalize the resulting callables because their descriptor kinds are no longer relevant.
+        // A method replacement must expose the same callable interface through both class and
+        // instance access. Once the descriptor protocol has been applied, normalize the resulting
+        // callables because their descriptor kinds are no longer relevant.
+        let instance_ty = object_ty.to_instance(db);
         let descriptor_callable = |ty: Type<'db>, instance: Option<Type<'db>>| {
-            let descriptor_callable_element = |ty: Type<'db>| {
-                ty.try_call_dunder_get(db, instance, object_ty)
-                    .map_or(ty, |(ty, _)| ty)
-                    .try_upcast_to_callable(db)
-                    .map(|callables| {
-                        callables
-                            .map(|callable| callable.into_regular(db))
-                            .into_type(db)
-                    })
-            };
-
-            match ty {
-                Type::Union(union) => {
-                    union.try_map(db, |element| descriptor_callable_element(*element))
-                }
-                _ => descriptor_callable_element(ty),
-            }
+            ty.try_call_dunder_get(db, instance, object_ty)
+                .map_or(ty, |(ty, _)| ty)
+                .try_upcast_to_callable(db)
+                .map(|callables| {
+                    callables
+                        .map(|callable| callable.into_regular(db))
+                        .into_type(db)
+                })
         };
 
         let classmethod_receiver_is_valid = |ty: Type<'db>| {
-            let receiver_is_valid = |ty: Type<'db>| {
-                if let Some(specialization) = ty.known_specialization(db, KnownClass::Classmethod) {
-                    let Some(receiver_ty) = specialization.types(db).first() else {
-                        return false;
-                    };
-                    return object_ty
-                        .to_instance(db)
-                        .is_some_and(|instance_ty| instance_ty.is_assignable_to(db, *receiver_ty));
-                }
-
-                let signatures = match ty {
-                    Type::FunctionLiteral(function) if function.is_classmethod(db) => {
-                        Some(function.signature(db))
-                    }
-                    Type::Callable(callable) if callable.is_classmethod_like(db) => {
-                        Some(callable.signatures(db))
-                    }
-                    _ => None,
-                };
-                signatures.is_none_or(|signatures| {
-                    signatures
-                        .iter()
-                        .any(|signature| signature.can_bind_self_to(db, object_ty))
-                })
-            };
-
-            match ty {
-                Type::Union(union) => union.elements(db).iter().copied().all(receiver_is_valid),
-                _ => receiver_is_valid(ty),
+            if let Some(specialization) = ty.known_specialization(db, KnownClass::Classmethod) {
+                return specialization.types(db).first().is_some_and(|receiver_ty| {
+                    instance_ty
+                        .is_some_and(|instance_ty| instance_ty.is_assignable_to(db, *receiver_ty))
+                });
             }
+
+            ty.try_upcast_to_callable(db).is_none_or(|callables| {
+                callables
+                    .iter()
+                    .filter(|callable| callable.is_classmethod_like(db))
+                    .all(|callable| {
+                        callable
+                            .signatures(db)
+                            .iter()
+                            .any(|signature| signature.can_bind_self_to(db, object_ty))
+                    })
+            })
         };
 
         let descriptor_assignment_is_valid =
@@ -2720,19 +2700,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !matches!(object_ty, Type::ClassLiteral(_)) || !target_is_method_like {
                     return None;
                 }
-                if !classmethod_receiver_is_valid(value_ty) {
-                    return Some(false);
-                }
+                let instance_ty = instance_ty?;
+                let value_tys = match value_ty {
+                    Type::Union(union) => union.elements(db),
+                    _ => std::slice::from_ref(&value_ty),
+                };
 
-                let instance_ty = object_ty.to_instance(db)?;
-                Some([None, Some(instance_ty)].into_iter().all(|instance| {
-                    let Some(target_ty) = descriptor_callable(attr_ty, instance) else {
-                        return false;
-                    };
-                    let Some(value_ty) = descriptor_callable(value_ty, instance) else {
-                        return false;
-                    };
-                    value_ty.is_assignable_to(db, target_ty)
+                Some(value_tys.iter().copied().all(|value_ty| {
+                    classmethod_receiver_is_valid(value_ty)
+                        && [None, Some(instance_ty)].into_iter().all(|instance| {
+                            descriptor_callable(value_ty, instance)
+                                .zip(descriptor_callable(attr_ty, instance))
+                                .is_some_and(|(value_ty, target_ty)| {
+                                    value_ty.is_assignable_to(db, target_ty)
+                                })
+                        })
                 }))
             };
 
