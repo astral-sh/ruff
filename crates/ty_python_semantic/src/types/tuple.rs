@@ -18,6 +18,7 @@
 
 use std::cmp::Ordering;
 use std::hash::Hash;
+use std::num::NonZeroUsize;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
@@ -1069,20 +1070,18 @@ impl VariableTupleSlicePlan {
                     )));
                 }
 
+                let prefix = if let Some(prefix_start) = prefix_start {
+                    tuple
+                        .prefix_elements()
+                        .py_slice(db, i32::try_from(prefix_start).ok(), None, Some(step))?
+                        .collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                };
+
                 Ok(Type::tuple(TupleType::mixed(
                     db,
-                    prefix_start
-                        .map(|start| {
-                            tuple.prefix_elements().py_slice(
-                                db,
-                                i32::try_from(start).ok(),
-                                None,
-                                Some(step),
-                            )
-                        })
-                        .transpose()?
-                        .into_iter()
-                        .flatten(),
+                    prefix,
                     tuple.variable_and_suffix_type(db, suffix_stop),
                     std::iter::empty(),
                 )))
@@ -1186,7 +1185,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
 
             let minimum_len = self.prefix_len() + self.suffix_len();
             if let Ok(step) = usize::try_from(step)
-                && Self::last_forward_slice_index(start, stop, step)
+                && let Some(nonzero_step) = NonZeroUsize::new(step)
+                && Self::last_forward_slice_index(start, stop, nonzero_step)
                     .is_some_and(|last| last < minimum_len)
             {
                 return Some(VariableTupleSlicePlan::FixedFromFront { start, stop, step });
@@ -1276,7 +1276,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         let suffix_stop = match stop {
             None => None,
             Some(stop) if stop >= 0 => {
-                let stop = usize::try_from(stop).ok()?;
+                let stop = Self::nonnegative_slice_index(Some(stop))?;
                 if stop <= self.len().minimum() {
                     return None;
                 }
@@ -1329,7 +1329,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     ) -> VariableTupleSlicePlan {
         if let Some(start) = Self::nonnegative_slice_index(start)
             && start < self.prefix_len()
-            && let Some(start) = i32::try_from(start).ok()
+            && let Ok(start) = i32::try_from(start)
             && (stop.is_none()
                 || Self::nonnegative_slice_index(stop).is_some_and(|stop| stop < self.prefix_len()))
         {
@@ -1385,26 +1385,22 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn last_forward_slice_index(start: usize, stop: usize, step: usize) -> Option<usize> {
-        debug_assert!(step > 0);
+    fn last_forward_slice_index(start: usize, stop: usize, step: NonZeroUsize) -> Option<usize> {
+        let step = step.get();
         (start < stop).then(|| start + ((stop - start - 1) / step) * step)
     }
 
     fn type_at_nonnegative_index(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
+        (index < self.len().minimum()).then(|| self.type_at_nonnegative_index_unbounded(db, index))
+    }
+
+    fn type_at_nonnegative_index_unbounded(&self, db: &'db dyn Db, index: usize) -> Type<'db> {
         if let Some(element) = self.prefix_elements().get(index) {
-            return Some(*element);
+            *element
+        } else {
+            let suffix_stop = index - self.prefix_len() + 1;
+            self.variable_and_suffix_type(db, Some(suffix_stop))
         }
-
-        let suffix_end = index.checked_sub(self.prefix_len())?;
-        if suffix_end >= self.suffix_len() {
-            return None;
-        }
-
-        Some(UnionType::from_elements_leave_aliases(
-            db,
-            std::iter::once(self.variable())
-                .chain(self.suffix_elements().iter().take(suffix_end + 1).copied()),
-        ))
     }
 
     fn homogeneous_type(&self, db: &'db dyn Db) -> Type<'db> {
@@ -1630,26 +1626,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
 
     fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
         match Nth::from_index(index) {
-            Nth::FromStart(index) => {
-                if let Some(element) = self.prefix_elements().get(index) {
-                    // index is small enough that it lands in the prefix of the tuple.
-                    return Ok(*element);
-                }
-
-                // index is large enough that it lands past the prefix. The tuple can always be
-                // large enough that it lands in the variable-length portion. It might also be
-                // small enough to land in the suffix.
-                let index_past_prefix = index - self.prefix_elements().len() + 1;
-                Ok(UnionType::from_elements_leave_aliases(
-                    db,
-                    std::iter::once(self.variable()).chain(
-                        self.suffix_elements()
-                            .iter()
-                            .take(index_past_prefix)
-                            .copied(),
-                    ),
-                ))
-            }
+            Nth::FromStart(index) => Ok(self.type_at_nonnegative_index_unbounded(db, index)),
 
             Nth::FromEnd(index_from_end) => {
                 if index_from_end < self.suffix_elements().len() {
