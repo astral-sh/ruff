@@ -615,31 +615,28 @@ fn output_format_notebook() -> Result<()> {
     unformatted: File would be reformatted
       --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:1:1
      ::: cell 1
-    1 | import numpy
+      |
       - maths = (numpy.arange(100)**2).sum()
       - stats= numpy.asarray([1,2,3,4]).median()
     2 +
     3 + maths = (numpy.arange(100) ** 2).sum()
     4 + stats = numpy.asarray([1, 2, 3, 4]).median()
+      |
      ::: cell 3
-    1 | # A cell with IPython escape command
-    2 | def some_function(foo, bar):
-    3 |     pass
+      |
     4 +
     5 +
-    6 | %matplotlib inline
-      ::: cell 4
-    1  | foo = %pwd
-       - def some_function(foo,bar,):
-    2  +
-    3  +
-    4  + def some_function(
-    5  +     foo,
-    6  +     bar,
-    7  + ):
-    8  |     # Another cell with IPython escape command
-    9  |     foo = %pwd
-    10 |     print(foo)
+      |
+     ::: cell 4
+      |
+      - def some_function(foo,bar,):
+    2 +
+    3 +
+    4 + def some_function(
+    5 +     foo,
+    6 +     bar,
+    7 + ):
+      |
 
     1 file would be reformatted
 
@@ -2451,9 +2448,7 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     ----- stdout -----
     unformatted: File would be reformatted
       --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
-    1  | This is a markdown document with two fenced code blocks:
-    2  |
-    3  | ```py
+       |
        - print( "hello" )
        - def foo(): pass
     4  + print("hello")
@@ -2461,16 +2456,14 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     6  +
     7  + def foo():
     8  +     pass
-    9  | ```
-    10 |
-    11 | ```pyi
+    --------------------------------------------------------------------------------
        - print( "hello" )
        - def foo(): pass
     12 + print("hello")
     13 +
     14 + def foo():
     15 +     pass
-    16 | ```
+       |
 
     1 file would be reformatted
 
@@ -2591,18 +2584,18 @@ print( 'hello' )
 
     unformatted: File would be reformatted
      --> test.bar:1:1
-    2 | Text string
-    3 |
-    4 | ```py
+      |
       - print( 'hello' )
     5 + print("hello")
-    6 | ```
+      |
 
     unformatted: File would be reformatted
      --> test.foo:1:1
+      |
       -
       - print( 'hello' )
     1 + print("hello")
+      |
 
     2 files would be reformatted
 

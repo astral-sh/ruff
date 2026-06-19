@@ -66,7 +66,8 @@ impl<'a> FullRenderer<'a> {
 
             if self.config.show_fix_diff
                 && diag.has_applicable_fix(self.config.fix_applicability())
-                && let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver)
+                && let Some(diff) =
+                    Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config.fix_context)
             {
                 write!(f, "{diff}")?;
             }
@@ -91,6 +92,7 @@ struct Diff<'a> {
     diagnostic_source: DiagnosticSource,
     notebook_index: Option<NotebookIndex>,
     stylesheet: &'a DiagnosticStylesheet,
+    context: usize,
 }
 
 impl<'a> Diff<'a> {
@@ -98,6 +100,7 @@ impl<'a> Diff<'a> {
         diagnostic: &'a Diagnostic,
         stylesheet: &'a DiagnosticStylesheet,
         resolver: &'a dyn FileResolver,
+        context: usize,
     ) -> Option<Diff<'a>> {
         let file = &diagnostic.primary_span_ref()?.file;
         Some(Diff {
@@ -105,7 +108,17 @@ impl<'a> Diff<'a> {
             diagnostic_source: file.diagnostic_source(resolver),
             notebook_index: resolver.notebook_index(file),
             stylesheet,
+            context,
         })
+    }
+
+    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{line} {separator}",
+            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
+            separator = fmt_styled("|", self.stylesheet.line_no),
+        )
     }
 }
 
@@ -161,7 +174,7 @@ impl std::fmt::Display for Diff<'_> {
 
             let diff = TextDiff::from_lines(input, &output);
 
-            let grouped_ops = diff.grouped_ops(3);
+            let grouped_ops = diff.grouped_ops(self.context);
 
             // Find the new line number with the largest number of digits to align all of the line
             // number separators.
@@ -174,6 +187,10 @@ impl std::fmt::Display for Diff<'_> {
                 // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
                 // three colons on the pipe.
                 writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
+            }
+
+            if self.context == 0 {
+                self.write_gutter(f, digit_with)?;
             }
 
             for (idx, group) in grouped_ops.iter().enumerate() {
@@ -235,6 +252,10 @@ impl std::fmt::Display for Diff<'_> {
                         }
                     }
                 }
+            }
+
+            if self.context == 0 {
+                self.write_gutter(f, digit_with)?;
             }
         }
 
@@ -926,7 +947,7 @@ line 10
             range,
         )));
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic][*]: main diagnostic message
          --> example.py:3:1
           |
@@ -947,6 +968,48 @@ line 10
         9  | line 9
         10 | line 10
         note: This is an unsafe fix and may change runtime behavior
+        ");
+    }
+
+    #[test]
+    fn zero_context_fix_diff_is_framed() {
+        let mut env = TestEnvironment::new();
+        let contents = "\
+line 1
+line 2
+line 3
+line 4
+line 5
+line 6
+line 7
+";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+        env.context(0);
+        env.fix_context(0);
+        env.show_fix_diff(true);
+
+        let mut diagnostic = env.err().primary("example.py", "4", "4", "").build();
+        diagnostic.help("Replace the line");
+        let target = "line 4";
+        let target_start = contents.find(target).unwrap();
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "replacement".to_string(),
+            TextRange::at(TextSize::try_from(target_start).unwrap(), target.text_len()),
+        )));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:4:1
+          |
+        4 | line 4
+          | ^^^^^^
+          |
+        help: Replace the line
+          |
+          - line 4
+        4 + replacement
+          |
         ");
     }
 }

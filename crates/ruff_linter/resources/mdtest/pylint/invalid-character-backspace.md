@@ -56,9 +56,10 @@ error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
   |                        ^
   |
 help: Replace with escape sequence
+  |
   - format_spec = f"{value:␈}"  # snapshot: invalid-character-backspace
 1 + format_spec = f"{value:\b}"  # snapshot: invalid-character-backspace
-2 | f_string_literal = f"hello␈"  # snapshot: invalid-character-backspace
+  |
 
 
 error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
@@ -68,9 +69,10 @@ error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
   |                           ^
   |
 help: Replace with escape sequence
-1 | format_spec = f"{value:␈}"  # snapshot: invalid-character-backspace
+  |
   - f_string_literal = f"hello␈"  # snapshot: invalid-character-backspace
 2 + f_string_literal = f"hello\b"  # snapshot: invalid-character-backspace
+  |
 ```
 
 ## Python 3.12 and later
@@ -99,11 +101,10 @@ error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
   |                         ^
   |
 help: Replace with escape sequence
+  |
   - replacement_field = f"{'␈'}"  # snapshot: invalid-character-backspace
 1 + replacement_field = f"{'\b'}"  # snapshot: invalid-character-backspace
-2 | format_spec = f"{value:␈}"  # snapshot: invalid-character-backspace
-3 | f_string_literal = f"hello␈"  # snapshot: invalid-character-backspace
-4 | nested_f_string = f"{f'hello␈'}"  # snapshot: invalid-character-backspace
+  |
 
 
 error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
@@ -113,11 +114,10 @@ error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
   |                        ^
   |
 help: Replace with escape sequence
-1 | replacement_field = f"{'␈'}"  # snapshot: invalid-character-backspace
+  |
   - format_spec = f"{value:␈}"  # snapshot: invalid-character-backspace
 2 + format_spec = f"{value:\b}"  # snapshot: invalid-character-backspace
-3 | f_string_literal = f"hello␈"  # snapshot: invalid-character-backspace
-4 | nested_f_string = f"{f'hello␈'}"  # snapshot: invalid-character-backspace
+  |
 
 
 error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
@@ -127,11 +127,10 @@ error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
   |                           ^
   |
 help: Replace with escape sequence
-1 | replacement_field = f"{'␈'}"  # snapshot: invalid-character-backspace
-2 | format_spec = f"{value:␈}"  # snapshot: invalid-character-backspace
+  |
   - f_string_literal = f"hello␈"  # snapshot: invalid-character-backspace
 3 + f_string_literal = f"hello\b"  # snapshot: invalid-character-backspace
-4 | nested_f_string = f"{f'hello␈'}"  # snapshot: invalid-character-backspace
+  |
 
 
 error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
@@ -141,9 +140,8 @@ error[PLE2510]: Invalid unescaped character backspace, use "\b" instead
   |                             ^
   |
 help: Replace with escape sequence
-1 | replacement_field = f"{'␈'}"  # snapshot: invalid-character-backspace
-2 | format_spec = f"{value:␈}"  # snapshot: invalid-character-backspace
-3 | f_string_literal = f"hello␈"  # snapshot: invalid-character-backspace
+  |
   - nested_f_string = f"{f'hello␈'}"  # snapshot: invalid-character-backspace
 4 + nested_f_string = f"{f'hello\b'}"  # snapshot: invalid-character-backspace
+  |
 ```
