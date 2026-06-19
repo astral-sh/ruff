@@ -149,6 +149,33 @@ pub fn extract_with(source_tree: &Path, namespace: &str) -> ModelGraph {
     graph
 }
 
+/// Like [`extract_with`], but walks the **whole Rails application** — the
+/// core `app/models` **plus every mounted engine's `app/models`**
+/// (`modules/*/app/models`, `engines/*/app/models`).
+///
+/// OpenProject keeps a large share of its domain in `modules/*` engines
+/// (e.g. `TimeEntry` lives in `modules/costs/app/models`), invisible to
+/// the core-only [`extract`]. All roots feed one `build_models` pass, so a
+/// class reopened across engines still merges into a single [`Model`].
+///
+/// Plain [`extract`] / [`extract_with`] stay core-only for backward
+/// compatibility; opt into engines explicitly with this entry point.
+#[must_use]
+pub fn extract_app_with(source_tree: &Path, namespace: &str) -> ModelGraph {
+    let classes = parse::parse_models_with_engines(source_tree);
+    let mut graph = ModelGraph::new(namespace);
+    graph.models = build_models(&classes);
+    graph
+}
+
+/// Whole-application extraction (core + engines) tagged with the default
+/// [`NAMESPACE`]. Thin wrapper over [`extract_app_with`]; see [`extract`]
+/// for the namespace caveat.
+#[must_use]
+pub fn extract_app(source_tree: &Path) -> ModelGraph {
+    extract_app_with(source_tree, NAMESPACE)
+}
+
 /// Build the deduplicated `Vec<Model>` from parsed [`RubyClass`]es —
 /// merging same-named reopens into a single Model.
 ///
@@ -757,6 +784,95 @@ end
         eprintln!(
             "D-AR-4 corpus gate: {class_count} classes, {total_decls} declarations, 0 leaked names",
         );
+    }
+
+    /// Engine-walking: [`extract_app`] harvests core `app/models` PLUS every
+    /// mounted engine's `app/models`, and a class reopened across roots
+    /// merges into one `Model` (cross-root reopen-merge). Plain [`extract`]
+    /// stays core-only.
+    #[test]
+    fn extract_app_walks_engines_and_merges_across_roots() {
+        use std::fs;
+        let base = std::env::temp_dir().join(format!("ruff_engines_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let core = base.join("app/models");
+        let engine = base.join("modules/costs/app/models");
+        fs::create_dir_all(&core).unwrap();
+        fs::create_dir_all(&engine).unwrap();
+        fs::write(
+            core.join("project.rb"),
+            "class Project < ApplicationRecord\n  has_many :issues\nend\n",
+        )
+        .unwrap();
+        // Engine-only model — invisible to core-only `extract`.
+        fs::write(
+            engine.join("time_entry.rb"),
+            "class TimeEntry < ApplicationRecord\n  belongs_to :project\nend\n",
+        )
+        .unwrap();
+        // Same class reopened in BOTH roots — must merge into one Model.
+        fs::write(
+            core.join("user.rb"),
+            "class User < ApplicationRecord\n  has_many :members\nend\n",
+        )
+        .unwrap();
+        fs::write(
+            engine.join("user_costs.rb"),
+            "class User < ApplicationRecord\n  has_many :time_entries\nend\n",
+        )
+        .unwrap();
+
+        // core-only extract misses the engine model.
+        let core_only = extract(&base);
+        assert!(core_only.models.iter().any(|m| m.name == "Project"));
+        assert!(
+            !core_only.models.iter().any(|m| m.name == "TimeEntry"),
+            "core-only extract must NOT see the engine model",
+        );
+
+        // extract_app sees both, namespace-tagged, and merges the reopen.
+        let app = extract_app_with(&base, "openproject");
+        assert_eq!(app.namespace, "openproject");
+        assert!(app.models.iter().any(|m| m.name == "Project"));
+        assert!(
+            app.models.iter().any(|m| m.name == "TimeEntry"),
+            "extract_app must harvest modules/*/app/models",
+        );
+        let users: Vec<&Model> = app.models.iter().filter(|m| m.name == "User").collect();
+        assert_eq!(users.len(), 1, "cross-root reopen must merge into ONE Model");
+        assert_eq!(
+            users[0].associations.len(),
+            2,
+            "both roots' associations must be merged",
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// Real-corpus engine gate: on OpenProject, [`extract_app`] (core +
+    /// engines) harvests strictly more than core-only [`extract`], and
+    /// surfaces an engine-only model (`TimeEntry` lives in
+    /// `modules/costs/app/models`). Env-gated like the coverage gate.
+    #[test]
+    #[allow(clippy::print_stderr)]
+    fn extract_app_harvests_openproject_engines() {
+        let Ok(root) = std::env::var("OPENPROJECT_PATH") else {
+            eprintln!("OPENPROJECT_PATH unset; skipping engine real-corpus gate");
+            return;
+        };
+        let path = std::path::Path::new(&root);
+        let core = extract(path).models.len();
+        let app = extract_app(path);
+        let app_count = app.models.len();
+        assert!(
+            app_count > core,
+            "extract_app ({app_count}) must exceed core-only ({core})",
+        );
+        assert!(
+            app.models.iter().any(|m| m.name == "TimeEntry"),
+            "TimeEntry (modules/costs/app/models) must be harvested by extract_app",
+        );
+        eprintln!("engine gate: core={core}, core+engines={app_count}");
     }
 
     // ────────────────── Codex P2 regression tests ──────────────────
