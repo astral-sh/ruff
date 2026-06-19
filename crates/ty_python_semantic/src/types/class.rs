@@ -14,8 +14,8 @@ pub(crate) use self::static_literal::{
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, KnownInstanceType, MemberLookupPolicy, MroIterator, SpecialFormType,
-    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
+    TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -336,24 +336,6 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
-/// Return whether `class` inherits from the `Any` special form.
-#[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
-fn inherits_from_any_inner<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    class.explicit_bases(db).iter().any(|base| match base {
-        Type::SpecialForm(SpecialFormType::Any) => true,
-        Type::ClassLiteral(base) => inherits_from_any_inner(db, *base),
-        Type::GenericAlias(alias) => {
-            inherits_from_any_inner(db, ClassLiteral::Static(alias.origin(db)))
-        }
-        Type::KnownInstance(KnownInstanceType::Annotated(ty)) => {
-            ty.inner(db).as_nominal_instance().is_some_and(|instance| {
-                inherits_from_any_inner(db, instance.class(db).class_literal(db))
-            })
-        }
-        _ => false,
-    })
-}
-
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -419,7 +401,14 @@ impl<'db> ClassLiteral<'db> {
     /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
     /// arbitrary types.
     pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
-        inherits_from_any_inner(db, self)
+        match self {
+            Self::Static(literal) if !literal.has_explicit_bases(db) => false,
+            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => false,
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::Static(_) | Self::Dynamic(_) | Self::DynamicEnum(_) => {
+                self.iter_mro(db).any(|base| base == ClassBase::Any)
+            }
+        }
     }
 
     /// Returns the metaclass of this class.
@@ -2198,16 +2187,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
-                    TypeRelation::Subtyping
-                    | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming => {
-                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                    match self.relation {
+                        TypeRelation::Subtyping
+                        | TypeRelation::Redundancy { .. }
+                        | TypeRelation::SubtypingAssuming => {
+                            ConstraintSet::from_bool(self.constraints, target.is_object(db))
+                        }
+                        TypeRelation::Assignability => {
+                            ConstraintSet::from_bool(self.constraints, !target.is_final(db))
+                        }
                     }
-                    TypeRelation::Assignability => {
-                        ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                    }
-                },
+                }
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
                 ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => self.never(),
@@ -2417,8 +2408,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) if policy.require_concrete() => {}
-                ClassBase::Dynamic(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) if policy.require_concrete() => {}
+                ClassBase::Any | ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
@@ -2493,7 +2484,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     // We already return the dynamic type for class member lookup, so we can
                     // just return unbound here (to avoid having to build a union of the
                     // dynamic type with itself).
