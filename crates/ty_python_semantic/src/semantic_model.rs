@@ -395,7 +395,11 @@ impl<'db> SemanticModel<'db> {
         self.inferred_type_for_covering_node(&target, range)
     }
 
-    fn inferred_type_for_covering_node(
+    /// Returns the inferred type for an already resolved covering node.
+    ///
+    /// `range` identifies the selected part of compound targets such as dotted module names and
+    /// string annotations, so it can be narrower than `target.node().range()`.
+    pub fn inferred_type_for_covering_node(
         &self,
         target: &CoveringNode<'_>,
         range: TextRange,
@@ -683,7 +687,7 @@ impl<'db> SemanticModel<'db> {
     }
 }
 
-fn covering_type_node<'a>(root: ast::AnyNodeRef<'a>, range: TextRange) -> Option<CoveringNode<'a>> {
+fn covering_type_node(root: ast::AnyNodeRef<'_>, range: TextRange) -> Option<CoveringNode<'_>> {
     if !root.range().contains_range(range) {
         return None;
     }

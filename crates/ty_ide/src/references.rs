@@ -392,7 +392,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
 
                 let kind = OccurrenceKind::from(name_expr.ctx);
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
-                self.check_covering_node(&covering_node, kind);
+                self.check_covering_node(covering_node, kind);
             }
             AnyNodeRef::ExprAttribute(attr_expr) => {
                 let kind = OccurrenceKind::from(attr_expr.ctx);
@@ -514,21 +514,21 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
 
 impl<'a> LocalReferencesFinder<'a> {
     /// Checks an identifier of a binding (e.g. `x = 10`)
-    fn check_binding_identifier(&mut self, identifier: &ast::Identifier) {
+    fn check_binding_identifier(&mut self, identifier: &'a ast::Identifier) {
         self.check_identifier(identifier, OccurrenceKind::Binding);
     }
 
     /// Checks an identifier that references a variable (a use).
-    fn check_reference_identifier(&mut self, identifier: &ast::Identifier) {
+    fn check_reference_identifier(&mut self, identifier: &'a ast::Identifier) {
         self.check_identifier(identifier, OccurrenceKind::Reference);
     }
 
     /// Checks an identifier that's part of a declaration, e.g. the name of the class.
-    fn check_declaration_identifier(&mut self, identifier: &ast::Identifier) {
+    fn check_declaration_identifier(&mut self, identifier: &'a ast::Identifier) {
         self.check_identifier(identifier, OccurrenceKind::Declaration);
     }
 
-    fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {
+    fn check_identifier(&mut self, identifier: &'a ast::Identifier, kind: OccurrenceKind) {
         // Quick text-based check first
         if identifier.id != self.target_text {
             return;
@@ -537,20 +537,20 @@ impl<'a> LocalReferencesFinder<'a> {
         let mut ancestors_with_identifier = self.ancestors.clone();
         ancestors_with_identifier.push(AnyNodeRef::from(identifier));
         let covering_node = CoveringNode::from_ancestors(ancestors_with_identifier);
-        self.check_covering_node(&covering_node, kind);
+        self.check_covering_node(covering_node, kind);
     }
 
     /// Returns the covering node's resolved definitions.
     fn definitions_for_covering_node(
         &self,
-        covering_node: &CoveringNode<'_>,
+        covering_node: CoveringNode<'a>,
     ) -> Option<Definitions<'a>> {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
         let goto_target =
-            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)?;
+            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens);
 
         let definitions = goto_target
             .definitions(self.model, self.mode.to_import_alias_resolution())?
@@ -559,7 +559,18 @@ impl<'a> LocalReferencesFinder<'a> {
         Some(definitions)
     }
 
-    fn check_covering_node(&mut self, covering_node: &CoveringNode<'_>, kind: OccurrenceKind) {
+    fn check_covering_node(&mut self, covering_node: CoveringNode<'a>, kind: OccurrenceKind) {
+        let range = covering_node.node().range();
+        let is_declaration = if matches!(self.mode, ReferencesMode::ReferencesSkipDeclaration) {
+            match kind {
+                OccurrenceKind::Declaration => true,
+                OccurrenceKind::Reference => false,
+                OccurrenceKind::Binding => self.is_declaration(&covering_node),
+            }
+        } else {
+            false
+        };
+
         let Some(current_definitions) = self.definitions_for_covering_node(covering_node) else {
             return;
         };
@@ -569,23 +580,11 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         }
 
-        if matches!(self.mode, ReferencesMode::ReferencesSkipDeclaration) {
-            let is_declaration = match kind {
-                OccurrenceKind::Declaration => true,
-                OccurrenceKind::Reference => false,
-                OccurrenceKind::Binding => self.is_declaration(covering_node),
-            };
-
-            if is_declaration {
-                return;
-            }
+        if is_declaration {
+            return;
         }
 
-        let target = ReferenceTarget::new(
-            self.model.file(),
-            covering_node.node().range(),
-            kind.to_reference_kind(),
-        );
+        let target = ReferenceTarget::new(self.model.file(), range, kind.to_reference_kind());
         self.references.push(target);
     }
 

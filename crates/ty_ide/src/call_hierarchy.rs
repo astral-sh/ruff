@@ -161,7 +161,7 @@ impl<'a> CalleeLeaf<'a> {
         model: &'a SemanticModel,
         tokens: &Tokens,
         ancestors: &[AnyNodeRef<'a>],
-    ) -> Option<(GotoTarget<'a>, TextRange)> {
+    ) -> (GotoTarget<'a>, TextRange) {
         // Construct the leaf stack the way `find_goto_target_impl` does: the leaf
         // node has to be the identifier/name, with `ExprAttribute` (for attribute
         // calls) sitting just above it so `from_covering_node`'s `Identifier` arm
@@ -183,8 +183,8 @@ impl<'a> CalleeLeaf<'a> {
         };
         let covering = CoveringNode::from_ancestors(stack);
         let goto_target =
-            GotoTarget::from_covering_node(model, &covering, call_site_range.start(), tokens)?;
-        Some((goto_target, call_site_range))
+            GotoTarget::from_covering_node(model, covering, call_site_range.start(), tokens);
+        (goto_target, call_site_range)
     }
 }
 

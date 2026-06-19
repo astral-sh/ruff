@@ -273,11 +273,7 @@ impl<'a> CallSitesFinder<'a, '_> {
     }
 
     fn check_call_site(&mut self, leaf: CalleeLeaf<'a>, scope_node: AnyNodeRef<'a>) {
-        let Some((goto_target, call_site_range)) =
-            leaf.resolve(self.model, self.tokens, &self.ancestors)
-        else {
-            return;
-        };
+        let (goto_target, call_site_range) = leaf.resolve(self.model, self.tokens, &self.ancestors);
 
         // Keep callable implementations here rather than applying
         // `goto_declaration`: clicking the name in `C()` deliberately navigates
@@ -316,11 +312,8 @@ impl<'a> CallSitesFinder<'a, '_> {
         // Strip the trailing self-push so the slice mirrors what `ExprCall` and
         // `Decorator` pass to `resolve_callee` (they resolve before descending).
         let ancestors_without_self = &self.ancestors[..self.ancestors.len() - 1];
-        let Some((goto_target, call_site_range)) =
-            leaf.resolve(self.model, self.tokens, ancestors_without_self)
-        else {
-            return;
-        };
+        let (goto_target, call_site_range) =
+            leaf.resolve(self.model, self.tokens, ancestors_without_self);
 
         let Some(current_definitions) = goto_target
             .definitions(self.model, ImportAliasResolution::ResolveAliases)
