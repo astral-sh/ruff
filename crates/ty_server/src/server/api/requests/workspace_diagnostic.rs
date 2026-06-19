@@ -399,7 +399,12 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| doc.version())
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(diagnostics, unnecessary_hints);
+        let result_id = Diagnostics::result_id_from_hash(
+            db,
+            diagnostics,
+            unnecessary_hints,
+            self.client_capabilities,
+        );
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
 
@@ -488,7 +493,7 @@ impl<'a> ResponseWriter<'a> {
             clippy::iter_over_hash_type,
             reason = "workspace diagnostic reports are independently identified by URI"
         )]
-        for (key, (previous_uri, previous_result_id)) in self.previous_result_ids {
+        for (key, (previous_uri, _)) in self.previous_result_ids {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index
@@ -496,31 +501,15 @@ impl<'a> ResponseWriter<'a> {
                 .ok()
                 .map(crate::session::index::Document::version);
 
-            let new_result_id = Diagnostics::result_id_from_hash(&[], &[]);
-
-            let report = match new_result_id {
-                Some(new_id) if new_id == previous_result_id => {
-                    WorkspaceUnchangedDocumentDiagnosticReport {
-                        uri: previous_uri,
-                        version,
-                        unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_id,
-                        },
-                    }
-                    .into()
-                }
-                new_id => {
-                    WorkspaceFullDocumentDiagnosticReport {
-                        uri: previous_uri,
-                        version,
-                        full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: new_id,
-                            items: vec![], // No diagnostics
-                        },
-                    }
-                    .into()
-                }
-            };
+            let report = WorkspaceFullDocumentDiagnosticReport {
+                uri: previous_uri,
+                version,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: vec![],
+                },
+            }
+            .into();
 
             items.push(report);
         }

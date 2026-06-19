@@ -36,6 +36,46 @@ def foo() -> str:
     Ok(())
 }
 
+#[test]
+fn full_diagnostic_output() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_full_diagnostic_output()
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    let rendered = diagnostics.diagnostics[0]
+        .data
+        .as_ref()
+        .and_then(|data| data.get("rendered"))
+        .and_then(serde_json::Value::as_str)
+        .expect("diagnostic should include fully rendered output");
+    let diagnostic_id = diagnostics.diagnostics[0]
+        .data
+        .as_ref()
+        .and_then(|data| data.get("diagnostic_id"))
+        .and_then(serde_json::Value::as_str);
+
+    assert_eq!(diagnostic_id, Some("invalid-return-type"));
+    assert!(rendered.contains("Return type does not match returned value"));
+    assert!(rendered.contains("def foo() -> str:"));
+    assert!(rendered.contains("return 42"));
+    assert!(rendered.contains("invalid-return-type"));
+
+    Ok(())
+}
+
 /// Tests that we get diagnostics for a file that is NOT saved to
 /// disk when using `OpenFilesOnly` diagnostic mode.
 #[test]

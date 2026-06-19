@@ -544,6 +544,68 @@ def foo() -> str:
 }
 
 #[test]
+fn document_diagnostic_caching_rendered_source_changed() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content_v1 = "\
+def foo() -> str:
+    return 42  # before
+";
+    let foo_content_v2 = "\
+def foo() -> str:
+    return 42  # after!
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content_v1)?
+        .with_full_diagnostic_output()
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content_v1, 1);
+
+    let first_response = server.document_diagnostic_request(foo, None);
+    let result_id = match first_response {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
+            .full_document_diagnostic_report
+            .result_id
+            .expect("First response should have a result ID"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("First response should be a full report")
+        }
+    };
+
+    server.change_text_document(
+        foo,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: foo_content_v2.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let second_response = server.document_diagnostic_request(foo, Some(result_id));
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = second_response
+    else {
+        panic!("Expected a full report when the rendered source changed");
+    };
+    let rendered = report.full_document_diagnostic_report.items[0]
+        .data
+        .as_ref()
+        .and_then(|data| data.get("rendered"))
+        .and_then(serde_json::Value::as_str)
+        .expect("Diagnostic should include rendered output");
+    assert!(rendered.contains("# after!"));
+
+    Ok(())
+}
+
+#[test]
 fn workspace_diagnostic_caching() -> Result<()> {
     let _filter = filter_result_id();
 

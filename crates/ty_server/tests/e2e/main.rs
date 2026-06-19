@@ -1378,6 +1378,14 @@ impl TestServerBuilder {
         self
     }
 
+    /// Advertise support for ty's fully rendered diagnostic output.
+    pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
+        self.client_capabilities.experimental = Some(serde_json::json!({
+            "fullDiagnosticOutput": true,
+        }));
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
