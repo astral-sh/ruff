@@ -4719,10 +4719,23 @@ struct SequentMap {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<DerivedConstraint>>,
+    pair_implications:
+        FxIndexMap<(ConstraintId, ConstraintId), SmallIndexSet<[DerivedConstraint; 2]>>,
     /// Sequents of the form `C → D`
-    single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
+    single_implications: FxIndexMap<ConstraintId, SmallIndexSet<[ConstraintId; 10]>>,
 }
+
+#[cfg(not(debug_assertions))]
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<SmallIndexSet<[DerivedConstraint; 2]>>(),
+    std::mem::size_of::<FxIndexSet<DerivedConstraint>>()
+);
+
+#[cfg(not(debug_assertions))]
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<SmallIndexSet<[ConstraintId; 10]>>(),
+    std::mem::size_of::<FxIndexSet<ConstraintId>>()
+);
 
 impl SequentMap {
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in
