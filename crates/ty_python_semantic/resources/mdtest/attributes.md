@@ -3958,6 +3958,20 @@ class ProjectionCustomSubscriptAssignment:
         reveal_type(self.x)  # revealed: ProjectionSubscriptBox[int]
 ```
 
+Single-target `for` assignments to an implicit attribute also use the iterable projection:
+
+```py
+class ProjectionForTargetAttribute:
+    def __init__(self) -> None:
+        self.x = [(1,)]
+
+    def read(self) -> None:
+        for self.x in self.x:
+            pass
+
+        reveal_type(self.x)  # revealed: list[tuple[int]] | tuple[int] | int
+```
+
 Projection recovery does not collapse recursive values that are wrapped under another container:
 
 ```py

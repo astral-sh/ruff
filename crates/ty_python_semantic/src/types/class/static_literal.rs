@@ -55,7 +55,7 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    attribute_scopes,
+    EvaluationMode, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -2482,7 +2482,29 @@ impl<'db> StaticClassLiteral<'db> {
                             );
                             let iterable_ty = inference.expression_type(iterable);
                             // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                            Some(iterable_ty.iterate(db).homogeneous_element_type(db))
+                            if let Some(projected) = iterable_ty
+                                .try_iter_projection_result_with_mode(
+                                    db,
+                                    EvaluationMode::from_is_async(for_stmt.is_async()),
+                                )
+                            {
+                                projection_evidence = ProjectionEvidenceSet::merged(
+                                    db,
+                                    projection_evidence,
+                                    projected.projection_evidence(),
+                                );
+                                Some(projected.ty())
+                            } else {
+                                Some(
+                                    iterable_ty
+                                        .try_iterate_with_mode(
+                                            db,
+                                            EvaluationMode::from_is_async(for_stmt.is_async()),
+                                        )
+                                        .map(|tuple| tuple.homogeneous_element_type(db))
+                                        .unwrap_or_else(|err| err.fallback_element_type(db)),
+                                )
+                            }
                         }
                     },
                     DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
