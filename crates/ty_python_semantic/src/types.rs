@@ -2166,16 +2166,13 @@ impl<'db> Type<'db> {
         projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            let div = Type::divergent(id);
+            let divergent = DivergentType::new(id);
+            let div = Type::Divergent(divergent);
             let ty = ty
-                .try_projection_cycle_normalized(
-                    db,
-                    div.as_divergent().unwrap(),
-                    projection_evidence,
-                )
+                .try_projection_cycle_normalized(db, divergent, projection_evidence)
                 .unwrap_or(ty);
             ty.recursive_type_normalized_impl(db, div, false)
-                .unwrap_or(Type::divergent(id))
+                .unwrap_or(div)
         })
     }
 

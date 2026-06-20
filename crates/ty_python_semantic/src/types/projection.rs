@@ -1445,7 +1445,7 @@ impl<'db> ProjectionSystem<'db> {
         let sccs = dependency_first_strongly_connected_components(&graph);
         let mut solutions = vec![None; paths.len()];
         for scc in sccs {
-            let wrap_in_list = equations[&paths[scc[0]]].wrap_in_list?;
+            let wrap_in_list = equations[&paths[*scc.first()?]].wrap_in_list?;
             for &index in &scc {
                 if equations[&paths[index]].wrap_in_list != Some(wrap_in_list) {
                     return None;
