@@ -277,52 +277,43 @@ impl<'db> Type<'db> {
         let elements = self.top_level_projection_union_elements(db);
         let mut projection_evidence = ProjectionEvidenceBuilder::default();
         let path = ProjectionPath::from_op(op);
-        let terms = elements
-            .into_iter()
-            .map(|element| {
-                let mentions_root = element.mentions_cycle_artifact_direct(db, *root);
-                let direct_container = ProjectionContainer::from_direct_type(db, element);
+        let mut terms = vec![None; elements.len()];
+        let mut recursive_elements = Vec::new();
 
-                let term = match (mentions_root, direct_container.as_ref()) {
-                    (false, None) => return None,
-                    (true, Some(container @ ProjectionContainer::Tuple { .. })) => {
-                        // Project recursive tuple arms structurally. Calling the normal projection
-                        // path here would reenter cycle recovery through tuple subscript handling.
-                        container.project_path(db, *root, None, &path)?
-                    }
-                    (true, Some(ProjectionContainer::Generic(_))) => {
-                        // Avoid reentering method or iteration inference for recursive generic
-                        // arms. Subscript has a projection-suppressed path that can still expose
-                        // the recursive element type without extending the projection cycle.
-                        match op {
-                            ProjectionOp::Subscript(_) => {
-                                ProjectionContainer::infer_projection_op(db, element, op)?
-                            }
-                            _ => return None,
-                        }
-                    }
-                    _ => project_non_cycle(element)?,
-                };
+        for (index, element) in elements.iter().copied().enumerate() {
+            if element.mentions_cycle_artifact_direct(db, *root) {
+                recursive_elements.push((index, element));
+                continue;
+            }
 
-                if !mentions_root
-                    && matches!(direct_container, Some(ProjectionContainer::Generic(_)))
-                    && !term.is_ambiguous(db)
-                {
-                    projection_evidence.push_projection_fact(ProjectionEvidenceFact {
-                        root: *root,
-                        arm: element,
-                        path: path.clone(),
-                        term,
-                    });
-                }
-                Some(term)
-            })
-            .collect::<Option<Vec<_>>>()?;
+            let term = project_non_cycle(element)?;
+            projection_evidence.record_projected_container_arm(db, [*root], element, &path, term);
+            terms[index] = Some(term);
+        }
+
+        let evidence = projection_evidence.finish(db);
+        for (index, element) in recursive_elements {
+            let container = ProjectionContainer::try_from(db, *root, element, evidence.as_ref())?;
+            let term = container
+                .project_path(db, *root, evidence.as_ref(), &path)
+                .or_else(|| {
+                    if matches!(op, ProjectionOp::Subscript(_)) {
+                        // The subscript path suppresses projection creation, so it can expose a
+                        // flat dependency without recursively extending the projection cycle.
+                        ProjectionContainer::infer_projection_op(db, element, op)
+                    } else {
+                        None
+                    }
+                })?;
+            terms[index] = Some(term);
+        }
+
+        let terms = terms.into_iter().collect::<Option<Vec<_>>>()?;
 
         let ty = Self::solve_projection_terms(db, *root, &path, &terms)?;
         Some(ProjectionResult {
             ty,
-            projection_evidence: projection_evidence.finish(db),
+            projection_evidence: evidence,
         })
     }
 
@@ -424,7 +415,7 @@ impl<'db> Type<'db> {
                 continue;
             }
 
-            let container = ProjectionContainer::from_recovery_type(db, root, *element, evidence)?;
+            let container = ProjectionContainer::try_from(db, root, *element, evidence)?;
             containers.push(container);
         }
 
@@ -450,7 +441,12 @@ impl<'db> Type<'db> {
             })
             .map(|element| {
                 Some((
-                    element.replace_solved_projection_artifacts(db, root, &solved_ops)?,
+                    element.replace_solved_projection_artifacts(
+                        db,
+                        root,
+                        &solved_ops,
+                        evidence,
+                    )?,
                     element.mentions_cycle_artifact_direct(db, root),
                 ))
             })
@@ -687,6 +683,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
         solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
         if !self.mentions_cycle_artifact(db, root) {
             return Some(self);
@@ -702,13 +699,15 @@ impl<'db> Type<'db> {
             let elements = union
                 .elements(db)
                 .iter()
-                .map(|element| element.replace_solved_projection_artifacts(db, root, solved_ops))
+                .map(|element| {
+                    element.replace_solved_projection_artifacts(db, root, solved_ops, evidence)
+                })
                 .collect::<Option<Vec<_>>>()?;
             return Some(UnionType::from_elements_cycle_recovery(db, elements));
         }
 
-        if let Some(container) = ProjectionContainer::from_direct_type(db, self) {
-            return container.into_type(db, root, solved_ops);
+        if let Some(container) = ProjectionContainer::try_from(db, root, self, evidence) {
+            return container.into_type(db, root, solved_ops, evidence);
         }
 
         let paths = self.projection_ops(db, root);
@@ -732,7 +731,7 @@ impl<'db> Type<'db> {
             .into_iter()
             .map(|path| (path, Type::Divergent(root)))
             .collect::<FxIndexMap<_, _>>();
-        self.replace_solved_projection_artifacts(db, root, &solved_ops)
+        self.replace_solved_projection_artifacts(db, root, &solved_ops, None)
     }
 
     fn mentions_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
@@ -852,32 +851,30 @@ enum ProjectionContainer<'db> {
 }
 
 impl<'db> ProjectionContainer<'db> {
-    /// Cycle-recovery-time API: builds a container shape from direct structure only.
-    fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    /// Cycle-recovery-time API: builds a container from direct structure or stored evidence.
+    fn try_from(
+        db: &'db dyn Db,
+        root: DivergentType,
+        ty: Type<'db>,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<Self> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             return Some(Self::Tuple {
                 spec: spec.as_ref().clone(),
             });
         }
 
-        if let Some(fact) = ProjectionContainerFact::from_direct_type(db, ty) {
+        if let Some(fact) =
+            ty.direct_class_specialization(db)
+                .and_then(|(class, specialization)| {
+                    ProjectionContainerFact::try_from_parts(ty, class, specialization.types(db))
+                })
+        {
             return Some(Self::Generic(fact));
         }
 
-        None
-    }
-
-    /// Cycle-recovery-time API: builds a container from direct structure or stored evidence.
-    fn from_recovery_type(
-        db: &'db dyn Db,
-        root: DivergentType,
-        ty: Type<'db>,
-        evidence: Option<&ProjectionEvidenceSet<'db>>,
-    ) -> Option<Self> {
-        Self::from_direct_type(db, ty).or_else(|| {
-            let fact = evidence?.container_fact_for_arm(db, root, ty)?;
-            Some(Self::Generic(fact.clone()))
-        })
+        let fact = evidence?.container_fact_for_arm(db, root, ty)?;
+        Some(Self::Generic(fact.clone()))
     }
 
     /// Cycle-recovery-time API: replays all demanded paths against this container.
@@ -1178,6 +1175,7 @@ impl<'db> ProjectionContainer<'db> {
         db: &'db dyn Db,
         root: DivergentType,
         solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Type<'db>> {
         match self {
             Self::Tuple { spec } => match spec {
@@ -1185,7 +1183,8 @@ impl<'db> ProjectionContainer<'db> {
                     let elements = tuple
                         .iter_all_elements()
                         .map(|element| {
-                            element.replace_solved_projection_artifacts(db, root, solved_ops)
+                            element
+                                .replace_solved_projection_artifacts(db, root, solved_ops, evidence)
                         })
                         .collect::<Option<Vec<_>>>()?;
 
@@ -1195,16 +1194,18 @@ impl<'db> ProjectionContainer<'db> {
                     let prefix = tuple
                         .iter_prefix_elements()
                         .map(|element| {
-                            element.replace_solved_projection_artifacts(db, root, solved_ops)
+                            element
+                                .replace_solved_projection_artifacts(db, root, solved_ops, evidence)
                         })
                         .collect::<Option<Vec<_>>>()?;
                     let variable = tuple
                         .variable()
-                        .replace_solved_projection_artifacts(db, root, solved_ops)?;
+                        .replace_solved_projection_artifacts(db, root, solved_ops, evidence)?;
                     let suffix = tuple
                         .iter_suffix_elements()
                         .map(|element| {
-                            element.replace_solved_projection_artifacts(db, root, solved_ops)
+                            element
+                                .replace_solved_projection_artifacts(db, root, solved_ops, evidence)
                         })
                         .collect::<Option<Vec<_>>>()?;
 
@@ -1216,7 +1217,8 @@ impl<'db> ProjectionContainer<'db> {
                     .arguments
                     .iter()
                     .map(|argument| {
-                        (*argument).replace_solved_projection_artifacts(db, root, solved_ops)
+                        (*argument)
+                            .replace_solved_projection_artifacts(db, root, solved_ops, evidence)
                     })
                     .collect::<Option<Vec<_>>>()?;
 
@@ -1767,7 +1769,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
             return;
         }
 
-        let Some(container_fact) = ProjectionContainerFact::from_inference_type(db, arm) else {
+        let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, arm) else {
             return;
         };
 
@@ -1894,7 +1896,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     ) -> FxIndexSet<ProjectionContainerFact<'db>> {
         let facts = RefCell::new(FxIndexSet::default());
         any_over_type(db, ty, false, |nested| {
-            if let Some(fact) = ProjectionContainerFact::from_inference_type(db, nested) {
+            if let Some(fact) = ProjectionContainerFact::try_from_inference_type(db, nested) {
                 facts.borrow_mut().insert(fact);
             }
             false
@@ -1983,7 +1985,7 @@ struct ProjectionContainerFact<'db> {
 }
 
 impl<'db> ProjectionContainerFact<'db> {
-    fn from_parts(
+    fn try_from_parts(
         arm: Type<'db>,
         class: StaticClassLiteral<'db>,
         arguments: &[Type<'db>],
@@ -1995,26 +1997,16 @@ impl<'db> ProjectionContainerFact<'db> {
         })
     }
 
-    /// Cycle-recovery-time API: builds a fact using only direct class structure.
-    fn from_direct_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        if ty.exact_tuple_instance_spec(db).is_some() {
-            return None;
-        }
-
-        let (class, specialization) = ty.direct_class_specialization(db)?;
-        Self::from_parts(ty, class, specialization.types(db))
-    }
-
     /// Inference-time API: builds a fact from the full specialization view.
     ///
     /// This may expand aliases, bounds, and fallbacks.
-    fn from_inference_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn try_from_inference_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         if ty.exact_tuple_instance_spec(db).is_some() {
             return None;
         }
 
         let (class, specialization) = ty.class_specialization(db)?;
-        Self::from_parts(ty, class, specialization.types(db))
+        Self::try_from_parts(ty, class, specialization.types(db))
     }
 }
 
