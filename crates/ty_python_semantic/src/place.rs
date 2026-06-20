@@ -1,6 +1,7 @@
 use itertools::Either;
 use ruff_db::files::File;
 use ruff_db::small_index_set::SmallIndexSet;
+use ruff_db::small_order_set::SmallOrderSet;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
@@ -16,7 +17,7 @@ use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -721,16 +722,13 @@ pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
     )
 }
 
-type DeclaredTypeAndConflictingTypes<'db> = (
-    TypeAndQualifiers<'db>,
-    Option<Box<indexmap::set::Slice<Type<'db>>>>,
-);
+type DeclaredTypeAndConflictingTypes<'db> = (TypeAndQualifiers<'db>, Option<Box<[Type<'db>]>>);
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
 #[derive(Debug, Default)]
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     place_and_quals: PlaceAndQualifiers<'db>,
-    conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
+    conflicting_types: Option<Box<[Type<'db>]>>,
     /// Contains the first reachable declaration for this place, if any.
     /// This field is used for backreferences in diagnostics.
     pub(crate) first_declaration: Option<Definition<'db>>,
@@ -739,7 +737,7 @@ pub(crate) struct PlaceFromDeclarationsResult<'db> {
 impl<'db> PlaceFromDeclarationsResult<'db> {
     fn conflict(
         place_and_quals: PlaceAndQualifiers<'db>,
-        conflicting_types: Box<indexmap::set::Slice<Type<'db>>>,
+        conflicting_types: Box<[Type<'db>]>,
         first_declaration: Option<Definition<'db>>,
     ) -> Self {
         PlaceFromDeclarationsResult {
@@ -755,10 +753,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 
     pub(crate) fn into_place_and_conflicting_declarations(
         self,
-    ) -> (
-        PlaceAndQualifiers<'db>,
-        Option<Box<indexmap::set::Slice<Type<'db>>>>,
-    ) {
+    ) -> (PlaceAndQualifiers<'db>, Option<Box<[Type<'db>]>>) {
         (self.place_and_quals, self.conflicting_types)
     }
 }
@@ -1801,7 +1796,7 @@ struct DeclaredTypeBuilder<'db> {
     inner: PublicTypeBuilder<'db>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
-    conflicting_types: FxOrderSet<Type<'db>>,
+    conflicting_types: SmallOrderSet<[Type<'db>; 3]>,
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
@@ -1810,7 +1805,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
             inner: PublicTypeBuilder::new(db),
             qualifiers: TypeQualifiers::empty(),
             first_type: None,
-            conflicting_types: FxOrderSet::default(),
+            conflicting_types: SmallOrderSet::default(),
         }
     }
 
@@ -1830,20 +1825,22 @@ impl<'db> DeclaredTypeBuilder<'db> {
         self.qualifiers = self.qualifiers.union(element.qualifiers());
     }
 
-    fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
+    fn build(self) -> DeclaredTypeAndConflictingTypes<'db> {
         let type_and_quals =
             TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers);
         if self.conflicting_types.is_empty() {
             (type_and_quals, None)
         } else {
-            self.conflicting_types.insert_before(
-                0,
-                self.first_type
-                    .expect("there must be a first type if there are conflicting types"),
-            );
             (
                 type_and_quals,
-                Some(self.conflicting_types.into_boxed_slice()),
+                Some(
+                    std::iter::once(
+                        self.first_type
+                            .expect("there must be a first type if there are conflicting types"),
+                    )
+                    .chain(self.conflicting_types)
+                    .collect(),
+                ),
             )
         }
     }
