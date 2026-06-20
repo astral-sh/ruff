@@ -101,7 +101,8 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchDateTime
 6  | from airflow.operators.bash import BashOperator
    - from airflow.operators.datetime import BranchDateTimeOperator
 7  | from airflow.operators.empty import EmptyOperator
---------------------------------------------------------------------------------
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.datetime import BranchDateTimeOperator
 12 |
@@ -142,7 +143,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator`
 7  | from airflow.operators.datetime import BranchDateTimeOperator
    - from airflow.operators.empty import EmptyOperator
 8  | from airflow.operators.latest_only import LatestOnlyOperator
---------------------------------------------------------------------------------
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.empty import EmptyOperator
 12 |
@@ -244,7 +245,8 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtuale
 27 |     PythonOperator,
    -     PythonVirtualenvOperator,
 28 |     ShortCircuitOperator,
---------------------------------------------------------------------------------
+29 | )
+30 | from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.operators.python import PythonVirtualenvOperator
 33 |
@@ -266,7 +268,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOp
 28 |     PythonVirtualenvOperator,
    -     ShortCircuitOperator,
 29 | )
---------------------------------------------------------------------------------
+30 | from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.operators.python import ShortCircuitOperator
 33 |
@@ -435,7 +437,8 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskMa
 42 | from airflow.sensors.external_task import (
    -     ExternalTaskMarker,
 43 |     ExternalTaskSensor,
---------------------------------------------------------------------------------
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.external_task import ExternalTaskMarker
 48 |
@@ -457,7 +460,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSe
 43 |     ExternalTaskMarker,
    -     ExternalTaskSensor,
 44 | )
---------------------------------------------------------------------------------
+45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
 48 |
@@ -665,7 +668,8 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `FileTrigger` f
 75 | )
    - from airflow.triggers.file import FileTrigger
 76 | from airflow.triggers.temporal import (
---------------------------------------------------------------------------------
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.triggers.file import FileTrigger
 81 |

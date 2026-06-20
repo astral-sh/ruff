@@ -264,7 +264,7 @@ help: Import from `collections.abc`
    -         Mapping,
    -         Callable,
 38 |         Bad,
---------------------------------------------------------------------------------
+39 |         Good,
 40 |     )
 41 +     from collections.abc import Mapping, Callable
 42 |

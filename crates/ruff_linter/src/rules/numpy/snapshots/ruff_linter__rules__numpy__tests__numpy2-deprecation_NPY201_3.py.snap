@@ -15,7 +15,7 @@ help: Replace with `numpy.exceptions.DTypePromotionError`
   |
 1 + from numpy.exceptions import DTypePromotionError
 2 | def func():
---------------------------------------------------------------------------------
+3 |     import numpy as np
 4 |
   -     np.DTypePromotionError
 5 +     DTypePromotionError

@@ -35,7 +35,8 @@ help: Add return type annotation: `builtins.str`
 2 | from typing import override
 3 + import builtins
 4 |
---------------------------------------------------------------------------------
+5 | def foo():
+6 |     return "!"
 7 |
   - def _foo():
 8 + def _foo() -> builtins.str:

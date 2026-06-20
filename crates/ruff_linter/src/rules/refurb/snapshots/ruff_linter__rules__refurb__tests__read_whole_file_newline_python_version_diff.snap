@@ -42,7 +42,8 @@ help: Replace with `Path("file.txt").read_text(encoding="utf-8", newline="")`
 3  | # FURB101 (newline is supported in read_text on Python 3.13+)
 4  + import pathlib
 5  | with open("file.txt", newline="\r\n") as f:
---------------------------------------------------------------------------------
+6  |     x = f.read()
+7  |
 8  | # FURB101 (newline with encoding)
    - with open("file.txt", encoding="utf-8", newline="") as f:
    -     x = f.read()

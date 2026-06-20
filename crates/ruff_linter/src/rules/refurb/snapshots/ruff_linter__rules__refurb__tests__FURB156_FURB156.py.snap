@@ -75,7 +75,7 @@ help: Replace hardcoded charset with `string.ascii_lowercase`
 2 |
 3 + import string
 4 | _ = "0123456789"
---------------------------------------------------------------------------------
+5 | _ = "01234567"
 6 | _ = "0123456789abcdefABCDEF"
   - _ = "abcdefghijklmnopqrstuvwxyz"
 7 + _ = string.ascii_lowercase
@@ -97,7 +97,8 @@ help: Replace hardcoded charset with `string.ascii_uppercase`
 2 |
 3 + import string
 4 | _ = "0123456789"
---------------------------------------------------------------------------------
+5 | _ = "01234567"
+6 | _ = "0123456789abcdefABCDEF"
 7 | _ = "abcdefghijklmnopqrstuvwxyz"
   - _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 8 + _ = string.ascii_uppercase

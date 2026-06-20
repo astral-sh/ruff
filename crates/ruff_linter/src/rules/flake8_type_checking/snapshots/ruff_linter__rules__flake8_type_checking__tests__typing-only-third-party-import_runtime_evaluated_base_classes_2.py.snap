@@ -40,7 +40,7 @@ help: Move into type-checking block
 4  | import pydantic
    - import pyproj  # TC002
 5  | from pydantic import BaseModel
---------------------------------------------------------------------------------
+6  |
 7  | import numpy
 8  + from typing import TYPE_CHECKING
 9  +

@@ -165,7 +165,8 @@ help: `dag` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airfl
 12 | from airflow.decorators import (
    -     dag,
 13 |     setup,
---------------------------------------------------------------------------------
+14 |     task,
+15 |     task_group,
 16 | )
 17 + from airflow.sdk import dag
 18 |
@@ -228,7 +229,7 @@ help: `setup` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-air
 13 |     dag,
    -     setup,
 14 |     task,
---------------------------------------------------------------------------------
+15 |     task_group,
 16 | )
 17 + from airflow.sdk import setup
 18 |
@@ -355,7 +356,8 @@ help: `Variable` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-
 40 |     Connection,
    -     Variable,
 41 | )
---------------------------------------------------------------------------------
+42 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
+43 | from airflow.models.baseoperatorlink import BaseOperatorLink
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk import Variable
 46 |
@@ -557,7 +559,8 @@ help: `DecoratedOperator` has been moved to `airflow.sdk.bases.decorator` since 
 79 |     DecoratedMappedOperator,
    -     DecoratedOperator,
 80 |     TaskDecorator,
---------------------------------------------------------------------------------
+81 |     get_unique_task_id,
+82 |     task_decorator_factory,
 83 | )
 84 + from airflow.sdk.bases.decorator import DecoratedOperator
 85 |
@@ -579,7 +582,7 @@ help: `TaskDecorator` has been moved to `airflow.sdk.bases.decorator` since Airf
 80 |     DecoratedOperator,
    -     TaskDecorator,
 81 |     get_unique_task_id,
---------------------------------------------------------------------------------
+82 |     task_decorator_factory,
 83 | )
 84 + from airflow.sdk.bases.decorator import TaskDecorator
 85 |
@@ -750,7 +753,7 @@ help: `BaseSensorOperator` has been moved to `airflow.sdk` since Airflow 3.0 (wi
 110 | from airflow.sensors.base import (
     -     BaseSensorOperator,
 111 |     PokeReturnValue,
---------------------------------------------------------------------------------
+112 |     poke_mode_only,
 113 | )
 114 + from airflow.sdk import BaseSensorOperator
 115 |

@@ -21,7 +21,7 @@ help: Organize imports
 7  |
 8  + from foo import bar  # some comment
 9  | from mylib import (
---------------------------------------------------------------------------------
+10 |     MyClient,
 11 |     MyMgmtClient,
    - ); from foo import (
    -     bar

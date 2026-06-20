@@ -16,7 +16,8 @@ help: Replace with `Path(...).resolve()`
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
 5  + import pathlib
 6  |
---------------------------------------------------------------------------------
+7  | p = "/foo"
+8  | q = "bar"
 9  |
    - a = abspath(p)
 10 + a = pathlib.Path(p).resolve()

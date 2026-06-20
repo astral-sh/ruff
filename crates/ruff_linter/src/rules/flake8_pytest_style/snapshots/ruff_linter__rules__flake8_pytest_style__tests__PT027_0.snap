@@ -16,7 +16,8 @@ help: Replace `assertRaises` with `pytest.raises`
 1 | import unittest
 2 + import pytest
 3 |
---------------------------------------------------------------------------------
+4 |
+5 | class Test(unittest.TestCase):
 6 |     def test_errors(self):
   -         with self.assertRaises(ValueError):
 7 +         with pytest.raises(ValueError):

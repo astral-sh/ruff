@@ -189,7 +189,7 @@ help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalC
 36 |     IntervalCheckOperator,
    -     SQLIntervalCheckOperator,
 37 | )
---------------------------------------------------------------------------------
+38 | from airflow.operators.druid_check_operator import DruidCheckOperator
 39 | from airflow.operators.presto_check_operator import PrestoCheckOperator
 40 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 41 |
@@ -209,7 +209,7 @@ help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalC
 36 |     IntervalCheckOperator,
    -     SQLIntervalCheckOperator,
 37 | )
---------------------------------------------------------------------------------
+38 | from airflow.operators.druid_check_operator import DruidCheckOperator
 39 | from airflow.operators.presto_check_operator import PrestoCheckOperator
 40 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 41 |
@@ -469,7 +469,7 @@ help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLTableChec
 96  |     SQLColumnCheckOperator,
     -     SQLTableCheckOperator,
 97  |     _convert_to_float_if_possible,
---------------------------------------------------------------------------------
+98  |     parse_boolean,
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import SQLTableCheckOperator
 101 |
@@ -491,7 +491,8 @@ help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `SQLColumnChe
 95  |     BranchSQLOperator,
     -     SQLColumnCheckOperator,
 96  |     SQLTableCheckOperator,
---------------------------------------------------------------------------------
+97  |     _convert_to_float_if_possible,
+98  |     parse_boolean,
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import SQLColumnCheckOperator
 101 |

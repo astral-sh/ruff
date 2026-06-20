@@ -36,7 +36,7 @@ help: Use `AssetDetails` from `airflow.api_fastapi.auth.managers.models.resource
 15 | from airflow.security.permissions import RESOURCE_DATASET
 16 + from airflow.api_fastapi.auth.managers.models.resource_details import AssetDetails
 17 |
---------------------------------------------------------------------------------
+18 | requires_access_dataset()
 19 |
    - DatasetDetails()
 20 + AssetDetails()
@@ -380,7 +380,7 @@ help: Use `conf.get` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + conf, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -400,7 +400,7 @@ help: Use `conf.getboolean` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, conf, getfloat, getint, has_option, remove_option, as_dict, set
@@ -420,7 +420,7 @@ help: Use `conf.getfloat` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, getboolean, conf, getint, has_option, remove_option, as_dict, set
@@ -440,7 +440,7 @@ help: Use `conf.getint` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, getboolean, getfloat, conf, has_option, remove_option, as_dict, set
@@ -460,7 +460,7 @@ help: Use `conf.has_option` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, getboolean, getfloat, getint, conf, remove_option, as_dict, set
@@ -480,7 +480,7 @@ help: Use `conf.remove_option` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, getboolean, getfloat, getint, has_option, conf, as_dict, set
@@ -500,7 +500,7 @@ help: Use `conf.as_dict` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, getboolean, getfloat, getint, has_option, remove_option, conf, set
@@ -520,7 +520,7 @@ help: Use `conf.set` from `airflow.configuration` instead.
 83 |     set,
 84 + conf,
 85 | )
---------------------------------------------------------------------------------
+86 |
 87 | # airflow.configuration
    - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 88 + get, getboolean, getfloat, getint, has_option, remove_option, as_dict, conf
@@ -618,7 +618,7 @@ help: `cross_downstream` has been moved to `airflow.sdk` since Airflow 3.0 (with
 100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
 101 + from airflow.sdk import cross_downstream
 102 |
---------------------------------------------------------------------------------
+103 | #  airflow.utils.helpers
 104 | helper_chain
     - helper_cross_downstream
 105 + cross_downstream

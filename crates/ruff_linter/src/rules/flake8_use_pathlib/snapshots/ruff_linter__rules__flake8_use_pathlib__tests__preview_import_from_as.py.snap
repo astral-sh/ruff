@@ -16,7 +16,8 @@ help: Replace with `Path(...).resolve()`
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
 11 |
---------------------------------------------------------------------------------
+12 | p = "/foo"
+13 | q = "bar"
 14 |
    - a = xabspath(p)
 15 + a = pathlib.Path(p).resolve()

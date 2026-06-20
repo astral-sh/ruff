@@ -324,7 +324,7 @@ help: Replace with `next(...)`
    - revision_heads_map_ast = [
 50 + revision_heads_map_ast = next(
 51 |     a
---------------------------------------------------------------------------------
+52 |     for a in revision_heads_map_ast_obj.body
 53 |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
    - ][0]
 54 + )

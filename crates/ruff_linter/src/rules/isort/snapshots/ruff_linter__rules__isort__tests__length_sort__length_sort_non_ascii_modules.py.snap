@@ -20,7 +20,8 @@ help: Organize imports
   - import loooooooooooooong
   - import mediuuuuuum
 1 | import short
---------------------------------------------------------------------------------
+2 | import σηορτ
+3 | import shoort
 4 | import mediuuuuum
 5 + import μεδιυυυυυμ
 6 + import mediuuuuuum

@@ -16,7 +16,8 @@ help: Install `apache-airflow-providers-celery>=3.3.0` and use `DEFAULT_CELERY_C
 2 |
   - from airflow.config_templates.default_celery import DEFAULT_CELERY_CONFIG
 3 | from airflow.executors.celery_executor import (
---------------------------------------------------------------------------------
+4 |     CeleryExecutor,
+5 |     app,
 6 | )
 7 + from airflow.providers.celery.executors.default_celery import DEFAULT_CELERY_CONFIG
 8 |

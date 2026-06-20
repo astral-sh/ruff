@@ -2118,7 +2118,8 @@ Source with applied edits:
           |
         1 + from ty_extensions import Unknown
         2 |
-        --------------------------------------------------------------------------------
+        3 | class A:
+        4 |     def __init__(self, y):
         5 |         self.x = int(1)
           -         self.y = y
         6 +         self.y: Unknown = y
@@ -7076,7 +7077,7 @@ Source with applied edits:
         1 + from ty_extensions import Top
         2 + from ty_extensions import Unknown
         3 |
-        --------------------------------------------------------------------------------
+        4 | def f(xyxy: object):
         5 |     if isinstance(xyxy, list):
           -         x = xyxy
         6 +         x: Top[list[Unknown]] = xyxy
@@ -7246,7 +7247,7 @@ Source with applied edits:
           |
         1 + from bar import D
         2 |
-        --------------------------------------------------------------------------------
+        3 | import foo
         4 |
           - a = foo.C().foo()
         5 + a: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]] = foo.C().foo()
@@ -7670,7 +7671,7 @@ Source with applied edits:
         1 + from typing import TypeVar
         2 + from typing import Any
         3 |
-        --------------------------------------------------------------------------------
+        4 | from foo import foo
         5 |
           - a = foo()
         6 + a: dict[TypeVar, Any] | None = foo()
@@ -7756,7 +7757,7 @@ Source with applied edits:
         1 + import bar
         2 + import baz
         3 |
-        --------------------------------------------------------------------------------
+        4 | from foo import foo
         5 |
           - a = foo()
         6 + a: bar.A | baz.A = foo()
@@ -7886,7 +7887,8 @@ Source with applied edits:
         1 + import bar
         2 + import baz
         3 |
-        --------------------------------------------------------------------------------
+        4 | from foo import foo
+        5 | from bar import B
         6 |
           - a = foo()
         7 + a: bar.A | baz.A | list[bar.A | baz.A] = foo()

@@ -134,7 +134,8 @@ help: `make_naive` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (w
 27 |     datetime,
    -     make_naive,
 28 |     parse,
---------------------------------------------------------------------------------
+29 |     utc,
+30 |     utcnow,
 31 | )
 32 + from airflow.sdk.timezone import make_naive
 33 |
@@ -156,7 +157,7 @@ help: `parse` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with a
 28 |     make_naive,
    -     parse,
 29 |     utc,
---------------------------------------------------------------------------------
+30 |     utcnow,
 31 | )
 32 + from airflow.sdk.timezone import parse
 33 |
@@ -293,7 +294,8 @@ help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airfl
 70 | from airflow.macros import (
    -     ds_add,
 71 |     ds_format,
---------------------------------------------------------------------------------
+72 |     datetime_diff_for_humans,
+73 |     ds_format_locale,
 74 | )
 75 + from airflow.sdk.execution_time.macros import ds_add
 76 |
@@ -314,7 +316,7 @@ help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Ai
 71 |     ds_add,
    -     ds_format,
 72 |     datetime_diff_for_humans,
---------------------------------------------------------------------------------
+73 |     ds_format_locale,
 74 | )
 75 + from airflow.sdk.execution_time.macros import ds_format
 76 |
@@ -377,7 +379,7 @@ help: `get_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache
 86 | from airflow.io import (
    -     get_fs,
 87 |     has_fs,
---------------------------------------------------------------------------------
+88 |     Properties,
 89 | )
 90 + from airflow.sdk.io import get_fs
 91 |

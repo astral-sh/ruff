@@ -347,7 +347,8 @@ help: Replace for loop with list comprehension
 207 +                     2,
 208 +                 ) for i in range(  # Comment 1 should not be duplicated
 209 |         (
---------------------------------------------------------------------------------
+210 |             2  # Comment 2
+211 |             + 1
 212 |         )
     -     ):  # Comment 3
     -         if i % 2:  # Comment 4

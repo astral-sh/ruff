@@ -146,7 +146,8 @@ help: Import from `unittest.mock` instead
    -     mock,
 27 + from unittest.mock import (
 28 |     a,
---------------------------------------------------------------------------------
+29 |     b,
+30 |     c,
 31 | )
 32 + from unittest import mock
 33 | from mock import (
@@ -173,7 +174,7 @@ help: Import from `unittest.mock` instead
    - from mock import (
 33 + from unittest.mock import (
 34 |     a,
---------------------------------------------------------------------------------
+35 |     b,
 36 |     c,
    -     mock,
 37 | )
@@ -202,7 +203,8 @@ help: Import from `unittest.mock` instead
    -     mock,
 41 + from unittest.mock import (
 42 |     a,
---------------------------------------------------------------------------------
+43 |     b,
+44 |     c
 45 | )
 46 + from unittest import mock
 47 | from mock import (
@@ -297,7 +299,8 @@ help: Import from `unittest.mock` instead
    -             mock,
 58 +         from unittest.mock import (
 59 |             a,
---------------------------------------------------------------------------------
+60 |             b,
+61 |             c
 62 |         )
 63 +         from unittest import mock
 64 |

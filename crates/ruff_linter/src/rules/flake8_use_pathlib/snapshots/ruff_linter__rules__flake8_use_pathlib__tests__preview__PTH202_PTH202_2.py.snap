@@ -53,7 +53,7 @@ help: Replace with `Path(...).stat().st_size`
 1 | import os
 2 + import pathlib
 3 |
---------------------------------------------------------------------------------
+4 | os.path.getsize(filename="filename")
 5 | os.path.getsize(filename=b"filename")
   - os.path.getsize(filename=__file__)
 6 + pathlib.Path(__file__).stat().st_size

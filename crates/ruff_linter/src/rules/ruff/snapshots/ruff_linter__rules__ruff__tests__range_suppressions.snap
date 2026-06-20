@@ -309,7 +309,7 @@ help: Remove the suppression comment
 92 |     # Unknown rule codes
    -     # ruff: disable[YF829]
 93 |     # ruff: disable[F841, RQW320]
---------------------------------------------------------------------------------
+94 |     value = 0
 95 |     # ruff: enable[F841, RQW320]
    -     # ruff: enable[YF829]
 96 |

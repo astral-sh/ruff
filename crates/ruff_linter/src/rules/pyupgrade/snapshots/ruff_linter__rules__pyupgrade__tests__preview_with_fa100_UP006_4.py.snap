@@ -53,7 +53,8 @@ help: Replace with `list`
   |
 1 + from __future__ import annotations
 2 | import typing
---------------------------------------------------------------------------------
+3 | from typing import List
+4 |
 5 |
   - def f(x: typing.List[str]) -> None:
 6 + def f(x: list[str]) -> None:

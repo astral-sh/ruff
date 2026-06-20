@@ -77,7 +77,7 @@ help: Replace with `operator.neg`
 1 | # Errors.
 2 + import operator
 3 | op_bitnot = lambda x: ~x
---------------------------------------------------------------------------------
+4 | op_not = lambda x: not x
 5 | op_pos = lambda x: +x
   - op_neg = lambda x: -x
 6 + op_neg = operator.neg

@@ -213,7 +213,7 @@ help: Parenthesize the `and` subexpression
    -     or some_fourth_reasonably_long_condition
 48 +     or (some_fourth_reasonably_long_condition
 49 |     and some_fifth_reasonably_long_condition
---------------------------------------------------------------------------------
+50 |     # a comment
 51 |     and some_sixth_reasonably_long_condition
    -     and some_seventh_reasonably_long_condition
 52 +     and some_seventh_reasonably_long_condition)

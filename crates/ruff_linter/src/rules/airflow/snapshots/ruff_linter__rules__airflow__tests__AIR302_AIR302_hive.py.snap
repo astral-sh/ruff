@@ -144,7 +144,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveOperato
 12 | )
    - from airflow.operators.hive_operator import HiveOperator
 13 | from airflow.operators.hive_stats_operator import HiveStatsCollectionOperator
---------------------------------------------------------------------------------
+14 | from airflow.operators.hive_to_mysql import HiveToMySqlOperator
 15 | from airflow.operators.hive_to_samba_operator import HiveToSambaOperator
 16 + from airflow.providers.apache.hive.operators.hive import HiveOperator
 17 |

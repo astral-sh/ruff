@@ -49,7 +49,7 @@ help: Move out of type-checking block
 6  | from fastapi import FastAPI as Api
 7  + from array import array
 8  |
---------------------------------------------------------------------------------
+9  | if TYPE_CHECKING:
 10 |     import datetime  # TC004
    -     from array import array  # TC004
 11 |

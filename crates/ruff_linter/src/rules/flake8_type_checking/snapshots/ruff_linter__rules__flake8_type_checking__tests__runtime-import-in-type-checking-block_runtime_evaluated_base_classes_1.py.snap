@@ -47,7 +47,7 @@ help: Move out of type-checking block
 7  | from pydantic import BaseModel
 8  + from array import array
 9  |
---------------------------------------------------------------------------------
+10 | if TYPE_CHECKING:
 11 |     import datetime  # TC004
    -     from array import array  # TC004
 12 |

@@ -179,7 +179,7 @@ help: Replace with `Path("test.json")....`
 150 | import json
 151 + import pathlib
 152 |
---------------------------------------------------------------------------------
+153 | data = {"price": 100}
 154 |
     - with open("test.json", "wb") as f:
     -     f.write(json.dumps(data, indent=4).encode("utf-8"))

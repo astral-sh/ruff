@@ -130,7 +130,7 @@ help: Replace with `yield from`
    -     for x, y in {  # Comment three\n'
 33 +     yield from {  # Comment three\n'
 34 |         3: "x",  # Comment four\n'
---------------------------------------------------------------------------------
+35 |         # Comment five\n'
 36 |         6: "y",  # Comment six\n'
    -     }:  # Comment seven\n'
    -         # Comment eight\n'

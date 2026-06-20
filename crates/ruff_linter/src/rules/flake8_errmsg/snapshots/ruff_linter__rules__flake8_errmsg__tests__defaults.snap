@@ -250,7 +250,7 @@ help: Assign to variable; remove string literal
    -     raise RuntimeError(
 68 +     msg = (
 69 |         "first"
---------------------------------------------------------------------------------
+70 |         "second"
 71 |     )
 72 +     raise RuntimeError(
 73 +         msg
@@ -276,7 +276,8 @@ help: Assign to variable; remove `.format()` string
    -     raise RuntimeError(
 75 +     msg = (
 76 |         "This is an {example} exception".format(
---------------------------------------------------------------------------------
+77 |             example="example"
+78 |         )
 79 |     )
 80 +     raise RuntimeError(
 81 +         msg

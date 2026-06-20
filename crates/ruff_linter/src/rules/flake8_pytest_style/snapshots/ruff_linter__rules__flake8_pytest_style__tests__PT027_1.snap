@@ -32,7 +32,7 @@ help: Replace `assertRaises` with `pytest.raises`
    -         with self.assertRaises(ValueError) as e:
 15 +         with pytest.raises(ValueError) as e:
 16 |             raise ValueError
---------------------------------------------------------------------------------
+17 |
 18 |         print(e.foo)
    -         print(e.exception)
 19 +         print(e.value)
@@ -55,7 +55,8 @@ help: Replace `assertRaises` with `pytest.raises`
    -         with self.assertRaises(ValueError) as e1, \
 22 +         with pytest.raises(ValueError) as e1, \
 23 |             self.assertRaises(ValueError) as e2:
---------------------------------------------------------------------------------
+24 |             raise ValueError
+25 |
 26 |         print(e1.foo)
    -         print(e1.exception)
 27 +         print(e1.value)
@@ -101,7 +102,8 @@ help: Replace `assertRaises` with `pytest.raises`
    -         with self.assertRaises(ValueError) as e1, \
 33 +         with pytest.raises(ValueError) as e1, \
 34 |             foo(self.assertRaises(ValueError)) as e2:
---------------------------------------------------------------------------------
+35 |             raise ValueError
+36 |
 37 |         print(e1.foo)
    -         print(e1.exception)
 38 +         print(e1.value)

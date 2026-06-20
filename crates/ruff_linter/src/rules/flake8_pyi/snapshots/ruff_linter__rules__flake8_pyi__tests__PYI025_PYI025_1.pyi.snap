@@ -89,7 +89,7 @@ help: Alias `Set` to `AbstractSet`
    - from collections.abc import Set
 33 + from collections.abc import Set as AbstractSet
 34 |
---------------------------------------------------------------------------------
+35 | def f():
 36 |     """Test: global symbol renaming."""
    -     global Set
 37 +     global AbstractSet

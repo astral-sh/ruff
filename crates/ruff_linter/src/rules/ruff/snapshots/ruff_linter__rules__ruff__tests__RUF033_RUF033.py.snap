@@ -205,7 +205,8 @@ help: Use `dataclasses.InitVar` instead
 78 | class Foo:
 79 +     baz: InitVar[int] = (y := 2)
 80 |     def __post_init__(
---------------------------------------------------------------------------------
+81 |         self,
+82 |         bar: int = (x := 1)  #  comment
 83 |         ,
    -         baz: int = (y := 2),  # comment
 84 +         baz: int,  # comment
@@ -296,7 +297,7 @@ help: Use `dataclasses.InitVar` instead
 92 | class Foo:
 93 +     baz: InitVar[int] = 2
 94 |     def __post_init__(
---------------------------------------------------------------------------------
+95 |         self,
 96 |         bar: int = 1,  # comment
    -         baz: int = 2,  # comment
 97 +         baz: int,  # comment
@@ -341,7 +342,8 @@ help: Use `dataclasses.InitVar` instead
 102 | class Foo:
 103 +     arg2: InitVar[int] = ((1))
 104 |     def __post_init__(
---------------------------------------------------------------------------------
+105 |         self,
+106 |         arg1: int = (1)  # comment
 107 |         ,
     -         arg2: int = ((1))  # comment
 108 +         arg2: int  # comment

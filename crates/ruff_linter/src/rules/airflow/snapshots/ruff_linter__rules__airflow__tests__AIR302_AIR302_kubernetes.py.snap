@@ -268,7 +268,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=10.0.0` and use `add_un
 47 | )
 48 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import add_unique_suffix
 49 |
---------------------------------------------------------------------------------
+50 | PodDefaults()
 51 | PodGenerator()
    - add_pod_suffix()
 52 + add_unique_suffix()
@@ -334,7 +334,8 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `label_s
 42 |     extend_object_field,
    -     label_safe_datestring_to_datetime,
 43 |     make_safe_label_value,
---------------------------------------------------------------------------------
+44 |     merge_objects,
+45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import label_safe_datestring_to_datetime
 48 |
@@ -356,7 +357,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `make_sa
 43 |     label_safe_datestring_to_datetime,
    -     make_safe_label_value,
 44 |     merge_objects,
---------------------------------------------------------------------------------
+45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import make_safe_label_value
 48 |
@@ -565,7 +566,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=3.0.0` and use `PodPhas
 88 | from airflow.kubernetes.volume_mount import VolumeMount
 89 + from  airflow.providers.cncf.kubernetes.utils.pod_manager import PodPhase
 90 |
---------------------------------------------------------------------------------
+91 | PodDefaults()
 92 | PodLauncher()
    - PodStatus()
 93 + PodPhase()
@@ -630,7 +631,8 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `K8SMode
 83 | from airflow.kubernetes.secret import (
    -     K8SModel,
 84 |     Secret,
---------------------------------------------------------------------------------
+85 | )
+86 | from airflow.kubernetes.volume import Volume
 87 | from airflow.kubernetes.volume_mount import VolumeMount
 88 + from airflow.providers.cncf.kubernetes.k8s_model import K8SModel
 89 |
@@ -652,7 +654,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `Secret`
 84 |     K8SModel,
    -     Secret,
 85 | )
---------------------------------------------------------------------------------
+86 | from airflow.kubernetes.volume import Volume
 87 | from airflow.kubernetes.volume_mount import VolumeMount
 88 + from airflow.providers.cncf.kubernetes.secret import Secret
 89 |
@@ -717,7 +719,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `annotat
 101 | from airflow.kubernetes.kubernetes_helper_functions import (
     -     annotations_to_key,
 102 |     get_logs_task_metadata,
---------------------------------------------------------------------------------
+103 |     rand_str,
 104 | )
 105 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import annotations_to_key
 106 |

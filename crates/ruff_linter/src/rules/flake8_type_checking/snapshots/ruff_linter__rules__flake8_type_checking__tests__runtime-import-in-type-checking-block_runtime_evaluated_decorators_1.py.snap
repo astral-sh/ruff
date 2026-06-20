@@ -49,7 +49,7 @@ help: Move out of type-checking block
 9  | import numpy
 10 + from array import array
 11 |
---------------------------------------------------------------------------------
+12 | if TYPE_CHECKING:
 13 |     import datetime  # TC004
    -     from array import array  # TC004
 14 |

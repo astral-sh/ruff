@@ -68,7 +68,8 @@ help: Convert to `X | Y`
   |
 1 + from __future__ import annotations
 2 | import typing
---------------------------------------------------------------------------------
+3 | from typing import Union
+4 |
 5 |
   - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 6 + def f(x: str | int | Union[float, bytes]) -> None:
@@ -88,7 +89,8 @@ help: Convert to `X | Y`
   |
 1 + from __future__ import annotations
 2 | import typing
---------------------------------------------------------------------------------
+3 | from typing import Union
+4 |
 5 |
   - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 6 + def f(x: Union[str, int, float | bytes]) -> None:

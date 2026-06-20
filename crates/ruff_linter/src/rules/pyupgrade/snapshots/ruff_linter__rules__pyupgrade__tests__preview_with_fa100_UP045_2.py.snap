@@ -53,7 +53,8 @@ help: Convert to `X | None`
   |
 1 + from __future__ import annotations
 2 | import typing
---------------------------------------------------------------------------------
+3 | from typing import Optional
+4 |
 5 |
   - def f(x: Optional[str]) -> None:
 6 + def f(x: str | None) -> None:

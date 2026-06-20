@@ -438,7 +438,7 @@ help: Remove outdated version block
     -         expected_error = [
 130 +     expected_error = [
 131 | "<stdin>:1:5: Generator expression must be parenthesized",
---------------------------------------------------------------------------------
+132 | "max(1 for i in range(10), key=lambda x: x+1)",
 133 | "    ^",
     -         ]
 134 +     ]
@@ -463,7 +463,7 @@ help: Remove outdated version block
     -     expected_error = [
 140 + expected_error = [
 141 | "<stdin>:1:5: Generator expression must be parenthesized",
---------------------------------------------------------------------------------
+142 | "max(1 for i in range(10), key=lambda x: x+1)",
 143 | "    ^",
     -     ]
 144 + ]

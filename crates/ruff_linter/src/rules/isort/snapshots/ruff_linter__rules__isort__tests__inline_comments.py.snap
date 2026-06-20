@@ -22,7 +22,7 @@ help: Organize imports
 3  | )
    -
 4  | from b.prometheus.metrics import (
---------------------------------------------------------------------------------
+5  |     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]
 6  | )
    -
    - from c.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]

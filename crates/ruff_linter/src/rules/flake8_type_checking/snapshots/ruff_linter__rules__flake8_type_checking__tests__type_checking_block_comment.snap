@@ -16,7 +16,7 @@ help: Move into type-checking block
 5  |
    - import pandas as pd
 6  |
---------------------------------------------------------------------------------
+7  | if TYPE_CHECKING:
 8  |     # This is a comment.
 9  +     import pandas as pd
 10 |     import os

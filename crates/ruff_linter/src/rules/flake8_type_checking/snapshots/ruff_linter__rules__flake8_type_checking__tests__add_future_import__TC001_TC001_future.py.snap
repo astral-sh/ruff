@@ -40,7 +40,7 @@ help: Move into type-checking block
 55 + if TYPE_CHECKING:
 56 +     from . import foo
 57 |
---------------------------------------------------------------------------------
+58 |
 59 | def n():
    -     from . import foo
 60 |

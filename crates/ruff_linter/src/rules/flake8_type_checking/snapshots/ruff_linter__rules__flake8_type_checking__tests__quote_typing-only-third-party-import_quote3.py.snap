@@ -18,7 +18,7 @@ help: Move into type-checking block
 3 + if TYPE_CHECKING:
 4 +     from django.contrib.auth.models import AbstractBaseUser
 5 | def f():
---------------------------------------------------------------------------------
+6 |     from typing import Literal, Union
 7 |
   -     from django.contrib.auth.models import AbstractBaseUser
 8 |

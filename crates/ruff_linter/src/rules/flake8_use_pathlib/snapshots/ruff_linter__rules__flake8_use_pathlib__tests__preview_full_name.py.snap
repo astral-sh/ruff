@@ -16,7 +16,8 @@ help: Replace with `Path(...).resolve()`
 2 | import os.path
 3 + import pathlib
 4 |
---------------------------------------------------------------------------------
+5 | p = "/foo"
+6 | q = "bar"
 7 |
   - a = os.path.abspath(p)
 8 + a = pathlib.Path(p).resolve()

@@ -330,11 +330,11 @@ help: Apply an isort-style sorting to `__all__`
    -     "HTMLCalendar",
    -     "IllegalMonthError",
 60 |     "JANUARY",
---------------------------------------------------------------------------------
+61 |     "JULY",
 62 |     "JUNE",
    -     "LocaleHTMLCalendar",
 63 |     "MARCH",
---------------------------------------------------------------------------------
+64 |     "MAY",
 65 |     "MONDAY",
    -     "Month",
 66 |     "NOVEMBER",
@@ -350,7 +350,7 @@ help: Apply an isort-style sorting to `__all__`
 79 +     "Month",
 80 +     "TextCalendar",
 81 |     "calendar",
---------------------------------------------------------------------------------
+82 |     "timegm",
 83 |     "weekday",
    -     "weekheader"]
 84 +     "weekheader",
@@ -542,7 +542,7 @@ help: Apply an isort-style sorting to `__all__`
 127 +     # multiline comment about "aaa" part 2
 128 +     "aaa",
 129 |     # multiline comment about "bbb" part 1
---------------------------------------------------------------------------------
+130 |     # multiline comment about "bbb" part 2
 131 |     "bbb",
     -     # multiline comment about "aaa" part 1
     -     # multiline comment about "aaa" part 2

@@ -15,7 +15,8 @@ help: Replace with `functools.reduce`
 1 + import functools
 2 + import operator
 3 | x = [1, 2, 3]
---------------------------------------------------------------------------------
+4 | y = [4, 5, 6]
+5 |
 6 | # RUF017
   - sum([x, y], start=[])
 7 + functools.reduce(operator.iadd, [x, y], [])

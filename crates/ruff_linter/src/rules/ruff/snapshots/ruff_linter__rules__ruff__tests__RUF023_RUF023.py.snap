@@ -366,7 +366,8 @@ help: Apply a natural sort to `PurePath.__slots__`
 94  +         '_raw_paths',
 95  +         '_root',
 96  |         # The `_str` slot stores the string representation of the path,
---------------------------------------------------------------------------------
+97  |         # computed from the drive, root and tail when `__str__()` is called
+98  |         # for the first time. It's used to implement `_str_normcase`
 99  |         '_str',
     -
 100 |         # The `_str_normcase_cached` slot stores the string path with
@@ -423,13 +424,15 @@ help: Apply a natural sort to `ArgumentDescriptor.__slots__`
 114 +         # human-readable docs for this arg descriptor; a string
 115 +         'doc',
 116 |         # length of argument, in bytes; an int; UP_TO_NEWLINE and
---------------------------------------------------------------------------------
+117 |         # TAKEN_FROM_ARGUMENT{1,4,8} are negative values for variable-length
+118 |         # cases
 119 |         'n',
     -
 120 +         # name of descriptor record, also a module global name; a string
 121 +         'name',
 122 |         # a function taking a file-like object, reading this kind of argument
---------------------------------------------------------------------------------
+123 |         # from the object at the current position, advancing the current
+124 |         # position by n bytes, and returning the value of the argument
 125 |         'reader',
     -
     -         # human-readable docs for this arg descriptor; a string

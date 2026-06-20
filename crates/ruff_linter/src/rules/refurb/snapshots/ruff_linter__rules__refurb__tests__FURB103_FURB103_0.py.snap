@@ -198,7 +198,7 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 62 | import builtins
 63 + import pathlib
 64 |
---------------------------------------------------------------------------------
+65 |
 66 | # FURB103
    - with builtins.open("file.txt", "w", newline="\r\n") as f:
    -     f.write(foobar)
@@ -219,7 +219,7 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 70 | from builtins import open as o
 71 + import pathlib
 72 |
---------------------------------------------------------------------------------
+73 |
 74 | # FURB103
    - with o("file.txt", "w", newline="\r\n") as f:
    -     f.write(foobar)
@@ -241,7 +241,7 @@ help: Replace with `Path("test.json")....`
 150 | import json
 151 + import pathlib
 152 |
---------------------------------------------------------------------------------
+153 | data = {"price": 100}
 154 |
     - with open("test.json", "wb") as f:
     -     f.write(json.dumps(data, indent=4).encode("utf-8"))

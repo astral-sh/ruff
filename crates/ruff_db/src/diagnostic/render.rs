@@ -2609,11 +2609,11 @@ watermelon
             self.config = config.fix_context(lines);
         }
 
-        /// Set the "merge window" for annotations in this test.
+        /// Set the "merge window" for annotations and fix diff hunks in this test.
         ///
-        /// If two annotations have fewer than this number of lines between them,
-        /// they will be merged into a single annotation.
-        fn merge_window(&mut self, lines: usize) {
+        /// Nearby annotations or fix edits are rendered in a single source frame even when their
+        /// configured context windows would not otherwise overlap.
+        pub(super) fn merge_window(&mut self, lines: usize) {
             let config = self.config.clone();
             self.config = config.merge_window(lines);
         }

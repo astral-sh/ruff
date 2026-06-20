@@ -16,7 +16,8 @@ help: Install `apache-airflow-providers-mysql>=1.0.0` and use `MySqlHook` from `
 2 |
   - from airflow.hooks.mysql_hook import MySqlHook
 3 | from airflow.operators.presto_to_mysql import (
---------------------------------------------------------------------------------
+4 |     PrestoToMySqlOperator,
+5 |     PrestoToMySqlTransfer,
 6 | )
 7 + from airflow.providers.mysql.hooks.mysql import MySqlHook
 8 |

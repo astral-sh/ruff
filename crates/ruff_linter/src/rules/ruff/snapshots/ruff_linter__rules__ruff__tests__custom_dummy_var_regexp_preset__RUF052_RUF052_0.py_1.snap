@@ -254,7 +254,8 @@ help: Remove leading underscores
     -     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
 157 +     NT2 = namedtuple("NT2", ['x', 'y', 'z'])
 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
---------------------------------------------------------------------------------
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
 161 |
     -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
 162 +     print(_T, _P, _NT, _E, NT2, _NT3, _DynamicClass, _NotADynamicClass)
@@ -278,7 +279,7 @@ help: Remove leading underscores
     -     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
 158 +     NT3 = namedtuple(typename="NT3", field_names=['x', 'y', 'z'])
 159 |     _DynamicClass = type("_DynamicClass", (), {})
---------------------------------------------------------------------------------
+160 |     _NotADynamicClass = type("_NotADynamicClass")
 161 |
     -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
 162 +     print(_T, _P, _NT, _E, _NT2, NT3, _DynamicClass, _NotADynamicClass)
@@ -345,7 +346,7 @@ help: Prefer using trailing underscores to avoid shadowing a variable
     -     _dummy_var = 42
 182 +     dummy_var_ = 42
 183 |
---------------------------------------------------------------------------------
+184 |     def bar():
 185 |         dummy_var = 43
     -         print(_dummy_var)
 186 +         print(dummy_var_)

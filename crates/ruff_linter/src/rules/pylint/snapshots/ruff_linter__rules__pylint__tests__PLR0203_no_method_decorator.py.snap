@@ -16,7 +16,8 @@ help: Add @staticmethod decorator
 14 |
 15 +     @staticmethod
 16 |     def pick_one_color():  # [no-staticmethod-decorator]
---------------------------------------------------------------------------------
+17 |         """staticmethod to pick one fruit color"""
+18 |         return choice(Fruit.COLORS)
 19 |
    -     pick_one_color = staticmethod(pick_one_color)
 20 |
@@ -36,7 +37,7 @@ help: Add @staticmethod decorator
 26 |
 27 +     @staticmethod
 28 |     def static_method():
---------------------------------------------------------------------------------
+29 |         pass
 30 |
    -     static_method = staticmethod(static_method);
 31 +     

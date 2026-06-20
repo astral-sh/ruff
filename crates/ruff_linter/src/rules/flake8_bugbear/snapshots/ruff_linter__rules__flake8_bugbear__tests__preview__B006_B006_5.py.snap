@@ -54,7 +54,7 @@ help: Replace with `None`; initialize within function
    - def import_modules_wrong(value: dict[str, str] = {}):
 15 + def import_modules_wrong(value: dict[str, str] = None):
 16 |     import os
---------------------------------------------------------------------------------
+17 |     import sys
 18 |     import itertools
 19 +     if value is None:
 20 +         value = {}

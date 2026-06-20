@@ -18,7 +18,7 @@ help: Move into type-checking block
 6  + if TYPE_CHECKING:
 7  +     from pandas import DataFrame
 8  |
---------------------------------------------------------------------------------
+9  |
 10 | def func():
    -     from pandas import DataFrame
 11 |

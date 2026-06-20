@@ -15,7 +15,8 @@ help: Move into type-checking block
 6  | from pandas import (
    -     DataFrame,  # DataFrame
 7  |     Series,  # Series
---------------------------------------------------------------------------------
+8  | )
+9  |
 10 | if TYPE_CHECKING:
 11 +     from pandas import (
 12 +         DataFrame,  # DataFrame

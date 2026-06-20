@@ -18,7 +18,7 @@ help: Move into type-checking block
 7  + if TYPE_CHECKING:
 8  +     import os
 9  |
---------------------------------------------------------------------------------
+10 |
 11 | def f():
    -     import os
 12 |

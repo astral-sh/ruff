@@ -475,7 +475,7 @@ help: Replace TypeVar `S` with `Self`
 134 +     def comment_outside_fix_range[T](
 135 +         self,
 136 |         a: T,
---------------------------------------------------------------------------------
+137 |         b: tuple[
 138 |             # Lorem ipsum
     -             S, T
 139 +             Self, T

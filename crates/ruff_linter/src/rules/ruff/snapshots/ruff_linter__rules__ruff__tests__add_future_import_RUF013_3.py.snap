@@ -12,7 +12,7 @@ help: Convert to `T | None`
   |
 1 + from __future__ import annotations
 2 | import typing
---------------------------------------------------------------------------------
+3 |
 4 |
   - def f(arg: typing.List[str] = None):  # RUF013
 5 + def f(arg: typing.List[str] | None = None):  # RUF013

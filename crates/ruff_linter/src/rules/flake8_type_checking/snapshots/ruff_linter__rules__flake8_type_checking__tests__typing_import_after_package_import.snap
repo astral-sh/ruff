@@ -16,7 +16,7 @@ help: Move into type-checking block
 3  |
    - import pandas as pd
 4  |
---------------------------------------------------------------------------------
+5  | from typing import TYPE_CHECKING
 6  |
 7  + if TYPE_CHECKING:
 8  +     import pandas as pd

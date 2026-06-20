@@ -92,7 +92,7 @@ help: Remove unnecessary comprehension
    -     [
 14 +     (
 15 |         delta
---------------------------------------------------------------------------------
+16 |         for delta in timedelta_list
 17 |         if delta
    -     ],
 18 +     ),

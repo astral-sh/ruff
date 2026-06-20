@@ -217,7 +217,8 @@ help: Assign to variable; remove `.format()` string
    -     raise RuntimeError(
 75 +     msg = (
 76 |         "This is an {example} exception".format(
---------------------------------------------------------------------------------
+77 |             example="example"
+78 |         )
 79 |     )
 80 +     raise RuntimeError(
 81 +         msg

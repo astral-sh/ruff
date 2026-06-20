@@ -79,7 +79,8 @@ help: Install `apache-airflow-providers-amazon>=1.0.0` and use `GoogleApiToS3Ope
 7  | from airflow.operators.gcs_to_s3 import GCSToS3Operator
    - from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
 8  | from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
---------------------------------------------------------------------------------
+9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
+10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
 12 + from airflow.providers.amazon.aws.transfers.google_api_to_s3 import GoogleApiToS3Operator
 13 |
@@ -101,7 +102,7 @@ help: Install `apache-airflow-providers-amazon>=1.0.0` and use `RedshiftToS3Oper
 8  | from airflow.operators.google_api_to_s3_transfer import GoogleApiToS3Operator
    - from airflow.operators.redshift_to_s3_operator import RedshiftToS3Operator
 9  | from airflow.operators.s3_file_transform_operator import S3FileTransformOperator
---------------------------------------------------------------------------------
+10 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftOperator
 11 | from airflow.sensors.s3_key_sensor import S3KeySensor
 12 + from airflow.providers.amazon.aws.transfers.redshift_to_s3 import RedshiftToS3Operator
 13 |

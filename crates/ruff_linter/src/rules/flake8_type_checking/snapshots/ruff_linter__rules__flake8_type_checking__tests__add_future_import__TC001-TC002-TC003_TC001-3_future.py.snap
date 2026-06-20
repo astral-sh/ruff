@@ -13,7 +13,8 @@ help: Move into type-checking block
   |
   - from collections import Counter
 1 |
---------------------------------------------------------------------------------
+2 | from elsewhere import third_party
+3 |
 4 | from . import first_party
 5 + from typing import TYPE_CHECKING
 6 +

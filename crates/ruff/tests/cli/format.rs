@@ -2463,7 +2463,7 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     7  + def foo():
     8  +     pass
     9  | ```
-    --------------------------------------------------------------------------------
+    10 |
     11 | ```pyi
        - print( "hello" )
        - def foo(): pass

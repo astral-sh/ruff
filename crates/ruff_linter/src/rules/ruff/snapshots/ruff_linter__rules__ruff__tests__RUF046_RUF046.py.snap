@@ -1033,7 +1033,8 @@ help: Remove unnecessary `int` call
 189 |
     - int(  # Unsafe fix because of this comment
 190 | (  # Comment
---------------------------------------------------------------------------------
+191 |     (round
+192 | )  # Comment
 193 | )(42)
     - )
 194 |
