@@ -586,6 +586,30 @@ mod tests {
     }
 
     #[test]
+    fn enum_complements_expand_to_remaining_literals() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
+                BLUE = 3
+
+            def f(color: Color):
+                if color is Color.RED:
+                    return
+                <START>color<END>
+            "#,
+        );
+
+        assert_snapshot!(
+            test.provided_type(),
+            @"typing.Literal[foo.Color.GREEN] | typing.Literal[foo.Color.BLUE]"
+        );
+    }
+
+    #[test]
     fn synthesized_typed_dict_constraints_remain_unsupported() {
         let test = ProvideTypeTest::with_source(
             r#"

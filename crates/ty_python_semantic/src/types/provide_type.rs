@@ -24,6 +24,10 @@
 //! - ty's internal float-only and complex-only numeric-tower types are printed using the public
 //!   `float` and `complex` spellings.
 //! - Internal `Todo` types are printed as `Unknown`.
+//! - Internal dynamic states for unknown generics, unspecialized type variables, invalid
+//!   `Concatenate` expressions, and ambiguous overloads are widened to `typing.Any`.
+//! - Compact enum complements such as `Color & ~Literal[Color.RED]` are expanded to the exact
+//!   union of the remaining enum-member literals.
 //! - Stable runtime type-form values are printed as exact `TypeOf` expressions. This includes
 //!   special forms, named type variables and `NewType`s, unions, literals, generic aliases,
 //!   callables, and sentinels.
@@ -124,8 +128,6 @@ use crate::Db;
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnsupportedTypeKind {
-    /// A dynamic type used only during inference.
-    InternalDynamic,
     /// A bound-method type used only internally.
     InternalBoundMethod,
     /// A callable type used only internally.
@@ -138,8 +140,6 @@ pub enum UnsupportedTypeKind {
     RuntimeTypingObject,
     /// An instance of `property`.
     PropertyInstance,
-    /// An enum with one or more members excluded.
-    EnumComplement,
     /// A bound `super` object.
     BoundSuper,
     /// An anonymous synthesized `TypedDict`.
@@ -161,14 +161,12 @@ pub enum UnsupportedTypeKind {
 impl fmt::Display for UnsupportedTypeKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::InternalDynamic => "internal dynamic type",
             Self::InternalBoundMethod => "internal bound method",
             Self::InternalCallable => "internal callable type",
             Self::NonRegularAnonymousCallable => "non-regular anonymous callable",
             Self::SynthesizedProtocol => "synthesized protocol",
             Self::RuntimeTypingObject => "runtime typing object",
             Self::PropertyInstance => "property instance",
-            Self::EnumComplement => "enum complement",
             Self::BoundSuper => "bound super type",
             Self::SynthesizedTypedDict => "synthesized TypedDict",
             Self::MaterializedGenericSpecialization => "materialized generic specialization",
@@ -287,6 +285,9 @@ impl<'db> PrintType<'db> {
                 Precedence::Callable
             }
             Type::Union(_) => Precedence::Union,
+            Type::EnumComplement(complement) => {
+                self.precedence(complement.remaining_literal_union(self.db))
+            }
             Type::Intersection(_) => Precedence::Intersection,
             _ => Precedence::Primary,
         }
@@ -294,7 +295,7 @@ impl<'db> PrintType<'db> {
 
     fn print_inner(&mut self, ty: Type<'db>) -> Result<(), PrintTypeError> {
         match ty {
-            Type::Dynamic(dynamic) => self.print_dynamic(dynamic)?,
+            Type::Dynamic(dynamic) => self.print_dynamic(dynamic),
             Type::Divergent(_) => self.push_str("Divergent"),
             Type::Never => {
                 self.print_intrinsic("typing", "Never");
@@ -344,7 +345,7 @@ impl<'db> PrintType<'db> {
                 self.push('[');
                 match subclass.subclass_of() {
                     SubclassOfInner::Class(class) => self.print_class_type(class)?,
-                    SubclassOfInner::Dynamic(dynamic) => self.print_dynamic(dynamic)?,
+                    SubclassOfInner::Dynamic(dynamic) => self.print_dynamic(dynamic),
                     SubclassOfInner::TypeVar(typevar) => self.print_bound_typevar(typevar)?,
                 }
                 self.push(']');
@@ -395,9 +396,10 @@ impl<'db> PrintType<'db> {
                     return Self::unsupported(UnsupportedTypeKind::SynthesizedProtocol);
                 }
             }
-            Type::EnumComplement(_) => {
-                return Self::unsupported(UnsupportedTypeKind::EnumComplement);
-            }
+            Type::EnumComplement(complement) => self.print(
+                complement.remaining_literal_union(self.db),
+                Precedence::Callable,
+            )?,
             Type::AlwaysTruthy => {
                 self.print_intrinsic("ty_extensions", "AlwaysTruthy");
             }
@@ -436,7 +438,7 @@ impl<'db> PrintType<'db> {
         Ok(())
     }
 
-    fn print_dynamic(&mut self, dynamic: DynamicType<'db>) -> Result<(), PrintTypeError> {
+    fn print_dynamic(&mut self, dynamic: DynamicType<'db>) {
         match dynamic {
             DynamicType::Any => self.print_intrinsic("typing", "Any"),
             DynamicType::Todo(_)
@@ -447,11 +449,8 @@ impl<'db> PrintType<'db> {
             DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
             | DynamicType::InvalidConcatenateUnknown
-            | DynamicType::AmbiguousOverload => {
-                return Self::unsupported(UnsupportedTypeKind::InternalDynamic);
-            }
+            | DynamicType::AmbiguousOverload => self.print_intrinsic("typing", "Any"),
         }
-        Ok(())
     }
 
     fn print_special_form(&mut self, special_form: SpecialFormType) {
@@ -1394,6 +1393,27 @@ mod tests {
         Unknown
         Unknown
         Unknown
+        ");
+    }
+
+    #[test]
+    fn internal_dynamic_types_are_normalized_to_any() {
+        let db = setup_db();
+        let generic_context = GenericContext::from_typevar_instances(&db, []);
+
+        let dynamic_types = [
+            DynamicType::UnknownGeneric(generic_context),
+            DynamicType::UnspecializedTypeVar,
+            DynamicType::InvalidConcatenateUnknown,
+            DynamicType::AmbiguousOverload,
+        ]
+        .map(|dynamic| printed(print_type(&db, Type::Dynamic(dynamic))))
+        .join("\n");
+        assert_snapshot!(dynamic_types, @r"
+        typing.Any
+        typing.Any
+        typing.Any
+        typing.Any
         ");
     }
 
