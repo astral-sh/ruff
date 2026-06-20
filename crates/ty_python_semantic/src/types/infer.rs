@@ -62,7 +62,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
-use super::projection::ProjectionEvidenceSet;
+use super::projection::{ProjectionEvidenceSet, ProjectionRecoveryBuilder};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -803,11 +803,21 @@ impl<'db> ScopeInference<'db> {
                 .as_deref()
                 .and_then(|extra| extra.projection_evidence),
         );
+        let mut projection_recovery = ProjectionRecoveryBuilder::default();
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized_with_projection_evidence(
+            let previous_ty = previous_inference.expression_type(expr);
+            projection_recovery.push_candidate(
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, previous_ty, cycle),
+            )
+        });
+        let projection_solutions =
+            projection_recovery.finish(db, cycle, projection_evidence.as_ref());
+        self.expressions.map_values(|_, ty| {
+            ty.recursive_type_normalized_with_projection_solutions(
                 db,
-                previous_inference.expression_type(expr),
                 cycle,
+                projection_solutions.as_ref(),
                 projection_evidence.as_ref(),
             )
         });
@@ -1008,99 +1018,89 @@ impl<'db> DefinitionTypes<'db> {
             .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
     }
 
-    fn normalize_binding(
+    fn join_binding(
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
-        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+        projection_recovery: &mut ProjectionRecoveryBuilder<'db>,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized_with_projection_evidence(
-                db,
-                previous_ty,
-                cycle,
-                projection_evidence,
+            projection_recovery.push_candidate(
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, previous_ty, cycle),
             )
         } else {
-            ty.recursive_type_normalized_with_projection_evidence(db, cycle, projection_evidence)
+            projection_recovery.push_candidate(None, ty)
         }
     }
 
-    fn normalize_declaration(
+    fn join_declaration(
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
-        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+        projection_recovery: &mut ProjectionRecoveryBuilder<'db>,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
             ty.map_type(|inner| {
-                inner.cycle_normalized_with_projection_evidence(
-                    db,
-                    previous_ty.inner_type(),
-                    cycle,
-                    projection_evidence,
+                projection_recovery.push_candidate(
+                    Some(previous_ty.inner_type()),
+                    inner.cycle_join_for_recovery(db, previous_ty.inner_type(), cycle),
                 )
             })
         } else {
-            ty.map_type(|inner| {
-                inner.recursive_type_normalized_with_projection_evidence(
-                    db,
-                    cycle,
-                    projection_evidence,
-                )
-            })
+            ty.map_type(|inner| projection_recovery.push_candidate(None, inner))
         }
     }
 
-    fn cycle_normalized(
+    fn cycle_joined(
         self,
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
-        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+        projection_recovery: &mut ProjectionRecoveryBuilder<'db>,
         owner: Definition<'db>,
     ) -> Self {
         match self {
             Self::Empty => Self::Empty,
-            Self::Binding(ty) => Self::Binding(Self::normalize_binding(
+            Self::Binding(ty) => Self::Binding(Self::join_binding(
                 db,
                 previous,
                 cycle,
-                projection_evidence,
+                projection_recovery,
                 owner,
                 owner,
                 ty,
             )),
-            Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
+            Self::Declaration(ty) => Self::Declaration(Self::join_declaration(
                 db,
                 previous,
                 cycle,
-                projection_evidence,
+                projection_recovery,
                 owner,
                 owner,
                 ty,
             )),
             Self::BindingAndDeclaration(declaration_ty) => {
-                let binding_ty = Self::normalize_binding(
+                let binding_ty = Self::join_binding(
                     db,
                     previous,
                     cycle,
-                    projection_evidence,
+                    projection_recovery,
                     owner,
                     owner,
                     declaration_ty.inner_type(),
                 );
-                let declaration_ty = Self::normalize_declaration(
+                let declaration_ty = Self::join_declaration(
                     db,
                     previous,
                     cycle,
-                    projection_evidence,
+                    projection_recovery,
                     owner,
                     owner,
                     declaration_ty,
@@ -1117,26 +1117,82 @@ impl<'db> DefinitionTypes<'db> {
             }
             Self::Other(mut other) => {
                 for (definition, ty) in &mut other.bindings {
-                    *ty = Self::normalize_binding(
+                    *ty = Self::join_binding(
                         db,
                         previous,
                         cycle,
-                        projection_evidence,
+                        projection_recovery,
                         owner,
                         *definition,
                         *ty,
                     );
                 }
                 for (definition, ty) in &mut other.declarations {
-                    *ty = Self::normalize_declaration(
+                    *ty = Self::join_declaration(
                         db,
                         previous,
                         cycle,
-                        projection_evidence,
+                        projection_recovery,
                         owner,
                         *definition,
                         *ty,
                     );
+                }
+
+                match (&*other.bindings, &*other.declarations) {
+                    ([(binding, binding_ty)], [(declaration, declaration_ty)])
+                        if *binding == owner
+                            && binding == declaration
+                            && *binding_ty == declaration_ty.inner_type() =>
+                    {
+                        Self::BindingAndDeclaration(*declaration_ty)
+                    }
+                    _ => Self::Other(other),
+                }
+            }
+        }
+    }
+
+    fn normalize_joined(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        projection_solutions: Option<&super::projection::ProjectionSolutions<'db>>,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+        owner: Definition<'db>,
+    ) -> Self {
+        let normalize = |ty: Type<'db>| {
+            ty.recursive_type_normalized_with_projection_solutions(
+                db,
+                cycle,
+                projection_solutions,
+                projection_evidence,
+            )
+        };
+
+        match self {
+            Self::Empty => Self::Empty,
+            Self::Binding(ty) => Self::Binding(normalize(ty)),
+            Self::Declaration(ty) => Self::Declaration(ty.map_type(normalize)),
+            Self::BindingAndDeclaration(declaration_ty) => {
+                let binding_ty = normalize(declaration_ty.inner_type());
+                let declaration_ty = declaration_ty.map_type(normalize);
+
+                if binding_ty == declaration_ty.inner_type() {
+                    Self::BindingAndDeclaration(declaration_ty)
+                } else {
+                    Self::Other(Box::new(OtherDefinitionTypes {
+                        bindings: Box::new([(owner, binding_ty)]),
+                        declarations: Box::new([(owner, declaration_ty)]),
+                    }))
+                }
+            }
+            Self::Other(mut other) => {
+                for (_, ty) in &mut other.bindings {
+                    *ty = normalize(*ty);
+                }
+                for (_, ty) in &mut other.declarations {
+                    *ty = ty.map_type(normalize);
                 }
 
                 match (&*other.bindings, &*other.declarations) {
@@ -1407,19 +1463,35 @@ impl<'db> DefinitionInference<'db> {
                 .and_then(DefinitionInferenceExtra::projection_evidence)
                 .copied(),
         );
+        let mut projection_recovery = ProjectionRecoveryBuilder::default();
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_projection_evidence(
-                db,
-                previous_ty,
-                cycle,
-                projection_evidence.as_ref(),
+            *ty = projection_recovery.push_candidate(
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, previous_ty, cycle),
             );
         }
-        self.types = std::mem::take(&mut self.types).cycle_normalized(
+        self.types = std::mem::take(&mut self.types).cycle_joined(
             db,
             &previous_inference.types,
             cycle,
+            &mut projection_recovery,
+            definition,
+        );
+        let projection_solutions =
+            projection_recovery.finish(db, cycle, projection_evidence.as_ref());
+        for (_, ty) in &mut self.expressions {
+            *ty = ty.recursive_type_normalized_with_projection_solutions(
+                db,
+                cycle,
+                projection_solutions.as_ref(),
+                projection_evidence.as_ref(),
+            );
+        }
+        self.types = std::mem::take(&mut self.types).normalize_joined(
+            db,
+            cycle,
+            projection_solutions.as_ref(),
             projection_evidence.as_ref(),
             definition,
         );
@@ -1700,6 +1772,7 @@ impl<'db> ExpressionInference<'db> {
                 .as_deref()
                 .and_then(|extra| extra.projection_evidence),
         );
+        let mut projection_recovery = ProjectionRecoveryBuilder::default();
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
                 if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
@@ -1708,28 +1781,40 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized_with_projection_evidence(
-                        db,
-                        *previous_binding,
-                        cycle,
-                        projection_evidence.as_ref(),
+                    *binding_ty = projection_recovery.push_candidate(
+                        Some(*previous_binding),
+                        binding_ty.cycle_join_for_recovery(db, *previous_binding, cycle),
                     );
                 } else {
-                    *binding_ty = binding_ty.recursive_type_normalized_with_projection_evidence(
-                        db,
-                        cycle,
-                        projection_evidence.as_ref(),
-                    );
+                    *binding_ty = projection_recovery.push_candidate(None, *binding_ty);
                 }
             }
         }
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_projection_evidence(
+            *ty = projection_recovery.push_candidate(
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, previous_ty, cycle),
+            );
+        }
+        let projection_solutions =
+            projection_recovery.finish(db, cycle, projection_evidence.as_ref());
+        if let Some(extra) = self.extra.as_mut() {
+            for (_, binding_ty) in &mut extra.bindings {
+                *binding_ty = binding_ty.recursive_type_normalized_with_projection_solutions(
+                    db,
+                    cycle,
+                    projection_solutions.as_ref(),
+                    projection_evidence.as_ref(),
+                );
+            }
+        }
+        for (_, ty) in &mut self.expressions {
+            *ty = ty.recursive_type_normalized_with_projection_solutions(
                 db,
-                previous_ty,
                 cycle,
+                projection_solutions.as_ref(),
                 projection_evidence.as_ref(),
             );
         }
@@ -1940,13 +2025,12 @@ impl<'db> StatementInferenceInner<'db> {
                 .as_deref()
                 .and_then(|extra| extra.projection_evidence),
         );
+        let mut projection_recovery = ProjectionRecoveryBuilder::default();
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_projection_evidence(
-                db,
-                previous_ty,
-                cycle,
-                projection_evidence.as_ref(),
+            *ty = projection_recovery.push(
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, previous_ty, cycle),
             );
         }
         for (binding, binding_ty) in &mut self.bindings {
@@ -1955,18 +2039,12 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
             {
-                *binding_ty = binding_ty.cycle_normalized_with_projection_evidence(
-                    db,
-                    *previous_binding,
-                    cycle,
-                    projection_evidence.as_ref(),
+                *binding_ty = projection_recovery.push_candidate(
+                    Some(*previous_binding),
+                    binding_ty.cycle_join_for_recovery(db, *previous_binding, cycle),
                 );
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized_with_projection_evidence(
-                    db,
-                    cycle,
-                    projection_evidence.as_ref(),
-                );
+                *binding_ty = projection_recovery.push_candidate(None, *binding_ty);
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -1976,22 +2054,47 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized_with_projection_evidence(
-                        db,
-                        previous_declaration.inner_type(),
-                        cycle,
-                        projection_evidence.as_ref(),
+                    projection_recovery.push_candidate(
+                        Some(previous_declaration.inner_type()),
+                        decl_ty.cycle_join_for_recovery(
+                            db,
+                            previous_declaration.inner_type(),
+                            cycle,
+                        ),
                     )
                 });
             } else {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.recursive_type_normalized_with_projection_evidence(
-                        db,
-                        cycle,
-                        projection_evidence.as_ref(),
-                    )
-                });
+                *declaration_ty = declaration_ty
+                    .map_type(|decl_ty| projection_recovery.push_candidate(None, decl_ty));
             }
+        }
+        let projection_solutions =
+            projection_recovery.finish(db, cycle, projection_evidence.as_ref());
+        for (_, ty) in &mut self.expressions {
+            *ty = ty.recursive_type_normalized_with_projection_solutions(
+                db,
+                cycle,
+                projection_solutions.as_ref(),
+                projection_evidence.as_ref(),
+            );
+        }
+        for (_, binding_ty) in &mut self.bindings {
+            *binding_ty = binding_ty.recursive_type_normalized_with_projection_solutions(
+                db,
+                cycle,
+                projection_solutions.as_ref(),
+                projection_evidence.as_ref(),
+            );
+        }
+        for (_, declaration_ty) in &mut self.declarations {
+            *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                decl_ty.recursive_type_normalized_with_projection_solutions(
+                    db,
+                    cycle,
+                    projection_solutions.as_ref(),
+                    projection_evidence.as_ref(),
+                )
+            });
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES

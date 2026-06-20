@@ -3867,7 +3867,7 @@ class ProjectionSwap:
         for x, y in self.x:
             self.x = [(y, x)]
 
-        reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[int | str, int | str]]
+        reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[str | int, int | str]]
 
 class ProjectionChain:
     def __init__(self) -> None:
@@ -3891,7 +3891,7 @@ class ProjectionThreeWayRotation:
         for number, text, data in self.x:
             self.x = [(text, data, number)]
 
-        # revealed: list[tuple[int, str, bytes]] | list[tuple[int | bytes | str, int | bytes | str, int | bytes | str]]
+        # revealed: list[tuple[int, str, bytes]] | list[tuple[bytes | int | str, int | str | bytes, str | bytes | int]]
         reveal_type(self.x)
 ```
 
@@ -3925,8 +3925,8 @@ class ProjectionCorrelatedAttributes:
                 self.left = [(right_text, right_number)]
                 self.right = [(left_text, left_number)]
 
-        reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[int | str, str | int]]
-        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
+        reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[str | int, int | str]]
+        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[int | str, str | int]]
 
 class ProjectionCorrelatedAttributeCycle:
     def __init__(self) -> None:
@@ -3942,6 +3942,55 @@ class ProjectionCorrelatedAttributeCycle:
         # revealed: list[tuple[int, str]] | list[tuple[int | str, int | str]]
         reveal_type(self.left)
         reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
+
+class ProjectionMultiRootTupleBridge:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+
+    def read(self) -> None:
+        pair = (self.x, self.y)
+        x_item = pair[0][0]
+        y_item = pair[1][0]
+        self.x = [y_item]
+        self.y = [x_item]
+
+        reveal_type(self.x)  # revealed: list[str | int]
+        reveal_type(self.y)  # revealed: list[int | str]
+
+class ProjectionMultiRootTupleBridgeReversed:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+
+    def read(self) -> None:
+        pair = (self.y, self.x)
+        y_item = pair[0][0]
+        x_item = pair[1][0]
+        self.x = [y_item]
+        self.y = [x_item]
+
+        reveal_type(self.x)  # revealed: list[str | int]
+        reveal_type(self.y)  # revealed: list[int | str]
+
+class ProjectionMultiRootTriple:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+        self.z = [b""]
+
+    def read(self) -> None:
+        triple = (self.x, self.y, self.z)
+        x_item = triple[0][0]
+        y_item = triple[1][0]
+        z_item = triple[2][0]
+        self.x = [y_item]
+        self.y = [z_item]
+        self.z = [x_item]
+
+        reveal_type(self.x)  # revealed: list[str | bytes | int]
+        reveal_type(self.y)  # revealed: list[bytes | int | str]
+        reveal_type(self.z)  # revealed: list[int | str | bytes]
 ```
 
 Deeply nested projections are inferred correctly:

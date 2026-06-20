@@ -16,7 +16,7 @@ use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
-use super::projection::{ProjectionEvidenceSet, ProjectionResult};
+use super::projection::{ProjectionEvidenceSet, ProjectionRecoveryBuilder, ProjectionResult};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
@@ -555,12 +555,21 @@ impl<'db> UnpackResult<'db> {
             self.projection_evidence,
             previous_cycle_result.projection_evidence,
         );
+        let mut projection_recovery = ProjectionRecoveryBuilder::default();
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_projection_evidence(
+            *ty = projection_recovery.push_candidate(
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, previous_ty, cycle),
+            );
+        }
+        let projection_solutions =
+            projection_recovery.finish(db, cycle, projection_evidence.as_ref());
+        for (_, ty) in &mut self.targets {
+            *ty = ty.recursive_type_normalized_with_projection_solutions(
                 db,
-                previous_ty,
                 cycle,
+                projection_solutions.as_ref(),
                 projection_evidence.as_ref(),
             );
         }

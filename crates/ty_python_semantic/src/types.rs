@@ -1173,6 +1173,21 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
         projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
     ) -> Self {
+        self.cycle_join_for_recovery(db, previous, cycle)
+            .recursive_type_normalized_with_projection_evidence(db, cycle, projection_evidence)
+    }
+
+    /// Cycle-recovery-time API: combines the current and previous fixed-point iteration results.
+    ///
+    /// This intentionally does not normalize recursive projection artifacts. Result-level
+    /// recovery first joins every type slot, solves projection equations for all cycle heads, and
+    /// then normalizes the joined slots.
+    pub(crate) fn cycle_join_for_recovery(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -1208,7 +1223,6 @@ impl<'db> Type<'db> {
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
-        .recursive_type_normalized_with_projection_evidence(db, cycle, projection_evidence)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -2171,6 +2185,37 @@ impl<'db> Type<'db> {
             let ty = ty
                 .try_projection_cycle_normalized(db, divergent, projection_evidence)
                 .unwrap_or(ty);
+            ty.recursive_type_normalized_impl(db, div, false)
+                .unwrap_or(div)
+        })
+    }
+
+    /// Cycle-recovery-time API: normalizes a joined result slot using result-wide projection
+    /// solutions when available, falling back to the single-root projection solver otherwise.
+    #[must_use]
+    pub(crate) fn recursive_type_normalized_with_projection_solutions(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        projection_solutions: Option<&projection::ProjectionSolutions<'db>>,
+        projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        if let Some(projection_solutions) = projection_solutions
+            && let Some(ty) = self.replace_solved_projection_vars(db, projection_solutions)
+        {
+            return ty.recursive_type_normalized_without_projection_solver(db, cycle);
+        }
+
+        self.recursive_type_normalized_with_projection_evidence(db, cycle, projection_evidence)
+    }
+
+    fn recursive_type_normalized_without_projection_solver(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        cycle.head_ids().fold(self, |ty, id| {
+            let div = Type::Divergent(DivergentType::new(id));
             ty.recursive_type_normalized_impl(db, div, false)
                 .unwrap_or(div)
         })

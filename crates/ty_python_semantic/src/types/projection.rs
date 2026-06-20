@@ -9,6 +9,7 @@ use std::cell::RefCell;
 
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use smallvec::SmallVec;
 use ty_python_core::EvaluationMode;
 
 use super::{
@@ -21,6 +22,62 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::{Db, FxIndexMap, FxIndexSet};
+
+/// A type slot participating in result-level projection cycle recovery.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ProjectionRecoverySlot<'db> {
+    pub(crate) previous: Option<Type<'db>>,
+    pub(crate) joined: Type<'db>,
+    /// Whether this slot can explain the shape of a cycle root.
+    candidate: bool,
+}
+
+/// Solved projection variables for one Salsa cycle recovery step.
+pub(crate) struct ProjectionSolutions<'db> {
+    solved: FxIndexMap<ProjectionVar<'db>, Type<'db>>,
+}
+
+/// Cycle-recovery-time accumulator for result-wide projection solving.
+#[derive(Default)]
+pub(crate) struct ProjectionRecoveryBuilder<'db> {
+    slots: Vec<ProjectionRecoverySlot<'db>>,
+}
+
+impl<'db> ProjectionRecoveryBuilder<'db> {
+    /// Cycle-recovery-time API: records a joined result slot that can contain projection demands.
+    pub(crate) fn push(&mut self, previous: Option<Type<'db>>, joined: Type<'db>) -> Type<'db> {
+        self.slots.push(ProjectionRecoverySlot {
+            previous,
+            joined,
+            candidate: false,
+        });
+        joined
+    }
+
+    /// Cycle-recovery-time API: records a joined result slot that can also act as a root candidate.
+    pub(crate) fn push_candidate(
+        &mut self,
+        previous: Option<Type<'db>>,
+        joined: Type<'db>,
+    ) -> Type<'db> {
+        self.slots.push(ProjectionRecoverySlot {
+            previous,
+            joined,
+            candidate: true,
+        });
+        joined
+    }
+
+    /// Cycle-recovery-time API: solves all projection variables visible in the recorded slots.
+    pub(crate) fn finish(
+        &self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<ProjectionSolutions<'db>> {
+        ProjectionSolutions::from_recovery_slots(db, cycle, &self.slots, evidence)
+    }
+}
 
 impl<'db> Type<'db> {
     /// Inference-time API: projects an iterable value while recording cycle projection evidence.
@@ -812,6 +869,154 @@ impl<'db> Type<'db> {
         dependency
     }
 
+    fn matching_projection_narrowing_var_multi(
+        self,
+        db: &'db dyn Db,
+        roots: &CycleRootSet,
+    ) -> Option<ProjectionVar<'db>> {
+        let Type::Intersection(intersection) = self else {
+            return None;
+        };
+
+        let mut dependency = None;
+        for positive in intersection.positive(db) {
+            if let Type::Projection(projection) = positive {
+                let root = projection.root(db);
+                if !roots.contains(root) {
+                    return None;
+                }
+                let var = ProjectionVar {
+                    root,
+                    path: projection.path(db),
+                };
+                if dependency.as_ref().is_some_and(|existing| existing != &var) {
+                    return None;
+                }
+                dependency = Some(var);
+            } else if positive.mentions_any_cycle_artifact(db) {
+                return None;
+            }
+        }
+
+        for negative in intersection.negative(db) {
+            if negative.mentions_any_cycle_artifact(db) {
+                return None;
+            }
+        }
+
+        dependency
+    }
+
+    fn mentions_cycle_artifact_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::Divergent(root) => roots.contains(root),
+            Type::Projection(projection) => roots.contains(projection.root(db)),
+            _ => false,
+        })
+    }
+
+    fn mentions_cycle_artifact_outside_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::Divergent(root) => !roots.contains(root),
+            Type::Projection(projection) => !roots.contains(projection.root(db)),
+            _ => false,
+        })
+    }
+
+    fn mentions_divergent_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::Divergent(root) => roots.contains(root),
+            _ => false,
+        })
+    }
+
+    fn mentions_projection_var_in(
+        self,
+        db: &'db dyn Db,
+        vars: &FxIndexSet<ProjectionVar<'db>>,
+    ) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::Projection(projection) => vars.contains(&ProjectionVar {
+                root: projection.root(db),
+                path: projection.path(db),
+            }),
+            _ => false,
+        })
+    }
+
+    pub(crate) fn replace_solved_projection_vars(
+        self,
+        db: &'db dyn Db,
+        solutions: &ProjectionSolutions<'db>,
+    ) -> Option<Self> {
+        let roots = solutions.roots();
+        if !self.mentions_cycle_artifact_in_roots(db, &roots) {
+            return Some(self);
+        }
+
+        if let Type::Divergent(root) = self
+            && roots.contains(root)
+        {
+            return Some(self);
+        }
+
+        if let Type::Projection(projection) = self {
+            return solutions.solved_type(&ProjectionVar {
+                root: projection.root(db),
+                path: projection.path(db),
+            });
+        }
+
+        if let Type::Union(union) = self {
+            let elements = union
+                .elements(db)
+                .iter()
+                .map(|element| element.replace_solved_projection_vars(db, solutions))
+                .collect::<Option<Vec<_>>>()?;
+            return Some(UnionType::from_elements_cycle_recovery(db, elements));
+        }
+
+        if let Some(spec) = self.exact_tuple_instance_spec(db) {
+            return Some(match spec.as_ref() {
+                TupleSpec::Fixed(tuple) => {
+                    let elements = tuple
+                        .iter_all_elements()
+                        .map(|element| element.replace_solved_projection_vars(db, solutions))
+                        .collect::<Option<Vec<_>>>()?;
+                    Type::heterogeneous_tuple(db, elements)
+                }
+                TupleSpec::Variable(tuple) => {
+                    let prefix = tuple
+                        .iter_prefix_elements()
+                        .map(|element| element.replace_solved_projection_vars(db, solutions))
+                        .collect::<Option<Vec<_>>>()?;
+                    let variable = tuple
+                        .variable()
+                        .replace_solved_projection_vars(db, solutions)?;
+                    let suffix = tuple
+                        .iter_suffix_elements()
+                        .map(|element| element.replace_solved_projection_vars(db, solutions))
+                        .collect::<Option<Vec<_>>>()?;
+                    Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
+                }
+            });
+        }
+
+        if let Some((class, specialization)) = self.direct_class_specialization(db) {
+            let arguments = specialization
+                .types(db)
+                .iter()
+                .map(|argument| argument.replace_solved_projection_vars(db, solutions))
+                .collect::<Option<Vec<_>>>()?;
+            return Type::from(class.apply_specialization(db, |generic_context| {
+                generic_context.specialize(db, arguments)
+            }))
+            .to_instance(db);
+        }
+
+        None
+    }
+
     fn mentions_any_cycle_artifact(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| {
             matches!(ty, Type::Divergent(_) | Type::Projection(_))
@@ -850,6 +1055,22 @@ enum ProjectionContainer<'db> {
     Generic(ProjectionContainerFact<'db>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectionReplayMode {
+    SingleRoot,
+    MultiRoot,
+}
+
+impl ProjectionReplayMode {
+    const fn projects_cycle_artifacts(self) -> bool {
+        matches!(self, Self::MultiRoot)
+    }
+
+    const fn uses_direct_generic_replay(self) -> bool {
+        matches!(self, Self::MultiRoot)
+    }
+}
+
 impl<'db> ProjectionContainer<'db> {
     /// Cycle-recovery-time API: builds a container from direct structure or stored evidence.
     fn try_from(
@@ -864,12 +1085,7 @@ impl<'db> ProjectionContainer<'db> {
             });
         }
 
-        if let Some(fact) =
-            ty.direct_class_specialization(db)
-                .and_then(|(class, specialization)| {
-                    ProjectionContainerFact::try_from_parts(ty, class, specialization.types(db))
-                })
-        {
+        if let Some(fact) = ProjectionContainerFact::try_from_recovery_type(db, ty) {
             return Some(Self::Generic(fact));
         }
 
@@ -899,13 +1115,78 @@ impl<'db> ProjectionContainer<'db> {
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
+        self.project_path_impl(db, root, evidence, path, ProjectionReplayMode::SingleRoot)
+    }
+
+    fn project_multi_root_path(
+        &self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        self.project_path_impl(db, root, evidence, path, ProjectionReplayMode::MultiRoot)
+    }
+
+    fn project_path_impl(
+        &self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
             Self::Generic(fact) => {
-                return evidence?.project_generic_path(db, root, fact.arm, path);
+                if let Some(term) = evidence
+                    .and_then(|evidence| evidence.project_generic_path(db, root, fact.arm, path))
+                {
+                    return Some(term);
+                }
+
+                if mode.uses_direct_generic_replay() {
+                    return Self::project_known_generic_path(db, fact, root, evidence, path, mode);
+                }
+
+                return None;
             }
         };
-        Self::project_type_path(db, ty, root, evidence, path)
+        Self::project_type_path_impl(db, ty, root, evidence, path, mode)
+    }
+
+    fn project_known_generic_path(
+        db: &'db dyn Db,
+        fact: &ProjectionContainerFact<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
+        // List projection is structural and query-free. Custom generic containers still require
+        // inference-time evidence.
+        if !fact.class.is_known(db, KnownClass::List) {
+            return None;
+        }
+
+        let [element] = &*fact.arguments else {
+            return None;
+        };
+
+        let (&op, tail) = path.ops().split_first()?;
+        let term = Self::project_list_op(db, *element, op)?;
+        if tail.is_empty() {
+            return Some(term);
+        }
+
+        Self::project_term_path_impl(
+            db,
+            term,
+            root,
+            evidence,
+            &ProjectionPath::from_ops(tail.iter().copied()),
+            mode,
+        )
     }
 
     /// Cycle-recovery-time API: structurally replays a projection path against a type.
@@ -916,11 +1197,68 @@ impl<'db> ProjectionContainer<'db> {
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
+        Self::project_type_path_impl(
+            db,
+            ty,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::SingleRoot,
+        )
+    }
+
+    fn project_multi_root_type_path(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        Self::project_type_path_impl(
+            db,
+            ty,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::MultiRoot,
+        )
+    }
+
+    fn project_type_path_impl(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
+        if mode.projects_cycle_artifacts()
+            && let Type::Divergent(divergent) = ty
+        {
+            return Some(ProjectionTerm::Exact(Type::Projection(
+                ProjectionType::new(db, divergent, path.clone()),
+            )));
+        }
+
+        if mode.projects_cycle_artifacts()
+            && let Type::Projection(projection) = ty
+        {
+            return Some(ProjectionTerm::Exact(Type::Projection(
+                ProjectionType::new(
+                    db,
+                    projection.root(db),
+                    projection.path(db).append_path(path),
+                ),
+            )));
+        }
+
         if let Type::Union(union) = ty {
             let terms = union
                 .elements(db)
                 .iter()
-                .map(|element| Self::project_type_path(db, *element, root, evidence, path))
+                .map(|element| {
+                    Self::project_type_path_impl(db, *element, root, evidence, path, mode)
+                })
                 .collect::<Option<Vec<_>>>()?;
             return ProjectionTerm::from_union_terms(db, &terms);
         }
@@ -943,24 +1281,26 @@ impl<'db> ProjectionContainer<'db> {
             return Some(projected);
         }
 
-        Self::project_term_path(
+        Self::project_term_path_impl(
             db,
             projected,
             root,
             evidence,
             &ProjectionPath::from_ops(tail.iter().copied()),
+            mode,
         )
     }
 
-    fn project_term_path(
+    fn project_term_path_impl(
         db: &'db dyn Db,
         term: ProjectionTerm<'db>,
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
     ) -> Option<ProjectionTerm<'db>> {
         let ProjectionTerm::List(element) = term else {
-            return Self::project_type_path(db, term.ty(db), root, evidence, path);
+            return Self::project_type_path_impl(db, term.ty(db), root, evidence, path, mode);
         };
 
         // Preserve the list wrapper from starred unpacking while applying the tail path.
@@ -972,12 +1312,13 @@ impl<'db> ProjectionContainer<'db> {
             return Some(projected);
         }
 
-        Self::project_term_path(
+        Self::project_term_path_impl(
             db,
             projected,
             root,
             evidence,
             &ProjectionPath::from_ops(tail.iter().copied()),
+            mode,
         )
     }
 
@@ -1377,6 +1718,510 @@ impl<'db> ProjectionContainer<'db> {
 ///
 /// The system is solved only for the paths collected from the candidate type. If replay exposes a
 /// dependency on a path outside that set, solving fails closed.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct ProjectionVar<'db> {
+    root: DivergentType,
+    path: ProjectionPath<'db>,
+}
+
+#[derive(Debug, Clone)]
+struct CycleRootSet {
+    roots: SmallVec<[DivergentType; 4]>,
+}
+
+impl CycleRootSet {
+    fn from_cycle(cycle: &salsa::Cycle) -> Self {
+        Self {
+            roots: cycle.head_ids().map(DivergentType::new).collect(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.roots.len()
+    }
+
+    fn contains(&self, root: DivergentType) -> bool {
+        self.roots
+            .iter()
+            .any(|candidate| candidate.same_marker(root))
+    }
+}
+
+impl<'db> ProjectionSolutions<'db> {
+    pub(crate) fn from_recovery_slots(
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        slots: &[ProjectionRecoverySlot<'db>],
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<Self> {
+        MultiRootProjectionSystem::from_recovery_slots(db, cycle, slots, evidence)?.solve(db)
+    }
+
+    fn new(solved: FxIndexMap<ProjectionVar<'db>, Type<'db>>) -> Self {
+        Self { solved }
+    }
+
+    fn roots(&self) -> CycleRootSet {
+        let mut roots = SmallVec::new();
+        for var in self.solved.keys() {
+            if !roots
+                .iter()
+                .any(|candidate: &DivergentType| candidate.same_marker(var.root))
+            {
+                roots.push(var.root);
+            }
+        }
+        CycleRootSet { roots }
+    }
+
+    fn solved_type(&self, var: &ProjectionVar<'db>) -> Option<Type<'db>> {
+        self.solved.get(var).copied()
+    }
+}
+
+struct MultiRootProjectionSystem<'db> {
+    equations: FxIndexMap<ProjectionVar<'db>, MultiRootProjectionEquation<'db>>,
+}
+
+impl<'db> MultiRootProjectionSystem<'db> {
+    fn from_recovery_slots(
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        slots: &[ProjectionRecoverySlot<'db>],
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<Self> {
+        let roots = CycleRootSet::from_cycle(cycle);
+        if roots.len() <= 1 {
+            return None;
+        }
+
+        let mut demands = FxIndexSet::default();
+        for slot in slots {
+            for (root, path) in slot.joined.projection_demands(db) {
+                if roots.contains(root) {
+                    demands.insert(ProjectionVar { root, path });
+                }
+            }
+        }
+
+        if demands.is_empty() {
+            return None;
+        }
+
+        let mut candidates = RootCandidates::default();
+        for slot in slots {
+            if !slot.candidate {
+                continue;
+            }
+            let joined_demands = slot.joined.projection_demands(db);
+            let Some(previous) = slot.previous else {
+                for (root, _) in joined_demands {
+                    if demands.iter().any(|var| var.root.same_marker(root))
+                        && is_plausible_root_candidate(db, root, slot.joined, evidence)
+                    {
+                        candidates.insert(root, slot.joined);
+                    }
+                }
+                continue;
+            };
+            let root = root_candidate_from_previous(db, previous, &roots)
+                .or_else(|| root_candidate_from_demands(&joined_demands, &roots));
+            let Some(root) = root else {
+                continue;
+            };
+            if !demands.iter().any(|var| var.root.same_marker(root)) {
+                continue;
+            }
+            if !is_plausible_root_candidate(db, root, slot.joined, evidence) {
+                continue;
+            }
+            candidates.insert(root, slot.joined);
+        }
+
+        let mut equations = FxIndexMap::default();
+        let mut pending = demands.into_iter().collect::<Vec<_>>();
+        while let Some(var) = pending.pop() {
+            if equations.contains_key(&var) {
+                continue;
+            }
+
+            let mut equation = MultiRootProjectionEquation::default();
+            for candidate in candidates.get(var.root)? {
+                let Some(candidate_equation) =
+                    Self::build_equation(db, &roots, *candidate, &var, evidence)
+                else {
+                    continue;
+                };
+                equation.merge(candidate_equation)?;
+            }
+            equation.wrap_in_list?;
+            if equation.unsupported {
+                return None;
+            }
+            for dependency in &equation.dependencies {
+                if !equations.contains_key(dependency) {
+                    pending.push(dependency.clone());
+                }
+            }
+            equations.insert(var, equation);
+        }
+
+        Some(Self { equations })
+    }
+
+    fn build_equation(
+        db: &'db dyn Db,
+        roots: &CycleRootSet,
+        candidate: Type<'db>,
+        var: &ProjectionVar<'db>,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<MultiRootProjectionEquation<'db>> {
+        let elements = candidate.top_level_projection_union_elements(db);
+        let mut equation = MultiRootProjectionEquation::default();
+
+        for element in elements {
+            if element.same_divergent_marker(db, Type::Divergent(var.root)) {
+                continue;
+            }
+
+            let container = ProjectionContainer::try_from(db, var.root, element, evidence)?;
+            let term = container.project_multi_root_path(db, var.root, evidence, &var.path)?;
+            let allow_productive = !element.mentions_cycle_artifact_direct(db, var.root);
+            equation.add_projection_term(db, roots, var, term, allow_productive)?;
+        }
+
+        Some(equation)
+    }
+
+    fn solve(self, db: &'db dyn Db) -> Option<ProjectionSolutions<'db>> {
+        let Self { equations } = self;
+        if equations.is_empty() || equations.values().any(|equation| equation.unsupported) {
+            return None;
+        }
+
+        let vars = equations.keys().cloned().collect::<Vec<_>>();
+        let var_indices = vars
+            .iter()
+            .enumerate()
+            .map(|(index, var)| (var.clone(), index))
+            .collect::<FxIndexMap<_, _>>();
+
+        let mut graph = vec![Vec::new(); vars.len()];
+        for (var, equation) in &equations {
+            let source = var_indices[var];
+            for dependency in &equation.dependencies {
+                graph[source].push(*var_indices.get(dependency)?);
+            }
+        }
+
+        let sccs = dependency_first_strongly_connected_components(&graph);
+        let mut solutions = vec![None; vars.len()];
+        for scc in sccs {
+            let wrap_in_list = equations[&vars[*scc.first()?]].wrap_in_list?;
+            for &index in &scc {
+                if equations[&vars[index]].wrap_in_list != Some(wrap_in_list) {
+                    return None;
+                }
+            }
+
+            let scc_vars = scc
+                .iter()
+                .map(|&index| vars[index].clone())
+                .collect::<FxIndexSet<_>>();
+            let scc_is_divergent = scc.iter().any(|&index| {
+                let equation = &equations[&vars[index]];
+                equation.divergent
+                    || equation
+                        .productive
+                        .iter()
+                        .any(|term| term.mentions_projection_var_in(db, &scc_vars))
+            });
+
+            if scc_is_divergent {
+                for index in scc {
+                    let root = vars[index].root;
+                    let solved = if wrap_in_list {
+                        KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
+                    } else {
+                        Type::Divergent(root)
+                    };
+                    solutions[index] = Some(solved);
+                }
+                continue;
+            }
+
+            let mut base = Vec::new();
+            let solved_so_far = vars
+                .iter()
+                .cloned()
+                .zip(solutions.iter().copied())
+                .filter_map(|(var, solution)| Some((var, solution?)))
+                .collect::<FxIndexMap<_, _>>();
+            let solved_so_far = ProjectionSolutions::new(solved_so_far);
+            for &index in &scc {
+                let equation = &equations[&vars[index]];
+                for term in &equation.productive {
+                    base.push(
+                        term.replace_solved_projection_vars(db, &solved_so_far)
+                            .unwrap_or(*term),
+                    );
+                }
+                for dependency in &equation.dependencies {
+                    let dependency_index = var_indices[dependency];
+                    if !scc.contains(&dependency_index) {
+                        base.push(solutions[dependency_index]?);
+                    }
+                }
+            }
+
+            if base.is_empty() {
+                return None;
+            }
+
+            let solved = match base.as_slice() {
+                [term] => *term,
+                _ => UnionType::from_elements_cycle_recovery(db, base),
+            };
+            let solved = if wrap_in_list {
+                KnownClass::List.to_specialized_instance(db, &[solved])
+            } else {
+                solved
+            };
+            for index in scc {
+                solutions[index] = Some(solved);
+            }
+        }
+
+        let solved = vars
+            .into_iter()
+            .enumerate()
+            .map(|(index, var)| Some((var, solutions[index]?)))
+            .collect::<Option<FxIndexMap<_, _>>>()?;
+
+        Some(ProjectionSolutions::new(solved))
+    }
+}
+
+#[derive(Default)]
+struct RootCandidates<'db> {
+    candidates: FxIndexMap<DivergentType, Vec<Type<'db>>>,
+}
+
+impl<'db> RootCandidates<'db> {
+    fn insert(&mut self, root: DivergentType, ty: Type<'db>) {
+        if let Some((_, candidates)) = self
+            .candidates
+            .iter_mut()
+            .find(|(candidate, _)| candidate.same_marker(root))
+        {
+            if !candidates.contains(&ty) {
+                candidates.push(ty);
+            }
+        } else {
+            self.candidates.insert(root, vec![ty]);
+        }
+    }
+
+    fn get(&self, root: DivergentType) -> Option<&[Type<'db>]> {
+        self.candidates
+            .iter()
+            .find_map(|(candidate, ty)| candidate.same_marker(root).then_some(ty.as_slice()))
+    }
+}
+
+#[derive(Default)]
+struct MultiRootProjectionEquation<'db> {
+    productive: Vec<Type<'db>>,
+    dependencies: FxIndexSet<ProjectionVar<'db>>,
+    divergent: bool,
+    unsupported: bool,
+    wrap_in_list: Option<bool>,
+}
+
+impl<'db> MultiRootProjectionEquation<'db> {
+    fn merge(&mut self, other: Self) -> Option<()> {
+        match (self.wrap_in_list, other.wrap_in_list) {
+            (Some(left), Some(right)) if left != right => return None,
+            (None, Some(right)) => self.wrap_in_list = Some(right),
+            _ => {}
+        }
+
+        self.productive.extend(other.productive);
+        self.dependencies.extend(other.dependencies);
+        self.divergent |= other.divergent;
+        self.unsupported |= other.unsupported;
+        Some(())
+    }
+
+    fn add_projection_term(
+        &mut self,
+        db: &'db dyn Db,
+        roots: &CycleRootSet,
+        var: &ProjectionVar<'db>,
+        term: ProjectionTerm<'db>,
+        allow_productive: bool,
+    ) -> Option<()> {
+        let wrap_in_list = matches!(term, ProjectionTerm::List(_));
+        match self.wrap_in_list {
+            Some(existing) if existing != wrap_in_list => return None,
+            None => self.wrap_in_list = Some(wrap_in_list),
+            Some(_) => {}
+        }
+
+        match term {
+            ProjectionTerm::Exact(term) => {
+                if term.same_divergent_marker(db, Type::Divergent(var.root)) {
+                    self.dependencies.insert(var.clone());
+                    return Some(());
+                }
+
+                if term.mentions_matching_projection(db, var.root, &var.path)
+                    && let Some(projected) = ProjectionContainer::project_multi_root_type_path(
+                        db, term, var.root, None, &var.path,
+                    )
+                {
+                    if projected
+                        .ty(db)
+                        .is_matching_projection(db, var.root, &var.path)
+                    {
+                        self.divergent = true;
+                        return Some(());
+                    }
+                    return self.add_projection_term(db, roots, var, projected, allow_productive);
+                }
+
+                self.add_type_term(db, roots, term, true, allow_productive)
+            }
+            ProjectionTerm::Homogeneous(term) => {
+                if term.same_divergent_marker(db, Type::Divergent(var.root)) {
+                    self.dependencies.insert(var.clone());
+                    return Some(());
+                }
+
+                self.add_type_term(db, roots, term, true, allow_productive)
+            }
+            ProjectionTerm::List(term) => {
+                self.add_type_term(db, roots, term, false, allow_productive)
+            }
+        }
+    }
+
+    fn add_type_term(
+        &mut self,
+        db: &'db dyn Db,
+        roots: &CycleRootSet,
+        term: Type<'db>,
+        allow_dependencies: bool,
+        allow_productive: bool,
+    ) -> Option<()> {
+        if let Type::Union(union) = term {
+            for element in union.elements(db) {
+                self.add_type_term(db, roots, *element, allow_dependencies, allow_productive)?;
+            }
+            return Some(());
+        }
+
+        if allow_dependencies {
+            if let Type::Projection(projection) = term {
+                let root = projection.root(db);
+                if roots.contains(root) {
+                    self.dependencies.insert(ProjectionVar {
+                        root,
+                        path: projection.path(db),
+                    });
+                } else {
+                    self.unsupported = true;
+                }
+                return Some(());
+            }
+
+            if let Some(var) = term.matching_projection_narrowing_var_multi(db, roots) {
+                self.dependencies.insert(var);
+                return Some(());
+            }
+        }
+
+        if term.mentions_cycle_artifact_outside_roots(db, roots) {
+            self.unsupported = true;
+            return Some(());
+        }
+
+        if allow_dependencies {
+            let dependencies = term
+                .projection_demands(db)
+                .into_iter()
+                .filter_map(|(root, path)| {
+                    roots.contains(root).then_some(ProjectionVar { root, path })
+                })
+                .collect::<Vec<_>>();
+            if !dependencies.is_empty() {
+                self.dependencies.extend(dependencies);
+                if allow_productive {
+                    self.productive.push(term);
+                }
+                return Some(());
+            }
+        }
+
+        if term.mentions_divergent_in_roots(db, roots)
+            || term.mentions_cycle_artifact_in_roots(db, roots)
+        {
+            self.divergent = true;
+            return Some(());
+        }
+
+        if allow_productive {
+            self.productive.push(term);
+        }
+        Some(())
+    }
+}
+
+fn root_candidate_from_previous(
+    db: &dyn Db,
+    previous: Type<'_>,
+    roots: &CycleRootSet,
+) -> Option<DivergentType> {
+    let mut candidates = previous
+        .cycle_artifact_roots(db)
+        .into_iter()
+        .filter(|root| roots.contains(*root))
+        .collect::<Vec<_>>();
+    candidates.dedup_by(|left, right| left.same_marker(*right));
+    match candidates.as_slice() {
+        [root] => Some(*root),
+        _ => None,
+    }
+}
+
+fn root_candidate_from_demands(
+    demands: &[(DivergentType, ProjectionPath<'_>)],
+    roots: &CycleRootSet,
+) -> Option<DivergentType> {
+    let mut candidates = Vec::new();
+    for (root, _) in demands {
+        if roots.contains(*root) {
+            Type::push_cycle_artifact_root(&mut candidates, *root);
+        }
+    }
+    match candidates.as_slice() {
+        [root] => Some(*root),
+        _ => None,
+    }
+}
+
+fn is_plausible_root_candidate<'db>(
+    db: &'db dyn Db,
+    root: DivergentType,
+    ty: Type<'db>,
+    evidence: Option<&ProjectionEvidenceSet<'db>>,
+) -> bool {
+    ty.top_level_projection_union_elements(db)
+        .into_iter()
+        .filter(|element| !element.same_divergent_marker(db, Type::Divergent(root)))
+        .any(|element| ProjectionContainer::try_from(db, root, element, evidence).is_some())
+}
+
 struct ProjectionSystem<'db> {
     root: DivergentType,
     equations: FxIndexMap<ProjectionPath<'db>, ProjectionEquation<'db>>,
@@ -1511,6 +2356,11 @@ impl<'db> ProjectionEquation<'db> {
 
         match term {
             ProjectionTerm::Exact(term) => {
+                if term.same_divergent_marker(db, Type::Divergent(root)) {
+                    self.dependencies.insert(path.clone());
+                    return Some(());
+                }
+
                 // The term may still be an unprojected recursive candidate like
                 // `tuple[Projection_{path}(D), T]`; project it before collecting
                 // productive parts for `Projection_{path}(D)`.
@@ -1527,7 +2377,14 @@ impl<'db> ProjectionEquation<'db> {
 
                 self.add_type_term(db, root, term, true)
             }
-            ProjectionTerm::Homogeneous(term) => self.add_type_term(db, root, term, true),
+            ProjectionTerm::Homogeneous(term) => {
+                if term.same_divergent_marker(db, Type::Divergent(root)) {
+                    self.dependencies.insert(path.clone());
+                    return Some(());
+                }
+
+                self.add_type_term(db, root, term, true)
+            }
             ProjectionTerm::List(term) => self.add_type_term(db, root, term, false),
         }
     }
@@ -1997,6 +2854,16 @@ impl<'db> ProjectionContainerFact<'db> {
         })
     }
 
+    /// Cycle-recovery-time API: builds a fact from direct specialization only.
+    fn try_from_recovery_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        if ty.exact_tuple_instance_spec(db).is_some() {
+            return None;
+        }
+
+        let (class, specialization) = ty.direct_class_specialization(db)?;
+        Self::try_from_parts(ty, class, specialization.types(db))
+    }
+
     /// Inference-time API: builds a fact from the full specialization view.
     ///
     /// This may expand aliases, bounds, and fallbacks.
@@ -2073,6 +2940,10 @@ impl<'db> ProjectionPath<'db> {
         Self {
             ops: ops.into_boxed_slice(),
         }
+    }
+
+    fn append_path(&self, path: &Self) -> Self {
+        Self::from_ops(self.ops.iter().chain(path.ops.iter()).copied())
     }
 
     fn suffixes(&self) -> impl Iterator<Item = Self> + '_ {
