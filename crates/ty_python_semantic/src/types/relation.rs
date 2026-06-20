@@ -685,6 +685,33 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    /// Peel `NewType` transparency from this type.
+    ///
+    /// A `NewType` is a no-op at runtime: `NewType("N", Base)(v)` returns `v` unchanged, so a
+    /// value of `N` is indistinguishable at runtime from a value of `Base`. This maps a type to
+    /// the type its runtime objects actually inhabit, descending through unions.
+    /// (`NewType::concrete_base_type` already collapses a `NewType`-of-`NewType` chain.)
+    pub(crate) fn peel_newtype_transparency(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+            Type::Union(union) => union.map(db, |element| (*element).peel_newtype_transparency(db)),
+            _ => self,
+        }
+    }
+
+    /// Return `true` if no two inhabitants of `self` and `other` can ever be the *same* runtime
+    /// object.
+    ///
+    /// Unlike [`Type::is_disjoint_from`], this peels `NewType` transparency first: two
+    /// type-level-disjoint `NewType`s (e.g. `NewType("A", Foo)` and `NewType("B", Foo)`) can still
+    /// wrap one and the same underlying runtime object, so they are *not* runtime-object-disjoint.
+    /// `is`/`is not` comparisons and identity narrowing must reason about runtime-object identity
+    /// rather than type-level disjointness (see ty#3552).
+    pub(crate) fn is_runtime_object_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        self.peel_newtype_transparency(db)
+            .is_disjoint_from(db, other.peel_newtype_transparency(db))
+    }
+
     pub(crate) fn when_disjoint_from<'c>(
         self,
         db: &'db dyn Db,

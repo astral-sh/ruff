@@ -1370,7 +1370,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
-            ast::CmpOp::Is => Some(rhs_ty),
+            ast::CmpOp::Is => {
+                // Narrowing `x is y` intersects each operand's type with the other's. When the two
+                // types are type-level disjoint, that intersection collapses to `Never`. But that
+                // collapse is wrong when the operands could still point to the *same* runtime
+                // object -- most importantly across `NewType` boundaries, which are transparent at
+                // runtime. Suppress narrowing (keep the original type) in exactly that case;
+                // otherwise narrow as before, so ordinary cases like `Foo | Bar is Foo` -> `Foo`
+                // are unaffected.
+                if lhs_ty.is_disjoint_from(self.db, rhs_ty)
+                    && !lhs_ty.is_runtime_object_disjoint_from(self.db, rhs_ty)
+                {
+                    None
+                } else {
+                    Some(rhs_ty)
+                }
+            }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,

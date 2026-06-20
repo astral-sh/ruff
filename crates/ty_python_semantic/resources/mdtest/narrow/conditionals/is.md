@@ -251,3 +251,57 @@ def h(x: object):
     else:
         reveal_type(x)  # revealed: None
 ```
+
+## `is` with `NewType` operands
+
+A `NewType` is transparent at runtime (`NewType("N", Base)(v)` returns `v` unchanged), so two
+variables whose declared types are *type-level disjoint* can still refer to the same runtime
+object. `is` narrowing must therefore not collapse such operands to `Never`. This is a regression
+test for <https://github.com/astral-sh/ty/issues/3552>.
+
+```py
+from typing import Literal, NewType, final
+
+class Foo: ...
+
+FooNewType1 = NewType("FooNewType1", Foo)
+FooNewType2 = NewType("FooNewType2", Foo)
+
+# `FooNewType1` and `FooNewType2` are type-disjoint, but both wrap `Foo`, so `foo1 is foo2` can be
+# `True` at runtime. Neither operand should be narrowed to `Never`.
+def two_newtypes_same_base(foo1: FooNewType1, foo2: FooNewType2):
+    if foo1 is foo2:
+        reveal_type(foo1)  # revealed: FooNewType1
+        reveal_type(foo2)  # revealed: FooNewType2
+
+BoolNewType = NewType("BoolNewType", bool)
+IntNewType = NewType("IntNewType", int)
+
+# A `NewType` over a literal's type is not disjoint from the literal at runtime either.
+def newtype_over_literal(true: Literal[True], one: Literal[1]):
+    if BoolNewType(true) is true:
+        reveal_type(true)  # revealed: Literal[True]
+    if IntNewType(one) is one:
+        reveal_type(one)  # revealed: Literal[1]
+```
+
+But genuinely disjoint runtime value sets must still narrow to `Never`: two distinct `@final`
+classes can never share an object, so neither can `NewType`s over them.
+
+```py
+from typing import NewType, final
+
+@final
+class FinalFoo: ...
+
+@final
+class FinalBar: ...
+
+FinalFooNewType = NewType("FinalFooNewType", FinalFoo)
+FinalBarNewType = NewType("FinalBarNewType", FinalBar)
+
+def final_disjoint_bases(f: FinalFooNewType, b: FinalBarNewType):
+    if f is b:
+        reveal_type(f)  # revealed: Never
+        reveal_type(b)  # revealed: Never
+```
