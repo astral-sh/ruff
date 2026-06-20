@@ -1404,6 +1404,33 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_nested_collection_literal_peer_inference(criterion: &mut Criterion) {
+    const DEPTH: usize = 14;
+
+    setup_rayon();
+
+    // Regression benchmark for deeply nested peer collection literals. Each level doubles the
+    // number of collection literal subtrees, so recursively re-inferring those subtrees adds a
+    // depth-dependent multiplier to inference time.
+    let mut expression = "[1]".to_string();
+    for _ in 0..DEPTH {
+        expression = format!("[{expression}, {expression}]");
+    }
+    let code = format!("value = {expression}\n");
+
+    criterion.bench_function("ty_micro[nested_collection_literal_peer_inference]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1581,6 +1608,7 @@ criterion_group!(
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
+    benchmark_nested_collection_literal_peer_inference,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

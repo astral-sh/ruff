@@ -7120,17 +7120,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
             builder.infer_expression(elt, tcx)
         };
-        speculative_builder.infer_collection_literal(
+        let peer_ty = speculative_builder.infer_collection_literal(
             collection_class,
             None,
             elts,
             &mut infer_elt_ty,
             TypeContext::default(),
-        )
+        );
+        self.extend_cached_expression_effects(speculative_builder);
+        peer_ty
     }
 
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
+        &mut self,
+        collection_class: KnownClass,
+        collection_expr: Option<ast::ExprRef<'_>>,
+        elts: &[[Option<&'expr ast::Expr>; N]],
+        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let teardown_expression_cache = elts
+            .iter()
+            .flatten()
+            .flatten()
+            .any(|elt| is_collection_literal(elt))
+            && self.setup_expression_cache();
+
+        let result = self.infer_collection_literal_cached(
+            collection_class,
+            collection_expr,
+            elts,
+            infer_elt_expression,
+            tcx,
+        );
+
+        if teardown_expression_cache {
+            self.teardown_expression_cache();
+        }
+
+        result
+    }
+
+    fn infer_collection_literal_cached<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: Option<ast::ExprRef<'_>>,
@@ -11504,6 +11536,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
+        self.extend_impl(other, true);
+    }
+
+    /// Extend the current region with all non-expression results from cached inference.
+    fn extend_cached_expression_effects(&mut self, other: Self) {
+        self.extend_impl(other, false);
+    }
+
+    fn extend_impl(&mut self, other: Self, include_expression_types: bool) {
         let Self {
             context,
             expressions,
@@ -11546,7 +11587,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.expressions.extend(expressions.iter());
+        if include_expression_types {
+            self.expressions.extend(expressions.iter());
+        }
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
