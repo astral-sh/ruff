@@ -427,6 +427,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
+        if let Some(projection) = value_ty.try_subscript_projection_result(db, slice_ty) {
+            self.extend_projection_result(projection);
+        }
         let result_ty = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }

@@ -3934,6 +3934,30 @@ class ProjectionDeepPath:
         reveal_type(self.x)  # revealed: list[tuple[tuple[tuple[tuple[tuple[int]]]]]]
 ```
 
+Subscript projections from custom generic containers preserve inference-time evidence:
+
+```py
+from typing import Generic, TypeVar
+
+_ProjectionSubscriptT = TypeVar("_ProjectionSubscriptT")
+
+class ProjectionSubscriptBox(Generic[_ProjectionSubscriptT]):
+    def __init__(self, value: _ProjectionSubscriptT) -> None:
+        self.value = value
+
+    def __getitem__(self, key: int) -> _ProjectionSubscriptT:
+        return self.value
+
+class ProjectionCustomSubscriptAssignment:
+    def __init__(self) -> None:
+        self.x = ProjectionSubscriptBox(1)
+
+    def read(self) -> None:
+        self.x = ProjectionSubscriptBox(self.x[0])
+
+        reveal_type(self.x)  # revealed: ProjectionSubscriptBox[int]
+```
+
 Projection recovery does not collapse recursive values that are wrapped under another container:
 
 ```py
