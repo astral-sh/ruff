@@ -289,7 +289,7 @@ struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
+    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -370,13 +370,14 @@ impl Default for ApplyTypeMappingVisitor<'_> {
 }
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
-pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
+pub(crate) type FindLegacyTypeVarsVisitor<'db> =
+    CycleDetector<FindLegacyTypeVars, Type<'db>, (), 3>;
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
+pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, (), 3>;
 pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
