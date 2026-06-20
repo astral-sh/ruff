@@ -2331,6 +2331,9 @@ impl<'db> StaticClassLiteral<'db> {
                         projection_evidence = ProjectionEvidenceSet::merged(
                             db,
                             projection_evidence,
+                            // Projection demand can be introduced after this implicit-attribute
+                            // result is produced. The attribute inference cannot know ahead of
+                            // time whether evidence will be needed, so collect eagerly.
                             ProjectionEvidenceSet::from_types(db, [inferred_ty]),
                         );
                         return ImplicitAttributeMember::new(Member::new(
@@ -2608,6 +2611,9 @@ impl<'db> StaticClassLiteral<'db> {
             projection_evidence = ProjectionEvidenceSet::merged(
                 db,
                 projection_evidence,
+                // Projection demand can be introduced after this implicit-attribute result is
+                // produced. The attribute inference cannot know ahead of time whether evidence
+                // will be needed, so collect eagerly.
                 ProjectionEvidenceSet::from_types(db, [inferred_ty]),
             );
             Place::bound(inferred_ty)

@@ -10811,6 +10811,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let projection_evidence = ProjectionEvidenceSet::merged(
             db,
             nested_projection_evidence,
+            // Projection demand can be introduced after this expression result is produced, e.g.
+            // when an unpacker projects the right-hand side. This result cannot know ahead of time
+            // whether evidence will be needed, so collect eagerly.
             ProjectionEvidenceSet::from_types(
                 db,
                 expressions

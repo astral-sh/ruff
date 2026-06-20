@@ -1821,7 +1821,10 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
 }
 
 impl<'db> ProjectionEvidenceSet<'db> {
-    /// Inference-time API: collects projection evidence for later cycle recovery.
+    /// Inference-time API: eagerly collects projection evidence for later cycle recovery.
+    ///
+    /// Use this when the projection demand can be introduced after the inference result is
+    /// produced, so the result cannot know ahead of time whether evidence will be needed.
     pub(crate) fn from_types(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
@@ -1832,6 +1835,11 @@ impl<'db> ProjectionEvidenceSet<'db> {
     }
 
     /// Inference-time API: conditionally collects projection evidence.
+    ///
+    /// Use this only when every projection demand that may need facts from these types has already
+    /// been observed before the inference result is produced. If an external consumer can later
+    /// introduce a new demand for the produced result, use [`ProjectionEvidenceSet::from_types`]
+    /// instead.
     pub(crate) fn from_types_if_needed(
         db: &'db dyn Db,
         should_collect: bool,
