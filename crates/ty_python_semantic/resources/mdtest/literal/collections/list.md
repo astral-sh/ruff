@@ -57,6 +57,13 @@ reveal_type([[None], [1]])  # revealed: list[list[None | int]]
 reveal_type([{1}, {"a"}])  # revealed: list[set[int | str]]
 reveal_type([{"a": 1}, {"b": "x"}])  # revealed: list[dict[str, int | str]]
 reveal_type({1: [1], 2: ["a"]})  # revealed: dict[int, list[int | str]]
+
+# Effects from peer pre-inference are produced exactly once by the real inference pass.
+with_named_expression = [[(x := 1)], ["a"]]
+reveal_type(with_named_expression)  # revealed: list[list[int | str]]
+reveal_type(x)  # revealed: Literal[1]
+
+with_diagnostic = [[1 + "x"], ["a"]]  # error: [unsupported-operator]
 ```
 
 ## None promotion

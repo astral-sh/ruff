@@ -7131,7 +7131,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut infer_elt_ty,
             TypeContext::default(),
         );
-        self.extend_cached_expression_effects(speculative_builder);
+
+        // Cached types cannot replay inference effects. If the speculative pass produced any,
+        // discard its cache entries so that the real pass produces those effects exactly once.
+        let has_effects = speculative_builder.context.has_diagnostics()
+            || !speculative_builder.bindings.is_empty()
+            || !speculative_builder.declarations.is_empty()
+            || !speculative_builder.deferred.is_empty()
+            || !speculative_builder.called_functions.is_empty()
+            || !speculative_builder.collection_use_constraints.is_empty()
+            || !speculative_builder.string_annotations.is_empty()
+            || !speculative_builder.expected_types.is_empty()
+            || !speculative_builder.type_expression_flags.is_empty()
+            || !speculative_builder.qualifiers.is_empty()
+            || speculative_builder.cycle_recovery != self.cycle_recovery
+            || speculative_builder.discards_dict_key_assignments
+            || speculative_builder.return_types_and_ranges.len()
+                != self.return_types_and_ranges.len();
+        if has_effects && let Some(expression_cache) = &self.expression_cache {
+            expression_cache.borrow_mut().clear();
+        }
+
         peer_ty
     }
 
@@ -11550,15 +11570,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
-        self.extend_impl(other, true);
-    }
-
-    /// Extend the current region with all non-expression results from cached inference.
-    fn extend_cached_expression_effects(&mut self, other: Self) {
-        self.extend_impl(other, false);
-    }
-
-    fn extend_impl(&mut self, other: Self, include_expression_types: bool) {
         let Self {
             context,
             expressions,
@@ -11601,9 +11612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        if include_expression_types {
-            self.expressions.extend(expressions.iter());
-        }
+        self.expressions.extend(expressions.iter());
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
