@@ -5635,11 +5635,13 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Never) => Some(GeneratorTypes {
-                yield_ty: Some(ty),
-                send_ty: Some(ty),
-                return_ty: Some(ty),
-            }),
+            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never) => {
+                Some(GeneratorTypes {
+                    yield_ty: Some(ty),
+                    send_ty: Some(ty),
+                    return_ty: Some(ty),
+                })
+            }
             _ => None,
         }
     }
