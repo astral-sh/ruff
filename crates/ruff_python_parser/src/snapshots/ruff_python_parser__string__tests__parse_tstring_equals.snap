@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
+assertion_line: 801
 expression: suite
 ---
 [
@@ -50,6 +51,7 @@ expression: suite
                                                     ],
                                                 },
                                             ),
+                                            expression_source: "42 == 42",
                                             debug_text: None,
                                             conversion: None,
                                             format_spec: None,
