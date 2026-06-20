@@ -1146,7 +1146,7 @@ impl<'db> ProjectionContainer<'db> {
                 }
 
                 if mode.uses_direct_generic_replay() {
-                    return Self::project_known_generic_path(db, fact, root, evidence, path, mode);
+                    return Self::project_direct_generic_path(db, fact, root, evidence, path, mode);
                 }
 
                 return None;
@@ -1155,7 +1155,8 @@ impl<'db> ProjectionContainer<'db> {
         Self::project_type_path_impl(db, ty, root, evidence, path, mode)
     }
 
-    fn project_known_generic_path(
+    /// Cycle-recovery-time API: query-free replay for directly visible generic containers.
+    fn project_direct_generic_path(
         db: &'db dyn Db,
         fact: &ProjectionContainerFact<'db>,
         root: DivergentType,
@@ -1163,18 +1164,12 @@ impl<'db> ProjectionContainer<'db> {
         path: &ProjectionPath<'db>,
         mode: ProjectionReplayMode,
     ) -> Option<ProjectionTerm<'db>> {
-        // List projection is structural and query-free. Custom generic containers still require
-        // inference-time evidence.
-        if !fact.class.is_known(db, KnownClass::List) {
-            return None;
-        }
-
         let [element] = &*fact.arguments else {
             return None;
         };
 
         let (&op, tail) = path.ops().split_first()?;
-        let term = Self::project_list_op(db, *element, op)?;
+        let term = Self::project_homogeneous_op(db, *element, op, fact)?;
         if tail.is_empty() {
             return Some(term);
         }
@@ -1320,6 +1315,36 @@ impl<'db> ProjectionContainer<'db> {
             &ProjectionPath::from_ops(tail.iter().copied()),
             mode,
         )
+    }
+
+    /// Cycle-recovery-time API: replays operations whose result follows the element type.
+    fn project_homogeneous_op(
+        db: &'db dyn Db,
+        element: Type<'db>,
+        op: ProjectionOp<'db>,
+        fact: &ProjectionContainerFact<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        match op {
+            ProjectionOp::Iter { is_async: false } => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Iter { is_async: true } => None,
+            ProjectionOp::Unpack(UnpackProjection::Exact { .. }) => {
+                Some(ProjectionTerm::Homogeneous(element))
+            }
+            ProjectionOp::Unpack(UnpackProjection::Star { position, .. }) => {
+                Some(Self::star_unpack_homogeneous(element, position))
+            }
+            ProjectionOp::Subscript(
+                ProjectionSubscript::Unknown
+                | ProjectionSubscript::Int
+                | ProjectionSubscript::LiteralInt(_),
+            ) => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Subscript(ProjectionSubscript::StaticSlice(_)) => {
+                Some(ProjectionTerm::Exact(fact.with_arguments(db, [element])?))
+            }
+            ProjectionOp::CallMethod0(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => None,
+        }
     }
 
     fn project_list_op(
@@ -2852,6 +2877,18 @@ impl<'db> ProjectionContainerFact<'db> {
             class,
             arguments: arguments.to_vec().into_boxed_slice(),
         })
+    }
+
+    /// Cycle-recovery-time API: rebuilds this direct generic container with new arguments.
+    fn with_arguments(
+        &self,
+        db: &'db dyn Db,
+        arguments: impl IntoIterator<Item = Type<'db>>,
+    ) -> Option<Type<'db>> {
+        Type::from(self.class.apply_specialization(db, |generic_context| {
+            generic_context.specialize(db, arguments.into_iter().collect::<Vec<_>>())
+        }))
+        .to_instance(db)
     }
 
     /// Cycle-recovery-time API: builds a fact from direct specialization only.
