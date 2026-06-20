@@ -459,9 +459,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn stores_projection_evidence(&self) -> bool {
+        !matches!(self.region, InferenceRegion::FunctionDecorators(_))
+    }
+
     fn extend_projection_evidence(&mut self, other: Option<ProjectionEvidenceSet<'db>>) {
         // Function decorator inference does not store projection evidence in its result.
-        if matches!(self.region, InferenceRegion::FunctionDecorators(_)) {
+        if !self.stores_projection_evidence() {
             return;
         }
         self.projection_evidence =
@@ -469,11 +473,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_projection_result(&mut self, result: ProjectionResult<'db>) {
+        if !self.stores_projection_evidence() {
+            return;
+        }
         self.needs_projection_evidence_from_types = true;
         self.extend_projection_evidence(result.projection_evidence());
     }
 
     fn extend_unpack_projection_evidence(&mut self, unpacked: &UnpackResult<'db>) {
+        if !self.stores_projection_evidence() {
+            return;
+        }
         self.needs_projection_evidence_from_types |=
             unpacked.needs_projection_evidence_from_types();
         self.extend_projection_evidence(unpacked.projection_evidence());
