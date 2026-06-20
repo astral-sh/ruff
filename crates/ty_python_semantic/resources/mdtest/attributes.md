@@ -3284,7 +3284,7 @@ class ProjectionHomogeneousTupleSlice:
     def read(self) -> None:
         self.x = self.x[1:]
 
-        reveal_type(self.x)  # revealed: tuple[int, ...]
+        reveal_type(self.x)  # revealed: @Todo(slice into variable-length tuple)
 ```
 
 Projection recovery also works for simple custom generic containers that define their own iteration

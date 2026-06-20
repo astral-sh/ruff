@@ -697,16 +697,7 @@ impl<'db> Type<'db> {
                             SubscriptErrorKind::SliceStepSizeZero,
                         )),
                     },
-                    TupleSpec::Variable(tuple) => {
-                        let element = UnionType::from_elements_leave_aliases(
-                            db,
-                            tuple
-                                .iter_prefix_elements()
-                                .chain(std::iter::once(tuple.variable()))
-                                .chain(tuple.iter_suffix_elements()),
-                        );
-                        Ok(Type::homogeneous_tuple(db, element))
-                    }
+                    TupleSpec::Variable(_) => Ok(todo_type!("slice into variable-length tuple")),
                 }),
 
             // Ex) Given `"value"[1]`, return `"a"`
