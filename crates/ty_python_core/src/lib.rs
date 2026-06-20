@@ -348,7 +348,7 @@ pub struct SemanticIndex<'db> {
     ast_ids: AstIds,
 
     /// The set of modules that are imported anywhere within this file.
-    imported_modules: Arc<FrozenSet<ModuleName>>,
+    imported_modules: FrozenSet<ModuleName>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
