@@ -5483,6 +5483,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar)
         }
 
+        let decorator_call_ty = match &decorator_node.expression {
+            ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
+            _ => None,
+        };
+        let decorator_ty =
+            class::resolve_decorator_type(self.db(), decorator_ty, decorator_call_ty);
+
         // For FunctionLiteral, get the kind directly without computing the full signature.
         // This avoids a query cycle when the function has default parameter values, since
         // computing the signature requires evaluating those defaults which may trigger
@@ -5517,20 +5524,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bindings.report_diagnostics(&self.context, decorator_node.into());
                 bindings.return_type(self.db())
             });
+        let return_ty = class::recover_decorator_result(self.db(), decorator_ty, return_ty);
 
-        // Untyped decorators are assumed to preserve a function's type when applying them loses
-        // all type information. For decorator factories, inspect the call target because the
-        // decorator expression itself has already become `Unknown`.
-        if return_ty.is_unknown()
-            && class::preserve_binding_for_unknown_result(
-                self.db(),
-                decorator_ty,
-                match &decorator_node.expression {
-                    ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-                    _ => None,
-                },
-                return_ty,
-            )
+        // Pyright treats an unannotated variadic wrapper as transparent. If applying a completely
+        // untyped decorator still loses all type information, preserve the decorated function as
+        // a fallback.
+        if class::is_unannotated_variadic_wrapper(self.db(), return_ty)
+            || class::is_partly_unknown_decorator_result(self.db(), return_ty)
+                && class::preserve_binding_for_unknown_result(
+                    self.db(),
+                    decorator_ty,
+                    decorator_call_ty,
+                    return_ty,
+                )
         {
             return decorated_ty;
         }

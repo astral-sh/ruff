@@ -181,10 +181,10 @@ reveal_type(Foo().foo)  # revealed: str
 
 ## Untyped decorators
 
-If applying an untyped decorator produces `Unknown`, we assume that the decorator preserves the type
-of the decorated function. This heuristic is not always sound, but it preserves useful type
-information for the common case where an untyped decorator returns the original function or a
-wrapper with the same signature. This matches Pyright's behavior.
+For an untyped decorator, we use the inferred return shape of its body when that reveals a known
+replacement. If the result remains partly unknown, or is an unannotated variadic wrapper, we assume
+that the decorator preserves the decorated function's type. This heuristic is not always sound, but
+matches Pyright's behavior.
 
 ```py
 def untyped_decorator(func):
@@ -232,6 +232,49 @@ def wrapped(x: int) -> str:
     return str(x)
 
 reveal_type(wrapped)  # revealed: def wrapped(x: int) -> str
+
+def property_decorator(func):
+    return property(func)
+
+class DirectProperty:
+    @property_decorator
+    def value(self) -> int:
+        return 1
+
+reveal_type(DirectProperty().value)  # revealed: Unknown
+
+def property_factory():
+    def decorator(func):
+        return property(func)
+    return decorator
+
+class FactoryProperty:
+    @property_factory()
+    def value(self) -> int:
+        return 1
+
+reveal_type(FactoryProperty().value)  # revealed: Unknown
+
+def partly_unknown_replacement(func):
+    return (func, 1)
+
+@partly_unknown_replacement
+def partly_unknown(x: int) -> str:
+    return str(x)
+
+reveal_type(partly_unknown)  # revealed: def partly_unknown(x: int) -> str
+
+def known_replacement(func):
+    def replacement(x: int) -> int:
+        return x
+    return replacement
+
+@known_replacement
+def replaced(x: int, y: str) -> str:
+    return y
+
+reveal_type(replaced)  # revealed: def replacement(x: int) -> int
+replaced(1, "x")  # error: [too-many-positional-arguments]
 
 @lambda f: f
 def lambda_decorated(x: int) -> str:
@@ -540,10 +583,10 @@ def personify(cls):
 @personify
 class Animal: ...
 
-reveal_type(Animal)  # revealed: <class 'Animal'>
-reveal_type(Animal())  # revealed: Animal
+reveal_type(Animal)  # revealed: <class 'Wrapped'>
+reveal_type(Animal())  # revealed: Wrapped
 
-Animal().set_full_name("John")  # error: [unresolved-attribute]
+Animal().set_full_name("John")
 ```
 
 This also applies to unannotated callables that are not function definitions:

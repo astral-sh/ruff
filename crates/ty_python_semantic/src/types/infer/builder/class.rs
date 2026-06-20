@@ -1,7 +1,7 @@
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, any_over_type,
     call::CallError,
     callable::CallableFunctionProvenance,
     function::KnownFunction,
@@ -173,6 +173,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // For ordinary decorators that still apply to the original class, precompute the call so
         // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
+            let decorator_ty =
+                resolve_decorator_type(db, decorator_ty, decorator_call_ty(decorator));
             if !metadata_applies_to_original_class {
                 decorators_to_apply.push((decorator_ty, decorator, None));
                 continue;
@@ -279,7 +281,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Ok(return_ty) => *return_ty,
                 Err(error) => error.return_type(db),
             };
-            if is_unknown_decorator_result(db, decorated_ty) {
+            let decorated_ty = recover_decorator_result(db, decorator_ty, decorated_ty);
+            if is_unannotated_variadic_wrapper(db, decorated_ty) {
+                // Pyright treats this wrapper shape as preserving the decorated input.
+            } else if is_unknown_decorator_result(db, decorated_ty) {
                 if !preserve_binding_for_unknown_result(
                     db,
                     decorator_ty,
@@ -331,19 +336,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     bindings.return_type(db)
                 }
             };
+            let decorated_ty = recover_decorator_result(db, decorator_ty, decorated_ty);
             let decorated_ty = match decorated_ty {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding for decorators known to preserve unknown results.
-            let should_preserve_binding = is_unknown_decorator_result(db, decorated_ty)
-                && preserve_binding_for_unknown_result(
-                    db,
-                    decorator_ty,
-                    decorator_call_ty(decorator_node),
-                    decorated_ty,
-                );
+            let should_preserve_binding = is_unannotated_variadic_wrapper(db, decorated_ty)
+                || is_unknown_decorator_result(db, decorated_ty)
+                    && preserve_binding_for_unknown_result(
+                        db,
+                        decorator_ty,
+                        decorator_call_ty(decorator_node),
+                        decorated_ty,
+                    );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
             } else if class_decorator_preserves_class_binding(db, original_class_ty, decorated_ty) {
@@ -459,6 +466,95 @@ fn apply_class_decorator<'db>(
         .map(|bindings| bindings.return_type(db))
 }
 
+/// Recover the callable returned by an unannotated decorator factory.
+///
+/// An unannotated factory's public return type is `Unknown`, even when body inference can see that
+/// it returns a nested decorator. Recovering that nested function lets decorator application make
+/// the same result-shape distinction as Pyright.
+pub(super) fn resolve_decorator_type<'db>(
+    db: &'db dyn crate::Db,
+    decorator_ty: Type<'db>,
+    decorator_call_ty: Option<Type<'db>>,
+) -> Type<'db> {
+    if !decorator_ty.is_unknown() {
+        return decorator_ty;
+    }
+
+    decorator_call_ty
+        .and_then(|ty| inferred_unannotated_return_type(db, ty))
+        .unwrap_or(decorator_ty)
+}
+
+/// Recover a known result produced by an unannotated decorator body.
+///
+/// This is deliberately limited to decorator application. ty otherwise continues to expose
+/// unannotated functions as returning `Unknown`.
+pub(super) fn recover_decorator_result<'db>(
+    db: &'db dyn crate::Db,
+    decorator_ty: Type<'db>,
+    decorator_result_ty: Type<'db>,
+) -> Type<'db> {
+    if !decorator_result_ty.is_unknown() {
+        return decorator_result_ty;
+    }
+
+    inferred_unannotated_return_type(db, decorator_ty).unwrap_or(decorator_result_ty)
+}
+
+/// Return `true` if `ty` has the unannotated wrapper shape that Pyright treats as transparent.
+pub(super) fn is_unannotated_variadic_wrapper<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::FunctionLiteral(function) => function.is_unannotated_variadic_wrapper(db),
+        Type::BoundMethod(method) => method.function(db).is_unannotated_variadic_wrapper(db),
+        Type::Callable(callable)
+            if callable.provenance(db) == CallableFunctionProvenance::ImplicitReturn =>
+        {
+            let signatures = callable.signatures(db);
+            let [signature] = signatures.overloads.as_slice() else {
+                return false;
+            };
+            signature
+                .parameters()
+                .iter()
+                .all(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
+        }
+        Type::TypeAlias(alias) => is_unannotated_variadic_wrapper(db, alias.value_type(db)),
+        _ => false,
+    }
+}
+
+fn inferred_unannotated_return_type<'db>(
+    db: &'db dyn crate::Db,
+    callable_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    match callable_ty {
+        Type::FunctionLiteral(function) => function.inferred_unannotated_return_type(db),
+        Type::BoundMethod(method) => method.function(db).inferred_unannotated_return_type(db),
+        Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
+            let call_symbol = callable_ty
+                .member_lookup_with_policy(
+                    db,
+                    Name::new_static("__call__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place;
+
+            if let Place::Defined(place) = call_symbol
+                && place.is_definitely_defined()
+            {
+                inferred_unannotated_return_type(db, place.ty)
+            } else {
+                None
+            }
+        }
+        Type::Union(union) => {
+            union.try_map(db, |element| inferred_unannotated_return_type(db, *element))
+        }
+        Type::TypeAlias(alias) => inferred_unannotated_return_type(db, alias.value_type(db)),
+        _ => None,
+    }
+}
+
 /// Return true if a decorator result still binds the name to the original class.
 ///
 /// For example, an identity decorator keeps the public name bound to the same class:
@@ -563,7 +659,44 @@ pub(super) fn preserve_binding_for_unknown_result<'db>(
 
 /// Return true if applying a class decorator produced no useful replacement type.
 fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
-    ty.is_unknown() || is_unknown_class_object_decorator_result(db, ty)
+    is_partly_unknown_decorator_result(db, ty) || is_unknown_class_object_decorator_result(db, ty)
+}
+
+/// Return `true` if a decorator result contains `Unknown` anywhere in its exposed type.
+pub(super) fn is_partly_unknown_decorator_result<'db>(
+    db: &'db dyn crate::Db,
+    ty: Type<'db>,
+) -> bool {
+    match ty {
+        // A property is a known replacement even when its getter came from an untyped decorator
+        // parameter. Pyright likewise does not classify the property itself as partly unknown.
+        Type::PropertyInstance(_) => false,
+        Type::FunctionLiteral(function) => {
+            function.has_unannotated_parameters(db)
+                || function
+                    .inferred_unannotated_return_type(db)
+                    .is_some_and(|return_ty| {
+                        !matches!(return_ty, Type::PropertyInstance(_))
+                            && any_over_type(db, return_ty, false, |nested| nested.is_unknown())
+                    })
+        }
+        Type::BoundMethod(method) => {
+            let function = method.function(db);
+            function.has_unannotated_parameters(db)
+                || function
+                    .inferred_unannotated_return_type(db)
+                    .is_some_and(|return_ty| {
+                        !matches!(return_ty, Type::PropertyInstance(_))
+                            && any_over_type(db, return_ty, false, |nested| nested.is_unknown())
+                    })
+        }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| is_partly_unknown_decorator_result(db, *element)),
+        Type::TypeAlias(alias) => is_partly_unknown_decorator_result(db, alias.value_type(db)),
+        _ => any_over_type(db, ty, false, |nested| nested.is_unknown()),
+    }
 }
 
 /// Return true if applying a class decorator produced an unknown class-object type.
@@ -646,18 +779,16 @@ impl DecoratorUnknownResultPolicy {
         decorator_result_ty: Type<'db>,
     ) -> Option<Self> {
         match decorator_ty {
-            Type::FunctionLiteral(function) => {
-                Some(if function.has_explicit_return_annotation(db) {
-                    Self::ReplaceBinding
-                } else {
-                    Self::PreserveBinding
-                })
-            }
+            Type::FunctionLiteral(function) => Some(if function.is_completely_unannotated(db) {
+                Self::PreserveBinding
+            } else {
+                Self::ReplaceBinding
+            }),
             Type::BoundMethod(method) => {
-                Some(if method.function(db).has_explicit_return_annotation(db) {
-                    Self::ReplaceBinding
-                } else {
+                Some(if method.function(db).is_completely_unannotated(db) {
                     Self::PreserveBinding
+                } else {
+                    Self::ReplaceBinding
                 })
             }
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {

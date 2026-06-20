@@ -1783,13 +1783,13 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        def foo() -> Unknown
+        Literal[42]
         ---------------------------------------------
         Foo documentation
 
         ---------------------------------------------
         ```python
-        def foo() -> Unknown
+        Literal[42]
         ```
         ---
         Foo documentation

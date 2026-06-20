@@ -58,6 +58,8 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
@@ -79,7 +81,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::{nearest_enclosing_class, original_class_type};
+use crate::types::infer::{infer_scope_types, nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -104,6 +106,27 @@ use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
 struct RecursiveTypeNormalizationKey {
     function_literal: salsa::Id,
     nested: bool,
+}
+
+const HAS_ANNOTATED_PARAMETER: u8 = 1 << 0;
+const HAS_UNANNOTATED_PARAMETER: u8 = 1 << 1;
+
+#[salsa::tracked]
+fn parameter_annotation_mask(db: &dyn Db, overload: OverloadLiteral<'_>) -> u8 {
+    let file = overload.file(db);
+    let module = parsed_module(db, file).load(db);
+    let node = overload.node(db, file, &module);
+    let mut parameters = node.parameters.iter();
+    if overload.has_implicit_receiver(db) {
+        parameters.next();
+    }
+    parameters.fold(0, |mask, parameter| {
+        if parameter.annotation().is_some() {
+            mask | HAS_ANNOTATED_PARAMETER
+        } else {
+            mask | HAS_UNANNOTATED_PARAMETER
+        }
+    })
 }
 
 // Keep this detector thread-local rather than threading it through every recursive
@@ -1339,6 +1362,115 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn has_explicit_return_annotation(self, db: &'db dyn Db) -> bool {
         self.iter_overloads_and_implementation(db)
             .any(|overload| overload.has_explicit_return_annotation(db))
+    }
+
+    /// Infer the implementation's return type from its body when no return type is declared.
+    ///
+    /// ty does not generally expose inferred return types for unannotated functions. Decorator
+    /// application needs this narrower view to distinguish an identity decorator whose result is
+    /// still unknown from a decorator that returns a known replacement such as `property`.
+    pub(crate) fn inferred_unannotated_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        #[salsa::tracked]
+        fn inferred_return_type<'db>(
+            db: &'db dyn Db,
+            implementation: OverloadLiteral<'db>,
+        ) -> Option<Type<'db>> {
+            if implementation.has_explicit_return_annotation(db) {
+                return None;
+            }
+
+            let scope = implementation.body_scope(db);
+            let file = scope.file(db);
+            let module = parsed_module(db, file).load(db);
+            let node = implementation.node(db, file, &module);
+            if node.is_async {
+                return None;
+            }
+
+            let mut returns = ReturnStatementVisitor::default();
+            for statement in &node.body {
+                returns.visit_stmt(statement);
+            }
+            if returns.is_generator {
+                return None;
+            }
+
+            let inference = infer_scope_types(db, scope, TypeContext::default());
+            let mut return_type = UnionBuilder::new(db);
+            for statement in returns.returns {
+                return_type = return_type.add(statement.value.as_deref().map_or_else(
+                    || Type::none(db),
+                    |expression| inference.expression_type(expression),
+                ));
+            }
+
+            let index = semantic_index(db, file);
+            let use_def = index.use_def_map(scope.file_scope_id(db));
+            if crate::types::infer::can_implicitly_return_none(db, use_def) {
+                return_type = return_type.add(Type::none(db));
+            }
+
+            Some(return_type.build())
+        }
+
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        if !overloads.is_empty() {
+            return None;
+        }
+        inferred_return_type(db, implementation?)
+    }
+
+    /// Return `true` if any non-receiver parameter lacks an annotation.
+    pub(crate) fn has_unannotated_parameters(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db).any(|overload| {
+            parameter_annotation_mask(db, overload) & HAS_UNANNOTATED_PARAMETER != 0
+        })
+    }
+
+    /// Return `true` if neither the parameters nor return type have explicit annotations.
+    pub(crate) fn is_completely_unannotated(self, db: &'db dyn Db) -> bool {
+        !self.has_explicit_return_annotation(db)
+            && self.iter_overloads_and_implementation(db).all(|overload| {
+                parameter_annotation_mask(db, overload) & HAS_ANNOTATED_PARAMETER == 0
+            })
+    }
+
+    /// Return `true` for the unannotated wrapper shape that Pyright treats as transparent.
+    pub(crate) fn is_unannotated_variadic_wrapper(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked]
+        fn overload_is_unannotated_variadic_wrapper(
+            db: &dyn Db,
+            implementation: OverloadLiteral<'_>,
+        ) -> bool {
+            let file = implementation.file(db);
+            let module = parsed_module(db, file).load(db);
+            let node = implementation.node(db, file, &module);
+            let parameters = &node.parameters;
+
+            if parameters
+                .iter()
+                .any(|parameter| parameter.annotation().is_some())
+            {
+                return false;
+            }
+
+            let positional_count = parameters.posonlyargs.len() + parameters.args.len();
+            positional_count == usize::from(implementation.has_implicit_receiver(db))
+                && parameters.kwonlyargs.is_empty()
+        }
+
+        if self.has_explicit_return_annotation(db) {
+            return false;
+        }
+
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        if !overloads.is_empty() {
+            return false;
+        }
+        let Some(implementation) = implementation else {
+            return false;
+        };
+        overload_is_unannotated_variadic_wrapper(db, implementation)
     }
 
     /// Returns all of the overload signatures and the implementation definition, if any, of this

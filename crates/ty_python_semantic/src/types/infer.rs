@@ -53,6 +53,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -69,12 +70,23 @@ use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, UseDefMap, semantic_index};
 
 mod builder;
 mod comparisons;
 #[cfg(test)]
 mod tests;
+
+pub(crate) fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
+    !use_def
+        .reachability_constraints()
+        .evaluate(
+            db,
+            use_def.predicates(),
+            use_def.end_of_scope_reachability(),
+        )
+        .is_always_false()
+}
 
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
