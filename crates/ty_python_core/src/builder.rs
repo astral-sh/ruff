@@ -38,6 +38,7 @@ use crate::definition::{
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
+use crate::no_weak_arc::NoWeakArc;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -2607,13 +2608,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(|builder| NoWeakArc::new(builder.finish()))
             .collect();
 
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(|builder| NoWeakArc::new(builder.finish()))
             .collect();
 
         let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);

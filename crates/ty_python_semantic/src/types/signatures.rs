@@ -11,11 +11,11 @@
 //! arguments must match _at least one_ overload.
 
 use std::slice::Iter;
-use std::sync::Arc;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
+use ty_python_core::no_weak_arc::ThinArcSlice;
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -927,15 +927,17 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
-        if let Some(first_parameter) = self.parameters.data.value.first()
-            && first_parameter.is_positional()
-            && first_parameter.annotated_type.is_unknown()
-            && first_parameter.inferred_annotation
-            && let Some(self_type) = self_type()
-            && let Some(first_parameter) =
-                Arc::make_mut(&mut self.parameters.data).value.first_mut()
-        {
-            first_parameter.annotated_type = self_type;
+        let needs_annotation = self.parameters.as_slice().first().is_some_and(|parameter| {
+            parameter.is_positional()
+                && parameter.annotated_type.is_unknown()
+                && parameter.inferred_annotation
+        });
+        if needs_annotation && let Some(self_type) = self_type() {
+            self.parameters.data.with_make_mut(|parameters| {
+                if let Some(first_parameter) = parameters.first_mut() {
+                    first_parameter.annotated_type = self_type;
+                }
+            });
 
             // If we've added an implicit `self` annotation, we might need to update the
             // signature's generic context, too. (The generic context should include any synthetic
@@ -3188,24 +3190,18 @@ pub(crate) enum ParametersKind<'db> {
 // between the `value` and `kind` field, it would be better to structure it such that these
 // invariants are followed at the type level instead.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct ParametersData<'db> {
-    // TODO: use SmallVec here once invariance bug is fixed
-    value: Box<[Parameter<'db>]>,
-    kind: ParametersKind<'db>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameters<'db> {
-    data: Arc<ParametersData<'db>>,
+    data: ThinArcSlice<ParametersKind<'db>, Parameter<'db>>,
 }
 
 impl<'db> Parameters<'db> {
-    fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+    fn from_parts<I>(value: I, kind: ParametersKind<'db>) -> Self
+    where
+        I: IntoIterator<Item = Parameter<'db>>,
+        I::IntoIter: ExactSizeIterator,
+    {
         Self {
-            data: Arc::new(ParametersData {
-                value: value.into(),
-                kind,
-            }),
+            data: ThinArcSlice::from_iter(kind, value),
         }
     }
 
@@ -3341,34 +3337,34 @@ impl<'db> Parameters<'db> {
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self::from_parts(Box::default(), ParametersKind::Standard)
+        Self::from_parts([], ParametersKind::Standard)
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
-        &self.data.value
+        self.data.as_slice()
     }
 
     pub(crate) fn kind(&self) -> ParametersKind<'db> {
-        self.data.kind
+        *self.data.header()
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
     /// or a `Concatenate` form with `...` as the last argument.
     pub(crate) fn is_gradual(&self) -> bool {
         matches!(
-            self.data.kind,
+            self.kind(),
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
     }
 
     pub(crate) fn is_top(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Top)
+        matches!(self.kind(), ParametersKind::Top)
     }
 
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
     pub(crate) fn is_standard(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Standard)
+        matches!(self.kind(), ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -3377,7 +3373,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`as_paramspec_with_prefix`]: Self::as_paramspec_with_prefix
     pub(crate) fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
-        match self.data.kind {
+        match self.kind() {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
@@ -3392,12 +3388,11 @@ impl<'db> Parameters<'db> {
     pub(crate) fn as_paramspec_with_prefix<'a>(
         &'a self,
     ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
-        match self.data.kind {
+        match self.kind() {
             ParametersKind::ParamSpec(typevar) => Some((&[], typevar)),
-            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => Some((
-                &self.data.value[..self.data.value.len().saturating_sub(2)],
-                typevar,
-            )),
+            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => {
+                Some((&self.as_slice()[..self.len().saturating_sub(2)], typevar))
+            }
             _ => None,
         }
     }
@@ -3647,7 +3642,7 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
             && matches!(
-                self.data.kind,
+                self.kind(),
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
@@ -3666,21 +3661,19 @@ impl<'db> Parameters<'db> {
         // Parameters are in contravariant position, so we need to flip the type mapping.
         let type_mapping = type_mapping.flip();
 
-        let value: Box<[_]> = self
-            .data
-            .value
-            .iter()
-            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-            .collect();
-
-        Self::from_parts(value, self.data.kind)
+        Self::from_parts(
+            self.data
+                .iter()
+                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)),
+            self.kind(),
+        )
     }
     pub(crate) fn len(&self) -> usize {
-        self.data.value.len()
+        self.data.len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
-        self.data.value.iter()
+        self.data.iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -3694,7 +3687,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.data.value.get(index)
+        self.data.get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -3792,9 +3785,9 @@ impl<'db> Parameters<'db> {
         };
 
         let mut expanded = Vec::with_capacity(self.len());
-        expanded.extend_from_slice(&self.data.value[..variadic_index]);
+        expanded.extend_from_slice(&self.as_slice()[..variadic_index]);
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-        expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
+        expanded.extend_from_slice(&self.as_slice()[variadic_index + 2..]);
         Parameters::new(db, expanded)
     }
 }
@@ -3804,7 +3797,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.data.value.iter()
+        self.data.iter()
     }
 }
 
@@ -3812,7 +3805,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.data.value[index]
+        &self.data[index]
     }
 }
 

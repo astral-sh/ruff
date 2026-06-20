@@ -19,6 +19,7 @@ use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
+use crate::no_weak_arc::NoWeakArc;
 use crate::place::ScopedPlaceId;
 pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
@@ -48,6 +49,7 @@ pub mod expression;
 pub mod frozen;
 pub(crate) mod member;
 pub mod narrowing_constraints;
+pub mod no_weak_arc;
 pub mod node_key;
 pub mod place;
 pub mod platform;
@@ -81,11 +83,11 @@ pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
+pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> NoWeakArc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-    Arc::clone(&index.place_tables[scope.file_scope_id(db)])
+    NoWeakArc::clone(&index.place_tables[scope.file_scope_id(db)])
 }
 
 /// Returns the use-def map for a specific `scope`.
@@ -94,11 +96,11 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
+pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> NoWeakArc<UseDefMap<'db>> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+    NoWeakArc::clone(&index.use_def_maps[scope.file_scope_id(db)])
 }
 
 /// All the bindings made in a loop, which are visible to the entire loop via "loop header
@@ -303,7 +305,7 @@ impl<'db> DefinitionsByNode<'db> {
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
-    place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
+    place_tables: FrozenIndexVec<FileScopeId, NoWeakArc<PlaceTable>>,
 
     /// List of all scopes in this file.
     scopes: FrozenIndexVec<FileScopeId, Scope>,
@@ -339,7 +341,7 @@ pub struct SemanticIndex<'db> {
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, NoWeakArc<UseDefMap<'db>>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///

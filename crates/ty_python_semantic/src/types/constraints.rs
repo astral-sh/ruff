@@ -91,13 +91,13 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Range;
-use std::sync::Arc;
 
 use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
+use ty_python_core::no_weak_arc::NoWeakArc;
 use ty_python_core::rank::RankBitBox;
 
 use crate::types::class::GenericAlias;
@@ -242,7 +242,7 @@ where
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
-    inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
+    inner: Option<NoWeakArc<OwnedConstraintSetInner<'db>>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
@@ -687,7 +687,7 @@ struct ConstraintSetStorage<'db> {
     ///
     /// IDs below the overlay split points are looked up in this storage; newly interned entries
     /// are stored in the dense local arenas below.
-    compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
+    compacted: Option<NoWeakArc<OwnedConstraintSetInner<'db>>>,
 
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
@@ -836,7 +836,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         OwnedConstraintSet {
             node,
-            inner: Some(Arc::new(OwnedConstraintSetInner {
+            inner: Some(NoWeakArc::new(OwnedConstraintSetInner {
                 constraints,
                 constraint_indices,
                 typevars: storage.typevars,
