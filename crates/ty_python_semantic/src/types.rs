@@ -40,13 +40,11 @@ pub(crate) use self::match_pattern::{
     singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
-use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
-pub use self::set_theoretic::{
-    IntersectionType, NegativeIntersectionElements, NegativeIntersectionElementsIterator, UnionType,
-};
+use self::set_theoretic::{IntersectionElementSet, KnownUnion};
+pub use self::set_theoretic::{IntersectionType, NegativeIntersectionElements, UnionType};
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -1885,8 +1883,8 @@ impl<'db> Type<'db> {
             | Type::TypeAlias(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
-                FxOrderSet::default(),
-                NegativeIntersectionElements::Single(*self),
+                IntersectionElementSet::default(),
+                NegativeIntersectionElements::from_iter([*self]),
             )),
 
             Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {

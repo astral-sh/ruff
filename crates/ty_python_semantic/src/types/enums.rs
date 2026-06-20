@@ -16,7 +16,7 @@ use crate::{
         Type, UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
-            RecursivelyDefined,
+            IntersectionElementSet, RecursivelyDefined,
             builder::{IntersectionBuilder, UnionBuilder},
         },
     },
@@ -441,7 +441,7 @@ impl<'db> EnumComplementType<'db> {
     /// Recognize the compact enum-complement shape inside an intersection.
     pub(crate) fn from_intersection_parts(
         db: &'db dyn Db,
-        positive: &FxOrderSet<Type<'db>>,
+        positive: &IntersectionElementSet<'db>,
         negative: &NegativeIntersectionElements<'db>,
     ) -> Option<Self> {
         let mut enum_class = None;
@@ -638,8 +638,9 @@ impl<'db> EnumComplementType<'db> {
     /// Reconstruct the equivalent set-theoretic intersection.
     pub(crate) fn to_intersection(self, db: &'db dyn Db) -> Type<'db> {
         let enum_class = self.enum_class(db);
-        let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db)]);
-        positive.extend(self.rest(db).iter().copied());
+        let mut positive =
+            IntersectionElementSet::from_iter([enum_class.to_non_generic_instance(db)]);
+        positive.extend(self.rest(db));
 
         let mut negative = NegativeIntersectionElements::default();
         for name in self.excluded_names(db) {

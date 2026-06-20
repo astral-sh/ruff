@@ -852,7 +852,7 @@ fn evaluate_against_results<'db>(
 fn evaluate_intersection_left<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     original: Type<'db>,
-    positive: &crate::FxOrderSet<Type<'db>>,
+    positive: &crate::types::set_theoretic::IntersectionElementSet<'db>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,

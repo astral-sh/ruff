@@ -38,13 +38,15 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
-use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::set_theoretic::{
+    IntersectionElementSet, expand_intersection_typevars_and_newtypes,
+};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
     SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxOrderMap};
 use ruff_db::small_index_set::SmallIndexSet;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
@@ -1291,7 +1293,7 @@ impl<'db> IntersectionBuilder<'db> {
 
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
-    positive: FxOrderSet<Type<'db>>,
+    positive: IntersectionElementSet<'db>,
     negative: NegativeIntersectionElements<'db>,
 }
 

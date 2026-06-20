@@ -1,7 +1,9 @@
 use itertools::Either;
+use ruff_db::small_order_set::SmallOrderSet;
 
 use std::convert::Infallible;
 
+use crate::Db;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy, TypeOrigin,
 };
@@ -9,11 +11,18 @@ use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
-use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
+
+pub(crate) type IntersectionElementSet<'db> = SmallOrderSet<[Type<'db>; 2]>;
+
+#[cfg(not(debug_assertions))]
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<IntersectionElementSet<'static>>(),
+    std::mem::size_of::<crate::FxOrderSet<Type<'static>>>()
+);
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -446,7 +455,7 @@ impl KnownUnion {
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
     #[returns(ref)]
-    pub(crate) positive: FxOrderSet<Type<'db>>,
+    pub(crate) positive: IntersectionElementSet<'db>,
 
     /// The intersection type does not include any value in any of these types.
     ///
@@ -457,218 +466,7 @@ pub struct IntersectionType<'db> {
     pub(crate) negative: NegativeIntersectionElements<'db>,
 }
 
-/// To avoid unnecessary allocations for the common case of 1 negative elements,
-/// we use this enum to represent the negative elements of an intersection type.
-///
-/// It should otherwise have identical behavior to `FxOrderSet<Type<'db>>`.
-///
-/// Note that we do not try to maintain the invariant that length-0 collections
-/// are always represented using `Self::Empty`, and that length-1 collections
-/// are always represented using `Self::Single`: `Self::Multiple` is permitted
-/// to have 0-1 elements in its wrapped data, and this could happen if you called
-/// `Self::swap_remove` or `Self::swap_remove_index` on an instance that is
-/// already the `Self::Multiple` variant. Maintaining the invariant that
-/// 0-length or 1-length collections are always represented using `Self::Empty`
-/// and `Self::Single` would add overhead to methods like `Self::swap_remove`,
-/// and would have little value. At the point when you're calling that method, a
-/// heap allocation has already taken place.
-#[derive(Debug, Clone, get_size2::GetSize, salsa::Update, Default)]
-pub enum NegativeIntersectionElements<'db> {
-    #[default]
-    Empty,
-    Single(Type<'db>),
-    Multiple(FxOrderSet<Type<'db>>),
-}
-
-impl<'db> NegativeIntersectionElements<'db> {
-    pub(crate) fn iter(&self) -> NegativeIntersectionElementsIterator<'_, 'db> {
-        match self {
-            Self::Empty => NegativeIntersectionElementsIterator::EmptyOrOne(None),
-            Self::Single(ty) => NegativeIntersectionElementsIterator::EmptyOrOne(Some(ty)),
-            Self::Multiple(set) => NegativeIntersectionElementsIterator::Multiple(set.iter()),
-        }
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        match self {
-            Self::Empty => 0,
-            Self::Single(_) => 1,
-            Self::Multiple(set) => set.len(),
-        }
-    }
-
-    pub(crate) fn contains(&self, ty: &Type<'db>) -> bool {
-        match self {
-            Self::Empty => false,
-            Self::Single(existing) => existing == ty,
-            Self::Multiple(set) => set.contains(ty),
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        // See struct-level comment: we don't try to maintain the invariant that empty
-        // collections are representend as `Self::Empty`
-        self.len() == 0
-    }
-
-    /// Insert the type into the collection.
-    ///
-    /// Returns `true` if the elements was newly added.
-    /// Returns `false` if the element was already present in the collection.
-    pub(crate) fn insert(&mut self, ty: Type<'db>) -> bool {
-        match self {
-            Self::Empty => {
-                *self = Self::Single(ty);
-                true
-            }
-            Self::Single(existing) => {
-                if ty != *existing {
-                    *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
-                    true
-                } else {
-                    false
-                }
-            }
-            Self::Multiple(set) => set.insert(ty),
-        }
-    }
-
-    /// Shrink the capacity of the collection as much as possible.
-    pub(crate) fn shrink_to_fit(&mut self) {
-        match self {
-            Self::Empty | Self::Single(_) => {}
-            Self::Multiple(set) => set.shrink_to_fit(),
-        }
-    }
-
-    /// Remove `ty` from the collection.
-    ///
-    /// Returns `true` if `ty` was previously in the collection and has now been removed.
-    /// Returns `false` if `ty` was never present in the collection.
-    ///
-    /// If `ty` was previously present in the collection,
-    /// the last element in the collection is popped off the end of the collection
-    /// and placed at the index where `ty` was previously, allowing this method to complete
-    /// in O(1) time (average).
-    pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
-        match self {
-            Self::Empty => false,
-            Self::Single(existing) => {
-                if existing == ty {
-                    *self = Self::Empty;
-                    true
-                } else {
-                    false
-                }
-            }
-            // See struct-level comment: we don't try to maintain the invariant that collections
-            // with size 0 or 1 are represented as `Empty` or `Single`.
-            Self::Multiple(set) => set.swap_remove(ty),
-        }
-    }
-
-    /// Remove the element at `index` from the collection.
-    ///
-    /// The element is removed by swapping it with the last element
-    /// of the collection and popping it off, allowing this method to complete
-    /// in O(1) time (average).
-    pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
-        match self {
-            Self::Empty => None,
-            Self::Single(existing) => {
-                if index == 0 {
-                    let ty = *existing;
-                    *self = Self::Empty;
-                    Some(ty)
-                } else {
-                    None
-                }
-            }
-            // See struct-level comment: we don't try to maintain the invariant that collections
-            // with size 0 or 1 are represented as `Empty` or `Single`.
-            Self::Multiple(set) => set.swap_remove_index(index),
-        }
-    }
-
-    /// Apply a transformation to all elements in this collection,
-    /// and return a new collection of the transformed elements.
-    fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
-        match self {
-            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
-            NegativeIntersectionElements::Single(ty) => {
-                NegativeIntersectionElements::Single(map_fn(ty))
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                NegativeIntersectionElements::Multiple(set.iter().map(map_fn).collect())
-            }
-        }
-    }
-
-    /// Apply a fallible transformation to all elements in this collection,
-    /// and return a new collection of the transformed elements.
-    ///
-    /// Returns `None` if `map_fn` fails for any element in the collection.
-    fn try_map(&self, map_fn: impl Fn(&Type<'db>) -> Option<Type<'db>>) -> Option<Self> {
-        match self {
-            NegativeIntersectionElements::Empty => Some(NegativeIntersectionElements::Empty),
-            NegativeIntersectionElements::Single(ty) => {
-                map_fn(ty).map(NegativeIntersectionElements::Single)
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                Some(NegativeIntersectionElements::Multiple(
-                    set.iter().map(map_fn).collect::<Option<_>>()?,
-                ))
-            }
-        }
-    }
-}
-
-impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
-    type Item = &'a Type<'db>;
-    type IntoIter = NegativeIntersectionElementsIterator<'a, 'db>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl PartialEq for NegativeIntersectionElements<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        // Same implementation as `OrderSet::eq`
-        self.len() == other.len() && self.iter().eq(other)
-    }
-}
-
-impl Eq for NegativeIntersectionElements<'_> {}
-
-impl std::hash::Hash for NegativeIntersectionElements<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Same implementation as `OrderSet::hash`
-        self.len().hash(state);
-        for value in self {
-            value.hash(state);
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum NegativeIntersectionElementsIterator<'a, 'db> {
-    EmptyOrOne(Option<&'a Type<'db>>),
-    Multiple(ordermap::set::Iter<'a, Type<'db>>),
-}
-
-impl<'a, 'db> Iterator for NegativeIntersectionElementsIterator<'a, 'db> {
-    type Item = &'a Type<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            NegativeIntersectionElementsIterator::EmptyOrOne(opt) => opt.take(),
-            NegativeIntersectionElementsIterator::Multiple(iter) => iter.next(),
-        }
-    }
-}
-
-impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {}
+pub type NegativeIntersectionElements<'db> = SmallOrderSet<[Type<'db>; 2]>;
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
@@ -766,7 +564,7 @@ impl<'db> IntersectionType<'db> {
             self.positive(db)
                 .iter()
                 .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
-                .collect::<Option<FxOrderSet<Type<'db>>>>()?
+                .collect::<Option<IntersectionElementSet<'db>>>()?
         } else {
             self.positive(db)
                 .iter()
@@ -779,12 +577,17 @@ impl<'db> IntersectionType<'db> {
 
         let negative = if nested {
             self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+                .collect::<Option<NegativeIntersectionElements<'db>>>()?
         } else {
-            self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, nested)
-                    .unwrap_or(div)
-            })
+            self.negative(db)
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, div, nested)
+                        .unwrap_or(div)
+                })
+                .collect()
         };
 
         Some(IntersectionType::new(db, positive, negative))
@@ -956,7 +759,7 @@ impl<'db> IntersectionType<'db> {
 
 fn expand_intersection_typevars_and_newtypes<'db>(
     db: &'db dyn Db,
-    positive: &FxOrderSet<Type<'db>>,
+    positive: &IntersectionElementSet<'db>,
     negative: &NegativeIntersectionElements<'db>,
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db);
