@@ -28,10 +28,10 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, BoundTypeVarSet, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, Program};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
@@ -249,7 +249,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.tuple(db)
@@ -756,7 +756,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.0 {
@@ -1145,7 +1145,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in self.prefix_elements() {
@@ -1356,7 +1356,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {

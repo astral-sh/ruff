@@ -63,6 +63,7 @@ use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
+use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -88,13 +89,12 @@ use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Si
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    definition_expression_type, walk_signature,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, BoundTypeVarSet, CallableType,
+    ClassBase, ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor,
+    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, UnionType, definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -1485,7 +1485,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         let signatures = self.signature(db);

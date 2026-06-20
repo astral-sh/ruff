@@ -14,8 +14,8 @@ pub(crate) use self::static_literal::{
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, BoundTypeVarSet, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -43,7 +43,7 @@ use crate::types::{
     VarianceInferable,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet,
+    Db, FxIndexMap,
     place::{
         Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy,
         place_from_bindings, place_from_declarations,
@@ -259,7 +259,7 @@ impl<'db> GenericAlias<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.specialization(db)
@@ -1050,7 +1050,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {

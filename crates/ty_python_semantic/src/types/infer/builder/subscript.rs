@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
+use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
@@ -25,13 +26,12 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    BoundTypeVarInstance, BoundTypeVarSet, CallArguments, CallDunderError, CallableBinding,
+    CycleDetector, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
     UnionTypeInstance, any_over_type, todo_type,
 };
-use crate::{Db, FxOrderSet};
 use ty_python_core::SemanticIndex;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
@@ -244,7 +244,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _,
             ))) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
-                let mut variables = FxOrderSet::default();
+                let mut variables = BoundTypeVarSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
                     self.typevar_binding_context,
@@ -414,7 +414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Type::Dynamic(DynamicType::Unknown) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
-                let mut variables = FxOrderSet::default();
+                let mut variables = BoundTypeVarSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
                     self.typevar_binding_context,
@@ -1178,7 +1178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ),
             Type::SpecialForm(SpecialFormType::Concatenate) => {
                 // TODO: Add proper support for `Concatenate`
-                let mut variables = FxOrderSet::default();
+                let mut variables = BoundTypeVarSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
                     self.typevar_binding_context,
@@ -2108,7 +2108,7 @@ fn legacy_generic_class_context<'db>(
         std::slice::from_ref(&typevars)
     };
 
-    let mut validated_typevars = FxOrderSet::default();
+    let mut validated_typevars = BoundTypeVarSet::default();
     for ty in typevars {
         let argument_ty = *ty;
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = argument_ty {

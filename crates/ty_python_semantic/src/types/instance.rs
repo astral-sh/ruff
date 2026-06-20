@@ -8,9 +8,10 @@ use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
 use super::{
-    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
-    SubclassOfType, Type, TypeVarVariance,
+    BoundTypeVarInstance, BoundTypeVarSet, ClassType, DivergentType, KnownClass,
+    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
 };
+use crate::Db;
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -29,7 +30,6 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 use ty_python_core::definition::Definition;
 
@@ -446,7 +446,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.0 {
@@ -827,7 +827,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.inner {
@@ -901,12 +901,12 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 }
 
 mod synthesized_protocol {
+    use crate::Db;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
-        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, BoundTypeVarSet, FindLegacyTypeVarsVisitor,
+        Type, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
-    use crate::{Db, FxOrderSet};
     use ty_python_core::definition::Definition;
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -935,7 +935,7 @@ mod synthesized_protocol {
             self,
             db: &'db dyn Db,
             binding_context: Option<Definition<'db>>,
-            typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+            typevars: &mut BoundTypeVarSet<'db>,
             visitor: &FindLegacyTypeVarsVisitor<'db>,
         ) {
             self.0

@@ -1,3 +1,4 @@
+use crate::Db;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
@@ -5,12 +6,11 @@ use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, BoundTypeVarSet, ClassLiteral, ClassType,
+    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
     SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     TypedDictType, UnionType, todo_type,
 };
-use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
@@ -169,7 +169,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.subclass_of {

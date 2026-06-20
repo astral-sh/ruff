@@ -20,13 +20,13 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
-    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
-    any_over_type, todo_type,
+    BindingContext, BoundTypeVarSet, CallableType, DynamicType, GenericContext,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
+    TypeAliasType, TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
+    UnionBuilder, UnionType, any_over_type, todo_type,
 };
-use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
+use crate::{Program, add_inferred_python_version_hint_to_diagnostic};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -1365,7 +1365,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        let mut variables = FxOrderSet::default();
+        let mut variables = BoundTypeVarSet::default();
         value_ty.find_legacy_typevars(db, None, &mut variables);
         let generic_context = GenericContext::from_typevar_instances(db, variables);
 
@@ -1614,7 +1614,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
                     // TODO: support generic "manual" PEP 695 type aliases
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    let mut variables = FxOrderSet::default();
+                    let mut variables = BoundTypeVarSet::default();
                     slice_ty.bind_and_find_all_legacy_typevars(
                         self.db(),
                         self.typevar_binding_context,

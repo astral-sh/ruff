@@ -18,6 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
+use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -33,12 +34,11 @@ use crate::types::relation::{
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, BoundTypeVarSet, CallableType,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
     ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
     TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
 };
-use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::Definition;
 
@@ -392,7 +392,7 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for signature in &self.overloads {
@@ -894,7 +894,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for param in &self.parameters {

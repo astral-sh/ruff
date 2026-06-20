@@ -10,16 +10,17 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
-    Db, FxOrderSet,
+    Db,
     place::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, place_from_bindings,
         place_from_declarations,
     },
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
-        ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
-        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, BoundTypeVarSet, CallableType, ClassBase,
+        ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
+        PropertyInstanceType, ProtocolInstanceType, Signature, StaticClassLiteral, Type,
+        TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -376,7 +377,7 @@ impl<'db> ProtocolInterface<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for data in self.inner(db).values() {
@@ -482,7 +483,7 @@ impl<'db> ProtocolMemberData<'db> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.kind
@@ -609,7 +610,7 @@ impl<'db> ProtocolMemberKind<'db> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        typevars: &mut BoundTypeVarSet<'db>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
