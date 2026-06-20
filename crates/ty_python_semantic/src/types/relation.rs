@@ -1124,12 +1124,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
-            // but this is not true for divergent types (and moving this case any lower down appears to cause
-            // "too many cycle iterations" panics).
+            // Cycle artifacts are assignability-compatible with anything while their recursive
+            // solution is still unknown, but they are not subtypes of arbitrary types and must not
+            // be simplified out of unions or intersections.
             (Type::Divergent(_) | Type::Projection(_), _)
             | (_, Type::Divergent(_) | Type::Projection(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
             // Instances of classes that inherit from an explicit `Any` base retain their nominal

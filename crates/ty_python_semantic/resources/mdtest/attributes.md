@@ -3575,6 +3575,30 @@ class ProjectionCustomMethodCall:
 
         reveal_type(self.x)  # revealed: MethodBox[int]
 
+class MethodPair(Generic[ProjectionT, ProjectionU]):
+    def __init__(self, left: ProjectionT, right: ProjectionU) -> None:
+        self.left_value = left
+        self.right_value = right
+
+    def left(self) -> ProjectionT:
+        return self.left_value
+
+    def right(self) -> ProjectionU:
+        return self.right_value
+
+class ProjectionCustomMethodBridge:
+    def __init__(self) -> None:
+        self.x = MethodBox(0)
+        self.y = MethodBox("")
+
+    def read(self) -> None:
+        pair = MethodPair(self.x, self.y)
+        self.x = MethodBox(pair.right().unwrap())
+        self.y = MethodBox(pair.left().unwrap())
+
+        reveal_type(self.x)  # revealed: MethodBox[str | int]
+        reveal_type(self.y)  # revealed: MethodBox[Divergent | int | str]
+
 class ViewBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
         self.value = value
