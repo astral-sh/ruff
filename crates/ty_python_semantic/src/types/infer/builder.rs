@@ -22,11 +22,12 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
-    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
-    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -52,16 +53,16 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
-    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_type_checking_constant,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_bad_dunder_set_call,
+    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -354,8 +355,26 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
+/// Inference results for a collection expression cached during multi-inference.
+struct CachedExpressionInference<'db> {
+    ty: Type<'db>,
+    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
+    cycle_recovery: Option<Type<'db>>,
+    called_functions: FxIndexSet<FunctionType<'db>>,
+    return_types_and_ranges: Box<[TypeAndRange<'db>]>,
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+    diagnostics: TypeCheckDiagnostics,
+    discards_dict_key_assignments: bool,
+}
+
 /// An expression cache shared across builders during multi-inference.
-type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
+type ExpressionCache<'db> =
+    FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Rc<CachedExpressionInference<'db>>>;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
@@ -6179,27 +6198,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(ty) = self.expression_cache.as_ref().and_then(|expression_cache| {
+        let cached = self.expression_cache.as_ref().and_then(|expression_cache| {
             expression_cache
                 .borrow()
                 .get(&(expression.into(), tcx))
-                .copied()
-        }) {
-            self.store_expression_type(expression, ty);
+                .cloned()
+        });
+        if let Some(cached) = cached {
+            self.extend_cached_expression(&cached);
+            return cached.ty;
+        }
+
+        if let Some(expression_cache) = self.expression_cache.clone()
+            && is_collection_literal(expression)
+        {
+            let inherited_return_types = self.return_types_and_ranges.len();
+            let mut speculative_builder = self.speculate();
+            let ty = speculative_builder.infer_expression_uncached(expression, tcx);
+            let cached =
+                Rc::new(speculative_builder.finish_cached_expression(ty, inherited_return_types));
+
+            self.extend_cached_expression(&cached);
+            expression_cache
+                .borrow_mut()
+                .insert((expression.into(), tcx), Rc::clone(&cached));
             return ty;
         }
 
+        self.infer_expression_uncached(expression, tcx)
+    }
+
+    fn infer_expression_uncached(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         if let Some(target) = tcx.annotation
             && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
             self.store_expression_type(expression, ty);
-
-            if let Some(expression_cache) = &self.expression_cache {
-                expression_cache
-                    .borrow_mut()
-                    .insert((expression.into(), tcx), ty);
-            }
-
             return ty;
         }
 
@@ -11577,6 +11614,103 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut builder = self.speculate();
         builder.context.suppress_diagnostics();
         builder
+    }
+
+    fn finish_cached_expression(
+        self,
+        ty: Type<'db>,
+        inherited_return_types: usize,
+    ) -> CachedExpressionInference<'db> {
+        let Self {
+            context,
+            expressions,
+            type_expression_flags,
+            collection_use_constraints,
+            string_annotations,
+            expected_types,
+            bindings,
+            declarations,
+            deferred,
+            cycle_recovery,
+            called_functions,
+            mut return_types_and_ranges,
+            qualifiers,
+            discards_dict_key_assignments,
+            scope: _,
+
+            // Ignored; only relevant to definition regions.
+            undecorated_type: _,
+
+            // Builder-only state.
+            expression_cache: _,
+            reachability_cache: _,
+            typevar_binding_context: _,
+            deferred_state: _,
+            dataclass_field_specifiers: _,
+            index: _,
+            region: _,
+        } = self;
+
+        assert!(
+            declarations.is_empty(),
+            "cached expression inference cannot contain declarations"
+        );
+        assert!(
+            deferred.is_empty(),
+            "cached expression inference cannot contain deferred definitions"
+        );
+
+        let return_types_and_ranges = return_types_and_ranges
+            .split_off(inherited_return_types)
+            .into_boxed_slice();
+
+        CachedExpressionInference {
+            ty,
+            expressions,
+            type_expression_flags,
+            collection_use_constraints,
+            string_annotations,
+            expected_types,
+            bindings: bindings.into_boxed_slice(),
+            cycle_recovery,
+            called_functions,
+            return_types_and_ranges,
+            qualifiers,
+            diagnostics: context.finish(),
+            discards_dict_key_assignments,
+        }
+    }
+
+    fn extend_cached_expression(&mut self, cached: &CachedExpressionInference<'db>) {
+        self.expressions.extend(cached.expressions.iter());
+        self.context.extend(&cached.diagnostics);
+        self.extend_cycle_recovery(cached.cycle_recovery);
+        self.string_annotations
+            .extend(cached.string_annotations.iter().copied());
+        self.expected_types.extend(cached.expected_types.iter());
+        self.type_expression_flags
+            .extend(cached.type_expression_flags.iter());
+        self.called_functions
+            .extend(cached.called_functions.iter().copied());
+        self.return_types_and_ranges
+            .extend(cached.return_types_and_ranges.iter().copied());
+        self.qualifiers.extend(cached.qualifiers.iter());
+        self.discards_dict_key_assignments |= cached.discards_dict_key_assignments;
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            self.bindings.extend(cached.bindings.iter().copied());
+        }
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "constraints for distinct collection definitions are merged independently"
+        )]
+        for (collection_def, constraints) in &cached.collection_use_constraints {
+            self.collection_use_constraints
+                .entry(*collection_def)
+                .and_modify(|this| this.extend(constraints))
+                .or_insert_with(|| constraints.clone());
+        }
     }
 
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
