@@ -1,5 +1,6 @@
 use crate::{
     Db,
+    reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
         TypeContext, TypeVarKind, UnionType,
@@ -22,8 +23,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            can_implicitly_return_none, function_known_decorators, infer_statement_types,
-            nearest_enclosing_function, original_class_type,
+            function_known_decorators, infer_statement_types, nearest_enclosing_function,
+            original_class_type,
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
@@ -32,6 +33,7 @@ use crate::{
     },
 };
 use ty_python_core::{
+    UseDefMap,
     definition::{Definition, DefinitionKind},
     scope::NodeWithScopeRef,
 };
@@ -114,6 +116,17 @@ impl<'db> ExpectedReturnType<'db> {
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
+            !use_def
+                .reachability_constraints()
+                .evaluate(
+                    db,
+                    use_def.predicates(),
+                    use_def.end_of_scope_reachability(),
+                )
+                .is_always_false()
+        }
+
         let db = self.db();
 
         // Parameters are odd: they are Definitions in the function body scope, but have no
