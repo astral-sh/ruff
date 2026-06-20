@@ -95,6 +95,7 @@ use std::sync::Arc;
 
 use indexmap::map::Entry;
 use itertools::Itertools;
+use ruff_db::small_index_set::SmallIndexSet;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -3155,8 +3156,8 @@ struct InteriorNodeData {
 /// accumulated sets are collapsed into a [`ConstraintBounds`].
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
-    lower: FxIndexSet<Type<'db>>,
-    upper: FxIndexSet<Type<'db>>,
+    lower: SmallIndexSet<[Type<'db>; 3]>,
+    upper: SmallIndexSet<[Type<'db>; 3]>,
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
