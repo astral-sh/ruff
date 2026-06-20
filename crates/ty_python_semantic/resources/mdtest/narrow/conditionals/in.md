@@ -99,10 +99,6 @@ def _(x: Foo):
 
 ## `in` for `str` and literal strings
 
-String membership checks for substrings, not only individual characters. This also applies through a
-constrained type variable. If the right-hand side could be one of several literal strings, the true
-branch keeps strings found in at least one possible value; the false branch remains unchanged.
-
 ```py
 def _(x: str):
     if x in "abc":
@@ -170,7 +166,7 @@ def empty_bytes(x: bytes):
 ## Byte containment
 
 `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, not only the
-integers described by their iteration type. We therefore do not narrow the value being tested:
+integers described by their iteration type. We therefore leave the subject unchanged:
 
 ```py
 from typing import Literal, final
