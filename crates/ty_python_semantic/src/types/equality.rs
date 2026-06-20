@@ -172,7 +172,6 @@ pub(super) fn equality_exclusion_constraint<'db>(
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
     let ty = ty.resolve_type_alias(db);
-    // Built-in literals need their full equality domain, such as `Literal[1, True]` for `1`.
     builtin_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
         .or_else(|| ty.is_single_valued(db).then(|| ty.negate(db)))
         .or_else(|| {
