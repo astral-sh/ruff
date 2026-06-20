@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use super::super::document::preformatted::MarkdownFence;
 
+mod inline;
+
 /// Applies whole-docstring Markdown escaping and code-fence handling.
 ///
 /// This function assumes the input has had its whitespace normalized by
@@ -275,77 +277,7 @@ fn render_with_indentation_mode(
         }
 
         if !in_any_code {
-            // This line is plain text, so we need to escape things that are inert in reST
-            // but active syntax in markdown... but not if it's inside `inline code`.
-            // Inline-code syntax is shared by reST and markdown which is really convenient
-            // except we need to find and parse it anyway to do this escaping properly! :(
-            // For now we assume `inline code` does not span a line (I'm not even sure if can).
-            //
-            // Things that need to be escaped: underscores and HTML-sensitive characters.
-            //
-            // e.g. we want __init__ => \_\_init\_\_ but `__init__` => `__init__`
-            let escape = |input: &str| {
-                input
-                    .replace('&', "&amp;")
-                    .replace('<', "&lt;")
-                    .replace('>', "&gt;")
-                    .replace('_', "\\_")
-            };
-
-            let mut in_inline_code = false;
-            let mut first_chunk = true;
-            let mut opening_tick_count = 0;
-            let mut current_tick_count = 0;
-            for chunk in rendered_line.split('`') {
-                // First chunk is definitionally not in inline-code and so always plaintext
-                if first_chunk {
-                    first_chunk = false;
-                    output.push_str(&escape(chunk));
-                    continue;
-                }
-                // Not in first chunk, emit the ` between the last chunk and this one
-                output.push('`');
-                current_tick_count += 1;
-
-                // If we're in an inline block and have enough close-ticks to terminate it, do so.
-                // TODO: we parse ``hello```there` as (hello)(there) which probably isn't correct
-                // (definitely not for markdown) but it's close enough for horse grenades in this
-                // MVP impl. Notably we're verbatime emitting all the `'s so as long as reST and
-                // markdown agree we're *fine*. The accuracy of this parsing only affects the
-                // accuracy of where we apply escaping (so we need to misparse and see escapables
-                // for any of this to matter).
-                if opening_tick_count > 0 && current_tick_count >= opening_tick_count {
-                    opening_tick_count = 0;
-                    current_tick_count = 0;
-                    in_inline_code = false;
-                }
-
-                // If this chunk is completely empty we're just in a run of ticks, continue
-                if chunk.is_empty() {
-                    continue;
-                }
-
-                // Ok the chunk is non-empty, our run of ticks is complete
-                if in_inline_code {
-                    // The previous check for >= open_tick_count didn't trip, so these can't close
-                    // and these ticks will be verbatim rendered in the content
-                    current_tick_count = 0;
-                } else if current_tick_count > 0 {
-                    // Ok we're now in inline code
-                    opening_tick_count = current_tick_count;
-                    current_tick_count = 0;
-                    in_inline_code = true;
-                }
-
-                // Finally include the content either escaped or not
-                if in_inline_code {
-                    output.push_str(chunk);
-                } else {
-                    output.push_str(&escape(chunk));
-                }
-            }
-            // NOTE: explicitly not "flushing" the ticks here.
-            // We respect however the user closed their inline code.
+            inline::render_line(output, rendered_line);
         } else if rendered_line.is_empty() {
             if in_doctest {
                 // This is the end of a doctest
