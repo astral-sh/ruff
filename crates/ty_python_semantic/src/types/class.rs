@@ -154,7 +154,9 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn code_generator_of_dynamic_class<'db>(
             db: &'db dyn Db,
             class: DynamicClassLiteral<'db>,
