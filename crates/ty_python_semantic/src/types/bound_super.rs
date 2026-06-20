@@ -544,6 +544,7 @@ impl<'db> BoundSuperType<'db> {
             Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
             Type::Divergent(divergent) => ClassBase::Divergent(divergent),
+            Type::Projection(projection) => ClassBase::Divergent(projection.root(db)),
             _ => {
                 return Err(BoundSuperError::InvalidPivotClassType {
                     pivot_class: pivot_class_type,
