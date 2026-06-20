@@ -1095,7 +1095,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
-        let result = match (source, target) {
+        match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -1117,6 +1117,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+            }
+
+            // Instances of classes that inherit from an explicit `Any` base retain their nominal
+            // identity and precise members, but have the same assignability as `Any`.
+            (Type::NominalInstance(source), _)
+                if self.relation.is_assignability() && source.inherits_from_explicit_any() =>
+            {
+                self.always()
             }
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
@@ -2206,25 +2214,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
             (Type::NominalInstance(_), _) => self.never(),
-        };
-
-        // A nominal instance that inherits from an explicit `Any` base is assignable to any type.
-        // Nominal targets already handle `ClassBase::Any` while walking the source MRO, so only
-        // check failed relations to non-nominal targets here.
-        if !result.is_always_satisfied(db)
-            && let Type::NominalInstance(source) = source
-            && !matches!(target, Type::NominalInstance(_))
-            && self.relation.is_assignability()
-            && let class = source.class(db).class_literal(db)
-            && class.has_explicit_bases(db)
-            && class.inherits_from_any(db)
-        {
-            // Discard error context from the failed relation that this fallback overrides.
-            self.context_tree.take();
-            return self.always();
         }
-
-        result
     }
 
     pub(super) fn check_property_instance_pair(

@@ -1291,7 +1291,7 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.is_specialized_generic(db))
             }
-            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
+            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(db),
             Type::ProtocolInstance(protocol) => {
                 matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
             }
