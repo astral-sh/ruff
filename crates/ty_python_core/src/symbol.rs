@@ -6,7 +6,7 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
-const LINEAR_SEARCH_THRESHOLD: usize = 16;
+const LINEAR_SEARCH_THRESHOLD: usize = 8;
 
 /// Uniquely identifies a symbol in a given scope.
 #[newtype_index]

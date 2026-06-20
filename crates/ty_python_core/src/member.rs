@@ -11,7 +11,7 @@ use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
-const LINEAR_SEARCH_THRESHOLD: usize = 16;
+const LINEAR_SEARCH_THRESHOLD: usize = 8;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
