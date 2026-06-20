@@ -40,6 +40,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
 help: Remove the unused suppression comment
  ::: cell 2
   |
+1 | # snapshot
   - x = 1  # ty: ignore[unresolved-reference]
 2 + x = 1
   |

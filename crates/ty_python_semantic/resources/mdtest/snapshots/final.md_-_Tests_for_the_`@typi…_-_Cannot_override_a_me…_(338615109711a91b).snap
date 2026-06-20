@@ -147,8 +147,10 @@ info: `Parent.foo` is decorated with `@final`, forbidding overrides
   |
 help: Remove the override of `foo`
    |
+41 |     # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
    -     def foo(self): ...
 42 +     
+43 |     @property
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -230,9 +232,11 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `class_method1`
    |
+52 |     def my_proeprty3(self) -> None: ...
    -     @classmethod
    -     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
 53 +       # error: [override-of-final-method]
+54 |     @staticmethod
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -256,9 +260,11 @@ info: `Parent.static_method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `static_method1`
    |
+54 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
    -     @staticmethod
    -     def static_method1() -> int: ...  # error: [override-of-final-method]
 55 +       # error: [override-of-final-method]
+56 |     @classmethod
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -281,9 +287,11 @@ info: `Parent.class_method2` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `class_method2`
    |
+56 |     def static_method1() -> int: ...  # error: [override-of-final-method]
    -     @classmethod
    -     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
 57 +       # error: [override-of-final-method]
+58 |     @staticmethod
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -306,9 +314,11 @@ info: `Parent.static_method2` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `static_method2`
    |
+58 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
    -     @staticmethod
    -     def static_method2() -> int: ...  # error: [override-of-final-method]
 59 +       # error: [override-of-final-method]
+60 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -348,11 +358,13 @@ info: `Parent.foo` is decorated with `@final`, forbidding overrides
   |
 help: Remove the override of `foo`
    |
+71 |     # concern of Liskov.
    -     @staticmethod
    -     # error: [override-of-final-method]
    -     # error: [invalid-method-override]
    -     def foo(): ...
 72 +     
+73 |     @property
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -418,6 +430,7 @@ info: `Foo.bar` is decorated with `@final`, forbidding overrides
     |
 help: Remove the override of `bar`
     |
+112 | class Baz(Foo):
     -     def bar(self): ...  # error: [override-of-final-method]
 113 +     pass  # error: [override-of-final-method]
     |

@@ -28,6 +28,7 @@ unused-import: [*] `os` imported but unused
 help: Remove unused import: `os`
   |
   - import os  # F401
+1 | x = y      # F821
   |
 
 undefined-name: Undefined name `y`

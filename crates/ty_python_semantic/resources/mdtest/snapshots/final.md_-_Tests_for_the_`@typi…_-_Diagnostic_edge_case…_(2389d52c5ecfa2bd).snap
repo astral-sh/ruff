@@ -48,6 +48,7 @@ info: `module1.Foo.f` is decorated with `@final`, forbidding overrides
   |
 help: Remove the override of `f`
   |
+3 | class Foo(module1.Foo):
   -     def f(self): ...  # error: [override-of-final-method]
 4 +     pass  # error: [override-of-final-method]
   |

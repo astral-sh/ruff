@@ -189,9 +189,7 @@ impl std::fmt::Display for Diff<'_> {
                 writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
             }
 
-            if self.context == 0 {
-                self.write_gutter(f, digit_with)?;
-            }
+            self.write_gutter(f, digit_with)?;
 
             for (idx, group) in grouped_ops.iter().enumerate() {
                 if idx > 0 {
@@ -254,9 +252,7 @@ impl std::fmt::Display for Diff<'_> {
                 }
             }
 
-            if self.context == 0 {
-                self.write_gutter(f, digit_with)?;
-            }
+            self.write_gutter(f, digit_with)?;
         }
 
         match self.fix.applicability() {
@@ -959,6 +955,7 @@ line 10
         5 | line 5
           |
         help: Start of diff:
+           |
         4  | line 4
         5  | line 5
         6  | line 6
@@ -967,6 +964,7 @@ line 10
         8  | line 8
         9  | line 9
         10 | line 10
+           |
         note: This is an unsafe fix and may change runtime behavior
         ");
     }

@@ -152,6 +152,7 @@ mod tests {
           |     ^
           |
           |
+        1 |
           - b = a / 0  # ty:ignore[division-by-zero]
         2 + b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
           |
@@ -174,6 +175,7 @@ mod tests {
           |     ^
           |
           |
+        1 |
           - b = a / 0  # type:ignore[ty:division-by-zero]
         2 + b = a / 0  # type:ignore[ty:division-by-zero, ty:unresolved-reference]
           |
@@ -196,6 +198,7 @@ mod tests {
           |     ^
           |
           |
+        1 |
           - b = a / 0  # type:ignore[mypy-code]
         2 + b = a / 0  # type:ignore[mypy-code]  # ty:ignore[unresolved-reference]
           |
@@ -220,6 +223,7 @@ mod tests {
           |     ^
           |
           |
+        3 |
           - b = a / 0
         4 + b = a / 0  # ty:ignore[unresolved-reference]
           |
@@ -242,6 +246,7 @@ mod tests {
           |     ^
           |
           |
+        1 |
           - b = a / 0  # ty:ignore[division-by-zero,]
         2 + b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
           |
@@ -264,6 +269,7 @@ mod tests {
           |     ^
           |
           |
+        1 |
           - b = a / 0  # ty:ignore[division-by-zero   ]
         2 + b = a / 0  # ty:ignore[division-by-zero, unresolved-reference   ]
           |
@@ -286,6 +292,7 @@ mod tests {
           |     ^
           |
           |
+        1 |
           - b = a / 0  # ty:ignore[division-by-zero] some explanation
         2 + b = a / 0  # ty:ignore[division-by-zero] some explanation  # ty:ignore[unresolved-reference]
           |
@@ -314,8 +321,10 @@ mod tests {
           | |_________^
           |
           |
+        2 | b = (
           -         a  # ty:ignore[division-by-zero]
         3 +         a  # ty:ignore[division-by-zero, unresolved-reference]
+        4 |         /
           |
         ");
     }
@@ -342,8 +351,10 @@ mod tests {
           | |_________^
           |
           |
+        4 |         /
           -         0  # ty:ignore[division-by-zero]
         5 +         0  # ty:ignore[division-by-zero, unresolved-reference]
+        6 | )
           |
         ");
     }
@@ -370,8 +381,10 @@ mod tests {
           | |_________^
           |
           |
+        2 | b = (
           -         a  # ty:ignore[division-by-zero]
         3 +         a  # ty:ignore[division-by-zero, unresolved-reference]
+        4 |         /
           |
         ");
     }
@@ -395,6 +408,7 @@ mod tests {
           |      ^
           |
           |
+        4 |     more text
           - """
         5 + """  # ty:ignore[unresolved-reference]
           |
@@ -422,8 +436,10 @@ mod tests {
           |     ^
           |
           |
+        3 |     {
           -     a
         4 +     a  # ty:ignore[unresolved-reference]
+        5 |     }
           |
         ");
     }
@@ -446,6 +462,7 @@ mod tests {
           |     ^
           |
           |
+        3 |     more text
           - """
         4 + """  # ty:ignore[unresolved-reference]
           |
@@ -469,6 +486,7 @@ mod tests {
           |     ^
           |
           |
+        2 | b = a \
           - + "test"
         3 + + "test"  # ty:ignore[unresolved-reference]
           |
@@ -495,8 +513,10 @@ mod tests {
           |           ^^^
           |
           |
+        4 |         + ddd  \
           -
         5 +   # ty:ignore[unresolved-reference]
+        6 |     ] # test
           |
         ");
     }
@@ -519,6 +539,7 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from typing import reveal_type
+        2 |
           |
 
         info[code-action]: Ignore 'undefined-reveal' for this line
@@ -528,6 +549,7 @@ mod tests {
           | ^^^^^^^^^^^
           |
           |
+        1 |
           - reveal_type(1)
         2 + reveal_type(1)  # ty:ignore[undefined-reveal]
           |
@@ -553,6 +575,7 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
+        2 |
           |
 
         info[code-action]: Ignore 'unresolved-reference' for this line
@@ -562,8 +585,10 @@ mod tests {
           |  ^^^^^^^^^^
           |
           |
+        1 |
           - @deprecated("do not use")
         2 + @deprecated("do not use")  # ty:ignore[unresolved-reference]
+        3 | def my_func(): ...
           |
         "#);
     }
@@ -589,6 +614,7 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
+        2 |
           |
 
         info[code-action]: qualify warnings.deprecated
@@ -599,8 +625,10 @@ mod tests {
           |
         help: This is a preferred code action
           |
+        3 |
           - @deprecated("do not use")
         4 + @warnings.deprecated("do not use")
+        5 | def my_func(): ...
           |
 
         info[code-action]: Ignore 'unresolved-reference' for this line
@@ -610,8 +638,10 @@ mod tests {
           |  ^^^^^^^^^^
           |
           |
+        3 |
           - @deprecated("do not use")
         4 + @deprecated("do not use")  # ty:ignore[unresolved-reference]
+        5 | def my_func(): ...
           |
         "#);
     }
@@ -635,6 +665,7 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from importlib.abc import ExecutionLoader
+        2 |
           |
 
         info[code-action]: Ignore 'unresolved-reference' for this line
@@ -644,6 +675,7 @@ mod tests {
           | ^^^^^^^^^^^^^^^
           |
           |
+        1 |
           - ExecutionLoader
         2 + ExecutionLoader  # ty:ignore[unresolved-reference]
           |
@@ -673,6 +705,7 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from importlib.abc import ExecutionLoader
+        2 |
           |
 
         info[code-action]: Ignore 'unresolved-reference' for this line
@@ -682,6 +715,7 @@ mod tests {
           | ^^^^^^^^^^^^^^^
           |
           |
+        2 | import importlib
           - ExecutionLoader
         3 + ExecutionLoader  # ty:ignore[unresolved-reference]
           |
@@ -708,6 +742,7 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from importlib.abc import ExecutionLoader
+        2 |
           |
 
         info[code-action]: qualify importlib.abc.ExecutionLoader
@@ -718,6 +753,7 @@ mod tests {
           |
         help: This is a preferred code action
           |
+        2 | import importlib.abc
           - ExecutionLoader
         3 + importlib.abc.ExecutionLoader
           |
@@ -729,6 +765,7 @@ mod tests {
           | ^^^^^^^^^^^^^^^
           |
           |
+        2 | import importlib.abc
           - ExecutionLoader
         3 + ExecutionLoader  # ty:ignore[unresolved-reference]
           |

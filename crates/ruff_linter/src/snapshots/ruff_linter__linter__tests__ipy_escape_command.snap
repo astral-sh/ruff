@@ -13,12 +13,11 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
  ::: cell 1
-2 |
-3 | %matplotlib inline
+  |
 4 |
   - import os
 5 |
-6 | _ = math.pi
+  |
 
 F401 [*] `sys` imported but unused
  --> ipy_escape_command.ipynb:cell 2:2:8
@@ -29,5 +28,7 @@ F401 [*] `sys` imported but unused
   |
 help: Remove unused import: `sys`
  ::: cell 2
+  |
 1 | %%timeit
   - import sys
+  |

@@ -146,12 +146,14 @@ info: `Good.bar` is decorated with `@final`, forbidding overrides
   |
 help: Remove all overloads for `bar`
    |
+15 | class ChildOfGood(Good):
    -     @overload
    -     def bar(self, x: str) -> str: ...
    -     @overload
    -     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
 16 +     
 17 +       # error: [override-of-final-method]
+18 |     @overload
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -175,12 +177,14 @@ info: `Good.baz` is decorated with `@final`, forbidding overrides
    |
 help: Remove all overloads for `baz`
    |
+19 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
    -     @overload
    -     def baz(self, x: str) -> str: ...
    -     @overload
    -     def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
 20 +     
 21 +       # error: [override-of-final-method]
+22 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -235,12 +239,14 @@ info: `Bad.bar` is decorated with `@final`, forbidding overrides
    |
 help: Remove all overloads for `bar`
    |
+39 | class ChildOfBad(Bad):
    -     @overload
    -     def bar(self, x: str) -> str: ...
    -     @overload
    -     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
 40 +     
 41 +       # error: [override-of-final-method]
+42 |     @overload
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -261,6 +267,7 @@ info: `Bad.baz` is decorated with `@final`, forbidding overrides
    |
 help: Remove all overloads for `baz`
    |
+43 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
    -     @overload
    -     def baz(self, x: str) -> str: ...
    -     @overload
@@ -289,16 +296,19 @@ info: `Good.f` is decorated with `@final`, forbidding overrides
   |
 help: Remove all overloads and the implementation for `f`
    |
+12 | class ChildOfGood(Good):
    -     @overload
    -     def f(self, x: str) -> str: ...
    -     @overload
    -     def f(self, x: int) -> int: ...
 13 +     pass
 14 +     pass
---------------------------------------------------------------------------------
+15 |
+16 |     # error: [override-of-final-method]
    -     def f(self, x: int | str) -> int | str:
    -         return x
 17 +     pass
+18 |
    |
 note: This is an unsafe fix and may change runtime behavior
 

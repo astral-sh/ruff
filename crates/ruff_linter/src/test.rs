@@ -468,7 +468,6 @@ pub(crate) fn print_jupyter_messages(
         .hide_severity(true)
         .with_show_fix_status(true)
         .show_fix_diff(true)
-        .fix_context(3)
         .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(
@@ -488,7 +487,6 @@ pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
         .hide_severity(true)
         .with_show_fix_status(true)
         .show_fix_diff(true)
-        .fix_context(3)
         .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(

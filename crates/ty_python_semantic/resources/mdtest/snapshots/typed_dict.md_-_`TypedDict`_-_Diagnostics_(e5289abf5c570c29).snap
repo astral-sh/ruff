@@ -84,8 +84,10 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   |     TypedDict `Person`
   |
   |
+7 | def access_invalid_literal_string_key(person: Person):
   -     person["nane"]  # error: [invalid-key]
 8 +     person["name"]  # error: [invalid-key]
+9 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -142,8 +144,10 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     TypedDict `Person`
    |
    |
+21 | def write_to_non_existing_key(person: Person):
    -     person["nane"] = "Alice"  # error: [invalid-key]
 22 +     person["name"] = "Alice"  # error: [invalid-key]
+23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -210,8 +214,10 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     TypedDict `Person`
    |
    |
+42 |     # error: [invalid-key]
    -     person['nane'] = "Alice"  # fmt: skip
 43 +     person['name'] = "Alice"  # fmt: skip
+44 | class MovieBase(TypedDict):
    |
 note: This is an unsafe fix and may change runtime behavior
 

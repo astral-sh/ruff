@@ -692,8 +692,10 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
   |
 help: Move `Generic[K, V]` to the end of the bases list
   |
+6 | # error: [missing-type-argument]
   - class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
 7 + class Foo1(dict, Generic[K, V]): ...  # snapshot: inconsistent-mro
+8 | # fmt: off
   |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -728,11 +730,13 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
    |
 help: Move `Generic[K, V]` to the end of the bases list
    |
+11 |     # comment1
    -     Generic[K, V],  # comment2
    -     # comment3
    -     # error: [missing-type-argument]
    -     dict  # comment4
 12 +     dict, Generic[K, V]  # comment4
+13 |     # comment5
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -751,8 +755,10 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
    |
 help: Move `Generic[K, V]` to the end of the bases list
    |
+18 | # error: [missing-type-argument]
    - class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
 19 + class Foo3(dict, Generic[K, V], metaclass=type): ...  # snapshot: inconsistent-mro
+20 | class Foo4(  # snapshot: inconsistent-mro
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -791,11 +797,13 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
    |
 help: Move `Generic[K, V]` to the end of the bases list
    |
+21 |     # comment1
    -     Generic[K, V],  # comment2
    -     # comment3
    -     # error: [missing-type-argument]
    -     dict,  # comment4
 22 +     dict, Generic[K, V],  # comment4
+23 |     # comment5
    |
 note: This is an unsafe fix and may change runtime behavior
 ```

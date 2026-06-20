@@ -116,8 +116,10 @@ warning[redundant-cast]: Value is already of type `int`
   |
 help: Remove the redundant `cast`
   |
+4 | # snapshot: redundant-cast
   - cast(int, secrets.randbelow(10))
 5 + secrets.randbelow(10)
+6 | # snapshot: redundant-cast
   |
 ```
 
@@ -135,8 +137,10 @@ warning[redundant-cast]: Value is already of type `int`
   |
 help: Remove the redundant `cast`
   |
+6 | # snapshot: redundant-cast
   - cast(val=secrets.randbelow(10), typ=int)
 7 + secrets.randbelow(10)
+8 | def f(x: int, y: int, z: int) -> int:
   |
 ```
 
@@ -155,8 +159,10 @@ warning[redundant-cast]: Value is already of type `int`
    |
 help: Remove the redundant `cast`
    |
+9  |     # snapshot: redundant-cast
    -     return cast(int, x + y) * z
 10 +     return (x + y) * z
+11 | def g(x: int, y: int) -> int:
    |
 ```
 
@@ -175,8 +181,10 @@ warning[redundant-cast]: Value is already of type `int`
    |
 help: Remove the redundant `cast`
    |
+12 |     # snapshot: redundant-cast
    -     return -cast(int, x + y)
 13 +     return -(x + y)
+14 | def h(x: int, y: int) -> None:
    |
 ```
 
@@ -195,6 +203,7 @@ warning[redundant-cast]: Value is already of type `int`
    |
 help: Remove the redundant `cast`
    |
+15 |     # snapshot: redundant-cast
    -     print(cast(int, x + y))
 16 +     print(x + y)
    |

@@ -18,6 +18,7 @@ unformatted: File would be reformatted
  --> input.py:1:1
   |
   -
+1 | from test import say_hy
   |
 
 1 file would be reformatted

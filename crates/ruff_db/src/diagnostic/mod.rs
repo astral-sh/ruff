@@ -1438,7 +1438,7 @@ impl DisplayDiagnosticConfig {
             color: false,
             anonymized_line_numbers: false,
             context: 2,
-            fix_context: 0,
+            fix_context: 1,
             merge_window: 2,
             preview: false,
             hide_severity: false,

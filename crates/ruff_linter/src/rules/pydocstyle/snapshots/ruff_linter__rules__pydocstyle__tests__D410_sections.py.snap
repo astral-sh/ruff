@@ -12,13 +12,11 @@ D410 [*] Missing blank line after section ("Returns")
 80 |     Yields
    |
 help: Add blank line after "Returns"
-77 |
-78 |     Returns
+   |
 79 |     -------
 80 +
 81 |     Yields
-82 |     ------
-83 |
+   |
 
 D410 [*] Missing blank line after section ("Returns")
    --> sections.py:224:5
@@ -31,10 +29,8 @@ D410 [*] Missing blank line after section ("Returns")
 226 |     Many many wonderful things.
     |
 help: Add blank line after "Returns"
-224 |     Returns
-225 |     ------
+    |
 226 |     Many many wonderful things.
 227 +
 228 |     Raises:
-229 |     My attention.
-230 |
+    |

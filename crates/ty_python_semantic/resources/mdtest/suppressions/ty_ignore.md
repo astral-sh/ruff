@@ -31,6 +31,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |
 help: Remove the unused suppression comment
   |
+2 | # snapshot
   - a = test + 3  # ty: ignore[possibly-unresolved-reference]
 3 + a = test + 3
   |
@@ -54,8 +55,10 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |
 help: Remove the unused suppression comment
   |
+2 | # error: [unresolved-reference]
   - a = test + 3  # ty: ignore[possibly-unresolved-reference]
 3 + a = test + 3
+4 | print(a)
   |
 ```
 
@@ -86,6 +89,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unused-ignore-co
   |
 help: Remove the unused suppression code
   |
+1 | # snapshot
   - a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
 2 + a = 10 / 0  # ty: ignore[division-by-zero]
   |
@@ -109,8 +113,10 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |
 help: Remove the unused suppression comment
   |
+1 | # snapshot
   - a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
 2 + a = 10 / 2
+3 | # snapshot
   |
 ```
 
@@ -129,8 +135,10 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignme
   |
 help: Remove the unused suppression code
   |
+4 | # snapshot
   - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
 5 + a = 10 / 0  # ty: ignore[division-by-zero, unresolved-reference]
+6 | # snapshot
   |
 
 
@@ -142,8 +150,10 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-refer
   |
 help: Remove the unused suppression code
   |
+4 | # snapshot
   - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
 5 + a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero]
+6 | # snapshot
   |
 ```
 
@@ -161,6 +171,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignme
   |
 help: Remove the unused suppression codes
   |
+6 | # snapshot
   - a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
 7 + a = 10 / 0  # ty: ignore[division-by-zero]
   |

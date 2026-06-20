@@ -72,12 +72,14 @@ info: `Foo.method` is decorated with `@final`, forbidding overrides
   |
 help: Remove all overloads for `method`
    |
+27 | class Bar(Foo):
    -     @overload
    -     def method(self, x: int) -> int: ...
    -     @overload
    -     def method(self, x: str) -> str: ...  # error: [override-of-final-method]
 28 +     
 29 +       # error: [override-of-final-method]
+30 |
    |
 note: This is an unsafe fix and may change runtime behavior
 

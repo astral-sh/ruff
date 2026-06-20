@@ -12,14 +12,12 @@ D207 [*] Docstring is under-indented
 234 |     """
     |
 help: Increase indentation
-229 | def asdfsdf():
-230 |     """Summary.
+    |
 231 |
     - Description.
 232 +     Description.
 233 |
-234 |     """
-235 |
+    |
 
 D207 [*] Docstring is under-indented
    --> D.py:244:1
@@ -30,14 +28,12 @@ D207 [*] Docstring is under-indented
     | ^
     |
 help: Increase indentation
-241 |
-242 |     Description.
+    |
 243 |
     - """
 244 +     """
 245 |
-246 |
-247 | @expect('D208: Docstring is over-indented')
+    |
 
 D207 [*] Docstring is under-indented
    --> D.py:440:1
@@ -49,14 +45,12 @@ D207 [*] Docstring is under-indented
 441 |     """
     |
 help: Increase indentation
-437 | @expect('D213: Multi-line docstring summary should start at the second line')
-438 | def docstring_start_in_same_line(): """First Line.
+    |
 439 |
     -     Second Line
 440 +                                     Second Line
 441 |     """
-442 |
-443 |
+    |
 
 D207 [*] Docstring is under-indented
    --> D.py:441:1
@@ -66,11 +60,9 @@ D207 [*] Docstring is under-indented
     | ^
     |
 help: Increase indentation
-438 | def docstring_start_in_same_line(): """First Line.
-439 |
+    |
 440 |     Second Line
     -     """
 441 +                                     """
 442 |
-443 |
-444 | def function_with_lambda_arg(x=lambda y: y):
+    |

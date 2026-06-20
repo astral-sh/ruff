@@ -20,6 +20,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |______________________________^
    |
 help: Organize imports
+   |
    - from a import a1  # import_from
    - from c import * # import_from_star
 1  + import z
@@ -40,3 +41,4 @@ help: Organize imports
    - from . import my
 13 | from .my.nested import fn2
    - from ...grandparent import fn3
+   |
