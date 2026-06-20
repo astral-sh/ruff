@@ -269,8 +269,7 @@ impl<'db> Type<'db> {
         op: ProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
     ) -> Option<ProjectionResult<'db>> {
-        let mut roots = Vec::new();
-        Self::collect_projection_artifact_roots(db, self, &mut roots);
+        let roots = self.projection_artifact_roots(db);
         let [root] = roots.as_slice() else {
             return None;
         };
@@ -368,8 +367,7 @@ impl<'db> Type<'db> {
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
-        let mut paths = Vec::new();
-        Self::collect_projection_ops(db, root, self, &mut paths);
+        let paths = self.projection_ops(db, root);
         if paths.is_empty() {
             return None;
         }
@@ -591,28 +589,20 @@ impl<'db> Type<'db> {
             .shift_remove(path)
     }
 
-    fn collect_projection_ops(
-        db: &'db dyn Db,
-        root: DivergentType,
-        ty: Type<'db>,
-        paths: &mut Vec<ProjectionPath<'db>>,
-    ) {
-        let mut demands = Vec::new();
-        Self::collect_projection_demands(db, ty, &mut demands);
+    fn projection_ops(self, db: &'db dyn Db, root: DivergentType) -> Vec<ProjectionPath<'db>> {
+        let mut paths = Vec::new();
+        let demands = self.projection_demands(db);
         for (candidate_root, path) in demands {
             if candidate_root.same_marker(root) && !paths.contains(&path) {
                 paths.push(path);
             }
         }
+        paths
     }
 
-    fn collect_projection_demands(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        demands: &mut Vec<(DivergentType, ProjectionPath<'db>)>,
-    ) {
-        let demands = RefCell::new(demands);
-        any_over_type(db, ty, false, |nested| {
+    fn projection_demands(self, db: &'db dyn Db) -> Vec<(DivergentType, ProjectionPath<'db>)> {
+        let demands = RefCell::<Vec<(DivergentType, ProjectionPath<'db>)>>::new(Vec::new());
+        any_over_type(db, self, false, |nested| {
             if let Type::Projection(projection) = nested {
                 let mut demands = demands.borrow_mut();
                 let root = projection.root(db);
@@ -625,61 +615,51 @@ impl<'db> Type<'db> {
             }
             false
         });
+        demands.into_inner()
+    }
+
+    fn cycle_artifact_roots(self, db: &'db dyn Db) -> Vec<DivergentType> {
+        let mut roots = Vec::new();
+        self.collect_cycle_artifact_roots(db, &mut roots, true);
+        roots
+    }
+
+    fn projection_artifact_roots(self, db: &'db dyn Db) -> Vec<DivergentType> {
+        let mut roots = Vec::new();
+        // Bare `Divergent` inside containers appears in recursive aliases too. Nested projection
+        // recovery only starts from an already-recorded projection demand.
+        self.collect_cycle_artifact_roots(db, &mut roots, false);
+        roots
     }
 
     fn collect_cycle_artifact_roots(
+        self,
         db: &'db dyn Db,
-        ty: Type<'db>,
-        roots: &mut Vec<DivergentType>,
-    ) {
-        Self::collect_cycle_artifact_roots_impl(db, ty, roots, true);
-    }
-
-    fn collect_projection_artifact_roots(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        roots: &mut Vec<DivergentType>,
-    ) {
-        // Bare `Divergent` inside containers appears in recursive aliases too. Nested projection
-        // recovery only starts from an already-recorded projection demand.
-        Self::collect_cycle_artifact_roots_impl(db, ty, roots, false);
-    }
-
-    fn collect_cycle_artifact_roots_impl(
-        db: &'db dyn Db,
-        ty: Type<'db>,
         roots: &mut Vec<DivergentType>,
         include_divergent: bool,
     ) {
-        match ty {
+        match self {
             Type::Divergent(root) if include_divergent => {
                 Self::push_cycle_artifact_root(roots, root);
-                return;
             }
             Type::Projection(projection) => {
                 Self::push_cycle_artifact_root(roots, projection.root(db));
-                return;
             }
-            _ => {}
-        }
-
-        if let Type::Union(union) = ty {
-            for element in union.elements(db) {
-                Self::collect_cycle_artifact_roots_impl(db, *element, roots, include_divergent);
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    element.collect_cycle_artifact_roots(db, roots, include_divergent);
+                }
             }
-            return;
-        }
-
-        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            for element in spec.as_ref().iter_all_elements() {
-                Self::collect_cycle_artifact_roots_impl(db, element, roots, include_divergent);
-            }
-            return;
-        }
-
-        if let Some((_, specialization)) = ty.direct_class_specialization(db) {
-            for argument in specialization.types(db) {
-                Self::collect_cycle_artifact_roots_impl(db, *argument, roots, include_divergent);
+            _ => {
+                if let Some(spec) = self.exact_tuple_instance_spec(db) {
+                    for element in spec.as_ref().iter_all_elements() {
+                        element.collect_cycle_artifact_roots(db, roots, include_divergent);
+                    }
+                } else if let Some((_, specialization)) = self.direct_class_specialization(db) {
+                    for argument in specialization.types(db) {
+                        argument.collect_cycle_artifact_roots(db, roots, include_divergent);
+                    }
+                }
             }
         }
     }
@@ -691,8 +671,7 @@ impl<'db> Type<'db> {
     }
 
     fn mentions_cycle_artifact_direct(self, db: &'db dyn Db, root: DivergentType) -> bool {
-        let mut roots = Vec::new();
-        Self::collect_cycle_artifact_roots(db, self, &mut roots);
+        let roots = self.cycle_artifact_roots(db);
         roots.iter().any(|candidate| candidate.same_marker(root))
     }
 
@@ -732,8 +711,7 @@ impl<'db> Type<'db> {
             return container.into_type(db, root, solved_ops);
         }
 
-        let mut paths = Vec::new();
-        Self::collect_projection_ops(db, root, self, &mut paths);
+        let paths = self.projection_ops(db, root);
         match paths.as_slice() {
             [path] => Self::solved_projection_type(solved_ops, path),
             _ => None,
@@ -745,8 +723,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
     ) -> Option<Self> {
-        let mut paths = Vec::new();
-        Self::collect_projection_ops(db, root, self, &mut paths);
+        let paths = self.projection_ops(db, root);
         if paths.is_empty() {
             return Some(self);
         }
@@ -1738,14 +1715,12 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
     /// Inference-time API: records facts needed by projection cycle recovery.
     fn extend_from_types(&mut self, db: &'db dyn Db, types: impl IntoIterator<Item = Type<'db>>) {
         for ty in types {
-            let mut demands = Vec::new();
-            Type::collect_projection_demands(db, ty, &mut demands);
+            let demands = ty.projection_demands(db);
             if demands.is_empty() {
                 continue;
             }
 
-            let mut generic_containers = FxIndexSet::default();
-            ProjectionEvidenceSet::collect_generic_containers(db, ty, &mut generic_containers);
+            let generic_containers = ProjectionEvidenceSet::generic_containers(db, ty);
             for container_fact in generic_containers {
                 let arm = container_fact.arm;
                 let mut has_projection_fact = false;
@@ -1913,18 +1888,18 @@ impl<'db> ProjectionEvidenceSet<'db> {
     }
 
     /// Inference-time API: finds generic containers that may need recovery-time replay.
-    fn collect_generic_containers(
+    fn generic_containers(
         db: &'db dyn Db,
         ty: Type<'db>,
-        facts: &mut FxIndexSet<ProjectionContainerFact<'db>>,
-    ) {
-        let facts = RefCell::new(facts);
+    ) -> FxIndexSet<ProjectionContainerFact<'db>> {
+        let facts = RefCell::new(FxIndexSet::default());
         any_over_type(db, ty, false, |nested| {
             if let Some(fact) = ProjectionContainerFact::from_inference_type(db, nested) {
                 facts.borrow_mut().insert(fact);
             }
             false
         });
+        facts.into_inner()
     }
 
     /// Cycle-recovery-time API: looks up a previously collected container fact.
