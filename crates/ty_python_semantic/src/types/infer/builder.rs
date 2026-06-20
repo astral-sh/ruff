@@ -22,12 +22,11 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
-    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
+    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
+    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -53,16 +52,16 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
-    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_bad_dunder_set_call,
-    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_class_match_pattern, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
-    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
+    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
+    report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -358,17 +357,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 /// Inference results for a collection expression cached during multi-inference.
 struct CachedExpressionInference<'db> {
     ty: Type<'db>,
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
-    collection_use_constraints: CollectionUseConstraints<'db>,
-    string_annotations: FxHashSet<ExpressionNodeKey>,
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
-    bindings: Box<[(Definition<'db>, Type<'db>)]>,
-    cycle_recovery: Option<Type<'db>>,
-    called_functions: FxIndexSet<FunctionType<'db>>,
-    return_types_and_ranges: Box<[TypeAndRange<'db>]>,
-    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
-    diagnostics: TypeCheckDiagnostics,
+    inference: StatementInferenceInner<'db>,
     discards_dict_key_assignments: bool,
 }
 
@@ -551,6 +540,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        self.extend_statement_inner(inference);
+    }
+
+    fn extend_statement_inner(&mut self, inference: &StatementInferenceInner<'db>) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
@@ -7161,35 +7154,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
             builder.infer_expression(elt, tcx)
         };
-        let peer_ty = speculative_builder.infer_collection_literal(
+        speculative_builder.infer_collection_literal(
             collection_class,
             None,
             elts,
             &mut infer_elt_ty,
             TypeContext::default(),
-        );
-
-        // Cached types cannot replay inference effects. If the speculative pass produced any,
-        // discard its cache entries so that the real pass produces those effects exactly once.
-        let has_effects = speculative_builder.context.has_diagnostics()
-            || !speculative_builder.bindings.is_empty()
-            || !speculative_builder.declarations.is_empty()
-            || !speculative_builder.deferred.is_empty()
-            || !speculative_builder.called_functions.is_empty()
-            || !speculative_builder.collection_use_constraints.is_empty()
-            || !speculative_builder.string_annotations.is_empty()
-            || !speculative_builder.expected_types.is_empty()
-            || !speculative_builder.type_expression_flags.is_empty()
-            || !speculative_builder.qualifiers.is_empty()
-            || speculative_builder.cycle_recovery != self.cycle_recovery
-            || speculative_builder.discards_dict_key_assignments
-            || speculative_builder.return_types_and_ranges.len()
-                != self.return_types_and_ranges.len();
-        if has_effects && let Some(expression_cache) = &self.expression_cache {
-            expression_cache.borrow_mut().clear();
-        }
-
-        peer_ty
+        )
     }
 
     // Infer the type of a collection literal expression.
@@ -11195,6 +11166,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_statement(mut self) -> StatementInferenceInner<'db> {
         self.infer_region();
+        self.into_statement_inference()
+    }
+
+    fn into_statement_inference(self) -> StatementInferenceInner<'db> {
+        let region = self.region;
 
         let Self {
             context,
@@ -11262,7 +11238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bindings.len() > 20 {
             tracing::debug!(
                 "Inferred statement region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
-                self.region,
+                region,
                 bindings.len(),
             );
         }
@@ -11270,7 +11246,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if declarations.len() > 20 {
             tracing::debug!(
                 "Inferred statement region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
-                self.region,
+                region,
                 declarations.len(),
             );
         }
@@ -11617,99 +11593,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn finish_cached_expression(
-        self,
+        mut self,
         ty: Type<'db>,
         inherited_return_types: usize,
     ) -> CachedExpressionInference<'db> {
-        let Self {
-            context,
-            expressions,
-            type_expression_flags,
-            collection_use_constraints,
-            string_annotations,
-            expected_types,
-            bindings,
-            declarations,
-            deferred,
-            cycle_recovery,
-            called_functions,
-            mut return_types_and_ranges,
-            qualifiers,
-            discards_dict_key_assignments,
-            scope: _,
-
-            // Ignored; only relevant to definition regions.
-            undecorated_type: _,
-
-            // Builder-only state.
-            expression_cache: _,
-            reachability_cache: _,
-            typevar_binding_context: _,
-            deferred_state: _,
-            dataclass_field_specifiers: _,
-            index: _,
-            region: _,
-        } = self;
-
         assert!(
-            declarations.is_empty(),
+            self.declarations.is_empty(),
             "cached expression inference cannot contain declarations"
         );
         assert!(
-            deferred.is_empty(),
+            self.deferred.is_empty(),
             "cached expression inference cannot contain deferred definitions"
         );
-
-        let return_types_and_ranges = return_types_and_ranges
-            .split_off(inherited_return_types)
-            .into_boxed_slice();
+        self.return_types_and_ranges.drain(..inherited_return_types);
 
         CachedExpressionInference {
             ty,
-            expressions,
-            type_expression_flags,
-            collection_use_constraints,
-            string_annotations,
-            expected_types,
-            bindings: bindings.into_boxed_slice(),
-            cycle_recovery,
-            called_functions,
-            return_types_and_ranges,
-            qualifiers,
-            diagnostics: context.finish(),
-            discards_dict_key_assignments,
+            discards_dict_key_assignments: self.discards_dict_key_assignments,
+            inference: self.into_statement_inference(),
         }
     }
 
     fn extend_cached_expression(&mut self, cached: &CachedExpressionInference<'db>) {
-        self.expressions.extend(cached.expressions.iter());
-        self.context.extend(&cached.diagnostics);
-        self.extend_cycle_recovery(cached.cycle_recovery);
-        self.string_annotations
-            .extend(cached.string_annotations.iter().copied());
-        self.expected_types.extend(cached.expected_types.iter());
-        self.type_expression_flags
-            .extend(cached.type_expression_flags.iter());
-        self.called_functions
-            .extend(cached.called_functions.iter().copied());
-        self.return_types_and_ranges
-            .extend(cached.return_types_and_ranges.iter().copied());
-        self.qualifiers.extend(cached.qualifiers.iter());
+        self.extend_statement_inner(&cached.inference);
         self.discards_dict_key_assignments |= cached.discards_dict_key_assignments;
 
-        if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings.extend(cached.bindings.iter().copied());
-        }
-
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "constraints for distinct collection definitions are merged independently"
-        )]
-        for (collection_def, constraints) in &cached.collection_use_constraints {
-            self.collection_use_constraints
-                .entry(*collection_def)
-                .and_modify(|this| this.extend(constraints))
-                .or_insert_with(|| constraints.clone());
+        if let Some(extra) = &cached.inference.extra {
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "constraints for distinct collection definitions are merged independently"
+            )]
+            for (collection_def, constraints) in &extra.collection_use_constraints {
+                self.collection_use_constraints
+                    .entry(*collection_def)
+                    .and_modify(|this| this.extend(constraints))
+                    .or_insert_with(|| constraints.clone());
+            }
         }
     }
 

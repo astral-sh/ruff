@@ -1405,30 +1405,42 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
 }
 
 fn benchmark_nested_collection_literal_peer_inference(criterion: &mut Criterion) {
-    const DEPTH: usize = 14;
-
     setup_rayon();
 
-    // Regression benchmark for deeply nested peer collection literals. Each level doubles the
-    // number of collection literal subtrees, so recursively re-inferring those subtrees adds a
-    // depth-dependent multiplier to inference time.
-    let mut expression = "[1]".to_string();
-    for _ in 0..DEPTH {
-        expression = format!("[{expression}, {expression}]");
-    }
-    let code = format!("value = {expression}\n");
+    // Each level doubles the number of collection literal subtrees. The second case adds
+    // inference state that cached expressions must replay.
+    for (name, depth, prefix, leaf) in [
+        (
+            "ty_micro[nested_collection_literal_peer_inference]",
+            14,
+            "",
+            "[1]",
+        ),
+        (
+            "ty_micro[effectful_nested_collection_literal_peer_inference]",
+            15,
+            "def f() -> int:\n    return 1\n\n",
+            "f()",
+        ),
+    ] {
+        let mut expression = leaf.to_string();
+        for _ in 0..depth {
+            expression = format!("[{expression}, {expression}]");
+        }
+        let code = format!("{prefix}value = {expression}\n");
 
-    criterion.bench_function("ty_micro[nested_collection_literal_peer_inference]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 struct ProjectBenchmark<'a> {
