@@ -64,6 +64,11 @@ reveal_type(with_named_expression)  # revealed: list[list[int | str]]
 reveal_type(x)  # revealed: Literal[1]
 
 with_diagnostic = [[1 + "x"], ["a"]]  # error: [unsupported-operator]
+
+# A rejected union narrowing must not suppress diagnostics from the fallback inference.
+# error: [unsupported-operator]
+# error: [invalid-assignment]
+invalid_union_context: list[list[int]] | None = [[1 + "x", "a"]]
 ```
 
 ## None promotion

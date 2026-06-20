@@ -7197,6 +7197,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let mut try_narrow = |narrowed_ty| {
+            let cached_expressions = self
+                .expression_cache
+                .as_ref()
+                .map(|expression_cache| expression_cache.borrow().clone());
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
@@ -7206,12 +7210,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 elts,
                 infer_elt_expression,
                 TypeContext::new(Some(narrowed_ty)),
-            )?;
+            );
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
-            if !inferred_ty.is_assignable_to(db, narrowed_ty) {
+            let Some(inferred_ty) =
+                inferred_ty.filter(|inferred_ty| inferred_ty.is_assignable_to(db, narrowed_ty))
+            else {
+                if let (Some(expression_cache), Some(cached_expressions)) =
+                    (&self.expression_cache, cached_expressions)
+                {
+                    *expression_cache.borrow_mut() = cached_expressions;
+                }
                 return None;
-            }
+            };
 
             // Successfully narrowed to an element of the union.
             self.extend(speculative_builder);
