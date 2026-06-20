@@ -2034,9 +2034,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         let iterable = rhs_ty.try_iterate(self.db).ok()?;
 
-        // A fixed empty iteration spec does not imply empty containment: `"" in ""` and
-        // `b"" in b""` are both true. Exact tuples are the fixed-length container here whose
-        // containment is known to be element-wise.
+        // A fixed-length iteration spec with no elements does not imply that membership is always
+        // false: `"" in ""` is true. Exact tuples are the fixed-length containers here whose
+        // membership is known to test their elements individually.
         if matches!(
             rhs_ty.resolve_type_alias(self.db),
             Type::NominalInstance(instance)
