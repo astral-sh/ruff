@@ -41,6 +41,10 @@ for value in mixed.values():
         for nested_value in value.values():
             nested_value.upper()
 
+# Multiple unpack operands use peer context without being conflated with ordinary values.
+unpacked_peers = [{**{"a": [1]}}, {**{"b": ["x"]}}]
+reveal_type(unpacked_peers)  # revealed: list[dict[str, list[int | str]]]
+
 class HasKeysAndGetItem:
     def keys(self) -> KeysView[str]:
         return {}.keys()

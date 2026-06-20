@@ -7032,10 +7032,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             FxHashMap::default();
 
         for elts in elts {
-            // A dictionary-unpack row contains the mapping expression itself in the value slot,
-            // rather than an ordinary value expression. Its key and value types are inferred by
-            // the dedicated unpack path below.
-            if matches!(elts.as_slice(), [None, Some(_)]) {
+            // Keep dictionary-unpack operands separate from ordinary value expressions. The
+            // sentinel index `N` cannot overlap with a real type-parameter index.
+            if let [None, Some(elt)] = elts.as_slice() {
+                if slots.iter().all(|slot| *slot)
+                    && let Some(collection_class) = collection_literal_class(elt)
+                {
+                    groups.entry((N, collection_class)).or_default().push(elt);
+                }
                 continue;
             }
 
@@ -7056,7 +7060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut peer_types = FxHashMap::default();
-        for index in 0..N {
+        for index in 0..=N {
             for collection_class in [KnownClass::List, KnownClass::Set, KnownClass::Dict] {
                 let key = (index, collection_class);
                 if let Some(expressions) = groups.remove(&key)
@@ -7564,7 +7568,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
-                let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
+                let peer_ty = if allows_collection_literal_peer_context(tcx) {
+                    collection_literal_class(value_expr).and_then(|collection_class| {
+                        peer_types.get(&(N, collection_class)).copied()
+                    })
+                } else {
+                    None
+                };
+                let unpack_ty = infer_elt_expression(
+                    self,
+                    (1, value_expr, TypeContext::new(tcx.annotation.or(peer_ty))),
+                );
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(self.db())
