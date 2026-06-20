@@ -68,14 +68,10 @@ fn elementwise_containment_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option
             }
             Some(builder.build())
         }
-        Type::TypeVar(type_var) => match type_var.typevar(db).bound_or_constraints(db)? {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                elementwise_containment_domain(db, bound)
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                elementwise_containment_domain(db, constraints.as_type(db))
-            }
-        },
+        Type::TypeVar(type_var) => elementwise_containment_domain(
+            db,
+            type_var.typevar(db).bound_or_constraints(db)?.as_type(db),
+        ),
         Type::NewTypeInstance(newtype) => {
             elementwise_containment_domain(db, newtype.concrete_base_type(db))
         }
