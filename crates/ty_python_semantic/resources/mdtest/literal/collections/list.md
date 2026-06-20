@@ -49,6 +49,11 @@ Regression test for <https://github.com/astral-sh/ty/issues/3775>.
 reveal_type([[1], ["a"]])  # revealed: list[list[int | str]]
 reveal_type([[1], ["a"], [1, "a"]])  # revealed: list[list[int | str]]
 
+# Existing collections retain their distinct invariant types.
+ints = [1]
+strings = ["a"]
+reveal_type([ints, strings])  # revealed: list[list[int] | list[str]]
+
 # Empty literals and singleton promotion are handled from the combined sibling contents.
 reveal_type([[], [1]])  # revealed: list[list[int]]
 reveal_type([[None], [1]])  # revealed: list[list[None | int]]
@@ -69,6 +74,35 @@ with_diagnostic = [[1 + "x"], ["a"]]  # error: [unsupported-operator]
 # error: [unsupported-operator]
 # error: [invalid-assignment]
 invalid_union_context: list[list[int]] | None = [[1 + "x", "a"]]
+```
+
+## Nested collection inference cycles
+
+Collection simplification must not recursively re-enter inference when a collection type is used
+from another module.
+
+`shapes.py`:
+
+```py
+EMPTY = {}
+
+properties: dict[str, object] = {
+    "oneOf": [
+        {"": ""},
+        {
+            "include": {**EMPTY},
+            "from": {"include": {**EMPTY}},
+        },
+    ]
+}
+```
+
+`main.py`:
+
+```py
+import shapes
+
+defs = {name: value for name, value in shapes.properties.items()}
 ```
 
 ## None promotion

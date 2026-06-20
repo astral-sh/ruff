@@ -354,16 +354,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
-/// Inference results for a collection expression cached during multi-inference.
-struct CachedExpressionInference<'db> {
-    ty: Type<'db>,
-    inference: StatementInferenceInner<'db>,
-    discards_dict_key_assignments: bool,
-}
-
 /// An expression cache shared across builders during multi-inference.
-type ExpressionCache<'db> =
-    FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Rc<CachedExpressionInference<'db>>>;
+type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
@@ -540,10 +532,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.extend_statement_inner(inference);
-    }
-
-    fn extend_statement_inner(&mut self, inference: &StatementInferenceInner<'db>) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
@@ -6191,45 +6179,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let cached = self.expression_cache.as_ref().and_then(|expression_cache| {
+        if let Some(ty) = self.expression_cache.as_ref().and_then(|expression_cache| {
             expression_cache
                 .borrow()
                 .get(&(expression.into(), tcx))
-                .cloned()
-        });
-        if let Some(cached) = cached {
-            self.extend_cached_expression(&cached);
-            return cached.ty;
-        }
-
-        if let Some(expression_cache) = self.expression_cache.clone()
-            && is_collection_literal(expression)
-        {
-            let inherited_return_types = self.return_types_and_ranges.len();
-            let mut speculative_builder = self.speculate();
-            let ty = speculative_builder.infer_expression_uncached(expression, tcx);
-            let cached =
-                Rc::new(speculative_builder.finish_cached_expression(ty, inherited_return_types));
-
-            self.extend_cached_expression(&cached);
-            expression_cache
-                .borrow_mut()
-                .insert((expression.into(), tcx), Rc::clone(&cached));
+                .copied()
+        }) {
+            self.store_expression_type(expression, ty);
             return ty;
         }
 
-        self.infer_expression_uncached(expression, tcx)
-    }
-
-    fn infer_expression_uncached(
-        &mut self,
-        expression: &ast::Expr,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
         if let Some(target) = tcx.annotation
             && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
             self.store_expression_type(expression, ty);
+
+            if let Some(expression_cache) = &self.expression_cache {
+                expression_cache
+                    .borrow_mut()
+                    .insert((expression.into(), tcx), ty);
+            }
+
             return ty;
         }
 
@@ -7047,154 +7017,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    /// Infers a shared type context for sibling collection literals from their combined contents.
-    ///
-    /// Inferring each literal independently would retain separate invariant types such as
-    /// `list[int] | list[str]`. Combining their contents first instead provides `list[int | str]`
-    /// as context for both literals. The inference is speculative because the real expressions
-    /// are inferred below with that shared context.
-    fn infer_collection_literal_peer_types<'expr, const N: usize>(
-        &mut self,
-        elts: &[[Option<&'expr ast::Expr>; N]],
-        slots: &[bool],
-    ) -> FxHashMap<(usize, KnownClass), Type<'db>> {
-        let mut groups: FxHashMap<(usize, KnownClass), Vec<&'expr ast::Expr>> =
-            FxHashMap::default();
-
-        for elts in elts {
-            // Keep dictionary-unpack operands separate from ordinary value expressions. The
-            // sentinel index `N` cannot overlap with a real type-parameter index.
-            if let [None, Some(elt)] = elts.as_slice() {
-                if slots.iter().all(|slot| *slot)
-                    && let Some(collection_class) = collection_literal_class(elt)
-                {
-                    groups.entry((N, collection_class)).or_default().push(elt);
-                }
-                continue;
-            }
-
-            for (index, elt) in elts.iter().enumerate() {
-                if !slots.get(index).copied().unwrap_or(false) {
-                    continue;
-                }
-
-                let Some(elt) = elt else { continue };
-                let Some(collection_class) = collection_literal_class(elt) else {
-                    continue;
-                };
-                groups
-                    .entry((index, collection_class))
-                    .or_default()
-                    .push(elt);
-            }
-        }
-
-        let mut peer_types = FxHashMap::default();
-        for index in 0..=N {
-            for collection_class in [KnownClass::List, KnownClass::Set, KnownClass::Dict] {
-                let key = (index, collection_class);
-                if let Some(expressions) = groups.remove(&key)
-                    && expressions.len() > 1
-                    && let Some(ty) =
-                        self.infer_collection_literal_peer_type(collection_class, &expressions)
-                {
-                    peer_types.insert(key, ty);
-                }
-            }
-        }
-        peer_types
-    }
-
-    fn infer_collection_literal_peer_type<'expr>(
-        &mut self,
-        collection_class: KnownClass,
-        expressions: &[&'expr ast::Expr],
-    ) -> Option<Type<'db>> {
-        match collection_class {
-            KnownClass::List | KnownClass::Set => {
-                let elts = expressions
-                    .iter()
-                    .filter_map(|expression| match (collection_class, expression) {
-                        (KnownClass::List, ast::Expr::List(list)) => Some(list.elts.as_slice()),
-                        (KnownClass::Set, ast::Expr::Set(set)) => Some(set.elts.as_slice()),
-                        _ => None,
-                    })
-                    .flatten()
-                    .map(|elt| [Some(elt)])
-                    .collect_vec();
-                self.infer_collection_literal_peer_type_from_elements(collection_class, &elts)
-            }
-            KnownClass::Dict => {
-                let items = expressions
-                    .iter()
-                    .filter_map(|expression| {
-                        let ast::Expr::Dict(dict) = expression else {
-                            return None;
-                        };
-                        Some(
-                            dict.items
-                                .iter()
-                                .map(|item| [item.key.as_ref(), Some(&item.value)]),
-                        )
-                    })
-                    .flatten()
-                    .collect_vec();
-                self.infer_collection_literal_peer_type_from_elements(collection_class, &items)
-            }
-            _ => None,
-        }
-    }
-
-    fn infer_collection_literal_peer_type_from_elements<'expr, const N: usize>(
-        &mut self,
-        collection_class: KnownClass,
-        elts: &[[Option<&'expr ast::Expr>; N]],
-    ) -> Option<Type<'db>> {
-        let mut speculative_builder = self.speculate();
-        let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
-            builder.infer_expression(elt, tcx)
-        };
-        speculative_builder.infer_collection_literal(
-            collection_class,
-            None,
-            elts,
-            &mut infer_elt_ty,
-            TypeContext::default(),
-        )
-    }
-
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
-        &mut self,
-        collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
-        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
-        tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
-        let teardown_expression_cache = elts
-            .iter()
-            .flatten()
-            .flatten()
-            .any(|elt| is_collection_literal(elt))
-            && self.setup_expression_cache();
-
-        let result = self.infer_collection_literal_cached(
-            collection_class,
-            collection_expr,
-            elts,
-            infer_elt_expression,
-            tcx,
-        );
-
-        if teardown_expression_cache {
-            self.teardown_expression_cache();
-        }
-
-        result
-    }
-
-    fn infer_collection_literal_cached<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: Option<ast::ExprRef<'_>>,
@@ -7205,10 +7029,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let mut try_narrow = |narrowed_ty| {
-            let cached_expressions = self
-                .expression_cache
-                .as_ref()
-                .map(|expression_cache| expression_cache.borrow().clone());
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
@@ -7218,19 +7038,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 elts,
                 infer_elt_expression,
                 TypeContext::new(Some(narrowed_ty)),
-            );
+            )?;
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
-            let Some(inferred_ty) =
-                inferred_ty.filter(|inferred_ty| inferred_ty.is_assignable_to(db, narrowed_ty))
-            else {
-                if let (Some(expression_cache), Some(cached_expressions)) =
-                    (&self.expression_cache, cached_expressions)
-                {
-                    *expression_cache.borrow_mut() = cached_expressions;
-                }
+            if !inferred_ty.is_assignable_to(db, narrowed_ty) {
                 return None;
-            };
+            }
 
             // Successfully narrowed to an element of the union.
             self.extend(speculative_builder);
@@ -7502,18 +7315,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             pre_inferred_elt_tys = Some(inferred_elts);
         }
 
-        let peer_context_slots = elt_tys
-            .clone()
-            .map(|elt_ty| {
-                allows_collection_literal_peer_context(TypeContext::new(
-                    elt_tcx_constraints
-                        .get(&elt_ty.identity(self.db()))
-                        .copied(),
-                ))
-            })
-            .collect_vec();
-        let peer_types = self.infer_collection_literal_peer_types(elts, &peer_context_slots);
-
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
@@ -7604,20 +7405,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let mut inferred_elts = if let Some(pre_inferred_elt_tys) = pre_inferred_elt_tys {
+            pre_inferred_elt_tys
+        } else {
+            let mut inferred_elts = Vec::with_capacity(elts.len());
+            for elts in elts {
+                let mut inferred_elt_tys = [None; N];
+
+                if let &[None, Some(value_expr)] = elts.as_slice() {
+                    inferred_elt_tys[1] = Some(infer_elt_expression(self, (1, value_expr, tcx)));
+                } else {
+                    for (i, elt, elt_ty) in itertools::izip!(0.., elts, elt_tys.clone()) {
+                        let Some(elt) = elt else { continue };
+                        let elt_tcx = elt_tcx_constraints
+                            .get(&elt_ty.identity(self.db()))
+                            .copied()
+                            .map(|tcx| {
+                                if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                                    Type::homogeneous_tuple(self.db(), tcx)
+                                } else {
+                                    tcx
+                                }
+                            });
+                        inferred_elt_tys[i] = Some(infer_elt_expression(
+                            self,
+                            (i, elt, TypeContext::new(elt_tcx)),
+                        ));
+                    }
+                }
+
+                inferred_elts.push(inferred_elt_tys);
+            }
+            inferred_elts
+        };
+
+        let peer_context_slots = elt_tys
+            .clone()
+            .map(|elt_ty| {
+                allows_collection_literal_peer_context(TypeContext::new(
+                    elt_tcx_constraints
+                        .get(&elt_ty.identity(self.db()))
+                        .copied(),
+                ))
+            })
+            .collect_vec();
+        merge_collection_literal_peer_types(
+            self.db(),
+            elts,
+            &mut inferred_elts,
+            &peer_context_slots,
+            allows_collection_literal_peer_context(tcx),
+        );
+
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
-                let peer_ty = if allows_collection_literal_peer_context(tcx) {
-                    collection_literal_class(value_expr).and_then(|collection_class| {
-                        peer_types.get(&(N, collection_class)).copied()
-                    })
-                } else {
-                    None
+                let Some(unpack_ty) = inferred_elts[elts_index][1] else {
+                    continue;
                 };
-                let unpack_ty = infer_elt_expression(
-                    self,
-                    (1, value_expr, TypeContext::new(peer_ty.or(tcx.annotation))),
-                );
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(self.db())
@@ -7683,15 +7528,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     });
 
-                let inferred_elt_ty = pre_inferred_elt_tys
-                    .as_ref()
-                    .and_then(|inferred_elts| inferred_elts[elts_index][i])
-                    .unwrap_or_else(|| {
-                        let peer_ty = collection_literal_class(elt)
-                            .and_then(|collection_class| peer_types.get(&(i, collection_class)))
-                            .copied();
-                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx.or(peer_ty))))
-                    });
+                let Some(inferred_elt_ty) = inferred_elts[elts_index][i] else {
+                    continue;
+                };
 
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
@@ -11166,11 +11005,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_statement(mut self) -> StatementInferenceInner<'db> {
         self.infer_region();
-        self.into_statement_inference()
-    }
-
-    fn into_statement_inference(self) -> StatementInferenceInner<'db> {
-        let region = self.region;
 
         let Self {
             context,
@@ -11238,7 +11072,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bindings.len() > 20 {
             tracing::debug!(
                 "Inferred statement region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
-                region,
+                self.region,
                 bindings.len(),
             );
         }
@@ -11246,7 +11080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if declarations.len() > 20 {
             tracing::debug!(
                 "Inferred statement region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
-                region,
+                self.region,
                 declarations.len(),
             );
         }
@@ -11591,47 +11425,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.context.suppress_diagnostics();
         builder
     }
-
-    fn finish_cached_expression(
-        mut self,
-        ty: Type<'db>,
-        inherited_return_types: usize,
-    ) -> CachedExpressionInference<'db> {
-        assert!(
-            self.declarations.is_empty(),
-            "cached expression inference cannot contain declarations"
-        );
-        assert!(
-            self.deferred.is_empty(),
-            "cached expression inference cannot contain deferred definitions"
-        );
-        self.return_types_and_ranges.drain(..inherited_return_types);
-
-        CachedExpressionInference {
-            ty,
-            discards_dict_key_assignments: self.discards_dict_key_assignments,
-            inference: self.into_statement_inference(),
-        }
-    }
-
-    fn extend_cached_expression(&mut self, cached: &CachedExpressionInference<'db>) {
-        self.extend_statement_inner(&cached.inference);
-        self.discards_dict_key_assignments |= cached.discards_dict_key_assignments;
-
-        if let Some(extra) = &cached.inference.extra {
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "constraints for distinct collection definitions are merged independently"
-            )]
-            for (collection_def, constraints) in &extra.collection_use_constraints {
-                self.collection_use_constraints
-                    .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
-                    .or_insert_with(|| constraints.clone());
-            }
-        }
-    }
-
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
         let Self {
@@ -11829,6 +11622,119 @@ fn can_defer_type_context(expression: &ast::Expr) -> bool {
         | ast::Expr::Named(_)
         | ast::Expr::IpyEscapeCommand(_) => true,
     }
+}
+
+/// Merges sibling collection literals after their expressions have been inferred normally.
+///
+/// This avoids retaining unions of invariant types such as `list[int] | list[str]` without a
+/// speculative inference pass that could repeat effects or re-enter inference cycles.
+fn merge_collection_literal_peer_types<'db, const N: usize>(
+    db: &'db dyn Db,
+    elts: &[[Option<&ast::Expr>; N]],
+    inferred_elts: &mut [[Option<Type<'db>>; N]],
+    slots: &[bool],
+    merge_dict_unpacks: bool,
+) {
+    for index in 0..=N {
+        if index == N {
+            if !merge_dict_unpacks {
+                continue;
+            }
+        } else if !slots.get(index).copied().unwrap_or(false) {
+            continue;
+        }
+
+        for collection_class in [KnownClass::List, KnownClass::Set, KnownClass::Dict] {
+            let peers = elts
+                .iter()
+                .enumerate()
+                .filter_map(|(elts_index, elts)| {
+                    let (actual_index, elt) = if index == N {
+                        let [None, Some(elt)] = elts.as_slice() else {
+                            return None;
+                        };
+                        (1, *elt)
+                    } else {
+                        if matches!(elts.as_slice(), [None, Some(_)]) {
+                            return None;
+                        }
+                        (index, *elts.get(index)?.as_ref()?)
+                    };
+                    (collection_literal_class(elt) == Some(collection_class))
+                        .then_some((elts_index, actual_index))
+                })
+                .collect_vec();
+            if peers.len() < 2 {
+                continue;
+            }
+
+            let merged = simplify_collection_literal_types(
+                db,
+                UnionType::from_elements(
+                    db,
+                    peers
+                        .iter()
+                        .filter_map(|(elts_index, index)| inferred_elts[*elts_index][*index]),
+                ),
+            );
+            for (elts_index, index) in peers {
+                inferred_elts[elts_index][index] = Some(merged);
+            }
+        }
+    }
+}
+
+/// Recursively merges specializations of the same built-in collection in a union.
+fn simplify_collection_literal_types<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    let Some(union) = ty.as_union() else {
+        return ty;
+    };
+
+    let mut elements = union.elements(db).to_vec();
+
+    for collection_class in [KnownClass::List, KnownClass::Set, KnownClass::Dict] {
+        let matching = elements
+            .iter()
+            .filter_map(|ty| ty.known_specialization(db, collection_class))
+            .collect_vec();
+
+        if matching.len() < 2 {
+            continue;
+        }
+
+        let typevar_count = matching[0].types(db).len();
+        let specialization = (0..typevar_count)
+            .map(|typevar_index| {
+                let ty = UnionType::from_elements(
+                    db,
+                    matching
+                        .iter()
+                        .map(|specialization| specialization.types(db)[typevar_index]),
+                );
+                let ty = simplify_collection_literal_types(db, ty);
+                ty.as_union().map_or(ty, |union| {
+                    union.filter(db, |ty| *ty != Type::Dynamic(DynamicType::Unknown))
+                })
+            })
+            .collect_vec();
+        let merged = collection_class.to_specialized_instance(db, &specialization);
+
+        let mut first = true;
+        elements.retain_mut(|ty| {
+            if ty.known_specialization(db, collection_class).is_none() {
+                return true;
+            }
+            if first {
+                *ty = merged;
+                first = false;
+                true
+            } else {
+                false
+            }
+        });
+    }
+
+    UnionType::from_elements(db, elements)
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.

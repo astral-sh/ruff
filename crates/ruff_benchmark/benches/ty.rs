@@ -1407,40 +1407,24 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
 fn benchmark_nested_collection_literal_peer_inference(criterion: &mut Criterion) {
     setup_rayon();
 
-    // Each level doubles the number of collection literal subtrees. The second case adds
-    // inference state that cached expressions must replay.
-    for (name, depth, prefix, leaf) in [
-        (
-            "ty_micro[nested_collection_literal_peer_inference]",
-            14,
-            "",
-            "[1]",
-        ),
-        (
-            "ty_micro[effectful_nested_collection_literal_peer_inference]",
-            15,
-            "def f() -> int:\n    return 1\n\n",
-            "f()",
-        ),
-    ] {
-        let mut expression = leaf.to_string();
-        for _ in 0..depth {
-            expression = format!("[{expression}, {expression}]");
-        }
-        let code = format!("{prefix}value = {expression}\n");
-
-        criterion.bench_function(name, |b| {
-            b.iter_batched_ref(
-                || setup_micro_case(&code),
-                |case| {
-                    let Case { db, .. } = case;
-                    let result = db.check();
-                    assert_eq!(result.len(), 0);
-                },
-                BatchSize::SmallInput,
-            );
-        });
+    // Each level doubles the number of collection literal subtrees.
+    let mut expression = "[1]".to_string();
+    for _ in 0..14 {
+        expression = format!("[{expression}, {expression}]");
     }
+    let code = format!("value = {expression}\n");
+
+    criterion.bench_function("ty_micro[nested_collection_literal_peer_inference]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 struct ProjectBenchmark<'a> {
