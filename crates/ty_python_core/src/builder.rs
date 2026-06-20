@@ -2646,7 +2646,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
-            imported_modules: Arc::new(FrozenSet::from(self.imported_modules)),
+            imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
