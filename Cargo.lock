@@ -3094,6 +3094,7 @@ dependencies = [
  "filetime",
  "get-size2",
  "ignore",
+ "indexmap",
  "insta",
  "matchit",
  "path-slash",

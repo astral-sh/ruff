@@ -19,6 +19,7 @@ pub mod file_revision;
 pub mod files;
 pub mod panic;
 pub mod parsed;
+pub mod small_index_set;
 pub mod source;
 pub mod system;
 #[cfg(feature = "testing")]
