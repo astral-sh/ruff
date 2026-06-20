@@ -45,6 +45,7 @@
 
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
+use ruff_db::small_index_set::SmallIndexSet;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -53,6 +54,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::Db;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -60,7 +62,6 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
 };
-use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
@@ -93,7 +94,15 @@ struct TypeAndRange<'db> {
     range: TextRange,
 }
 
-type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
+pub(super) type CollectionUseConstraintSet<'db> = SmallIndexSet<[Type<'db>; 2]>;
+type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, CollectionUseConstraintSet<'db>>;
+
+// Two release-mode `Type`s fit without making the enum larger than `FxIndexSet`.
+#[cfg(not(debug_assertions))]
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<CollectionUseConstraintSet<'static>>(),
+    std::mem::size_of::<crate::FxIndexSet<Type<'static>>>()
+);
 
 /// Extends the current collection-use constraints with those from the previous cycle iteration.
 ///
@@ -1364,7 +1373,7 @@ impl<'db> DefinitionInference<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&CollectionUseConstraintSet<'db>> {
         self.extra
             .as_deref()?
             .collection_use_constraints()?
@@ -1606,7 +1615,7 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&CollectionUseConstraintSet<'db>> {
         self.extra
             .as_ref()?
             .collection_use_constraints
@@ -1641,7 +1650,7 @@ impl<'db> StatementInference<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&CollectionUseConstraintSet<'db>> {
         match self {
             StatementInference::Expression(inference) => {
                 inference.collection_use_constraints(collection_def)
@@ -1795,7 +1804,7 @@ impl<'db> StatementInferenceInner<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&CollectionUseConstraintSet<'db>> {
         self.extra
             .as_ref()?
             .collection_use_constraints

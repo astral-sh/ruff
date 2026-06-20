@@ -22,11 +22,12 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
-    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
-    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    CollectionUseConstraintSet, DeferredAndUndecorated, DefinitionInference,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -267,7 +268,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     // generic context and existentially quantify away the method-local typevars, so combining
     // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
-    collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+    collection_use_constraints: FxHashMap<Definition<'db>, CollectionUseConstraintSet<'db>>,
 
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
