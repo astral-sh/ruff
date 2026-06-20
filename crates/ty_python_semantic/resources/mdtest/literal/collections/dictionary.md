@@ -45,6 +45,9 @@ for value in mixed.values():
 unpacked_peers = [{**{"a": [1]}}, {**{"b": ["x"]}}]
 reveal_type(unpacked_peers)  # revealed: list[dict[str, list[int | str]]]
 
+# An unspecialized generic call context does not override unpack peer context.
+reveal_type({**{"a": [1]}, **{"b": ["x"]}})  # revealed: dict[str, list[int | str]]
+
 class HasKeysAndGetItem:
     def keys(self) -> KeysView[str]:
         return {}.keys()

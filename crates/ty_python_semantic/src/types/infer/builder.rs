@@ -7597,7 +7597,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 let unpack_ty = infer_elt_expression(
                     self,
-                    (1, value_expr, TypeContext::new(tcx.annotation.or(peer_ty))),
+                    (1, value_expr, TypeContext::new(peer_ty.or(tcx.annotation))),
                 );
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
