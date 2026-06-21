@@ -3192,6 +3192,43 @@ not_a_directory
     }
 
     #[test]
+    fn import_redirect_flat_regular_package() {
+        // A redirect with a flat, top-level prefix (no namespace ancestor)
+        // pointing at a regular (non-namespace) package, with nothing competing
+        // for the name. Both directions should resolve to the redirect target.
+        const SITE_PACKAGES: &[FileSpec] = &[(
+            "widget-redirects.pth",
+            "# import redirect widget -> /x/checkout",
+        )];
+        let checkout = [("/x/checkout/__init__.py", ""), ("/x/checkout/sub.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files(checkout).unwrap();
+
+        // Forward: the package and a submodule resolve to the redirect target.
+        let pkg =
+            resolve_module_confident(&db, &ModuleName::new_static("widget").unwrap()).unwrap();
+        assert_eq!(
+            pkg.file(&db).unwrap().path(&db),
+            &FilePath::system("/x/checkout/__init__.py")
+        );
+        let sub =
+            resolve_module_confident(&db, &ModuleName::new_static("widget.sub").unwrap()).unwrap();
+        assert_eq!(
+            sub.file(&db).unwrap().path(&db),
+            &FilePath::system("/x/checkout/sub.py")
+        );
+
+        // Reverse: files under the target map back to `widget.*`.
+        let init = path_to_module(&db, &FilePath::system("/x/checkout/__init__.py")).unwrap();
+        assert_eq!("widget", init.name(&db));
+        let sub_rev = path_to_module(&db, &FilePath::system("/x/checkout/sub.py")).unwrap();
+        assert_eq!("widget.sub", sub_rev.name(&db));
+    }
+
+    #[test]
     fn import_redirect_does_not_shadow_real_module() {
         // A redirect is authoritative over site-packages, but a first-party
         // module of the same name still wins (mirroring runtime `sys.path`
