@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+assertion_line: 82
 ---
 PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
  --> PTH203.py:5:1
@@ -9,16 +10,6 @@ PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
 5 | os.path.getatime("filename")
   | ^^^^^^^^^^^^^^^^
 6 | os.path.getatime(b"filename")
-7 | os.path.getatime(Path("filename"))
-  |
-help: Replace with `Path.stat(...).st_atime`
-
-PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
- --> PTH203.py:6:1
-  |
-5 | os.path.getatime("filename")
-6 | os.path.getatime(b"filename")
-  | ^^^^^^^^^^^^^^^^
 7 | os.path.getatime(Path("filename"))
   |
 help: Replace with `Path.stat(...).st_atime`
@@ -39,16 +30,6 @@ PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
 10 | getatime("filename")
    | ^^^^^^^^
 11 | getatime(b"filename")
-12 | getatime(Path("filename"))
-   |
-help: Replace with `Path.stat(...).st_atime`
-
-PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
-  --> PTH203.py:11:1
-   |
-10 | getatime("filename")
-11 | getatime(b"filename")
-   | ^^^^^^^^
 12 | getatime(Path("filename"))
    |
 help: Replace with `Path.stat(...).st_atime`

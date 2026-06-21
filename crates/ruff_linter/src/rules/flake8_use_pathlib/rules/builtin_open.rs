@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_builtin_open_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_argument_non_default, is_file_descriptor,
-    is_pathlib_path_call,
+    has_unknown_keywords_or_starred_expr, is_argument_non_default, is_bytes_path,
+    is_file_descriptor, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -100,7 +100,9 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
             )
         })
         || is_argument_non_default(&call.arguments, "opener", 7)
-        || file_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+        || file_arg.is_some_and(|expr| {
+            is_file_descriptor(expr, checker.semantic()) || is_bytes_path(expr, checker.semantic())
+        })
     {
         return;
     }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+assertion_line: 82
 ---
 PTH211 `os.symlink` should be replaced by `Path.symlink_to`
  --> PTH211.py:5:1
@@ -12,16 +13,6 @@ PTH211 `os.symlink` should be replaced by `Path.symlink_to`
 help: Replace with `Path(...).symlink_to(...)`
 
 PTH211 `os.symlink` should be replaced by `Path.symlink_to`
- --> PTH211.py:6:1
-  |
-5 | os.symlink("usr/bin/python", "tmp/python")
-6 | os.symlink(b"usr/bin/python", b"tmp/python")
-  | ^^^^^^^^^^
-7 | Path("tmp/python").symlink_to("usr/bin/python")  # Ok
-  |
-help: Replace with `Path(...).symlink_to(...)`
-
-PTH211 `os.symlink` should be replaced by `Path.symlink_to`
   --> PTH211.py:9:1
    |
  7 | Path("tmp/python").symlink_to("usr/bin/python")  # Ok
@@ -29,16 +20,6 @@ PTH211 `os.symlink` should be replaced by `Path.symlink_to`
  9 | os.symlink("usr/bin/python", "tmp/python", target_is_directory=True)
    | ^^^^^^^^^^
 10 | os.symlink(b"usr/bin/python", b"tmp/python", target_is_directory=True)
-11 | Path("tmp/python").symlink_to("usr/bin/python", target_is_directory=True)  # Ok
-   |
-help: Replace with `Path(...).symlink_to(...)`
-
-PTH211 `os.symlink` should be replaced by `Path.symlink_to`
-  --> PTH211.py:10:1
-   |
- 9 | os.symlink("usr/bin/python", "tmp/python", target_is_directory=True)
-10 | os.symlink(b"usr/bin/python", b"tmp/python", target_is_directory=True)
-   | ^^^^^^^^^^
 11 | Path("tmp/python").symlink_to("usr/bin/python", target_is_directory=True)  # Ok
    |
 help: Replace with `Path(...).symlink_to(...)`

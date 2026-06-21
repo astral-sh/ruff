@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_symlink_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_keyword_only_argument_non_default,
+    has_unknown_keywords_or_starred_expr, is_bytes_path, is_keyword_only_argument_non_default,
     is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
@@ -80,6 +80,17 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         return;
     }
 
+    let (Some(src), Some(dst)) = (
+        call.arguments.find_argument_value("src", 0),
+        call.arguments.find_argument_value("dst", 1),
+    ) else {
+        return;
+    };
+
+    if is_bytes_path(src, checker.semantic()) || is_bytes_path(dst, checker.semantic()) {
+        return;
+    }
+
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(OsSymlink, call.func.range());
 
@@ -97,13 +108,6 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
     ) {
         return;
     }
-
-    let (Some(src), Some(dst)) = (
-        call.arguments.find_argument_value("src", 0),
-        call.arguments.find_argument_value("dst", 1),
-    ) else {
-        return;
-    };
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(

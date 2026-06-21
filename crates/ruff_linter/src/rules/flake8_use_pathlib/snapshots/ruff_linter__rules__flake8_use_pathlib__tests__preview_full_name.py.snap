@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+assertion_line: 148
 ---
 PTH100 [*] `os.path.abspath()` should be replaced by `Path.resolve()`
  --> full_name.py:7:5
@@ -659,87 +660,6 @@ help: Replace with `Path.open()`
 49 | open(p, 'r', - 1, None, None, None, False, opener)
 50 |
 51 | # Cannot be upgraded `pathlib.Open` does not support fds
-
-PTH123 [*] `open()` should be replaced by `Path.open()`
-  --> full_name.py:65:1
-   |
-63 | open(f())
-64 |
-65 | open(b"foo")
-   | ^^^^
-66 | byte_str = b"bar"
-67 | open(byte_str)
-   |
-help: Replace with `Path.open()`
-1  | import os
-2  | import os.path
-3  + import pathlib
-4  |
-5  | p = "/foo"
-6  | q = "bar"
---------------------------------------------------------------------------------
-63 |     return 1
-64 | open(f())
-65 |
-   - open(b"foo")
-66 + pathlib.Path(b"foo").open()
-67 | byte_str = b"bar"
-68 | open(byte_str)
-69 |
-
-PTH123 [*] `open()` should be replaced by `Path.open()`
-  --> full_name.py:67:1
-   |
-65 | open(b"foo")
-66 | byte_str = b"bar"
-67 | open(byte_str)
-   | ^^^^
-68 |
-69 | def bytes_str_func() -> bytes:
-   |
-help: Replace with `Path.open()`
-1  | import os
-2  | import os.path
-3  + import pathlib
-4  |
-5  | p = "/foo"
-6  | q = "bar"
---------------------------------------------------------------------------------
-65 |
-66 | open(b"foo")
-67 | byte_str = b"bar"
-   - open(byte_str)
-68 + pathlib.Path(byte_str).open()
-69 |
-70 | def bytes_str_func() -> bytes:
-71 |     return b"foo"
-
-PTH123 [*] `open()` should be replaced by `Path.open()`
-  --> full_name.py:71:1
-   |
-69 | def bytes_str_func() -> bytes:
-70 |     return b"foo"
-71 | open(bytes_str_func())
-   | ^^^^
-72 |
-73 | # https://github.com/astral-sh/ruff/issues/17693
-   |
-help: Replace with `Path.open()`
-1  | import os
-2  | import os.path
-3  + import pathlib
-4  |
-5  | p = "/foo"
-6  | q = "bar"
---------------------------------------------------------------------------------
-69 |
-70 | def bytes_str_func() -> bytes:
-71 |     return b"foo"
-   - open(bytes_str_func())
-72 + pathlib.Path(bytes_str_func()).open()
-73 |
-74 | # https://github.com/astral-sh/ruff/issues/17693
-75 | os.stat(1)
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
    --> full_name.py:108:1
