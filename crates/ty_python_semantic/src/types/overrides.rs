@@ -8,7 +8,6 @@ use ruff_db::{
     diagnostic::{Annotation, Span},
     files::FileRange,
     parsed::ParsedModuleRef,
-    small_index_set::SmallIndexSet,
 };
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
@@ -1245,7 +1244,7 @@ fn extract_local_override_definitions<'db>(
     let member_functions =
         extract_member_functions_from_type(db, member.ty, &member.name, subclass_scope);
     let mut candidates = smallvec::smallvec![];
-    let mut seen_function_types = SmallIndexSet::<[FunctionType<'db>; 2]>::new();
+    let mut seen_function_types = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
 
     for definition in end_of_scope_function_definitions(db, subclass_scope, &member.name) {
         let function = member_functions
@@ -1258,18 +1257,19 @@ fn extract_local_override_definitions<'db>(
             continue;
         };
 
-        if !seen_function_types.insert(function) {
+        if seen_function_types.contains(&function) {
             continue;
         }
         candidates.push(LocalOverrideDefinition::from_function(
             db, function, in_stub, module,
         ));
+        seen_function_types.push(function);
     }
 
     // A property with a setter can keep the getter in the member type even though the setter is the
     // end-of-scope binding. Preserve any type-derived functions that the syntactic pass did not see.
     for function in member_functions {
-        if seen_function_types.insert(function) {
+        if !seen_function_types.contains(&function) {
             candidates.push(LocalOverrideDefinition::from_function(
                 db, function, in_stub, module,
             ));
