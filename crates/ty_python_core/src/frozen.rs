@@ -50,8 +50,15 @@ impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> 
 }
 
 impl<K: Ord, V> FrozenMap<K, V> {
+    /// Creates a frozen map from entries with unique keys.
     pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+        debug_assert!(
+            entries
+                .windows(2)
+                .all(|entries| entries[0].0 != entries[1].0),
+            "frozen map keys must be unique",
+        );
         Self(entries.into_boxed_slice())
     }
 
