@@ -39,10 +39,14 @@ use ruff_python_ast::token::parenthesized_range;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is currently always marked as unsafe, since runtime
-/// typing libraries may try to access/resolve the type alias in a way
-/// that we can't statically determine during analysis and relies on the
-/// type alias not containing any forward references.
+/// This rule's fix is marked as unsafe, since runtime typing libraries may try to
+/// access/resolve the type alias in a way that we can't statically determine during
+/// analysis and relies on the type alias not containing any forward references.
+///
+/// No fix is offered when no escape-free forward reference exists, either because the
+/// type expression uses every quote style or because quoting would leave a non-quote
+/// escape sequence (for example `Literal["\n"]`), since type checkers reject escape
+/// sequences in forward references.
 ///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
@@ -178,6 +182,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     // Eventually we may try to be more clever and come up with the
     // minimal set of subexpressions that need to be quoted.
     let parent = expr.range().start();
+    // `None` means no escape-free forward reference exists, so no fix is offered.
     let edit = quote_type_expression(
         expr,
         checker.semantic(),
@@ -188,7 +193,9 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     for name in names {
         let mut diagnostic = checker.report_diagnostic(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
-        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+        if let Some(edit) = &edit {
+            diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+        }
     }
 }
 
