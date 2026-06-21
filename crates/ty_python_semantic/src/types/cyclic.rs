@@ -26,7 +26,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
 
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::Db;
@@ -71,13 +71,12 @@ pub struct CycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
 
 /// The memoized results for a [`CycleDetector`].
 ///
-/// Almost all populated cycle-detector caches contain at most two results. Keep those results
-/// inline, but spill on the third distinct result so lookups in the rare wider caches remain
-/// hashed.
+/// Most populated cycle-detector caches contain at most two results. Keep those results inline,
+/// but spill on the third distinct result so lookups in wider caches remain hashed.
 #[derive(Debug)]
 enum CycleDetectorCache<T, R> {
     Empty,
-    One { item: T, result: R },
+    One((T, R)),
     Two([(T, R); 2]),
     Spilled(FxHashMap<T, R>),
 }
@@ -93,10 +92,7 @@ impl<T, R> CycleDetectorCache<T, R> {
     {
         match self {
             Self::Empty => None,
-            Self::One {
-                item: cached_item,
-                result,
-            } => (cached_item == item).then_some(result),
+            Self::One((cached_item, result)) => (cached_item == item).then_some(result),
             Self::Two(entries) => entries
                 .iter()
                 .find_map(|(cached_item, result)| (cached_item == item).then_some(result)),
@@ -109,28 +105,13 @@ impl<T, R> CycleDetectorCache<T, R> {
     where
         T: Hash + Eq,
     {
-        match self {
-            Self::Empty => {
-                *self = Self::One { item, result };
-                return;
-            }
-            Self::Spilled(cache) => {
-                cache.insert(item, result);
-                return;
-            }
-            Self::One { .. } | Self::Two(_) => {}
-        }
-
-        let previous = mem::replace(self, Self::Empty);
-        *self = match previous {
-            Self::Empty => Self::One { item, result },
-            Self::One {
-                item: cached_item,
-                result: cached_result,
-            } => Self::Two([(cached_item, cached_result), (item, result)]),
-            Self::Two(entries) => Self::spill(entries, (item, result)),
+        let entry = (item, result);
+        *self = match mem::replace(self, Self::Empty) {
+            Self::Empty => Self::One(entry),
+            Self::One(first) => Self::Two([first, entry]),
+            Self::Two(entries) => Self::spill(entries, entry),
             Self::Spilled(mut cache) => {
-                cache.insert(item, result);
+                cache.insert(entry.0, entry.1);
                 Self::Spilled(cache)
             }
         };
@@ -141,12 +122,7 @@ impl<T, R> CycleDetectorCache<T, R> {
     where
         T: Hash + Eq,
     {
-        let mut cache = FxHashMap::with_capacity_and_hasher(3, FxBuildHasher);
-        for (item, result) in entries {
-            cache.insert(item, result);
-        }
-        cache.insert(third.0, third.1);
-        Self::Spilled(cache)
+        Self::Spilled(entries.into_iter().chain([third]).collect())
     }
 
     #[cfg(test)]
@@ -311,48 +287,22 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
-
     use super::CycleDetector;
 
     struct TestCycleDetector;
     type Detector = CycleDetector<TestCycleDetector, u8, u8, 1>;
 
     #[test]
-    fn caches_one_result_inline() {
-        let detector = Detector::new(0);
-        let calls = Cell::new(0);
-
-        assert_eq!(
-            detector.visit(1, || {
-                calls.set(calls.get() + 1);
-                10
-            }),
-            10
-        );
-        assert!(!detector.cache.borrow().is_spilled());
-
-        assert_eq!(
-            detector.visit(1, || {
-                calls.set(calls.get() + 1);
-                20
-            }),
-            10
-        );
-        assert_eq!(calls.get(), 1);
-    }
-
-    #[test]
-    fn spills_multiple_results() {
+    fn caches_results_and_spills_after_two_entries() {
         let detector = Detector::new(0);
 
         assert_eq!(detector.visit(1, || 10), 10);
+        assert_eq!(detector.visit(1, || 40), 10);
         assert_eq!(detector.visit(2, || 20), 20);
         assert!(!detector.cache.borrow().is_spilled());
         assert_eq!(detector.visit(3, || 30), 30);
         assert!(detector.cache.borrow().is_spilled());
 
-        assert_eq!(detector.visit(1, || 40), 10);
         assert_eq!(detector.visit(2, || 40), 20);
         assert_eq!(detector.visit(3, || 40), 30);
     }
