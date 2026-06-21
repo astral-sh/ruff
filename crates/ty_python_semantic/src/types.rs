@@ -377,8 +377,7 @@ pub(crate) type FindLegacyTypeVarsVisitor<'db> =
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> =
-    CycleDetector<VisitSpecialization, Type<'db>, (), 3>;
+pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, (), 3>;
 pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
