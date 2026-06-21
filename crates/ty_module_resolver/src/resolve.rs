@@ -295,12 +295,21 @@ pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
+    let mode = ModuleResolveMode::StubsAllowed;
+
+    // Import redirects are authoritative for files under their root: a redirect
+    // explicitly declares the module name of that subtree (e.g. an editable
+    // install whose source lives outside any normal search path, or whose
+    // package name doesn't match its on-disk layout). That declaration should
+    // win over the first-party search path's bare-name mapping, so we consult
+    // redirects first when deriving a file's module name.
     file_to_module_impl(
         db,
         file,
         path,
-        search_paths(db, ModuleResolveMode::StubsAllowed),
+        search_paths(db, mode).filter(|search_path| search_path.as_redirect().is_some()),
     )
+    .or_else(|| file_to_module_impl(db, file, path, search_paths(db, mode)))
     .or_else(|| {
         file_to_module_impl(
             db,
@@ -1150,12 +1159,27 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     let search_paths = search_paths(db, mode);
     let generic = resolve_name_impl(db, name, mode, search_paths);
 
-    // Import redirects are handled separately from the generic search-path walk
-    // and merged in at the end: like editable installs, they sit at the lowest
-    // module-resolution priority, so any module found via a "real" search path
-    // wins over a redirect of the same name.
+    // Import redirects are handled separately from the generic search-path walk.
+    // A redirect is an *explicit, intentional* declaration of where a module
+    // lives, so it is authoritative over `site-packages` and editable installs
+    // -- in particular, it overrides the opaque proxy module that an editable
+    // install may also drop into `site-packages`. But a higher-priority generic
+    // result (extra path, first-party code, or the standard library) still
+    // wins, mirroring runtime `sys.path` precedence. `merge_resolved_names`
+    // applies the usual namespace-package shadowing rules across the combined
+    // set either way.
     let redirected = resolve_name_redirects(db, name, mode);
-    merge_resolved_names(db, generic, redirected)
+
+    let generic_outranks_redirect = generic
+        .as_ref()
+        .and_then(|candidates| candidates.first())
+        .is_some_and(|candidate| candidate.path.search_path().outranks_import_redirect());
+
+    if generic_outranks_redirect {
+        merge_resolved_names(db, generic, redirected)
+    } else {
+        merge_resolved_names(db, redirected, generic)
+    }
 }
 
 /// Resolve `name` against any matching import-redirect search paths.
@@ -1285,25 +1309,26 @@ fn resolve_redirect_submodule(
     Some(candidate)
 }
 
-/// Merge the candidates found via the generic search-path walk with those found
-/// via import redirects.
+/// Merge two ordered sets of resolution candidates, `primary` taking priority
+/// over `secondary`.
 ///
-/// Generic candidates come first (higher priority). Because regular packages
-/// and modules shadow namespace packages regardless of search-path order, drop
-/// namespace-package candidates whenever a non-namespace candidate exists in the
-/// merged set, mirroring the dedup performed within `resolve_name_impl`.
+/// Candidates from `primary` come first (higher priority). Because regular
+/// packages and modules shadow namespace packages regardless of search-path
+/// order, drop namespace-package candidates whenever a non-namespace candidate
+/// exists in the merged set, mirroring the dedup performed within
+/// `resolve_name_impl`.
 fn merge_resolved_names(
     db: &dyn Db,
-    generic: Option<ResolvedNames>,
-    redirected: Option<ResolvedNames>,
+    primary: Option<ResolvedNames>,
+    secondary: Option<ResolvedNames>,
 ) -> Option<ResolvedNames> {
-    let mut merged = match (generic, redirected) {
-        (Some(mut generic), Some(redirected)) => {
-            generic.extend(redirected);
-            generic
+    let mut merged = match (primary, secondary) {
+        (Some(mut primary), Some(secondary)) => {
+            primary.extend(secondary);
+            primary
         }
-        (Some(generic), None) => return Some(generic),
-        (None, redirected) => return redirected,
+        (Some(primary), None) => return Some(primary),
+        (None, secondary) => return secondary,
     };
 
     let found_non_namespace = merged
@@ -3168,8 +3193,9 @@ not_a_directory
 
     #[test]
     fn import_redirect_does_not_shadow_real_module() {
-        // A redirect sits at the lowest module-resolution priority (like an
-        // editable install): a first-party module of the same name wins.
+        // A redirect is authoritative over site-packages, but a first-party
+        // module of the same name still wins (mirroring runtime `sys.path`
+        // precedence, where a local module shadows an editable install).
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "# import redirect foo -> /x/foo")];
         let redirect_files = [("/x/foo/__init__.py", "")];
 
@@ -3184,6 +3210,72 @@ not_a_directory
         assert_eq!(
             module.file(&db).unwrap().path(&db),
             &FilePath::from(src.join("foo.py"))
+        );
+    }
+
+    #[test]
+    fn import_redirect_overrides_site_packages_proxy() {
+        // An editable install may drop *both* an (opaque) proxy package of the
+        // real name into site-packages *and* an `import redirect` comment
+        // pointing at the real source. The redirect is authoritative: it wins
+        // over the same-named site-packages entry.
+        const SITE_PACKAGES: &[FileSpec] = &[
+            (
+                "ed.pkg-redirects.pth",
+                "# import redirect ed.pkg -> /checkout",
+            ),
+            // The proxy package installed directly into site-packages.
+            ("ed/pkg/__init__.py", "PROXY = True"),
+        ];
+        let checkout = [("/checkout/__init__.py", ""), ("/checkout/mod.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files(checkout).unwrap();
+
+        // The package and its submodules resolve to the redirect target, not
+        // the site-packages proxy.
+        let pkg =
+            resolve_module_confident(&db, &ModuleName::new_static("ed.pkg").unwrap()).unwrap();
+        assert_eq!(
+            pkg.file(&db).unwrap().path(&db),
+            &FilePath::system("/checkout/__init__.py")
+        );
+        let mod_ =
+            resolve_module_confident(&db, &ModuleName::new_static("ed.pkg.mod").unwrap()).unwrap();
+        assert_eq!(
+            mod_.file(&db).unwrap().path(&db),
+            &FilePath::system("/checkout/mod.py")
+        );
+    }
+
+    #[test]
+    fn import_redirect_reverse_resolution_overrides_first_party() {
+        // The "essential layout" case: the redirect target *is* the first-party
+        // root, and the package name (`my.pkg`) does not match the on-disk
+        // layout. A file under the root must take its module name from the
+        // redirect (`my.pkg.core`) rather than the first-party bare name
+        // (`core`), so that e.g. relative imports within it resolve.
+        const SITE_PACKAGES: &[FileSpec] = &[("_pkg.pth", "# import redirect my.pkg -> /src")];
+
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("__init__.py", ""), ("core.py", "")])
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        // Reverse: files under the first-party root map to `my.pkg.*`.
+        let init = path_to_module(&db, &FilePath::from(src.join("__init__.py"))).unwrap();
+        assert_eq!("my.pkg", init.name(&db));
+        let core = path_to_module(&db, &FilePath::from(src.join("core.py"))).unwrap();
+        assert_eq!("my.pkg.core", core.name(&db));
+
+        // Forward: the qualified name resolves back to the same file.
+        let core_fwd =
+            resolve_module_confident(&db, &ModuleName::new_static("my.pkg.core").unwrap()).unwrap();
+        assert_eq!(
+            core_fwd.file(&db).unwrap().path(&db),
+            &FilePath::from(src.join("core.py"))
         );
     }
 

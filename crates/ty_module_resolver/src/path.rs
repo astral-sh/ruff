@@ -641,6 +641,27 @@ impl SearchPath {
         }
     }
 
+    /// Does this search path take priority over an "import redirect" during
+    /// forward module resolution?
+    ///
+    /// A redirect is authoritative over `site-packages` and editable installs
+    /// (in particular, it overrides the opaque proxy module that an editable
+    /// install may *also* drop into `site-packages`). But a higher-priority
+    /// search path -- an extra path, first-party code, or the standard library
+    /// -- still wins, mirroring runtime `sys.path` precedence where a local
+    /// module shadows an editable install of the same name.
+    #[must_use]
+    pub(crate) fn outranks_import_redirect(&self) -> bool {
+        matches!(
+            &*self.0,
+            SearchPathInner::Extra(_)
+                | SearchPathInner::FirstParty(_)
+                | SearchPathInner::StandardLibraryCustom(_)
+                | SearchPathInner::StandardLibraryVendored(_)
+                | SearchPathInner::StandardLibraryReal(_)
+        )
+    }
+
     #[must_use]
     pub(crate) fn to_module_path(&self) -> ModulePath {
         ModulePath {
