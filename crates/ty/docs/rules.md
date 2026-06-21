@@ -2012,6 +2012,7 @@ Invalid match patterns will cause a `TypeError` at runtime. Specifically:
 class Point:
     __match_args__ = ("x", "y")
 
+
 def describe(p: Point) -> None:
     match p:
         case Point(x, y, z):  # error: [invalid-match-pattern]
