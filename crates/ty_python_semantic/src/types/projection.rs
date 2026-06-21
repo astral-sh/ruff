@@ -343,9 +343,19 @@ impl<'db> Type<'db> {
         op: ProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
     ) -> Option<ProjectionResult<'db>> {
-        let roots = self.projection_artifact_roots(db);
+        let mut roots = self.projection_artifact_roots(db);
+        // Bare divergent roots below a bridge container also need projection evidence. Unpack is
+        // excluded because unpacking can be the operation that grows a recursive structure.
+        if roots.is_empty() && !matches!(op, ProjectionOp::Unpack(_)) {
+            roots = self.cycle_artifact_roots(db);
+        }
         let [root] = roots.as_slice() else {
-            return None;
+            return self.try_multi_root_nested_cycle_projection_result(
+                db,
+                op,
+                &roots,
+                project_non_cycle,
+            );
         };
 
         let elements = self.top_level_projection_union_elements(db);
@@ -388,6 +398,55 @@ impl<'db> Type<'db> {
         Some(ProjectionResult {
             ty,
             projection_evidence: evidence,
+        })
+    }
+
+    /// Inference-time API: projects a nested value that mentions multiple cycle roots.
+    ///
+    /// This records the operation result and evidence for result-level cycle recovery, but does
+    /// not try to solve any one root-local projection variable immediately.
+    fn try_multi_root_nested_cycle_projection_result(
+        self,
+        db: &'db dyn Db,
+        op: ProjectionOp<'db>,
+        roots: &[DivergentType],
+        mut project: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
+    ) -> Option<ProjectionResult<'db>> {
+        if roots.is_empty() {
+            return None;
+        }
+
+        let root_set = CycleRootSet::from_roots(roots.iter().copied());
+        let elements = self.top_level_projection_union_elements(db);
+        let mut projection_evidence = ProjectionEvidenceBuilder::default();
+        let path = ProjectionPath::from_op(op);
+        let mut terms = Vec::with_capacity(elements.len());
+
+        for element in elements {
+            let term = if element.mentions_cycle_artifact_in_roots(db, &root_set) {
+                roots
+                    .iter()
+                    .find_map(|root| {
+                        let container = ProjectionContainer::try_from(db, *root, element, None)?;
+                        container.project_multi_root_path(db, *root, None, &path)
+                    })
+                    .or_else(|| project(element))?
+            } else {
+                project(element)?
+            };
+            projection_evidence.record_projected_container_arm(
+                db,
+                roots.iter().copied(),
+                element,
+                &path,
+                term,
+            );
+            terms.push(term.ty(db));
+        }
+
+        Some(ProjectionResult {
+            ty: UnionType::from_elements_cycle_recovery(db, terms),
+            projection_evidence: projection_evidence.finish(db),
         })
     }
 
@@ -1707,6 +1766,12 @@ impl CycleRootSet {
         }
     }
 
+    fn from_roots(roots: impl IntoIterator<Item = DivergentType>) -> Self {
+        Self {
+            roots: roots.into_iter().collect(),
+        }
+    }
+
     fn len(&self) -> usize {
         self.roots.len()
     }
@@ -1850,13 +1915,28 @@ impl<'db> ProjectionEquationSystem<'db> {
             }
 
             let mut equation = ProjectionEquation::default();
-            for candidate in candidates.get(var.root)? {
-                let Some(candidate_equation) =
-                    Self::build_equation(db, roots, *candidate, &var, evidence)
-                else {
-                    continue;
-                };
-                equation.merge(candidate_equation)?;
+            let mut has_equation_terms = false;
+            if let Some(candidates) = candidates.get(var.root) {
+                for candidate in candidates {
+                    let Some(candidate_equation) =
+                        Self::build_equation(db, roots, *candidate, &var, evidence)
+                    else {
+                        continue;
+                    };
+                    has_equation_terms = true;
+                    equation.merge(candidate_equation)?;
+                }
+            }
+            if !has_equation_terms && let Some(evidence) = evidence {
+                for fact in evidence.projection_facts(db) {
+                    if fact.root.same_marker(var.root) && fact.path == var.path {
+                        has_equation_terms = true;
+                        equation.add_projection_term(db, roots, &var, fact.term, true)?;
+                    }
+                }
+            }
+            if !has_equation_terms {
+                return None;
             }
             equation.wrap_in_list?;
             if equation.unsupported {

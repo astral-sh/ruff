@@ -105,7 +105,7 @@ use crate::types::{
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -499,6 +499,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.needs_projection_evidence_from_types |=
             unpacked.needs_projection_evidence_from_types();
         self.extend_projection_evidence(unpacked.projection_evidence());
+    }
+
+    /// Returns a binding type while carrying its inference-time projection evidence forward.
+    fn binding_type_with_projection_evidence(&mut self, definition: Definition<'db>) -> Type<'db> {
+        let inference = infer_definition_types(self.db(), definition);
+        self.extend_projection_evidence(inference.projection_evidence());
+        inference.binding_type(definition)
     }
 
     fn extend_definition(
@@ -2288,7 +2295,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
         for reachable_binding in &loop_header.reachable_bindings {
-            let binding_ty = binding_type(db, reachable_binding.definition);
+            let inference = infer_definition_types(db, reachable_binding.definition);
+            self.extend_projection_evidence(inference.projection_evidence());
+            let binding_ty = inference.binding_type(reachable_binding.definition);
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
                 .narrow(db, binding_ty, place);
@@ -9217,7 +9226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
     fn narrow_place_with_applicable_constraints(
-        &self,
+        &mut self,
         expr: PlaceExprRef,
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
@@ -9271,7 +9280,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
-                                let binding_ty = binding_type(db, definition);
+                                let binding_ty =
+                                    self.binding_type_with_projection_evidence(definition);
                                 union = union.add(
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
@@ -9415,7 +9425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_local_place_load(
-        &self,
+        &mut self,
         expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
     ) -> (Place<'db>, Option<ScopedUseId>) {
@@ -9456,7 +9466,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition)).with_definition(definition)
+                    Place::bound(self.binding_type_with_projection_evidence(definition))
+                        .with_definition(definition)
                 } else {
                     Place::Undefined
                 };
@@ -9464,12 +9475,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = place_from_bindings_with_reachability_cache(
+            let resolved = place_from_bindings_with_reachability_cache(
                 db,
                 use_def.bindings_at_use(use_id),
                 self.reachability_cache(),
-            )
-            .place;
+            );
+            if let Some(definition) = resolved.first_definition {
+                let inference = infer_definition_types(db, definition);
+                self.extend_projection_evidence(inference.projection_evidence());
+            }
+            let place = resolved.place;
 
             (place, Some(use_id))
         }
@@ -9490,7 +9505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// places like `a.x`, but the fallback global query only works for bare symbols. `assume_bound`
     /// preserves the class-body fallback behavior for names that are also local to the class body.
     fn infer_explicit_global_symbol_load(
-        &self,
+        &mut self,
         place_expr: PlaceExprRef,
         symbol_name: Option<&str>,
         current_scope_id: FileScopeId,
@@ -9561,7 +9576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This method also returns the [`ConstraintKey`]s for each scope associated with `expr`,
     /// which is used to narrow by condition rather than by assignment.
     fn infer_place_load(
-        &self,
+        &mut self,
         place_expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {

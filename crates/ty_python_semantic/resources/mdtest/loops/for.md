@@ -1881,6 +1881,55 @@ def recursive_subscript_assignment(items):
     reveal_type(maps)  # revealed: list[Divergent]
 ```
 
+Loop variable projections can pass through tuple bridges and nested custom iterables before feeding
+implicit attribute inference.
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar
+
+_ProjectionForLoopT = TypeVar("_ProjectionForLoopT")
+
+class ProjectionForLoopIterBox(Generic[_ProjectionForLoopT]):
+    def __init__(self, value: _ProjectionForLoopT) -> None:
+        self.value = value
+
+    def __iter__(self) -> Iterator[_ProjectionForLoopT]:
+        raise NotImplementedError
+
+class ProjectionForLoopAttributeTupleBridge:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+
+    def f(self) -> None:
+        for _ in range(10):
+            pair = (self.x, self.y)
+            a = pair[1][0]
+            b = pair[0][0]
+            self.x = [a]
+            self.y = [b]
+
+        reveal_type(self.x)  # revealed: list[int] | list[str | int]
+        reveal_type(self.y)  # revealed: list[str] | list[int | str]
+
+class ProjectionForLoopAttributeNestedIterableBridge:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+
+    def f(self) -> None:
+        for box in ProjectionForLoopIterBox(ProjectionForLoopIterBox((self.x, self.y))):
+            for pair in box:
+                a = pair[1][0]
+                b = pair[0][0]
+                self.x = [a]
+                self.y = [b]
+
+        reveal_type(self.x)  # revealed: list[int] | list[str | int]
+        reveal_type(self.y)  # revealed: list[str] | list[int | str]
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the
