@@ -198,37 +198,29 @@ pub enum GlobalOrNonlocal {
     Nonlocal,
 }
 
-#[derive(Clone)]
 struct ConditionFlowSnapshots {
     truthy: FlowSnapshot,
     falsy: FlowSnapshot,
 }
 
-struct ConditionFlowSnapshot {
-    fallback: FlowSnapshot,
-    snapshots: Option<ConditionFlowSnapshots>,
+enum ConditionFlowSnapshot {
+    Fallback(FlowSnapshot),
+    Branches(ConditionFlowSnapshots),
 }
 
 impl ConditionFlowSnapshot {
-    fn truthy(&self) -> FlowSnapshot {
-        let Self {
-            fallback,
-            snapshots,
-        } = self;
-        snapshots
-            .as_ref()
-            .map_or_else(|| fallback, |snapshots| &snapshots.truthy)
-            .clone()
+    fn into_truthy(self) -> FlowSnapshot {
+        match self {
+            Self::Fallback(fallback) => fallback,
+            Self::Branches(snapshots) => snapshots.truthy,
+        }
     }
-    fn falsy(&self) -> FlowSnapshot {
-        let Self {
-            fallback,
-            snapshots,
-        } = self;
-        snapshots
-            .as_ref()
-            .map_or_else(|| fallback, |snapshots| &snapshots.falsy)
-            .clone()
+
+    fn into_branches(self) -> (FlowSnapshot, FlowSnapshot) {
+        match self {
+            Self::Fallback(fallback) => (fallback.clone(), fallback),
+            Self::Branches(snapshots) => (snapshots.truthy, snapshots.falsy),
+        }
     }
 }
 
@@ -1283,16 +1275,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map().snapshot()
     }
 
-    /// Returns specialized truthy/falsy flow states for condition expressions whose evaluation can
+    /// Takes specialized truthy/falsy flow states for condition expressions whose evaluation can
     /// leave different bindings behind depending on the condition outcome.
-    fn condition_flow_snapshots(&self, expr: &ast::Expr) -> Option<ConditionFlowSnapshots> {
+    fn take_condition_flow_snapshots(
+        &mut self,
+        expr: &ast::Expr,
+    ) -> Option<ConditionFlowSnapshots> {
         match expr {
             ast::Expr::BoolOp(_) => self
                 .condition_flow_snapshots_by_node
-                .get(&ExpressionNodeKey::from(expr))
-                .cloned(),
+                .remove(&ExpressionNodeKey::from(expr)),
             ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                let snapshots = self.condition_flow_snapshots(&unary_op.operand)?;
+                let snapshots = self.take_condition_flow_snapshots(&unary_op.operand)?;
                 Some(ConditionFlowSnapshots {
                     truthy: snapshots.falsy,
                     falsy: snapshots.truthy,
@@ -1302,10 +1296,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn flow_snapshot_for_condition(&self, condition: &ast::Expr) -> ConditionFlowSnapshot {
-        ConditionFlowSnapshot {
-            fallback: self.flow_snapshot(),
-            snapshots: self.condition_flow_snapshots(condition),
+    fn flow_snapshot_for_condition(&mut self, condition: &ast::Expr) -> ConditionFlowSnapshot {
+        if let Some(snapshots) = self.take_condition_flow_snapshots(condition) {
+            ConditionFlowSnapshot::Branches(snapshots)
+        } else {
+            ConditionFlowSnapshot::Fallback(self.flow_snapshot())
         }
     }
 
@@ -2417,7 +2412,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) {
         self.visit_expr(if_expr);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
-        self.flow_restore(condition_flow_snapshot.truthy());
+        self.flow_restore(condition_flow_snapshot.into_truthy());
         let _ = self.record_expression_narrowing_constraint(if_expr);
     }
 
@@ -3099,14 +3094,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let predicate = self.build_predicate(test);
 
                 if let Some(msg) = msg {
-                    self.flow_restore(condition_flow_snapshot.falsy());
+                    let (truthy, falsy) = condition_flow_snapshot.into_branches();
+                    self.flow_restore(falsy);
                     let negated_predicate = predicate.negated();
                     self.record_narrowing_constraint(negated_predicate);
                     self.record_reachability_constraint(negated_predicate);
                     self.visit_expr(msg);
+                    self.flow_restore(truthy);
+                } else {
+                    self.flow_restore(condition_flow_snapshot.into_truthy());
                 }
 
-                self.flow_restore(condition_flow_snapshot.truthy());
                 self.record_narrowing_constraint(predicate);
                 self.record_reachability_constraint(predicate);
             }
@@ -3232,8 +3230,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
-                let mut condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
-                self.flow_restore(condition_flow_snapshot.truthy());
+                let (truthy, falsy) = self.flow_snapshot_for_condition(&node.test).into_branches();
+                self.flow_restore(truthy);
+                let mut falsy = falsy;
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
@@ -3274,23 +3273,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(condition_flow_snapshot.falsy());
+                    self.flow_restore(falsy);
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
-                    if let Some(elif_test) = clause_test {
+                    let next_falsy = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
-                        condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
-                        self.flow_restore(condition_flow_snapshot.truthy());
+                        let (truthy, next_falsy) =
+                            self.flow_snapshot_for_condition(elif_test).into_branches();
+                        self.flow_restore(truthy);
 
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
 
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
-                    }
+
+                        Some(next_falsy)
+                    } else {
+                        None
+                    };
 
                     // Determine if this clause is in type checking context
                     let clause_in_type_checking = if let Some(elif_test) = clause_test {
@@ -3315,6 +3319,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         is_outer_block_in_type_checking || clause_in_type_checking;
 
                     self.visit_body(clause_body);
+
+                    let Some(next_falsy) = next_falsy else {
+                        break;
+                    };
+                    falsy = next_falsy;
                 }
 
                 for post_clause_state in post_clauses {
@@ -3355,7 +3364,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // condition's truthy flow for the body. This preserves the zero-iteration path for
                 // the loop exit merge below.
                 let pre_loop = self.flow_snapshot();
-                self.flow_restore(condition_flow_snapshot.truthy());
+                self.flow_restore(condition_flow_snapshot.into_truthy());
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
@@ -3591,14 +3600,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // Use the same predicate ID for the successful and failed checks.
                         let guard_predicate_id = self.add_predicate(predicate);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-                        self.flow_restore(condition_flow_snapshot.falsy());
+                        let (truthy, falsy) = condition_flow_snapshot.into_branches();
+                        self.flow_restore(falsy);
                         self.current_use_def_map_mut()
                             .record_negated_narrowing_constraint_for_places(
                                 guard_predicate_id,
                                 &possibly_narrowed,
                             );
                         let match_success_guard_failure = self.flow_snapshot();
-                        self.flow_restore(condition_flow_snapshot.truthy());
+                        self.flow_restore(truthy);
                         self.current_use_def_map_mut()
                             .record_narrowing_constraint_for_places(
                                 guard_predicate_id,
@@ -4320,7 +4330,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 self.visit_expr(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
-                self.flow_restore(condition_flow_snapshot.truthy());
+                let (truthy, falsy) = condition_flow_snapshot.into_branches();
+                self.flow_restore(truthy);
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 let in_type_checking_block = self.in_type_checking_block;
@@ -4328,7 +4339,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .record_range_reachability(body.range(), in_type_checking_block);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(condition_flow_snapshot.falsy());
+                self.flow_restore(falsy);
 
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
