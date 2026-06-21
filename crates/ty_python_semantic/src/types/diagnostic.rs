@@ -169,8 +169,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
-    registry.register_lint(&BAD_MATCH);
-
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
@@ -1251,15 +1249,6 @@ declare_lint! {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
         default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/bad-match.md")]
-    pub(crate) static BAD_MATCH = {
-        summary: "detect class patterns with too many positional arguments",
-        status: LintStatus::preview("0.0.21"),
-        default_level: Level::Error,
     }
 }
 
@@ -2514,13 +2503,13 @@ pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: 
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_match_arguments<'db>(
-    context: &InferContext<'db, '_>,
+pub(crate) fn report_too_many_match_arguments(
+    context: &InferContext,
     excess_range: impl Ranged,
     match_args_len: usize,
     positional_count: usize,
 ) {
-    let Some(builder) = context.report_lint(&BAD_MATCH, excess_range) else {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, excess_range) else {
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(

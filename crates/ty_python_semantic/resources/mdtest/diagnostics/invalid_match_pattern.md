@@ -1,6 +1,6 @@
-# Bad Match
+# Invalid Match Pattern
 
-Tests for `[bad-match]` diagnostic (issue #3738).
+Tests for `[invalid-match-pattern]` diagnostic (issue #3738).
 
 ## Basic positional overflow
 
@@ -10,7 +10,7 @@ class Point:
 
 def describe(p: Point) -> None:
     match p:
-        case Point(x, y, z):  # error: [bad-match]
+        case Point(x, y, z):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -22,7 +22,7 @@ class Position:
 
 def check(x: Position) -> None:
     match x:
-        case Position(a, b):  # error: [bad-match]
+        case Position(a, b):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -72,7 +72,7 @@ class Vec:
 
 def describe(v: Vec) -> None:
     match v:
-        case Vec(a, b):  # error: [bad-match]
+        case Vec(a, b):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -84,7 +84,7 @@ class Foo:
 
 def bar(x: Foo) -> None:
     match x:
-        case Foo(a):  # error: [bad-match]
+        case Foo(a):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -100,7 +100,7 @@ class Point:
 
 def describe(p: Point) -> None:
     match p:
-        case Point(x, y, z):  # error: [bad-match]
+        case Point(x, y, z):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -117,7 +117,7 @@ class NoMatch:
 # __match_args__ is not synthesized, so positional patterns
 # in a class pattern will fail — but this is a different error
 # (no __match_args__ means the class pattern won't match).
-# This test just verifies no false positive for bad-match.
+# This test just verifies no false positive for invalid-match-pattern.
 def describe(n: NoMatch) -> None:
     match n:
         case NoMatch(x, y):
@@ -136,7 +136,7 @@ class NoMatch:
 
 def describe(n: NoMatch) -> None:
     match n:
-        case NoMatch(x, y):  # error: [bad-match]
+        case NoMatch(x, y):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -150,7 +150,7 @@ class Point:
 
 def describe(n: Point) -> None:
     match n:
-        case Point(x, y):  # error: [bad-match]
+        case Point(x, y):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -165,7 +165,7 @@ class Point(NamedTuple):
 
 def describe(p: Point) -> None:
     match p:
-        case Point(x, y, z):  # error: [bad-match]
+        case Point(x, y, z):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -180,6 +180,6 @@ class Derived(Base):
 
 def check(d: Derived) -> None:
     match d:
-        case Derived(a, b, c):  # error: [bad-match]
+        case Derived(a, b, c):  # error: [invalid-match-pattern]
             pass
 ```

@@ -792,7 +792,7 @@
         },
         "invalid-match-pattern": {
           "title": "detect invalid match patterns",
-          "description": "## What it does\n\nChecks for invalid match patterns.\n\n## Why is this bad?\n\nMatching on invalid patterns will lead to a runtime error.\n\n## Examples\n\n```python\nNotAClass = 42\n\nmatch object():\n    # TypeError at runtime: must be a class\n    case NotAClass():  # error\n        ...\n```",
+          "description": "## What it does\n\nChecks for invalid match patterns.\n\n## Why is this bad?\n\nInvalid match patterns will cause a `TypeError` at runtime. Specifically:\n\n- Using a non-type object in a class pattern.\n- Providing more positional sub-patterns than `__match_args__` allows.\n- Matching against `collections.abc.Callable` with positional sub-patterns.\n- Matching against a non-runtime-checkable protocol.\n- Matching against a `TypedDict`.\n\n## Examples\n\n```python\nclass Point:\n    __match_args__ = (\"x\", \"y\")\n\ndef describe(p: Point) -> None:\n    match p:\n        case Point(x, y, z):  # error: [invalid-match-pattern]\n            ...\n```",
           "default": "error",
           "oneOf": [
             {
