@@ -228,6 +228,12 @@ pub(super) struct Bindings {
 }
 
 impl Bindings {
+    pub(super) fn preserved_unbound_narrowing_constraint(
+        &self,
+    ) -> Option<ScopedNarrowingConstraint> {
+        self.unbound_narrowing_constraint
+    }
+
     pub(super) fn is_always_unbound(&self) -> bool {
         let [binding] = self.live_bindings.as_slice() else {
             return false;
