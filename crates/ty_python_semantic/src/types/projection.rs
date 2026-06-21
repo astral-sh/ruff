@@ -15,6 +15,7 @@ use ty_python_core::EvaluationMode;
 use super::{
     DivergentType, DynamicType, KnownClass, MemberLookupPolicy, StaticClassLiteral, TupleSpec,
     Type, UnionBuilder, UnionType, call::CallArguments, instance::SliceLiteral,
+    subscript::SubscriptError,
 };
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
@@ -195,16 +196,38 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<ProjectionResult<'db>> {
-        let subscript = ProjectionSubscript::from_type(db, slice_ty).or_else(|| {
-            (!slice_ty.is_instance_of(db, KnownClass::Slice))
-                .then_some(ProjectionSubscript::Unknown)
-        })?;
+        let subscript = ProjectionSubscript::from_type(db, slice_ty)?;
         let op = ProjectionOp::Subscript(subscript);
         self.try_projection_with_non_cycle_result(db, op, |ty| {
             ty.subscript(db, slice_ty, ast::ExprContext::Load)
                 .ok()
                 .map(ProjectionTerm::Exact)
         })
+    }
+
+    /// Inference-time API: tries ordinary subscript semantics before projection for concrete keys.
+    ///
+    /// Concrete non-index keys can produce real diagnostics on some union arms, such as
+    /// `list[T]["key"]`. Treating those keys as an unknown projection would hide the errors.
+    pub(crate) fn try_subscript_without_projection_for_concrete_key(
+        self,
+        db: &'db dyn Db,
+        slice_ty: Type<'db>,
+        expr_context: ast::ExprContext,
+    ) -> Option<Result<Self, SubscriptError<'db>>> {
+        if !matches!(
+            ProjectionSubscript::from_type(db, slice_ty)?,
+            ProjectionSubscript::KeyType(_)
+        ) {
+            return None;
+        }
+
+        let result = self.subscript_without_projection(db, slice_ty, expr_context);
+        match result {
+            Ok(ty) if !ty.has_top_level_cycle_artifact(db) => Some(Ok(ty)),
+            Err(error) => Some(Err(error)),
+            Ok(_) => None,
+        }
     }
 
     /// Inference-time API: projects a zero-argument method call.
@@ -1368,6 +1391,7 @@ impl<'db> ProjectionContainer<'db> {
             ProjectionOp::Subscript(ProjectionSubscript::StaticSlice(_)) => Some(
                 ProjectionTerm::Exact(KnownClass::List.to_specialized_instance(db, &[element])),
             ),
+            ProjectionOp::Subscript(ProjectionSubscript::KeyType(_)) => None,
             ProjectionOp::CallMethod0(_)
             | ProjectionOp::ContextEnter { .. }
             | ProjectionOp::AwaitResult => None,
@@ -1496,7 +1520,7 @@ impl<'db> ProjectionContainer<'db> {
     fn project_subscript(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subscript: ProjectionSubscript,
+        subscript: ProjectionSubscript<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             let tuple = spec.as_ref();
@@ -1509,6 +1533,7 @@ impl<'db> ProjectionContainer<'db> {
                 ProjectionSubscript::Int | ProjectionSubscript::Unknown => Some(
                     ProjectionTerm::Homogeneous(tuple.homogeneous_element_type(db)),
                 ),
+                ProjectionSubscript::KeyType(_) => None,
                 ProjectionSubscript::StaticSlice(slice) => match tuple {
                     TupleSpec::Fixed(tuple) => {
                         let elements = tuple
@@ -2945,12 +2970,21 @@ impl<'db> ProjectionMethodName<'db> {
     }
 }
 
+/// An interned non-index subscript key type.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ProjectionSubscriptKeyType<'db> {
+    ty: Type<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionSubscriptKeyType<'_> {}
+
 /// A single operation that can be preserved through cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum ProjectionOp<'db> {
     Iter { is_async: bool },
     Unpack(UnpackProjection),
-    Subscript(ProjectionSubscript),
+    Subscript(ProjectionSubscript<'db>),
     // There is no reason to target only 0-argument methods.
     // It would be nice to be able to scale it without compromising performance.
     CallMethod0(ProjectionMethodName<'db>),
@@ -2974,15 +3008,16 @@ enum UnpackProjection {
 
 /// A subscript projection represented precisely enough for cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-enum ProjectionSubscript {
+enum ProjectionSubscript<'db> {
     Unknown,
     Int,
     LiteralInt(i64),
     StaticSlice(StaticSliceProjection),
+    KeyType(ProjectionSubscriptKeyType<'db>),
 }
 
-impl ProjectionSubscript {
-    fn from_type(db: &dyn Db, slice_ty: Type<'_>) -> Option<Self> {
+impl<'db> ProjectionSubscript<'db> {
+    fn from_type(db: &'db dyn Db, slice_ty: Type<'db>) -> Option<Self> {
         if let Some(index) = slice_ty.as_int_like_literal() {
             return Some(Self::LiteralInt(index));
         }
@@ -3001,10 +3036,18 @@ impl ProjectionSubscript {
             return Some(Self::Int);
         }
 
-        None
+        if slice_ty.is_dynamic() {
+            return Some(Self::Unknown);
+        }
+
+        if slice_ty.is_instance_of(db, KnownClass::Slice) {
+            return None;
+        }
+
+        Some(Self::KeyType(ProjectionSubscriptKeyType::new(db, slice_ty)))
     }
 
-    fn to_type(self, db: &dyn Db) -> Type<'_> {
+    fn to_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Unknown => Type::unknown(),
             Self::Int => KnownClass::Int.to_instance(db),
@@ -3026,6 +3069,7 @@ impl ProjectionSubscript {
                     ),
                 ],
             ),
+            Self::KeyType(key) => key.ty(db),
         }
     }
 }

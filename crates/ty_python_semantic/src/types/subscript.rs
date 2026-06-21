@@ -563,6 +563,17 @@ impl<'db> Type<'db> {
 
         if allow_projection
             && expr_context == ast::ExprContext::Load
+            && let Some(result) = value_ty.try_subscript_without_projection_for_concrete_key(
+                db,
+                slice_ty,
+                expr_context,
+            )
+        {
+            return result;
+        }
+
+        if allow_projection
+            && expr_context == ast::ExprContext::Load
             && let Some(projection) = value_ty.try_subscript_projection(db, slice_ty)
         {
             return Ok(projection);
