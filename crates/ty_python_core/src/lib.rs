@@ -269,9 +269,12 @@ struct DefinitionsByNode<'db> {
 
 impl<'db> DefinitionsByNode<'db> {
     fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
-        let mut single = FxHashMap::default();
-        let mut non_single = FxHashMap::default();
-        single.reserve(definitions_by_node.len());
+        let single_count = definitions_by_node
+            .values()
+            .filter(|definitions| definitions.len() == 1)
+            .count();
+        let mut single = Vec::with_capacity(single_count);
+        let mut non_single = Vec::with_capacity(definitions_by_node.len() - single_count);
 
         #[expect(
             clippy::iter_over_hash_type,
@@ -279,15 +282,15 @@ impl<'db> DefinitionsByNode<'db> {
         )]
         for (key, definitions) in definitions_by_node {
             if definitions.len() == 1 {
-                single.insert(key, definitions[0]);
+                single.push((key, definitions[0]));
             } else {
-                non_single.insert(key, definitions.into_boxed_slice());
+                non_single.push((key, definitions.into_boxed_slice()));
             }
         }
 
         Self {
-            single: FrozenMap::from(single),
-            non_single: FrozenMap::from(non_single),
+            single: FrozenMap::from_entries(single),
+            non_single: FrozenMap::from_entries(non_single),
         }
     }
 
