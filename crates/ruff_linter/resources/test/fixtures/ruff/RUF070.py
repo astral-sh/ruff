@@ -56,16 +56,18 @@ def foo():
     x = yield 1
     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
 
-# Assignment inside `with`, yield outside
-def foo():
-    with open("foo.txt") as f:
-        x = f.read()
-    yield x  # RUF070
-
 
 ###
 # Non-errors
 ###
+
+# Assignment inside `with`, yield outside: squashing the assignment back into the
+# `yield` would move it inside the `with`, changing when the value is computed and
+# (for async generators) resurfacing ASYNC119 -- an autofix loop. See #25653.
+def foo():
+    with open("foo.txt") as f:
+        x = f.read()
+    yield x
 
 # Variable used after yield
 def foo():

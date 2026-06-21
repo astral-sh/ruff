@@ -4,8 +4,6 @@ mod helpers;
 pub(crate) mod rules;
 mod visitor;
 
-pub(crate) use visitor::has_conditional_body;
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;

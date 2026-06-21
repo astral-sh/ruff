@@ -4,13 +4,11 @@ use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Identifier, Stmt};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
-use crate::rules::flake8_return::has_conditional_body;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -76,7 +74,7 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
     };
 
     let visitor = {
-        let mut visitor = YieldVisitor::new(checker.semantic());
+        let mut visitor = YieldVisitor::new();
         visitor.visit_body(&function_def.body);
         visitor
     };
@@ -156,9 +154,7 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
     }
 }
 
-struct YieldVisitor<'semantic, 'a> {
-    /// The semantic model of the current file.
-    semantic: &'semantic SemanticModel<'a>,
+struct YieldVisitor<'a> {
     /// The non-local variables in the current function.
     non_locals: FxHashSet<&'a str>,
     /// The annotated variables in the current function.
@@ -169,10 +165,9 @@ struct YieldVisitor<'semantic, 'a> {
     sibling: Option<&'a Stmt>,
 }
 
-impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
-    fn new(semantic: &'semantic SemanticModel<'a>) -> Self {
+impl YieldVisitor<'_> {
+    fn new() -> Self {
         Self {
-            semantic,
             non_locals: FxHashSet::default(),
             annotations: FxHashSet::default(),
             assignment_yield: Vec::new(),
@@ -181,7 +176,7 @@ impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
     }
 }
 
-impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
+impl<'a> Visitor<'a> for YieldVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {
@@ -202,23 +197,17 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
                 }
             }
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_)) {
-                    match self.sibling {
-                        Some(Stmt::Assign(stmt_assign)) => {
-                            self.assignment_yield
-                                .push((stmt_assign, value.as_ref(), stmt));
-                        }
-                        Some(Stmt::With(with)) => {
-                            if let Some(stmt_assign) =
-                                with.body.last().and_then(Stmt::as_assign_stmt)
-                                && !has_conditional_body(with, self.semantic)
-                            {
-                                self.assignment_yield
-                                    .push((stmt_assign, value.as_ref(), stmt));
-                            }
-                        }
-                        _ => {}
-                    }
+                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
+                    && let Some(Stmt::Assign(stmt_assign)) = self.sibling
+                {
+                    // Only flag when the assignment and the `yield` are siblings. An assignment
+                    // that is the last statement of a preceding `with` block is intentionally
+                    // skipped: squashing it into the `yield` would move the assignment back inside
+                    // the `with`, changing when the value is computed relative to the context
+                    // manager's cleanup. For async generators this also resurfaces ASYNC119,
+                    // creating an autofix loop (see #25653).
+                    self.assignment_yield
+                        .push((stmt_assign, value.as_ref(), stmt));
                 }
             }
             _ => {}
