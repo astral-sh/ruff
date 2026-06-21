@@ -28,8 +28,16 @@ use crate::{Db, FxIndexMap, FxIndexSet};
 pub(crate) struct ProjectionRecoverySlot<'db> {
     pub(crate) previous: Option<Type<'db>>,
     pub(crate) joined: Type<'db>,
-    /// Whether this slot can explain the shape of a cycle root.
-    candidate: bool,
+    role: ProjectionRecoverySlotRole,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProjectionRecoverySlotRole {
+    DemandOnly,
+    Candidate {
+        /// The cycle root this result slot represented in the previous iteration, if unique.
+        root_hint: Option<DivergentType>,
+    },
 }
 
 /// Solved projection variables for one Salsa cycle recovery step.
@@ -38,18 +46,25 @@ pub(crate) struct ProjectionSolutions<'db> {
 }
 
 /// Cycle-recovery-time accumulator for result-wide projection solving.
-#[derive(Default)]
 pub(crate) struct ProjectionRecoveryBuilder<'db> {
+    roots: CycleRootSet,
     slots: Vec<ProjectionRecoverySlot<'db>>,
 }
 
 impl<'db> ProjectionRecoveryBuilder<'db> {
+    pub(crate) fn new(cycle: &salsa::Cycle) -> Self {
+        Self {
+            roots: CycleRootSet::from_cycle(cycle),
+            slots: Vec::new(),
+        }
+    }
+
     /// Cycle-recovery-time API: records a joined result slot that can contain projection demands.
     pub(crate) fn push(&mut self, previous: Option<Type<'db>>, joined: Type<'db>) -> Type<'db> {
         self.slots.push(ProjectionRecoverySlot {
             previous,
             joined,
-            candidate: false,
+            role: ProjectionRecoverySlotRole::DemandOnly,
         });
         joined
     }
@@ -57,13 +72,16 @@ impl<'db> ProjectionRecoveryBuilder<'db> {
     /// Cycle-recovery-time API: records a joined result slot that can also act as a root candidate.
     pub(crate) fn push_candidate(
         &mut self,
+        db: &'db dyn Db,
         previous: Option<Type<'db>>,
         joined: Type<'db>,
     ) -> Type<'db> {
+        let root_hint =
+            previous.and_then(|previous| root_candidate_from_previous(db, previous, &self.roots));
         self.slots.push(ProjectionRecoverySlot {
             previous,
             joined,
-            candidate: true,
+            role: ProjectionRecoverySlotRole::Candidate { root_hint },
         });
         joined
     }
@@ -72,10 +90,9 @@ impl<'db> ProjectionRecoveryBuilder<'db> {
     pub(crate) fn finish(
         &self,
         db: &'db dyn Db,
-        cycle: &salsa::Cycle,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<ProjectionSolutions<'db>> {
-        ProjectionSolutions::from_recovery_slots(db, cycle, &self.slots, evidence)
+        ProjectionSolutions::from_recovery_slots(db, &self.roots, &self.slots, evidence)
     }
 }
 
@@ -413,7 +430,11 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Cycle-recovery-time API: tries to solve projections rooted at the current cycle.
+    /// Cycle-recovery-time API: legacy root-local fallback for projection recovery.
+    ///
+    /// Result-level recovery uses [`ProjectionRecoveryBuilder`] and solves all visible roots
+    /// together. This fallback remains for type-local normalization paths that do not have a
+    /// result-wide slot set.
     pub(crate) fn try_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
@@ -1720,13 +1741,13 @@ impl CycleRootSet {
 }
 
 impl<'db> ProjectionSolutions<'db> {
-    pub(crate) fn from_recovery_slots(
+    fn from_recovery_slots(
         db: &'db dyn Db,
-        cycle: &salsa::Cycle,
+        roots: &CycleRootSet,
         slots: &[ProjectionRecoverySlot<'db>],
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
-        MultiRootProjectionSystem::from_recovery_slots(db, cycle, slots, evidence)?.solve(db)
+        MultiRootProjectionSystem::from_recovery_slots(db, roots, slots, evidence)?.solve(db)
     }
 
     fn new(solved: FxIndexMap<ProjectionVar<'db>, Type<'db>>) -> Self {
@@ -1780,11 +1801,10 @@ struct MultiRootProjectionSystem<'db> {
 impl<'db> MultiRootProjectionSystem<'db> {
     fn from_recovery_slots(
         db: &'db dyn Db,
-        cycle: &salsa::Cycle,
+        roots: &CycleRootSet,
         slots: &[ProjectionRecoverySlot<'db>],
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
-        let roots = CycleRootSet::from_cycle(cycle);
         if roots.len() <= 1 {
             return None;
         }
@@ -1804,11 +1824,24 @@ impl<'db> MultiRootProjectionSystem<'db> {
 
         let mut candidates = RootCandidates::default();
         for slot in slots {
-            if !slot.candidate {
+            let ProjectionRecoverySlotRole::Candidate { root_hint } = slot.role else {
+                continue;
+            };
+            let joined_demands = slot.joined.projection_demands(db);
+            if let Some(root) =
+                root_hint.or_else(|| root_candidate_from_demands(&joined_demands, roots))
+            {
+                if !demands.iter().any(|var| var.root.same_marker(root)) {
+                    continue;
+                }
+                if !is_plausible_root_candidate(db, root, slot.joined, evidence) {
+                    continue;
+                }
+                candidates.insert(root, slot.joined);
                 continue;
             }
-            let joined_demands = slot.joined.projection_demands(db);
-            let Some(previous) = slot.previous else {
+
+            if slot.previous.is_none() {
                 for (root, _) in joined_demands {
                     if demands.iter().any(|var| var.root.same_marker(root))
                         && is_plausible_root_candidate(db, root, slot.joined, evidence)
@@ -1816,20 +1849,7 @@ impl<'db> MultiRootProjectionSystem<'db> {
                         candidates.insert(root, slot.joined);
                     }
                 }
-                continue;
-            };
-            let root = root_candidate_from_previous(db, previous, &roots)
-                .or_else(|| root_candidate_from_demands(&joined_demands, &roots));
-            let Some(root) = root else {
-                continue;
-            };
-            if !demands.iter().any(|var| var.root.same_marker(root)) {
-                continue;
             }
-            if !is_plausible_root_candidate(db, root, slot.joined, evidence) {
-                continue;
-            }
-            candidates.insert(root, slot.joined);
         }
 
         let demands = demands.into_iter().collect::<Vec<_>>();
@@ -1892,6 +1912,9 @@ impl<'db> MultiRootProjectionSystem<'db> {
 
             let container = ProjectionContainer::try_from(db, var.root, element, evidence)?;
             let term = container.project_multi_root_path(db, var.root, evidence, &var.path)?;
+            // Terms projected from an arm that already contains this root are recursive evidence,
+            // not a productive base. Cross-root projection terms may still be productive because
+            // they can be substituted once the other root is solved.
             let allow_productive = !element.mentions_cycle_artifact_direct(db, var.root);
             equation.add_projection_term(db, roots, var, term, allow_productive)?;
         }
@@ -2067,6 +2090,8 @@ impl<'db> RootCandidates<'db> {
 
 #[derive(Default)]
 struct MultiRootProjectionEquation<'db> {
+    // Productive terms may still contain projection variables. Variables outside the SCC are
+    // substituted with solved values; variables inside the SCC force divergent widening.
     productive: Vec<Type<'db>>,
     dependencies: FxIndexSet<ProjectionVar<'db>>,
     divergent: bool,
@@ -2283,6 +2308,7 @@ fn is_plausible_root_candidate<'db>(
         .any(|element| ProjectionContainer::try_from(db, root, element, evidence).is_some())
 }
 
+// Root-local fallback used when recovery does not have result-wide slots.
 struct ProjectionSystem<'db> {
     root: DivergentType,
     equations: FxIndexMap<ProjectionPath<'db>, ProjectionEquation<'db>>,

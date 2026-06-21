@@ -555,16 +555,16 @@ impl<'db> UnpackResult<'db> {
             self.projection_evidence,
             previous_cycle_result.projection_evidence,
         );
-        let mut projection_recovery = ProjectionRecoveryBuilder::default();
+        let mut projection_recovery = ProjectionRecoveryBuilder::new(cycle);
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = projection_recovery.push_candidate(
+                db,
                 Some(previous_ty),
                 ty.cycle_join_for_recovery(db, previous_ty, cycle),
             );
         }
-        let projection_solutions =
-            projection_recovery.finish(db, cycle, projection_evidence.as_ref());
+        let projection_solutions = projection_recovery.finish(db, projection_evidence.as_ref());
         for (_, ty) in &mut self.targets {
             *ty = ty.recursive_type_normalized_with_projection_solutions(
                 db,
