@@ -3597,7 +3597,7 @@ class ProjectionCustomMethodBridge:
         self.y = MethodBox(pair.left().unwrap())
 
         reveal_type(self.x)  # revealed: MethodBox[str | int]
-        reveal_type(self.y)  # revealed: MethodBox[Divergent | int | str]
+        reveal_type(self.y)  # revealed: MethodBox[int | str]
 
 class ViewBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
