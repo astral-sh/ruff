@@ -671,12 +671,6 @@ impl<'db> Type<'db> {
         demands.into_inner()
     }
 
-    fn has_projection_demands(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |nested| {
-            matches!(nested, Type::Projection(_))
-        })
-    }
-
     fn cycle_artifact_roots(self, db: &'db dyn Db) -> Vec<DivergentType> {
         let mut roots = Vec::new();
         self.collect_cycle_artifact_roots(db, &mut roots, true);
@@ -1071,6 +1065,10 @@ impl ProjectionReplayMode {
     const fn projects_cycle_artifacts(self) -> bool {
         matches!(self, Self::MultiRoot)
     }
+
+    const fn uses_direct_generic_replay(self) -> bool {
+        matches!(self, Self::MultiRoot)
+    }
 }
 
 impl<'db> ProjectionContainer<'db> {
@@ -1147,10 +1145,43 @@ impl<'db> ProjectionContainer<'db> {
                     return Some(term);
                 }
 
+                if mode.uses_direct_generic_replay() {
+                    return Self::project_direct_generic_path(db, fact, root, evidence, path, mode);
+                }
+
                 return None;
             }
         };
         Self::project_type_path_impl(db, ty, root, evidence, path, mode)
+    }
+
+    /// Cycle-recovery-time API: query-free replay for directly visible generic containers.
+    fn project_direct_generic_path(
+        db: &'db dyn Db,
+        fact: &ProjectionContainerFact<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
+        let [element] = &*fact.arguments else {
+            return None;
+        };
+
+        let (&op, tail) = path.ops().split_first()?;
+        let term = Self::project_homogeneous_op(db, *element, op, fact)?;
+        if tail.is_empty() {
+            return Some(term);
+        }
+
+        Self::project_term_path_impl(
+            db,
+            term,
+            root,
+            evidence,
+            &ProjectionPath::from_ops(tail.iter().copied()),
+            mode,
+        )
     }
 
     /// Cycle-recovery-time API: structurally replays a projection path against a type.
@@ -1284,6 +1315,36 @@ impl<'db> ProjectionContainer<'db> {
             &ProjectionPath::from_ops(tail.iter().copied()),
             mode,
         )
+    }
+
+    /// Cycle-recovery-time API: replays operations whose result follows the element type.
+    fn project_homogeneous_op(
+        db: &'db dyn Db,
+        element: Type<'db>,
+        op: ProjectionOp<'db>,
+        fact: &ProjectionContainerFact<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        match op {
+            ProjectionOp::Iter { is_async: false } => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Iter { is_async: true } => None,
+            ProjectionOp::Unpack(UnpackProjection::Exact { .. }) => {
+                Some(ProjectionTerm::Homogeneous(element))
+            }
+            ProjectionOp::Unpack(UnpackProjection::Star { position, .. }) => {
+                Some(Self::star_unpack_homogeneous(element, position))
+            }
+            ProjectionOp::Subscript(
+                ProjectionSubscript::Unknown
+                | ProjectionSubscript::Int
+                | ProjectionSubscript::LiteralInt(_),
+            ) => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Subscript(ProjectionSubscript::StaticSlice(_)) => {
+                Some(ProjectionTerm::Exact(fact.with_arguments(db, [element])?))
+            }
+            ProjectionOp::CallMethod0(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => None,
+        }
     }
 
     fn project_list_op(
@@ -2635,9 +2696,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     /// Inference-time API: conditionally collects projection evidence.
     ///
     /// Use this only when every projection demand that may need facts from these types has already
-    /// been observed before the inference result is produced. The collection still runs if the
-    /// produced types already contain projection demands; `should_collect` controls only demands
-    /// that may be introduced later by an external consumer. If an external consumer can later
+    /// been observed before the inference result is produced. If an external consumer can later
     /// introduce a new demand for the produced result, use [`ProjectionEvidenceSet::from_types`]
     /// instead.
     pub(crate) fn from_types_if_needed(
@@ -2645,8 +2704,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
         should_collect: bool,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let types = types.into_iter().collect::<SmallVec<[_; 8]>>();
-        (should_collect || types.iter().any(|ty| ty.has_projection_demands(db)))
+        should_collect
             .then(|| Self::from_types(db, types))
             .flatten()
     }
@@ -2819,6 +2877,18 @@ impl<'db> ProjectionContainerFact<'db> {
             class,
             arguments: arguments.to_vec().into_boxed_slice(),
         })
+    }
+
+    /// Cycle-recovery-time API: rebuilds this direct generic container with new arguments.
+    fn with_arguments(
+        &self,
+        db: &'db dyn Db,
+        arguments: impl IntoIterator<Item = Type<'db>>,
+    ) -> Option<Type<'db>> {
+        Type::from(self.class.apply_specialization(db, |generic_context| {
+            generic_context.specialize(db, arguments.into_iter().collect::<Vec<_>>())
+        }))
+        .to_instance(db)
     }
 
     /// Cycle-recovery-time API: builds a fact from direct specialization only.
