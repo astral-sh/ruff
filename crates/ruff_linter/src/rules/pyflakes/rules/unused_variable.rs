@@ -40,8 +40,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe because removing an unused variable assignment may
-/// delete comments that are attached to the assignment.
+/// This rule's fix is marked as unsafe in case it would
+/// delete comments that are attached to the assignment. The fix is also
+/// marked unsafe for exception handlers (e.g., `except ValueError as e`)
+/// when a variable with the same name exists in an outer scope.
 ///
 /// ## See also
 ///

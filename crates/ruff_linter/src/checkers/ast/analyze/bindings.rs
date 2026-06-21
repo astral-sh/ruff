@@ -68,7 +68,7 @@ pub(crate) fn bindings(checker: &Checker) {
                             binding,
                             checker.locator,
                         )
-                        .map(Fix::safe_edit)
+                        .map(Fix::unsafe_edit)
                     });
             }
         }

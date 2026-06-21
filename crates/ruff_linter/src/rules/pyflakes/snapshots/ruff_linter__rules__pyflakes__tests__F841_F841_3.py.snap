@@ -253,6 +253,7 @@ help: Remove assignment to unused variable `x1`
 41 |         pass
 42 |
 43 |     try:
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x2` is assigned to but never used
   --> F841_3.py:45:47
@@ -272,6 +273,7 @@ help: Remove assignment to unused variable `x2`
 46 |         pass
 47 |
 48 |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
   --> F841_3.py:50:5
@@ -626,6 +628,7 @@ help: Remove assignment to unused variable `e`
 156 |         print("oh no!")
 157 |
 158 |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
    --> F841_3.py:160:5

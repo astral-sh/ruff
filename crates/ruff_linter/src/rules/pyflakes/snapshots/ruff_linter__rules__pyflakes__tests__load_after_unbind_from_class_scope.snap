@@ -19,6 +19,7 @@ help: Remove assignment to unused variable `x`
 9  |             pass
 10 |
 11 |         # This should raise an F821 error, rather than resolving to the
+note: This is an unsafe fix and may change runtime behavior
 
 F821 Undefined name `x`
   --> <filename>:13:15
