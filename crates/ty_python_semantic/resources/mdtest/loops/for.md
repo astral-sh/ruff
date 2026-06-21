@@ -1870,6 +1870,17 @@ for _ in range(10):
 reveal_type(pair_items)  # revealed: list[tuple[Unknown, Unknown]]
 ```
 
+Recursive subscript assignments to an initially empty collection should converge.
+
+```py
+def recursive_subscript_assignment(items):
+    maps = []
+    for item in items:
+        maps[-1] = (maps[-1][0], 1)
+
+    reveal_type(maps)  # revealed: list[Divergent]
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the

@@ -386,6 +386,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_) | Type::Projection(_))
     }
 
+    /// Inference-time API: returns whether this type still contains a cycle artifact.
+    pub(crate) fn contains_cycle_artifact(self, db: &'db dyn Db) -> bool {
+        !self.cycle_artifact_roots(db).is_empty()
+    }
+
     fn has_top_level_cycle_artifact(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Divergent(_) | Type::Projection(_) => true,
@@ -967,10 +972,13 @@ impl<'db> Type<'db> {
         }
 
         if let Type::Projection(projection) = self {
-            return solutions.solved_type(&ProjectionVar {
-                root: projection.root(db),
-                path: projection.path(db),
-            });
+            return solutions.solved_type(
+                db,
+                &ProjectionVar {
+                    root: projection.root(db),
+                    path: projection.path(db),
+                },
+            );
         }
 
         if let Type::Union(union) = self {
@@ -1738,8 +1746,30 @@ impl<'db> ProjectionSolutions<'db> {
         CycleRootSet { roots }
     }
 
-    fn solved_type(&self, var: &ProjectionVar<'db>) -> Option<Type<'db>> {
-        self.solved.get(var).copied()
+    fn solved_type(&self, db: &'db dyn Db, var: &ProjectionVar<'db>) -> Option<Type<'db>> {
+        if let Some(solved) = self.solved.get(var).copied() {
+            return Some(solved);
+        }
+
+        // Longer demanded paths are represented by the nearest solved prefix plus a
+        // structural replay of the remaining operations.
+        for prefix_len in (1..var.path.ops().len()).rev() {
+            let prefix = ProjectionPath::from_ops(var.path.ops()[..prefix_len].iter().copied());
+            let Some(solved) = self.solved.get(&ProjectionVar {
+                root: var.root,
+                path: prefix,
+            }) else {
+                continue;
+            };
+            let tail = ProjectionPath::from_ops(var.path.ops()[prefix_len..].iter().copied());
+            if solved.same_divergent_marker(db, Type::Divergent(var.root)) {
+                return Some(*solved);
+            }
+            return ProjectionContainer::project_type_path(db, *solved, var.root, None, &tail)
+                .map(|term| term.ty(db));
+        }
+
+        None
     }
 }
 
@@ -1802,8 +1832,20 @@ impl<'db> MultiRootProjectionSystem<'db> {
             candidates.insert(root, slot.joined);
         }
 
+        let demands = demands.into_iter().collect::<Vec<_>>();
         let mut equations = FxIndexMap::default();
-        let mut pending = demands.into_iter().collect::<Vec<_>>();
+        // A longer path whose prefix is also demanded is solved by replaying the tail
+        // on the prefix solution. Keeping both as independent variables can build an
+        // infinite chain such as `A_[0]^n -> B_[0]^(2n)`.
+        let mut pending = demands
+            .iter()
+            .filter(|var| {
+                !demands.iter().any(|prefix| {
+                    prefix.root.same_marker(var.root) && prefix.path.is_strict_prefix_of(&var.path)
+                })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
         while let Some(var) = pending.pop() {
             if equations.contains_key(&var) {
                 continue;
@@ -1900,21 +1942,6 @@ impl<'db> MultiRootProjectionSystem<'db> {
                         .iter()
                         .any(|term| term.mentions_projection_var_in(db, &scc_vars))
             });
-
-            if scc_is_divergent {
-                for index in scc {
-                    let root = vars[index].root;
-                    let solved = if wrap_in_list {
-                        KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
-                    } else {
-                        Type::Divergent(root)
-                    };
-                    solutions[index] = Some(solved);
-                }
-                continue;
-            }
-
-            let mut base = Vec::new();
             let solved_so_far = vars
                 .iter()
                 .cloned()
@@ -1922,6 +1949,42 @@ impl<'db> MultiRootProjectionSystem<'db> {
                 .filter_map(|(var, solution)| Some((var, solution?)))
                 .collect::<FxIndexMap<_, _>>();
             let solved_so_far = ProjectionSolutions::new(solved_so_far);
+
+            if scc_is_divergent {
+                for &index in &scc {
+                    let mut base = Vec::new();
+                    let equation = &equations[&vars[index]];
+                    for term in &equation.productive {
+                        if term.mentions_projection_var_in(db, &scc_vars) {
+                            continue;
+                        }
+                        base.push(
+                            term.replace_solved_projection_vars(db, &solved_so_far)
+                                .unwrap_or(*term),
+                        );
+                    }
+                    for dependency in &equation.dependencies {
+                        let dependency_index = var_indices[dependency];
+                        if !scc.contains(&dependency_index) {
+                            base.push(solutions[dependency_index]?);
+                        }
+                    }
+                    let root = vars[index].root;
+                    base.push(Type::Divergent(root));
+                    let solved = match base.as_slice() {
+                        [term] => *term,
+                        _ => UnionType::from_elements_cycle_recovery(db, base),
+                    };
+                    solutions[index] = Some(if wrap_in_list {
+                        KnownClass::List.to_specialized_instance(db, &[solved])
+                    } else {
+                        solved
+                    });
+                }
+                continue;
+            }
+
+            let mut base = Vec::new();
             for &index in &scc {
                 let equation = &equations[&vars[index]];
                 for term in &equation.productive {
@@ -1939,7 +2002,16 @@ impl<'db> MultiRootProjectionSystem<'db> {
             }
 
             if base.is_empty() {
-                return None;
+                for index in scc {
+                    let root = vars[index].root;
+                    let solved = if wrap_in_list {
+                        KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
+                    } else {
+                        Type::Divergent(root)
+                    };
+                    solutions[index] = Some(solved);
+                }
+                continue;
             }
 
             let solved = match base.as_slice() {
@@ -2039,7 +2111,8 @@ impl<'db> MultiRootProjectionEquation<'db> {
                     return Some(());
                 }
 
-                if term.mentions_matching_projection(db, var.root, &var.path)
+                if !term.is_matching_projection(db, var.root, &var.path)
+                    && term.mentions_matching_projection(db, var.root, &var.path)
                     && let Some(projected) = ProjectionContainer::project_multi_root_type_path(
                         db, term, var.root, None, &var.path,
                     )
@@ -2054,7 +2127,7 @@ impl<'db> MultiRootProjectionEquation<'db> {
                     return self.add_projection_term(db, roots, var, projected, allow_productive);
                 }
 
-                self.add_type_term(db, roots, term, true, allow_productive)
+                self.add_type_term(db, roots, var, term, true, allow_productive)
             }
             ProjectionTerm::Homogeneous(term) => {
                 if term.same_divergent_marker(db, Type::Divergent(var.root)) {
@@ -2062,10 +2135,10 @@ impl<'db> MultiRootProjectionEquation<'db> {
                     return Some(());
                 }
 
-                self.add_type_term(db, roots, term, true, allow_productive)
+                self.add_type_term(db, roots, var, term, true, allow_productive)
             }
             ProjectionTerm::List(term) => {
-                self.add_type_term(db, roots, term, false, allow_productive)
+                self.add_type_term(db, roots, var, term, false, allow_productive)
             }
         }
     }
@@ -2074,13 +2147,21 @@ impl<'db> MultiRootProjectionEquation<'db> {
         &mut self,
         db: &'db dyn Db,
         roots: &CycleRootSet,
+        var: &ProjectionVar<'db>,
         term: Type<'db>,
         allow_dependencies: bool,
         allow_productive: bool,
     ) -> Option<()> {
         if let Type::Union(union) = term {
             for element in union.elements(db) {
-                self.add_type_term(db, roots, *element, allow_dependencies, allow_productive)?;
+                self.add_type_term(
+                    db,
+                    roots,
+                    var,
+                    *element,
+                    allow_dependencies,
+                    allow_productive,
+                )?;
             }
             return Some(());
         }
@@ -2089,10 +2170,17 @@ impl<'db> MultiRootProjectionEquation<'db> {
             if let Type::Projection(projection) = term {
                 let root = projection.root(db);
                 if roots.contains(root) {
-                    self.dependencies.insert(ProjectionVar {
+                    let dependency = ProjectionVar {
                         root,
                         path: projection.path(db),
-                    });
+                    };
+                    if var.path.is_strict_prefix_of(&dependency.path) {
+                        // A strict extension of the current path cannot be closed by
+                        // adding another projection variable; widen this equation.
+                        self.divergent = true;
+                    } else {
+                        self.dependencies.insert(dependency);
+                    }
                 } else {
                     self.unsupported = true;
                 }
@@ -2119,6 +2207,15 @@ impl<'db> MultiRootProjectionEquation<'db> {
                 })
                 .collect::<Vec<_>>();
             if !dependencies.is_empty() {
+                if dependencies
+                    .iter()
+                    .any(|dependency| var.path.is_strict_prefix_of(&dependency.path))
+                {
+                    // A strict extension of the current path cannot be closed by
+                    // adding another projection variable; widen this equation.
+                    self.divergent = true;
+                    return Some(());
+                }
                 self.dependencies.extend(dependencies);
                 if allow_productive {
                     self.productive.push(term);
@@ -2241,16 +2338,39 @@ impl<'db> ProjectionSystem<'db> {
             }
 
             if scc.iter().any(|&index| equations[&paths[index]].divergent) {
-                // This deliberately loses productive terms in the SCC. Keeping them would require
-                // representing recursive solutions such as `A = int | list[A]`; `Divergent` is the
-                // conservative widening value that avoids under-approximating the shape as `int`.
-                let solved = if wrap_in_list {
-                    KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
-                } else {
-                    Type::Divergent(root)
-                };
-                for index in scc {
-                    solutions[index] = Some(solved);
+                let scc_paths = scc
+                    .iter()
+                    .map(|&index| paths[index].clone())
+                    .collect::<FxIndexSet<_>>();
+                for &index in &scc {
+                    let mut base = Vec::new();
+                    let equation = &equations[&paths[index]];
+                    for term in &equation.productive {
+                        if term
+                            .projection_ops(db, root)
+                            .iter()
+                            .any(|path| scc_paths.contains(path))
+                        {
+                            continue;
+                        }
+                        base.push(*term);
+                    }
+                    for dependency in &equation.dependencies {
+                        let dependency_index = path_indices[dependency];
+                        if !scc.contains(&dependency_index) {
+                            base.push(solutions[dependency_index]?);
+                        }
+                    }
+                    base.push(Type::Divergent(root));
+                    let solved = match base.as_slice() {
+                        [term] => *term,
+                        _ => UnionType::from_elements_cycle_recovery(db, base),
+                    };
+                    solutions[index] = Some(if wrap_in_list {
+                        KnownClass::List.to_specialized_instance(db, &[solved])
+                    } else {
+                        solved
+                    });
                 }
                 continue;
             }
@@ -2268,7 +2388,15 @@ impl<'db> ProjectionSystem<'db> {
             }
 
             if base.is_empty() {
-                return None;
+                let solved = if wrap_in_list {
+                    KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
+                } else {
+                    Type::Divergent(root)
+                };
+                for index in scc {
+                    solutions[index] = Some(solved);
+                }
+                continue;
             }
 
             let solved = match base.as_slice() {
@@ -2328,7 +2456,8 @@ impl<'db> ProjectionEquation<'db> {
                 // The term may still be an unprojected recursive candidate like
                 // `tuple[Projection_{path}(D), T]`; project it before collecting
                 // productive parts for `Projection_{path}(D)`.
-                if term.mentions_matching_projection(db, root, path)
+                if !term.is_matching_projection(db, root, path)
+                    && term.mentions_matching_projection(db, root, path)
                     && let Some(projected) =
                         ProjectionContainer::project_type_path(db, term, root, None, path)
                 {
@@ -2339,7 +2468,7 @@ impl<'db> ProjectionEquation<'db> {
                     return self.add_projection_term(db, root, path, projected);
                 }
 
-                self.add_type_term(db, root, term, true)
+                self.add_type_term(db, root, path, term, true)
             }
             ProjectionTerm::Homogeneous(term) => {
                 if term.same_divergent_marker(db, Type::Divergent(root)) {
@@ -2347,9 +2476,9 @@ impl<'db> ProjectionEquation<'db> {
                     return Some(());
                 }
 
-                self.add_type_term(db, root, term, true)
+                self.add_type_term(db, root, path, term, true)
             }
-            ProjectionTerm::List(term) => self.add_type_term(db, root, term, false),
+            ProjectionTerm::List(term) => self.add_type_term(db, root, path, term, false),
         }
     }
 
@@ -2357,12 +2486,13 @@ impl<'db> ProjectionEquation<'db> {
         &mut self,
         db: &'db dyn Db,
         root: DivergentType,
+        path: &ProjectionPath<'db>,
         term: Type<'db>,
         allow_dependencies: bool,
     ) -> Option<()> {
         if let Type::Union(union) = term {
             for element in union.elements(db) {
-                self.add_type_term(db, root, *element, allow_dependencies)?;
+                self.add_type_term(db, root, path, *element, allow_dependencies)?;
             }
             return Some(());
         }
@@ -2371,7 +2501,14 @@ impl<'db> ProjectionEquation<'db> {
             if let Type::Projection(projection) = term
                 && projection.root(db).same_marker(root)
             {
-                self.dependencies.insert(projection.path(db));
+                let dependency = projection.path(db);
+                if path.is_strict_prefix_of(&dependency) {
+                    // A strict extension of the current path cannot be closed by
+                    // adding another projection variable; widen this equation.
+                    self.divergent = true;
+                } else {
+                    self.dependencies.insert(dependency);
+                }
                 return Some(());
             }
 
@@ -2911,6 +3048,10 @@ impl<'db> ProjectionPath<'db> {
 
     fn append_path(&self, path: &Self) -> Self {
         Self::from_ops(self.ops.iter().chain(path.ops.iter()).copied())
+    }
+
+    fn is_strict_prefix_of(&self, other: &Self) -> bool {
+        self.ops.len() < other.ops.len() && other.ops.starts_with(&self.ops)
     }
 
     fn suffixes(&self) -> impl Iterator<Item = Self> + '_ {
