@@ -38,7 +38,7 @@ impl<'db> Type<'db> {
     pub(crate) fn project_type_form(self, db: &'db dyn Db) -> Type<'db> {
         struct TypeFormArgument;
         type TypeFormArgumentVisitor<'db> =
-            CycleDetector<TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
+            CycleDetector<TypeFormArgument, Type<'db>, Option<Type<'db>>>;
 
         fn project<'db>(
             db: &'db dyn Db,

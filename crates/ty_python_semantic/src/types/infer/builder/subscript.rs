@@ -64,7 +64,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
         type TypedDictKeyExpectedTypeVisitor<'db> =
-            CycleDetector<TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
+            CycleDetector<TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>>;
 
         fn imp<'db>(
             db: &'db dyn Db,

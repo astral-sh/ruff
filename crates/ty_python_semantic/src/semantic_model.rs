@@ -512,7 +512,6 @@ impl<'db> SemanticModel<'db> {
             StringLiteralCandidates,
             Type<'db>,
             Vec<ExpectedStringLiteralCompletion<'db>>,
-            3,
         >;
 
         fn collect<'db>(

@@ -714,7 +714,6 @@ pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     TypeRelation,
     (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
     ConstraintSet<'db, 'c>,
-    1,
 >;
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {

@@ -47,11 +47,8 @@ use crate::types::{
     SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap};
-use ruff_db::small_set::SmallIndexSet;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
-
-type SeenTypeAliases<'db> = SmallIndexSet<Type<'db>, 1>;
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -558,7 +555,7 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
-    fn widen_literal_types(&mut self, seen_aliases: &mut SeenTypeAliases<'db>) {
+    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
         let mut replace_with = vec![];
         for elem in &self.elements {
             match elem {
@@ -591,14 +588,10 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        self.add_in_place_impl(ty, &mut SeenTypeAliases::default());
+        self.add_in_place_impl(ty, &mut vec![]);
     }
 
-    pub(crate) fn add_in_place_impl(
-        &mut self,
-        ty: Type<'db>,
-        seen_aliases: &mut SeenTypeAliases<'db>,
-    ) {
+    pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
@@ -641,7 +634,7 @@ impl<'db> UnionBuilder<'db> {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
-                    seen_aliases.insert(ty);
+                    seen_aliases.push(ty);
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                 }
             }
@@ -907,7 +900,7 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
-    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut SeenTypeAliases<'db>) {
+    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
@@ -1129,13 +1122,13 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
-        self.add_positive_impl(ty, &mut SeenTypeAliases::default())
+        self.add_positive_impl(ty, &mut vec![])
     }
 
     pub(crate) fn add_positive_impl(
         mut self,
         ty: Type<'db>,
-        seen_aliases: &mut SeenTypeAliases<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
     ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
@@ -1146,7 +1139,7 @@ impl<'db> IntersectionBuilder<'db> {
                     }
                     return self;
                 }
-                seen_aliases.insert(ty);
+                seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
             }
@@ -1195,13 +1188,13 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_negative(self, ty: Type<'db>) -> Self {
-        self.add_negative_impl(ty, &mut SeenTypeAliases::default())
+        self.add_negative_impl(ty, &mut vec![])
     }
 
     pub(crate) fn add_negative_impl(
         mut self,
         ty: Type<'db>,
-        seen_aliases: &mut SeenTypeAliases<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
     ) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
@@ -1213,7 +1206,7 @@ impl<'db> IntersectionBuilder<'db> {
                     }
                     return self;
                 }
-                seen_aliases.insert(ty);
+                seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_negative_impl(value_type, seen_aliases)
             }

@@ -25,18 +25,18 @@ use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use ruff_db::small_set::SmallIndexSet;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
+use crate::FxIndexSet;
 use crate::types::Type;
 
-pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>, 3>;
+pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>>;
 
 impl<Tag> Default for TypeTransformer<'_, Tag> {
     fn default() -> Self {
         CycleDetector {
-            seen: RefCell::new(SmallIndexSet::default()),
+            seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
             fallback: None,
             _tag: PhantomData,
@@ -44,16 +44,14 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C, 1>;
+pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
-/// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
-/// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
-pub struct CycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
+pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
-    seen: RefCell<SmallIndexSet<T, INLINE_CAPACITY>>,
+    seen: RefCell<FxIndexSet<T>>,
 
     /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
     /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
@@ -68,10 +66,10 @@ pub struct CycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
     _tag: PhantomData<Tag>,
 }
 
-impl<Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CAPACITY> {
+impl<Tag, T, R> CycleDetector<Tag, T, R> {
     pub fn new(fallback: R) -> Self {
         CycleDetector {
-            seen: RefCell::new(SmallIndexSet::default()),
+            seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
             fallback: Some(fallback),
             _tag: PhantomData,
@@ -79,16 +77,14 @@ impl<Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CA
     }
 }
 
-impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
-    CycleDetector<Tag, T, R, INLINE_CAPACITY>
-{
-    /// Some recursive types need a notion of identity beyond `Hash` and `Eq`.
-    /// `is_semantic_cycle` provides that additional equality check.
+impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
+    /// Some recursive types cannot be evaluated for equality using simple hash values.
+    /// `is_cycle` provides a manual equality check.
     /// `on_cycle` returns the type to be used as a fallback during the cycle.
     fn visit_or_else(
         &self,
         item: T,
-        is_semantic_cycle: impl Fn(&T, &T) -> bool,
+        is_cycle: impl FnOnce(&FxIndexSet<T>, &T) -> bool,
         on_cycle: impl FnOnce(T) -> R,
         func: impl FnOnce() -> R,
     ) -> R {
@@ -96,7 +92,8 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
             return val.clone();
         }
 
-        if !self.try_enter(&item, is_semantic_cycle) {
+        // We hit a cycle
+        if is_cycle(&self.seen.borrow(), &item) || !self.seen.borrow_mut().insert(item.clone()) {
             return on_cycle(item);
         }
 
@@ -108,35 +105,24 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
         ret
     }
 
-    fn try_enter(&self, item: &T, is_semantic_cycle: impl Fn(&T, &T) -> bool) -> bool {
-        let mut seen = self.seen.borrow_mut();
-        if !seen.insert(item.clone()) {
-            return false;
-        }
-
-        // The newly inserted item is last, so only compare it with the previously active items.
-        if seen
-            .iter()
-            .take(seen.len() - 1)
-            .any(|seen_item| is_semantic_cycle(seen_item, item))
-        {
-            // Roll back the speculative insertion because this item wasn't entered.
-            let _ = seen.pop();
-            return false;
-        }
-
-        true
-    }
-
     /// For `TypeTransformer`, use `visit_type` instead.
     pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         debug_assert!(self.fallback.is_some());
-        self.visit_or_else(item, |_, _| false, |_| self.fallback.clone().unwrap(), func)
+        self.visit_or_else(
+            item,
+            FxIndexSet::contains,
+            |_| self.fallback.clone().unwrap(),
+            func,
+        )
     }
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
     fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        if left == right {
+            return true;
+        }
+
         match (left, right) {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -159,7 +145,12 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     ) -> Type<'db> {
         self.visit_or_else(
             ty,
-            |seen, ty| Self::same_type_identity(db, *seen, *ty),
+            |seen, ty| {
+                seen.contains(ty)
+                    || seen
+                        .iter()
+                        .any(|seen_type| Self::same_type_identity(db, *seen_type, *ty))
+            },
             // When a cycle is encountered, the type being visited is returned as a fallback (typically a recursive type alias).
             |item| item,
             func,
@@ -167,9 +158,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     }
 }
 
-impl<Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
-    for CycleDetector<Tag, T, R, INLINE_CAPACITY>
-{
+impl<Tag, T, R: Default> Default for CycleDetector<Tag, T, R> {
     fn default() -> Self {
         CycleDetector::new(R::default())
     }

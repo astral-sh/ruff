@@ -3086,7 +3086,7 @@ fn is_name_like_token(token: &Token) -> bool {
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
+        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
 
     fn imp<'db>(
         db: &'db dyn Db,

@@ -27,7 +27,6 @@ pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
     ast::CmpOp,
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
-    1,
 >;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

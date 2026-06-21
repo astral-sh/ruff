@@ -74,7 +74,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
         struct ContainsTypeFormValue;
         type ContainsTypeFormValueVisitor<'db> =
-            CycleDetector<ContainsTypeFormValue, Type<'db>, bool, 3>;
+            CycleDetector<ContainsTypeFormValue, Type<'db>, bool>;
 
         fn imp<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,
