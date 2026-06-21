@@ -1,4 +1,4 @@
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
 use ruff_index::{IndexVec, newtype_index};
@@ -35,22 +35,19 @@ pub(crate) struct AstIds {
 impl AstIds {
     pub(super) fn from_builders(builders: IndexVec<FileScopeId, AstIdsBuilder>) -> Self {
         let capacity = builders.iter().map(|builder| builder.uses_map.len()).sum();
-        let mut uses_map = FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher);
+        let mut uses_map = Vec::with_capacity(capacity);
 
         for builder in builders {
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "AST IDs have unique keys and are inserted independently"
-            )]
-            for (key, use_id) in builder.uses_map {
-                let previous = uses_map.insert(key, use_id);
-                debug_assert!(previous.is_none());
-            }
+            uses_map.extend(builder.uses_map);
         }
 
-        Self {
-            uses_map: FrozenMap::from(uses_map),
-        }
+        let uses_map = FrozenMap::from_entries(uses_map);
+        debug_assert!(
+            uses_map.keys().is_sorted_by(|left, right| left < right),
+            "AST ID builders must contain disjoint keys"
+        );
+
+        Self { uses_map }
     }
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
