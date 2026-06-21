@@ -344,10 +344,10 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
     }
 
     pub(crate) fn for_new_materialization_root(&self) -> Self {
-        let materialization_equivalence = OnceCell::new();
-        let was_empty =
-            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
-        debug_assert!(was_empty.is_ok());
+        let materialization_equivalence = self
+            .materialization_equivalence
+            .get()
+            .map_or_else(OnceCell::new, |visitor| OnceCell::from(Rc::clone(visitor)));
 
         Self {
             default: OnceCell::new(),
