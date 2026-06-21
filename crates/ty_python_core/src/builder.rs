@@ -269,7 +269,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
-    use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
+    // Box to avoid copying large builders when this index grows.
+    use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
@@ -503,7 +504,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
-            .push(UseDefMapBuilder::new(is_class_scope));
+            .push(Box::new(UseDefMapBuilder::new(is_class_scope)));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
@@ -2613,7 +2614,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(|builder| Arc::new((*builder).finish()))
             .collect();
 
         let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
