@@ -431,16 +431,13 @@ impl<'db> ErrorContextNode<'db> {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ErrorContextTree<'db> {
-    root: Option<Rc<RefCell<ErrorContextNode<'db>>>>,
+    root: Rc<RefCell<ErrorContextNode<'db>>>,
     enabled: Cell<bool>,
 }
 
 impl PartialEq for ErrorContextTree<'_> {
     fn eq(&self, other: &Self) -> bool {
-        match (&self.root, &other.root) {
-            (Some(left), Some(right)) => *left.borrow() == *right.borrow(),
-            _ => self.is_empty() && other.is_empty(),
-        }
+        *self.root.borrow() == *other.root.borrow()
     }
 }
 
@@ -449,27 +446,22 @@ impl Eq for ErrorContextTree<'_> {}
 impl<'db> From<ErrorContext<'db>> for ErrorContextTree<'db> {
     fn from(context: ErrorContext<'db>) -> Self {
         Self {
-            root: Some(Rc::new(RefCell::new(ErrorContextNode {
+            root: Rc::new(RefCell::new(ErrorContextNode {
                 context,
                 children: Vec::new(),
-            }))),
+            })),
             enabled: Cell::new(true),
         }
     }
 }
 
 impl<'db> ErrorContextTree<'db> {
-    /// Create a new, empty error context tree with collection disabled.
-    pub(crate) fn disabled() -> Self {
-        Self {
-            root: None,
-            enabled: Cell::new(false),
-        }
-    }
-
     /// Create a new, empty error context tree with collection enabled.
     pub(crate) fn enabled() -> Self {
-        ErrorContext::Empty.into()
+        Self {
+            root: Rc::default(),
+            enabled: Cell::new(true),
+        }
     }
 
     pub(crate) fn is_enabled(&self) -> bool {
@@ -477,15 +469,12 @@ impl<'db> ErrorContextTree<'db> {
     }
 
     pub(crate) fn set_enabled(&self, enabled: bool) {
-        debug_assert!(!enabled || self.root.is_some());
         self.enabled.set(enabled);
     }
 
     /// Returns `true` if the tree has no renderable content.
     pub(crate) fn is_empty(&self) -> bool {
-        self.root
-            .as_ref()
-            .is_none_or(|root| root.borrow().is_empty())
+        self.root.borrow().is_empty()
     }
 
     /// Push a new error context node, making the existing tree a child of the new context.
@@ -493,13 +482,10 @@ impl<'db> ErrorContextTree<'db> {
         if !self.is_enabled() {
             return;
         }
-        let Some(root_cell) = &self.root else {
-            return;
-        };
         let context = get_context();
-        let root = root_cell.take();
+        let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
-        *root_cell.borrow_mut() = ErrorContextNode { context, children };
+        *self.root.borrow_mut() = ErrorContextNode { context, children };
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
@@ -511,14 +497,11 @@ impl<'db> ErrorContextTree<'db> {
         if !self.is_enabled() {
             return;
         }
-        let Some(root) = &self.root else {
-            return;
-        };
-        *root.borrow_mut() = ErrorContextNode {
+        *self.root.borrow_mut() = ErrorContextNode {
             context,
             children: children
                 .into_iter()
-                .filter_map(|child_context| child_context.root.map(|root| root.take()))
+                .map(|child_context| child_context.root.take())
                 .filter(|child| !child.is_empty())
                 .collect(),
         };
@@ -527,10 +510,7 @@ impl<'db> ErrorContextTree<'db> {
     /// Return the full tree, replacing it with an empty tree.
     pub(crate) fn take(&self) -> Self {
         ErrorContextTree {
-            root: self
-                .root
-                .as_ref()
-                .map(|root| Rc::new(RefCell::new(std::mem::take(&mut *root.borrow_mut())))),
+            root: Rc::new(RefCell::new(std::mem::take(&mut *self.root.borrow_mut()))),
             enabled: Cell::new(self.enabled.get()),
         }
     }
@@ -541,12 +521,10 @@ impl<'db> ErrorContextTree<'db> {
         db: &'db dyn Db,
         diag: &mut LintDiagnosticGuard<'_, '_>,
     ) {
-        let Some(root) = &self.root else {
-            return;
-        };
         let mut output_lines = Vec::new();
         let mut help_messages = FxOrderSet::default();
-        root.borrow()
+        self.root
+            .borrow()
             .render_tree(db, &mut output_lines, &mut help_messages, "", "");
         for line in output_lines {
             diag.info(line);
