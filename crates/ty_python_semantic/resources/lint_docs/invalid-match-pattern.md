@@ -21,6 +21,16 @@ class Point:
 
 def describe(p: Point) -> None:
     match p:
+        # TypeError at runtime: Point() accepts 2 positional sub-patterns (3 given)
         case Point(x, y, z):  # error: [invalid-match-pattern]
             ...
+```
+
+```python
+NotAClass = 42
+
+match object():
+    # TypeError at runtime: called match pattern must be a class
+    case NotAClass():  # error: [invalid-match-pattern]
+        ...
 ```
