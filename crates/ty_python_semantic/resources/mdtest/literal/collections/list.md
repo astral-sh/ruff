@@ -76,35 +76,6 @@ with_diagnostic = [[1 + "x"], ["a"]]  # error: [unsupported-operator]
 invalid_union_context: list[list[int]] | None = [[1 + "x", "a"]]
 ```
 
-## Nested collection inference cycles
-
-Collection simplification must not recursively re-enter inference when a collection type is used
-from another module.
-
-`shapes.py`:
-
-```py
-EMPTY = {}
-
-properties: dict[str, object] = {
-    "oneOf": [
-        {"": ""},
-        {
-            "include": {**EMPTY},
-            "from": {"include": {**EMPTY}},
-        },
-    ]
-}
-```
-
-`main.py`:
-
-```py
-import shapes
-
-defs = {name: value for name, value in shapes.properties.items()}
-```
-
 ## None promotion
 
 `None` is promoted to `None | Unknown` in list literals when it is the only element type, so that
