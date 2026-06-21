@@ -47,11 +47,11 @@ use crate::types::{
     SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap};
-use ruff_db::small_index_set::SmallIndexSet;
+use ruff_db::small_set::SmallIndexSet;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
-type SeenTypeAliases<'db> = SmallIndexSet<[Type<'db>; 1]>;
+type SeenTypeAliases<'db> = SmallIndexSet<Type<'db>, 1>;
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///

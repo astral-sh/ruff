@@ -16,7 +16,7 @@ use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::small_order_set::SmallOrderSet;
+use ruff_db::small_set::SmallOrderSet;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
@@ -95,7 +95,7 @@ pub use crate::types::typevar::{
     TypeVarKind, TypeVarNonce,
 };
 
-pub(crate) type BoundTypeVarSet<'db> = SmallOrderSet<[BoundTypeVarInstance<'db>; 6]>;
+pub(crate) type BoundTypeVarSet<'db> = SmallOrderSet<BoundTypeVarInstance<'db>, 6>;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;

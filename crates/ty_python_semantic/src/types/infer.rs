@@ -45,7 +45,7 @@
 
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
-use ruff_db::small_index_set::SmallIndexSet;
+use ruff_db::small_set::SmallIndexSet;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -94,11 +94,11 @@ struct TypeAndRange<'db> {
     range: TextRange,
 }
 
-pub(super) type CollectionUseConstraintSet<'db> = SmallIndexSet<[Type<'db>; 2]>;
+pub(super) type CollectionUseConstraintSet<'db> = SmallIndexSet<Type<'db>, 2>;
 type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, CollectionUseConstraintSet<'db>>;
 
-// Two release-mode `Type`s fit without making the enum larger than `FxIndexSet`.
-#[cfg(not(debug_assertions))]
+// Two `Type`s fit without making the enum larger than `FxIndexSet` in 64-bit release builds.
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
 static_assertions::const_assert_eq!(
     std::mem::size_of::<CollectionUseConstraintSet<'static>>(),
     std::mem::size_of::<crate::FxIndexSet<Type<'static>>>()

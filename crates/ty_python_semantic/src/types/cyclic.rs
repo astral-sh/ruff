@@ -25,7 +25,7 @@ use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use ruff_db::small_index_set::SmallIndexSet;
+use ruff_db::small_set::SmallIndexSet;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
@@ -53,7 +53,7 @@ pub struct CycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
-    seen: RefCell<SmallIndexSet<[T; INLINE_CAPACITY]>>,
+    seen: RefCell<SmallIndexSet<T, INLINE_CAPACITY>>,
 
     /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
     /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
@@ -88,7 +88,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
     fn visit_or_else(
         &self,
         item: T,
-        is_cycle: impl FnOnce(&SmallIndexSet<[T; INLINE_CAPACITY]>, &T) -> bool,
+        is_cycle: impl FnOnce(&SmallIndexSet<T, INLINE_CAPACITY>, &T) -> bool,
         on_cycle: impl FnOnce(T) -> R,
         func: impl FnOnce() -> R,
     ) -> R {

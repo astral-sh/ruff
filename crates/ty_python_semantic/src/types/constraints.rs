@@ -95,7 +95,7 @@ use std::sync::Arc;
 
 use indexmap::map::Entry;
 use itertools::Itertools;
-use ruff_db::small_index_set::SmallIndexSet;
+use ruff_db::small_set::SmallIndexSet;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -3156,8 +3156,8 @@ struct InteriorNodeData {
 /// accumulated sets are collapsed into a [`ConstraintBounds`].
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
-    lower: SmallIndexSet<[Type<'db>; 3]>,
-    upper: SmallIndexSet<[Type<'db>; 3]>,
+    lower: SmallIndexSet<Type<'db>, 3>,
+    upper: SmallIndexSet<Type<'db>, 3>,
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
@@ -4720,20 +4720,20 @@ struct SequentMap {
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
     pair_implications:
-        FxIndexMap<(ConstraintId, ConstraintId), SmallIndexSet<[DerivedConstraint; 2]>>,
+        FxIndexMap<(ConstraintId, ConstraintId), SmallIndexSet<DerivedConstraint, 2>>,
     /// Sequents of the form `C → D`
-    single_implications: FxIndexMap<ConstraintId, SmallIndexSet<[ConstraintId; 10]>>,
+    single_implications: FxIndexMap<ConstraintId, SmallIndexSet<ConstraintId, 10>>,
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
 static_assertions::const_assert_eq!(
-    std::mem::size_of::<SmallIndexSet<[DerivedConstraint; 2]>>(),
+    std::mem::size_of::<SmallIndexSet<DerivedConstraint, 2>>(),
     std::mem::size_of::<FxIndexSet<DerivedConstraint>>()
 );
 
-#[cfg(not(debug_assertions))]
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
 static_assertions::const_assert_eq!(
-    std::mem::size_of::<SmallIndexSet<[ConstraintId; 10]>>(),
+    std::mem::size_of::<SmallIndexSet<ConstraintId, 10>>(),
     std::mem::size_of::<FxIndexSet<ConstraintId>>()
 );
 

@@ -1,5 +1,5 @@
 use itertools::Either;
-use ruff_db::small_order_set::SmallOrderSet;
+use ruff_db::small_set::SmallOrderSet;
 
 use std::convert::Infallible;
 
@@ -16,9 +16,9 @@ pub(crate) mod builder;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
-pub(crate) type IntersectionElementSet<'db> = SmallOrderSet<[Type<'db>; 2]>;
+pub(crate) type IntersectionElementSet<'db> = SmallOrderSet<Type<'db>, 2>;
 
-#[cfg(not(debug_assertions))]
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
 static_assertions::const_assert_eq!(
     std::mem::size_of::<IntersectionElementSet<'static>>(),
     std::mem::size_of::<crate::FxOrderSet<Type<'static>>>()
@@ -466,7 +466,7 @@ pub struct IntersectionType<'db> {
     pub(crate) negative: NegativeIntersectionElements<'db>,
 }
 
-pub type NegativeIntersectionElements<'db> = SmallOrderSet<[Type<'db>; 2]>;
+pub type NegativeIntersectionElements<'db> = SmallOrderSet<Type<'db>, 2>;
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}

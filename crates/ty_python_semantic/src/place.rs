@@ -1,7 +1,6 @@
 use itertools::Either;
 use ruff_db::files::File;
-use ruff_db::small_index_set::SmallIndexSet;
-use ruff_db::small_order_set::SmallOrderSet;
+use ruff_db::small_set::{SmallIndexSet, SmallOrderSet};
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
@@ -1424,13 +1423,13 @@ fn loop_header_reachability_impl<'db>(
 pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable loop-back bindings that are not `del`s.
-    pub(crate) reachable_bindings: SmallIndexSet<[ReachableLoopBinding<'db>; 3]>,
+    pub(crate) reachable_bindings: SmallIndexSet<ReachableLoopBinding<'db>, 3>,
 }
 
-// Three release-mode bindings fit without making the enum larger than `FxIndexSet`.
-#[cfg(not(debug_assertions))]
+// Three bindings fit without making the enum larger than `FxIndexSet` in 64-bit release builds.
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
 static_assertions::const_assert_eq!(
-    std::mem::size_of::<SmallIndexSet<[ReachableLoopBinding<'static>; 3]>>(),
+    std::mem::size_of::<SmallIndexSet<ReachableLoopBinding<'static>, 3>>(),
     std::mem::size_of::<crate::FxIndexSet<ReachableLoopBinding<'static>>>()
 );
 
@@ -1796,7 +1795,7 @@ struct DeclaredTypeBuilder<'db> {
     inner: PublicTypeBuilder<'db>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
-    conflicting_types: SmallOrderSet<[Type<'db>; 3]>,
+    conflicting_types: SmallOrderSet<Type<'db>, 3>,
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
