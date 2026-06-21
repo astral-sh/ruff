@@ -65,6 +65,7 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_too_many_match_arguments,
     report_too_many_positional_patterns_for_callable_class_pattern,
     report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
@@ -2464,6 +2465,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &*pattern.cls,
                     protocol_class,
                 );
+            }
+
+            // compare number of pattern arguments to the number of arguments that can be accepted via __match_args__
+            let positional_count = pattern.arguments.patterns.len();
+            if positional_count > 0 {
+                let member =
+                    class.class_member(self.db(), "__match_args__", MemberLookupPolicy::default());
+                if let Some(match_args_len) = match member.ignore_possibly_undefined() {
+                    Some(Type::NominalInstance(nominal)) => {
+                        if let Some(len) = nominal
+                            .tuple_spec(self.db())
+                            .and_then(|spec| spec.len().into_fixed_length())
+                        {
+                            Some(len)
+                        } else if nominal
+                            .class(self.db())
+                            .is_known(self.db(), KnownClass::Str)
+                        {
+                            Some(1)
+                        } else {
+                            None
+                        }
+                    }
+                    Some(Type::KnownInstance(known))
+                        if known.class(self.db()) == KnownClass::Str =>
+                    {
+                        Some(1)
+                    }
+                    Some(Type::LiteralValue(literal))
+                        if literal.is_string() || literal.is_literal_string() =>
+                    {
+                        Some(1)
+                    }
+                    _ => None,
+                } {
+                    if positional_count > match_args_len {
+                        report_too_many_match_arguments(
+                            &self.context,
+                            &pattern.arguments.patterns[match_args_len],
+                            match_args_len,
+                            positional_count,
+                        );
+                    }
+                }
             }
         } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
