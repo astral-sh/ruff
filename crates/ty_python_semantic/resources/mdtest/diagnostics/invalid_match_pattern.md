@@ -114,10 +114,6 @@ class NoMatch:
     x: int
     y: int
 
-# __match_args__ is not synthesized, so positional patterns
-# in a class pattern will fail — but this is a different error
-# (no __match_args__ means the class pattern won't match).
-# This test just verifies no false positive for invalid-match-pattern.
 def describe(n: NoMatch) -> None:
     match n:
         case NoMatch(x, y):
