@@ -577,17 +577,12 @@ impl<'db> IntersectionType<'db> {
 
         let negative = if nested {
             self.negative(db)
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
-                .collect::<Option<NegativeIntersectionElements<'db>>>()?
+                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
         } else {
-            self.negative(db)
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, nested)
-                        .unwrap_or(div)
-                })
-                .collect()
+            self.negative(db).map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, nested)
+                    .unwrap_or(div)
+            })
         };
 
         Some(IntersectionType::new(db, positive, negative))

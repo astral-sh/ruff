@@ -82,13 +82,13 @@ impl<Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CA
 impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
     CycleDetector<Tag, T, R, INLINE_CAPACITY>
 {
-    /// Some recursive types cannot be evaluated for equality using simple hash values.
-    /// `is_cycle` provides a manual equality check.
+    /// Some recursive types need a notion of identity beyond `Hash` and `Eq`.
+    /// `is_semantic_cycle` provides that additional equality check.
     /// `on_cycle` returns the type to be used as a fallback during the cycle.
     fn visit_or_else(
         &self,
         item: T,
-        is_cycle: impl FnOnce(&SmallIndexSet<T, INLINE_CAPACITY>, &T) -> bool,
+        is_semantic_cycle: impl Fn(&T, &T) -> bool,
         on_cycle: impl FnOnce(T) -> R,
         func: impl FnOnce() -> R,
     ) -> R {
@@ -96,8 +96,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
             return val.clone();
         }
 
-        // We hit a cycle
-        if is_cycle(&self.seen.borrow(), &item) || !self.seen.borrow_mut().insert(item.clone()) {
+        if !self.try_enter(&item, is_semantic_cycle) {
             return on_cycle(item);
         }
 
@@ -109,24 +108,35 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
         ret
     }
 
+    fn try_enter(&self, item: &T, is_semantic_cycle: impl Fn(&T, &T) -> bool) -> bool {
+        let mut seen = self.seen.borrow_mut();
+        if !seen.insert(item.clone()) {
+            return false;
+        }
+
+        // The newly inserted item is last, so only compare it with the previously active items.
+        if seen
+            .iter()
+            .take(seen.len() - 1)
+            .any(|seen_item| is_semantic_cycle(seen_item, item))
+        {
+            // Roll back the speculative insertion because this item wasn't entered.
+            let _ = seen.pop();
+            return false;
+        }
+
+        true
+    }
+
     /// For `TypeTransformer`, use `visit_type` instead.
     pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         debug_assert!(self.fallback.is_some());
-        self.visit_or_else(
-            item,
-            SmallIndexSet::contains,
-            |_| self.fallback.clone().unwrap(),
-            func,
-        )
+        self.visit_or_else(item, |_, _| false, |_| self.fallback.clone().unwrap(), func)
     }
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
     fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-        if left == right {
-            return true;
-        }
-
         match (left, right) {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -149,12 +159,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     ) -> Type<'db> {
         self.visit_or_else(
             ty,
-            |seen, ty| {
-                seen.contains(ty)
-                    || seen
-                        .iter()
-                        .any(|seen_type| Self::same_type_identity(db, *seen_type, *ty))
-            },
+            |seen, ty| Self::same_type_identity(db, *seen, *ty),
             // When a cycle is encountered, the type being visited is returned as a fallback (typically a recursive type alias).
             |item| item,
             func,

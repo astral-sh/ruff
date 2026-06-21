@@ -61,6 +61,26 @@ impl<T, const N: usize> SmallOrderSet<T, N> {
         self.0.insert(value)
     }
 
+    /// Transforms all elements, preserving insertion order.
+    ///
+    /// If multiple elements map to the same value, only the first is retained.
+    pub fn map(&self, map: impl FnMut(&T) -> T) -> Self
+    where
+        T: Hash + Eq,
+    {
+        Self(self.0.map(map))
+    }
+
+    /// Transforms all elements, returning `None` if the transformation fails.
+    ///
+    /// If multiple elements map to the same value, only the first is retained.
+    pub fn try_map(&self, map: impl FnMut(&T) -> Option<T>) -> Option<Self>
+    where
+        T: Hash + Eq,
+    {
+        self.0.try_map(map).map(Self)
+    }
+
     /// Removes `value` by swapping the last element into its place.
     ///
     /// Returns `true` if the value was present.
@@ -247,6 +267,21 @@ mod tests {
         let mut set = SmallOrderSet::<u32, 3>::new();
         set.extend(&[2, 1, 2]);
         assert_eq!(set.iter().copied().collect::<Vec<_>>(), [2, 1]);
+    }
+
+    #[test]
+    fn maps_elements() {
+        let inline = [1, 2].into_iter().collect::<SmallOrderSet<_, 2>>();
+        let mapped = inline.map(|_| 0);
+        assert_eq!(mapped.iter().copied().collect::<Vec<_>>(), [0]);
+        assert_eq!(
+            inline.try_map(|value| (*value != 2).then_some(*value)),
+            None
+        );
+
+        let spilled = [1, 2, 3].into_iter().collect::<SmallOrderSet<_, 2>>();
+        let mapped = spilled.map(|value| value % 2);
+        assert_eq!(mapped.iter().copied().collect::<Vec<_>>(), [1, 0]);
     }
 
     #[test]

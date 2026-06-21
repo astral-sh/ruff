@@ -80,7 +80,7 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
         T: Hash + Eq,
     {
         match &mut self.storage {
-            Storage::Spilled(spilled) => return spilled.insert(value),
+            Storage::Spilled(spilled) => spilled.insert(value),
             Storage::Inline(inline) => {
                 if inline.as_slice().contains(&value) {
                     return false;
@@ -94,6 +94,30 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
                 true
             }
         }
+    }
+
+    pub(super) fn map(&self, map: impl FnMut(&T) -> T) -> Self
+    where
+        T: Hash + Eq,
+    {
+        let storage = match &self.storage {
+            Storage::Inline(inline) => Storage::Inline(inline.map(map)),
+            Storage::Spilled(spilled) => Storage::Spilled(spilled.iter().map(map).collect()),
+        };
+        Self { storage }
+    }
+
+    pub(super) fn try_map(&self, map: impl FnMut(&T) -> Option<T>) -> Option<Self>
+    where
+        T: Hash + Eq,
+    {
+        let storage = match &self.storage {
+            Storage::Inline(inline) => Storage::Inline(inline.try_map(map)?),
+            Storage::Spilled(spilled) => {
+                Storage::Spilled(spilled.iter().map(map).collect::<Option<_>>()?)
+            }
+        };
+        Some(Self { storage })
     }
 
     /// Removes and returns the last element.
@@ -488,6 +512,34 @@ impl<T, const N: usize> Inline<T, N> {
         self.set_len(new_len);
         // SAFETY: The old last element was initialized and is no longer covered by `len`.
         Some(unsafe { self.as_mut_ptr().add(new_len).read() })
+    }
+
+    fn map(&self, mut map: impl FnMut(&T) -> T) -> Self
+    where
+        T: Eq,
+    {
+        let mut mapped = Self::new();
+        for value in self.as_slice() {
+            let value = map(value);
+            if !mapped.as_slice().contains(&value) {
+                mapped.push(value);
+            }
+        }
+        mapped
+    }
+
+    fn try_map(&self, mut map: impl FnMut(&T) -> Option<T>) -> Option<Self>
+    where
+        T: Eq,
+    {
+        let mut mapped = Self::new();
+        for value in self.as_slice() {
+            let value = map(value)?;
+            if !mapped.as_slice().contains(&value) {
+                mapped.push(value);
+            }
+        }
+        Some(mapped)
     }
 
     fn retain(&mut self, mut keep: impl FnMut(&T) -> bool) {
