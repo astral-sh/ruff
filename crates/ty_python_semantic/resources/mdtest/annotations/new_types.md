@@ -671,6 +671,57 @@ def f(x: N):
             reveal_type(x)  # revealed: N
 ```
 
+## `is` narrowing treats a `NewType` as its base, but `==` narrowing leaves it alone
+
+A `NewType` is an identity function at runtime (`NewType("N", Base)(x) is x`), so a `NewType`
+instance shares all of its base type's inhabitants. Two `NewType`s over the same base are therefore
+not disjoint, and an `is` comparison between them can succeed at runtime, so it must not narrow to
+`Never`:
+
+```py
+from typing import NewType, Literal
+
+class C: ...
+
+A = NewType("A", C)
+B = NewType("B", C)
+
+def share(a: A, b: B) -> None:
+    if a is b:
+        reveal_type(a)  # revealed: A & B
+
+NI = NewType("NI", int)
+
+def newtype_vs_literal(n: NI) -> None:
+    if n is 5:
+        reveal_type(n)  # revealed: NI & Literal[5]
+```
+
+But the bases still drive disjointness, so genuinely disjoint `NewType`s narrow to `Never` as
+before:
+
+```py
+def disjoint(n: NI, s: str) -> None:
+    if n is s:
+        reveal_type(n)  # revealed: Never
+```
+
+Value-equality (`==`, and `match` value patterns) deliberately does *not* narrow a `NewType`
+subject: we keep the `NewType` brand rather than narrowing it down to a member of its base. Type
+aliases to a `NewType` are treated the same way:
+
+```py
+def eq(n: NI) -> None:
+    if n == 5:
+        reveal_type(n)  # revealed: NI
+
+AliasNI = NI
+
+def eq_through_alias(n: AliasNI) -> None:
+    if n == 5:
+        reveal_type(n)  # revealed: NI
+```
+
 ## The base of a `NewType` can't be a protocol class or a `TypedDict`
 
 ```py

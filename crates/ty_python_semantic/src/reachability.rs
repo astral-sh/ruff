@@ -203,7 +203,8 @@ use crate::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
         enum_metadata, equality_truthiness, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        infer_same_file_expression_type, mapping_pattern_type,
+        narrow::is_brand_preserving_newtype_subject, sequence_pattern_type_builder,
         singleton_pattern_type,
     },
 };
@@ -475,7 +476,14 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
+    // Previous value/enum-member patterns do not exhaust a `NewType` subject, so a trailing
+    // `case _:` stays reachable as the `NewType` rather than `Never`. Companion to the value-
+    // equality guard in `narrow.rs`; see `is_brand_preserving_newtype_subject`.
+    let narrowed_subject_ty = if is_brand_preserving_newtype_subject(db, subject_ty) {
+        subject_ty
+    } else {
+        type_narrowed_by_previous_patterns(db, predicate, subject_ty)
+    };
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed

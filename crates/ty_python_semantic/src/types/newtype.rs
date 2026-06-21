@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::types::constraints::ConstraintSet;
-use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -227,16 +227,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: NewType<'db>,
         right: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
-        // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
-        // it's not possible for some third type to multiply-inherit from both.
-        let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
-        relation_checker
-            .check_newtype_pair(db, left, right)
-            .or(db, self.constraints, || {
-                relation_checker.check_newtype_pair(db, right, left)
-            })
-            .negate(db, self.constraints)
+        // Two `NewType`s are disjoint exactly when their concrete bases are: each shares its base's
+        // inhabitants, so distinct `NewType`s over the same base still overlap and `a is b` can
+        // hold. Mirrors the mixed `(NewType, other)` arm.
+        self.check_type_pair(
+            db,
+            left.concrete_base_type(db),
+            right.concrete_base_type(db),
+        )
     }
 }
 
