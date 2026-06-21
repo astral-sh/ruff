@@ -65,9 +65,9 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_match_arguments,
     report_too_many_positional_patterns_for_callable_class_pattern,
-    report_unsupported_augmented_assignment, report_unsupported_comparison,
+    report_too_many_positional_patterns_for_match_args, report_unsupported_augmented_assignment,
+    report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -2500,7 +2500,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => None,
                 } {
                     if positional_count > match_args_len {
-                        report_too_many_match_arguments(
+                        report_too_many_positional_patterns_for_match_args(
                             &self.context,
                             &pattern.arguments.patterns[match_args_len],
                             match_args_len,

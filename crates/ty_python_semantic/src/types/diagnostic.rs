@@ -2503,7 +2503,7 @@ pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: 
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_match_arguments<T: Ranged>(
+pub(crate) fn report_too_many_positional_patterns_for_match_args<T: Ranged>(
     context: &InferContext,
     excess_range: T,
     match_args_len: usize,
