@@ -2467,7 +2467,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
 
-            // compare number of pattern arguments to the number of arguments that can be accepted via __match_args__
             let positional_count = pattern.arguments.patterns.len();
             if positional_count > 0 {
                 let member =
@@ -2506,6 +2505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &pattern.arguments.patterns[match_args_len],
                             match_args_len,
                             positional_count,
+                            cls_ty,
                         );
                     }
                 }

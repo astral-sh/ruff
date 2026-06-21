@@ -2503,25 +2503,19 @@ pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: 
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_match_arguments(
+pub(crate) fn report_too_many_match_arguments<T: Ranged>(
     context: &InferContext,
-    excess_range: impl Ranged,
+    excess_range: T,
     match_args_len: usize,
     positional_count: usize,
+    cls_ty: Type,
 ) {
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, excess_range) else {
         return;
     };
+    let class_display = cls_ty.display(context.db());
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Too many positional sub-patterns: `__match_args__` has \
-         {match_args_len} field{match_args_plural}, \
-         but {positional_count} positional sub-pattern{match_positional_plural} were given",
-        match_args_plural = if match_args_len == 1 { "" } else { "s" },
-        match_positional_plural = if positional_count == 1 {
-            " was"
-        } else {
-            "s were"
-        },
+        "Too many positional subpatterns for `{class_display}`: expected {match_args_len}, got {positional_count}"
     ));
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
