@@ -1930,6 +1930,27 @@ class ProjectionForLoopAttributeNestedIterableBridge:
         reveal_type(self.y)  # revealed: list[str] | list[int | str]
 ```
 
+Recursive loop inference can involve multiple local containers that feed each other through
+unpacking, subscripting, and append operations. This should still terminate.
+
+```py
+def projection_for_loop_recursive_orbit_transversal(degree, generators, alpha):
+    tr = [(alpha, list(range(degree)))]
+    slp_dict = {alpha: []}
+    used = [False] * degree
+    used[alpha] = True
+    gens = [generator._array_form for generator in generators]
+    for x, px in tr:
+        px_slp = slp_dict[x]
+        for gen in gens:
+            temp = gen[x]
+            if used[temp] == False:
+                slp_dict[temp] = [gens.index(gen)] + px_slp
+                tr.append((temp, px))
+                used[temp] = True
+    return tr, slp_dict
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the

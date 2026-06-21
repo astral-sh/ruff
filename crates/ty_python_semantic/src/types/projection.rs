@@ -447,13 +447,12 @@ impl<'db> Type<'db> {
 
         for element in elements {
             let term = if element.mentions_cycle_artifact_in_roots(db, &root_set) {
-                roots
-                    .iter()
-                    .find_map(|root| {
-                        let container = ProjectionContainer::try_from(db, *root, element, None)?;
-                        container.project_multi_root_path(db, *root, None, &path)
-                    })
-                    .or_else(|| project(element))?
+                // Recursive arms must replay structurally. Re-running the full operation can
+                // re-enter projection construction with the same recursive element.
+                roots.iter().find_map(|root| {
+                    let container = ProjectionContainer::try_from(db, *root, element, None)?;
+                    container.project_multi_root_path(db, *root, None, &path)
+                })?
             } else {
                 project(element)?
             };
