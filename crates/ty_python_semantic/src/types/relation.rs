@@ -345,7 +345,7 @@ impl<'db> Type<'db> {
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: ErrorContextTree::disabled(),
+            context_tree: None,
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -382,7 +382,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: ErrorContextTree::enabled(),
+            context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -390,7 +390,7 @@ impl<'db> Type<'db> {
             materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
         checker.check_type_pair(db, self, target);
-        checker.context_tree
+        checker.into_error_context()
     }
 
     /// Return true if this type is assignable to type `target` using constraint-set typevar rules.
@@ -586,7 +586,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             typevar_evaluation,
-            context_tree: ErrorContextTree::disabled(),
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -714,6 +714,7 @@ pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     TypeRelation,
     (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
     ConstraintSet<'db, 'c>,
+    1,
 >;
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
@@ -740,7 +741,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
-    context_tree: ErrorContextTree<'db>,
+    context_tree: Option<ErrorContextTree<'db>>,
     pub(super) given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -769,7 +770,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: ErrorContextTree::disabled(),
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -790,7 +791,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
-            context_tree: ErrorContextTree::disabled(),
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -811,7 +812,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
-            context_tree: ErrorContextTree::enabled(),
+            context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -832,7 +833,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: ErrorContextTree::enabled(),
+            context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -853,8 +854,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
     }
 
+    /// Return the collected error context, or an empty tree if collection was disabled.
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
-        self.context_tree
+        self.context_tree.unwrap_or_else(ErrorContextTree::new)
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
@@ -867,7 +869,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     /// Provide context about a failing (assignability) relation between two types.
     pub(super) fn provide_context(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
-        self.context_tree.push(get_context);
+        if let Some(context_tree) = &self.context_tree {
+            context_tree.push(get_context);
+        }
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
@@ -876,12 +880,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         root: ErrorContext<'db>,
         children: impl IntoIterator<Item = ErrorContextTree<'db>>,
     ) {
-        self.context_tree.set(root, children);
+        if let Some(context_tree) = &self.context_tree {
+            context_tree.set(root, children);
+        }
     }
 
     /// Return true if error context collection is currently enabled.
     pub(super) fn is_context_collection_enabled(&self) -> bool {
-        self.context_tree.is_enabled()
+        self.context_tree
+            .as_ref()
+            .is_some_and(ErrorContextTree::is_enabled)
     }
 
     /// Temporarily suppress error context collection for the duration of `f`.
@@ -889,10 +897,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// Note: we may eventually not need this method once we properly retain error
     /// context everywhere.
     pub(super) fn without_context_collection<R>(&self, f: impl FnOnce() -> R) -> R {
-        let was_enabled = self.context_tree.is_enabled();
-        self.context_tree.set_enabled(false);
+        let Some(context_tree) = &self.context_tree else {
+            return f();
+        };
+        let was_enabled = context_tree.is_enabled();
+        context_tree.set_enabled(false);
         let result = f();
-        self.context_tree.set_enabled(was_enabled);
+        context_tree.set_enabled(was_enabled);
         result
     }
 
@@ -1095,7 +1106,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
-        let result = match (source, target) {
+        match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -1117,6 +1128,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+            }
+
+            // Instances of classes that inherit from an explicit `Any` base retain their nominal
+            // identity and precise members, but have the same assignability as `Any`.
+            (Type::NominalInstance(source), _)
+                if self.relation.is_assignability() && source.inherits_from_explicit_any() =>
+            {
+                self.always()
             }
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
@@ -1540,15 +1559,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 };
 
                 let mut elements_context = vec![];
-                let context_collection_enabled = self.is_context_collection_enabled();
+                let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
 
                 let elements = union.elements(db);
                 let result = elements
                     .iter()
                     .when_any(db, self.constraints, |&elem_ty| {
                         let result = self.check_type_pair(db, source, elem_ty);
-                        if context_collection_enabled {
-                            let ctx = self.context_tree.take();
+                        if let Some(context_tree) = context_tree {
+                            let ctx = context_tree.take();
                             if !ctx.is_empty() {
                                 elements_context.push(ctx);
                             }
@@ -1557,7 +1576,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
                     .or(db, self.constraints, is_new_type_of_union);
 
-                if context_collection_enabled
+                if context_tree.is_some()
                     && !elements_context.is_empty()
                     && result.is_never_satisfied(db)
                 {
@@ -1647,14 +1666,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // `object & ~str`).
 
                 let mut elements_context = vec![];
-                let context_collection_enabled = self.is_context_collection_enabled();
+                let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
 
                 let result = intersection
                     .positive_elements_or_object(db)
                     .when_any(db, self.constraints, |elem_ty| {
                         let result = self.check_type_pair(db, elem_ty, target);
-                        if context_collection_enabled {
-                            let ctx = self.context_tree.take();
+                        if let Some(context_tree) = context_tree {
+                            let ctx = context_tree.take();
                             if !ctx.is_empty() {
                                 elements_context.push(ctx);
                             }
@@ -1673,7 +1692,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         }
                     });
 
-                if context_collection_enabled
+                if context_tree.is_some()
                     && !elements_context.is_empty()
                     && result.is_never_satisfied(db)
                 {
@@ -2206,25 +2225,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
             (Type::NominalInstance(_), _) => self.never(),
-        };
-
-        // A nominal instance that inherits from an explicit `Any` base is assignable to any type.
-        // Nominal targets already handle `ClassBase::Any` while walking the source MRO, so only
-        // check failed relations to non-nominal targets here.
-        if !result.is_always_satisfied(db)
-            && let Type::NominalInstance(source) = source
-            && !matches!(target, Type::NominalInstance(_))
-            && self.relation.is_assignability()
-            && let class = source.class(db).class_literal(db)
-            && class.has_explicit_bases(db)
-            && class.inherits_from_any(db)
-        {
-            // Discard error context from the failed relation that this fallback overrides.
-            self.context_tree.take();
-            return self.always();
         }
-
-        result
     }
 
     pub(super) fn check_property_instance_pair(
@@ -2335,7 +2336,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             relation: TypeRelation::Redundancy { pure: true },
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
-            context_tree: ErrorContextTree::disabled(),
+            context_tree: None,
             given: self.given,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
@@ -2421,7 +2422,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
             inferable: self.inferable,
-            context_tree: ErrorContextTree::disabled(),
+            context_tree: None,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,

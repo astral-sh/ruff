@@ -4,6 +4,7 @@ use std::rc::Rc;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::{
     Db, TypeQualifiers,
@@ -354,12 +355,14 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
+        type SeenTypeAliases<'db> = SmallVec<[TypeAliasType<'db>; 1]>;
+
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
             db: &'db dyn Db,
             visitor: &'a TypeVarDefaultVisitor<'db>,
             seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &'a RefCell<FxHashSet<TypeAliasType<'db>>>,
+            seen_type_aliases: &'a RefCell<SeenTypeAliases<'db>>,
         }
 
         fn typevar_default_is_self_referential<'db>(
@@ -387,8 +390,12 @@ impl<'db> TypeVarInstance<'db> {
             type_alias: TypeAliasType<'db>,
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
-            if !state.seen_type_aliases.borrow_mut().insert(type_alias) {
-                return false;
+            {
+                let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
+                if seen_type_aliases.contains(&type_alias) {
+                    return false;
+                }
+                seen_type_aliases.push(type_alias);
             }
 
             let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
@@ -442,7 +449,7 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let seen_typevars = RefCell::new(FxHashSet::default());
-        let seen_type_aliases = RefCell::new(FxHashSet::default());
+        let seen_type_aliases = RefCell::new(SeenTypeAliases::new());
 
         let state = State {
             db,
@@ -1736,6 +1743,5 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>>;
-
+    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
 pub(crate) struct VisitTypeVarDefault;
