@@ -2166,11 +2166,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | def my_func(command: str):
-        3 |     match command.split():
+          |
         4 |         case ["get", ab]:
           -             x = ab
         5 +             x: str = ab
+          |
         "#);
     }
 
@@ -2222,11 +2222,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | def my_func(command: str):
-        3 |     match command.split():
+          |
         4 |         case ["get", *ab]:
           -             x = ab
         5 +             x: list[str] = ab
+          |
         "#);
     }
 
@@ -2265,11 +2265,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | def my_func(command: str):
-        3 |     match command.split():
+          |
         4 |         case ["get", ("a" | "b") as ab]:
           -             x = ab
         5 +             x: str = ab
+          |
         "#);
     }
 
@@ -2320,16 +2320,14 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+           |
         1  + from ty_extensions import Unknown
         2  |
-        3  | class Click:
-        4  |     __match_args__ = ("position", "button")
         --------------------------------------------------------------------------------
-        9  | def my_func(event: Click):
-        10 |     match event:
         11 |         case Click(x, button=ab):
            -             x = ab
         12 +             x: Unknown = ab
+           |
         "#);
     }
 
