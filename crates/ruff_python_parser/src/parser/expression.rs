@@ -934,6 +934,8 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rpar);
 
+        keywords.shrink_to_fit();
+
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
