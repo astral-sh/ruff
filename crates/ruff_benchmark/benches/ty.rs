@@ -426,6 +426,103 @@ fn benchmark_tuple_implicit_instance_attributes(criterion: &mut Criterion) {
     });
 }
 
+fn projection_wrap(value: &str, depth: usize) -> String {
+    let mut wrapped = value.to_string();
+    for _ in 0..depth {
+        wrapped = format!("[{wrapped}]");
+    }
+    wrapped
+}
+
+fn projection_path(value: &str, depth: usize) -> String {
+    format!("{value}{}", "[0]".repeat(depth))
+}
+
+fn projection_deep_path_code(depth: usize) -> String {
+    let mut code = String::new();
+    writeln!(code, "class ProjectionDeepPath:").unwrap();
+    writeln!(code, "    def __init__(self) -> None:").unwrap();
+    writeln!(code, "        self.x = {}", projection_wrap("0", depth)).unwrap();
+    writeln!(code).unwrap();
+    writeln!(code, "    def f(self) -> None:").unwrap();
+    writeln!(code, "        x = {}", projection_path("self.x", depth)).unwrap();
+    writeln!(code, "        x += 1").unwrap();
+    writeln!(code, "        self.x = {}", projection_wrap("x", depth)).unwrap();
+    code
+}
+
+fn projection_many_roots_code(roots: usize, depth: usize) -> String {
+    let mut code = String::new();
+    writeln!(code, "class ProjectionManyRoots:").unwrap();
+    writeln!(code, "    def __init__(self) -> None:").unwrap();
+    for index in 0..roots {
+        writeln!(
+            code,
+            "        self.x{index} = {}",
+            projection_wrap(&index.to_string(), depth)
+        )
+        .unwrap();
+    }
+    writeln!(code).unwrap();
+    writeln!(code, "    def f(self) -> None:").unwrap();
+    write!(code, "        roots = (").unwrap();
+    for index in 0..roots {
+        write!(code, "self.x{index}, ").unwrap();
+    }
+    writeln!(code, ")").unwrap();
+    for index in 0..roots {
+        let source = (index + 1) % roots;
+        writeln!(
+            code,
+            "        y{index} = {}",
+            projection_path(&format!("roots[{source}]"), depth)
+        )
+        .unwrap();
+    }
+    for index in 0..roots {
+        writeln!(
+            code,
+            "        self.x{index} = {}",
+            projection_wrap(&format!("y{index}"), depth)
+        )
+        .unwrap();
+    }
+    code
+}
+
+fn benchmark_projection_stress(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut group = criterion.benchmark_group("ty_projection");
+    group.sample_size(10);
+
+    group.bench_function("deep_path", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&projection_deep_path_code(16)),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("many_roots", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&projection_many_roots_code(16, 4)),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.finish();
+}
+
 fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -1525,5 +1622,6 @@ criterion_group!(
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
 );
+criterion_group!(projection, benchmark_projection_stress);
 criterion_group!(project, anyio, attrs, hydra, datetype);
-criterion_main!(check_file, micro, project);
+criterion_main!(check_file, micro, projection, project);

@@ -1693,35 +1693,6 @@ impl<'db> ProjectionContainer<'db> {
         Some(ty)
     }
 
-    fn infer_projection_path(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        path: &ProjectionPath<'db>,
-    ) -> Option<ProjectionTerm<'db>> {
-        if let Type::Union(union) = ty {
-            let terms = union
-                .elements(db)
-                .iter()
-                .map(|element| Self::infer_projection_path(db, *element, path))
-                .collect::<Option<Vec<_>>>()?;
-            return ProjectionTerm::from_union_terms(db, &terms);
-        }
-
-        let ops = path.ops();
-        let (&op, tail) = ops.split_first()?;
-
-        let projected = Self::infer_projection_op(db, ty, op)?;
-        if tail.is_empty() {
-            return Some(projected);
-        }
-
-        Self::infer_projection_path(
-            db,
-            projected.ty(db),
-            &ProjectionPath::from_ops(tail.iter().copied()),
-        )
-    }
-
     fn infer_projection_op(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -2632,41 +2603,99 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
     fn extend_from_types(&mut self, db: &'db dyn Db, types: impl IntoIterator<Item = Type<'db>>) {
         for ty in types {
             let demands = ty.projection_demands(db);
-            if demands.is_empty() {
-                continue;
+            for (root, path) in demands {
+                self.record_projection_path(db, root, ty, &path);
             }
+        }
+    }
 
-            let generic_containers = ProjectionEvidenceSet::generic_containers(db, ty);
-            for container_fact in generic_containers {
-                let arm = container_fact.arm;
-                let mut has_projection_fact = false;
-                for (root, path) in &demands {
-                    if arm.same_divergent_marker(db, Type::Divergent(*root)) {
-                        continue;
-                    }
-
-                    for suffix in path.suffixes() {
-                        let Some(term) =
-                            ProjectionContainer::infer_projection_path(db, arm, &suffix)
-                        else {
-                            continue;
-                        };
-                        if term.is_ambiguous(db) {
-                            continue;
-                        }
-                        has_projection_fact = true;
-                        self.push_projection_fact(ProjectionEvidenceFact {
-                            root: *root,
-                            arm,
-                            path: suffix,
-                            term,
-                        });
-                    }
-                }
-                if has_projection_fact {
-                    self.push_container_fact(container_fact);
+    fn record_projection_path(
+        &mut self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        ty: Type<'db>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Type::Union(union) = ty {
+            let mut terms = Vec::new();
+            let mut all_arms_projected = true;
+            for element in union.elements(db) {
+                if let Some(term) = self.record_projection_path(db, root, *element, path) {
+                    terms.push(term);
+                } else {
+                    all_arms_projected = false;
                 }
             }
+
+            // Evidence remains useful for arms that projected successfully; the union result is
+            // valid only when every arm supports the operation.
+            return all_arms_projected
+                .then(|| ProjectionTerm::from_union_terms(db, &terms))
+                .flatten();
+        }
+
+        let ops = path.ops();
+        let (&op, tail) = ops.split_first()?;
+        let projected = ProjectionContainer::infer_projection_op(db, ty, op)?;
+        let term = if tail.is_empty() {
+            projected
+        } else {
+            self.record_projection_term_path(db, root, projected, tail)?
+        };
+
+        self.record_inferred_projection_fact(db, root, ty, path, term);
+        Some(term)
+    }
+
+    // Follow the demanded path once and record generic containers encountered along it. This
+    // avoids trying every suffix of every nested container.
+    fn record_projection_term_path(
+        &mut self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        term: ProjectionTerm<'db>,
+        path: &[ProjectionOp<'db>],
+    ) -> Option<ProjectionTerm<'db>> {
+        let (&op, tail) = path.split_first()?;
+        let projected = match term {
+            ProjectionTerm::List(element) => ProjectionContainer::project_list_op(db, element, op)?,
+            _ => {
+                return self.record_projection_path(
+                    db,
+                    root,
+                    term.ty(db),
+                    &ProjectionPath::from_ops(path.iter().copied()),
+                );
+            }
+        };
+
+        if tail.is_empty() {
+            return Some(projected);
+        }
+
+        self.record_projection_term_path(db, root, projected, tail)
+    }
+
+    fn record_inferred_projection_fact(
+        &mut self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        arm: Type<'db>,
+        path: &ProjectionPath<'db>,
+        term: ProjectionTerm<'db>,
+    ) {
+        if term.is_ambiguous(db) {
+            return;
+        }
+
+        if let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, arm) {
+            self.push_container_fact(container_fact);
+            self.push_projection_fact(ProjectionEvidenceFact {
+                root,
+                arm,
+                path: path.clone(),
+                term,
+            });
         }
     }
 
@@ -2802,21 +2831,6 @@ impl<'db> ProjectionEvidenceSet<'db> {
 
     fn container_facts(self, db: &'db dyn Db) -> &'db [ProjectionContainerFact<'db>] {
         self.0.container_facts(db)
-    }
-
-    /// Inference-time API: finds generic containers that may need recovery-time replay.
-    fn generic_containers(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> FxIndexSet<ProjectionContainerFact<'db>> {
-        let facts = RefCell::new(FxIndexSet::default());
-        any_over_type(db, ty, false, |nested| {
-            if let Some(fact) = ProjectionContainerFact::try_from_inference_type(db, nested) {
-                facts.borrow_mut().insert(fact);
-            }
-            false
-        });
-        facts.into_inner()
     }
 
     /// Cycle-recovery-time API: looks up a previously collected container fact.
@@ -3006,10 +3020,6 @@ impl<'db> ProjectionPath<'db> {
 
     fn is_strict_prefix_of(&self, other: &Self) -> bool {
         self.ops.len() < other.ops.len() && other.ops.starts_with(&self.ops)
-    }
-
-    fn suffixes(&self) -> impl Iterator<Item = Self> + '_ {
-        (0..self.ops.len()).map(|index| Self::from_ops(self.ops[index..].iter().copied()))
     }
 }
 
