@@ -118,6 +118,10 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
 #[derive(get_size2::GetSize, salsa::Update)]
 struct FrozenValueIndex;
 
+/// Sorts entries by key and removes duplicate keys, retaining the last value for each key.
+///
+/// Stable sorting preserves the input order of equal-key entries, allowing the deduplication
+/// pass to provide last-entry-wins semantics like standard map collection.
 fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
     entries.sort_by(|(left, _), (right, _)| left.cmp(right));
     entries.dedup_by(|(later_key, later_value), (earlier_key, earlier_value)| {
