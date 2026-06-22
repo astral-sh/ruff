@@ -150,6 +150,10 @@ impl Violation for MultiValueRepeatedKeyVariable {
 
 /// F601, F602
 pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
+    if dict.len() < 2 {
+        return;
+    }
+
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<HashableExpr, (&Expr, FxHashSet<ComparableExpr>)> =
         FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
