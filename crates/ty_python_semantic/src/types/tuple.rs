@@ -684,6 +684,15 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         new_length: TupleLength,
     ) -> Result<Tuple<Type<'db>>, ResizeTupleError> {
+        self.resize_with_variadic(db, new_length, |middle| middle.homogeneous_element_type(db))
+    }
+
+    fn resize_with_variadic<'a>(
+        &'a self,
+        _db: &'db dyn Db,
+        new_length: TupleLength,
+        pack: impl FnOnce(TupleVariadicPart<'a, 'db>) -> Type<'db>,
+    ) -> Result<Tuple<Type<'db>>, ResizeTupleError> {
         match new_length {
             TupleLength::Fixed(new_length) => match self.len().cmp(&new_length) {
                 Ordering::Less => Err(ResizeTupleError::TooFewValues),
@@ -693,18 +702,22 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
             TupleLength::Variable(prefix, suffix) => {
                 // The number of rhs values that will be consumed by the starred target.
-                let Some(variable) = self.len().checked_sub(prefix + suffix) else {
+                let Some(middle_end) = self.len().checked_sub(suffix) else {
                     return Err(ResizeTupleError::TooFewValues);
                 };
+                if middle_end < prefix {
+                    return Err(ResizeTupleError::TooFewValues);
+                }
 
                 // Extract rhs values into the prefix, then into the starred target, then into the
                 // suffix.
-                let mut elements = self.iter_all_elements();
-                let prefix: Vec<_> = elements.by_ref().take(prefix).collect();
-                let variable =
-                    UnionType::from_elements_leave_aliases(db, elements.by_ref().take(variable));
-                let suffix = elements.by_ref().take(suffix);
-                Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
+                let elements = self.elements_slice();
+                let variable = pack(TupleVariadicPart::Fixed(&elements[prefix..middle_end]));
+                Ok(VariableLengthTuple::mixed(
+                    elements[..prefix].iter().copied(),
+                    variable,
+                    elements[middle_end..].iter().copied(),
+                ))
             }
         }
     }
@@ -1798,6 +1811,15 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         new_length: TupleLength,
     ) -> Result<Tuple<Type<'db>>, ResizeTupleError> {
+        self.resize_with_variadic(db, new_length, |middle| middle.homogeneous_element_type(db))
+    }
+
+    fn resize_with_variadic<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        new_length: TupleLength,
+        pack: impl FnOnce(TupleVariadicPart<'a, 'db>) -> Type<'db>,
+    ) -> Result<Tuple<Type<'db>>, ResizeTupleError> {
         match new_length {
             TupleLength::Fixed(new_length) => {
                 // The number of elements that will get their value from our variable-length
@@ -1826,16 +1848,16 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // For example, `tuple[I0, *tuple[I1, ...], I2]` unpacked as
                 // `[a, b, *c]` means `b` could be `I1` (variable non-empty) or
                 // `I2` (variable empty, suffix shifts left), so it should be `I1 | I2`.
-                let variable = UnionType::from_elements_leave_aliases(
-                    db,
-                    self.iter_prefix_elements()
-                        .skip(prefix_length)
-                        .chain(std::iter::once(self.variable()))
-                        .chain(self.iter_suffix_elements().take(suffix_overflow)),
-                );
+                let middle = TupleVariadicPart::Variable {
+                    prefix: &self.prefix_elements()[prefix_length.min(self_prefix_length)..],
+                    variable: self.variable(),
+                    suffix: &self.suffix_elements()[..suffix_overflow],
+                };
+                let element_type = middle.homogeneous_element_type(db);
+                let variable = pack(middle);
                 let prefix = (self.iter_prefix_elements().take(prefix_length))
-                    .chain(std::iter::repeat_n(variable, prefix_underflow));
-                let suffix = std::iter::repeat_n(variable, suffix_underflow)
+                    .chain(std::iter::repeat_n(element_type, prefix_underflow));
+                let suffix = std::iter::repeat_n(element_type, suffix_underflow)
                     .chain(self.iter_suffix_elements().skip(suffix_overflow));
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
@@ -2101,6 +2123,20 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
+    /// Resizes this tuple while allowing the variable-length portion to be represented by a
+    /// caller-provided type instead of its homogeneous element type.
+    pub(crate) fn resize_with_variadic<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        new_length: TupleLength,
+        pack: impl FnOnce(TupleVariadicPart<'a, 'db>) -> Type<'db>,
+    ) -> Result<Self, ResizeTupleError> {
+        match self {
+            Tuple::Fixed(tuple) => tuple.resize_with_variadic(db, new_length, pack),
+            Tuple::Variable(tuple) => tuple.resize_with_variadic(db, new_length, pack),
+        }
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -2355,6 +2391,56 @@ pub(crate) enum TupleElement<T> {
     Prefix(T),
     Variable(T),
     Suffix(T),
+}
+
+/// The portion of a tuple assigned to a variable-length target during resizing.
+#[derive(Clone, Copy)]
+pub(crate) enum TupleVariadicPart<'a, 'db> {
+    Fixed(&'a [Type<'db>]),
+    Variable {
+        prefix: &'a [Type<'db>],
+        variable: Type<'db>,
+        suffix: &'a [Type<'db>],
+    },
+}
+
+impl<'a, 'db: 'a> TupleVariadicPart<'a, 'db> {
+    fn iter_all_elements(self) -> impl Iterator<Item = Type<'db>> + 'a {
+        match self {
+            Self::Fixed(elements) => Either::Left(elements.iter().copied()),
+            Self::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => Either::Right(
+                prefix
+                    .iter()
+                    .copied()
+                    .chain(std::iter::once(variable))
+                    .chain(suffix.iter().copied()),
+            ),
+        }
+    }
+
+    fn homogeneous_element_type(self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements_leave_aliases(db, self.iter_all_elements())
+    }
+
+    pub(crate) fn into_tuple_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Fixed(elements) => Type::heterogeneous_tuple(db, elements.iter().copied()),
+            Self::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => Type::tuple(TupleType::mixed(
+                db,
+                prefix.iter().copied(),
+                variable,
+                suffix.iter().copied(),
+            )),
+        }
+    }
 }
 
 /// Unpacks tuple values in an unpacking assignment.
@@ -2697,5 +2783,38 @@ impl<'db> From<&TupleSpec<'db>> for TupleSpecBuilder<'db> {
                 suffix: variable.suffix_elements().to_vec(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::tests::setup_db;
+
+    #[test]
+    fn resize_with_variadic_packs_mixed_middle() {
+        let db = setup_db();
+        let actual =
+            VariableLengthTuple::mixed([Type::object()], Type::unknown(), [Type::literal_string()]);
+
+        let resized = actual
+            .resize_with_variadic(&db, TupleLength::Variable(0, 0), |middle| {
+                middle.into_tuple_type(&db)
+            })
+            .unwrap();
+        let Tuple::Variable(resized) = resized else {
+            panic!("expected a variable-length tuple");
+        };
+
+        assert!(resized.prefix_elements().is_empty());
+        assert!(resized.suffix_elements().is_empty());
+        assert_eq!(
+            resized
+                .variable()
+                .exact_tuple_instance_spec(&db)
+                .unwrap()
+                .as_ref(),
+            &actual,
+        );
     }
 }
