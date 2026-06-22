@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use bitflags::bitflags;
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
@@ -806,7 +807,9 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Lpar);
 
         let mut args = vec![];
-        let mut keywords = vec![];
+        // Most keyword argument lists contain a single item. Reserve that slot lazily so that
+        // calls without keyword arguments remain allocation-free.
+        let mut keywords = ThinVec::new();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -816,6 +819,9 @@ impl<'src> Parser<'src> {
                 if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
+                    if keywords.capacity() == 0 {
+                        keywords.reserve_exact(1);
+                    }
                     keywords.push(ast::Keyword {
                         arg: None,
                         value: value.expr,
@@ -906,6 +912,9 @@ impl<'src> Parser<'src> {
 
                         let value = parser.parse_conditional_expression_or_higher();
 
+                        if keywords.capacity() == 0 {
+                            keywords.reserve_exact(1);
+                        }
                         keywords.push(ast::Keyword {
                             arg: Some(arg),
                             value: value.expr,
@@ -937,7 +946,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             args: args.into_boxed_slice(),
-            keywords: keywords.into(),
+            keywords,
         };
 
         self.validate_arguments(&arguments, has_trailing_comma, context);
