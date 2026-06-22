@@ -12,6 +12,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_______________________________________________________^
   |
 help: Organize imports
+  |
   - from collections import Awaitable
   - from collections import AsyncIterable
   - from collections import Collection
@@ -25,3 +26,4 @@ help: Organize imports
 6 +     MutableMapping,
 7 +     MutableSequence,
 8 + )
+  |

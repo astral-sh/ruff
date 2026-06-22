@@ -11,14 +11,12 @@ F841 [*] Local variable `x` is assigned to but never used
 9 |             pass
   |
 help: Remove assignment to unused variable `x`
-5  |     def f():
-6  |         try:
-7  |             pass
-   -         except ValueError as x:
-8  +         except ValueError:
-9  |             pass
-10 |
-11 |         # This should raise an F821 error, rather than resolving to the
+  |
+7 |             pass
+  -         except ValueError as x:
+8 +         except ValueError:
+9 |             pass
+  |
 
 F821 Undefined name `x`
   --> <filename>:13:15

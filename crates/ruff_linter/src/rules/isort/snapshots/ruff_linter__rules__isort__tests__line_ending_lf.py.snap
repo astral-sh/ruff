@@ -8,6 +8,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Organize imports
+  |
   - from long_module_name import member_one, member_two, member_three, member_four, member_five
 1 + from long_module_name import (
 2 +     member_five,
@@ -17,3 +18,4 @@ help: Organize imports
 6 +     member_two,
 7 + )
 8 |
+  |

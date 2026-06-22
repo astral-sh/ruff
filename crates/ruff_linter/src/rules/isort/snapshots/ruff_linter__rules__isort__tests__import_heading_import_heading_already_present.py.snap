@@ -22,8 +22,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |____________________________________^
    |
 help: Organize imports
-6  | import sys
-7  |
+   |
 8  | # Third party imports
 9  + import pandas
 10 | import requests
@@ -34,3 +33,4 @@ help: Organize imports
 14 |
 15 + # Local folder imports
 16 | from . import my_local_folder_object
+   |

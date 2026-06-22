@@ -43,11 +43,11 @@ error[UP032]: Use f-string instead of `format` call
   | ^^^^^^^^^^^^^^^^^^^^^
   |
 help: Convert to f-string
-1 | def foo(): ...
-2 |
+  |
 3 |
   - "{x}".format(x=foo())  # snapshot: f-string
 4 + f"{foo()}"  # snapshot: f-string
+  |
 ```
 
 ## A leading empty literal is preserved
@@ -68,11 +68,11 @@ error[UP032]: Use f-string instead of `format` call
   | ^^^^^^^^^^^^^^^^^
   |
 help: Convert to f-string
+  |
   - "" "{}".format(x)  # snapshot: f-string
 1 + "" f"{x}"  # snapshot: f-string
 2 | "a" "" "{}".format(x)  # snapshot: f-string
-3 | x = ("" "{}").format(value)  # snapshot: f-string
-4 | foo(
+  |
 ```
 
 ```py
@@ -87,12 +87,12 @@ error[UP032]: Use f-string instead of `format` call
   | ^^^^^^^^^^^^^^^^^^^^^
   |
 help: Convert to f-string
+  |
 1 | "" "{}".format(x)  # snapshot: f-string
   - "a" "" "{}".format(x)  # snapshot: f-string
 2 + "a" f"{x}"  # snapshot: f-string
 3 | x = ("" "{}").format(value)  # snapshot: f-string
-4 | foo(
-5 |     ""  # snapshot: f-string
+  |
 ```
 
 A leading empty literal inside parentheses must keep the opening parenthesis, otherwise the fix would
@@ -110,13 +110,12 @@ error[UP032]: Use f-string instead of `format` call
   |     ^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Convert to f-string
-1 | "" "{}".format(x)  # snapshot: f-string
+  |
 2 | "a" "" "{}".format(x)  # snapshot: f-string
   - x = ("" "{}").format(value)  # snapshot: f-string
 3 + x = ("" f"{value}")  # snapshot: f-string
 4 | foo(
-5 |     ""  # snapshot: f-string
-6 |     # comment
+  |
 ```
 
 A comment between a leading empty literal and the f-string must not be dropped by a safe fix.
@@ -139,13 +138,12 @@ error[UP032]: Use f-string instead of `format` call
   | |______________________^
   |
 help: Convert to f-string
-4 | foo(
-5 |     ""  # snapshot: f-string
+  |
 6 |     # comment
   -     "{}".format(value)
 7 +     f"{value}"
 8 | )
-9 | y = ("" "").format(value)  # snapshot: f-string
+  |
 ```
 
 When every segment is an empty literal, the leading one is still preserved, keeping the concatenation
@@ -163,9 +161,9 @@ error[UP032]: Use f-string instead of `format` call
   |     ^^^^^^^^^^^^^^^^^^^^^
   |
 help: Convert to f-string
-6 |     # comment
-7 |     "{}".format(value)
+  |
 8 | )
   - y = ("" "").format(value)  # snapshot: f-string
 9 + y = ("" "")  # snapshot: f-string
+  |
 ```

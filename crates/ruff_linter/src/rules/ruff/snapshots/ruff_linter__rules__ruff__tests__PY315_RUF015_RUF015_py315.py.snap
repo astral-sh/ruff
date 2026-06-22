@@ -11,11 +11,12 @@ RUF015 [*] Prefer `next(*x for x in xs)` over single element slice
 4 | list(*x for x in xs)[0]
   |
 help: Replace with `next(*x for x in xs)`
-1 | xs = [[1], [2]]
+  |
 2 |
   - [*x for x in xs][0]
 3 + next(*x for x in xs)
 4 | list(*x for x in xs)[0]
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF015 [*] Prefer `next(*x for x in xs)` over single element slice
@@ -26,9 +27,9 @@ RUF015 [*] Prefer `next(*x for x in xs)` over single element slice
   | ^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace with `next(*x for x in xs)`
-1 | xs = [[1], [2]]
-2 |
+  |
 3 | [*x for x in xs][0]
   - list(*x for x in xs)[0]
 4 + next(*x for x in xs)
+  |
 note: This is an unsafe fix and may change runtime behavior

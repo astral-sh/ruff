@@ -18,9 +18,11 @@ Q000 [*] Single quotes found but double quotes preferred
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
   |
 help: Replace single quotes with double quotes
+  |
   - s = ''"Start with empty string" ' and lint docstring safely'
 1 + s = ''"Start with empty string" " and lint docstring safely"
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
+  |
 
 Q000 [*] Single quotes found but double quotes preferred
  --> singles_would_be_triple_quotes.py:2:5
@@ -30,9 +32,11 @@ Q000 [*] Single quotes found but double quotes preferred
   |     ^^^^^^^^
   |
 help: Replace single quotes with double quotes
+  |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
   - s = 'Do not'" start with empty string" ' and lint docstring safely'
 2 + s = "Do not"" start with empty string" ' and lint docstring safely'
+  |
 
 Q000 [*] Single quotes found but double quotes preferred
  --> singles_would_be_triple_quotes.py:2:40
@@ -42,6 +46,8 @@ Q000 [*] Single quotes found but double quotes preferred
   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace single quotes with double quotes
+  |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
   - s = 'Do not'" start with empty string" ' and lint docstring safely'
 2 + s = 'Do not'" start with empty string" " and lint docstring safely"
+  |

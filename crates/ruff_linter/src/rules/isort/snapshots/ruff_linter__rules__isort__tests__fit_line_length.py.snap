@@ -16,8 +16,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_____^
    |
 help: Organize imports
-5  |
-6  | if indented:
+   |
 7  |     from line_with_88 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
    -     from line_with_89 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
    -     from line_with_90 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -36,5 +35,4 @@ help: Organize imports
 18 +         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 19 +     )
 20 |     from line_with_93 import (
-21 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-22 |     )
+   |
