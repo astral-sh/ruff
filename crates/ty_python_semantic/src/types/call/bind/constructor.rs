@@ -161,20 +161,6 @@ impl<'db> ConstructorBinding<'db> {
         self.downstream_constructor.as_deref_mut()
     }
 
-    pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
-    where
-        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
-    {
-        // TODO: Model the nested constructor chain if we want to support class objects assigned to
-        // `__new__`. For now, map the callable itself and drop its downstream constructor checks
-        // instead of panicking.
-        ConstructorBinding {
-            entry: f(self.entry),
-            constructor_context: self.constructor_context,
-            downstream_constructor: None,
-        }
-    }
-
     /// Compute the overall effective return type of this `ConstructorBinding`.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();

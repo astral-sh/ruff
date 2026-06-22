@@ -307,16 +307,6 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn map<F>(self, f: &F) -> CallableItem<'db>
-    where
-        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
-    {
-        match self {
-            CallableItem::Regular(binding) => CallableItem::Regular(f(binding)),
-            CallableItem::Constructor(binding) => CallableItem::Constructor(binding.map(f)),
-        }
-    }
-
     fn wrap_as_constructor(
         self,
         constructed_instance_type: Type<'db>,
@@ -923,27 +913,23 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    fn map_with<F>(self, f: &F) -> Self
-    where
-        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
-    {
-        Self {
-            callable_type: self.callable_type,
-            implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
-            implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
-            enclosing_binding_contexts: self.enclosing_binding_contexts,
-            elements: self
-                .elements
-                .into_iter()
-                .map(|elem| BindingsElement {
-                    items: elem.items.into_iter().map(|item| item.map(f)).collect(),
-                })
-                .collect(),
-        }
-    }
+    pub(in crate::types) fn bind_constructor_new(&mut self, db: &'db dyn Db, self_type: Type<'db>) {
+        for item in self.iter_callable_items_mut() {
+            let binding = item.callable_mut();
+            // If descriptor binding produced a bound callable, bake that into the signature
+            // first, then bind `cls` for constructor-call semantics (the call site omits `cls`).
+            // Note: This intentionally preserves `type.__call__` behavior for `@classmethod __new__`,
+            // which receives an extra implicit `cls` and errors at call sites.
+            binding.bake_bound_type_into_overloads(db);
+            binding.bound_type = Some(self_type);
 
-    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
-        self.map_with(&f)
+            if let CallableItem::Constructor(binding) = item {
+                // TODO: Model the nested constructor chain if we want to support class objects
+                // assigned to `__new__`. Until then, preserve the old mapping behavior by
+                // dropping downstream constructor checks instead of panicking.
+                binding.downstream_constructor = None;
+            }
+        }
     }
 
     fn freshen_generic_contexts_in_place(

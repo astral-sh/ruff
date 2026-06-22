@@ -5044,23 +5044,6 @@ impl<'db> Type<'db> {
                 Place::Undefined => None,
             }
         }
-        fn bind_constructor_new<'db>(
-            db: &'db dyn Db,
-            bindings: Bindings<'db>,
-            self_type: Type<'db>,
-        ) -> Bindings<'db> {
-            bindings.map(|binding| {
-                let mut binding = binding;
-                // If descriptor binding produced a bound callable, bake that into the signature
-                // first, then bind `cls` for constructor-call semantics (the call site omits `cls`).
-                // Note: This intentionally preserves `type.__call__` behavior for `@classmethod __new__`,
-                // which receives an extra implicit `cls` and errors at call sites.
-                binding.bake_bound_type_into_overloads(db);
-                binding.bound_type = Some(self_type);
-                binding
-            })
-        }
-
         let class_literal = class.class_literal(db);
         let class_generic_context = class_literal.generic_context(db);
 
@@ -5159,13 +5142,14 @@ impl<'db> Type<'db> {
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
             Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
                 Some((new_callable, definedness)) => {
-                    let mut bindings =
-                        bind_constructor_new(db, new_callable.bindings(db), self_type)
-                            .into_constructor_bindings(
-                                constructor_instance_ty,
-                                ConstructorCallableKind::New,
-                            )
-                            .with_constructed_instance_type(db, constructor_instance_ty);
+                    let mut bindings = new_callable.bindings(db);
+                    bindings.bind_constructor_new(db, self_type);
+                    let mut bindings = bindings
+                        .into_constructor_bindings(
+                            constructor_instance_ty,
+                            ConstructorCallableKind::New,
+                        )
+                        .with_constructed_instance_type(db, constructor_instance_ty);
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
