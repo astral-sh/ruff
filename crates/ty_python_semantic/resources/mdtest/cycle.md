@@ -232,9 +232,10 @@ T = f()
 
 ## Type replacement with a lazy function signature
 
-Type replacement during cycle recovery must not evaluate a function's lazy signature. Doing so can
-introduce a new dependency on the reachability of a loop header while recovering from a different
-cycle, which Salsa rejects.
+Type replacement while recovering the first `function` definition must not evaluate its lazy
+signature. The definition's reachability depends on the enclosing loop header through the match
+pattern. Evaluating the signature during `infer_definition_types` cycle recovery would therefore
+introduce a new `loop_header_reachability` dependency, which Salsa rejects.
 
 ```toml
 [environment]
@@ -242,18 +243,16 @@ python-version = "3.10"
 ```
 
 ```py
-lambda: name_4
-for name_5 in (lambda: (name_4 for unique_name_0 in name_5),):  # error: [not-iterable]
+lambda: function
+for factory in (lambda: (function for _ in factory),):  # error: [not-iterable]
     match 0:
-        case unique_name_2():  # error: [unresolved-reference]
-            async def name_4():
-                pass
+        case missing():  # error: [unresolved-reference]
+            def function(): ...
 
-        case name_5():  # error: [invalid-match-pattern]
-            pass
+        case factory():  # error: [invalid-match-pattern]
+            ...
         case 0:
-            async def name_4():
-                pass
+            def function(): ...
 ```
 
 ## Lazy cached property behind `hasattr`
