@@ -192,37 +192,49 @@ struct CollectionConstraintTarget<'db> {
     has_dependency: Rc<Cell<bool>>,
 }
 
-struct StarredUseVisitor {
-    target: ExpressionNodeKey,
-    starred_depth: usize,
-    found: bool,
+#[derive(Default)]
+struct CollectionUseContext {
+    in_call: bool,
+    in_starred: bool,
 }
 
-impl<'ast> Visitor<'ast> for StarredUseVisitor {
+struct CollectionUseContextVisitor {
+    target: ExpressionNodeKey,
+    call_depth: usize,
+    starred_depth: usize,
+    context: CollectionUseContext,
+}
+
+impl<'ast> Visitor<'ast> for CollectionUseContextVisitor {
     fn visit_expr(&mut self, expression: &'ast ast::Expr) {
-        if self.found {
-            return;
-        }
-        if self.starred_depth > 0 && ExpressionNodeKey::from(expression) == self.target {
-            self.found = true;
+        if ExpressionNodeKey::from(expression) == self.target {
+            self.context.in_call |= self.call_depth > 0;
+            self.context.in_starred |= self.starred_depth > 0;
             return;
         }
 
+        let is_call = matches!(expression, ast::Expr::Call(_));
         let is_starred = matches!(expression, ast::Expr::Starred(_));
+        self.call_depth += usize::from(is_call);
         self.starred_depth += usize::from(is_starred);
         walk_expr(self, expression);
+        self.call_depth -= usize::from(is_call);
         self.starred_depth -= usize::from(is_starred);
     }
 }
 
-fn expression_contains_starred_use(expression: &ast::Expr, target: ExpressionNodeKey) -> bool {
-    let mut visitor = StarredUseVisitor {
+fn collection_use_context(
+    expression: &ast::Expr,
+    target: ExpressionNodeKey,
+) -> CollectionUseContext {
+    let mut visitor = CollectionUseContextVisitor {
         target,
+        call_depth: 0,
         starred_depth: 0,
-        found: false,
+        context: CollectionUseContext::default(),
     };
     visitor.visit_expr(expression);
-    visitor.found
+    visitor.context
 }
 
 /// Builder to infer all types in a region.
@@ -10894,15 +10906,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Statement::Other(statement) => {
                     let statement = statement.node_ref(self.db()).node(self.module());
                     match statement {
-                        // An unannotated return does not constrain its result, but a direct call can
-                        // still constrain the collection through an annotated argument. Starred
-                        // uses participate in iterable inference and need cycle recovery.
+                        // An unannotated return does not constrain its result, but a call within
+                        // the return expression can still constrain the collection through an
+                        // annotated argument. Starred uses participate in iterable inference and
+                        // need cycle recovery.
                         ast::Stmt::Return(ast::StmtReturn {
                             value: Some(value), ..
                         }) if return_is_unconstrained => {
-                            if expression_contains_starred_use(value, use_expression) {
+                            let use_context = collection_use_context(value, use_expression);
+                            if use_context.in_starred {
                                 false
-                            } else if matches!(value.as_ref(), ast::Expr::Call(_)) {
+                            } else if use_context.in_call {
                                 self.infer_statement(statement);
                                 true
                             } else {
