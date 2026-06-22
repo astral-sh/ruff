@@ -1444,6 +1444,46 @@ for _ in range(1_000_000):
 reveal_type(i)  # revealed: int
 ```
 
+### Recursive packing/unpacking
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar
+
+i = (1,)
+for _i in range(10):
+    (j,) = i
+    j += 1
+    i = (j,)
+
+reveal_type(i)  # revealed: tuple[int]
+
+a = [1]
+for _ in range(10):
+    [b] = a
+    b += 1
+    a = [b]
+
+reveal_type(a)  # revealed: list[int]
+
+LoopT = TypeVar("LoopT")
+
+class LoopVarBox(Generic[LoopT]):
+    def __init__(self, value: LoopT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[LoopT]:
+        return iter(())
+
+box = LoopVarBox(1)
+for _ in range(10):
+    (value,) = box
+    value += 1
+    box = LoopVarBox(value)
+
+reveal_type(box)  # revealed: LoopVarBox[int]
+```
+
 ### A binding that didn't exist before the loop started
 
 ```py
@@ -1777,6 +1817,84 @@ for _ in range(1_000_000):
     node = node.next
 reveal_type(node)  # revealed: Node
 reveal_type(node.next)  # revealed: Node | None
+```
+
+### Recursive tuple projections in loop-local containers
+
+```py
+def tuple_entries() -> list[tuple[int, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]:
+    return []
+
+def tuple_projection_with_side_containers() -> None:
+    out = []
+    seen: set[object] = set()
+    bound = None
+
+    for entry in sorted(tuple_entries(), key=lambda item: item[0]):
+        if entry in seen:
+            continue
+
+        seen.add(entry)
+        _, address = entry
+        host, requested_port = address[:2]
+
+        if requested_port == 0 and bound is not None:
+            address = tuple([host, bound] + list(address[2:]))
+
+        try:
+            pass
+        except OSError as error:
+            if error.errno == 1 and address[0] == "::1":
+                continue
+
+        out.append(object())
+        reveal_type(address)  # revealed: tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]
+
+    reveal_type(out)  # revealed: list[object]
+```
+
+Recursive updates through tuple entries should not introduce the tuple itself into an element type.
+
+```py
+growing_tuple = (int(),)
+
+for _ in range(10):
+    (item,) = growing_tuple
+    growing_tuple = ((item,),)
+
+reveal_type(growing_tuple)  # revealed: tuple[int] | tuple[tuple[int | Divergent]]
+```
+
+Recursive subscript assignments to an initially empty collection should converge.
+
+```py
+def recursive_subscript_assignment(items):
+    maps = []
+    for item in items:
+        maps[-1] = (maps[-1][0], 1)
+
+    reveal_type(maps)  # revealed: list[Divergent]
+```
+
+Recursive loop inference can involve multiple local containers that feed each other through
+unpacking, subscripting, and append operations. This should still terminate.
+
+```py
+def projection_for_loop_recursive_orbit_transversal(degree, generators, alpha):
+    tr = [(alpha, list(range(degree)))]
+    slp_dict = {alpha: []}
+    used = [False] * degree
+    used[alpha] = True
+    gens = [generator._array_form for generator in generators]
+    for x, px in tr:
+        px_slp = slp_dict[x]
+        for gen in gens:
+            temp = gen[x]
+            if used[temp] == False:
+                slp_dict[temp] = [gens.index(gen)] + px_slp
+                tr.append((temp, px))
+                used[temp] = True
+    return tr, slp_dict
 ```
 
 ### `global` and `nonlocal` keywords in a loop

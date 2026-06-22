@@ -2914,6 +2914,1000 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
+Unpacking a cyclic fixed-length tuple attribute and assigning it back to the same shape should
+preserve the productive element type:
+
+```py
+class ProjectionTuple:
+    def __init__(self) -> None:
+        self.x = (0,)
+
+    def read(self, items) -> None:
+        (x,) = self.x
+        while x < len(items):
+            if x:
+                x += 1
+                break
+            self.x = (x,)
+
+        reveal_type(self.x)  # revealed: tuple[int]
+```
+
+The same recovery works for multiple tuple elements:
+
+```py
+class ProjectionTuplePair:
+    def __init__(self) -> None:
+        self.x = (0, "")
+
+    def read(self, items) -> None:
+        x, y = self.x
+        while x < len(items):
+            self.x = (x, y)
+
+        reveal_type(self.x)  # revealed: tuple[int, str]
+```
+
+For a homogeneous list, unpack projections recover the list's element type:
+
+```py
+class ProjectionList:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self, items) -> None:
+        (x,) = self.x
+        while x < len(items):
+            if x:
+                x += 1
+                break
+            self.x = [x]
+
+        reveal_type(self.x)  # revealed: list[int]
+```
+
+The unpacked value can be transformed before it is wrapped again:
+
+```py
+class ProjectionMixedContainerOperationWidening:
+    def __init__(self, value: int) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object], text: str | None) -> None:
+        (x,) = self.x
+        while items:
+            if text is not None:
+                x = text
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int] | tuple[int | str]
+
+class ProjectionMixedContainerOperationChange:
+    def __init__(self, value: int) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            text = str(x)
+            self.x = (text,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int] | tuple[str]
+
+class ProjectionMixedContainerOperationNarrowing:
+    def __init__(self, value: int | None) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            if x is None:
+                break
+            x += 1
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int | None] | tuple[int]
+```
+
+Terminal assignments in other methods are also part of the projected attribute type:
+
+```py
+class ProjectionTerminalAssignmentInOtherMethod:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def replace(self) -> None:
+        self.x = [""]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int] | list[str] | tuple[int | str]
+```
+
+Starred unpacking also recovers the prefix, suffix, and rest element types:
+
+```py
+class ProjectionStarredList:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        first, *rest = self.x
+        rest.append(first)
+        self.x = rest
+
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
+        reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionStarredListSuffix:
+    def __init__(self) -> None:
+        self.x = [0, 1]
+
+    def read(self) -> None:
+        first, *middle, last = self.x
+        middle.append(first)
+        middle.append(last)
+        self.x = middle
+
+        reveal_type(first)  # revealed: int
+        reveal_type(middle)  # revealed: list[int]
+        reveal_type(last)  # revealed: int
+        reveal_type(self.x)  # revealed: list[int]
+```
+
+Projection recovery works for other known generic containers:
+
+```py
+from collections import deque
+from collections.abc import Mapping
+
+class ProjectionSet:
+    def __init__(self) -> None:
+        self.x = {0}
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = {x}
+
+        reveal_type(self.x)  # revealed: set[int]
+
+class ProjectionDict:
+    def __init__(self) -> None:
+        self.x = {0: ""}
+
+    def read(self) -> None:
+        for key in self.x:
+            self.x = {key: ""}
+
+        reveal_type(self.x)  # revealed: dict[int, str]
+
+class ProjectionDictKeys:
+    def __init__(self) -> None:
+        self.x = {0: ""}
+
+    def read(self) -> None:
+        for key in self.x.keys():
+            self.x = {key: ""}
+
+        reveal_type(self.x)  # revealed: dict[int, str]
+
+class ProjectionDictValue:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = {"value": x}
+
+        reveal_type(self.x)  # revealed: dict[str, int | str]
+
+class ProjectionDeque:
+    def __init__(self, values: deque[int]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for item in self.x:
+            self.x = deque([item])
+
+        reveal_type(self.x)  # revealed: deque[int]
+
+class ProjectionMapping:
+    def __init__(self, values: Mapping[int, str]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for key in self.x:
+            self.x = {key: ""}
+
+        reveal_type(self.x)  # revealed: Mapping[int, str]
+
+class ProjectionDictSubscript:
+    def __init__(self) -> None:
+        self.x = {"key": 0}
+
+    def read(self, key: str) -> None:
+        value = self.x[key]
+        self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: dict[str, int]
+
+class ProjectionMappingSubscript:
+    def __init__(self, values: Mapping[str, int]) -> None:
+        self.x = values
+
+    def read(self, key: str) -> None:
+        value = self.x[key]
+        self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: dict[str, int]
+```
+
+Indexing and slicing cyclic attributes can recover consumed list element and slice types:
+
+```py
+class ProjectionListIndex:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self, index: int) -> None:
+        item = self.x[index]
+        self.x = [item]
+
+        reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionDirectSliceAssignment:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        self.x = self.x[:]
+
+        reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionHomogeneousTupleSlice:
+    def __init__(self, values: tuple[int, ...]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        self.x = self.x[1:]
+
+        reveal_type(self.x)  # revealed: @Todo(slice into variable-length tuple)
+```
+
+Projection recovery also works for simple custom generic containers that define their own iteration
+behavior. Some recursive relationships that depend on user-defined method behavior are still
+approximated:
+
+```py
+from collections.abc import AsyncIterator, Callable, Generator, Iterator, Mapping
+from typing import Any, Generic, TypeVar, overload
+
+ProjectionT = TypeVar("ProjectionT")
+ProjectionU = TypeVar("ProjectionU")
+ProjectionCovariantT = TypeVar("ProjectionCovariantT", covariant=True)
+ProjectionContravariantT = TypeVar("ProjectionContravariantT", contravariant=True)
+
+class Box(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+class ProjectionCustomBox:
+    def __init__(self) -> None:
+        self.x = Box(0)
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = Box(x)
+
+        reveal_type(self.x)  # revealed: Box[int]
+
+class ProjectionCustomStarredBox:
+    def __init__(self) -> None:
+        self.x = Box(0)
+
+    def read(self) -> None:
+        first, *rest = self.x
+        self.x = Box(first)
+
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
+        reveal_type(self.x)  # revealed: Box[int]
+
+class ProjectionCustomBoxInList:
+    def __init__(self) -> None:
+        self.x = [Box(0)]
+
+    def read(self) -> None:
+        for box in self.x:
+            (x,) = box
+            self.x = [Box(x)]
+
+        reveal_type(self.x)  # revealed: list[Box[int]]
+
+class ReversedPair(Generic[ProjectionT, ProjectionU]):
+    def __init__(self, first: ProjectionT, second: ProjectionU) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[tuple[ProjectionU, ProjectionT]]:
+        return iter(())
+
+class ProjectionCustomParameterOrder:
+    def __init__(self) -> None:
+        self.x = ReversedPair(0, "")
+
+    def read(self) -> None:
+        for text, number in self.x:
+            self.x = ReversedPair(number, text)
+
+        reveal_type(self.x)  # revealed: ReversedPair[int, str]
+
+class NestedBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[tuple[ProjectionT]]:
+        return iter(())
+
+class ProjectionCustomNested:
+    def __init__(self) -> None:
+        self.x = NestedBox(0)
+
+    def read(self) -> None:
+        for (item,) in self.x:
+            self.x = NestedBox(item)
+
+        reveal_type(self.x)  # revealed: NestedBox[int]
+
+class ConstantIterable(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(())
+
+class ProjectionCustomNonGenericItem:
+    def __init__(self) -> None:
+        self.x = ConstantIterable(0)
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = ConstantIterable(x)
+
+        reveal_type(self.x)  # revealed: ConstantIterable[str]
+
+class OverloadedBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    @overload
+    def __iter__(self) -> Iterator[int]: ...
+    @overload
+    def __iter__(self) -> Iterator[str]: ...
+    def __iter__(self) -> Iterator[Any]:
+        return iter(())
+
+class ProjectionCustomOverloadedIterator:
+    def __init__(self) -> None:
+        self.x = OverloadedBox(0)
+
+    def read(self, flag: bool) -> None:
+        if flag:
+            (x,) = self.x
+            self.x = OverloadedBox(x)
+        else:
+            self.x = OverloadedBox("")
+
+        reveal_type(self.x)  # revealed: OverloadedBox[int] | OverloadedBox[str]
+
+class SelfOverloadedBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    @overload
+    def __iter__(self: "SelfOverloadedBox[int]") -> Iterator[int]: ...
+    @overload
+    def __iter__(self: "SelfOverloadedBox[str]") -> Iterator[str]: ...
+    def __iter__(self) -> Iterator[Any]:
+        return iter(())
+
+class ProjectionCustomAnyOverload:
+    def __init__(self, value: Any) -> None:
+        self.x = SelfOverloadedBox(value)
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = SelfOverloadedBox(x)
+
+        reveal_type(self.x)  # revealed: SelfOverloadedBox[Any]
+
+class InvariantProjectionBox(Generic[ProjectionT]):
+    value: ProjectionT
+
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __iter__(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+class ProjectionCustomInvariant:
+    def __init__(
+        self,
+        flag: bool,
+        object_box: InvariantProjectionBox[object],
+        str_box: InvariantProjectionBox[str],
+    ) -> None:
+        if flag:
+            self.x = object_box
+        else:
+            self.x = str_box
+
+    def read(self, update: bool) -> None:
+        (item,) = self.x
+        if update:
+            self.x = InvariantProjectionBox(item)
+
+        reveal_type(self.x)  # revealed: InvariantProjectionBox[object] | InvariantProjectionBox[str]
+
+class CovariantProjectionBox(Generic[ProjectionCovariantT]):
+    def __init__(self, value: ProjectionCovariantT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[ProjectionCovariantT]:
+        return iter(())
+
+class ProjectionCustomCovariant:
+    def __init__(
+        self,
+        flag: bool,
+        object_box: CovariantProjectionBox[object],
+        str_box: CovariantProjectionBox[str],
+    ) -> None:
+        if flag:
+            self.x = object_box
+        else:
+            self.x = str_box
+
+    def read(self, update: bool) -> None:
+        (item,) = self.x
+        if update:
+            self.x = CovariantProjectionBox(item)
+
+        reveal_type(self.x)  # revealed: CovariantProjectionBox[object]
+
+class ContravariantProjectionBox(Generic[ProjectionContravariantT]):
+    def __init__(self, callback: Callable[[ProjectionContravariantT], None]) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[Callable[[ProjectionContravariantT], None]]:
+        return iter(())
+
+class ProjectionCustomContravariant:
+    def __init__(
+        self,
+        flag: bool,
+        object_box: ContravariantProjectionBox[object],
+        str_box: ContravariantProjectionBox[str],
+    ) -> None:
+        if flag:
+            self.x = object_box
+        else:
+            self.x = str_box
+
+    def read(self, update: bool) -> None:
+        (callback,) = self.x
+        if update:
+            self.x = ContravariantProjectionBox(callback)
+
+        reveal_type(self.x)  # revealed: ContravariantProjectionBox[str & Unknown]
+
+class ProjectionCustomRecursiveShape:
+    def __init__(self) -> None:
+        self.x = Box(0)
+
+    def read(self) -> None:
+        self.x = Box(self.x)
+
+        reveal_type(self.x)  # revealed: Box[Divergent]
+
+class IndexBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __getitem__(self, index: int) -> ProjectionT:
+        return self.value
+
+class ProjectionCustomGetItem:
+    def __init__(self) -> None:
+        self.x = IndexBox(0)
+
+    def read(self) -> None:
+        item = self.x[0]
+        self.x = IndexBox(item)
+
+        reveal_type(self.x)  # revealed: IndexBox[int]
+
+class SliceBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __getitem__(self, index: slice) -> "SliceBox[ProjectionT]":
+        return self
+
+class ProjectionCustomSlice:
+    def __init__(self) -> None:
+        self.x = SliceBox(0)
+
+    def read(self) -> None:
+        self.x = self.x[:]
+
+        reveal_type(self.x)  # revealed: SliceBox[int]
+
+class MethodBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def unwrap(self) -> ProjectionT:
+        return self.value
+
+class ProjectionCustomMethodCall:
+    def __init__(self) -> None:
+        self.x = MethodBox(0)
+
+    def read(self) -> None:
+        item = self.x.unwrap()
+        self.x = MethodBox(item)
+
+        reveal_type(self.x)  # revealed: MethodBox[int]
+
+class MethodPair(Generic[ProjectionT, ProjectionU]):
+    def __init__(self, left: ProjectionT, right: ProjectionU) -> None:
+        self.left_value = left
+        self.right_value = right
+
+    def left(self) -> ProjectionT:
+        return self.left_value
+
+    def right(self) -> ProjectionU:
+        return self.right_value
+
+class ViewBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def view(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+class ProjectionCustomMapping(Generic[ProjectionT, ProjectionU], Mapping[ProjectionT, ProjectionU]):
+    def __getitem__(self, key: ProjectionT) -> ProjectionU:
+        raise KeyError
+
+    def __iter__(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+    def __len__(self) -> int:
+        return 0
+
+class ContextBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __enter__(self) -> ProjectionT:
+        return self.value
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+class ProjectionCustomContext:
+    def __init__(self) -> None:
+        self.x = ContextBox(0)
+
+    def read(self) -> None:
+        with self.x as item:
+            self.x = ContextBox(item)
+
+        reveal_type(self.x)  # revealed: ContextBox[int]
+
+class TupleContextBox(Generic[ProjectionT, ProjectionU]):
+    def __init__(self, first: ProjectionT, second: ProjectionU) -> None:
+        self.first = first
+        self.second = second
+
+    def __enter__(self) -> tuple[ProjectionT, ProjectionU]:
+        return self.first, self.second
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+class ProjectionCustomContextUnpack:
+    def __init__(self) -> None:
+        self.x = TupleContextBox(0, "")
+
+    def read(self) -> None:
+        with self.x as (number, text):
+            self.x = TupleContextBox(number, text)
+
+        reveal_type(self.x)  # revealed: TupleContextBox[int, str]
+
+class AsyncContextBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    async def __aenter__(self) -> ProjectionT:
+        return self.value
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+class ProjectionCustomAsyncContext:
+    def __init__(self) -> None:
+        self.x = AsyncContextBox(0)
+
+    async def read(self) -> None:
+        async with self.x as item:
+            self.x = AsyncContextBox(item)
+
+        reveal_type(self.x)  # revealed: AsyncContextBox[int]
+
+class AwaitBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __await__(self) -> Generator[None, None, ProjectionT]:
+        async def inner() -> ProjectionT:
+            return self.value
+
+        return inner().__await__()
+
+class ProjectionCustomAwait:
+    def __init__(self) -> None:
+        self.x = AwaitBox(0)
+
+    async def read(self) -> None:
+        item = await self.x
+        self.x = AwaitBox(item)
+
+        reveal_type(self.x)  # revealed: AwaitBox[int]
+
+class AsyncBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __aiter__(self) -> AsyncIterator[ProjectionT]:
+        async def gen() -> AsyncIterator[ProjectionT]:
+            if False:
+                yield self.value
+
+        return gen()
+
+class ProjectionCustomAsyncFor:
+    def __init__(self) -> None:
+        self.x = AsyncBox(0)
+
+    async def read(self) -> None:
+        async for item in self.x:
+            self.x = AsyncBox(item)
+
+        reveal_type(self.x)  # revealed: AsyncBox[int]
+
+class AsyncTupleBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __aiter__(self) -> AsyncIterator[tuple[ProjectionT]]:
+        async def gen() -> AsyncIterator[tuple[ProjectionT]]:
+            if False:
+                yield (self.value,)
+
+        return gen()
+
+class ProjectionCustomAsyncForUnpack:
+    def __init__(self) -> None:
+        self.x = AsyncTupleBox(0)
+
+    async def read(self) -> None:
+        async for (item,) in self.x:
+            self.x = AsyncTupleBox(item)
+
+        reveal_type(self.x)  # revealed: AsyncTupleBox[int]
+```
+
+Different container wrappers can share the same unpack projection:
+
+```py
+class ProjectionMixedContainer:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self, items) -> None:
+        (x,) = self.x
+        while x < len(items):
+            if x:
+                x += 1
+                break
+            self.x = (x,)
+
+        reveal_type(self.x)  # revealed: list[int] | tuple[int]
+```
+
+For-loop iteration creates a projection for the item type:
+
+```py
+class ProjectionIter:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        for item in self.x:
+            self.x = [item]
+            reveal_type(item)  # revealed: int
+
+        reveal_type(self.x)  # revealed: list[int]
+```
+
+Projection recovery works through nested container wrappers:
+
+```py
+class ProjectionNestedWrappedAssignment:
+    def __init__(self) -> None:
+        self.x = [(0,)]
+
+    def read(self) -> None:
+        ((x,),) = self.x
+        self.x = [(x,)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int]]
+```
+
+Nested for-loop unpacking composes iteration and exact-unpack projections:
+
+```py
+class ProjectionNestedForUnpack:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        for x, y in self.x:
+            self.x = [(x, y)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]]
+```
+
+Projection recovery solves flat dependencies between different projection paths:
+
+```py
+class ProjectionSwap:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        for x, y in self.x:
+            self.x = [(y, x)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[int | str, int | str]]
+
+class ProjectionChain:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        for x, y in self.x:
+            self.x = [(y, y)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]] | list[tuple[str, str]]
+```
+
+Projection recovery can follow a dependency cycle through several unpacked positions:
+
+```py
+class ProjectionThreeWayRotation:
+    def __init__(self) -> None:
+        self.x = [(0, "", b"")]
+
+    def read(self) -> None:
+        for number, text, data in self.x:
+            self.x = [(text, data, number)]
+
+        # revealed: list[tuple[int, str, bytes]] | list[tuple[bytes | str | int, bytes | str | int, bytes | str | int]]
+        reveal_type(self.x)
+```
+
+Some recursive projections are still inferred conservatively when narrowing is involved:
+
+```py
+class ProjectionNarrowedCrossDependency:
+    def __init__(self, value: int | None) -> None:
+        self.x = [(value, "")]
+
+    def read(self) -> None:
+        for maybe_number, text in self.x:
+            if maybe_number is not None:
+                self.x = [(text, maybe_number)]
+
+        # revealed: list[tuple[int | None, str]] | list[tuple[str | int, int | str]]
+        reveal_type(self.x)
+```
+
+Several recursive attributes can exchange projected values:
+
+```py
+class ProjectionCorrelatedAttributes:
+    def __init__(self) -> None:
+        self.left = [(0, "")]
+        self.right = [("", 0)]
+
+    def read(self) -> None:
+        for left_number, left_text in self.left:
+            for right_text, right_number in self.right:
+                self.left = [(right_text, right_number)]
+                self.right = [(left_text, left_number)]
+
+        reveal_type(self.left)  # revealed: list[tuple[int, str]] | list[tuple[int | str, str | int]]
+        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
+
+class ProjectionCorrelatedAttributeCycle:
+    def __init__(self) -> None:
+        self.left = [(0, "")]
+        self.right = [("", 0)]
+
+    def read(self) -> None:
+        for left_number, left_text in self.left:
+            for right_text, right_number in self.right:
+                self.left = [(left_text, right_text)]
+                self.right = [(right_number, left_number)]
+
+        # revealed: list[tuple[int, str]] | list[tuple[int | str, int | str]]
+        reveal_type(self.left)
+        reveal_type(self.right)  # revealed: list[tuple[str, int]] | list[tuple[str | int, int | str]]
+```
+
+Deeply nested projections are inferred correctly:
+
+```py
+class ProjectionDeepPath:
+    def __init__(self) -> None:
+        self.x = [(((((0,),),),),)]
+
+    def read(self) -> None:
+        for (((((x,),),),),) in self.x:
+            self.x = [(((((x,),),),),)]
+
+        reveal_type(self.x)  # revealed: list[tuple[tuple[tuple[tuple[tuple[int]]]]]]
+```
+
+Subscript projections from custom generic containers preserve inference-time evidence:
+
+```py
+from typing import Generic, TypeVar
+
+_ProjectionSubscriptT = TypeVar("_ProjectionSubscriptT")
+
+class ProjectionSubscriptBox(Generic[_ProjectionSubscriptT]):
+    def __init__(self, value: _ProjectionSubscriptT) -> None:
+        self.value = value
+
+    def __getitem__(self, key: int) -> _ProjectionSubscriptT:
+        return self.value
+
+class ProjectionCustomSubscriptAssignment:
+    def __init__(self) -> None:
+        self.x = ProjectionSubscriptBox(1)
+
+    def read(self) -> None:
+        self.x = ProjectionSubscriptBox(self.x[0])
+
+        reveal_type(self.x)  # revealed: ProjectionSubscriptBox[int]
+```
+
+Single-target `for` assignments to an implicit attribute also use the iterable projection:
+
+```py
+class ProjectionForTargetAttribute:
+    def __init__(self) -> None:
+        self.x = [(1,)]
+
+    def read(self) -> None:
+        for self.x in self.x:
+            pass
+
+        reveal_type(self.x)  # revealed: list[tuple[int]] | tuple[int] | int
+```
+
+Projection recovery does not collapse recursive values that are wrapped under another container:
+
+```py
+class ProjectionGuardedList:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = [[x]]
+
+        reveal_type(self.x)  # revealed: list[Divergent]
+
+class ProjectionGuardedTuple:
+    def __init__(self) -> None:
+        self.x = (0,)
+
+    def read(self) -> None:
+        (x,) = self.x
+        self.x = ((x,),)
+
+        # This reads the local attribute binding after the assignment above definitely ran.
+        # The growing inner shape is represented by `Divergent`.
+        reveal_type(self.x)  # revealed: tuple[tuple[int | Divergent]]
+
+    def _(self) -> None:
+        reveal_type(self.x)  # revealed: tuple[int] | tuple[Divergent]
+```
+
+Narrowing that reduces the unpacked value to an ordinary union element is preserved when rebuilding
+the mixed containers:
+
+```py
+class ProjectionMixedContainerNoneNarrowing:
+    def __init__(self, value: int | None) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            if x is None:
+                break
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int | None] | tuple[int]
+```
+
+TODO: negative predicate constraints are currently widened when rebuilding a mixed container. The
+tuple arm below could be `tuple[~str]`; for now, recovery produces `tuple[object]`.
+
+```py
+from typing_extensions import TypeIs
+from ty_extensions import Not
+
+def is_str(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def assert_not_str(value: Not[str]) -> None:
+    pass
+
+class ProjectionMixedContainerNegativePredicate:
+    def __init__(self, value: object) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        (x,) = self.x
+        while items:
+            if is_str(x):
+                break
+            reveal_type(x)  # revealed: ~str
+            self.x = (x,)
+            break
+
+        # TODO: it would be nice if this were `list[object] | tuple[~str]`.
+        reveal_type(self.x)  # revealed: list[object] | tuple[object]
+        if isinstance(self.x, tuple):
+            (y,) = self.x
+            # TODO: it would be nice if this were `~str`.
+            reveal_type(y)  # revealed: object
+            # TODO: it would be nice if this did not produce an error.
+            # error: [invalid-argument-type]
+            assert_not_str(y)
+```
+
 If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
 
 ```py
