@@ -592,9 +592,15 @@ impl<'db> Bindings<'db> {
         }
 
         assert!(!combined.elements.is_empty());
-        combined.callable_type = callable_type;
-        combined.enclosing_binding_contexts = None;
-        combined
+        Self {
+            callable_type,
+            implicit_dunder_new_is_possibly_unbound: combined
+                .implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound: combined
+                .implicit_dunder_init_is_possibly_unbound,
+            elements: combined.elements,
+            enclosing_binding_contexts: None,
+        }
     }
 
     /// Creates a new `Bindings` from an iterator of [`Bindings`]s for an intersection type.
