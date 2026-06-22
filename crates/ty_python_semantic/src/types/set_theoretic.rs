@@ -226,26 +226,27 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
-    /// Returns the shared fallback instance type for a union of literal-value types.
+    /// Returns a shared fully static supertype for a union of literal-value types.
     ///
-    /// The returned type is broader than the literal types themselves. For example, the fallback
-    /// for `Literal["a"] | Literal["b"]` is `str`.
-    pub(crate) fn common_literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    /// The returned type is broader than the literal types themselves. For example, the
+    /// supertype for `Literal["a"] | Literal["b"]` is `LiteralString`.
+    pub(crate) fn common_literal_supertype(self, db: &'db dyn Db) -> Option<Type<'db>> {
         // Do not use `Type::literal_fallback_instance` here: it also falls back from function
         // literals to `FunctionType`. Since `FunctionType.__call__` is gradual, it can be
         // assignable to a callable that the function literal's precise signature is not.
-        // Literal values have fully static fallbacks, so a successful relation check for the
-        // fallback proves the relation for every literal in the union.
-        let fallback_instance = |element: &Type<'db>| match element {
+        // Literal values have fully static supertypes, so a successful relation check for the
+        // supertype proves the relation for every literal in the union.
+        let supertype = |element: &Type<'db>| match element {
+            Type::LiteralValue(literal) if literal.is_string() => Some(Type::literal_string()),
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
             _ => None,
         };
 
         let mut elements = self.elements(db).iter();
-        let fallback = fallback_instance(elements.next()?)?;
-        elements.try_fold(fallback, |fallback, element| {
-            let next = fallback_instance(element)?;
-            (next == fallback).then_some(fallback)
+        let shared_supertype = supertype(elements.next()?)?;
+        elements.try_fold(shared_supertype, |shared_supertype, element| {
+            let next = supertype(element)?;
+            (next == shared_supertype).then_some(shared_supertype)
         })
     }
 
