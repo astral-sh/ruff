@@ -1223,6 +1223,8 @@ impl<'db> Type<'db> {
     /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
     /// tainted cycles, replace the recursive type argument with the cycle's `Divergent` marker so
     /// that the existing recursive-type normalization can converge on `C[Divergent]`.
+    /// Class-backed protocol instances participate through their nominal representation;
+    /// synthesized protocols are excluded.
     fn recursive_nominal_growth_normalized(
         self,
         db: &'db dyn Db,
@@ -1297,10 +1299,15 @@ impl<'db> Type<'db> {
             (Type::NominalInstance(current), Type::NominalInstance(previous)) => {
                 (current, previous)
             }
-            (Type::ProtocolInstance(current), Type::ProtocolInstance(previous)) => (
-                current.to_nominal_instance()?,
-                previous.to_nominal_instance()?,
-            ),
+            (Type::ProtocolInstance(current), Type::ProtocolInstance(previous)) => {
+                // A class-backed protocol shares a nominal specialization with its runtime class.
+                // `nominal_wrapper_normalized` reconstructs the result through `Type::instance`,
+                // which recognizes the protocol class and restores a protocol instance.
+                (
+                    current.to_nominal_instance()?,
+                    previous.to_nominal_instance()?,
+                )
+            }
             _ => return None,
         };
 
