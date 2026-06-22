@@ -8331,6 +8331,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(constraint)
     }
 
+    fn record_bound_method_collection_constraints(
+        &mut self,
+        attribute: &ast::ExprAttribute,
+        arguments: &ast::Arguments,
+        call_arguments: &mut CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        let value = &attribute.value;
+        let value_type = self.expression_type(value);
+
+        let Some(collection_def) = self.index.unannotated_collection_literal(value) else {
+            return;
+        };
+        let Some((collection_literal, _)) = value_type.class_specialization(self.db()) else {
+            return;
+        };
+
+        let identity_instance = Type::instance(
+            self.db(),
+            collection_literal.identity_specialization(self.db()),
+        );
+        let collection_generic_context = collection_literal.generic_context(self.db());
+
+        let mut identity_bindings = self
+            .infer_attribute_load_impl(attribute, identity_instance)
+            .bindings(self.db())
+            .match_parameters(self.db(), call_arguments)
+            // Perform inference against the type variables on the receiver's generic context.
+            .with_generic_context(self.db(), collection_generic_context);
+
+        let call_result = self.speculate().infer_and_check_argument_types(
+            ArgumentsIter::from_ast(arguments),
+            call_arguments,
+            // TODO: The argument types have already been inferred and stored in `call_arguments`.
+            // However, `value` may have been inferred as a collection with `Divergent` element
+            // types, meaning the type context for a given argument, by which the inferred type is
+            // keyed, may not be the same as the type context we get here. It is not immediately
+            // clear how to retrieve those types, and so we just re-infer the argument expressions
+            // for simplicity.
+            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+            &mut identity_bindings,
+            call_expression_tcx,
+        );
+
+        if call_result.is_err() {
+            return;
+        }
+
+        for call_specialization in identity_bindings
+            .iter_flat()
+            .flat_map(CallableBinding::matching_overloads)
+            .filter_map(|(_, identity_overload)| identity_overload.specialization())
+        {
+            // Record the constraints on the receiver's generic context formed by the arguments to
+            // this bound method call.
+            let Some(constraints) = self.collection_use_constraint_from_specialization(
+                identity_instance,
+                collection_generic_context,
+                call_specialization,
+            ) else {
+                continue;
+            };
+
+            self.collection_use_constraints
+                .entry(collection_def)
+                .or_default()
+                .insert(constraints);
+        }
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -8840,62 +8910,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
         // unannotated collection literal.
-        if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
-            let value_type = self.expression_type(value);
-
-            if let Some(collection_def) = self.index.unannotated_collection_literal(value)
-                && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
-            {
-                let identity_instance = Type::instance(
-                    self.db(),
-                    collection_literal.identity_specialization(self.db()),
-                );
-                let collection_generic_context = collection_literal.generic_context(self.db());
-
-                let mut identity_bindings = self
-                    .infer_attribute_load_impl(attribute, identity_instance)
-                    .bindings(self.db())
-                    .match_parameters(self.db(), &call_arguments)
-                    // Perform inference against the type variables on the receiver's generic context.
-                    .with_generic_context(self.db(), collection_generic_context);
-
-                let call_result = self.speculate().infer_and_check_argument_types(
-                    ArgumentsIter::from_ast(arguments),
-                    &mut call_arguments,
-                    // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                    // However, `value` would have been inferred to a be a collection with `Divergent`
-                    // element types, meaning the type context for a given argument, by which the inferred
-                    // type is keyed, may not be the same as the type context we get here. It is not immediately
-                    // clear how to retrieve those types, and so we just re-infer the argument expressions
-                    // for simplicity.
-                    &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
-                    &mut identity_bindings,
-                    call_expression_tcx,
-                );
-
-                if call_result.is_ok() {
-                    for call_specialization in identity_bindings
-                        .iter_flat()
-                        .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| identity_overload.specialization())
-                    {
-                        // Record the constraints on the receiver's generic context formed by
-                        // the arguments to this bound method call.
-                        let Some(constraints) = self.collection_use_constraint_from_specialization(
-                            identity_instance,
-                            collection_generic_context,
-                            call_specialization,
-                        ) else {
-                            continue;
-                        };
-
-                        self.collection_use_constraints
-                            .entry(collection_def)
-                            .or_default()
-                            .insert(constraints);
-                    }
-                }
-            }
+        if let ast::Expr::Attribute(attribute) = func.as_ref() {
+            self.record_bound_method_collection_constraints(
+                attribute,
+                arguments,
+                &mut call_arguments,
+                call_expression_tcx,
+            );
         }
 
         let db = self.db();
