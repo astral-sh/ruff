@@ -1201,6 +1201,10 @@ impl<'db> Type<'db> {
             } else {
                 self
             }
+        } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
+            && let Some(merged) = current.merge_cycle_recovery(db, previous)
+        {
+            Type::GenericAlias(merged)
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
             // cause the fixed-point iterations to converge slowly or even fail. Consider the case
