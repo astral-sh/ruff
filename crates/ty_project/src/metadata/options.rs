@@ -773,6 +773,10 @@ pub struct EnvironmentOptions {
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
     ///
+    /// ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+    /// through 3.9 can still be selected, but ty may produce false positives or false negatives for
+    /// standard-library APIs because its bundled stubs do not fully describe those versions.
+    ///
     /// If a version is not specified, ty will try the following techniques in order of preference
     /// to determine a value:
     /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
