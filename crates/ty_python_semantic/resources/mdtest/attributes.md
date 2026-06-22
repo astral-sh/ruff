@@ -3993,6 +3993,45 @@ class ProjectionMultiRootTriple:
         reveal_type(self.z)  # revealed: list[int | str | bytes]
 ```
 
+Projection recovery also works when recursive attributes flow through PEP 695 recursive aliases:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+@final
+class ProjectionAliasBox[T]:
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    def unwrap(self) -> T:
+        return self.value
+
+type ProjectionRecursiveBox[T] = T | ProjectionAliasBox[ProjectionRecursiveBox[T]]
+
+class ProjectionPEP695AliasBridge:
+    def __init__(self, x: ProjectionRecursiveBox[int], y: ProjectionRecursiveBox[str]) -> None:
+        self.x = x
+        self.y = y
+
+    def read(self) -> None:
+        pair = (self.x, self.y)
+        if isinstance(pair[0], ProjectionAliasBox) and isinstance(pair[1], ProjectionAliasBox):
+            x_item = pair[0].unwrap()
+            y_item = pair[1].unwrap()
+            self.x = ProjectionAliasBox(y_item)
+            self.y = ProjectionAliasBox(x_item)
+
+        # revealed: int | ProjectionAliasBox[ProjectionRecursiveBox[int]] | ProjectionAliasBox[str | ProjectionAliasBox[ProjectionRecursiveBox[str]] | int | ProjectionAliasBox[ProjectionRecursiveBox[int]]]
+        reveal_type(self.x)
+        # revealed: str | ProjectionAliasBox[ProjectionRecursiveBox[str]] | ProjectionAliasBox[int | ProjectionAliasBox[ProjectionRecursiveBox[int]] | str | ProjectionAliasBox[ProjectionRecursiveBox[str]]]
+        reveal_type(self.y)
+```
+
 Deeply nested projections are inferred correctly:
 
 ```py

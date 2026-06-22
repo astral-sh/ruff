@@ -21,8 +21,9 @@ use crate::{
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, ProjectionEvidenceSet,
-        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType,
-        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        ProjectionRecoveryBuilder, PropertyInstanceType, Signature, SpecialFormType,
+        StaticMroError, SubclassOfType, Truthiness, Type, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -3325,14 +3326,28 @@ fn implicit_attribute_cycle_recover<'db>(
         member.projection_evidence,
         previous_member.projection_evidence,
     );
-    let inner = member
+    let previous_inner = previous_member.member.inner;
+    let previous_ty = match previous_inner.place {
+        Place::Defined(previous) => Some(previous.ty),
+        Place::Undefined => None,
+    };
+    let mut projection_recovery = ProjectionRecoveryBuilder::new(cycle);
+    let mut joined = member
         .member
         .inner
-        .cycle_normalized_with_projection_evidence(
-            db,
-            previous_member.member.inner,
-            cycle,
-            projection_evidence.as_ref(),
-        );
+        .cycle_join_for_recovery(db, previous_inner, cycle);
+    if let Place::Defined(current) = joined.place {
+        joined.place = Place::Defined(DefinedPlace {
+            ty: projection_recovery.push_candidate(db, previous_ty, current.ty),
+            ..current
+        });
+    }
+    let projection_solutions = projection_recovery.finish(db, projection_evidence.as_ref());
+    let inner = joined.recursive_type_normalized_with_projection_solutions(
+        db,
+        cycle,
+        projection_solutions.as_ref(),
+        projection_evidence.as_ref(),
+    );
     ImplicitAttributeMember::new(Member::new(inner)).with_projection_evidence(projection_evidence)
 }

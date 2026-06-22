@@ -12,8 +12,8 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, ProjectionEvidenceSet, Type, TypeAndQualifiers,
-    TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
+    DynamicType, KnownClass, MemberLookupPolicy, ProjectionEvidenceSet, ProjectionSolutions, Type,
+    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
@@ -927,6 +927,25 @@ impl<'db> PlaceAndQualifiers<'db> {
         cycle: &salsa::Cycle,
         projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Self {
+        self.cycle_join_for_recovery(db, previous_place, cycle)
+            .recursive_type_normalized_with_projection_solutions(
+                db,
+                cycle,
+                None,
+                projection_evidence,
+            )
+    }
+
+    /// Cycle-recovery-time API: combines the current and previous fixed-point iteration results.
+    ///
+    /// This keeps projection artifacts intact so callers can solve all result slots together before
+    /// applying recursive normalization.
+    pub(crate) fn cycle_join_for_recovery(
+        self,
+        db: &'db dyn Db,
+        previous_place: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let qualifiers = if cycle.iteration() <= 1 {
             self.qualifiers
         } else {
@@ -938,12 +957,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized_with_projection_evidence(
-                    db,
-                    prev.ty,
-                    cycle,
-                    projection_evidence,
-                ),
+                ty: current.ty.cycle_join_for_recovery(db, prev.ty, cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -964,13 +978,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current
-                    .ty
-                    .recursive_type_normalized_with_projection_evidence(
-                        db,
-                        cycle,
-                        projection_evidence,
-                    ),
+                ty: current.ty,
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -985,11 +993,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized_with_projection_evidence(
-                            db,
-                            cycle,
-                            projection_evidence,
-                        ),
+                        ty: prev.ty,
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -998,6 +1002,34 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
         PlaceAndQualifiers { place, qualifiers }
+    }
+
+    /// Cycle-recovery-time API: normalizes a joined place using result-wide projection solutions.
+    pub(crate) fn recursive_type_normalized_with_projection_solutions(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        projection_solutions: Option<&ProjectionSolutions<'db>>,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        let place = match self.place {
+            Place::Defined(place) => Place::Defined(DefinedPlace {
+                ty: place
+                    .ty
+                    .recursive_type_normalized_with_projection_solutions(
+                        db,
+                        cycle,
+                        projection_solutions,
+                        projection_evidence,
+                    ),
+                ..place
+            }),
+            Place::Undefined => Place::Undefined,
+        };
+        PlaceAndQualifiers {
+            place,
+            qualifiers: self.qualifiers,
+        }
     }
 }
 

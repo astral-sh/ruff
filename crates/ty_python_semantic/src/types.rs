@@ -168,7 +168,9 @@ mod definition;
 mod property_tests;
 mod subscript;
 
-pub(crate) use projection::ProjectionEvidenceSet;
+pub(crate) use projection::{
+    ProjectionEvidenceSet, ProjectionRecoveryBuilder, ProjectionSolutions,
+};
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
