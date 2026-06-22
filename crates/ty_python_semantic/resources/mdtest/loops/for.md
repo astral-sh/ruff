@@ -1856,6 +1856,8 @@ def tuple_projection_with_side_containers() -> None:
 Recursive updates through tuple entries should not introduce the tuple itself into an element type.
 
 ```py
+import copy
+
 growing_tuple = (int(),)
 
 for _ in range(10):
@@ -1863,6 +1865,21 @@ for _ in range(10):
     growing_tuple = ((item,),)
 
 reveal_type(growing_tuple)  # revealed: tuple[int] | tuple[tuple[int | Divergent]]
+
+def unknown():
+    pass
+
+pair_items = []
+
+for _ in range(10):
+    pairs_copied = copy.copy(pair_items)
+    for recursive_pair in pairs_copied:
+        reveal_type(recursive_pair)  # revealed: tuple[Unknown, Unknown]
+        reveal_type(recursive_pair[0])  # revealed: Unknown
+        pair_items.append((recursive_pair[0], unknown()))
+    pair_items.append((unknown(), unknown()))
+
+reveal_type(pair_items)  # revealed: list[tuple[Unknown, Unknown]]
 ```
 
 Recursive subscript assignments to an initially empty collection should converge.
@@ -1874,6 +1891,55 @@ def recursive_subscript_assignment(items):
         maps[-1] = (maps[-1][0], 1)
 
     reveal_type(maps)  # revealed: list[Divergent]
+```
+
+Loop variable projections can pass through tuple bridges and nested custom iterables before feeding
+implicit attribute inference.
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar
+
+_ProjectionForLoopT = TypeVar("_ProjectionForLoopT")
+
+class ProjectionForLoopIterBox(Generic[_ProjectionForLoopT]):
+    def __init__(self, value: _ProjectionForLoopT) -> None:
+        self.value = value
+
+    def __iter__(self) -> Iterator[_ProjectionForLoopT]:
+        raise NotImplementedError
+
+class ProjectionForLoopAttributeTupleBridge:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+
+    def f(self) -> None:
+        for _ in range(10):
+            pair = (self.x, self.y)
+            a = pair[1][0]
+            b = pair[0][0]
+            self.x = [a]
+            self.y = [b]
+
+        reveal_type(self.x)  # revealed: list[int] | list[str | int]
+        reveal_type(self.y)  # revealed: list[str] | list[int | str]
+
+class ProjectionForLoopAttributeNestedIterableBridge:
+    def __init__(self) -> None:
+        self.x = [0]
+        self.y = [""]
+
+    def f(self) -> None:
+        for box in ProjectionForLoopIterBox(ProjectionForLoopIterBox((self.x, self.y))):
+            for pair in box:
+                a = pair[1][0]
+                b = pair[0][0]
+                self.x = [a]
+                self.y = [b]
+
+        reveal_type(self.x)  # revealed: list[int] | list[str | int]
+        reveal_type(self.y)  # revealed: list[str] | list[int | str]
 ```
 
 Recursive loop inference can involve multiple local containers that feed each other through

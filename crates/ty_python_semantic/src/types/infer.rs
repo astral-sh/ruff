@@ -825,10 +825,10 @@ impl<'db> ScopeInference<'db> {
             .iter()
             .map(|(expr, ty)| {
                 let previous_ty = previous_inference.expression_type(expr);
-                ProjectionRecoverySlot {
-                    previous: Some(previous_ty),
-                    joined: ty.cycle_joined(db, previous_ty, cycle),
-                }
+                ProjectionRecoverySlot::candidate(
+                    Some(previous_ty),
+                    ty.cycle_joined(db, previous_ty, cycle),
+                )
             })
             .collect::<Vec<_>>();
         let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
@@ -1243,10 +1243,10 @@ impl<'db> DefinitionInference<'db> {
             .iter()
             .map(|(expr, ty)| {
                 let previous_ty = previous_inference.expression_type(*expr);
-                ProjectionRecoverySlot {
-                    previous: Some(previous_ty),
-                    joined: ty.cycle_joined(db, previous_ty, cycle),
-                }
+                ProjectionRecoverySlot::demand(
+                    Some(previous_ty),
+                    ty.cycle_joined(db, previous_ty, cycle),
+                )
             })
             .collect::<Vec<_>>();
         let bindings = self.types.bindings(definition).collect::<Vec<_>>();
@@ -1256,23 +1256,22 @@ impl<'db> DefinitionInference<'db> {
         slots.extend(expression_slots);
         for (binding, ty) in &bindings {
             let previous_ty = previous_inference.types.binding_type(definition, *binding);
-            slots.push(ProjectionRecoverySlot {
-                previous: previous_ty,
-                joined: previous_ty
-                    .map_or(*ty, |previous_ty| ty.cycle_joined(db, previous_ty, cycle)),
-            });
+            slots.push(ProjectionRecoverySlot::candidate(
+                previous_ty,
+                previous_ty.map_or(*ty, |previous_ty| ty.cycle_joined(db, previous_ty, cycle)),
+            ));
         }
         for (declaration, ty) in &declarations {
             let previous_ty = previous_inference
                 .types
                 .declaration_type(definition, *declaration);
-            slots.push(ProjectionRecoverySlot {
-                previous: previous_ty.map(|ty| ty.inner_type()),
-                joined: previous_ty.map_or(ty.inner_type(), |previous_ty| {
+            slots.push(ProjectionRecoverySlot::candidate(
+                previous_ty.map(|ty| ty.inner_type()),
+                previous_ty.map_or(ty.inner_type(), |previous_ty| {
                     ty.inner_type()
                         .cycle_joined(db, previous_ty.inner_type(), cycle)
                 }),
-            });
+            ));
         }
 
         let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
@@ -1540,12 +1539,12 @@ impl<'db> ExpressionInference<'db> {
                                 .find(|(previous_binding, _)| previous_binding == binding)
                                 .map(|(_, ty)| *ty)
                         });
-                        ProjectionRecoverySlot {
-                            previous: previous_ty,
-                            joined: previous_ty.map_or(*binding_ty, |previous_ty| {
+                        ProjectionRecoverySlot::candidate(
+                            previous_ty,
+                            previous_ty.map_or(*binding_ty, |previous_ty| {
                                 binding_ty.cycle_joined(db, previous_ty, cycle)
                             }),
-                        }
+                        )
                     })
                     .collect::<Vec<_>>()
             })
@@ -1555,10 +1554,10 @@ impl<'db> ExpressionInference<'db> {
             .iter()
             .map(|(expr, ty)| {
                 let previous_ty = previous.expression_type(*expr);
-                ProjectionRecoverySlot {
-                    previous: Some(previous_ty),
-                    joined: ty.cycle_joined(db, previous_ty, cycle),
-                }
+                ProjectionRecoverySlot::candidate(
+                    Some(previous_ty),
+                    ty.cycle_joined(db, previous_ty, cycle),
+                )
             })
             .collect::<Vec<_>>();
 
@@ -1746,10 +1745,10 @@ impl<'db> StatementInferenceInner<'db> {
             .iter()
             .map(|(expr, ty)| {
                 let previous_ty = previous_inference.expression_type(*expr);
-                ProjectionRecoverySlot {
-                    previous: Some(previous_ty),
-                    joined: ty.cycle_joined(db, previous_ty, cycle),
-                }
+                ProjectionRecoverySlot::demand(
+                    Some(previous_ty),
+                    ty.cycle_joined(db, previous_ty, cycle),
+                )
             })
             .collect::<Vec<_>>();
         let binding_slots = self
@@ -1761,12 +1760,12 @@ impl<'db> StatementInferenceInner<'db> {
                     .iter()
                     .find(|(previous_binding, _)| previous_binding == binding)
                     .map(|(_, ty)| *ty);
-                ProjectionRecoverySlot {
-                    previous: previous_ty,
-                    joined: previous_ty.map_or(*binding_ty, |previous_ty| {
+                ProjectionRecoverySlot::candidate(
+                    previous_ty,
+                    previous_ty.map_or(*binding_ty, |previous_ty| {
                         binding_ty.cycle_joined(db, previous_ty, cycle)
                     }),
-                }
+                )
             })
             .collect::<Vec<_>>();
         let declaration_slots = self
@@ -1778,14 +1777,14 @@ impl<'db> StatementInferenceInner<'db> {
                     .iter()
                     .find(|(previous_declaration, _)| previous_declaration == declaration)
                     .map(|(_, ty)| ty.inner_type());
-                ProjectionRecoverySlot {
-                    previous: previous_ty,
-                    joined: previous_ty.map_or(declaration_ty.inner_type(), |previous_ty| {
+                ProjectionRecoverySlot::candidate(
+                    previous_ty,
+                    previous_ty.map_or(declaration_ty.inner_type(), |previous_ty| {
                         declaration_ty
                             .inner_type()
                             .cycle_joined(db, previous_ty, cycle)
                     }),
-                }
+                )
             })
             .collect::<Vec<_>>();
 

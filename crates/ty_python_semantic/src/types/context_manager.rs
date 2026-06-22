@@ -40,6 +40,15 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Type<'db>, ContextManagerError<'db>> {
+        if let Some(projected) = self.project_cycle(
+            db,
+            crate::types::ProjectionOp::ContextEnter {
+                is_async: mode.is_async(),
+            },
+        ) {
+            return Ok(projected);
+        }
+
         let (enter_method, exit_method) = match mode {
             EvaluationMode::Async => ("__aenter__", "__aexit__"),
             EvaluationMode::Sync => ("__enter__", "__exit__"),

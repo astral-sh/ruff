@@ -1210,10 +1210,7 @@ impl<'db> Type<'db> {
         let joined = self.cycle_joined(db, previous, cycle);
         solve_projections_in_cycle_slots(
             db,
-            &[ProjectionRecoverySlot {
-                previous: Some(previous),
-                joined,
-            }],
+            &[ProjectionRecoverySlot::candidate(Some(previous), joined)],
             cycle,
         )
         .into_iter()
@@ -1538,6 +1535,37 @@ impl<'db> Type<'db> {
         self.nominal_class(db)?
             .static_class_literal(db)
             .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
+    }
+
+    /// If this type is directly a specialized class instance, returns the class and specialization.
+    ///
+    /// Unlike [`Type::class_specialization`], this does not expand aliases, type-variable bounds, or
+    /// literal fallbacks. Use it from cycle recovery when replaying projection operations must not
+    /// introduce new Salsa dependencies.
+    fn direct_class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        match self {
+            Type::NominalInstance(instance) => Some(instance.class(db)),
+            Type::ProtocolInstance(instance) => instance
+                .to_nominal_instance()
+                .map(|instance| instance.class(db)),
+            _ => None,
+        }?
+        .static_class_literal(db)
+        .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
+    }
+
+    /// If this type is directly an instance of a known class, returns that class.
+    fn direct_known_class(self, db: &'db dyn Db) -> Option<KnownClass> {
+        match self {
+            Type::NominalInstance(instance) => instance.known_class(db),
+            Type::ProtocolInstance(instance) => instance
+                .to_nominal_instance()
+                .and_then(|instance| instance.known_class(db)),
+            _ => None,
+        }
     }
 
     /// If this type is a class instance, returns its class.
@@ -2357,7 +2385,8 @@ impl<'db> Type<'db> {
                 .type_argument(db)
                 .recursive_type_normalized_impl(db, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
-            Type::Divergent(_) | Type::Projection(_) => Some(self),
+            Type::Divergent(_) => Some(self),
+            Type::Projection(projection) => Some(Type::Divergent(projection.root(db))),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts

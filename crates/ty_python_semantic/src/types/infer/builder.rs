@@ -8360,7 +8360,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable_type =
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
 
+        if let Some(projected) = self.try_project_zero_argument_method_call(call_expression) {
+            return projected;
+        }
+
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
+    }
+
+    fn try_project_zero_argument_method_call(
+        &self,
+        call_expression: &ast::ExprCall,
+    ) -> Option<Type<'db>> {
+        let ast::ExprCall {
+            func, arguments, ..
+        } = call_expression;
+        if !arguments.args.is_empty() || !arguments.keywords.is_empty() {
+            return None;
+        }
+
+        let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+            return None;
+        };
+
+        self.expression_type(value)
+            .project_cycle(self.db(), ProjectionOp::call_method0(self.db(), &attr.id))
     }
 
     fn infer_call_expression_impl(
@@ -9140,6 +9163,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
             tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(self.db(), &[tcx])),
         );
+
+        if let Some(projected) = expr_type.project_cycle(self.db(), ProjectionOp::AwaitResult) {
+            return projected;
+        }
 
         expr_type.try_await(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
@@ -9966,9 +9993,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, &attr.id).map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        });
+        let fallback_place = value_type
+            .project_cycle(
+                db,
+                ProjectionOp::member(db, &attr.id, MemberLookupPolicy::default()),
+            )
+            .map_or_else(
+                || value_type.member(db, &attr.id),
+                |projected| Place::bound(projected).into(),
+            )
+            .map_type(|ty| {
+                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            });
 
         let attr_name = &attr.id;
         let resolved_type =

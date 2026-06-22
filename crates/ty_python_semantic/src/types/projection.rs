@@ -1,13 +1,17 @@
 use std::cell::RefCell;
 
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::EvaluationMode;
 
+use crate::place::{DefinedPlace, Definedness, Place};
+use crate::subscript::{PyIndex, PySlice};
 use crate::types::tuple::{TupleLength, TupleSpec, VariableLengthTuple};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, DivergentType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, CallArguments, DivergentType, KnownClass, MemberLookupPolicy, Type,
+    TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -35,6 +39,12 @@ pub enum ProjectionOp<'db> {
         other: Type<'db>,
         is_reverse: bool,
     },
+    Member(ProjectionMember<'db>),
+    CallMethod0(ProjectionMemberName<'db>),
+    ContextEnter {
+        is_async: bool,
+    },
+    AwaitResult,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -44,7 +54,71 @@ pub enum ProjectionUnpackTarget {
     Suffix { index: u32 },
 }
 
+/// An interned member name used by attribute and method-call projections.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub struct ProjectionMemberName<'db> {
+    #[returns(ref)]
+    name: Name,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionMemberName<'_> {}
+
+impl<'db> ProjectionMemberName<'db> {
+    fn new(db: &'db dyn Db, name: &Name) -> Self {
+        let mut name = name.clone();
+        name.shrink_to_fit();
+        Self::new_internal(db, name)
+    }
+}
+
+/// An attribute lookup projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct ProjectionMember<'db> {
+    name: ProjectionMemberName<'db>,
+    policy: ProjectionMemberLookupPolicy,
+}
+
+impl<'db> ProjectionMember<'db> {
+    fn new(db: &'db dyn Db, name: &Name, policy: MemberLookupPolicy) -> Self {
+        Self {
+            name: ProjectionMemberName::new(db, name),
+            policy: ProjectionMemberLookupPolicy::new(policy),
+        }
+    }
+
+    fn name(self, db: &'db dyn Db) -> &'db Name {
+        self.name.name(db)
+    }
+
+    fn policy(self) -> MemberLookupPolicy {
+        self.policy.to_policy()
+    }
+}
+
+/// Compact copyable member lookup policy stored in projection paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct ProjectionMemberLookupPolicy(u8);
+
+impl ProjectionMemberLookupPolicy {
+    const fn new(policy: MemberLookupPolicy) -> Self {
+        Self(policy.bits())
+    }
+
+    fn to_policy(self) -> MemberLookupPolicy {
+        MemberLookupPolicy::from_bits_retain(self.0)
+    }
+}
+
 impl<'db> ProjectionOp<'db> {
+    pub(crate) fn member(db: &'db dyn Db, name: &Name, policy: MemberLookupPolicy) -> Self {
+        Self::Member(ProjectionMember::new(db, name, policy))
+    }
+
+    pub(crate) fn call_method0(db: &'db dyn Db, name: &Name) -> Self {
+        Self::CallMethod0(ProjectionMemberName::new(db, name))
+    }
+
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -73,7 +147,13 @@ impl<'db> ProjectionOp<'db> {
                 other: other.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 is_reverse,
             },
-            Self::IterItem { .. } | Self::UnpackExact { .. } | Self::UnpackStarred { .. } => self,
+            Self::IterItem { .. }
+            | Self::UnpackExact { .. }
+            | Self::UnpackStarred { .. }
+            | Self::Member(_)
+            | Self::CallMethod0(_)
+            | Self::ContextEnter { .. }
+            | Self::AwaitResult => self,
         }
     }
 }
@@ -97,11 +177,11 @@ impl<'db> ProjectionType<'db> {
         Self::new(db, self.root(db), path.into_boxed_slice())
     }
 
-    pub(crate) fn apply_path(self, db: &'db dyn Db, mut ty: Type<'db>) -> Type<'db> {
+    fn try_apply_path(self, db: &'db dyn Db, mut ty: Type<'db>) -> Option<Type<'db>> {
         for op in self.path(db) {
-            ty = apply_projection_op(db, ty, *op);
+            ty = try_apply_projection_op(db, ty, *op)?;
         }
-        ty
+        Some(ty)
     }
 
     pub(crate) fn apply_type_mapping_impl(
@@ -141,15 +221,46 @@ pub(crate) fn walk_projection_type<'db, V: TypeVisitor<'db> + ?Sized>(
             ProjectionOp::Binary { other, .. } => visitor.visit_type(db, other),
             ProjectionOp::IterItem { .. }
             | ProjectionOp::UnpackExact { .. }
-            | ProjectionOp::UnpackStarred { .. } => {}
+            | ProjectionOp::UnpackStarred { .. }
+            | ProjectionOp::Member(_)
+            | ProjectionOp::CallMethod0(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => {}
         }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ProjectionRecoverySlot<'db> {
-    pub(crate) previous: Option<Type<'db>>,
-    pub(crate) joined: Type<'db>,
+    previous: Option<Type<'db>>,
+    joined: Type<'db>,
+    role: ProjectionRecoverySlotRole,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProjectionRecoverySlotRole {
+    /// A derived value that may demand projection solutions but must not define a root equation.
+    DemandOnly,
+    /// A query-managed value whose fixed-point slot can define a root equation.
+    Candidate,
+}
+
+impl<'db> ProjectionRecoverySlot<'db> {
+    pub(crate) const fn demand(previous: Option<Type<'db>>, joined: Type<'db>) -> Self {
+        Self {
+            previous,
+            joined,
+            role: ProjectionRecoverySlotRole::DemandOnly,
+        }
+    }
+
+    pub(crate) const fn candidate(previous: Option<Type<'db>>, joined: Type<'db>) -> Self {
+        Self {
+            previous,
+            joined,
+            role: ProjectionRecoverySlotRole::Candidate,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -177,15 +288,34 @@ fn solve_projections_in_slots<'db>(
         return slots.iter().map(|slot| slot.joined).collect();
     }
 
-    let mut pending = collect_slot_projections(db, slots, recovery_roots);
+    let candidates = root_candidates(db, slots, recovery_roots);
+    let projection_results = projection_results_from_slots(db, slots, recovery_roots, &candidates);
+    let collected = collect_slot_projections(db, slots, recovery_roots);
+    let pending = collected
+        .into_iter()
+        .filter(|projection| {
+            candidates.contains_key(&projection.root(db))
+                || projection_results.contains_key(projection)
+        })
+        .collect::<FxOrderSet<_>>();
+    let mut pending = remove_prefixed_projections(db, &pending);
     if pending.is_empty() {
         return slots
             .iter()
-            .map(|slot| normalize_recovered_type(db, slot.joined, cycle))
+            .map(|slot| {
+                if collect_active_projections(db, slot.joined, &[]).is_empty() {
+                    normalize_recovered_type(db, slot.joined, cycle)
+                } else {
+                    normalize_recovered_type(
+                        db,
+                        replace_projections_with_roots(db, slot.joined),
+                        cycle,
+                    )
+                }
+            })
             .collect();
     }
 
-    let candidates = root_candidates(db, slots, recovery_roots);
     let mut equations = FxHashMap::default();
     let mut index = 0;
     while let Some(&projection) = pending.get_index(index) {
@@ -194,14 +324,26 @@ fn solve_projections_in_slots<'db>(
             continue;
         }
 
-        let mut rhs = if let Some(candidate) = candidates.get(&projection.root(db)) {
-            projection.apply_path(db, *candidate)
-        } else {
-            Type::Divergent(projection.root(db))
+        let mut rhs_terms = Vec::with_capacity(2);
+        if let Some(result) = projection_results.get(&projection).copied() {
+            rhs_terms.push(result);
+        }
+        if let Some(candidate) = candidates.get(&projection.root(db))
+            && let Some(projected) = projection.try_apply_path(db, *candidate)
+        {
+            rhs_terms.push(projected);
+        }
+        let rhs = match rhs_terms.as_slice() {
+            [] => Type::Divergent(projection.root(db)),
+            [rhs] => *rhs,
+            _ => UnionType::from_elements_cycle_recovery(db, rhs_terms),
         };
-        rhs = replace_expansive_self_dependencies(db, rhs, projection, recovery_roots);
         let dependencies = collect_active_projections(db, rhs, recovery_roots);
-        pending.extend(dependencies.iter().copied());
+        pending.extend(dependencies.iter().copied().filter(|dependency| {
+            candidates.contains_key(&dependency.root(db))
+                || projection_results.contains_key(dependency)
+        }));
+        pending = remove_prefixed_projections(db, &pending);
         equations.insert(projection, Equation { rhs, dependencies });
     }
 
@@ -209,15 +351,30 @@ fn solve_projections_in_slots<'db>(
     slots
         .iter()
         .map(|slot| {
-            if collect_active_projections(db, slot.joined, recovery_roots).is_empty() {
+            if collect_active_projections(db, slot.joined, &[]).is_empty() {
                 return normalize_recovered_type(db, slot.joined, cycle);
             }
 
-            let recovered = slot
-                .joined
-                .replace_projections(db, &solutions)
-                .replace_active_projections_with_roots(db, recovery_roots);
+            let recovered = slot.joined.replace_projections(db, &solutions);
+            let recovered = replace_projections_with_roots(db, recovered);
             normalize_recovered_type(db, recovered, cycle)
+        })
+        .collect()
+}
+
+fn remove_prefixed_projections<'db>(
+    db: &'db dyn Db,
+    projections: &FxOrderSet<ProjectionType<'db>>,
+) -> FxOrderSet<ProjectionType<'db>> {
+    projections
+        .iter()
+        .copied()
+        .filter(|projection| {
+            !projections.iter().copied().any(|candidate| {
+                projection.root(db).same_marker(candidate.root(db))
+                    && candidate.path(db).len() < projection.path(db).len()
+                    && projection.path(db).starts_with(candidate.path(db))
+            })
         })
         .collect()
 }
@@ -249,12 +406,25 @@ fn root_candidates<'db>(
 ) -> FxHashMap<DivergentType, Type<'db>> {
     let mut candidates = FxHashMap::default();
     for slot in slots {
-        let Some(previous) = slot.previous else {
+        if !matches!(slot.role, ProjectionRecoverySlotRole::Candidate) {
+            continue;
+        }
+        let root = if let Some(previous) = slot.previous {
+            direct_active_root(db, previous, active_roots).or_else(|| {
+                collect_active_roots(db, previous, active_roots)
+                    .is_empty()
+                    .then(|| unique_active_root(db, slot.joined, active_roots))
+                    .flatten()
+            })
+        } else {
+            unique_active_root(db, slot.joined, active_roots)
+        };
+        let Some(root) = root else {
             continue;
         };
-        let Some(root) = unique_active_root(db, previous, active_roots) else {
+        if !is_plausible_root_candidate(db, root, slot.joined) {
             continue;
-        };
+        }
         candidates
             .entry(root)
             .and_modify(|candidate| {
@@ -277,6 +447,179 @@ fn collect_slot_projections<'db>(
     projections
 }
 
+fn projection_results_from_slots<'db>(
+    db: &'db dyn Db,
+    slots: &[ProjectionRecoverySlot<'db>],
+    active_roots: &[DivergentType],
+    candidates: &FxHashMap<DivergentType, Type<'db>>,
+) -> FxHashMap<ProjectionType<'db>, Type<'db>> {
+    let mut results = FxHashMap::<ProjectionType<'db>, Type<'db>>::default();
+    for slot in slots {
+        if matches!(slot.role, ProjectionRecoverySlotRole::Candidate) {
+            for projection in top_level_active_projections(db, slot.joined, active_roots) {
+                push_projection_result(db, &mut results, projection, slot.joined);
+            }
+        }
+        for projection in collect_active_projections(db, slot.joined, active_roots) {
+            if candidates.contains_key(&projection.root(db)) {
+                continue;
+            }
+            if let Some(result) = structural_projection_result(db, slot.joined, projection) {
+                push_projection_result(db, &mut results, projection, result);
+            }
+        }
+    }
+    results
+}
+
+fn push_projection_result<'db>(
+    db: &'db dyn Db,
+    results: &mut FxHashMap<ProjectionType<'db>, Type<'db>>,
+    projection: ProjectionType<'db>,
+    ty: Type<'db>,
+) {
+    results
+        .entry(projection)
+        .and_modify(|result| {
+            *result = UnionType::from_elements_cycle_recovery(db, [*result, ty]);
+        })
+        .or_insert(ty);
+}
+
+fn structural_projection_result<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    projection: ProjectionType<'db>,
+) -> Option<Type<'db>> {
+    let mut matches = Vec::new();
+    collect_structural_projection_result(db, ty, projection, &mut matches);
+
+    (!matches.is_empty()).then(|| UnionType::from_elements_cycle_recovery(db, matches))
+}
+
+fn collect_structural_projection_result<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    projection: ProjectionType<'db>,
+    matches: &mut Vec<Type<'db>>,
+) {
+    if let Type::Union(union) = ty {
+        for pattern in union
+            .elements(db)
+            .iter()
+            .copied()
+            .filter(|element| element.contains_projection(db, projection))
+        {
+            for candidate in union
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|candidate| !candidate.contains_projection(db, projection))
+            {
+                collect_structural_projection_matches(
+                    db, pattern, candidate, projection, matches, false,
+                );
+            }
+        }
+
+        for element in union.elements(db) {
+            collect_structural_projection_result(db, *element, projection, matches);
+        }
+        return;
+    }
+
+    if let Some(tuple) = ty.exact_tuple_instance_spec(db) {
+        for element in tuple.as_ref().all_elements() {
+            collect_structural_projection_result(db, *element, projection, matches);
+        }
+    }
+
+    if let Some((_, specialization)) = ty.direct_class_specialization(db) {
+        for argument in specialization.types(db) {
+            collect_structural_projection_result(db, *argument, projection, matches);
+        }
+    }
+}
+
+fn collect_structural_projection_matches<'db>(
+    db: &'db dyn Db,
+    pattern: Type<'db>,
+    candidate: Type<'db>,
+    projection: ProjectionType<'db>,
+    matches: &mut Vec<Type<'db>>,
+    nested: bool,
+) {
+    if pattern == Type::Projection(projection) {
+        if nested {
+            matches.push(candidate);
+        }
+        return;
+    }
+
+    if let (Some(pattern_tuple), Some(candidate_tuple)) = (
+        pattern.exact_tuple_instance_spec(db),
+        candidate.exact_tuple_instance_spec(db),
+    ) {
+        let pattern_elements = pattern_tuple.as_ref().all_elements();
+        let candidate_elements = candidate_tuple.as_ref().all_elements();
+        if pattern_elements.len() == candidate_elements.len() {
+            for (&pattern, &candidate) in pattern_elements.iter().zip(candidate_elements) {
+                collect_structural_projection_matches(
+                    db, pattern, candidate, projection, matches, true,
+                );
+            }
+        }
+    }
+
+    let (
+        Some((pattern_class, pattern_specialization)),
+        Some((candidate_class, candidate_specialization)),
+    ) = (
+        pattern.direct_class_specialization(db),
+        candidate.direct_class_specialization(db),
+    )
+    else {
+        return;
+    };
+
+    if pattern_class != candidate_class {
+        return;
+    }
+
+    let pattern_arguments = pattern_specialization.types(db);
+    let candidate_arguments = candidate_specialization.types(db);
+    if pattern_arguments.len() != candidate_arguments.len() {
+        return;
+    }
+
+    for (&pattern, &candidate) in pattern_arguments.iter().zip(candidate_arguments) {
+        collect_structural_projection_matches(db, pattern, candidate, projection, matches, true);
+    }
+}
+
+fn top_level_active_projections<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    active_roots: &[DivergentType],
+) -> FxOrderSet<ProjectionType<'db>> {
+    let mut projections = FxOrderSet::default();
+    match ty {
+        Type::Projection(projection) if root_is_active(projection.root(db), active_roots) => {
+            projections.insert(projection);
+        }
+        Type::Union(union) => {
+            projections.extend(union.elements(db).iter().filter_map(|element| {
+                let Type::Projection(projection) = *element else {
+                    return None;
+                };
+                root_is_active(projection.root(db), active_roots).then_some(projection)
+            }));
+        }
+        _ => {}
+    }
+    projections
+}
+
 fn collect_active_projections<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -291,28 +634,12 @@ fn collect_active_projections<'db>(
     collector.projections.into_inner()
 }
 
-fn replace_expansive_self_dependencies<'db>(
-    db: &'db dyn Db,
-    rhs: Type<'db>,
-    projection: ProjectionType<'db>,
-    active_roots: &[DivergentType],
-) -> Type<'db> {
-    let replacements = collect_active_projections(db, rhs, active_roots)
+pub(super) fn replace_projections_with_roots<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    let replacements = collect_active_projections(db, ty, &[])
         .into_iter()
-        .filter(|dependency| is_expansive_self_dependency(db, projection, *dependency))
-        .map(|dependency| (dependency, Type::Divergent(dependency.root(db))))
+        .map(|projection| (projection, Type::Divergent(projection.root(db))))
         .collect::<FxHashMap<_, _>>();
-    rhs.replace_projections(db, &replacements)
-}
-
-fn is_expansive_self_dependency<'db>(
-    db: &'db dyn Db,
-    projection: ProjectionType<'db>,
-    dependency: ProjectionType<'db>,
-) -> bool {
-    projection.root(db).same_marker(dependency.root(db))
-        && dependency.path(db).len() > projection.path(db).len()
-        && dependency.path(db).starts_with(projection.path(db))
+    ty.replace_projections(db, &replacements)
 }
 
 fn unique_active_root<'db>(
@@ -330,6 +657,54 @@ fn unique_active_root<'db>(
         }
     }
     unique
+}
+
+fn collect_active_roots<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    active_roots: &[DivergentType],
+) -> Vec<DivergentType> {
+    active_roots
+        .iter()
+        .copied()
+        .filter(|root| ty.contains_divergent_marker(db, *root))
+        .collect()
+}
+
+fn direct_active_root<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    active_roots: &[DivergentType],
+) -> Option<DivergentType> {
+    let root = match ty {
+        Type::Divergent(root) => root,
+        Type::Projection(projection) => projection.root(db),
+        _ => return None,
+    };
+    root_is_active(root, active_roots).then_some(root)
+}
+
+fn is_plausible_root_candidate<'db>(db: &'db dyn Db, root: DivergentType, ty: Type<'db>) -> bool {
+    union_elements(db, ty).iter().copied().any(|element| {
+        !is_same_cycle_artifact(db, element, root) && is_projection_container_candidate(db, element)
+    })
+}
+
+fn is_same_cycle_artifact<'db>(db: &'db dyn Db, ty: Type<'db>, root: DivergentType) -> bool {
+    match ty {
+        Type::Divergent(divergent) => divergent.same_marker(root),
+        Type::Projection(projection) => projection.root(db).same_marker(root),
+        _ => false,
+    }
+}
+
+fn is_projection_container_candidate<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    if ty.exact_tuple_instance_spec(db).is_some() {
+        return true;
+    }
+
+    ty.direct_class_specialization(db)
+        .is_some_and(|(_, specialization)| !specialization.types(db).is_empty())
 }
 
 struct ProjectionCollector<'db, 'a> {
@@ -361,134 +736,429 @@ fn root_is_active(root: DivergentType, active_roots: &[DivergentType]) -> bool {
         .any(|active_root| active_root.same_marker(root))
 }
 
-fn apply_projection_op<'db>(db: &'db dyn Db, ty: Type<'db>, op: ProjectionOp<'db>) -> Type<'db> {
+fn try_apply_projection_op<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    op: ProjectionOp<'db>,
+) -> Option<Type<'db>> {
     if let Some(projected) = ty.project_cycle(db, op) {
-        return projected;
+        return Some(projected);
     }
 
-    match op {
+    if let Type::Union(union) = ty {
+        let elements = union
+            .elements(db)
+            .iter()
+            .filter_map(|element| try_apply_projection_op(db, *element, op))
+            .collect::<Vec<_>>();
+        return (!elements.is_empty())
+            .then(|| UnionType::from_elements_cycle_recovery(db, elements));
+    }
+
+    if let Some(projected) = apply_projection_op_structurally(db, ty, op) {
+        return Some(projected);
+    }
+
+    Some(match op {
         ProjectionOp::Subscript {
             slice,
             expr_context,
-        } => ty
-            .subscript(db, slice, expr_context)
-            .unwrap_or_else(|err| err.result_type()),
+        } => ty.subscript(db, slice, expr_context).ok()?,
         ProjectionOp::IterItem { is_async } => {
             let mode = if is_async {
                 EvaluationMode::Async
             } else {
                 EvaluationMode::Sync
             };
-            ty.try_iterate_with_mode(db, mode).map_or_else(
-                |err| err.fallback_element_type(db),
-                |tuple| tuple.homogeneous_element_type(db),
-            )
+            ty.try_iterate_with_mode(db, mode)
+                .ok()?
+                .homogeneous_element_type(db)
         }
         ProjectionOp::UnpackExact { len, index } => {
-            apply_unpack_exact_projection(db, ty, len, index)
+            try_apply_unpack_exact_projection(db, ty, len, index)?
         }
         ProjectionOp::UnpackStarred {
             before,
             after,
             target,
-        } => apply_unpack_starred_projection(db, ty, before, after, target),
+        } => try_apply_unpack_starred_projection(db, ty, before, after, target)?,
         ProjectionOp::Binary {
             op,
             other,
             is_reverse,
         } => {
             let (left, right) = if is_reverse { (other, ty) } else { (ty, other) };
-            Type::try_call_bin_op_return_type(db, left, op, right).unwrap_or_else(Type::unknown)
+            Type::try_call_bin_op_return_type(db, left, op, right)?
         }
+        ProjectionOp::Member(member) => {
+            infer_member_type_for_type(db, ty, member.name(db), member.policy())?
+        }
+        ProjectionOp::CallMethod0(method_name) => {
+            infer_method_call0_type_for_type(db, ty, method_name.name(db))?
+        }
+        ProjectionOp::ContextEnter { is_async } => {
+            let mode = EvaluationMode::from_is_async(is_async);
+            ty.try_enter_with_mode(db, mode).ok()?
+        }
+        ProjectionOp::AwaitResult => ty.try_await(db).ok()?,
+    })
+}
+
+fn apply_projection_op_structurally<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    op: ProjectionOp<'db>,
+) -> Option<Type<'db>> {
+    if let Type::Union(union) = ty {
+        let elements = union
+            .elements(db)
+            .iter()
+            .map(|element| apply_projection_op_structurally(db, *element, op))
+            .collect::<Option<Vec<_>>>()?;
+        return Some(UnionType::from_elements_cycle_recovery(db, elements));
+    }
+
+    match op {
+        ProjectionOp::Subscript { slice, .. } => {
+            apply_subscript_projection_structurally(db, ty, slice)
+        }
+        ProjectionOp::IterItem { is_async } => apply_iter_projection_structurally(db, ty, is_async),
+        ProjectionOp::UnpackExact { len, index } => {
+            apply_unpack_exact_projection_structurally(db, ty, len, index)
+        }
+        ProjectionOp::UnpackStarred {
+            before,
+            after,
+            target,
+        } => apply_unpack_starred_projection_structurally(db, ty, before, after, target),
+        ProjectionOp::CallMethod0(method_name) => {
+            apply_zero_arg_method_projection_structurally(db, ty, method_name.name(db))
+        }
+        ProjectionOp::Binary { .. }
+        | ProjectionOp::Member(_)
+        | ProjectionOp::ContextEnter { .. }
+        | ProjectionOp::AwaitResult => None,
     }
 }
 
-fn apply_unpack_exact_projection<'db>(
+fn apply_iter_projection_structurally<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    is_async: bool,
+) -> Option<Type<'db>> {
+    if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+        return (!is_async).then(|| spec.as_ref().homogeneous_element_type(db));
+    }
+
+    let (known_class, arguments) = direct_known_class_arguments(db, ty)?;
+    match (known_class, arguments, is_async) {
+        (
+            KnownClass::List
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Deque
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::Sequence
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::TyExtensionsIterator,
+            [element],
+            false,
+        )
+        | (
+            KnownClass::AsyncIterator
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator,
+            [element],
+            true,
+        ) => Some(*element),
+        (
+            KnownClass::Dict
+            | KnownClass::DefaultDict
+            | KnownClass::OrderedDict
+            | KnownClass::Mapping,
+            [key, _],
+            false,
+        ) => Some(*key),
+        _ => None,
+    }
+}
+
+fn apply_subscript_projection_structurally<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    slice: Type<'db>,
+) -> Option<Type<'db>> {
+    if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+        let tuple = spec.as_ref();
+
+        if let Some(index) = slice.as_int_like_literal() {
+            return i32::try_from(index)
+                .ok()
+                .and_then(|index| tuple.py_index(db, index).ok());
+        }
+
+        if let Some(slice) = slice
+            .as_nominal_instance()
+            .and_then(|instance| instance.slice_literal(db))
+        {
+            return match tuple {
+                TupleSpec::Fixed(tuple) => Some(Type::heterogeneous_tuple(
+                    db,
+                    tuple
+                        .py_slice(db, slice.start, slice.stop, slice.step)
+                        .ok()?,
+                )),
+                TupleSpec::Variable(tuple) => {
+                    let element = UnionType::from_elements_leave_aliases(
+                        db,
+                        tuple
+                            .iter_prefix_elements()
+                            .chain(std::iter::once(tuple.variable()))
+                            .chain(tuple.iter_suffix_elements()),
+                    );
+                    Some(Type::homogeneous_tuple(db, element))
+                }
+            };
+        }
+    }
+
+    let (known_class, arguments) = direct_known_class_arguments(db, ty)?;
+    match (known_class, arguments) {
+        (KnownClass::List | KnownClass::Deque, [element]) if is_structural_int_index(db, slice) => {
+            Some(*element)
+        }
+        (KnownClass::List | KnownClass::Deque, [element])
+            if slice
+                .as_nominal_instance()
+                .and_then(|instance| instance.slice_literal(db))
+                .is_some() =>
+        {
+            Some(KnownClass::List.to_specialized_instance(db, &[*element]))
+        }
+        (
+            KnownClass::Dict
+            | KnownClass::DefaultDict
+            | KnownClass::OrderedDict
+            | KnownClass::Mapping,
+            [_, value],
+        ) => Some(*value),
+        _ => None,
+    }
+}
+
+fn apply_unpack_exact_projection_structurally<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     len: u32,
     index: u32,
-) -> Type<'db> {
-    if let Type::Union(union) = ty {
-        return UnionType::from_elements_cycle_recovery(
-            db,
-            union
-                .elements(db)
-                .iter()
-                .map(|element| apply_unpack_exact_projection(db, *element, len, index)),
-        );
-    }
+) -> Option<Type<'db>> {
+    let len = usize::try_from(len).ok()?;
+    let index = usize::try_from(index).ok()?;
 
-    let Ok(index) = usize::try_from(index) else {
-        return Type::unknown();
-    };
-    let Ok(len) = usize::try_from(len) else {
-        return Type::unknown();
-    };
-
-    ty.try_iterate(db).map_or_else(
-        |err| err.fallback_element_type(db),
-        |tuple| {
-            let Some(fixed) = tuple.as_fixed_length() else {
-                return tuple.homogeneous_element_type(db);
-            };
-            if fixed.len() != len {
-                return tuple.homogeneous_element_type(db);
-            }
-            fixed
+    if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+        let tuple = spec.as_ref().resize(db, TupleLength::Fixed(len)).ok()?;
+        return Some(
+            tuple
                 .all_elements()
                 .get(index)
                 .copied()
-                .unwrap_or_else(Type::unknown)
-        },
-    )
+                .unwrap_or_else(Type::unknown),
+        );
+    }
+
+    apply_iter_projection_structurally(db, ty, false)
 }
 
-fn apply_unpack_starred_projection<'db>(
+fn apply_unpack_starred_projection_structurally<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     before: u32,
     after: u32,
     target: ProjectionUnpackTarget,
-) -> Type<'db> {
-    if let Type::Union(union) = ty {
-        return UnionType::from_elements_cycle_recovery(
-            db,
-            union.elements(db).iter().map(|element| {
-                apply_unpack_starred_projection(db, *element, before, after, target)
-            }),
-        );
+) -> Option<Type<'db>> {
+    let before = usize::try_from(before).ok()?;
+    let after = usize::try_from(after).ok()?;
+
+    if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+        let TupleSpec::Variable(tuple) = spec
+            .as_ref()
+            .resize(db, TupleLength::Variable(before, after))
+            .ok()?
+        else {
+            return None;
+        };
+        return Some(match target {
+            ProjectionUnpackTarget::Prefix { index } => usize::try_from(index)
+                .ok()
+                .and_then(|index| tuple.prefix_elements().get(index).copied())
+                .unwrap_or_else(Type::unknown),
+            ProjectionUnpackTarget::Starred => tuple.variable(),
+            ProjectionUnpackTarget::Suffix { index } => usize::try_from(index)
+                .ok()
+                .and_then(|index| tuple.suffix_elements().get(index).copied())
+                .unwrap_or_else(Type::unknown),
+        });
     }
 
-    let Ok(before) = usize::try_from(before) else {
-        return Type::unknown();
+    apply_iter_projection_structurally(db, ty, false)
+}
+
+fn apply_zero_arg_method_projection_structurally<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    method_name: &Name,
+) -> Option<Type<'db>> {
+    let (known_class, arguments) = direct_known_class_arguments(db, ty)?;
+    let [key, value] = arguments else {
+        return None;
     };
-    let Ok(after) = usize::try_from(after) else {
-        return Type::unknown();
+    if !matches!(
+        known_class,
+        KnownClass::Dict | KnownClass::DefaultDict | KnownClass::OrderedDict | KnownClass::Mapping
+    ) {
+        return None;
+    }
+
+    match method_name.as_str() {
+        "keys" => Some(KnownClass::List.to_specialized_instance(db, &[*key])),
+        "values" => Some(KnownClass::List.to_specialized_instance(db, &[*value])),
+        "items" => {
+            let item = Type::heterogeneous_tuple(db, [*key, *value]);
+            Some(KnownClass::List.to_specialized_instance(db, &[item]))
+        }
+        _ => None,
+    }
+}
+
+fn direct_known_class_arguments<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<(KnownClass, &'db [Type<'db>])> {
+    let (class, specialization) = ty.direct_class_specialization(db)?;
+    Some((class.known(db)?, specialization.types(db)))
+}
+
+fn is_structural_int_index(db: &dyn Db, ty: Type<'_>) -> bool {
+    ty.as_int_like_literal().is_some()
+        || matches!(
+            ty.direct_known_class(db),
+            Some(KnownClass::Int | KnownClass::Bool)
+        )
+}
+
+fn infer_member_type_for_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    name: &Name,
+    policy: MemberLookupPolicy,
+) -> Option<Type<'db>> {
+    let Place::Defined(DefinedPlace {
+        ty,
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = ty.member_lookup_with_policy(db, name.clone(), policy).place
+    else {
+        return None;
     };
 
-    ty.try_iterate(db).map_or_else(
-        |err| err.fallback_element_type(db),
-        |tuple| {
-            let Ok(TupleSpec::Variable(tuple)) =
-                tuple.resize(db, TupleLength::Variable(before, after))
-            else {
-                return Type::unknown();
-            };
+    Some(ty)
+}
 
-            match target {
-                ProjectionUnpackTarget::Prefix { index } => usize::try_from(index)
-                    .ok()
-                    .and_then(|index| tuple.prefix_elements().get(index).copied())
-                    .unwrap_or_else(Type::unknown),
-                ProjectionUnpackTarget::Starred => tuple.variable(),
-                ProjectionUnpackTarget::Suffix { index } => usize::try_from(index)
-                    .ok()
-                    .and_then(|index| tuple.suffix_elements().get(index).copied())
-                    .unwrap_or_else(Type::unknown),
-            }
-        },
+fn infer_method_call0_type_for_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    method_name: &Name,
+) -> Option<Type<'db>> {
+    let Place::Defined(DefinedPlace {
+        ty: method,
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = ty
+        .member_lookup_with_policy(
+            db,
+            method_name.clone(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
+    else {
+        return None;
+    };
+
+    Some(
+        method
+            .try_call(db, &CallArguments::none())
+            .ok()?
+            .return_type(db),
     )
+}
+
+fn try_apply_unpack_exact_projection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    len: u32,
+    index: u32,
+) -> Option<Type<'db>> {
+    if let Type::Union(union) = ty {
+        let elements = union
+            .elements(db)
+            .iter()
+            .filter_map(|element| try_apply_unpack_exact_projection(db, *element, len, index))
+            .collect::<Vec<_>>();
+        return (!elements.is_empty())
+            .then(|| UnionType::from_elements_cycle_recovery(db, elements));
+    }
+
+    let index = usize::try_from(index).ok()?;
+    let len = usize::try_from(len).ok()?;
+
+    let tuple = ty.try_iterate(db).ok()?;
+    let Some(fixed) = tuple.as_fixed_length() else {
+        return Some(tuple.homogeneous_element_type(db));
+    };
+    if fixed.len() != len {
+        return Some(tuple.homogeneous_element_type(db));
+    }
+    fixed.all_elements().get(index).copied()
+}
+
+fn try_apply_unpack_starred_projection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    before: u32,
+    after: u32,
+    target: ProjectionUnpackTarget,
+) -> Option<Type<'db>> {
+    if let Type::Union(union) = ty {
+        let elements = union
+            .elements(db)
+            .iter()
+            .filter_map(|element| {
+                try_apply_unpack_starred_projection(db, *element, before, after, target)
+            })
+            .collect::<Vec<_>>();
+        return (!elements.is_empty())
+            .then(|| UnionType::from_elements_cycle_recovery(db, elements));
+    }
+
+    let before = usize::try_from(before).ok()?;
+    let after = usize::try_from(after).ok()?;
+
+    let tuple = ty.try_iterate(db).ok()?;
+    let Ok(TupleSpec::Variable(tuple)) = tuple.resize(db, TupleLength::Variable(before, after))
+    else {
+        return None;
+    };
+
+    match target {
+        ProjectionUnpackTarget::Prefix { index } => usize::try_from(index)
+            .ok()
+            .and_then(|index| tuple.prefix_elements().get(index).copied()),
+        ProjectionUnpackTarget::Starred => Some(tuple.variable()),
+        ProjectionUnpackTarget::Suffix { index } => usize::try_from(index)
+            .ok()
+            .and_then(|index| tuple.suffix_elements().get(index).copied()),
+    }
 }
 
 pub(crate) fn exact_unpack_projection_tuple<'db>(
@@ -574,8 +1244,7 @@ fn solve_component<'db>(
     solutions: &mut FxHashMap<ProjectionType<'db>, Type<'db>>,
 ) {
     let component_set = component.iter().copied().collect::<FxHashSet<_>>();
-    let mut builder = UnionBuilder::new(db).cycle_recovery(true);
-    let mut has_base = false;
+    let mut bases = Vec::new();
     let mut guarded = false;
 
     for projection in component {
@@ -587,12 +1256,11 @@ fn solve_component<'db>(
         let term = remove_component_dependencies(db, rhs, &component_set);
         guarded |= term.guarded;
         if let Some(base) = term.base {
-            builder = builder.add(base);
-            has_base = true;
+            bases.push(base);
         }
     }
 
-    let base = has_base.then(|| builder.build());
+    let base = (!bases.is_empty()).then(|| UnionType::from_elements_cycle_recovery(db, bases));
     for projection in component {
         let solution = match (base, guarded) {
             (Some(base), true) => UnionType::from_elements_cycle_recovery(
@@ -642,27 +1310,36 @@ fn remove_component_dependencies<'db>(
     ty: Type<'db>,
     component: &FxHashSet<ProjectionType<'db>>,
 ) -> ComponentTerm<'db> {
-    let mut builder = UnionBuilder::new(db).cycle_recovery(true);
-    let mut has_base = false;
+    let mut bases = Vec::new();
     let mut guarded = false;
 
     for element in union_elements(db, ty) {
         match element {
             Type::Projection(projection) if component.contains(&projection) => {}
+            Type::Divergent(root) if component_contains_root(db, component, root) => {}
             _ if contains_component_projection(db, element, component) => {
                 guarded = true;
             }
             _ => {
-                builder = builder.add(element);
-                has_base = true;
+                bases.push(element);
             }
         }
     }
 
     ComponentTerm {
-        base: has_base.then(|| builder.build()),
+        base: (!bases.is_empty()).then(|| UnionType::from_elements_cycle_recovery(db, bases)),
         guarded,
     }
+}
+
+fn component_contains_root<'db>(
+    db: &'db dyn Db,
+    component: &FxHashSet<ProjectionType<'db>>,
+    root: DivergentType,
+) -> bool {
+    component
+        .iter()
+        .any(|projection| projection.root(db).same_marker(root))
 }
 
 fn union_elements<'db>(db: &'db dyn Db, ty: Type<'db>) -> Box<[Type<'db>]> {
@@ -791,5 +1468,75 @@ impl<'db, 'a> Tarjan<'db, 'a> {
             }
         }
         self.components.push(component);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use salsa::plumbing::Id;
+
+    use crate::db::tests::setup_db;
+    use crate::types::KnownClass;
+
+    use super::*;
+
+    #[test]
+    fn strongly_connected_projection_equations_share_a_solution() {
+        let db = setup_db();
+        let root_p = Type::divergent(Id::from_bits(1))
+            .as_divergent()
+            .expect("divergent type should expose its marker");
+        let root_q = Type::divergent(Id::from_bits(2))
+            .as_divergent()
+            .expect("divergent type should expose its marker");
+        let projection_p = ProjectionType::new(
+            &db,
+            root_p,
+            vec![ProjectionOp::AwaitResult].into_boxed_slice(),
+        );
+        let projection_q = ProjectionType::new(
+            &db,
+            root_q,
+            vec![ProjectionOp::AwaitResult].into_boxed_slice(),
+        );
+
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let expected = UnionType::from_elements_cycle_recovery(&db, [int, str]);
+        let equations = FxHashMap::from_iter([
+            (
+                projection_p,
+                Equation {
+                    rhs: UnionType::from_elements_cycle_recovery(
+                        &db,
+                        [Type::Projection(projection_q), int],
+                    ),
+                    dependencies: FxOrderSet::from_iter([projection_q]),
+                },
+            ),
+            (
+                projection_q,
+                Equation {
+                    rhs: UnionType::from_elements_cycle_recovery(
+                        &db,
+                        [Type::Projection(projection_p), str],
+                    ),
+                    dependencies: FxOrderSet::from_iter([projection_p]),
+                },
+            ),
+        ]);
+
+        let solutions = solve_equations(&db, &equations);
+
+        let solution_p = solutions
+            .get(&projection_p)
+            .copied()
+            .expect("projection p should have a solution");
+        let solution_q = solutions
+            .get(&projection_q)
+            .copied()
+            .expect("projection q should have a solution");
+        assert!(solution_p.is_equivalent_to(&db, expected));
+        assert!(solution_q.is_equivalent_to(&db, expected));
     }
 }

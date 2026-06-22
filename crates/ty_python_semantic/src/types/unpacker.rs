@@ -406,10 +406,10 @@ impl<'db> UnpackResult<'db> {
             .iter()
             .map(|(expr, ty)| {
                 let previous_ty = previous_cycle_result.expression_type(*expr);
-                ProjectionRecoverySlot {
-                    previous: Some(previous_ty),
-                    joined: ty.cycle_joined(db, previous_ty, cycle),
-                }
+                ProjectionRecoverySlot::candidate(
+                    Some(previous_ty),
+                    ty.cycle_joined(db, previous_ty, cycle),
+                )
             })
             .collect::<Vec<_>>();
         let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
