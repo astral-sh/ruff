@@ -83,6 +83,10 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
+pub use crate::types::projection::{ProjectionOp, ProjectionType};
+pub(crate) use crate::types::projection::{
+    ProjectionRecoverySlot, solve_projections_in_cycle_slots,
+};
 use crate::types::signatures::walk_signature;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
@@ -142,6 +146,7 @@ mod mro;
 pub(crate) mod narrow;
 mod newtype;
 mod overrides;
+mod projection;
 mod protocol_class;
 pub(crate) mod relation;
 mod relation_error;
@@ -899,6 +904,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// A projection applied to a cycle marker during recursive type inference.
+    Projection(ProjectionType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -1057,6 +1064,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn cycle_marker_root(self, db: &'db dyn Db) -> Option<DivergentType> {
+        match self {
+            Type::Divergent(divergent) => Some(divergent),
+            Type::Projection(projection) => Some(projection.root(db)),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
     /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
@@ -1124,6 +1139,32 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) fn contains_divergent_marker(self, db: &'db dyn Db, root: DivergentType) -> bool {
+        any_over_type(db, self, false, |ty| {
+            ty.cycle_marker_root(db)
+                .is_some_and(|marker| marker.same_marker(root))
+        })
+    }
+
+    pub(crate) fn contains_projection(
+        self,
+        db: &'db dyn Db,
+        projection: ProjectionType<'db>,
+    ) -> bool {
+        any_over_type(db, self, false, |ty| ty == Type::Projection(projection))
+    }
+
+    pub(crate) fn project_cycle(self, db: &'db dyn Db, op: ProjectionOp<'db>) -> Option<Type<'db>> {
+        match self {
+            Type::Divergent(divergent) => {
+                let path: Box<[ProjectionOp<'db>]> = Box::new([op]);
+                Some(Type::Projection(ProjectionType::new(db, divergent, path)))
+            }
+            Type::Projection(projection) => Some(Type::Projection(projection.append(db, op))),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if this type supports eager `Self` binding via `bind_self_typevars`.
     ///
     /// `FunctionLiteral`, `BoundMethod`, and function-like `Callable` types return `false`
@@ -1161,6 +1202,26 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        let joined = self.cycle_joined(db, previous, cycle);
+        solve_projections_in_cycle_slots(
+            db,
+            &[ProjectionRecoverySlot {
+                previous: Some(previous),
+                joined,
+            }],
+            cycle,
+        )
+        .into_iter()
+        .next()
+        .unwrap_or(joined)
+    }
+
+    pub(crate) fn cycle_joined(
         self,
         db: &'db dyn Db,
         previous: Self,
@@ -1209,7 +1270,6 @@ impl<'db> Type<'db> {
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
-        .recursive_type_normalized(db, cycle)
     }
 
     /// Normalizes nominal growth that wraps the previous cycle result in a specialization, either
@@ -1929,7 +1989,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Never => Type::object(),
 
-            Type::Dynamic(_) => *self,
+            Type::Dynamic(_) | Type::Projection(_) => *self,
 
             Type::Divergent(_) => (*self)
                 .negated_divergent()
@@ -2005,6 +2065,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
+            | Type::Projection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -2038,6 +2099,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_)
             | Type::EnumComplement(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -2295,7 +2357,7 @@ impl<'db> Type<'db> {
                 .type_argument(db)
                 .recursive_type_normalized_impl(db, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
-            Type::Divergent(_) => Some(self),
+            Type::Divergent(_) | Type::Projection(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -2404,7 +2466,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => false,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2594,6 +2656,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::Union(..)
             | Type::AlwaysTruthy
@@ -2651,7 +2714,9 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
+                Some(Place::bound(self).into())
+            }
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -2961,7 +3026,9 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, *complement, name)
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
+                Place::bound(self).into()
+            }
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3645,7 +3712,9 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
+                    Place::bound(this).into()
+                }
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4140,7 +4209,10 @@ impl<'db> Type<'db> {
                 return Place::bound(self.dunder_class(db)).into();
             }
 
-            if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
+            if matches!(
+                self,
+                Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never
+            ) {
                 return Place::bound(self).into();
             }
         }
@@ -4560,7 +4632,7 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
@@ -5683,7 +5755,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => Some(self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -5930,7 +6002,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -6013,7 +6085,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
-            Type::Divergent(_) => self,
+            Type::Divergent(_) | Type::Projection(_) => self,
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
@@ -6155,6 +6227,36 @@ impl<'db> Type<'db> {
         };
 
         self.apply_type_mapping(db, &type_mapping, TypeContext::default())
+    }
+
+    pub(crate) fn replace_projections(
+        self,
+        db: &'db dyn Db,
+        replacements: &FxHashMap<ProjectionType<'db>, Type<'db>>,
+    ) -> Type<'db> {
+        if replacements.is_empty() {
+            return self;
+        }
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceProjections(replacements),
+            TypeContext::default(),
+        )
+    }
+
+    pub(crate) fn replace_active_projections_with_roots(
+        self,
+        db: &'db dyn Db,
+        active_roots: &[DivergentType],
+    ) -> Type<'db> {
+        if active_roots.is_empty() {
+            return self;
+        }
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceActiveProjectionsWithRoots(active_roots),
+            TypeContext::default(),
+        )
     }
 
     fn apply_type_mapping<'a>(
@@ -6439,6 +6541,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
+                TypeMapping::ReplaceProjections(_) |
+                TypeMapping::ReplaceActiveProjectionsWithRoots(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
@@ -6455,7 +6559,9 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
-                TypeMapping::RescopeReturnCallables(_) => self,
+                TypeMapping::RescopeReturnCallables(_) |
+                TypeMapping::ReplaceProjections(_) |
+                TypeMapping::ReplaceActiveProjectionsWithRoots(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -6469,6 +6575,26 @@ impl<'db> Type<'db> {
                     Type::Divergent(divergent.materialized(*materialization_kind))
                 }
                 _ => self,
+            },
+            Type::Projection(projection) => match type_mapping {
+                TypeMapping::ReplaceProjections(replacements) => replacements
+                    .get(&projection)
+                    .copied()
+                    .unwrap_or_else(|| {
+                        Type::Projection(
+                            projection.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        )
+                    }),
+                TypeMapping::ReplaceActiveProjectionsWithRoots(active_roots)
+                    if active_roots
+                        .iter()
+                        .any(|root| root.same_marker(projection.root(db))) =>
+                {
+                    Type::Divergent(projection.root(db))
+                }
+                _ => Type::Projection(
+                    projection.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ),
             },
 
             Type::Never
@@ -6551,7 +6677,7 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) => {}
+            Type::Divergent(_) | Type::Projection(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(self, || {
@@ -6966,6 +7092,7 @@ impl<'db> Type<'db> {
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db),
+            Self::Projection(_) => None,
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
@@ -7333,6 +7460,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeAlias(alias) => alias.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -7516,6 +7644,12 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+
+    /// Replaces projection variables while recovering an active recursive cycle.
+    ReplaceProjections(&'a FxHashMap<ProjectionType<'db>, Type<'db>>),
+
+    /// Replaces unsolved projection variables for active cycle roots with their root markers.
+    ReplaceActiveProjectionsWithRoots(&'a [DivergentType]),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -7561,7 +7695,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => context,
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::ReplaceProjections(_)
+            | TypeMapping::ReplaceActiveProjectionsWithRoots(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
                     context.remove_self(db, binding.binding_context())
@@ -7608,7 +7744,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceType { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => self.clone(),
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::ReplaceProjections(_)
+            | TypeMapping::ReplaceActiveProjectionsWithRoots(_) => self.clone(),
         }
     }
 }

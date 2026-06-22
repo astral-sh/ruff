@@ -23,8 +23,8 @@ use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypedDictType, UnionBuilder, UnionType, todo_type,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, ProjectionOp, Type,
+    TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -537,10 +537,22 @@ impl<'db> Type<'db> {
             return self.subscript(db, fallback, expr_context);
         }
 
+        if let Some(projected) = self.project_cycle(
+            db,
+            ProjectionOp::Subscript {
+                slice: slice_ty,
+                expr_context,
+            },
+        ) {
+            return Ok(projected);
+        }
+
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never, _) => {
+                Some(Ok(value_ty))
+            }
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))

@@ -1586,6 +1586,18 @@ for _ in range(1_000_000):
     reveal_type(x)  # revealed: int
 ```
 
+### Self-referential unpacking does not leak projection types
+
+```py
+t = (1,)
+for _ in range(10):
+    (i,) = i  # error: [possibly-unresolved-reference]
+    i += 1
+    t = (i,)
+
+reveal_type(t)  # revealed: tuple[Literal[1]] | tuple[Divergent]
+```
+
 ### Avoid oscillations
 
 We need to avoid oscillating cycles in cases like the following, where the type of one of these loop

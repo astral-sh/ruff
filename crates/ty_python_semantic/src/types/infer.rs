@@ -58,7 +58,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, KnownClass, ProjectionRecoverySlot, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers, solve_projections_in_cycle_slots,
 };
 use crate::{Db, FxIndexSet};
 
@@ -474,7 +475,7 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
+    cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
         StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
@@ -819,8 +820,21 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
+        let slots = self
+            .expressions
+            .iter()
+            .map(|(expr, ty)| {
+                let previous_ty = previous_inference.expression_type(expr);
+                ProjectionRecoverySlot {
+                    previous: Some(previous_ty),
+                    joined: ty.cycle_joined(db, previous_ty, cycle),
+                }
+            })
+            .collect::<Vec<_>>();
+        let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
+        self.expressions.map_values(|_, ty| match recovered.next() {
+            Some(recovered_ty) => recovered_ty,
+            None => ty.recursive_type_normalized(db, cycle),
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1000,94 +1014,6 @@ impl<'db> DefinitionTypes<'db> {
     ) -> Option<TypeAndQualifiers<'db>> {
         self.declarations(owner)
             .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
-    }
-
-    fn normalize_binding(
-        db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
-        cycle: &salsa::Cycle,
-        owner: Definition<'db>,
-        definition: Definition<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
-        if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized(db, previous_ty, cycle)
-        } else {
-            ty.recursive_type_normalized(db, cycle)
-        }
-    }
-
-    fn normalize_declaration(
-        db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
-        cycle: &salsa::Cycle,
-        owner: Definition<'db>,
-        definition: Definition<'db>,
-        ty: TypeAndQualifiers<'db>,
-    ) -> TypeAndQualifiers<'db> {
-        if let Some(previous_ty) = previous.declaration_type(owner, definition) {
-            ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
-        } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
-        }
-    }
-
-    fn cycle_normalized(
-        self,
-        db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
-        cycle: &salsa::Cycle,
-        owner: Definition<'db>,
-    ) -> Self {
-        match self {
-            Self::Empty => Self::Empty,
-            Self::Binding(ty) => Self::Binding(Self::normalize_binding(
-                db, previous, cycle, owner, owner, ty,
-            )),
-            Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
-                db, previous, cycle, owner, owner, ty,
-            )),
-            Self::BindingAndDeclaration(declaration_ty) => {
-                let binding_ty = Self::normalize_binding(
-                    db,
-                    previous,
-                    cycle,
-                    owner,
-                    owner,
-                    declaration_ty.inner_type(),
-                );
-                let declaration_ty =
-                    Self::normalize_declaration(db, previous, cycle, owner, owner, declaration_ty);
-
-                if binding_ty == declaration_ty.inner_type() {
-                    Self::BindingAndDeclaration(declaration_ty)
-                } else {
-                    Self::Other(Box::new(OtherDefinitionTypes {
-                        bindings: Box::new([(owner, binding_ty)]),
-                        declarations: Box::new([(owner, declaration_ty)]),
-                    }))
-                }
-            }
-            Self::Other(mut other) => {
-                for (definition, ty) in &mut other.bindings {
-                    *ty = Self::normalize_binding(db, previous, cycle, owner, *definition, *ty);
-                }
-                for (definition, ty) in &mut other.declarations {
-                    *ty = Self::normalize_declaration(db, previous, cycle, owner, *definition, *ty);
-                }
-
-                match (&*other.bindings, &*other.declarations) {
-                    ([(binding, binding_ty)], [(declaration, declaration_ty)])
-                        if *binding == owner
-                            && binding == declaration
-                            && *binding_ty == declaration_ty.inner_type() =>
-                    {
-                        Self::BindingAndDeclaration(*declaration_ty)
-                    }
-                    _ => Self::Other(other),
-                }
-            }
-        }
     }
 
     fn bindings(
@@ -1312,16 +1238,61 @@ impl<'db> DefinitionInference<'db> {
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        let expression_slots = self
+            .expressions
+            .iter()
+            .map(|(expr, ty)| {
+                let previous_ty = previous_inference.expression_type(*expr);
+                ProjectionRecoverySlot {
+                    previous: Some(previous_ty),
+                    joined: ty.cycle_joined(db, previous_ty, cycle),
+                }
+            })
+            .collect::<Vec<_>>();
+        let bindings = self.types.bindings(definition).collect::<Vec<_>>();
+        let declarations = self.types.declarations(definition).collect::<Vec<_>>();
+        let mut slots =
+            Vec::with_capacity(expression_slots.len() + bindings.len() + declarations.len());
+        slots.extend(expression_slots);
+        for (binding, ty) in &bindings {
+            let previous_ty = previous_inference.types.binding_type(definition, *binding);
+            slots.push(ProjectionRecoverySlot {
+                previous: previous_ty,
+                joined: previous_ty
+                    .map_or(*ty, |previous_ty| ty.cycle_joined(db, previous_ty, cycle)),
+            });
         }
-        self.types = std::mem::take(&mut self.types).cycle_normalized(
-            db,
-            &previous_inference.types,
-            cycle,
-            definition,
-        );
+        for (declaration, ty) in &declarations {
+            let previous_ty = previous_inference
+                .types
+                .declaration_type(definition, *declaration);
+            slots.push(ProjectionRecoverySlot {
+                previous: previous_ty.map(|ty| ty.inner_type()),
+                joined: previous_ty.map_or(ty.inner_type(), |previous_ty| {
+                    ty.inner_type()
+                        .cycle_joined(db, previous_ty.inner_type(), cycle)
+                }),
+            });
+        }
+
+        let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
+        for (_, ty) in &mut self.expressions {
+            if let Some(recovered_ty) = recovered.next() {
+                *ty = recovered_ty;
+            }
+        }
+        let bindings = bindings
+            .into_iter()
+            .map(|(binding, ty)| (binding, recovered.next().unwrap_or(ty)))
+            .collect::<Vec<_>>();
+        let declarations = declarations
+            .into_iter()
+            .map(|(declaration, ty)| {
+                let recovered_ty = recovered.next().unwrap_or_else(|| ty.inner_type());
+                (declaration, ty.map_type(|_| recovered_ty))
+            })
+            .collect::<Vec<_>>();
+        self.types = DefinitionTypes::from_parts(definition, bindings, declarations);
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference
@@ -1554,24 +1525,61 @@ impl<'db> ExpressionInference<'db> {
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
+        let binding_slots = self
+            .extra
+            .as_deref()
+            .map(|extra| {
+                extra
+                    .bindings
+                    .iter()
+                    .map(|(binding, binding_ty)| {
+                        let previous_ty = previous.extra.as_deref().and_then(|extra| {
+                            extra
+                                .bindings
+                                .iter()
+                                .find(|(previous_binding, _)| previous_binding == binding)
+                                .map(|(_, ty)| *ty)
+                        });
+                        ProjectionRecoverySlot {
+                            previous: previous_ty,
+                            joined: previous_ty.map_or(*binding_ty, |previous_ty| {
+                                binding_ty.cycle_joined(db, previous_ty, cycle)
+                            }),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let expression_slots = self
+            .expressions
+            .iter()
+            .map(|(expr, ty)| {
+                let previous_ty = previous.expression_type(*expr);
+                ProjectionRecoverySlot {
+                    previous: Some(previous_ty),
+                    joined: ty.cycle_joined(db, previous_ty, cycle),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let binding_slot_count = binding_slots.len();
+        let expression_slot_count = expression_slots.len();
+        let mut slots = Vec::with_capacity(binding_slot_count + expression_slot_count);
+        slots.extend(binding_slots);
+        slots.extend(expression_slots);
+
+        let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
         if let Some(extra) = self.extra.as_mut() {
-            for (binding, binding_ty) in &mut extra.bindings {
-                if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
-                    extra
-                        .bindings
-                        .iter()
-                        .find(|(previous_binding, _)| previous_binding == binding)
-                }) {
-                    *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
-                } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+            for (_, binding_ty) in &mut extra.bindings {
+                if let Some(recovered_ty) = recovered.next() {
+                    *binding_ty = recovered_ty;
                 }
             }
         }
-
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        for (_, ty) in &mut self.expressions {
+            if let Some(recovered_ty) = recovered.next() {
+                *ty = recovered_ty;
+            }
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1733,33 +1741,75 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
-        }
-        for (binding, binding_ty) in &mut self.bindings {
-            if let Some((_, previous_binding)) = previous_inference
-                .bindings
-                .iter()
-                .find(|(previous_binding, _)| previous_binding == binding)
-            {
-                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
-            } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+        let expression_slots = self
+            .expressions
+            .iter()
+            .map(|(expr, ty)| {
+                let previous_ty = previous_inference.expression_type(*expr);
+                ProjectionRecoverySlot {
+                    previous: Some(previous_ty),
+                    joined: ty.cycle_joined(db, previous_ty, cycle),
+                }
+            })
+            .collect::<Vec<_>>();
+        let binding_slots = self
+            .bindings
+            .iter()
+            .map(|(binding, binding_ty)| {
+                let previous_ty = previous_inference
+                    .bindings
+                    .iter()
+                    .find(|(previous_binding, _)| previous_binding == binding)
+                    .map(|(_, ty)| *ty);
+                ProjectionRecoverySlot {
+                    previous: previous_ty,
+                    joined: previous_ty.map_or(*binding_ty, |previous_ty| {
+                        binding_ty.cycle_joined(db, previous_ty, cycle)
+                    }),
+                }
+            })
+            .collect::<Vec<_>>();
+        let declaration_slots = self
+            .declarations
+            .iter()
+            .map(|(declaration, declaration_ty)| {
+                let previous_ty = previous_inference
+                    .declarations
+                    .iter()
+                    .find(|(previous_declaration, _)| previous_declaration == declaration)
+                    .map(|(_, ty)| ty.inner_type());
+                ProjectionRecoverySlot {
+                    previous: previous_ty,
+                    joined: previous_ty.map_or(declaration_ty.inner_type(), |previous_ty| {
+                        declaration_ty
+                            .inner_type()
+                            .cycle_joined(db, previous_ty, cycle)
+                    }),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut slots = Vec::with_capacity(
+            expression_slots.len() + binding_slots.len() + declaration_slots.len(),
+        );
+        slots.extend(expression_slots);
+        slots.extend(binding_slots);
+        slots.extend(declaration_slots);
+
+        let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
+        for (_, ty) in &mut self.expressions {
+            if let Some(recovered_ty) = recovered.next() {
+                *ty = recovered_ty;
             }
         }
-        for (declaration, declaration_ty) in &mut self.declarations {
-            if let Some((_, previous_declaration)) = previous_inference
-                .declarations
-                .iter()
-                .find(|(previous_declaration, _)| previous_declaration == declaration)
-            {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
-                });
-            } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+        for (_, binding_ty) in &mut self.bindings {
+            if let Some(recovered_ty) = recovered.next() {
+                *binding_ty = recovered_ty;
+            }
+        }
+        for (_, declaration_ty) in &mut self.declarations {
+            if let Some(recovered_ty) = recovered.next() {
+                *declaration_ty = declaration_ty.map_type(|_| recovered_ty);
             }
         }
 

@@ -101,10 +101,10 @@ use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
     DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, ProjectionOp, SentinelInstance,
+    Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -2800,7 +2800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(..) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -3564,6 +3564,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::Dynamic(..)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
@@ -3616,6 +3617,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeAlias(..)
                 | Type::Dynamic(..)
                 | Type::Divergent(_)
+                | Type::Projection(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
                 | Type::BoundSuper(..) => return None,
@@ -4970,6 +4972,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             }
 
+            Type::Projection(_) => {
+                let value_ty = infer_value_ty(self, TypeContext::default());
+                target_type
+                    .project_cycle(
+                        db,
+                        ProjectionOp::Binary {
+                            op,
+                            other: value_ty,
+                            is_reverse: false,
+                        },
+                    )
+                    .unwrap_or(target_type)
+            }
+            Type::Divergent(_) => {
+                infer_value_ty(self, TypeContext::default());
+                target_type
+            }
+
             _ => {
                 if let Some(typed_dict_update_ty) = self
                     .try_infer_typed_dict_pep_584_augmented_assignment(
@@ -5413,6 +5433,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
                 | Type::Divergent(_)
+                | Type::Projection(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
                 | Type::BoundMethod(_)
@@ -10313,7 +10334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match (op, operand_type) {
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
-            | (_, Type::Divergent(_)) => operand_type,
+            | (_, Type::Divergent(_) | Type::Projection(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {

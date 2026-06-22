@@ -166,6 +166,21 @@ while i < 1_000_000:
 reveal_type(loop_only)  # revealed: int
 ```
 
+### Self-referential unpacking does not leak projection types
+
+```py
+def random() -> bool:
+    return False
+
+t = (1,)
+while random():
+    (i,) = i  # error: [possibly-unresolved-reference]
+    i += 1
+    t = (i,)
+
+reveal_type(t)  # revealed: tuple[Literal[1]] | tuple[Divergent]
+```
+
 ### A more complex example
 
 Here the loop condition narrows both the loop-back value and the end-of-loop value:

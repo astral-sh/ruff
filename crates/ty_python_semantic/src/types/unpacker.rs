@@ -5,12 +5,20 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::projection::{
+    ProjectionRecoverySlot, exact_unpack_projection_tuple, solve_projections_in_cycle_slots,
+};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
+use crate::types::{
+    DivergentType, Type, TypeCheckDiagnostics, TypeContext, infer_expression_types,
+};
 use ty_python_core::ExpressionNodeKey;
+use ty_python_core::expression::Expression;
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
@@ -106,6 +114,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         };
 
         self.unpack_inner(target, value_expr.into(), value_type);
+        self.replace_self_referential_value_projections(
+            target,
+            value_expr,
+            value.expression(),
+            value_type,
+        );
     }
 
     /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
@@ -181,6 +195,53 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         .visit_expr(target);
     }
 
+    fn replace_self_referential_value_projections(
+        &mut self,
+        target: &ast::Expr,
+        value_expr: &ast::Expr,
+        expression: Expression<'db>,
+        value_type: Type<'db>,
+    ) {
+        let Some(value_place) = PlaceExpr::try_from_expr(value_expr) else {
+            return;
+        };
+        if !target_contains_place(target, &value_place) {
+            return;
+        }
+
+        // A projection rooted in this value expression has no outer place-level candidate to solve
+        // it against when the unpack target writes back to the same place.
+        let value_expression_root = Type::divergent(expression.as_id())
+            .as_divergent()
+            .expect("a divergent type should have a divergent marker");
+        let db = self.db();
+        if !top_level_contains_cycle_marker(db, value_type, value_expression_root) {
+            return;
+        }
+
+        self.replace_target_subtree_projections(target, value_expression_root);
+    }
+
+    fn replace_target_subtree_projections(&mut self, target: &ast::Expr, root: DivergentType) {
+        let db = self.db();
+        if let Some(target_ty) = self.targets.get_mut(&target.into()) {
+            *target_ty = target_ty.replace_active_projections_with_roots(db, &[root]);
+        }
+
+        match target {
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for elt in elts {
+                    self.replace_target_subtree_projections(elt, root);
+                }
+            }
+            ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                self.replace_target_subtree_projections(value, root);
+            }
+            _ => {}
+        }
+    }
+
     fn unpack_inner(
         &mut self,
         target: &ast::Expr,
@@ -215,10 +276,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, ty, value_expr);
-                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
-                    });
+                    let tuple = if let TupleLength::Fixed(len) = target_len
+                        && let Some(tuple) = exact_unpack_projection_tuple(self.db(), ty, len)
+                    {
+                        Cow::Owned(tuple)
+                    } else {
+                        ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, ty, value_expr);
+                            Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
+                        })
+                    };
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
                         unpacker
@@ -334,9 +401,22 @@ impl<'db> UnpackResult<'db> {
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        for (expr, ty) in &mut self.targets {
-            let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        let slots = self
+            .targets
+            .iter()
+            .map(|(expr, ty)| {
+                let previous_ty = previous_cycle_result.expression_type(*expr);
+                ProjectionRecoverySlot {
+                    previous: Some(previous_ty),
+                    joined: ty.cycle_joined(db, previous_ty, cycle),
+                }
+            })
+            .collect::<Vec<_>>();
+        let mut recovered = solve_projections_in_cycle_slots(db, &slots, cycle).into_iter();
+        for (_, ty) in &mut self.targets {
+            if let Some(recovered_ty) = recovered.next() {
+                *ty = recovered_ty;
+            }
         }
 
         self
@@ -349,5 +429,34 @@ fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
         ast::Expr::List(list) => Some(&list.elts),
         ast::Expr::Tuple(tuple) => Some(&tuple.elts),
         _ => None,
+    }
+}
+
+fn target_contains_place(target: &ast::Expr, value_place: &PlaceExpr) -> bool {
+    match target {
+        ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .any(|elt| target_contains_place(elt, value_place)),
+        ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+            target_contains_place(value, value_place)
+        }
+        _ => PlaceExpr::try_from_expr(target)
+            .is_some_and(|target_place| target_place == *value_place),
+    }
+}
+
+fn top_level_contains_cycle_marker<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    root: crate::types::DivergentType,
+) -> bool {
+    match ty {
+        Type::Divergent(_) | Type::Projection(_) => ty.contains_divergent_marker(db, root),
+        Type::Union(union) => union.elements(db).iter().any(|element| {
+            matches!(element, Type::Divergent(_) | Type::Projection(_))
+                && element.contains_divergent_marker(db, root)
+        }),
+        _ => false,
     }
 }

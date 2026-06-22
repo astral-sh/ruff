@@ -88,10 +88,9 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
-            Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
-                db,
-                Signature::dynamic(self),
-            ))),
+            Type::Divergent(_) | Type::Projection(_) => Some(CallableTypes::one(
+                CallableType::function_like(db, Signature::dynamic(self)),
+            )),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>

@@ -1145,7 +1145,9 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceType { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::ReplaceProjections(_)
+            | TypeMapping::ReplaceActiveProjectionsWithRoots(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }

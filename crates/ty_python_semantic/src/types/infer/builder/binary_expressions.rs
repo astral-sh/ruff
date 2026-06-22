@@ -12,8 +12,8 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    MemberLookupPolicy, ProjectionOp, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType,
+    UnionBuilder, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -378,7 +378,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
+            (cycle @ Type::Projection(_), other, _) => cycle.project_cycle(
+                db,
+                ProjectionOp::Binary {
+                    op,
+                    other,
+                    is_reverse: false,
+                },
+            ),
+            (other, cycle @ Type::Projection(_), _) => cycle.project_cycle(
+                db,
+                ProjectionOp::Binary {
+                    op,
+                    other,
+                    is_reverse: true,
+                },
+            ),
+            (cycle @ Type::Divergent(_), _, _) | (_, cycle @ Type::Divergent(_), _) => Some(cycle),
 
             (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),

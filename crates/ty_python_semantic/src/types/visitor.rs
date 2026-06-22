@@ -5,8 +5,9 @@ use crate::{
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        NominalInstanceType, ProjectionType, PropertyInstanceType, ProtocolInstanceType,
+        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
+        TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -15,6 +16,7 @@ use crate::{
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
+        projection::walk_projection_type,
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
@@ -130,6 +132,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
         walk_newtype_instance_type(db, newtype, self);
     }
+
+    fn visit_projection_type(&self, db: &'db dyn Db, projection: ProjectionType<'db>) {
+        walk_projection_type(db, projection, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -156,6 +162,7 @@ pub(super) enum NonAtomicType<'db> {
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
     NewTypeInstance(NewType<'db>),
+    Projection(ProjectionType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -229,6 +236,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::NewTypeInstance(newtype) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
+            Type::Projection(projection) => {
+                TypeKind::NonAtomic(NonAtomicType::Projection(projection))
+            }
         }
     }
 }
@@ -277,6 +287,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);
+        }
+        NonAtomicType::Projection(projection) => {
+            visitor.visit_projection_type(db, projection);
         }
     }
 }
