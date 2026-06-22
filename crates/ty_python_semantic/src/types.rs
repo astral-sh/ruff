@@ -1368,6 +1368,10 @@ impl<'db> Type<'db> {
             ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
         );
 
+        if specialization != original_specialization {
+            return Some(normalized);
+        }
+
         let contains_wrapped_elements = |intersection: IntersectionType<'db>| match wrapped {
             Type::Union(wrapped) => intersection
                 .positive(db)

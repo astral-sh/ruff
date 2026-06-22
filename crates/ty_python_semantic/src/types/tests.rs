@@ -101,6 +101,39 @@ fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
     );
 }
 
+#[test]
+fn recursive_nominal_growth_preserves_unrelated_intersections() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let int_intersection = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
+    let str_intersection = IntersectionType::from_two_elements(&db, list_str, Type::unknown());
+    let current = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Dict.to_specialized_instance(&db, &[previous, int_intersection]),
+            KnownClass::Dict.to_specialized_instance(&db, &[str_intersection, previous]),
+        ],
+    );
+
+    let normalized = current
+        .recursive_nominal_growth_normalized(&db, previous, div)
+        .expect("both union arms contain the previous type");
+    let expected = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Dict.to_specialized_instance(&db, &[div, int_intersection]),
+            KnownClass::Dict.to_specialized_instance(&db, &[str_intersection, div]),
+        ],
+    );
+
+    assert_eq!(normalized, expected);
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
