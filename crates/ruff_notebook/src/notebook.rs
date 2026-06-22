@@ -257,19 +257,25 @@ impl Notebook {
         let mut last_marker: Option<&SourceMarker> = None;
 
         // The first offset is always going to be at 0, so skip it.
-        for offset in self.cell_offsets.iter_mut().skip(1).rev() {
+        for (index, offset) in self.cell_offsets.iter_mut().skip(1).rev().enumerate() {
             let closest_marker = match last_marker {
-                Some(marker) if marker.source() <= *offset => marker,
+                Some(marker) if marker.source() < *offset => marker,
                 _ => {
-                    let Some(marker) = source_map
-                        .markers()
-                        .iter()
-                        .rev()
-                        .find(|marker| marker.source() <= *offset)
-                    else {
+                    let mut markers = source_map.markers().iter().rev();
+                    let Some(marker) = markers.find(|marker| marker.source() <= *offset) else {
                         // There are no markers above the current offset, so we can
                         // stop here.
                         break;
+                    };
+                    // An internal offset is also the start of the following cell, so prefer the
+                    // first marker at that offset. The final offset is only a cell end.
+                    let marker = if index > 0 && marker.source() == *offset {
+                        markers
+                            .take_while(|marker| marker.source() == *offset)
+                            .last()
+                            .unwrap_or(marker)
+                    } else {
+                        marker
                     };
                     last_marker = Some(marker);
                     marker
@@ -488,6 +494,7 @@ mod tests {
 
     use ruff_diagnostics::SourceMap;
     use ruff_source_file::OneIndexed;
+    use ruff_text_size::TextSize;
 
     use crate::{Cell, CellStart, Notebook, NotebookError, NotebookIndex};
 
@@ -730,6 +737,99 @@ print("after empty cells")
         );
 
         Ok(())
+    }
+
+    fn two_cell_notebook() -> Result<Notebook, NotebookError> {
+        Notebook::from_source_code(
+            r##"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["x = 1"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["x.method(inplace=True)"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}"##,
+        )
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_cell_start_in_that_cell() -> Result<(), NotebookError> {
+        let mut notebook = two_cell_notebook()?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(6.into(), 6.into());
+        source_map.push_marker(6.into(), 10.into());
+        notebook.update(
+            &source_map,
+            "x = 1\nx = x.method(inplace=True)\n".to_string(),
+        );
+
+        assert_eq!(
+            notebook.source_code(),
+            "x = 1\nx = x.method(inplace=True)\n"
+        );
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 6.into(), 33.into()]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_end_in_non_final_cell() -> Result<(), NotebookError> {
+        let mut notebook = two_cell_notebook()?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(5.into(), 5.into());
+        source_map.push_marker(5.into(), 16.into());
+        notebook.update(
+            &source_map,
+            "x = 1  # comment\nx.method(inplace=True)\n".to_string(),
+        );
+
+        assert_eq!(
+            notebook.source_code(),
+            "x = 1  # comment\nx.method(inplace=True)\n"
+        );
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 17.into(), 40.into()]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_end_in_last_cell() {
+        let mut notebook = Notebook::empty();
+        let end = TextSize::of(notebook.source_code());
+        let insertion = "# comment\n";
+        let transformed = format!("{}{insertion}", notebook.source_code());
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(end, end);
+        source_map.push_marker(end, end + TextSize::of(insertion));
+        notebook.update(&source_map, transformed.clone());
+
+        assert_eq!(
+            notebook.cell_offsets().last().copied(),
+            Some(TextSize::of(&transformed))
+        );
+        assert_eq!(notebook.cells()[0].source().to_string(), "\n# comment");
     }
 
     #[test_case("vscode_language_id.ipynb")]
