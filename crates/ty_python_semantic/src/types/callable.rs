@@ -3,10 +3,10 @@ use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::{
-    Db,
+    Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarSet, ClassType, FindLegacyTypeVarsVisitor,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
@@ -610,7 +610,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut BoundTypeVarSet<'db>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.signatures(db)

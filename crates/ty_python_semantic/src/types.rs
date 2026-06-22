@@ -16,7 +16,6 @@ use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::small_set::SmallOrderSet;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
@@ -94,12 +93,10 @@ pub use crate::types::typevar::{
     BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints,
     TypeVarKind, TypeVarNonce,
 };
-
-pub(crate) type BoundTypeVarSet<'db> = SmallOrderSet<BoundTypeVarInstance<'db>, 6>;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::{Db, Program};
+use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -757,7 +754,7 @@ impl<'db> PropertyInstanceType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut BoundTypeVarSet<'db>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         if let Some(ty) = self.getter(db) {
@@ -6417,7 +6414,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut BoundTypeVarSet<'db>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         self.find_legacy_typevars_impl(
             db,
@@ -6431,7 +6428,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut BoundTypeVarSet<'db>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
@@ -6670,7 +6667,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        variables: &mut BoundTypeVarSet<'db>,
+        variables: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         self.apply_type_mapping(
             db,
@@ -6980,7 +6977,7 @@ impl<'db> Type<'db> {
     ///
     /// This is used when an implicit type alias is referenced without explicitly specializing it.
     pub(crate) fn default_specialize(self, db: &'db dyn Db) -> Type<'db> {
-        let mut variables = BoundTypeVarSet::default();
+        let mut variables = FxOrderSet::default();
         self.find_legacy_typevars(db, None, &mut variables);
         let generic_context = GenericContext::from_typevar_instances(db, variables);
         self.apply_specialization(db, generic_context.default_specialization(db, None))

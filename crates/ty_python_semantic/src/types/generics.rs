@@ -28,11 +28,11 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, BoundTypeVarSet, CallableType,
-    CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
-    binding_type, infer_definition_types, inferred_declaration,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
+    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
+    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
+    infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -582,7 +582,7 @@ impl<'db> GenericContext<'db> {
         return_type: Type<'db>,
     ) -> Option<Self> {
         // Find all of the legacy typevars mentioned in the function signature.
-        let mut variables = BoundTypeVarSet::default();
+        let mut variables = FxOrderSet::default();
         for param in parameters {
             param
                 .annotated_type()
@@ -629,7 +629,7 @@ impl<'db> GenericContext<'db> {
         definition: Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let mut variables = BoundTypeVarSet::default();
+        let mut variables = FxOrderSet::default();
         for base in bases {
             base.find_legacy_typevars(db, Some(definition), &mut variables);
         }
@@ -654,7 +654,8 @@ impl<'db> GenericContext<'db> {
             /// A map containing all of the `Callable`s in the return type, along with the typevars
             /// that appear in each. (Note that at this point, we have not yet determined if those
             /// typevars _only_ appear there.)
-            found_inside_callable_return: FxHashMap<CallableType<'db>, BoundTypeVarSet<'db>>,
+            found_inside_callable_return:
+                FxHashMap<CallableType<'db>, FxOrderSet<BoundTypeVarInstance<'db>>>,
         }
 
         impl<'db> TypeVarLocations<'db> {
@@ -1444,7 +1445,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut BoundTypeVarSet<'db>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         if let Some(tuple) = self.tuple_inner(db) {
