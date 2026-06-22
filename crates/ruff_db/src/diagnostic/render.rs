@@ -2586,9 +2586,6 @@ watermelon
             // Default to a merge window of 0 for testing purposes,
             // even though this is not the default for user-facing diagnostics.
             env.merge_window(0);
-            // Preserve the historical fix context in existing rendering snapshots. Tests of the
-            // compact user-facing rendering override this explicitly.
-            env.fix_context(3);
             env
         }
 
@@ -2601,12 +2598,6 @@ watermelon
             // configuration. So just deal with this inconvenience for now.
             let config = self.config.clone();
             self.config = config.context(lines);
-        }
-
-        /// Set the number of unchanged lines to include around each fix diff.
-        pub(super) fn fix_context(&mut self, lines: usize) {
-            let config = self.config.clone();
-            self.config = config.fix_context(lines);
         }
 
         /// Set the "merge window" for annotations and fix diff hunks in this test.

@@ -79,6 +79,8 @@ impl<'a> FullRenderer<'a> {
     }
 }
 
+const FIX_CONTEXT: usize = 1;
+
 /// Renders a diff that shows the code fixes.
 ///
 /// The implementation isn't fully fledged out and only used by tests. Before using in production, try
@@ -92,7 +94,6 @@ struct Diff<'a> {
     diagnostic_source: DiagnosticSource,
     notebook_index: Option<NotebookIndex>,
     stylesheet: &'a DiagnosticStylesheet,
-    context: usize,
     merge_window: usize,
 }
 
@@ -109,7 +110,6 @@ impl<'a> Diff<'a> {
             diagnostic_source: file.diagnostic_source(resolver),
             notebook_index: resolver.notebook_index(file),
             stylesheet,
-            context: config.fix_context,
             merge_window: config.merge_window,
         })
     }
@@ -177,7 +177,7 @@ impl std::fmt::Display for Diff<'_> {
             let diff = TextDiff::from_lines(input, &output);
 
             let mut grouped_ops: Vec<Vec<DiffOp>> = Vec::new();
-            for group in diff.grouped_ops(self.context) {
+            for group in diff.grouped_ops(FIX_CONTEXT) {
                 if let Some(previous) = grouped_ops.last_mut()
                     && let Some(DiffOp::Equal { new_index, len, .. }) = previous.last_mut()
                     && let [
@@ -977,59 +977,13 @@ line 10
         5 | line 5
           |
         help: Start of diff:
-           |
-        4  | line 4
-        5  | line 5
-        6  | line 6
-           - line 7
-        7  + fixed line 7
-        8  | line 8
-        9  | line 9
-        10 | line 10
-           |
+          |
+        6 | line 6
+          - line 7
+        7 + fixed line 7
+        8 | line 8
+          |
         note: This is an unsafe fix and may change runtime behavior
-        ");
-    }
-
-    #[test]
-    fn zero_context_fix_diff_is_framed() {
-        let mut env = TestEnvironment::new();
-        let contents = "\
-line 1
-line 2
-line 3
-line 4
-line 5
-line 6
-line 7
-";
-        env.add("example.py", contents);
-        env.format(DiagnosticFormat::Full);
-        env.context(0);
-        env.fix_context(0);
-        env.show_fix_diff(true);
-
-        let mut diagnostic = env.err().primary("example.py", "4", "4", "").build();
-        diagnostic.help("Replace the line");
-        let target = "line 4";
-        let target_start = contents.find(target).unwrap();
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "replacement".to_string(),
-            TextRange::at(TextSize::try_from(target_start).unwrap(), target.text_len()),
-        )));
-
-        insta::assert_snapshot!(env.render(&diagnostic), @"
-        error[test-diagnostic]: main diagnostic message
-         --> example.py:4:1
-          |
-        4 | line 4
-          | ^^^^^^
-          |
-        help: Replace the line
-          |
-          - line 4
-        4 + replacement
-          |
         ");
     }
 
@@ -1054,7 +1008,6 @@ line 13
         env.add("example.py", contents);
         env.format(DiagnosticFormat::Full);
         env.context(0);
-        env.fix_context(1);
         env.merge_window(2);
         env.show_fix_diff(true);
 

@@ -20,12 +20,9 @@ help: Remove unused import: `os`
 1 | # cell 2
   - import math
 2 |
-3 | print('hello world')
   |
  ::: cell 3
   |
-1 | # cell 3
-2 | def foo():
 3 |     print()
   -     x = 1
 4 |

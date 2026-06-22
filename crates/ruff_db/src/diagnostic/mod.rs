@@ -1404,8 +1404,6 @@ pub struct DisplayDiagnosticConfig {
     /// here for now as the most "sensible" place for it to live until
     /// we had more concrete use cases. ---AG
     context: usize,
-    /// The number of unchanged lines to show around each fix diff.
-    fix_context: usize,
     /// The "merge window" for annotations and fix diff hunks.
     ///
     /// Nearby annotations or fix edits are rendered in a single source frame even when their
@@ -1438,7 +1436,6 @@ impl DisplayDiagnosticConfig {
             color: false,
             anonymized_line_numbers: false,
             context: 2,
-            fix_context: 1,
             merge_window: 2,
             preview: false,
             hide_severity: false,
@@ -1471,14 +1468,6 @@ impl DisplayDiagnosticConfig {
     pub fn context(self, lines: usize) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             context: lines,
-            ..self
-        }
-    }
-
-    /// Set the number of unchanged lines to show around each fix diff.
-    pub fn fix_context(self, lines: usize) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            fix_context: lines,
             ..self
         }
     }

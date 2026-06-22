@@ -31,7 +31,6 @@ help: Remove unused import: `math`
 1 | # cell 2
   - import math
 2 |
-3 | print('hello world')
   |
 
 error[F841][*]: Local variable `x` is assigned to but never used
@@ -45,8 +44,6 @@ error[F841][*]: Local variable `x` is assigned to but never used
 help: Remove assignment to unused variable `x`
  ::: cell 3
   |
-1 | # cell 3
-2 | def foo():
 3 |     print()
   -     x = 1
 4 |
