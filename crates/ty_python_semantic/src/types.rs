@@ -98,7 +98,7 @@ pub use crate::types::typevar::{
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, find_over_type};
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -1219,7 +1219,7 @@ impl<'db> Type<'db> {
     }
 
     /// Normalizes nominal growth that wraps the previous cycle result in one or more
-    /// specializations, either directly or beneath an unambiguous union wrapper.
+    /// specializations, either directly or beneath an unambiguous union or intersection wrapper.
     ///
     /// For example, an inference cycle can otherwise grow indefinitely as
     /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
@@ -1233,6 +1233,37 @@ impl<'db> Type<'db> {
         previous: Self,
         div: Self,
     ) -> Option<Self> {
+        // As with unions below, multiple intersection elements can each wrap the previous
+        // intersection. Requiring multiple replacements avoids ambiguous single-element matches.
+        if let (Type::Intersection(current), Type::Intersection(previous)) = (self, previous)
+            && current.negative(db) == previous.negative(db)
+        {
+            let previous_elements = previous.positive(db);
+            if previous_elements
+                .iter()
+                .all(|element| matches!(element, Type::NominalInstance(_)))
+            {
+                let mut replacements = 0;
+                let normalized = current.map_positive(db, |element| {
+                    element
+                        .as_nominal_instance()
+                        .and_then(|instance| {
+                            Self::nominal_wrapper_normalized(
+                                db,
+                                instance,
+                                Type::Intersection(previous),
+                                div,
+                            )
+                        })
+                        .inspect(|_| replacements += 1)
+                        .unwrap_or(*element)
+                });
+                if replacements > 1 {
+                    return Some(normalized);
+                }
+            }
+        }
+
         if let (Type::Union(current), Type::Union(previous)) = (self, previous) {
             let previous_elements = previous.elements(db);
 
@@ -1320,7 +1351,8 @@ impl<'db> Type<'db> {
         Self::nominal_wrapper_normalized(db, current, previous, div)
     }
 
-    /// Replaces `wrapped` beneath the outer nominal specialization in `current`.
+    /// Replaces `wrapped` beneath the outer nominal specialization in `current`, including union
+    /// elements that were distributed across intersections.
     fn nominal_wrapper_normalized(
         db: &'db dyn Db,
         current: NominalInstanceType<'db>,
@@ -1337,14 +1369,45 @@ impl<'db> Type<'db> {
                 to: div,
             },
         );
-        if specialization == original_specialization {
-            return None;
-        }
-
-        Some(Type::instance(
+        let mut normalized = Type::instance(
             db,
             ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
-        ))
+        );
+
+        if let Type::Union(wrapped) = wrapped {
+            while let Some(intersection) = find_over_type(db, normalized, false, |ty| match ty {
+                Type::Intersection(intersection)
+                    if intersection
+                        .positive(db)
+                        .iter()
+                        .any(|element| wrapped.elements(db).contains(element)) =>
+                {
+                    Some(intersection)
+                }
+                _ => None,
+            }) {
+                let replacement = intersection.map_positive(db, |element| {
+                    if wrapped.elements(db).contains(element) {
+                        div
+                    } else {
+                        *element
+                    }
+                });
+                if replacement == Type::Intersection(intersection) {
+                    break;
+                }
+                normalized = normalized.apply_type_mapping(
+                    db,
+                    &TypeMapping::ReplaceType {
+                        from: Type::Intersection(intersection),
+                        to: replacement,
+                    },
+                    TypeContext::default(),
+                );
+            }
+        }
+
+        (normalized != Type::NominalInstance(current)).then_some(normalized)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {

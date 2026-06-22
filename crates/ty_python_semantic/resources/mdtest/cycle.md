@@ -230,6 +230,33 @@ min(Y)
 T = f()
 ```
 
+## Recursive intersection growth
+
+Narrowing a loop-carried type can distribute the previous union across intersections. Cycle recovery
+should recognize the distributed previous elements instead of growing the type on every iteration.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeIs
+
+class Container[T]: ...
+
+def is_container[T](x: object, y: T) -> TypeIs[Container[T]]:
+    return True
+
+while True:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    if is_container(x, type(x)):
+        x = [x]  # error: [possibly-unresolved-reference]
+    else:
+        x = {x}  # error: [possibly-unresolved-reference]
+```
+
 ## Type replacement with a lazy function signature
 
 Type replacement while recovering the first `function` definition must not evaluate its lazy

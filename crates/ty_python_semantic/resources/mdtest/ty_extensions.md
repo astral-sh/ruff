@@ -502,7 +502,7 @@ python-version = "3.14"
 ```
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions import Intersection, TypeOf
 
 direct: TypeOf[direct]
 direct = 1
@@ -525,6 +525,13 @@ class Container[T]: ...
 y: Container[TypeOf[y]]
 y = 1  # error: [invalid-assignment]
 reveal_type(y)  # revealed: Container[Divergent]
+
+intersection: Intersection[
+    list[TypeOf[intersection]],
+    Container[TypeOf[intersection]],
+]
+intersection = [1]  # error: [invalid-assignment]
+reveal_type(intersection)  # revealed: list[Divergent] & Container[Divergent]
 
 union: list[TypeOf[union]] | Container[TypeOf[union]]
 union = [1]
