@@ -2630,16 +2630,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         for use_def_map in &use_def_maps {
             let mut defined_places = FxHashSet::default();
             for (_, state, _) in use_def_map.all_definitions_with_usage() {
-                let Some(definition) = state.definition() else {
-                    continue;
-                };
-                let place = definition.place(self.db);
-                if self.uses_by_collection.contains_key(&definition)
-                    && defined_places.contains(&place)
+                if let Some(definition) = state.definition()
+                    && !defined_places.insert(definition.place(self.db))
+                    && self.uses_by_collection.contains_key(&definition)
                 {
                     self.collections_requiring_cycle.insert(definition);
                 }
-                defined_places.insert(place);
             }
         }
 
