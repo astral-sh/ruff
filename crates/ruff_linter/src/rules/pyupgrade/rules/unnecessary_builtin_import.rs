@@ -10,11 +10,15 @@ use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
-/// Checks for unnecessary imports of builtins.
+/// Checks for imports from Python 2 compatibility shims that are unnecessary
+/// on Python 3, such as `from builtins import str` or `from six.moves import
+/// filter`.
 ///
 /// ## Why is this bad?
-/// Builtins are always available. Importing them is unnecessary and should be
-/// removed to avoid confusion.
+/// These modules (`builtins`, `io.open`, and the `six` / `six.moves` family)
+/// were used to access Python 3 builtins from Python 2-compatible code. On
+/// Python 3, the names they re-export are already builtins, so the imports
+/// are redundant and can be removed.
 ///
 /// ## Example
 /// ```python
