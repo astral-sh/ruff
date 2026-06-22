@@ -3,8 +3,8 @@ use smallvec::SmallVec;
 use crate::types::{DivergentType, KnownClass, Type, UnionType};
 use crate::{Db, FxIndexMap, FxIndexSet};
 
-use super::ProjectionContainer;
 use super::artifact::ProjectionPath;
+use super::container::ProjectionContainer;
 use super::evidence::ProjectionEvidenceSet;
 use super::recovery::{ProjectionRecoverySlot, ProjectionRecoverySlotRole};
 use super::term::ProjectionTerm;

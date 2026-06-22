@@ -7,7 +7,9 @@
 use crate::types::{DivergentType, StaticClassLiteral, Type};
 use crate::{Db, FxIndexSet};
 
-use super::{ProjectionContainer, ProjectionOp, ProjectionPath, ProjectionTerm};
+use super::artifact::{ProjectionOp, ProjectionPath};
+use super::container::ProjectionContainer;
+use super::term::ProjectionTerm;
 
 /// Projection facts computed during normal inference and reused during cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
