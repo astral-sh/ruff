@@ -274,12 +274,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
-    // A map from a constraining use of a collection literal to its definition.
+    // A map from each discovered use of a collection literal to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
-    // A map from a collection literal definition to statements containing a constraining use.
+    // A map from a collection literal definition to constraining statements that reference it.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
-    // Collection literals with uses that require cycle-based inference.
-    collections_requiring_cycle: FxHashSet<Definition<'db>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -330,7 +328,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
-            collections_requiring_cycle: FxHashSet::default(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -2624,21 +2621,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
 
-        // Replacing an existing binding can make later collection uses depend on the merge of all
-        // definitions for that place. The identity-specialized query deliberately bypasses that
-        // merge, so retain cycle-based inference for those collection definitions.
-        for use_def_map in &use_def_maps {
-            let mut defined_places = FxHashSet::default();
-            for (_, state, _) in use_def_map.all_definitions_with_usage() {
-                if let Some(definition) = state.definition()
-                    && !defined_places.insert(definition.place(self.db))
-                    && self.uses_by_collection.contains_key(&definition)
-                {
-                    self.collections_requiring_cycle.insert(definition);
-                }
-            }
-        }
-
         let uses_by_collection = FrozenMap::from_entries(
             self.uses_by_collection
                 .into_iter()
@@ -2661,7 +2643,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
-            collections_requiring_cycle: FrozenSet::from(self.collections_requiring_cycle),
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
@@ -4094,70 +4075,43 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.visit_stmt_impl(stmt);
         let mut current_statement = self.pop_statement();
 
-        // We currently only consider certain types of statements to introduce constraints
-        // on collection literals. This restriction is mostly for performance reasons, as we
-        // want to avoid "reads" of a collection contributing to the complexity of the cycles
-        // created by full-scope collection inference.
-        match stmt {
-            ast::Stmt::AugAssign(_) => self.collections_requiring_cycle.extend(
-                current_statement
-                    .collection_uses
-                    .iter()
-                    .map(|(definition, _)| *definition),
-            ),
-            ast::Stmt::Assign(ast::StmtAssign { targets, value, .. })
-                if targets
-                    .iter()
-                    .any(|target| target.is_attribute_expr() || target.is_subscript_expr()) =>
-            {
-                let assigned_value = ExpressionNodeKey::from(value);
-                self.collections_requiring_cycle.extend(
-                    current_statement
-                        .collection_uses
-                        .iter()
-                        .filter(|(_, use_expression)| *use_expression == assigned_value)
-                        .map(|(definition, _)| *definition),
-                );
-            }
-            _ => {}
-        }
+        let all_collection_uses = current_statement.collection_uses.clone();
+
+        // Keep every use-to-definition edge so a constraining operation on one collection can
+        // refer symbolically to another collection. Only add statements that can themselves
+        // contribute a collection constraint to the inference worklist below.
+        self.collections_by_use.extend(
+            current_statement
+                .collection_uses
+                .iter()
+                .map(|(definition, use_expression)| (*use_expression, *definition)),
+        );
 
         current_statement
             .collection_uses
-            .retain(|(_, use_expression)| {
-                match stmt {
-                    // A return involving the collection object.
-                    ruff_python_ast::Stmt::Return(_) => true,
-
-                    // A subscript assignment on the collection object.
-                    ruff_python_ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                        match targets.as_slice() {
-                            [ast::Expr::Subscript(ast::ExprSubscript { value, .. })] => {
-                                ExpressionNodeKey::from(value) == *use_expression
-                            }
-                            _ => false,
-                        }
-                    }
-
-                    // An annotated assignment assigning the collection object to a new binding.
-                    ruff_python_ast::Stmt::AnnAssign(_) => true,
-
-                    // A bound-method call on the collection object.
-                    ruff_python_ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                        match value.as_ref() {
-                            ast::Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-                                ruff_python_ast::Expr::Attribute(ast::ExprAttribute {
-                                    value,
-                                    ..
-                                }) => ExpressionNodeKey::from(value) == *use_expression,
-                                _ => false,
-                            },
-                            _ => false,
-                        }
-                    }
-
-                    _ => false,
+            .retain(|(_, use_expression)| match stmt {
+                ast::Stmt::Return(_) | ast::Stmt::AnnAssign(_) => true,
+                ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                    ExpressionNodeKey::from(target.as_ref()) == *use_expression
                 }
+                ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                    let mutates_collection = matches!(targets.as_slice(), [
+                        ast::Expr::Subscript(ast::ExprSubscript { value, .. })
+                    ] if ExpressionNodeKey::from(value.as_ref()) == *use_expression);
+                    mutates_collection
+                }
+                ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                    matches!(
+                        value.as_ref(),
+                        ast::Expr::Call(ast::ExprCall { func, .. })
+                            if matches!(
+                                func.as_ref(),
+                                ast::Expr::Attribute(ast::ExprAttribute { value, .. })
+                                    if ExpressionNodeKey::from(value.as_ref()) == *use_expression
+                            )
+                    )
+                }
+                _ => false,
             });
 
         if current_statement.lambda_expressions.is_empty()
@@ -4179,11 +4133,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 .map(|lambda| (lambda.into(), standalone_statement)),
         );
 
-        // The inferred element type of collection literal depends on uses of
-        // the collection in its containing scope, and so each use must be part
-        // of an standalone inferable statement to avoid large scope-level cycles.
+        // The inferred element type of a collection literal depends on uses of the collection in
+        // its containing scope. Record every use so collection inference can build one explicit
+        // constraint graph without depending on ordinary statement inference.
         let mut collection_defs = FxHashSet::default();
-        for (collection_def, use_expression) in current_statement.collection_uses {
+        // Every collection referenced by a constraining statement belongs to the same dataflow
+        // component, including collections used as arguments rather than receivers.
+        let collection_uses = if current_statement.collection_uses.is_empty() {
+            current_statement.collection_uses
+        } else {
+            all_collection_uses
+        };
+        for (collection_def, use_expression) in collection_uses {
             // If the same collection is referenced multiple times in this statement,
             // we only consider the first occurrence, as collection use constraints are
             // tracked at the statement level.
@@ -4195,9 +4156,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 .entry(collection_def)
                 .or_default()
                 .push((standalone_statement, use_expression));
-
-            self.collections_by_use
-                .insert(use_expression, collection_def);
         }
     }
 

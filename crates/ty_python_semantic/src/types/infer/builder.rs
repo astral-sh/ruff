@@ -1,4 +1,4 @@
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 
 use itertools::Itertools;
@@ -16,6 +16,7 @@ use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
@@ -23,12 +24,12 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    CollectionUseConstraint, CollectionUseConstraintInference, DeferredAndUndecorated,
-    DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
-    ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference,
-    InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
-    infer_collection_use_constraints, infer_deferred_types, infer_definition_types,
-    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
+    CollectionUseConstraint, DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra,
+    DefinitionTypes, ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet,
+    FrozenValueMap, FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra,
+    ScopeInference, ScopeInferenceExtra, infer_collection_use_constraints, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -76,7 +77,7 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
+    GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
     enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
@@ -105,8 +106,8 @@ use crate::types::{
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -188,53 +189,23 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 
 #[derive(Clone)]
 struct CollectionConstraintTarget<'db> {
-    definition: Definition<'db>,
-    has_dependency: Rc<Cell<bool>>,
+    identities: FxHashMap<Definition<'db>, Type<'db>>,
+    contexts: FxHashMap<Definition<'db>, GenericContext<'db>>,
+    generic_context: GenericContext<'db>,
 }
 
-#[derive(Default)]
-struct CollectionUseContext {
-    in_call: bool,
-    in_starred: bool,
+struct CollectionDependencyVisitor<'a, 'db> {
+    index: &'a SemanticIndex<'db>,
+    dependencies: &'a mut FxHashSet<Definition<'db>>,
 }
 
-struct CollectionUseContextVisitor {
-    target: ExpressionNodeKey,
-    call_depth: usize,
-    starred_depth: usize,
-    context: CollectionUseContext,
-}
-
-impl<'ast> Visitor<'ast> for CollectionUseContextVisitor {
+impl<'ast> Visitor<'ast> for CollectionDependencyVisitor<'_, '_> {
     fn visit_expr(&mut self, expression: &'ast ast::Expr) {
-        if ExpressionNodeKey::from(expression) == self.target {
-            self.context.in_call |= self.call_depth > 0;
-            self.context.in_starred |= self.starred_depth > 0;
-            return;
+        if let Some(definition) = self.index.unannotated_collection_literal(expression) {
+            self.dependencies.insert(definition);
         }
-
-        let is_call = matches!(expression, ast::Expr::Call(_));
-        let is_starred = matches!(expression, ast::Expr::Starred(_));
-        self.call_depth += usize::from(is_call);
-        self.starred_depth += usize::from(is_starred);
         walk_expr(self, expression);
-        self.call_depth -= usize::from(is_call);
-        self.starred_depth -= usize::from(is_starred);
     }
-}
-
-fn collection_use_context(
-    expression: &ast::Expr,
-    target: ExpressionNodeKey,
-) -> CollectionUseContext {
-    let mut visitor = CollectionUseContextVisitor {
-        target,
-        call_depth: 0,
-        starred_depth: 0,
-        context: CollectionUseContext::default(),
-    };
-    visitor.visit_expr(expression);
-    visitor.context
 }
 
 /// Builder to infer all types in a region.
@@ -323,6 +294,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
     collection_use_constraints:
         FxHashMap<Definition<'db>, FxIndexSet<CollectionUseConstraint<'db>>>,
+
+    /// Directed dependencies between collections in the active constraint component.
+    collection_constraint_dependencies: FxHashMap<Definition<'db>, FxHashSet<Definition<'db>>>,
 
     /// The collection whose constraints are being inferred without depending on its definition.
     collection_constraint_target: Option<CollectionConstraintTarget<'db>>,
@@ -441,6 +415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
             collection_use_constraints: FxHashMap::default(),
+            collection_constraint_dependencies: FxHashMap::default(),
             collection_constraint_target: None,
             string_annotations: FxHashSet::default(),
             expected_types: FxHashMap::default(),
@@ -473,17 +448,110 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn collection_constraint_override(&self, expression: &ast::Expr) -> Option<Type<'db>> {
         let target = self.collection_constraint_target.as_ref()?;
-        let direct_collection_def = self.index.unannotated_collection_literal(expression);
-        let collection_def = direct_collection_def.or_else(|| {
-            self.index
-                .unannotated_collection_literal_at_any_use(expression)
-        })?;
+        let collection_def = self
+            .index
+            .unannotated_collection_literal(expression)
+            .or_else(|| {
+                self.index
+                    .unannotated_collection_literal_at_any_use(expression)
+            })?;
 
-        if direct_collection_def != Some(target.definition) {
-            target.has_dependency.set(true);
+        target.identities.get(&collection_def).copied()
+    }
+
+    fn collection_constraint_identity(&self, collection_def: Definition<'db>) -> Option<Type<'db>> {
+        self.collection_constraint_target
+            .as_ref()?
+            .identities
+            .get(&collection_def)
+            .copied()
+    }
+
+    fn collection_constraint_generic_context(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> Option<GenericContext<'db>> {
+        self.collection_constraint_target
+            .as_ref()?
+            .contexts
+            .get(&collection_def)
+            .copied()
+    }
+
+    fn collection_constraint_projection(&self) -> Option<GenericContext<'db>> {
+        self.collection_constraint_target
+            .as_ref()
+            .map(|target| target.generic_context)
+    }
+
+    fn normalize_collection_constraint_type(&self, ty: Type<'db>) -> Type<'db> {
+        if self.collection_constraint_target.is_none() {
+            return ty;
         }
 
-        self.unannotated_collection_identity_type(collection_def)
+        let divergent = RefCell::new(FxHashSet::default());
+        any_over_type(self.db(), ty, false, |nested| {
+            if nested.is_divergent() {
+                divergent.borrow_mut().insert(nested);
+            }
+            false
+        });
+        divergent.into_inner().into_iter().fold(ty, |ty, from| {
+            ty.apply_type_mapping(
+                self.db(),
+                &TypeMapping::ReplaceType {
+                    from,
+                    to: Type::Never,
+                },
+                TypeContext::default(),
+            )
+        })
+    }
+
+    fn record_collection_dependencies<'expr>(
+        &mut self,
+        collection_def: Definition<'db>,
+        expressions: impl IntoIterator<Item = &'expr ast::Expr>,
+    ) {
+        if self.collection_constraint_target.is_none() {
+            return;
+        }
+
+        let mut dependencies = FxHashSet::default();
+        let mut visitor = CollectionDependencyVisitor {
+            index: self.index,
+            dependencies: &mut dependencies,
+        };
+        for expression in expressions {
+            visitor.visit_expr(expression);
+        }
+        self.collection_constraint_dependencies
+            .entry(collection_def)
+            .or_default()
+            .extend(dependencies);
+    }
+
+    fn collection_has_recursive_dependency(&self, collection_def: Definition<'db>) -> bool {
+        fn reaches<'db>(
+            dependencies: &FxHashMap<Definition<'db>, FxHashSet<Definition<'db>>>,
+            current: Definition<'db>,
+            target: Definition<'db>,
+            visited: &mut FxHashSet<Definition<'db>>,
+        ) -> bool {
+            dependencies.get(&current).is_some_and(|next| {
+                next.iter().any(|next| {
+                    *next == target
+                        || (visited.insert(*next) && reaches(dependencies, *next, target, visited))
+                })
+            })
+        }
+
+        reaches(
+            &self.collection_constraint_dependencies,
+            collection_def,
+            collection_def,
+            &mut FxHashSet::from_iter([collection_def]),
+        )
     }
 
     fn unannotated_collection_identity_type(
@@ -492,9 +560,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let assignment = collection_def.kind(self.db()).as_unannotated_assignment()?;
         let known_class = match assignment.value(self.module()) {
-            ast::Expr::List(list) if list.elts.is_empty() => KnownClass::List,
-            ast::Expr::Set(set) if set.elts.is_empty() => KnownClass::Set,
-            ast::Expr::Dict(dict) if dict.items.is_empty() => KnownClass::Dict,
+            ast::Expr::List(_) => KnownClass::List,
+            ast::Expr::Set(_) => KnownClass::Set,
+            ast::Expr::Dict(_) => KnownClass::Dict,
             _ => return None,
         };
         let collection_literal = known_class.try_to_class_literal(self.db())?;
@@ -502,6 +570,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(Type::instance(
             self.db(),
             collection_literal.identity_specialization(self.db()),
+        ))
+    }
+
+    fn collection_replaces_dynamic_binding(&self, collection_def: Definition<'db>) -> bool {
+        let collection_start = collection_def
+            .full_range(self.db(), self.module())
+            .range()
+            .start();
+        self.index
+            .use_def_map(collection_def.file_scope(self.db()))
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, _)| state.definition())
+            .filter(|definition| {
+                *definition != collection_def
+                    && definition.place(self.db()) == collection_def.place(self.db())
+                    && definition
+                        .full_range(self.db(), self.module())
+                        .range()
+                        .start()
+                        < collection_start
+            })
+            .any(|definition| binding_type(self.db(), definition).has_dynamic(self.db()))
+    }
+
+    fn default_collection_type(&self, collection_def: Definition<'db>) -> Option<Type<'db>> {
+        let identity = self.unannotated_collection_identity_type(collection_def)?;
+        let (class_literal, _) = identity.class_specialization(self.db())?;
+        Some(Type::instance(
+            self.db(),
+            class_literal.default_specialization(self.db()),
         ))
     }
 
@@ -5138,28 +5236,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         // Resolve the target type, assuming a load context.
-        let target_type = match &**target {
-            ast::Expr::Name(name) => {
-                let previous_value = self.infer_name_load(name);
-                self.store_expression_type(target, previous_value);
-                previous_value
-            }
-            ast::Expr::Attribute(attr) => {
-                let previous_value = self.infer_attribute_load(attr);
-                self.store_expression_type(target, previous_value);
-                previous_value
-            }
-            ast::Expr::Subscript(subscript) => {
-                let previous_value = self.infer_subscript_load(subscript);
-                self.store_expression_type(target, previous_value);
-                previous_value
-            }
-            _ => self.infer_expression(target, TypeContext::default()),
-        };
+        let target_type = self
+            .collection_constraint_override(target)
+            .unwrap_or_else(|| match &**target {
+                ast::Expr::Name(name) => {
+                    let previous_value = self.infer_name_load(name);
+                    self.store_expression_type(target, previous_value);
+                    previous_value
+                }
+                ast::Expr::Attribute(attr) => {
+                    let previous_value = self.infer_attribute_load(attr);
+                    self.store_expression_type(target, previous_value);
+                    previous_value
+                }
+                ast::Expr::Subscript(subscript) => {
+                    let previous_value = self.infer_subscript_load(subscript);
+                    self.store_expression_type(target, previous_value);
+                    previous_value
+                }
+                _ => self.infer_expression(target, TypeContext::default()),
+            });
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
-        })
+        let result =
+            self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            });
+
+        if self.collection_constraint_target.is_some()
+            && let Some(collection_def) = self.index.unannotated_collection_literal(target)
+        {
+            self.record_collection_dependencies(collection_def, std::iter::once(value.as_ref()));
+            let value_type = self.expression_type(value);
+            let constraint = target_type
+                .class_specialization(self.db())
+                .zip(value_type.class_specialization(self.db()))
+                .filter(|((target_class, _), (value_class, value_specialization))| {
+                    target_class == value_class
+                        && !value_specialization
+                            .types(self.db())
+                            .iter()
+                            .all(Type::is_unknown)
+                })
+                .map_or(result, |_| value_type);
+            if constraint.as_divergent().is_none() {
+                self.collection_use_constraints
+                    .entry(collection_def)
+                    .or_default()
+                    .insert(CollectionUseConstraint::Type(constraint));
+            }
+        }
+
+        result
     }
 
     fn infer_dict_key_assignment_definition(
@@ -6092,6 +6219,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if self.collection_constraint_target.is_some() {
+            return self.infer_expression_impl(expression, tcx);
+        }
+
         if let Some(standalone_expression) = self.index.try_expression(expression) {
             self.infer_standalone_expression_impl(expression, standalone_expression, tcx)
         } else {
@@ -6156,6 +6287,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if self.collection_constraint_target.is_some() {
+            return self.infer_expression_impl(expression, tcx);
+        }
+
         let standalone_expression = self.index.expression(expression);
         self.infer_standalone_expression_impl(expression, standalone_expression, tcx)
     }
@@ -6294,7 +6429,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
-        if let Some(tcx) = tcx.annotation
+        if self.collection_constraint_target.is_some()
+            && let Some(tcx) = tcx.annotation
             && let Some(collection_def) = self.index.unannotated_collection_literal(expression)
         {
             self.collection_use_constraints
@@ -7375,75 +7511,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
-            match infer_collection_use_constraints(self.db(), collection_def) {
-                CollectionUseConstraintInference::Constraints(use_constraints) => {
-                    for constraint in use_constraints {
-                        match constraint {
-                            CollectionUseConstraint::Type(constraint) => {
-                                if constraint.has_unspecialized_type_var(self.db()) {
-                                    continue;
-                                }
-                                builder.infer(identity_instance, *constraint).ok()?;
-                            }
-                            CollectionUseConstraint::Projected(projected) => {
-                                let projected = constraints.load(self.db(), projected);
-                                builder.intersect_constraint_set(projected);
-                            }
-                        }
-                    }
-                }
-                CollectionUseConstraintInference::RequiresCycle => {
-                    for (statement, use_expression) in
-                        self.index.constraining_collection_uses(collection_def)
-                    {
-                        let statement_use_types = infer_statement_types(self.db(), statement);
-
-                        if let Some(divergent) = statement_use_types
-                            .expression_type(use_expression)
-                            .as_divergent()
-                        {
-                            // Infer `collection[Divergent]` for the initial cycle result.
-                            let divergent_instance = collection_alias
-                                .origin(self.db())
-                                .apply_specialization(self.db(), |generic_context| {
-                                    generic_context.repeat_specialization(
-                                        self.db(),
-                                        Type::Divergent(divergent),
-                                    )
-                                });
-
-                            builder
-                                .infer(
-                                    identity_instance,
-                                    Type::instance(self.db(), divergent_instance),
-                                )
-                                .ok()?;
-                            continue;
-                        }
-
-                        let Some(statement_constraints) =
-                            statement_use_types.collection_use_constraints(collection_def)
-                        else {
-                            continue;
-                        };
-
-                        for constraint in statement_constraints {
-                            match constraint {
-                                CollectionUseConstraint::Type(constraint) => {
-                                    if constraint.has_unspecialized_type_var(self.db()) {
-                                        continue;
-                                    }
-                                    builder.infer(identity_instance, *constraint).ok()?;
-                                }
-                                CollectionUseConstraint::Projected(projected) => {
-                                    let projected = constraints.load(self.db(), projected);
-                                    builder.intersect_constraint_set(projected);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            let use_constraint = infer_collection_use_constraints(self.db(), collection_def);
+            builder.infer(identity_instance, *use_constraint).ok()?;
         }
 
         for (elts_index, elts) in elts.iter().enumerate() {
@@ -8457,52 +8526,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
-    fn collection_use_constraint_from_specialization(
-        &self,
-        identity_instance: Type<'db>,
-        receiver_generic_context: Option<GenericContext<'db>>,
-        call_specialization: Specialization<'db>,
-    ) -> Option<CollectionUseConstraint<'db>> {
-        let constraint = identity_instance.apply_specialization(self.db(), call_specialization);
-        let Some(receiver_generic_context) = receiver_generic_context else {
-            return Some(CollectionUseConstraint::Type(constraint));
-        };
-
-        // Method-local typevars describe requirements imposed by the method, not concrete element
-        // types learned for the collection. Until collection-use constraints are represented as
-        // projected constraint sets, avoid leaking those method-local typevars into the inferred
-        // collection literal type.
-        if any_over_type(self.db(), constraint, false, |ty| {
-            ty.as_typevar().is_some_and(|typevar| {
-                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
-            })
-        }) {
-            return None;
-        }
-
-        Some(CollectionUseConstraint::Type(constraint))
-    }
-
-    /// Records collection constraints and returns whether they are suitable for cycle-free
-    /// inference.
-    ///
-    /// Failed calls do not contribute constraints and can normally be ignored when another call
-    /// has already constrained the collection. A possibly-`None` argument requires the regular
-    /// cycle path, however, to avoid retaining the diagnostic from its initial `Divergent`
-    /// iteration alongside the stable diagnostic.
+    /// Records the projected constraints imposed by a bound collection method call.
     fn record_bound_method_collection_constraints(
         &mut self,
         attribute: &ast::ExprAttribute,
         arguments: &ast::Arguments,
         call_arguments: &mut CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) -> bool {
+    ) {
+        if self.collection_constraint_target.is_none() {
+            return;
+        }
+
         let value = &attribute.value;
         let value_type = self.expression_type(value);
 
         let Some(collection_def) = self.index.unannotated_collection_literal(value) else {
-            return false;
+            return;
         };
+        self.record_collection_dependencies(
+            collection_def,
+            arguments
+                .args
+                .iter()
+                .chain(arguments.keywords.iter().map(|keyword| &keyword.value)),
+        );
         let Some((collection_literal, _)) =
             value_type.class_specialization(self.db()).or_else(|| {
                 // Truthiness narrowing wraps a collection used under `if collection` in an
@@ -8518,22 +8566,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .ok()
             })
         else {
-            return false;
+            return;
         };
-        let identity_instance = Type::instance(
-            self.db(),
-            collection_literal.identity_specialization(self.db()),
-        );
-        let collection_generic_context = collection_literal.generic_context(self.db());
+        let identity_instance = self
+            .collection_constraint_identity(collection_def)
+            .unwrap_or_else(|| {
+                Type::instance(
+                    self.db(),
+                    collection_literal.identity_specialization(self.db()),
+                )
+            });
+        let collection_generic_context = self
+            .collection_constraint_generic_context(collection_def)
+            .or_else(|| collection_literal.generic_context(self.db()));
 
         let mut identity_bindings = self
             .infer_attribute_load_impl(attribute, identity_instance)
             .bindings(self.db())
             .match_parameters(self.db(), call_arguments)
-            // Perform inference against the type variables on the receiver's generic context.
             .with_generic_context(self.db(), collection_generic_context);
 
         let mut speculative = self.speculate();
+        let constraint_projection = self
+            .collection_constraint_projection()
+            .or(collection_generic_context);
         let call_result = speculative.infer_and_check_argument_types_with_projection(
             ArgumentsIter::from_ast(arguments),
             call_arguments,
@@ -8543,24 +8599,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // keyed, may not be the same as the type context we get here. It is not immediately
             // clear how to retrieve those types, and so we just re-infer the argument expressions
             // for simplicity.
-            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+            &mut |builder, (_, expr, tcx)| {
+                let ty = builder.infer_expression(expr, tcx);
+                builder.normalize_collection_constraint_type(ty)
+            },
             &mut identity_bindings,
             call_expression_tcx,
-            collection_generic_context,
+            constraint_projection,
         );
 
         if call_result.is_err() {
-            return !call_arguments.iter_types().any(|types| {
-                types.iter().any(|(_, ty)| {
-                    ty.is_none(self.db())
-                        || ty.as_union().is_some_and(|union| {
-                            union
-                                .elements(self.db())
-                                .iter()
-                                .any(|element| element.is_none(self.db()))
-                        })
-                })
-            });
+            return;
         }
 
         for projected in identity_bindings
@@ -8573,65 +8622,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_default()
                 .insert(CollectionUseConstraint::Projected(projected));
         }
-
-        if self.collection_constraint_target.is_none() {
-            for call_specialization in identity_bindings
-                .iter_flat()
-                .flat_map(CallableBinding::matching_overloads)
-                .filter_map(|(_, identity_overload)| identity_overload.specialization())
-            {
-                // Record the constraints on the receiver's generic context formed by the arguments
-                // to this bound method call.
-                let Some(constraints) = self.collection_use_constraint_from_specialization(
-                    identity_instance,
-                    collection_generic_context,
-                    call_specialization,
-                ) else {
-                    continue;
-                };
-
-                self.collection_use_constraints
-                    .entry(collection_def)
-                    .or_default()
-                    .insert(constraints);
-            }
-        }
-
-        true
-    }
-
-    fn infer_bound_method_collection_use_constraints(
-        &mut self,
-        call_expression: &ast::ExprCall,
-        collection_def: Definition<'db>,
-    ) -> bool {
-        let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) =
-            call_expression.func.as_ref()
-        else {
-            return false;
-        };
-        if self.index.unannotated_collection_literal(value) != Some(collection_def) {
-            return false;
-        }
-
-        let Some(identity_instance) = self.unannotated_collection_identity_type(collection_def)
-        else {
-            return false;
-        };
-        self.store_expression_type(value, identity_instance);
-
-        let mut call_arguments = self.prepare_call_arguments(&call_expression.arguments);
-        let supports_cycle_free_inference = self.record_bound_method_collection_constraints(
-            attribute,
-            &call_expression.arguments,
-            &mut call_arguments,
-            TypeContext::default(),
-        );
-        supports_cycle_free_inference
-            && self
-                .collection_use_constraints
-                .get(&collection_def)
-                .is_some_and(|constraints| !constraints.is_empty())
     }
 
     fn infer_call_expression(
@@ -10942,84 +10932,196 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_collection_use_constraints(
         mut self,
         collection_def: Definition<'db>,
-    ) -> CollectionUseConstraintInference<'db> {
+    ) -> Type<'db> {
         self.context.defuse();
 
-        if self
-            .index
-            .collection_requires_cycle_inference(collection_def)
-        {
-            return CollectionUseConstraintInference::RequiresCycle;
+        if self.collection_replaces_dynamic_binding(collection_def) {
+            return self
+                .default_collection_type(collection_def)
+                .unwrap_or_else(Type::unknown);
         }
 
-        let has_dependency = Rc::new(Cell::new(false));
-        self.collection_constraint_target = Some(CollectionConstraintTarget {
-            definition: collection_def,
-            has_dependency: Rc::clone(&has_dependency),
-        });
+        let mut candidates = self
+            .index
+            .unannotated_collections()
+            .filter(|definition| definition.scope(self.db()) == collection_def.scope(self.db()))
+            .collect::<Vec<_>>();
+        candidates.sort_unstable();
+        candidates.dedup();
 
-        let return_is_unconstrained = self
-            .scope
-            .node(self.db())
-            .as_function()
-            .is_some_and(|function| function.node(self.module()).returns.is_none());
-
-        for (statement, use_expression) in self.index.constraining_collection_uses(collection_def) {
-            let used_fast_path = match statement {
-                Statement::Expression(expression) => {
-                    match expression.node_ref(self.db()).node(self.module()) {
-                        ast::Expr::Call(call_expression) => self
-                            .infer_bound_method_collection_use_constraints(
-                                call_expression,
-                                collection_def,
-                            ),
-                        _ => false,
+        let mut definitions = FxHashSet::from_iter([collection_def]);
+        let mut statements = Vec::new();
+        let mut seen_statements = FxHashSet::default();
+        loop {
+            let mut ordered_definitions = definitions.iter().copied().collect::<Vec<_>>();
+            ordered_definitions.sort_unstable();
+            for definition in ordered_definitions {
+                for (statement, _) in self.index.constraining_collection_uses(definition) {
+                    if seen_statements.insert(statement) {
+                        statements.push(statement);
                     }
                 }
-                Statement::Other(statement) => {
-                    let statement = statement.node_ref(self.db()).node(self.module());
-                    match statement {
-                        // An unannotated return does not constrain its result, but a call within
-                        // the return expression can still constrain the collection through an
-                        // annotated argument. Starred uses participate in iterable inference and
-                        // need cycle recovery.
-                        ast::Stmt::Return(ast::StmtReturn {
-                            value: Some(value), ..
-                        }) if return_is_unconstrained => {
-                            let use_context = collection_use_context(value, use_expression);
-                            if use_context.in_starred {
-                                false
-                            } else if use_context.in_call {
-                                self.infer_statement(statement);
-                                true
-                            } else {
-                                true
-                            }
-                        }
-                        ast::Stmt::Return(_) => return_is_unconstrained,
-                        _ => false,
-                    }
-                }
-                Statement::Definition(_) => false,
-            };
+            }
 
-            if !used_fast_path {
-                return CollectionUseConstraintInference::RequiresCycle;
+            let previous_len = definitions.len();
+            definitions.extend(candidates.iter().copied().filter(|candidate| {
+                self.index
+                    .constraining_collection_uses(*candidate)
+                    .any(|(statement, _)| seen_statements.contains(&statement))
+            }));
+            if definitions.len() == previous_len {
+                break;
             }
         }
 
-        let constraints = self
-            .collection_use_constraints
-            .remove(&collection_def)
-            .unwrap_or_default()
-            .into_iter()
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+        let mut definitions = definitions.into_iter().collect::<Vec<_>>();
+        definitions.sort_unstable();
 
-        if has_dependency.get() {
-            CollectionUseConstraintInference::RequiresCycle
+        let mut identities = FxHashMap::default();
+        let mut contexts = FxHashMap::default();
+        let mut generic_context = None;
+        for (index, definition) in definitions.iter().enumerate() {
+            let Some(identity) = self.unannotated_collection_identity_type(*definition) else {
+                continue;
+            };
+            let Some((_, specialization)) = identity.class_specialization(self.db()) else {
+                continue;
+            };
+            let context = specialization.generic_context(self.db());
+            let Ok(delta) = u32::try_from(index + 1) else {
+                return Type::unknown();
+            };
+            let mapping = TypeMapping::FreshenBoundTypeVars {
+                generic_context: context,
+                delta,
+            };
+            let fresh_identity =
+                identity.apply_type_mapping(self.db(), &mapping, TypeContext::default());
+            let fresh_context = mapping.update_signature_generic_context(self.db(), context);
+            identities.insert(*definition, fresh_identity);
+            contexts.insert(*definition, fresh_context);
+            generic_context =
+                GenericContext::merge_optional(self.db(), generic_context, Some(fresh_context));
+        }
+        let Some(generic_context) = generic_context else {
+            return Type::unknown();
+        };
+
+        self.collection_constraint_target = Some(CollectionConstraintTarget {
+            identities: identities.clone(),
+            contexts,
+            generic_context,
+        });
+
+        for statement in statements {
+            match statement {
+                Statement::Expression(expression) => {
+                    self.infer_expression_impl(
+                        expression.node_ref(self.db()).node(self.module()),
+                        TypeContext::default(),
+                    );
+                }
+                Statement::Definition(definition) => self.infer_region_definition(definition),
+                Statement::Other(statement) => {
+                    self.infer_statement(statement.node_ref(self.db()).node(self.module()));
+                }
+            }
+        }
+
+        let constraints = ConstraintSetBuilder::new();
+        let inferable = generic_context.inferable_typevars(self.db());
+        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
+
+        let mut constraints_by_definition = std::mem::take(&mut self.collection_use_constraints)
+            .into_iter()
+            .collect::<Vec<_>>();
+        constraints_by_definition.sort_unstable_by_key(|(definition, _)| *definition);
+        for (definition, use_constraints) in constraints_by_definition {
+            let Some(identity_instance) = identities.get(&definition).copied() else {
+                continue;
+            };
+
+            for constraint in use_constraints {
+                match constraint {
+                    CollectionUseConstraint::Type(constraint) => {
+                        let added_element_mappings = identity_instance
+                            .class_specialization(self.db())
+                            .zip(constraint.class_specialization(self.db()))
+                            .filter(|((identity_class, _), (constraint_class, _))| {
+                                identity_class == constraint_class
+                            })
+                            .is_some_and(
+                                |((_, identity_specialization), (_, constraint_specialization))| {
+                                    if identity_specialization.types(self.db()).len()
+                                        != constraint_specialization.types(self.db()).len()
+                                    {
+                                        return false;
+                                    }
+                                    for (typevar, constraint) in identity_specialization
+                                        .types(self.db())
+                                        .iter()
+                                        .filter_map(|ty| ty.as_typevar())
+                                        .zip(constraint_specialization.types(self.db()))
+                                    {
+                                        builder.add_type_mapping(
+                                            typevar,
+                                            *constraint,
+                                            TypeVarVariance::Covariant,
+                                        );
+                                    }
+                                    true
+                                },
+                            );
+                        if !added_element_mappings {
+                            builder.infer(identity_instance, constraint).ok();
+                        }
+                    }
+                    CollectionUseConstraint::Projected(projected) => {
+                        let projected = constraints.load(self.db(), &projected);
+                        builder.intersect_constraint_set(projected);
+                    }
+                }
+            }
+        }
+
+        let has_recursive_dependency = self.collection_has_recursive_dependency(collection_def);
+        let specialization = builder.build_with(generic_context, |_, bounds| {
+            let lower = bounds?.lower?;
+            let lower = if let Some(union) = lower.as_union()
+                && union
+                    .elements(self.db())
+                    .iter()
+                    .any(|element| !element.is_unknown() && element.as_divergent().is_none())
+            {
+                lower.filter_union(self.db(), |element| {
+                    !element.is_unknown() && element.as_divergent().is_none()
+                })
+            } else {
+                lower
+            };
+            Some(lower.promote(self.db()))
+        });
+        let Some(identity) = identities.get(&collection_def) else {
+            return Type::unknown();
+        };
+        let result = self.normalize_collection_constraint_type(
+            identity.apply_specialization(self.db(), specialization),
+        );
+        if has_recursive_dependency
+            && any_over_type(self.db(), result, false, |ty| ty.is_never())
+            && let Some((class_literal, _)) = result.class_specialization(self.db())
+            && let Some(context) = class_literal.generic_context(self.db())
+        {
+            Type::instance(
+                self.db(),
+                class_literal.apply_specialization(self.db(), |generic_context| {
+                    debug_assert_eq!(generic_context, context);
+                    generic_context
+                        .repeat_specialization(self.db(), Type::divergent(collection_def.as_id()))
+                }),
+            )
         } else {
-            CollectionUseConstraintInference::Constraints(constraints)
+            result
         }
     }
 
@@ -11047,6 +11149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             collection_constraint_target: _,
+            collection_constraint_dependencies: _,
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
@@ -11130,6 +11233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             collection_constraint_target: _,
+            collection_constraint_dependencies: _,
             expression_cache: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
@@ -11226,6 +11330,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             collection_constraint_target: _,
+            collection_constraint_dependencies: _,
             expression_cache: _,
             reachability_cache: _,
             declarations: _,
@@ -11285,6 +11390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             collection_constraint_target: _,
+            collection_constraint_dependencies: _,
             expression_cache: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
@@ -11424,6 +11530,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Builder only state
             collection_constraint_target: _,
+            collection_constraint_dependencies: _,
             expression_cache: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
@@ -11502,6 +11609,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
+            collection_constraint_dependencies: _,
         } = *self;
 
         let mut builder = TypeInferenceBuilder::new(self.db(), region, index, self.module());
@@ -11551,6 +11659,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             collection_constraint_target: _,
+            collection_constraint_dependencies: _,
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,

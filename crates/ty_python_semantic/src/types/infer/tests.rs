@@ -385,7 +385,7 @@ fn unconstrained_collection_with_use_uses_cycle_free_constraint_query() -> anyho
 }
 
 #[test]
-fn collection_escape_uses_cycle_based_constraints() -> anyhow::Result<()> {
+fn collection_escape_uses_collection_constraint_query() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_file("/src/a.py", "x = []\nx.append(1)\nd = {}\nd['x'] = x")?;
 
@@ -404,7 +404,7 @@ fn collection_escape_uses_cycle_based_constraints() -> anyhow::Result<()> {
     };
 
     assert_function_query_was_run(&db, infer_collection_use_constraints, x, &events);
-    assert_function_query_was_run(
+    assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
         InferExpression::Bare(append),

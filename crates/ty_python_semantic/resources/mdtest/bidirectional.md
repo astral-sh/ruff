@@ -1019,7 +1019,7 @@ def _():
     return (AlternativeRule(rules), 1)
 ```
 
-Invalid bound-method calls should not retain diagnostics from the initial cycle iteration:
+Invalid bound-method calls do not contribute constraints when argument matching fails:
 
 ```py
 def _(values: list[str] | None):
@@ -1029,9 +1029,8 @@ def _(values: list[str] | None):
     reveal_type(lines)  # revealed: list[str]
 ```
 
-Full statement inference should also combine projected constraints from bound-method calls. Each of
-the following collections requires the full-statement path, but should still widen to include both
-tuple types:
+The collection component solver combines projected constraints across control flow and non-method
+uses, so each of the following collections widens to include both tuple types:
 
 ```py
 class Rule: ...
@@ -1070,9 +1069,7 @@ def augmented(include_rewrite: bool):
     pieces += []
 ```
 
-Uses that can refer to an intervening binding require cycle-based inference. Inferring these uses
-against the original collection's identity specialization can miss widening from an augmented
-assignment:
+Augmented assignment contributes constraints to the same collection component as bound-method calls:
 
 ```py
 class Node: ...
@@ -1089,7 +1086,7 @@ def _(flag: bool) -> None:
     values += nodes()
 ```
 
-Collections that replace an existing binding also require cycle-based inference:
+Replacing a dynamic binding keeps the collection specialization dynamic:
 
 ```py
 class Paths: ...
@@ -1105,8 +1102,8 @@ def _(options=None):
     Handler(**options)
 ```
 
-Collections stored in an attribute or subscript require cycle-based inference because the assignment
-can participate in later inference cycles:
+When a loop-carried collection is stored in an attribute, a concrete specialization supersedes the
+initial divergent loop placeholder:
 
 ```py
 import inspect
@@ -1127,7 +1124,7 @@ class C:
             reveal_type(module)  # revealed: ModuleType | None
 ```
 
-Starred uses in a return expression continue to participate in cycle recovery:
+Starred uses in a return expression preserve constraints from earlier mutations:
 
 ```py
 def consume(*values: int) -> None: ...
