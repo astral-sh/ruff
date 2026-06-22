@@ -513,16 +513,30 @@ pub enum TextWidth {
 
 impl TextWidth {
     pub fn from_text(text: &str, indent_width: IndentWidth) -> TextWidth {
+        const fn is_printable_ascii(byte: u8) -> bool {
+            matches!(byte, b' '..=b'~')
+        }
+
         let mut width = 0u32;
 
-        for c in text.chars() {
-            let char_width = match c {
-                '\t' => indent_width.value(),
-                '\n' => return TextWidth::Multiline,
-                #[expect(clippy::cast_possible_truncation)]
-                c => c.width().unwrap_or(0) as u32,
-            };
-            width += char_width;
+        for (index, byte) in text.bytes().enumerate() {
+            match byte {
+                b'\t' => width += indent_width.value(),
+                b'\n' => return TextWidth::Multiline,
+                byte if is_printable_ascii(byte) => width += 1,
+                _ => {
+                    for c in text[index..].chars() {
+                        let char_width = match c {
+                            '\t' => indent_width.value(),
+                            '\n' => return TextWidth::Multiline,
+                            #[expect(clippy::cast_possible_truncation)]
+                            c => c.width().unwrap_or(0) as u32,
+                        };
+                        width += char_width;
+                    }
+                    break;
+                }
+            }
         }
 
         Self::Width(Width::new(width))
@@ -543,7 +557,22 @@ impl TextWidth {
 #[cfg(test)]
 mod tests {
 
-    use crate::format_element::{LINE_TERMINATORS, normalize_newlines};
+    use crate::IndentWidth;
+    use crate::format_element::{LINE_TERMINATORS, TextWidth, normalize_newlines};
+
+    #[test]
+    fn text_width() {
+        let indent_width = IndentWidth::try_from(4).unwrap();
+        let width = |text| {
+            TextWidth::from_text(text, indent_width)
+                .width()
+                .map(super::Width::value)
+        };
+
+        assert_eq!(width("hello"), Some(5));
+        assert_eq!(width("a寿司b"), Some(6));
+        assert_eq!(width("a\0b"), Some(2));
+    }
 
     #[test]
     fn test_normalize_newlines() {
