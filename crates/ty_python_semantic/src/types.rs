@@ -92,8 +92,8 @@ pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::TypeVarInstance;
 pub use crate::types::typevar::{
-    BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarNonce,
+    BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ParamSpecAttrKind,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarNonce,
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -7172,10 +7172,10 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for Type<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         tracing::trace!(
             "Checking variance of '{tvar}' in `{ty:?}`",
-            tvar = typevar.typevar(db).name(db),
+            tvar = typevar.identity.name(db),
             ty = self.display(db),
         );
 
@@ -7198,7 +7198,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, typevar),
             Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, typevar),
             // A type variable is always covariant in itself.
-            Type::TypeVar(other_typevar) if other_typevar == typevar => {
+            Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
                 TypeVarVariance::Covariant
             }
@@ -7263,7 +7263,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 
         tracing::trace!(
             "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}`",
-            tvar = typevar.typevar(db).name(db),
+            tvar = typevar.identity.name(db),
             ty = self.display(db),
         );
         v
@@ -8428,7 +8428,7 @@ impl<'db> TypeIsType<'db> {
 impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
     // See the [typing spec] on why `TypeIs` is invariant in its type.
     // [typing spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.type_argument(db)
             .with_polarity(TypeVarVariance::Invariant)
             .variance_of(db, typevar)
@@ -8498,7 +8498,7 @@ impl<'db> TypeGuardType<'db> {
 impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
     // `TypeGuard` is covariant in its type parameter. See the `TypeGuard`
     // section of mdtest/generics/pep695/variance.md for details.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.return_type(db).variance_of(db, typevar)
     }
 }

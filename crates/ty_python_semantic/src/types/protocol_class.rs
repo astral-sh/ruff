@@ -16,10 +16,11 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
-        ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
-        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+        ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
+        PropertyInstanceType, ProtocolInstanceType, Signature, StaticClassLiteral, Type,
+        TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -411,7 +412,7 @@ impl<'db> ProtocolInterface<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.members(db)
             // TODO do we need to switch on member kind?
             .map(|member| member.ty().variance_of(db, typevar))
@@ -782,7 +783,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             }
         };
-        if result.is_never_satisfied(db) {
+        if self.is_context_collection_enabled() && result.is_never_satisfied(db) {
             self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
             });
@@ -805,7 +806,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         target
             .members(db)
-            .when_all(db, self.constraints, |target_member| {
+            .map(|target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
                 if self.is_context_collection_enabled() && source_member.is_none() {
@@ -886,12 +887,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ) => self.always(),
                     }
                 });
-                if result.is_never_satisfied(db) {
+                if self.is_context_collection_enabled() && result.is_never_satisfied(db) {
                     self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
                     });
                 }
                 result
+            })
+            .when_all(db, self.constraints, |when| {
+                // If any protocol methods are generic, our signature checking logic will end up
+                // doing an existential check: looking for _any_ specialization that causes the
+                // methods to be assignable. Normally, we do this quantification lazily, so that
+                // other parts of the larger constraint set we are producing can refer to the
+                // quantified variables. However, for protocols, we know that the members are
+                // independent of each other: typevars introduced by a generic protocol method
+                // cannot be referred to in other protocol members. That means that it's safe to do
+                // the quantification _eagerly_. This is an optimization, since it can result in
+                // smaller constraint sets that later operations can consume more efficiently.
+                when.apply_deferred_quantification(db, self.constraints)
             })
     }
 }

@@ -111,7 +111,7 @@ use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -197,16 +197,24 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: This merges deferred quantification linearly while `distributed_or` combines BDD
+        // nodes logarithmically via `tree_fold`. If this ever shows up in profiles, consider
+        // threading deferred quantification through `tree_fold` so both are combined in the same
+        // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
+        // regression.
+        let mut deferred_quantification = FxOrderSet::default();
         let node = NodeId::distributed_or(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
+                deferred_quantification.extend(constraint.deferred_quantification.iter(db));
                 constraint.node
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        let deferred_quantification = InferableTypeVars::from_typevars(db, deferred_quantification);
+        ConstraintSet::from_node_with_metadata(builder, node, deferred_quantification)
     }
 
     fn when_all<'db, 'c>(
@@ -215,16 +223,24 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: This merges deferred quantification linearly while `distributed_and` combines BDD
+        // nodes logarithmically via `tree_fold`. If this ever shows up in profiles, consider
+        // threading deferred quantification through `tree_fold` so both are combined in the same
+        // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
+        // regression.
+        let mut deferred_quantification = FxOrderSet::default();
         let node = NodeId::distributed_and(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
+                deferred_quantification.extend(constraint.deferred_quantification.iter(db));
                 constraint.node
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        let deferred_quantification = InferableTypeVars::from_typevars(db, deferred_quantification);
+        ConstraintSet::from_node_with_metadata(builder, node, deferred_quantification)
     }
 }
 
@@ -242,6 +258,7 @@ where
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
+    deferred_quantification: InferableTypeVars<'db>,
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
 }
 
@@ -258,6 +275,7 @@ impl Default for OwnedConstraintSet<'_> {
     fn default() -> Self {
         Self {
             node: ALWAYS_FALSE,
+            deferred_quantification: InferableTypeVars::None,
             inner: None,
         }
     }
@@ -267,6 +285,7 @@ impl<'db> OwnedConstraintSet<'db> {
     pub(crate) fn always() -> Self {
         Self {
             node: ALWAYS_TRUE,
+            deferred_quantification: InferableTypeVars::None,
             inner: None,
         }
     }
@@ -287,7 +306,11 @@ impl<'db> OwnedConstraintSet<'db> {
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
         };
-        let set = ConstraintSet::from_node(&builder, self.node);
+        let set = ConstraintSet::from_node_with_metadata(
+            &builder,
+            self.node,
+            self.deferred_quantification,
+        );
         f(&builder, set)
     }
 }
@@ -318,6 +341,13 @@ impl OwnedConstraintSetInner<'_> {
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
+/// A `ConstraintSet` is stored as a ternary decision diagram (TDD) over _individual constraints_,
+/// each of which provides a lower and/or upper bound for a typevar. In addition to the raw TDD, we
+/// also store a set of typevars that have we _lazily_ quantified over. We don't immediately
+/// perform the existential quantification, in case other clauses in the current specialization
+/// inference need to refer to them. Many operations (in particular, solution extraction) require
+/// "forcing" the quantification before they can be applied.
+///
 /// The underlying representation tracks the order that individual constraints are added to the
 /// constraint set, which typically tracks when they appear in the underlying Python source. For
 /// this to work, you should ensure that you call "combining" operators like [`and`][Self::and] and
@@ -329,6 +359,10 @@ pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
+    /// Type variables that should be existentially quantified before solution extraction or final
+    /// semantic observation.
+    deferred_quantification: InferableTypeVars<'db>,
+
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
 
@@ -336,10 +370,26 @@ pub struct ConstraintSet<'db, 'c> {
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum SolutionProjection<'db> {
+    #[cfg_attr(not(test), expect(dead_code))]
+    AllTypeVars,
+    InferableOnly(InferableTypeVars<'db>),
+}
+
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+        Self::from_node_with_metadata(builder, node, InferableTypeVars::None)
+    }
+
+    fn from_node_with_metadata(
+        builder: &'c ConstraintSetBuilder<'db>,
+        node: NodeId,
+        deferred_quantification: InferableTypeVars<'db>,
+    ) -> Self {
         Self {
             node,
+            deferred_quantification,
             builder,
             _invariant: PhantomData,
         }
@@ -380,9 +430,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> Self {
-        Self::from_node(
+        Self::from_node_with_metadata(
             builder,
             Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
+            InferableTypeVars::None,
         )
     }
 
@@ -414,12 +465,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
+        // Existential quantification preserves satisfiability: `∃D. P` is unsatisfiable exactly
+        // when `P` is unsatisfiable. Avoid applying deferred quantification here, since doing so
+        // can be much more expensive and cannot affect this result.
         self.node.is_never_satisfied(db, self.builder)
     }
 
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
-        self.node.is_always_satisfied(db, self.builder)
+        self.apply_deferred_quantification(db, self.builder)
+            .node
+            .is_always_satisfied(db, self.builder)
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -433,7 +489,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.implies_subtype_of(db, builder, lhs, rhs))
+        // TODO: Preserve quantifier structure through negation-like operations instead of forcing
+        // deferred quantification before checking the implication.
+        let self_effective = self.apply_deferred_quantification(db, builder);
+        Self::from_node_with_metadata(
+            builder,
+            self_effective
+                .node
+                .implies_subtype_of(db, builder, lhs, rhs),
+            InferableTypeVars::None,
+        )
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -457,7 +522,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         inferable: InferableTypeVars<'db>,
     ) -> bool {
         self.verify_builder(builder);
-        self.node.satisfied_by_all_typevars(db, builder, inferable)
+        self.apply_deferred_quantification(db, builder)
+            .node
+            .satisfied_by_all_typevars(db, builder, inferable)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -466,12 +533,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn union(
         &mut self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        other.verify_builder(builder);
         self.node = self.node.or_with_offset(builder, other.node);
+        self.deferred_quantification = self
+            .deferred_quantification
+            .merge(db, other.deferred_quantification);
         *self
     }
 
@@ -481,19 +552,30 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn intersect(
         &mut self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        other.verify_builder(builder);
         self.node = self.node.and_with_offset(builder, other.node);
+        self.deferred_quantification = self
+            .deferred_quantification
+            .merge(db, other.deferred_quantification);
         *self
     }
 
     /// Returns the negation of this constraint set.
-    pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
+    pub(crate) fn negate(self, db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.negate(builder))
+        // TODO: Preserve quantifier structure through negation instead of forcing deferred
+        // quantification before negating.
+        let self_effective = self.apply_deferred_quantification(db, builder);
+        Self::from_node_with_metadata(
+            builder,
+            self_effective.node.negate(builder),
+            InferableTypeVars::None,
+        )
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -509,7 +591,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_never_satisfied(db) {
+        // Use raw satisfiability for construction short-circuiting. If the RHS thunk is skipped,
+        // any skipped deferred quantifiers are vacuous relative to raw `false ∧ _`, and preserving
+        // laziness is important for performance.
+        if !self.node.is_never_satisfied(db, builder) {
             let other = other();
             other.verify_builder(builder);
             self.intersect(db, builder, other);
@@ -530,7 +615,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_always_satisfied(db) {
+        // Use raw satisfiability for construction short-circuiting. If the RHS thunk is skipped,
+        // any skipped deferred quantifiers are vacuous relative to raw `true ∨ _`, and preserving
+        // laziness is important for performance.
+        if !self.node.is_always_satisfied(db, builder) {
             let other = other();
             other.verify_builder(builder);
             self.union(db, builder, other);
@@ -548,6 +636,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         other: impl FnOnce() -> Self,
     ) -> Self {
+        // TODO: Preserve quantifier structure through implication instead of forcing deferred
+        // quantification before the negation-like operation.
         self.negate(db, builder).or(db, builder, other)
     }
 
@@ -557,40 +647,71 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn iff(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
-    }
-
-    /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
-    /// the typevars that were inferable when this constraint set was created, and which should be
-    /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
-    /// set will return true whenever there was _any_ specialization of those typevars that
-    /// returned true before.
-    pub(crate) fn reduce_inferable(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> Self {
-        self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists(db, builder, to_remove))
-    }
-
-    pub(crate) fn remove_noninferable(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
-    ) -> Self {
-        self.verify_builder(builder);
-        Self::from_node(
+        other.verify_builder(builder);
+        // TODO: Preserve quantifier structure through equivalence instead of forcing deferred
+        // quantification before the negation-like operation.
+        let self_effective = self.apply_deferred_quantification(db, builder);
+        let other_effective = other.apply_deferred_quantification(db, builder);
+        Self::from_node_with_metadata(
             builder,
-            self.node.remove_noninferable(db, builder, inferable),
+            self_effective
+                .node
+                .iff_with_offset(builder, other_effective.node),
+            InferableTypeVars::None,
         )
+    }
+
+    pub(crate) fn with_deferred_quantification(
+        mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        deferred_quantification: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        self.deferred_quantification = self
+            .deferred_quantification
+            .merge(db, deferred_quantification);
+        self
+    }
+
+    /// Applies any deferred existential quantification and returns the effective constraint set.
+    pub(crate) fn apply_deferred_quantification(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        if matches!(self.deferred_quantification, InferableTypeVars::None) {
+            return self;
+        }
+
+        Self::from_node_with_metadata(
+            builder,
+            self.node
+                .exists(db, builder, self.deferred_quantification.iter(db)),
+            InferableTypeVars::None,
+        )
+    }
+
+    pub(crate) fn path_bounds(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        projection: SolutionProjection<'db>,
+    ) -> PathBounds<'db> {
+        self.verify_builder(builder);
+        let set = self.apply_deferred_quantification(db, builder);
+        let node = match projection {
+            SolutionProjection::AllTypeVars => set.node,
+            SolutionProjection::InferableOnly(inferable) => {
+                set.node.remove_noninferable(db, builder, inferable)
+            }
+        };
+        PathBounds::compute(db, builder, node)
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
@@ -606,30 +727,56 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        projection: SolutionProjection<'db>,
     ) -> Solutions<'db> {
-        self.solutions_with(db, builder, |bound_typevar, _variance, bounds| {
-            PathBounds::default_solve(db, builder, bound_typevar, bounds)
-        })
+        self.path_bounds(db, builder, projection).solve(db, builder)
     }
 
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        projection: SolutionProjection<'db>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
             ConstraintBounds<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        self.verify_builder(builder);
-        self.node.solutions_with(db, builder, choose)
+        self.path_bounds(db, builder, projection).solve_with(choose)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        self.node
-            .simplify_for_display(db, self.builder)
-            .display(db, self.builder)
+        struct DisplayConstraintSet<'db, 'c> {
+            db: &'db dyn Db,
+            set: ConstraintSet<'db, 'c>,
+        }
+
+        impl Display for DisplayConstraintSet<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let formula = self
+                    .set
+                    .node
+                    .simplify_for_display(self.db, self.set.builder)
+                    .display(self.db, self.set.builder);
+
+                if matches!(self.set.deferred_quantification, InferableTypeVars::None) {
+                    return Display::fmt(&formula, f);
+                }
+
+                write!(
+                    f,
+                    "∃{} . {formula}",
+                    self.set
+                        .deferred_quantification
+                        .iter(self.db)
+                        .map(|identity| identity.display(self.db))
+                        .format(", ")
+                )
+            }
+        }
+
+        DisplayConstraintSet { db, set: self }
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -650,6 +797,7 @@ impl Debug for ConstraintSet<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConstraintSet")
             .field("node", &self.node)
+            .field("deferred_quantification", &self.deferred_quantification)
             .finish()
     }
 }
@@ -796,8 +944,13 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
+        let deferred_quantification = constraint.deferred_quantification;
         if node.is_terminal() {
-            return OwnedConstraintSet { node, inner: None };
+            return OwnedConstraintSet {
+                node,
+                deferred_quantification,
+                inner: None,
+            };
         }
 
         let mut storage = self.storage.into_inner();
@@ -836,6 +989,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         OwnedConstraintSet {
             node,
+            deferred_quantification,
             inner: Some(Arc::new(OwnedConstraintSetInner {
                 constraints,
                 constraint_indices,
@@ -927,7 +1081,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(self, inner, &constraints, &mut cache, other.node);
-        ConstraintSet::from_node(self, node)
+        ConstraintSet::from_node_with_metadata(self, node, other.deferred_quantification)
     }
 
     /// Interns a single typevar, giving it a stable order in this builder
@@ -1203,6 +1357,28 @@ fn nested_substitution<'db>(
 pub(crate) struct Constraint<'db> {
     pub(crate) typevar: BoundTypeVarInstance<'db>,
     pub(crate) bounds: ConstraintBounds<'db>,
+}
+
+fn constraint_mentions_bound_typevar<'db>(
+    db: &'db dyn Db,
+    builder: &ConstraintSetBuilder<'db>,
+    constraint: ConstraintId,
+    bound_typevar: BoundTypeVarIdentity<'db>,
+) -> bool {
+    let mentions_typevar = |ty: Type<'db>| match ty {
+        Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+        _ => false,
+    };
+    let constraint = builder.constraint_data(constraint);
+    constraint.typevar.identity(db) == bound_typevar
+        || constraint
+            .bounds
+            .lower
+            .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
+        || constraint
+            .bounds
+            .upper
+            .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
 }
 
 /// The explicit lower and upper bounds inferred for a typevar on one constraint path.
@@ -1583,33 +1759,143 @@ impl ConstraintId {
         std::cmp::Reverse(self.index())
     }
 
-    /// Returns whether this constraint implies another — i.e., whether every type that
-    /// satisfies this constraint also satisfies `other`.
+    /// Returns whether this constraint is proven to imply another.
     ///
-    /// This is used to simplify how we display constraint sets, by removing redundant constraints
-    /// from a clause.
+    /// This is used to derive optional sequents and to simplify how we display constraint sets by
+    /// removing redundant constraints from a clause. It is intentionally conservative: `false`
+    /// means "not proven", not "semantically false".
+    ///
+    /// We first try a shallow non-recursive assignability check. If that fails, we only perform a
+    /// full semantic assignability check when none of the bounds mention typevars. Bounds that do
+    /// mention typevars can cause us to recurse back into sequent discovery, which can cause
+    /// performance blowups for some complex types. Because we only use this method to add optional
+    /// derived sequents, we conservatively avoid deriving non-obvious and expensive implications
+    /// involving typevar bounds.
+    ///
+    /// These checks can themselves construct constraint sets, whose sequent discovery can in turn
+    /// ask for more implication checks. That introduces potential cycles. We salsa-track the
+    /// semantic assignability check both to break those cycles and to amortize the cost of that
+    /// check across multiple type inference checks.
     fn implies<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> bool {
-        let self_constraint = builder.constraint_data(self);
-        let other_constraint = builder.constraint_data(other);
-        if !self_constraint
-            .typevar
-            .is_same_typevar_as(db, other_constraint.typevar)
-        {
-            return false;
+        const MAX_SHALLOW_ASSIGNABILITY_DEPTH: u8 = 8;
+
+        /// Returns whether `source` is obviously assignable to `target`, using only shallow
+        /// structural facts. This is intentionally incomplete: `false` means "not proven", not
+        /// "not assignable".
+        fn shallowly_assignable_to<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+            depth: u8,
+        ) -> bool {
+            if source == target || source.is_never() || target.is_object() {
+                return true;
+            }
+            if depth == 0 {
+                return false;
+            }
+
+            match (source, target) {
+                (Type::Union(source_union), _) => source_union
+                    .elements(db)
+                    .iter()
+                    .all(|&element| shallowly_assignable_to(db, element, target, depth - 1)),
+
+                (_, Type::Union(target_union)) => target_union
+                    .elements(db)
+                    .iter()
+                    .any(|&element| shallowly_assignable_to(db, source, element, depth - 1)),
+
+                (Type::Intersection(source_intersection), _) => source_intersection
+                    .positive(db)
+                    .iter()
+                    .any(|&element| shallowly_assignable_to(db, element, target, depth - 1)),
+
+                (_, Type::Intersection(target_intersection))
+                    if target_intersection.negative(db).is_empty() =>
+                {
+                    target_intersection
+                        .positive(db)
+                        .iter()
+                        .all(|&element| shallowly_assignable_to(db, source, element, depth - 1))
+                }
+
+                _ => false,
+            }
         }
-        other_constraint
-            .bounds
-            .materialized_lower()
-            .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
-            && self_constraint
+
+        #[salsa::tracked(cycle_initial=|_, _, _, _| false, heap_size=get_size2::GetSize::get_heap_size)]
+        fn constraint_implies<'db>(
+            db: &'db dyn Db,
+            self_constraint: Constraint<'db>,
+            other_constraint: Constraint<'db>,
+        ) -> bool {
+            if !self_constraint
+                .typevar
+                .is_same_typevar_as(db, other_constraint.typevar)
+            {
+                return false;
+            }
+
+            if shallowly_assignable_to(
+                db,
+                other_constraint.bounds.materialized_lower(),
+                self_constraint.bounds.materialized_lower(),
+                MAX_SHALLOW_ASSIGNABILITY_DEPTH,
+            ) && shallowly_assignable_to(
+                db,
+                self_constraint.bounds.materialized_upper(),
+                other_constraint.bounds.materialized_upper(),
+                MAX_SHALLOW_ASSIGNABILITY_DEPTH,
+            ) {
+                return true;
+            }
+
+            // The full semantic implication check can recursively construct constraint sets and
+            // derive more sequents. That's useful when none of the bounds mention typevars, but
+            // bounds that do mention typevars can reference protocol-local typevars whose
+            // assignability checks recurse back into sequent discovery. Since implication checks
+            // only add optional derived sequents, conservatively decline to derive non-obvious
+            // implications involving typevar bounds.
+            let constraint_mentions_typevar = |constraint: Constraint<'db>| {
+                constraint
+                    .bounds
+                    .lower
+                    .is_some_and(|lower| any_over_type(db, lower, false, Type::is_type_var))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|upper| any_over_type(db, upper, false, Type::is_type_var))
+            };
+            if constraint_mentions_typevar(self_constraint)
+                || constraint_mentions_typevar(other_constraint)
+            {
+                return false;
+            }
+
+            other_constraint
                 .bounds
-                .materialized_upper()
-                .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+                .materialized_lower()
+                .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
+                && self_constraint
+                    .bounds
+                    .materialized_upper()
+                    .is_constraint_set_assignable_to(
+                        db,
+                        other_constraint.bounds.materialized_upper(),
+                    )
+        }
+
+        constraint_implies(
+            db,
+            builder.constraint_data(self),
+            builder.constraint_data(other),
+        )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -2179,20 +2465,6 @@ impl NodeId {
         }
     }
 
-    fn solutions_with<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            ConstraintBounds<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<'db> {
-        let path_bounds = PathBounds::compute(db, builder, self);
-        path_bounds.solve_with(choose)
-    }
-
     /// Returns the negation of this BDD.
     fn negate(self, builder: &ConstraintSetBuilder<'_>) -> Self {
         match self.node() {
@@ -2642,6 +2914,19 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
+        let mut bound_typevars: SmallVec<[_; 8]> = bound_typevars.into_iter().collect();
+        // Existential quantifiers commute, so remove the typevars that appear in the most
+        // constraints first. That tends to shrink the BDD earlier and leaves absent typevars for
+        // the cheap no-op path in `exists_one`.
+        bound_typevars.sort_by_key(|bound_typevar| {
+            let mut matching_constraints = 0usize;
+            self.for_each_unique_constraint(builder, &mut |constraint, _| {
+                if constraint_mentions_bound_typevar(db, builder, constraint, *bound_typevar) {
+                    matching_constraints += 1;
+                }
+            });
+            std::cmp::Reverse(matching_constraints)
+        });
         bound_typevars
             .into_iter()
             .fold(self, |abstracted, bound_typevar| {
@@ -3191,10 +3476,38 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     }
 
     fn finish(self, db: &'db dyn Db) -> ConstraintBounds<'db> {
-        ConstraintBounds::new(
-            (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower)),
-            (!self.upper.is_empty()).then(|| IntersectionType::from_elements(db, self.upper)),
-        )
+        let lower = (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower));
+        let upper = if self.upper.is_empty() {
+            None
+        } else {
+            // The final upper bound is the intersection of all of the individual upper bounds that
+            // we discovered for this typevar on this path. If those individual upper bounds are
+            // unions, we have to distribute the intersection across those unions in a way that can
+            // blow up the size of the resulting type. Detect that in advance, and fall back on
+            // `Unknown` if so. (`Unknown` is a good conservative fallback because it preserves the
+            // fact that there was an upper bound without forcing a large intersection to be
+            // materialized.)
+            //
+            // This is similar to the upper-bound size heuristic as in `ConstraintId::intersect`,
+            // generalized to all upper bounds collected for this path, and with a larger allowed
+            // size since this is called much less frequently that sequent map elaboration.
+            let estimated_union_size = self.upper.iter().fold(1usize, |size, upper| {
+                size.saturating_mul(upper.union_size(db))
+            });
+            let estimated_intersection_size = self.upper.iter().fold(0usize, |size, upper| {
+                size.saturating_add(upper.intersection_size(db))
+            });
+            let estimated_upper_bound_size =
+                estimated_union_size.saturating_mul(estimated_intersection_size);
+            let max_upper_bound_size = self.upper.len().saturating_mul(4);
+
+            if self.upper.len() > 1 && estimated_upper_bound_size > max_upper_bound_size {
+                Some(Type::unknown())
+            } else {
+                Some(IntersectionType::from_elements(db, self.upper))
+            }
+        };
+        ConstraintBounds::new(lower, upper)
     }
 }
 
@@ -3222,8 +3535,7 @@ impl<'db> Type<'db> {
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
             when.query(|builder, when| {
-                let when = when.remove_noninferable(db, builder, inferable);
-                PathBounds::compute(db, builder, when.node)
+                when.path_bounds(db, builder, SolutionProjection::InferableOnly(inferable))
             })
         }
 
@@ -3669,41 +3981,29 @@ impl InteriorNode {
         }
         drop(storage);
 
+        // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound that
+        // mentions `bound_typevar`. The sequent map ensures that derived facts are propagated for
+        // nested typevar references, using the variance of the typevar's position to determine the
+        // correct substitution.
+        let mut should_remove =
+            |constraint| constraint_mentions_bound_typevar(db, builder, constraint, bound_typevar);
+
+        let mut removes_any_constraint = false;
+        self.node()
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                removes_any_constraint |= should_remove(constraint);
+            });
+        // Quantifying a typevar that doesn't appear in the BDD is a no-op. Avoid the full
+        // path-sensitive abstraction, which can be expensive on large BDDs.
+        if !removes_any_constraint {
+            let result = self.node();
+            let mut storage = builder.storage.borrow_mut();
+            storage.exists_one_cache.insert(key, result);
+            return result;
+        }
+
         let mut path = self.path_assignments(builder);
-        let mentions_typevar = |ty: Type<'db>| match ty {
-            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
-            _ => false,
-        };
-        let result = self.abstract_one_inner(
-            db,
-            builder,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
-            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
-            // propagated for nested typevar references, using the variance of the typevar's
-            // position to determine the correct substitution.
-            &mut |constraint| {
-                let constraint = builder.constraint_data(constraint);
-                if constraint.typevar.identity(db) == bound_typevar {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .lower
-                    .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .upper
-                    .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
-                {
-                    return true;
-                }
-                false
-            },
-            &mut path,
-        );
+        let result = self.abstract_one_inner(db, builder, &mut should_remove, &mut path);
 
         let mut storage = builder.storage.borrow_mut();
         storage.exists_one_cache.insert(key, result);
@@ -3716,37 +4016,43 @@ impl InteriorNode {
         builder: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> NodeId {
-        let mut path = self.path_assignments(builder);
         let is_bare_inferable_typevar = |ty: Type<'db>| {
             ty.as_typevar()
                 .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
         };
-        self.abstract_one_inner(
-            db,
-            builder,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
-            // This ensure that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |constraint| {
-                let constraint = builder.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
-            },
-            &mut path,
-        )
+        // We only want to keep constraints on inferable typevars. If the constraint's typevar is
+        // itself inferable, we keep it. We also need to keep some constraints in non-inferable
+        // typevars, if their lower or upper bound is a bare inferable typevar. This ensures that
+        // our quantification logic does not depend on typevar ordering.
+        //
+        // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
+        // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we only
+        // checked the inferability of the constrained typevar, we would keep the first encoding but
+        // remove the second.
+        let mut should_remove = |constraint| {
+            let constraint = builder.constraint_data(constraint);
+            !constraint.typevar.is_inferable(db, inferable)
+                && !constraint
+                    .bounds
+                    .lower
+                    .is_some_and(is_bare_inferable_typevar)
+                && !constraint
+                    .bounds
+                    .upper
+                    .is_some_and(is_bare_inferable_typevar)
+        };
+
+        let mut removes_any_constraint = false;
+        self.node()
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                removes_any_constraint |= should_remove(constraint);
+            });
+        if !removes_any_constraint {
+            return self.node();
+        }
+
+        let mut path = self.path_assignments(builder);
+        self.abstract_one_inner(db, builder, &mut should_remove, &mut path)
     }
 
     fn abstract_one_inner<'db>(
@@ -5344,8 +5650,10 @@ impl SequentMap {
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
+                let bound_identity = bound_typevar.identity(db);
                 let constrained_data = builder.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
+                let constrained_identity = constrained_typevar.identity(db);
                 let constrained_lower = constrained_data.bounds.materialized_lower();
                 let constrained_upper = constrained_data.bounds.materialized_upper();
 
@@ -5359,8 +5667,8 @@ impl SequentMap {
                 // instead of calling `variance_of` on them. This avoids a large number of tiny
                 // tracked `variance_of` queries in hot paths.
                 let replacement_mentions_bound_or_constrained = |replacement: Type<'db>| {
-                    replacement.variance_of(db, bound_typevar) != TypeVarVariance::Bivariant
-                        || replacement.variance_of(db, constrained_typevar)
+                    replacement.variance_of(db, bound_identity) != TypeVarVariance::Bivariant
+                        || replacement.variance_of(db, constrained_identity)
                             != TypeVarVariance::Bivariant
                 };
 
@@ -5374,7 +5682,7 @@ impl SequentMap {
                 // need an alternative representation for "typevar not present"
                 // (e.g., `Option<TypeVarVariance>`).
                 let upper_replacement = match (
-                    constrained_upper.variance_of(db, bound_typevar),
+                    constrained_upper.variance_of(db, bound_identity),
                     bound_data.bounds.lower,
                     bound_data.bounds.upper,
                 ) {
@@ -5444,7 +5752,7 @@ impl SequentMap {
 
                 // Check the lower bound of the constrained constraint for nested occurrences.
                 let lower_replacement = match (
-                    constrained_lower.variance_of(db, bound_typevar),
+                    constrained_lower.variance_of(db, bound_identity),
                     bound_data.bounds.lower,
                     bound_data.bounds.upper,
                 ) {
@@ -5570,7 +5878,7 @@ impl SequentMap {
                         && !constrained_upper.is_never()
                         && !constrained_upper.is_object()
                         && !constrained_upper.is_dynamic()
-                        && match constrained_upper.variance_of(db, nested_typevar) {
+                        && match constrained_upper.variance_of(db, nested_typevar.identity(db)) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => !is_upper_bound,
                             TypeVarVariance::Contravariant => is_upper_bound,
@@ -5615,7 +5923,7 @@ impl SequentMap {
                         && !constrained_lower.is_never()
                         && !constrained_lower.is_object()
                         && !constrained_lower.is_dynamic()
-                        && match constrained_lower.variance_of(db, nested_typevar) {
+                        && match constrained_lower.variance_of(db, nested_typevar.identity(db)) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => is_upper_bound,
                             TypeVarVariance::Contravariant => !is_upper_bound,
@@ -6572,6 +6880,7 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
+    use crate::FxOrderSet;
     use crate::db::tests::setup_db;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
@@ -6588,6 +6897,13 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let ty = bound.to_instance(db);
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
+    }
+
+    fn create_typevar_set<'db>(
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> InferableTypeVars<'db> {
+        InferableTypeVars::from_typevars(db, FxOrderSet::from_iter([bound_typevar.identity(db)]))
     }
 
     #[test]
@@ -6631,6 +6947,45 @@ mod tests {
             Some(&false)
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
+    }
+
+    #[test]
+    fn constraint_implications_preserve_shallow_typevar_bound_proofs() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let u_ty = Type::TypeVar(u);
+        let builder = ConstraintSetBuilder::new();
+
+        let left_upper = UnionType::from_elements(&db, [int, u_ty]);
+        let right_upper = UnionType::from_elements(&db, [u_ty, int]);
+        let left = ConstraintId::new(&db, &builder, t, Type::Never, left_upper);
+        let right = ConstraintId::new(&db, &builder, t, Type::Never, right_upper);
+
+        assert!(builder.cached_constraint_implies(&db, left, right));
+        assert!(builder.cached_constraint_implies(&db, right, left));
+    }
+
+    #[test]
+    fn constraint_implications_skip_non_obvious_typevar_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let bool_ty = KnownClass::Bool.to_instance(&db);
+        let int_ty = KnownClass::Int.to_instance(&db);
+        let u_ty = Type::TypeVar(u);
+        let builder = ConstraintSetBuilder::new();
+
+        let bool_or_u = UnionType::from_elements(&db, [bool_ty, u_ty]);
+        let int_or_u = UnionType::from_elements(&db, [int_ty, u_ty]);
+        let left = ConstraintId::new(&db, &builder, t, Type::Never, bool_or_u);
+        let right = ConstraintId::new(&db, &builder, t, Type::Never, int_or_u);
+
+        // This implication is semantically true because `bool` is a subtype of `int`, but proving
+        // that requires semantic reasoning about a bound that mentions another typevar. For sequent
+        // discovery, conservatively skip such non-obvious implications involving typevar bounds.
+        assert!(!builder.cached_constraint_implies(&db, left, right));
     }
 
     #[track_caller]
@@ -6854,6 +7209,230 @@ mod tests {
         // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn deferred_quantification_of_absent_typevar_is_noop() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let u_deferred = create_typevar_set(&db, u);
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, u_deferred);
+
+        let applied = t_int.apply_deferred_quantification(&db, &builder);
+
+        assert_eq!(applied.node, t_int.node);
+    }
+
+    #[test]
+    fn deferred_quantification_applies_to_semantic_observations() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let deferred_quantification = create_typevar_set(&db, t);
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let eager = ConstraintSet::from_node(
+            &builder,
+            t_int
+                .node
+                .exists(&db, &builder, deferred_quantification.iter(&db)),
+        );
+        let deferred = t_int.with_deferred_quantification(&db, &builder, deferred_quantification);
+
+        assert!(!deferred.node.is_always_satisfied(&db, &builder));
+        assert_eq!(
+            deferred.is_always_satisfied(&db),
+            eager.is_always_satisfied(&db)
+        );
+        assert_eq!(
+            deferred.is_never_satisfied(&db),
+            eager.is_never_satisfied(&db)
+        );
+        assert!(deferred.is_always_satisfied(&db));
+        assert!(deferred.satisfied_by_all_typevars(&db, &builder, InferableTypeVars::None));
+    }
+
+    #[test]
+    fn deferred_quantification_merges_through_positive_combinators() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let t_deferred = create_typevar_set(&db, t);
+        let u_deferred = create_typevar_set(&db, u);
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, t_deferred);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str)
+            .with_deferred_quantification(&db, &builder, u_deferred);
+
+        let intersection = t_int.and(&db, &builder, || u_str);
+        let union = t_int.or(&db, &builder, || u_str);
+        let when_all = [t_int, u_str]
+            .into_iter()
+            .when_all(&db, &builder, |constraint| constraint);
+        let when_any = [t_int, u_str]
+            .into_iter()
+            .when_any(&db, &builder, |constraint| constraint);
+
+        let expected = FxOrderSet::from_iter([t.identity(&db), u.identity(&db)]);
+        for set in [intersection, union, when_all, when_any] {
+            let actual: FxOrderSet<_> = set.deferred_quantification.iter(&db).collect();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn deferred_quantification_preserves_raw_constraints_until_solving() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let t_deferred = create_typevar_set(&db, t);
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, t_deferred);
+        let u_equals_t =
+            ConstraintSet::constrain_typevar(&db, &builder, u, Type::TypeVar(t), Type::TypeVar(t));
+        let set = t_int.and(&db, &builder, || u_equals_t);
+
+        let Solutions::Constrained(raw_solutions) = ConstraintSet::from_node(&builder, set.node)
+            .solutions(&db, &builder, SolutionProjection::AllTypeVars)
+        else {
+            panic!("expected constrained raw solutions");
+        };
+        assert_eq!(raw_solutions.len(), 1);
+        let raw_identities: FxHashSet<_> = raw_solutions
+            .into_iter()
+            .flatten()
+            .map(|binding| binding.bound_typevar.identity(&db))
+            .collect();
+        assert_eq!(
+            raw_identities,
+            FxHashSet::from_iter([t.identity(&db), u.identity(&db)])
+        );
+
+        let Solutions::Constrained(solutions) =
+            set.solutions(&db, &builder, SolutionProjection::AllTypeVars)
+        else {
+            panic!("expected constrained deferred solutions");
+        };
+        assert_eq!(solutions.len(), 1);
+        let [solution] = solutions.as_slice() else {
+            panic!("expected one solution path");
+        };
+        let [binding] = solution.as_slice() else {
+            panic!("expected one typevar solution");
+        };
+        assert_eq!(binding.bound_typevar.identity(&db), u.identity(&db));
+        assert_eq!(binding.solution, KnownClass::Int.to_instance(&db));
+    }
+
+    #[test]
+    fn deferred_quantification_negates_effective_formula() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let deferred_quantification = create_typevar_set(&db, t);
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, deferred_quantification);
+        let quantified_after_negation = ConstraintSet::from_node_with_metadata(
+            &builder,
+            t_int.node.negate(&builder),
+            deferred_quantification,
+        );
+
+        assert!(t_int.negate(&db, &builder).is_never_satisfied(&db));
+        assert!(
+            t_int
+                .implies(&db, &builder, || ConstraintSet::never(&builder))
+                .is_never_satisfied(&db)
+        );
+        assert!(quantified_after_negation.is_always_satisfied(&db));
+    }
+
+    #[test]
+    fn solution_projection_controls_noninferable_removal() {
+        fn solution_identities<'db, 'c>(
+            db: &'db dyn Db,
+            builder: &'c ConstraintSetBuilder<'db>,
+            set: ConstraintSet<'db, 'c>,
+            projection: SolutionProjection<'db>,
+        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+            let solutions = set.solutions(db, builder, projection);
+            let Solutions::Constrained(mut solutions) = solutions else {
+                panic!("expected constrained solutions");
+            };
+            assert_eq!(solutions.len(), 1);
+            solutions
+                .pop()
+                .expect("expected a solution path")
+                .into_iter()
+                .map(|binding| binding.bound_typevar.identity(db))
+                .collect()
+        }
+
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let t_inferable = create_typevar_set(&db, t);
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
+            create_constraint(&db, &builder, u, KnownClass::Str)
+        });
+
+        assert_eq!(
+            solution_identities(&db, &builder, set, SolutionProjection::AllTypeVars),
+            FxHashSet::from_iter([t.identity(&db), u.identity(&db)]),
+        );
+        assert_eq!(
+            solution_identities(
+                &db,
+                &builder,
+                set,
+                SolutionProjection::InferableOnly(t_inferable),
+            ),
+            FxHashSet::from_iter([t.identity(&db)]),
+        );
+    }
+
+    #[test]
+    fn deferred_quantification_owned_round_trip() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let deferred_quantification = create_typevar_set(&db, t);
+
+        let expected = FxHashSet::from_iter([t.identity(&db)]);
+        let builder = ConstraintSetBuilder::new();
+        let owned = builder.into_owned(|builder| {
+            create_constraint(&db, builder, t, KnownClass::Int).with_deferred_quantification(
+                &db,
+                builder,
+                deferred_quantification,
+            )
+        });
+
+        owned.query(|_builder, set| {
+            assert_eq!(set.deferred_quantification, deferred_quantification);
+            assert_eq!(
+                set.deferred_quantification
+                    .iter(&db)
+                    .collect::<FxHashSet<_>>(),
+                expected
+            );
+            assert!(set.is_always_satisfied(&db));
+        });
+
+        let builder = ConstraintSetBuilder::new();
+        let set = builder.load(&db, &owned);
+        assert_eq!(set.deferred_quantification, deferred_quantification);
+        assert_eq!(
+            set.deferred_quantification
+                .iter(&db)
+                .collect::<FxHashSet<_>>(),
+            expected
+        );
+        assert!(set.is_always_satisfied(&db));
     }
 
     fn create_compacted_owned_set(db: &dyn Db) -> OwnedConstraintSet<'_> {

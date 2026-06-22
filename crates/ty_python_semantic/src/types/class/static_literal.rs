@@ -17,12 +17,13 @@ use crate::{
     },
     reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
-        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
+        CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
+        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
+        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
+        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
+        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -2993,10 +2994,10 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
     #[salsa::tracked(cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)
-            .is_some_and(|generic_context| generic_context.variables(db).contains(&typevar));
+            .is_some_and(|generic_context| generic_context.contains(db, typevar));
 
         if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;

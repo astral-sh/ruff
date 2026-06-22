@@ -1051,7 +1051,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => match self.binding_context(db) {
                 BindingContext::Definition(definition) => binding_type(db, definition)
                     .with_polarity(polarity)
-                    .variance_of(db, self),
+                    .variance_of(db, self.identity(db)),
                 BindingContext::Synthetic => TypeVarVariance::Invariant,
             },
         }

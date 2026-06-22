@@ -14,8 +14,8 @@ pub(crate) use self::static_literal::{
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -301,7 +301,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
         let specialization = self.specialization(db);
@@ -330,7 +330,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                     let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
                     origin
                         .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, generic_typevar)
+                        .variance_of(db, generic_typevar.identity(db))
                 }
             })
             .collect()
@@ -2177,7 +2177,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, typevar),
             Self::NonGeneric(
@@ -2383,7 +2383,7 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Self::Static(class) => class.variance_of(db, typevar),
             Self::Dynamic(_)

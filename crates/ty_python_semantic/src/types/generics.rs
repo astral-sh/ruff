@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBounds, Solutions,
+    PathBounds, SolutionProjection, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -244,6 +244,9 @@ pub(crate) fn typing_self<'db>(
 /// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
 /// fresh generic-callable occurrence be inferable without making the surrounding source-level
 /// typevar inferable.
+///
+/// TODO: This is now also used in other places where we need a salsa-interned set of typevars.
+/// Consider renaming it to a more general name, such as `InternedTypeVarSet`.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
@@ -288,15 +291,12 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 }
 
-#[salsa::tracked]
 impl<'db> InferableTypeVars<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                let merged = self_inner.inferable(db) | other_inner.inferable(db);
-                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
+                self_inner.merge(db, other_inner)
             }
         }
     }
@@ -322,6 +322,16 @@ impl<'db> InferableTypeVars<'db> {
                 .map(|identity| identity.display(db))
                 .format(", ")
         )
+    }
+}
+
+#[salsa::tracked]
+impl<'db> InferableTypeVarsInner<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn merge(self, db: &'db dyn Db, other: Self) -> InferableTypeVars<'db> {
+        let mut merged = self.inferable(db) | other.inferable(db);
+        merged.shrink_to_fit();
+        InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, merged))
     }
 }
 
@@ -1960,22 +1970,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // was not enough: `solutions_with` still performed the expensive path traversal, and the
         // skipped projection changed precision in LiteralString tests. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
-        let pending = self
-            .pending
-            .remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions =
-            match pending.solutions_with(self.db, self.constraints, |typevar, _variance, bounds| {
+        let solutions = match self.pending.solutions_with(
+            self.db,
+            self.constraints,
+            SolutionProjection::InferableOnly(self.inferable),
+            |typevar, _variance, bounds| {
                 if let Some(ty) = choose(typevar, Some(bounds)) {
                     return Ok(Some(ty));
                 }
 
                 PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
-            }) {
-                Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                    return self.solve_hash_map_with(generic_context, choose);
-                }
-                Solutions::Constrained(solutions) => solutions,
-            };
+            },
+        ) {
+            Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                return self.solve_hash_map_with(generic_context, choose);
+            }
+            Solutions::Constrained(solutions) => solutions,
+        };
 
         let mut types = FxHashMap::default();
         for solution in solutions {
@@ -2282,8 +2293,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ()> {
-        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match set.solutions(self.db, self.constraints) {
+        let solutions = match set.solutions(
+            self.db,
+            self.constraints,
+            SolutionProjection::InferableOnly(self.inferable),
+        ) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
