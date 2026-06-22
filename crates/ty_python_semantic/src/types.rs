@@ -98,7 +98,7 @@ pub use crate::types::typevar::{
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_type, find_over_type};
+use crate::types::visitor::{any_over_positive_type, any_over_type, find_over_type};
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -1571,13 +1571,15 @@ impl<'db> Type<'db> {
 
     /// Returns whether `current` contains `target` outside negative intersection elements.
     fn contains_positive_type(db: &'db dyn Db, current: Self, target: Self) -> bool {
-        any_over_type(db, current, false, |ty| ty == target)
+        any_over_positive_type(db, current, false, |ty| ty == target)
             && !any_over_type(db, current, false, |ty| {
-                matches!(
-                    ty,
-                    Type::Intersection(intersection)
-                        if intersection.negative(db).contains(&target)
-                )
+                let Type::Intersection(intersection) = ty else {
+                    return false;
+                };
+                intersection
+                    .negative(db)
+                    .iter()
+                    .any(|negative| any_over_type(db, *negative, false, |nested| nested == target))
             })
     }
 

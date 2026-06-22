@@ -313,6 +313,7 @@ fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
+    should_visit_negative_intersection_elements: bool,
     query: F,
 ) -> T
 where
@@ -324,6 +325,7 @@ where
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
         should_visit_lazy_type_attributes: bool,
+        should_visit_negative_intersection_elements: bool,
     }
 
     impl<'db, U> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_, U>
@@ -347,6 +349,16 @@ where
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
+
+        fn visit_intersection_type(&self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
+            if self.should_visit_negative_intersection_elements {
+                walk_intersection_type(db, intersection, self);
+            } else {
+                for element in intersection.positive(db) {
+                    self.visit_type(db, *element);
+                }
+            }
+        }
     }
 
     let visitor = AnyOverTypeVisitor {
@@ -354,6 +366,7 @@ where
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::default(),
         should_visit_lazy_type_attributes,
+        should_visit_negative_intersection_elements,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
@@ -373,7 +386,18 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, true, query)
+}
+
+/// Return `true` if `ty`, or any of the types contained in positive intersection elements,
+/// match the closure passed in.
+pub(super) fn any_over_positive_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_visit_lazy_type_attributes: bool,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, false, query)
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -398,5 +422,5 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, true, query)
 }

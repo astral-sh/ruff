@@ -387,6 +387,55 @@ fn recursive_nominal_growth_normalizes_exact_and_distributed_occurrences() {
     );
 }
 
+#[test]
+fn recursive_nominal_growth_rejects_nested_negative_occurrences() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let excluded_int = IntersectionBuilder::new(&db)
+        .add_positive(Type::object())
+        .add_negative(KnownClass::Set.to_specialized_instance(&db, &[list_int]))
+        .build();
+    let excluded_str = IntersectionBuilder::new(&db)
+        .add_positive(Type::object())
+        .add_negative(KnownClass::Set.to_specialized_instance(&db, &[list_str]))
+        .build();
+
+    for position in [
+        UnionType::from_elements(
+            &db,
+            [
+                Type::heterogeneous_tuple(&db, [excluded_int]),
+                Type::heterogeneous_tuple(&db, [excluded_str]),
+            ],
+        ),
+        UnionType::from_elements(
+            &db,
+            [
+                Type::heterogeneous_tuple(&db, [list_int, excluded_int]),
+                Type::heterogeneous_tuple(&db, [list_str, excluded_str]),
+            ],
+        ),
+    ] {
+        let current = KnownClass::List.to_specialized_instance(&db, &[position]);
+        assert_eq!(
+            Type::nominal_wrapper_normalized(
+                &db,
+                current
+                    .as_nominal_instance()
+                    .expect("a specialized list should be a nominal instance"),
+                previous,
+                div,
+            ),
+            None
+        );
+    }
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
