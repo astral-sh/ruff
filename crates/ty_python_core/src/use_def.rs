@@ -300,15 +300,9 @@ impl InternedPlaceStateId {
     }
 }
 
-#[derive(Clone, Copy)]
-struct InternedBindingsKey {
-    id: InternedBindingsId,
-    preserved_unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
-}
-
 struct PlaceStateInterner {
     interned_bindings: RetainedBindingsBuilder,
-    interned_ids_by_bindings: hashbrown::HashTable<InternedBindingsKey>,
+    interned_ids_by_bindings: hashbrown::HashTable<InternedBindingsId>,
     interned_declarations: RetainedDeclarationsBuilder,
     interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
     // Undeclared states are common and can be interned by their dense constraint IDs.
@@ -346,42 +340,27 @@ impl PlaceStateInterner {
             return interned_id;
         }
 
-        let preserved_unbound_narrowing_constraint =
-            bindings.preserved_unbound_narrowing_constraint();
-        let hash = Self::hash_bindings(preserved_unbound_narrowing_constraint, bindings.as_slice());
+        // The retained representation discards the unbound narrowing constraint, so it isn't
+        // part of the interned identity.
+        let hash = Self::hash_bindings(bindings.as_slice());
         let interned_bindings = &mut self.interned_bindings;
         let entry = self.interned_ids_by_bindings.entry(
             hash,
-            |key| {
-                key.preserved_unbound_narrowing_constraint == preserved_unbound_narrowing_constraint
-                    && interned_bindings[key.id] == *bindings.as_slice()
-            },
-            |key| {
-                Self::hash_bindings(
-                    key.preserved_unbound_narrowing_constraint,
-                    &interned_bindings[key.id],
-                )
-            },
+            |id| interned_bindings.get(*id) == bindings.as_slice(),
+            |id| Self::hash_bindings(interned_bindings.get(*id)),
         );
         match entry {
-            hashbrown::hash_table::Entry::Occupied(entry) => entry.get().id,
+            hashbrown::hash_table::Entry::Occupied(entry) => *entry.get(),
             hashbrown::hash_table::Entry::Vacant(entry) => {
                 let interned_id = interned_bindings.push(bindings);
-                entry.insert(InternedBindingsKey {
-                    id: interned_id,
-                    preserved_unbound_narrowing_constraint,
-                });
+                entry.insert(interned_id);
                 interned_id
             }
         }
     }
 
-    fn hash_bindings(
-        preserved_unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
-        live_bindings: &[LiveBinding],
-    ) -> u64 {
+    fn hash_bindings(live_bindings: &[LiveBinding]) -> u64 {
         let mut hasher = FxHasher::default();
-        preserved_unbound_narrowing_constraint.hash(&mut hasher);
         live_bindings.hash(&mut hasher);
         hasher.finish()
     }
@@ -509,14 +488,6 @@ impl RetainedBindingsBuilder {
             ends: self.ends.into(),
             live_bindings: self.live_bindings.into_boxed_slice(),
         }
-    }
-}
-
-impl Index<InternedBindingsId> for RetainedBindingsBuilder {
-    type Output = [LiveBinding];
-
-    fn index(&self, index: InternedBindingsId) -> &Self::Output {
-        self.get(index)
     }
 }
 
