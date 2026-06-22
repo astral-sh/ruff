@@ -6903,6 +6903,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
+    fn is_collection_literal_inference_root(&self, collection_expr: ast::ExprRef<'_>) -> bool {
+        let db = self.db();
+        match self.region {
+            InferenceRegion::Expression(current_expr, _) => {
+                current_expr.node_ref(db).index() == *collection_expr.node_index()
+            }
+            InferenceRegion::Definition(definition) => {
+                let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+                    return false;
+                };
+                assignment.value(self.module()).is_some_and(|value| {
+                    value.node_index().load() == collection_expr.node_index().load()
+                })
+            }
+            _ => false,
+        }
+    }
+
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
@@ -6915,13 +6933,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let use_empty_list_consensus = collection_class == KnownClass::List
             && elts.is_empty()
-            && collection_expr.is_some_and(|collection_expr| {
-                matches!(
-                    self.region,
-                    InferenceRegion::Expression(current_expr, _)
-                        if current_expr.node_ref(db).index() == *collection_expr.node_index()
-                )
-            });
+            && collection_expr.is_some_and(|expr| self.is_collection_literal_inference_root(expr));
 
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
@@ -7060,14 +7072,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
-        let inference_root = collection_expr.and_then(|collection_expr| match self.region {
-            InferenceRegion::Expression(current_expr, _)
-                if current_expr.node_ref(self.db()).index() == *collection_expr.node_index() =>
-            {
-                Some(current_expr)
-            }
-            _ => None,
-        });
+        let is_inference_root =
+            collection_expr.is_some_and(|expr| self.is_collection_literal_inference_root(expr));
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -7206,7 +7212,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
         let uses_empty_covariant_context = collection_class == KnownClass::List
             && elts.is_empty()
-            && inference_root.is_some()
+            && is_inference_root
             && elt_tcx_constraints.len() == 1
             && elt_tcx_constraints
                 .values()
@@ -7328,7 +7334,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if tcx.annotation.is_none()
-            && let Some(current_expr) = inference_root
+            && is_inference_root
+            && let InferenceRegion::Expression(current_expr, _) = self.region
             && let Some(assignment) = current_expr.assigned_to(self.db())
             && let Ok(collection_def) =
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()

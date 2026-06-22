@@ -27,6 +27,12 @@ def conflicting(items: Sequence[str] | Sequence[bytes] | None = None) -> None:
     if items is None:
         items = []
         reveal_type(items)  # revealed: list[Unknown]
+
+annotated: Sequence[int] = []
+reveal_type(annotated)  # revealed: list[int]
+
+annotated_agreeing: Iterable[int] | Reversible[int] = []
+reveal_type(annotated_agreeing)  # revealed: list[int]
 ```
 
 Semantically equivalent fully static element types also count as agreement:
