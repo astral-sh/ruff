@@ -589,7 +589,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         if self
             .node
-            .is_simple_lower_bound_conjunction_of_inferable_typevars(db, builder, inferable)
+            .simple_lower_bound_conjunction(db, builder)
+            .all(|bound| bound.is_ok_and(|(typevar, _, _)| typevar.is_inferable(db, inferable)))
         {
             return self;
         }
@@ -1741,6 +1742,8 @@ enum Node {
     Interior(InteriorNode),
 }
 
+type SimpleLowerBound<'db> = (BoundTypeVarInstance<'db>, Type<'db>, usize);
+
 impl NodeId {
     /// Creates a new BDD node, ensuring that it is quasi-reduced.
     fn new(
@@ -1982,77 +1985,42 @@ impl NodeId {
         }
     }
 
-    /// Returns whether this BDD is a single positive conjunction of concrete lower bounds on
-    /// inferable typevars.
-    fn is_simple_lower_bound_conjunction_of_inferable_typevars<'db>(
+    /// Iterates over the concrete lower bounds in this BDD if it is a single positive conjunction.
+    /// Yields an error and terminates if the BDD does not have that shape.
+    fn simple_lower_bound_conjunction<'db, 'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
-    ) -> bool {
-        let mut node = self;
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> impl Iterator<Item = Result<SimpleLowerBound<'db>, ()>> + use<'db, 'c> {
+        let mut node = Some(self);
+        std::iter::from_fn(move || {
+            let current = node.take()?;
 
-        loop {
-            match node.node() {
-                Node::AlwaysTrue => return true,
-                Node::AlwaysFalse => return false,
+            match current.node() {
+                Node::AlwaysTrue => None,
+                Node::AlwaysFalse => Some(Err(())),
                 Node::Interior(_) => {
-                    let interior = builder.interior_node_data(node);
+                    let interior = builder.interior_node_data(current);
                     if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return false;
+                        return Some(Err(()));
                     }
 
                     let constraint = builder.constraint_data(interior.constraint);
                     let Some(lower) = constraint.bounds.lower else {
-                        return false;
+                        return Some(Err(()));
                     };
-                    if !constraint.typevar.is_inferable(db, inferable)
-                        || constraint.bounds.upper.is_some()
-                        || lower.has_typevar(db)
-                        || lower.has_unspecialized_type_var(db)
-                    {
-                        return false;
-                    }
-
-                    node = interior.if_true;
-                }
-            }
-        }
-    }
-
-    /// Returns the concrete lower bounds in this BDD if it is a single positive conjunction.
-    fn simple_lower_bound_conjunction<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> Option<Vec<(BoundTypeVarInstance<'db>, Type<'db>, usize)>> {
-        let mut constraints = Vec::new();
-        let mut node = self;
-
-        loop {
-            match node.node() {
-                Node::AlwaysTrue => return Some(constraints),
-                Node::AlwaysFalse => return None,
-                Node::Interior(_) => {
-                    let interior = builder.interior_node_data(node);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return None;
-                    }
-
-                    let constraint = builder.constraint_data(interior.constraint);
-                    let lower = constraint.bounds.lower?;
                     if constraint.bounds.upper.is_some()
                         || lower.has_typevar(db)
                         || lower.has_unspecialized_type_var(db)
                     {
-                        return None;
+                        return Some(Err(()));
                     }
 
-                    constraints.push((constraint.typevar, lower, interior.source_order));
-                    node = interior.if_true;
+                    node = Some(interior.if_true);
+                    Some(Ok((constraint.typevar, lower, interior.source_order)))
                 }
             }
-        }
+        })
     }
 
     fn for_each_path<'db>(
@@ -3417,7 +3385,10 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
     ) -> Option<Self> {
-        let mut constraints = node.simple_lower_bound_conjunction(db, builder)?;
+        let mut constraints = node
+            .simple_lower_bound_conjunction(db, builder)
+            .collect::<Result<Vec<_>, _>>()
+            .ok()?;
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
 
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
