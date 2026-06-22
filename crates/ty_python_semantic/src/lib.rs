@@ -78,7 +78,7 @@ pub fn default_lint_registry() -> &'static LintRegistry {
     &REGISTRY
 }
 
-/// Register all known semantic lints.
+/// Registers all known semantic lints.
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
