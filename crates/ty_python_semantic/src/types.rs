@@ -1483,17 +1483,36 @@ impl<'db> Type<'db> {
         current: Self,
         wrapped: UnionType<'db>,
     ) -> bool {
-        any_over_type(db, current, false, |ty| matches!(ty, Type::Union(_)))
-            && any_over_type(db, current, false, |ty| matches!(ty, Type::Intersection(_)))
-            && wrapped.elements(db).iter().all(|wrapped_element| {
-                any_over_type(db, current, false, |ty| ty == *wrapped_element)
-                    && !any_over_type(db, current, false, |ty| {
-                        matches!(
-                            ty,
-                            Type::Intersection(intersection)
-                                if intersection.negative(db).contains(wrapped_element)
-                        )
+        any_over_type(db, current, false, |ty| {
+            matches!(
+                ty,
+                Type::Union(distributed)
+                    if wrapped.elements(db).iter().all(|wrapped_element| {
+                        distributed.elements(db).iter().any(|branch| {
+                            Self::contains_positive_type(db, *branch, *wrapped_element)
+                                && wrapped
+                                    .elements(db)
+                                    .iter()
+                                    .filter(|candidate| {
+                                        Self::contains_positive_type(db, *branch, **candidate)
+                                    })
+                                    .exactly_one()
+                                    .is_ok()
+                        })
                     })
+            )
+        })
+    }
+
+    /// Returns whether `current` contains `target` outside negative intersection elements.
+    fn contains_positive_type(db: &'db dyn Db, current: Self, target: Self) -> bool {
+        any_over_type(db, current, false, |ty| ty == target)
+            && !any_over_type(db, current, false, |ty| {
+                matches!(
+                    ty,
+                    Type::Intersection(intersection)
+                        if intersection.negative(db).contains(&target)
+                )
             })
     }
 

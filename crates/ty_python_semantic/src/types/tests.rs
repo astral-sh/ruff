@@ -251,6 +251,45 @@ fn recursive_nominal_growth_only_replaces_distributed_position() {
     assert_eq!(normalized, expected);
 }
 
+#[test]
+fn recursive_nominal_growth_rejects_unrelated_union_and_intersection() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let unrelated_union = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::Str.to_instance(&db),
+        ],
+    );
+    let list_bytes =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Bytes.to_instance(&db)]);
+    let unrelated_intersection =
+        IntersectionType::from_two_elements(&db, list_bytes, Type::unknown());
+    let position = Type::heterogeneous_tuple(
+        &db,
+        [list_int, list_str, unrelated_union, unrelated_intersection],
+    );
+    let current = KnownClass::List.to_specialized_instance(&db, &[position]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        None
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
