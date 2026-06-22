@@ -1373,20 +1373,45 @@ impl<'db> Type<'db> {
         }
 
         if let Type::Union(wrapped_union) = wrapped {
-            if !original_specialization
-                .types(db)
-                .iter()
-                .any(|position| Self::is_union_distribution_position(db, *position, wrapped_union))
-            {
+            let replacements: smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]> =
+                original_specialization
+                    .types(db)
+                    .iter()
+                    .copied()
+                    .filter(|position| {
+                        Self::is_union_distribution_position(db, *position, wrapped_union)
+                    })
+                    .map(|position| {
+                        (
+                            position,
+                            Self::union_distribution_position_normalized(
+                                db,
+                                position,
+                                wrapped_union,
+                                div,
+                            ),
+                        )
+                    })
+                    .collect();
+            if replacements.is_empty() {
                 return None;
             }
 
-            return Self::nominal_wrapper_elements_normalized(
-                db,
-                current,
-                wrapped_union.elements(db),
-                div,
+            let original = Type::NominalInstance(current);
+            let normalized = replacements.iter().fold(
+                original,
+                |normalized, (position, normalized_position)| {
+                    normalized.apply_type_mapping(
+                        db,
+                        &TypeMapping::ReplaceType {
+                            from: *position,
+                            to: *normalized_position,
+                        },
+                        TypeContext::default(),
+                    )
+                },
             );
+            return (normalized != original).then_some(normalized);
         }
 
         let contains_wrapped_intersection = |intersection: IntersectionType<'db>| match wrapped {
@@ -1428,28 +1453,27 @@ impl<'db> Type<'db> {
         (normalized != Type::NominalInstance(current)).then_some(normalized)
     }
 
-    /// Replaces the complete set of previous union arms after their coverage has been validated.
-    fn nominal_wrapper_elements_normalized(
+    /// Replaces the complete set of previous union arms within one validated distribution
+    /// position.
+    fn union_distribution_position_normalized(
         db: &'db dyn Db,
-        current: NominalInstanceType<'db>,
-        wrapped_elements: &[Self],
+        current: Self,
+        wrapped: UnionType<'db>,
         div: Self,
-    ) -> Option<Self> {
-        let original = Type::NominalInstance(current);
-        let normalized = wrapped_elements
+    ) -> Self {
+        wrapped
+            .elements(db)
             .iter()
-            .fold(original, |normalized, wrapped| {
+            .fold(current, |normalized, wrapped_element| {
                 normalized.apply_type_mapping(
                     db,
                     &TypeMapping::ReplaceType {
-                        from: *wrapped,
+                        from: *wrapped_element,
                         to: div,
                     },
                     TypeContext::default(),
                 )
-            });
-
-        (normalized != original).then_some(normalized)
+            })
     }
 
     /// Returns whether one specialization position contains a complete, positive distribution

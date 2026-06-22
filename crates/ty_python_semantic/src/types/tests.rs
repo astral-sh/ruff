@@ -213,6 +213,44 @@ fn recursive_nominal_growth_requires_structural_union_distribution() {
     );
 }
 
+#[test]
+fn recursive_nominal_growth_only_replaces_distributed_position() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distributed = UnionType::from_elements(
+        &db,
+        [
+            IntersectionType::from_two_elements(&db, list_int, Type::unknown()),
+            IntersectionType::from_two_elements(&db, list_str, Type::unknown()),
+        ],
+    );
+    let current = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Dict.to_specialized_instance(&db, &[distributed, list_int]),
+            KnownClass::Dict.to_specialized_instance(&db, &[distributed, list_str]),
+        ],
+    );
+
+    let normalized = current
+        .recursive_nominal_growth_normalized(&db, previous, div)
+        .expect("both union arms contain a complete distribution");
+    let expected = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Dict.to_specialized_instance(&db, &[div, list_int]),
+            KnownClass::Dict.to_specialized_instance(&db, &[div, list_str]),
+        ],
+    );
+
+    assert_eq!(normalized, expected);
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
