@@ -2757,6 +2757,13 @@ impl<'a> Checker<'a> {
     fn bind_builtins(&mut self) {
         let target_version = self.target_version();
         let settings = self.settings();
+        let builtin_count = python_builtins(target_version.minor, self.source_type.is_ipynb())
+            .count()
+            + python_magic_globals(target_version.minor).count()
+            + settings.builtins.len();
+
+        self.semantic.reserve_builtin_bindings(builtin_count);
+
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
