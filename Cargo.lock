@@ -3592,6 +3592,7 @@ dependencies = [
  "jod-thread",
  "libc",
  "lsp-server",
+ "memchr",
  "regex",
  "ruff_db",
  "ruff_diagnostics",

@@ -9,6 +9,7 @@ use ruff_linter::suppression::rule_identifier_range_at_offset;
 use ruff_python_ast::SourceType;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_parser::parse_unchecked_source;
+use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use std::fmt::Write;
 
@@ -56,6 +57,23 @@ pub(crate) fn hover(
         .as_single_document()
         .context("Failed to get text document for the hover request")
         .unwrap();
+    let line_number: usize = position
+        .position
+        .line
+        .try_into()
+        .expect("line number should fit within a usize");
+    let line_range = document.index().line_range(
+        OneIndexed::from_zero_indexed(line_number),
+        document.contents(),
+    );
+
+    let line = &document.contents()[line_range];
+
+    // Avoid parsing the document if the hovered line doesn't contain a comment.
+    if memchr::memchr(b'#', line.as_bytes()).is_none() {
+        return None;
+    }
+
     let cursor = types::Range::new(position.position, position.position)
         .to_text_range(document.contents(), document.index(), snapshot.encoding())
         .start();
