@@ -472,15 +472,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn collection_constraint_override(&self, expression: &ast::Expr) -> Option<Type<'db>> {
         let target = self.collection_constraint_target.as_ref()?;
-        let collection_def = self
-            .index
-            .unannotated_collection_literal(expression)
-            .or_else(|| {
-                self.index
-                    .unannotated_collection_literal_at_any_use(expression)
-            })?;
+        let direct_collection_def = self.index.unannotated_collection_literal(expression);
+        let collection_def = direct_collection_def.or_else(|| {
+            self.index
+                .unannotated_collection_literal_at_any_use(expression)
+        })?;
 
-        if self.index.unannotated_collection_literal(expression) != Some(target.definition) {
+        if direct_collection_def != Some(target.definition) {
             target.has_dependency.set(true);
         }
 
@@ -10885,24 +10883,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         mut self,
         collection_def: Definition<'db>,
     ) -> CollectionUseConstraintInference<'db> {
+        self.context.defuse();
+
+        if self
+            .index
+            .collection_requires_cycle_inference(collection_def)
+        {
+            return CollectionUseConstraintInference::RequiresCycle;
+        }
+
         let has_dependency = Rc::new(Cell::new(false));
         self.collection_constraint_target = Some(CollectionConstraintTarget {
             definition: collection_def,
             has_dependency: Rc::clone(&has_dependency),
         });
 
-        let return_is_unconstrained = match self.scope.node(self.db()) {
-            NodeWithScopeKind::Function(function) => function.node(self.module()).returns.is_none(),
-            _ => false,
-        };
-
-        if self
-            .index
-            .collection_requires_cycle_inference(collection_def)
-        {
-            self.context.defuse();
-            return CollectionUseConstraintInference::RequiresCycle;
-        }
+        let return_is_unconstrained = self
+            .scope
+            .node(self.db())
+            .as_function()
+            .is_some_and(|function| function.node(self.module()).returns.is_none());
 
         for (statement, use_expression) in self.index.constraining_collection_uses(collection_def) {
             let used_fast_path = match statement {
@@ -10944,7 +10944,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if !used_fast_path {
-                self.context.defuse();
                 return CollectionUseConstraintInference::RequiresCycle;
             }
         }
@@ -10956,7 +10955,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .into_iter()
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        self.context.defuse();
 
         if has_dependency.get() {
             CollectionUseConstraintInference::RequiresCycle
