@@ -430,7 +430,6 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
-const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -804,15 +803,7 @@ impl<'db> UnionBuilder<'db> {
                                     if *existing_enum_class != enum_class {
                                         continue;
                                     }
-                                    // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
-                                    // for why we avoid using the `should_widen` closure here.
-                                    let enum_literals_limit =
-                                        if self.recursively_defined.is_yes() && cycle_recovery {
-                                            MAX_RECURSIVE_UNION_LITERALS
-                                        } else {
-                                            MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                        };
-                                    if literals.len() >= enum_literals_limit {
+                                    if should_widen(literals.len(), self.recursively_defined) {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with = literal.enum_class_instance(self.db);
                                         self.add_in_place_impl(replace_with, seen_aliases);
