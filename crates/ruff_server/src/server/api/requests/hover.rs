@@ -8,6 +8,7 @@ use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::suppression::rule_identifier_range_at_offset;
 use ruff_python_ast::SourceType;
 use ruff_python_ast::token::TokenKind;
+use ruff_python_parser::parse_unchecked_source;
 use ruff_text_size::Ranged;
 use std::fmt::Write;
 
@@ -58,7 +59,7 @@ pub(crate) fn hover(
     let cursor = types::Range::new(position.position, position.position)
         .to_text_range(document.contents(), document.index(), snapshot.encoding())
         .start();
-    let parsed = document.parsed_module(source_type);
+    let parsed = parse_unchecked_source(document.contents(), source_type);
     let comment = parsed
         .tokens()
         .at_offset(cursor)
