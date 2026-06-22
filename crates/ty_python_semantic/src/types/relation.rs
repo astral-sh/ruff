@@ -2964,6 +2964,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
             }
 
+            // A `NewType` is an identity function at runtime (`NewType("N", Base)(x) is x`), so it
+            // shares all of its base type's inhabitants. Unwrap to the concrete base before the
+            // literal/nominal arms below, so e.g. `NewType("N", bool)` vs `Literal[True]` is not
+            // wrongly reported disjoint (which would narrow an `is` comparison to `Never`).
+            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
+                self.check_newtype_pair(db, left, right)
+            }
+            (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
+                self.check_type_pair(db, newtype.concrete_base_type(db), other)
+            }
+
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::LiteralValue(literal)) => {
                 let positive_relation_holds = match literal.kind() {
@@ -3165,13 +3176,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 .with_recursion_guard(left, right, || {
                     self.check_nominal_instance_pair(db, left_i, right_i)
                 }),
-
-            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                self.check_newtype_pair(db, left, right)
-            }
-            (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
-                self.check_type_pair(db, newtype.concrete_base_type(db), other)
-            }
 
             (Type::PropertyInstance(property), other)
             | (other, Type::PropertyInstance(property)) => {

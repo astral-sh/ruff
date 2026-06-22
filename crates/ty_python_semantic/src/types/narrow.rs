@@ -746,6 +746,18 @@ fn merge_constraints_or<'db>(
     }
 }
 
+/// Return `true` if `ty` is a `NewType` instance whose value-equality and match-exhaustiveness
+/// narrowing we deliberately suppress, to keep the `NewType` brand rather than narrow to a member
+/// of its base. Consumed by the guard in
+/// [`NarrowingConstraintsBuilder::evaluate_expr_compare_op`] and by [`crate::reachability`].
+///
+/// Type aliases are resolved first, so an alias to a `NewType` is recognized. Limited to a *direct*
+/// `NewType` subject: a `NewType` inside a union (`N | str`) or intersection still narrows
+/// element-wise, since suppressing the whole subject would also stop the non-`NewType` parts.
+pub(crate) fn is_brand_preserving_newtype_subject<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    matches!(ty.resolve_type_alias(db), Type::NewTypeInstance(_))
+}
+
 /// Return `true` if it is possible for any two inhabitants of the given types to
 /// compare equal to each other; otherwise return `false`.
 fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<'db>) -> bool {
@@ -1352,6 +1364,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         op: ast::CmpOp,
         is_positive: bool,
     ) -> Option<Type<'db>> {
+        // A `NewType` subject is not narrowed by value-(in)equality (`==`, `!=`, or a `match`
+        // value pattern): keep the `NewType` brand rather than narrow to a member of its base.
+        // See `is_brand_preserving_newtype_subject`.
+        if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
+            && is_brand_preserving_newtype_subject(self.db, lhs_ty)
+        {
+            return None;
+        }
         if op == ast::CmpOp::Eq {
             return evaluate_type_equality(self.db, lhs_ty, rhs_ty, is_positive);
         }
