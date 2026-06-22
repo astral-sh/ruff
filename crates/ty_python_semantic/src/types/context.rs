@@ -43,6 +43,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     file: File,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
+    diagnostics_suppressed: bool,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
@@ -56,6 +57,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             module,
             file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
+            diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
@@ -107,6 +109,13 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         !self.diagnostics.borrow().is_empty()
     }
 
+    /// Returns a guard that prevents diagnostic construction until it is dropped.
+    pub(super) fn suppress_diagnostics(&mut self) -> DiagnosticSuppressionGuard<'_, 'db, 'ast> {
+        debug_assert!(!self.diagnostics_suppressed);
+        self.diagnostics_suppressed = true;
+        DiagnosticSuppressionGuard { context: self }
+    }
+
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
         LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }
@@ -144,6 +153,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
+        if self.diagnostics_suppressed {
+            return None;
+        }
         LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
     }
 
@@ -166,6 +178,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'ctx, 'db>> {
+        if self.diagnostics_suppressed {
+            return None;
+        }
         DiagnosticGuardBuilder::new(self, id, severity)
     }
 
@@ -236,6 +251,28 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("diagnostics", &self.diagnostics)
             .field("defused", &self.bomb)
             .finish()
+    }
+}
+
+/// Prevents diagnostic construction while holding an exclusive borrow of an inference context.
+///
+/// The exclusive borrow prevents recursive expression inference from accidentally inheriting the
+/// suppression state.
+pub(super) struct DiagnosticSuppressionGuard<'ctx, 'db, 'ast> {
+    context: &'ctx mut InferContext<'db, 'ast>,
+}
+
+impl<'db, 'ast> std::ops::Deref for DiagnosticSuppressionGuard<'_, 'db, 'ast> {
+    type Target = InferContext<'db, 'ast>;
+
+    fn deref(&self) -> &Self::Target {
+        self.context
+    }
+}
+
+impl Drop for DiagnosticSuppressionGuard<'_, '_, '_> {
+    fn drop(&mut self) {
+        self.context.diagnostics_suppressed = false;
     }
 }
 

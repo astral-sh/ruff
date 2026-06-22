@@ -6798,7 +6798,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly.
                 if let Some(ty) =
-                    self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                    self.infer_typed_dict_expression(dict, typed_dict, &mut item_types, true)
                 {
                     return ty;
                 }
@@ -6826,7 +6826,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !has_dict_compatible_fallback
                 {
                     if let Some(ty) =
-                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types)
+                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types, true)
                     {
                         return ty;
                     }
@@ -6849,14 +6849,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Reuse nested expressions that receive the same field context across candidates.
                     let teardown = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
-                        // Disable diagnostics as we attempt to narrow to specific `TypedDict`
-                        // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
-                        // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
-                        // the literal.
+                        // Suppress validation diagnostics for discarded candidates. A mixed union
+                        // like `TypedDict | dict[str, Any]` should remain quiet when the dict arm
+                        // accepts the literal.
                         if let Some(inferred_ty) = self.speculate().infer_typed_dict_expression(
                             dict,
                             typed_dict,
                             &mut item_types,
+                            false,
                         ) {
                             narrowed_tys.push(inferred_ty);
                         }
