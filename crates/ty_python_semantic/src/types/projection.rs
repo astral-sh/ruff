@@ -13,8 +13,8 @@ use smallvec::SmallVec;
 use ty_python_core::EvaluationMode;
 
 use super::{
-    DivergentType, DynamicType, KnownClass, MemberLookupPolicy, StaticClassLiteral, TupleSpec,
-    Type, UnionBuilder, UnionType, call::CallArguments, subscript::SubscriptError,
+    DivergentType, KnownClass, MemberLookupPolicy, StaticClassLiteral, TupleSpec, Type,
+    UnionBuilder, UnionType, call::CallArguments, subscript::SubscriptError,
 };
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
@@ -24,12 +24,14 @@ use crate::types::visitor::any_over_type;
 use crate::{Db, FxIndexMap, FxIndexSet};
 
 mod artifact;
+mod term;
 
 pub use artifact::ProjectionType;
 use artifact::{
     ProjectionMember, ProjectionMemberName, ProjectionOp, ProjectionPath, ProjectionSubscript,
     StarUnpackPosition, UnpackProjection,
 };
+use term::ProjectionTerm;
 
 /// A type slot participating in result-level projection cycle recovery.
 #[derive(Debug, Clone, Copy)]
@@ -2535,55 +2537,6 @@ fn dependency_first_strongly_connected_components(graph: &[Vec<usize>]) -> Vec<V
     }
 
     state.components
-}
-
-/// The result of applying one projection path to one container arm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-enum ProjectionTerm<'db> {
-    Exact(Type<'db>),
-    Homogeneous(Type<'db>),
-    List(Type<'db>),
-}
-
-impl<'db> ProjectionTerm<'db> {
-    fn ty(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            ProjectionTerm::Exact(ty) | ProjectionTerm::Homogeneous(ty) => ty,
-            ProjectionTerm::List(element) => {
-                KnownClass::List.to_specialized_instance(db, &[element])
-            }
-        }
-    }
-
-    fn from_union_terms(db: &'db dyn Db, terms: &[Self]) -> Option<Self> {
-        let wrap_in_list = terms
-            .iter()
-            .any(|term| matches!(term, ProjectionTerm::List(_)));
-        if wrap_in_list
-            && terms
-                .iter()
-                .any(|term| !matches!(term, ProjectionTerm::List(_)))
-        {
-            return None;
-        }
-
-        let elements = terms.iter().map(|term| match *term {
-            ProjectionTerm::List(element) => element,
-            ProjectionTerm::Exact(ty) | ProjectionTerm::Homogeneous(ty) => ty,
-        });
-        let ty = UnionType::from_elements_cycle_recovery(db, elements);
-        Some(if wrap_in_list {
-            ProjectionTerm::List(ty)
-        } else {
-            ProjectionTerm::Exact(ty)
-        })
-    }
-
-    fn is_ambiguous(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self.ty(db), false, |ty| {
-            matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-        })
-    }
 }
 
 /// Projection facts computed during normal inference and reused during cycle recovery.
