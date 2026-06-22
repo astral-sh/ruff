@@ -3391,6 +3391,18 @@ impl<'db> PathBounds<'db> {
             .ok()?;
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
 
+        if let Some(&(typevar, _, _)) = constraints.first()
+            && constraints
+                .iter()
+                .all(|(constraint_typevar, _, _)| *constraint_typevar == typevar)
+        {
+            let lower =
+                UnionType::from_elements(db, constraints.into_iter().map(|(_, lower, _)| lower));
+            let path: Box<[PathBound<'db>]> =
+                Box::new([(typevar, ConstraintBounds::new(Some(lower), None))]);
+            return Some(PathBounds::Constrained(Box::new([path])));
+        }
+
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxHashMap::default();
         for (typevar, lower, _) in constraints {
