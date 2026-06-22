@@ -436,6 +436,50 @@ fn recursive_nominal_growth_rejects_nested_negative_occurrences() {
     }
 }
 
+#[test]
+fn recursive_nominal_growth_recomputes_overlapping_positions() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let first_distribution = UnionType::from_elements(
+        &db,
+        [
+            IntersectionType::from_two_elements(&db, list_int, Type::unknown()),
+            IntersectionType::from_two_elements(&db, list_str, Type::unknown()),
+        ],
+    );
+    let second_distribution = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[list_int]),
+            KnownClass::Set.to_specialized_instance(&db, &[list_str]),
+        ],
+    );
+    let nested = Type::heterogeneous_tuple(&db, [first_distribution, second_distribution]);
+    let current = KnownClass::Dict.to_specialized_instance(&db, &[first_distribution, nested]);
+    let normalized_nested = Type::heterogeneous_tuple(
+        &db,
+        [div, KnownClass::Set.to_specialized_instance(&db, &[div])],
+    );
+    let expected = KnownClass::Dict.to_specialized_instance(&db, &[div, normalized_nested]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized dict should be a nominal instance"),
+            previous,
+            div,
+        ),
+        Some(expected)
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.

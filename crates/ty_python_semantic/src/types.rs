@@ -1370,38 +1370,8 @@ impl<'db> Type<'db> {
         let original = Type::NominalInstance(current);
 
         if let Type::Union(wrapped_union) = wrapped {
-            let replacements: smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]> = specialization
-                .types(db)
-                .iter()
-                .copied()
-                .filter(|position| {
-                    Self::is_union_distribution_position(db, *position, wrapped_union)
-                })
-                .map(|position| {
-                    (
-                        position,
-                        Self::union_distribution_position_normalized(
-                            db,
-                            position,
-                            wrapped_union,
-                            div,
-                        ),
-                    )
-                })
-                .collect();
-            normalized = replacements.iter().fold(
-                normalized,
-                |normalized, (position, normalized_position)| {
-                    normalized.apply_type_mapping(
-                        db,
-                        &TypeMapping::ReplaceType {
-                            from: *position,
-                            to: *normalized_position,
-                        },
-                        TypeContext::default(),
-                    )
-                },
-            );
+            normalized =
+                Self::union_distribution_position_normalized(db, normalized, wrapped_union, div);
             return (normalized != original).then_some(normalized);
         }
 
@@ -1499,22 +1469,6 @@ impl<'db> Type<'db> {
                 *branch
             }
         }))
-    }
-
-    /// Returns whether one specialization position contains a complete, positive distribution
-    /// of `wrapped`.
-    fn is_union_distribution_position(
-        db: &'db dyn Db,
-        current: Self,
-        wrapped: UnionType<'db>,
-    ) -> bool {
-        any_over_type(db, current, false, |ty| {
-            matches!(
-                ty,
-                Type::Union(distributed)
-                    if Self::matching_union_distribution(db, distributed, wrapped).is_some()
-            )
-        })
     }
 
     /// Returns the branches in a single structural distribution of `wrapped`.
