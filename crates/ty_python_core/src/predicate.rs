@@ -67,8 +67,7 @@ impl<'db> PredicatesBuilder<'db> {
         self.predicates.push(predicate)
     }
 
-    pub(crate) fn build(mut self) -> Predicates<'db> {
-        self.predicates.shrink_to_fit();
+    pub(crate) fn build(self) -> Predicates<'db> {
         self.predicates.into()
     }
 }
