@@ -1009,6 +1009,16 @@ def _():
     return AlternativeRule(rules)
 ```
 
+The call can also be nested inside the return expression:
+
+```py
+def _():
+    rules = []
+    rules.append(URule())
+    reveal_type(rules)  # revealed: list[Rule]
+    return (AlternativeRule(rules), 1)
+```
+
 Invalid bound-method calls should not retain diagnostics from the initial cycle iteration:
 
 ```py
