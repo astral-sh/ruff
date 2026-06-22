@@ -756,47 +756,439 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     Ok(())
 }
 
-#[test_case::test_case(&["--select", "F481"])]
-#[test_case::test_case(&["--extend-select", "F481"])]
-#[test_case::test_case(&["--ignore", "F481"])]
-#[test_case::test_case(&["--fixable", "F481"])]
-#[test_case::test_case(&["--extend-fixable", "F481"])]
-#[test_case::test_case(&["--unfixable", "F481"])]
-#[test_case::test_case(&["--config", "lint.ignore=['F481']"])]
-#[test_case::test_case(&["--config", "lint.extend-safe-fixes=['F481']"])]
-#[test_case::test_case(&["--config", "lint.extend-unsafe-fixes=['F481']"])]
-#[test_case::test_case(&["--per-file-ignores", "test.py:F481"])]
-#[test_case::test_case(&["--extend-per-file-ignores", "test.py:F481"])]
-#[test_case::test_case(&["--config", "lint.per-file-ignores={'test.py'=['F481']}"])]
-#[test_case::test_case(&["--config", "lint.extend-per-file-ignores={'test.py'=['F481']}"])]
-#[test_case::test_case(&["--preview", "--select", "F481"])]
-#[test_case::test_case(&["--preview", "--extend-select", "F481"])]
-#[test_case::test_case(&["--preview", "--ignore", "F481"])]
-#[test_case::test_case(&["--preview", "--fixable", "F481"])]
-#[test_case::test_case(&["--preview", "--extend-fixable", "F481"])]
-#[test_case::test_case(&["--preview", "--unfixable", "F481"])]
-#[test_case::test_case(&["--preview", "--config", "lint.ignore=['F481']"])]
-#[test_case::test_case(&["--preview", "--config", "lint.extend-safe-fixes=['F481']"])]
-#[test_case::test_case(&["--preview", "--config", "lint.extend-unsafe-fixes=['F481']"])]
-#[test_case::test_case(&["--preview", "--per-file-ignores", "test.py:F481"])]
-#[test_case::test_case(&["--preview", "--extend-per-file-ignores", "test.py:F481"])]
-#[test_case::test_case(&["--preview", "--config", "lint.per-file-ignores={'test.py'=['F481']}"])]
-#[test_case::test_case(&["--preview", "--config", "lint.extend-per-file-ignores={'test.py'=['F481']}"])]
-fn unknown_rule_selectors_warn(args: &[&str]) -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file("test.py", "import os\n")?;
+fn unknown_rule_selector_test() -> Result<CliTest> {
+    CliTest::with_file("test.py", "import os\n")
+}
 
-    let name = args.join("__");
+#[test]
+fn unknown_rule_selectors_select_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-    assert_cmd_snapshot!(
-        name,
-        fixture
-            .check_command()
-            .args(["--select", "F401"])
-            .args(args)
-            .arg("test.py")
-    );
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
 
+#[test]
+fn unknown_rule_selectors_extend_select_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--extend-select", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ignore_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--ignore", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_fixable_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--fixable", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_fixable_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--extend-fixable", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_unfixable_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--unfixable", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_ignore_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.ignore=['F481']"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_extend_safe_fixes_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.extend-safe-fixes=['F481']"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_extend_unsafe_fixes_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.extend-unsafe-fixes=['F481']"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--extend-per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.per-file-ignores={'test.py'=['F481']}"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_extend_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args([
+        "--config",
+        "lint.extend-per-file-ignores={'test.py'=['F481']}",
+    ]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_select_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--select", "F481"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `select` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_select_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--extend-select", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-select` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ignore_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--ignore", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `ignore` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_fixable_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--fixable", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: `os` imported but unused
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `fixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_fixable_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--extend-fixable", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-fixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_unfixable_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--unfixable", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `unfixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_ignore_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--config", "lint.ignore=['F481']"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `ignore` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_extend_safe_fixes_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args([
+        "--preview",
+        "--config",
+        "lint.extend-safe-fixes=['F481']",
+    ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-safe-fixes` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_extend_unsafe_fixes_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args([
+        "--preview",
+        "--config",
+        "lint.extend-unsafe-fixes=['F481']",
+    ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--extend-per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args([
+        "--preview",
+        "--config",
+        "lint.per-file-ignores={'test.py'=['F481']}",
+    ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_extend_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args([
+        "--preview",
+        "--config",
+        "lint.extend-per-file-ignores={'test.py'=['F481']}",
+    ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
     Ok(())
 }
 
