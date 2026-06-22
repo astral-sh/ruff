@@ -208,6 +208,7 @@ impl<T, R> CycleDetectorCache<T, R> {
     where
         T: Hash + Eq,
     {
+        debug_assert!(self.get(&item).is_none());
         let entry = (item, result);
         *self = match mem::replace(self, Self::Empty) {
             Self::Empty => Self::One(entry),
@@ -229,7 +230,7 @@ impl<T, R> CycleDetectorCache<T, R> {
     }
 
     #[cfg(test)]
-    fn is_spilled(&self) -> bool {
+    const fn is_spilled(&self) -> bool {
         matches!(self, Self::Spilled(_))
     }
 }
