@@ -805,6 +805,15 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
+        if self.eat(TokenKind::Rpar) {
+            return ast::Arguments {
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+                args: Box::default(),
+                keywords: Default::default(),
+            };
+        }
+
         let mut args = vec![];
         let mut keywords = vec![];
         let mut seen_keyword_argument = false; // foo = 1
@@ -926,9 +935,9 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        // Avoid allocating the minimum `Vec` capacity of four only to shrink it
-                        // again for the common single-positional-argument case.
-                        if args.capacity() == 0 && parser.at(TokenKind::Rpar) {
+                        // Reserve exactly one slot for the first positional argument, while
+                        // avoiding any allocation for keyword-only calls.
+                        if args.is_empty() {
                             args.reserve_exact(1);
                         }
                         args.push(parsed_expr.expr);
