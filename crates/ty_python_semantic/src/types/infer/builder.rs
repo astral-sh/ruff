@@ -6931,9 +6931,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let use_empty_list_consensus = collection_class == KnownClass::List
-            && elts.is_empty()
-            && collection_expr.is_some_and(|expr| self.is_collection_literal_inference_root(expr));
+        let use_empty_collection_consensus =
+            matches!(collection_class, KnownClass::List | KnownClass::Dict)
+                && elts.is_empty()
+                && collection_expr
+                    .is_some_and(|expr| self.is_collection_literal_inference_root(expr));
 
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
@@ -6962,7 +6964,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = tcx.narrow_targets(db);
-        let has_dynamic_narrow_target = use_empty_list_consensus
+        let has_dynamic_narrow_target = use_empty_collection_consensus
             && narrow_targets
                 .as_deref()
                 .is_some_and(|targets| targets.iter().any(Type::is_dynamic));
@@ -6972,9 +6974,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .flatten()
             .filter(|ty| ty.class_specialization(db).is_some());
 
-        if use_empty_list_consensus {
+        if use_empty_collection_consensus {
             let mut narrowed_result: Option<(Type<'db>, Self)> = None;
-            let mut candidates_agree = !has_dynamic_narrow_target;
+            let mut common_types: Option<SmallVec<[Type<'db>; 2]>> = None;
+            let mut replaced_candidate_type = false;
             let mut uses_empty_covariant_context = false;
 
             for narrowed_ty in narrow_targets {
@@ -6984,27 +6987,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 };
 
-                if let Some((previous_ty, _)) = &narrowed_result {
-                    candidates_agree &=
-                        if inferred_ty.has_dynamic(db) || previous_ty.has_dynamic(db) {
-                            inferred_ty == *previous_ty
-                        } else {
-                            inferred_ty.is_equivalent_to(db, *previous_ty)
-                        };
+                let Some(specialization) = inferred_ty.known_specialization(db, collection_class)
+                else {
+                    continue;
+                };
+                let candidate_types: SmallVec<[Type<'db>; 2]> =
+                    specialization.types(db).iter().copied().collect();
+
+                if let Some(common_types) = &mut common_types {
+                    for (common_ty, candidate_ty) in common_types.iter_mut().zip(candidate_types) {
+                        let candidates_agree =
+                            if common_ty.has_dynamic(db) || candidate_ty.has_dynamic(db) {
+                                *common_ty == candidate_ty
+                            } else {
+                                common_ty.is_equivalent_to(db, candidate_ty)
+                            };
+                        if !candidates_agree {
+                            *common_ty = Type::unknown();
+                            replaced_candidate_type = true;
+                        }
+                    }
+                } else {
+                    common_types = Some(candidate_types);
                 }
                 uses_empty_covariant_context |= candidate_uses_covariant_context;
                 narrowed_result.get_or_insert((inferred_ty, speculative_builder));
             }
 
             if let Some((inferred_ty, speculative_builder)) = narrowed_result {
-                if uses_empty_covariant_context && !candidates_agree {
+                if has_dynamic_narrow_target && let Some(common_types) = &mut common_types {
+                    common_types.fill(Type::unknown());
+                    replaced_candidate_type = true;
+                }
+
+                if uses_empty_covariant_context
+                    && replaced_candidate_type
+                    && let Some(common_types) = common_types
+                {
+                    let common_ty =
+                        collection_class.to_specialized_instance(db, common_types.as_slice());
                     return self
                         .infer_collection_literal_impl(
                             collection_class,
                             collection_expr,
                             elts,
                             infer_elt_expression,
-                            TypeContext::default(),
+                            TypeContext::new(Some(common_ty)),
                         )
                         .map(|(ty, _)| ty);
                 }
@@ -7032,7 +7060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Infer the type of a collection literal expression and whether it uses a fully static,
-    // covariant context for a directly contextualized empty list.
+    // covariant context for a directly contextualized empty list or dictionary.
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
@@ -7210,16 +7238,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && elts
                 .iter()
                 .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
-        let uses_empty_covariant_context = collection_class == KnownClass::List
-            && elts.is_empty()
-            && is_inference_root
-            && elt_tcx_constraints.len() == 1
-            && elt_tcx_constraints
-                .values()
-                .all(|ty| !ty.has_dynamic(self.db()))
-            && elt_tcx_variance
-                .values()
-                .any(|variance| variance.is_covariant());
+        let empty_covariant_context: SmallVec<[BoundTypeVarIdentity<'db>; 2]> =
+            if matches!(collection_class, KnownClass::List | KnownClass::Dict)
+                && elts.is_empty()
+                && is_inference_root
+            {
+                elt_tcx_constraints
+                    .iter()
+                    .filter_map(|(identity, ty)| {
+                        (!ty.has_dynamic(self.db())
+                            && elt_tcx_variance
+                                .get(identity)
+                                .is_some_and(|variance| variance.is_covariant()))
+                        .then_some(*identity)
+                    })
+                    .collect()
+            } else {
+                SmallVec::new()
+            };
+        let uses_empty_covariant_context = !empty_covariant_context.is_empty();
 
         let mut pre_inferred_elt_tys = None;
 
@@ -7238,7 +7275,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if elt_tcx_variance
                         .get(&identity)
                         .is_some_and(|variance| variance.is_covariant())
-                        && !uses_empty_covariant_context
+                        && !empty_covariant_context.contains(&identity)
                     {
                         return None;
                     }
@@ -7319,7 +7356,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if elt_tcx_variance
                 .get(&elt_ty_identity)
                 .is_some_and(|variance| variance.is_covariant())
-                && !uses_empty_covariant_context
+                && !empty_covariant_context.contains(&elt_ty_identity)
             {
                 continue;
             }
