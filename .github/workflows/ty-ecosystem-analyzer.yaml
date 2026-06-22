@@ -1,6 +1,7 @@
 name: ty ecosystem-analyzer
 
-permissions: {}
+permissions:
+  actions: read
 
 on:
   pull_request:
@@ -74,7 +75,7 @@ jobs:
           REVISION: ${{ matrix.revision }}
         run: |
           echo "Building ${REVISION} revision $(git rev-parse HEAD)"
-          cargo build --package ty --profile profiling --no-default-features
+          cargo build --package ty --profile profiling
           cp target/profiling/ty "ty-${REVISION}"
 
           if [[ "${REVISION}" == "pr" ]]; then
@@ -106,7 +107,15 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        shard: [0, 1, 2, 3]
+        include:
+          - shard: 0
+            generate-report: false
+          - shard: 1
+            generate-report: true
+          - shard: 2
+            generate-report: false
+          - shard: 3
+            generate-report: false
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     env:
@@ -158,25 +167,38 @@ jobs:
             diagnostics-base-${{ matrix.shard }}.json
             diagnostics-PR-${{ matrix.shard }}.json
 
-  generate-report:
-    name: Generate diagnostic diff report
-    needs: [analyze-shards]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-        with:
-          enable-cache: true
-          version: "0.11.21"
+      - name: Wait for all shard diagnostics
+        if: matrix.generate-report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..90}; do
+            artifact_count="$(
+              gh api \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+                --jq '[.artifacts[] | select(.name | startswith("diagnostics-shard-"))] | length'
+            )"
+
+            if [[ "${artifact_count}" -eq 4 ]]; then
+              exit 0
+            fi
+
+            echo "Waiting for shard diagnostics (${artifact_count}/4, attempt ${attempt}/90)"
+            sleep 2
+          done
+
+          echo "Timed out waiting for all shard diagnostics" >&2
+          exit 1
 
       - name: Download shard diagnostics
+        if: matrix.generate-report
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: diagnostics-shard-*
           merge-multiple: true
 
       - name: Generate reports
+        if: matrix.generate-report
         id: generate-reports
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -226,6 +248,7 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
+        if: matrix.generate-report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: full-report
@@ -234,23 +257,26 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
+        if: matrix.generate-report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: comment.md
           path: comment.md
 
       - name: Upload diagnostics diff
+        if: matrix.generate-report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: diff.html
           path: dist/diff.html
 
       - name: Upload timing diff
+        if: matrix.generate-report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: timing.html
           path: dist/timing.html
 
       - name: Fail on new abnormal exits
-        if: steps.generate-reports.outputs.diff_statistics_exit_code != '0'
+        if: matrix.generate-report && steps.generate-reports.outputs.diff_statistics_exit_code != '0'
         run: exit 1

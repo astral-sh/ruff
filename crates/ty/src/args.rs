@@ -34,7 +34,6 @@ pub(crate) enum Command {
     Check(CheckCommand),
 
     /// Start the language server
-    #[cfg(feature = "server")]
     Server,
 
     /// Display ty's version
