@@ -2323,7 +2323,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
-    pub(super) fn finish(mut self) -> UseDefMap<'db> {
+    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
