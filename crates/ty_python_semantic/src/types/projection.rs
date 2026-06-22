@@ -812,12 +812,6 @@ impl<'db> Type<'db> {
         demands.into_inner()
     }
 
-    fn has_projection_demands(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |nested| {
-            matches!(nested, Type::Projection(_))
-        })
-    }
-
     fn cycle_artifact_roots(self, db: &'db dyn Db) -> Vec<DivergentType> {
         let mut roots = Vec::new();
         self.collect_cycle_artifact_roots(db, &mut roots, true);
@@ -850,7 +844,7 @@ impl<'db> Type<'db> {
                     element.collect_cycle_artifact_roots(db, roots, include_divergent);
                 }
             }
-            _ => {
+            Type::NominalInstance(_) => {
                 if let Some(spec) = self.exact_tuple_instance_spec(db) {
                     for element in spec.as_ref().iter_all_elements() {
                         element.collect_cycle_artifact_roots(db, roots, include_divergent);
@@ -861,6 +855,7 @@ impl<'db> Type<'db> {
                     }
                 }
             }
+            _ => {}
         }
     }
 
@@ -2733,6 +2728,10 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
         self.container_facts.insert(fact);
     }
 
+    fn is_empty(&self) -> bool {
+        self.projection_facts.is_empty() && self.container_facts.is_empty()
+    }
+
     fn finish(self, db: &'db dyn Db) -> Option<ProjectionEvidenceSet<'db>> {
         ProjectionEvidenceSet::new(db, self.projection_facts, self.container_facts)
     }
@@ -2765,10 +2764,23 @@ impl<'db> ProjectionEvidenceSet<'db> {
         should_collect: bool,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let types = types.into_iter().collect::<SmallVec<[_; 8]>>();
-        (should_collect || types.iter().any(|ty| ty.has_projection_demands(db)))
-            .then(|| Self::from_types(db, types))
-            .flatten()
+        if should_collect {
+            return Self::from_types(db, types);
+        }
+
+        let mut builder = ProjectionEvidenceBuilder::default();
+        for ty in types {
+            let demands = ty.projection_demands(db);
+            for (root, path) in demands {
+                builder.record_projection_path(db, root, ty, &path);
+            }
+        }
+
+        if builder.is_empty() {
+            None
+        } else {
+            builder.finish(db)
+        }
     }
 
     pub(crate) fn merged(
