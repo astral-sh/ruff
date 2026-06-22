@@ -6950,6 +6950,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = tcx.narrow_targets(db);
+        let has_dynamic_narrow_target = use_empty_list_consensus
+            && narrow_targets
+                .as_deref()
+                .is_some_and(|targets| targets.iter().any(Type::is_dynamic));
         let narrow_targets = narrow_targets
             .as_deref()
             .into_iter()
@@ -6958,7 +6962,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if use_empty_list_consensus {
             let mut narrowed_result: Option<(Type<'db>, Self)> = None;
-            let mut candidates_agree = true;
+            let mut candidates_agree = !has_dynamic_narrow_target;
             let mut uses_empty_covariant_context = false;
 
             for narrowed_ty in narrow_targets {

@@ -95,6 +95,11 @@ def nested_unknown_first(
     if items is None:
         items = []
         reveal_type(items)  # revealed: list[Unknown]
+
+def top_level_any(items: Sequence[int] | Any | None = None) -> None:
+    if items is None:
+        items = []
+        items.append("x")
 ```
 
 The effective variance of a structural constraint determines whether the fallback applies. Mixed
