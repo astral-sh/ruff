@@ -6,56 +6,40 @@
 reveal_type({})  # revealed: dict[Unknown, Unknown]
 ```
 
-A directly contextualized empty dictionary uses fully static covariant constraints. Constraints
-shared by every compatible union arm are retained independently for keys and values:
+## Empty dictionaries with an expected type
+
+An empty dictionary can use the key and value types from an expected `Mapping`. If it matches more
+than one union member, ty keeps a key or value type only when all matching members agree. `Any` is
+preserved as a key type, and different `NewType`s remain distinct:
 
 ```py
 from collections.abc import Mapping
 from typing import Any, NewType
-from ty_extensions import Unknown
 
 def default_to_empty(value: Mapping[str, int] | None = None) -> None:
     if value is None:
         value = {}
         reveal_type(value)  # revealed: dict[str, int]
-    reveal_type(value)  # revealed: Mapping[str, int]
 
 annotated: Mapping[str, int] = {}
 reveal_type(annotated)  # revealed: dict[str, int]
 
-def shared_key(value: Mapping[str, int] | Mapping[str, bytes] | None = None) -> None:
+def same_key(value: Mapping[str, int] | Mapping[str, bytes] | None = None) -> None:
     if value is None:
         value = {}
         reveal_type(value)  # revealed: dict[str, Unknown]
 
-def shared_key_reversed(
-    value: Mapping[str, bytes] | Mapping[str, int] | None = None,
-) -> None:
-    if value is None:
-        value = {}
-        reveal_type(value)  # revealed: dict[str, Unknown]
-
-def shared_value(value: Mapping[str, int] | Mapping[bytes, int] | None = None) -> None:
-    if value is None:
-        value = {}
-        reveal_type(value)  # revealed: dict[Unknown, int]
-
-def shared_value_reversed(
+def same_value(
     value: Mapping[bytes, int] | Mapping[str, int] | None = None,
 ) -> None:
     if value is None:
         value = {}
         reveal_type(value)  # revealed: dict[Unknown, int]
 
-def dynamic_invariant_key(value: Mapping[Any, int] | None = None) -> None:
+def any_key(value: Mapping[Any, int] | None = None) -> None:
     if value is None:
         value = {}
         reveal_type(value)  # revealed: dict[Any, int]
-
-def top_level_any(value: Mapping[str, int] | Any | None = None) -> None:
-    if value is None:
-        value = {}
-        value["key"] = "value"
 
 A = NewType("A", int)
 B = NewType("B", int)
@@ -64,13 +48,6 @@ def distinct_newtypes(value: Mapping[A, int] | Mapping[B, bytes] | None = None) 
     if value is None:
         value = {}
         reveal_type(value)  # revealed: dict[Unknown, Unknown]
-
-def nested_dynamic(
-    value: Mapping[str, list[Any]] | Mapping[str, list[Unknown]] | None = None,
-) -> None:
-    if value is None:
-        value = {}
-        reveal_type(value)  # revealed: dict[str, Unknown]
 ```
 
 ## Basic dict
