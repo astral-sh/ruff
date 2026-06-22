@@ -3,7 +3,7 @@ use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
-use crate::rules::refurb::helpers::IterLocation;
+use crate::rules::refurb::helpers::{IterLocation, binding_names, loop_variables_are_used_outside_loop};
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
@@ -101,6 +101,12 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     let [arg] = expr_call.arguments.args.as_ref() else {
         return;
     };
+
+    let binding_names = binding_names(&for_stmt.target);
+
+    if loop_variables_are_used_outside_loop(&binding_names, for_stmt.range, checker.semantic(), checker.semantic().scope_id) {
+        return;
+    }
 
     let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), arg) {
