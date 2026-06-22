@@ -551,6 +551,13 @@ with_protocol: Intersection[
 with_protocol = [1]  # error: [invalid-assignment]
 reveal_type(with_protocol)  # revealed: list[Divergent] & Container[Divergent] & P
 
+flattened: Intersection[
+    list[Intersection[TypeOf[flattened], P]],
+    Container[Intersection[TypeOf[flattened], P]],
+]
+flattened = [1]  # error: [invalid-assignment]
+reveal_type(flattened)  # revealed: list[Divergent] & Container[Divergent]
+
 union: list[TypeOf[union]] | Container[TypeOf[union]]
 union = [1]
 reveal_type(union)  # revealed: list[Divergent]

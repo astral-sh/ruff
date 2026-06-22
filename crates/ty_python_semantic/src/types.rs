@@ -1345,8 +1345,8 @@ impl<'db> Type<'db> {
         Self::nominal_wrapper_normalized(db, current, previous, div)
     }
 
-    /// Replaces `wrapped` beneath the outer nominal specialization in `current`, including union
-    /// elements that were distributed across intersections.
+    /// Replaces `wrapped` beneath the outer nominal specialization in `current`, including
+    /// set-theoretic elements that were distributed or flattened into intersections.
     fn nominal_wrapper_normalized(
         db: &'db dyn Db,
         current: NominalInstanceType<'db>,
@@ -1368,37 +1368,47 @@ impl<'db> Type<'db> {
             ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
         );
 
-        if let Type::Union(wrapped) = wrapped {
-            while let Some(intersection) = find_over_type(db, normalized, false, |ty| match ty {
-                Type::Intersection(intersection)
-                    if intersection
-                        .positive(db)
-                        .iter()
-                        .any(|element| wrapped.elements(db).contains(element)) =>
-                {
-                    Some(intersection)
-                }
-                _ => None,
-            }) {
-                let replacement = intersection.map_positive(db, |element| {
-                    if wrapped.elements(db).contains(element) {
-                        div
-                    } else {
-                        *element
-                    }
-                });
-                if replacement == Type::Intersection(intersection) {
-                    break;
-                }
-                normalized = normalized.apply_type_mapping(
-                    db,
-                    &TypeMapping::ReplaceType {
-                        from: Type::Intersection(intersection),
-                        to: replacement,
-                    },
-                    TypeContext::default(),
-                );
+        let contains_wrapped_elements = |intersection: IntersectionType<'db>| match wrapped {
+            Type::Union(wrapped) => intersection
+                .positive(db)
+                .iter()
+                .any(|element| wrapped.elements(db).contains(element)),
+            Type::Intersection(wrapped) if wrapped.negative(db).is_empty() => wrapped
+                .positive(db)
+                .iter()
+                .all(|element| intersection.positive(db).contains(element)),
+            _ => false,
+        };
+        let is_wrapped_element = |element: &Type<'db>| match wrapped {
+            Type::Union(wrapped) => wrapped.elements(db).contains(element),
+            Type::Intersection(wrapped) => wrapped.positive(db).contains(element),
+            _ => false,
+        };
+
+        while let Some(intersection) = find_over_type(db, normalized, false, |ty| match ty {
+            Type::Intersection(intersection) if contains_wrapped_elements(intersection) => {
+                Some(intersection)
             }
+            _ => None,
+        }) {
+            let replacement = intersection.map_positive(db, |element| {
+                if is_wrapped_element(element) {
+                    div
+                } else {
+                    *element
+                }
+            });
+            if replacement == Type::Intersection(intersection) {
+                break;
+            }
+            normalized = normalized.apply_type_mapping(
+                db,
+                &TypeMapping::ReplaceType {
+                    from: Type::Intersection(intersection),
+                    to: replacement,
+                },
+                TypeContext::default(),
+            );
         }
 
         (normalized != Type::NominalInstance(current)).then_some(normalized)
