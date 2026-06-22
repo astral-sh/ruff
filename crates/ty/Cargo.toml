@@ -22,7 +22,7 @@ ruff_diagnostics = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
 ty_python_semantic = { workspace = true, features = ["serde"] }
-ty_server = { workspace = true }
+ty_server = { workspace = true, optional = true }
 ty_static = { workspace = true }
 
 anyhow = { workspace = true }
@@ -63,7 +63,8 @@ tempfile = { workspace = true }
 toml = { workspace = true }
 
 [features]
-default = []
+default = ["server"]
+server = ["dep:ty_server"]
 
 [lints]
 workspace = true

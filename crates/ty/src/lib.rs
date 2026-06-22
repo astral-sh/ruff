@@ -30,6 +30,7 @@ use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
+#[cfg(feature = "server")]
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -48,6 +49,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     let args = Cli::parse_from(args);
 
     match args.command {
+        #[cfg(feature = "server")]
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),

@@ -74,7 +74,7 @@ jobs:
           REVISION: ${{ matrix.revision }}
         run: |
           echo "Building ${REVISION} revision $(git rev-parse HEAD)"
-          cargo build --package ty --profile profiling
+          cargo build --package ty --profile profiling --no-default-features
           cp target/profiling/ty "ty-${REVISION}"
 
           if [[ "${REVISION}" == "pr" ]]; then
