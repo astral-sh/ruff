@@ -20,6 +20,9 @@ def default_to_empty(value: Mapping[str, int] | None = None) -> None:
         reveal_type(value)  # revealed: dict[str, int]
     reveal_type(value)  # revealed: Mapping[str, int]
 
+annotated: Mapping[str, int] = {}
+reveal_type(annotated)  # revealed: dict[str, int]
+
 def shared_key(value: Mapping[str, int] | Mapping[str, bytes] | None = None) -> None:
     if value is None:
         value = {}
