@@ -2500,16 +2500,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let recursively_defined = match nested_bindings_kind.execution {
             NestedBindingExecution::Lazy => RecursivelyDefined::Yes,
-            NestedBindingExecution::Eager => RecursivelyDefined::No,
+            NestedBindingExecution::Eager | NestedBindingExecution::EagerAtException { .. } => {
+                RecursivelyDefined::No
+            }
+        };
+        let exception_source = match nested_bindings_kind.execution {
+            NestedBindingExecution::EagerAtException { source_definition } => {
+                Some(source_definition)
+            }
+            NestedBindingExecution::Lazy | NestedBindingExecution::Eager => None,
         };
         let env = self.program_environment();
         let mut union = UnionBuilder::new(db, env).recursively_defined(recursively_defined);
         for bindings in binding_sources {
-            if nested_bindings_kind.execution == NestedBindingExecution::Eager {
+            if matches!(
+                nested_bindings_kind.execution,
+                NestedBindingExecution::Eager | NestedBindingExecution::EagerAtException { .. }
+            ) {
                 // A comprehension can execute repeatedly, so a source that is unreachable in the
                 // first modeled iteration may become reachable in a later one. Preserve each
                 // source's narrowed type and let the proxy's outer use-def state track boundness.
                 for binding in bindings {
+                    if exception_source.is_some_and(|source| source != binding.binding_order) {
+                        continue;
+                    }
+
                     let DefinitionState::Defined(source) = binding.binding else {
                         continue;
                     };
@@ -2539,7 +2554,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = union.build();
         let ty = match nested_bindings_kind.execution {
             NestedBindingExecution::Lazy => ty,
-            NestedBindingExecution::Eager => ty.promote(db, env),
+            NestedBindingExecution::Eager | NestedBindingExecution::EagerAtException { .. } => {
+                ty.promote(db, env)
+            }
         };
         self.bindings.insert(definition, ty);
     }

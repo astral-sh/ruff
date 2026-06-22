@@ -8,9 +8,368 @@ For a full writeup on the semantics of exception handlers, see [this document][1
 The tests throughout this Markdown document use functions with names starting with `could_raise_*`
 to mark definitions that might or might not succeed (as the function could raise an exception). A
 type checker must assume that any arbitrary function call could raise an exception in Python; this
-is just a naming convention used in these tests for clarity, and to future-proof the tests against
-possible future improvements whereby certain statements or expressions could potentially be inferred
-as being incapable of causing an exception to be raised.
+is just a naming convention used in these tests for clarity.
+
+## Exception checkpoints
+
+Exception handlers are reachable only from operations that can raise. A local assignment of a
+literal cannot raise, so it does not make the handler reachable:
+
+```py
+x = 1
+try:
+    x = 2
+except:
+    x = "unreachable"
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+Truth-testing literals, identity comparisons, and Boolean combinations of known-safe expressions
+cannot raise either:
+
+```py
+def known_safe_conditions(value: int | None) -> None:
+    state = 0
+    try:
+        if not False:
+            state = 1
+        if not (value is None):
+            state = 1
+        if True and True:
+            state = 1
+        if False or True:
+            state = 1
+        for _ in [0]:
+            state = 1
+    except:
+        state = 2
+
+    reveal_type(state)  # revealed: Literal[1]
+```
+
+A checkpoint is recorded immediately before the raising operation, after evaluating its child
+expressions. If the outer call below raises, the assignment expression has therefore completed:
+
+```py
+def may_raise(value: object) -> None: ...
+
+x = 0
+try:
+    may_raise(x := 1)
+except:
+    reveal_type(x)  # revealed: Literal[1]
+```
+
+Imports also checkpoint between aliases because a later import can fail after an earlier name has
+been bound:
+
+```py
+first = 0
+try:
+    from collections.abc import Awaitable as first, Iterable as second
+except:
+    reveal_type(first)  # revealed: Literal[0] | <class 'Awaitable'>
+```
+
+Explicit raises and failing assertions also create checkpoints after their child expressions have
+been evaluated:
+
+```py
+x = 1
+try:
+    x = 2
+    raise RuntimeError
+except:
+    reveal_type(x)  # revealed: Literal[2]
+
+def check_assertion(x: int | None) -> None:
+    try:
+        assert x is not None
+    except:
+        reveal_type(x)  # revealed: None
+
+def check_short_circuit_assertion(flag: bool) -> None:
+    state = 2
+    try:
+        assert flag and (state := 0)
+    except:
+        reveal_type(state)  # revealed: Literal[2, 0]
+```
+
+Operations implemented by Python protocols create checkpoints after their operands have been
+evaluated:
+
+```py
+from collections.abc import AsyncIterable, Awaitable, Iterable
+
+class C:
+    value: int
+
+class Number:
+    def __truediv__(self, other: int) -> int:
+        raise NotImplementedError
+
+    def __getitem__(self, key: int) -> "Number":
+        return self
+
+    def __setitem__(self, key: int, value: "Number") -> None:
+        pass
+
+    def __add__(self, other: int) -> "Number":
+        return self
+
+def protocol_operations(c: C, number: Number, values: list[int]) -> None:
+    state: C | int = 0
+    try:
+        (state := c).value
+    except:
+        reveal_type(state)  # revealed: C
+
+    state = 0
+    try:
+        values[state := 1]
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+
+    state = 0
+    try:
+        number / (state := 1)
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+
+    state = 0
+    try:
+        0 < (state := 1)
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+
+def augmented_assignment(number: Number) -> None:
+    target_state = 0
+    rhs_state = 0
+    try:
+        number[target_state := 1] += (rhs_state := 1)
+    except:
+        reveal_type(target_state)  # revealed: Literal[1]
+        reveal_type(rhs_state)  # revealed: Literal[0, 1]
+
+def truthiness(value: object) -> None:
+    state = 0
+    try:
+        if value:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+
+    state = 0
+    try:
+        while value:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0, 1]
+
+def iteration(values: Iterable[int], target: C) -> None:
+    state = 0
+    try:
+        for _ in values:
+            state = 1
+    except:
+        # Iteration can fail before the first item or after a completed iteration.
+        reveal_type(state)  # revealed: Literal[0, 1]
+
+    state = 0
+    try:
+        for target.value in [0, 1]:
+            state = 1
+    except:
+        # Assigning the target can likewise fail on the first or a later iteration.
+        reveal_type(state)  # revealed: Literal[0, 1]
+
+async def async_iteration(values: AsyncIterable[int]) -> None:
+    state = 0
+    try:
+        async for _ in values:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0, 1]
+
+def unpacking(values: Iterable[int]) -> None:
+    state = 0
+    try:
+        first, second = values
+        state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+
+async def awaiting(value: Awaitable[int]) -> None:
+    state = 0
+    try:
+        await value
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+
+def yielding_from(values: Iterable[int]):
+    state = 0
+    try:
+        yield from values
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+
+def yielding():
+    state = 0
+    try:
+        yield
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
+Checkpoints propagate through eagerly evaluated nested scopes, but not through lazy generator
+expression bodies:
+
+```py
+def may_raise() -> None: ...
+
+x = 0
+try:
+    class C:
+        may_raise()
+
+except:
+    x = 1
+
+reveal_type(x)  # revealed: Literal[0, 1]
+
+y = 0
+try:
+    [may_raise() for _ in [0]]
+except:
+    y = 1
+
+reveal_type(y)  # revealed: Literal[0, 1]
+
+z = 0
+try:
+    (may_raise() for _ in [0])
+except:
+    z = 1
+
+reveal_type(z)  # revealed: Literal[0]
+
+def comprehension_may_raise() -> None: ...
+def comprehension_walrus_exception() -> None:
+    state = 0
+    try:
+        [(state := 1, comprehension_may_raise()) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+
+def comprehension_exception_before_walrus() -> None:
+    state = 0
+    try:
+        [(comprehension_may_raise(), state := 1) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+
+def comprehension_exception_before_later_walrus() -> None:
+    state = 0
+    try:
+        [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+
+def comprehension_exception_after_conditional_walrus(flag: bool) -> None:
+    state = "before"
+    try:
+        [((state := 1) if flag else 0, comprehension_may_raise(), state := 2) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: Literal["before"] | int
+
+def comprehension_exception_with_multiple_walruses() -> None:
+    first = 0
+    second = 0
+    try:
+        [(first := 1, second := "bound", comprehension_may_raise(), second := 2) for _ in [0]]
+    except:
+        reveal_type(first)  # revealed: int
+        reveal_type(second)  # revealed: str
+
+def nested_comprehension_walrus_exception() -> None:
+    state = 0
+    try:
+        [[(state := 1, comprehension_may_raise()) for _ in [0]] for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+
+def nested_comprehension_walrus_order() -> None:
+    state = 0
+    try:
+        [((state := "outer"), [(state := 1, comprehension_may_raise()) for _ in [0]]) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+
+module_comprehension_state = "before"
+try:
+    [(module_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
+except:
+    reveal_type(module_comprehension_state)  # revealed: int
+
+global_comprehension_state = "before"
+
+def global_comprehension_walrus_exception() -> None:
+    global global_comprehension_state
+    try:
+        [(global_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
+    except:
+        reveal_type(global_comprehension_state)  # revealed: Literal["before"] | int
+
+async def async_comprehension_walrus_exception(values: AsyncIterable[int], awaitable: Awaitable[int]) -> None:
+    state = "before"
+    try:
+        [(state := 1, await awaitable) async for _ in values]
+    except:
+        reveal_type(state)  # revealed: Literal["before"] | int
+```
+
+An active bare handler receives a checkpoint and prevents it from propagating to an enclosing
+handler. Once execution is inside that handler, however, a new checkpoint can propagate outward:
+
+```py
+def may_raise() -> None: ...
+
+x = 0
+try:
+    try:
+        x = 1
+        may_raise()
+    except:
+        x = 2
+except:
+    x = "outer"
+
+reveal_type(x)  # revealed: Literal[1, 2]
+
+try:
+    try:
+        may_raise()
+    except:
+        x = 3
+        may_raise()
+except:
+    reveal_type(x)  # revealed: Literal[3]
+
+z = 0
+try:
+    class C:
+        try:
+            pass
+        except:
+            may_raise()
+
+except:
+    z = 1
+
+reveal_type(z)  # revealed: Literal[0]
+```
 
 ## A single bare `except`
 
@@ -20,14 +379,10 @@ have been taken from the perspective of code following this block. The inferred 
 block's conclusion is therefore the union of the type at the end of the `try` suite (`str`) and the
 type at the end of the `except` suite (`Literal[2]`).
 
-*Within* the `except` suite, we must infer a union of all possible "definition states" we could have
-been in at any point during the `try` suite. This is because control flow could have jumped to the
-`except` suite without any of the `try`-suite definitions successfully completing, with only *some*
-of the `try`-suite definitions successfully completing, or indeed with *all* of them successfully
-completing. The type of `x` at the beginning of the `except` suite in this example is therefore
-`Literal[1] | str`, taking into account that we might have jumped to the `except` suite before the
-`x = could_raise_returns_str()` redefinition, but we *also* could have jumped to the `except` suite
-*after* that redefinition.
+*Within* the `except` suite, we infer a union of the definition states at each exception checkpoint
+in the `try` suite. The type of `x` at the beginning of the `except` suite in this example is
+therefore `Literal[1] | str`: the call on the right-hand side can raise before the redefinition
+completes, while the later `reveal_type` call can raise after it completes.
 
 ```py
 def could_raise_returns_str() -> str:
@@ -436,13 +791,10 @@ reveal_type(x)  # revealed: C | E | G
 
 ## Nested `try`/`except` blocks
 
-It would take advanced analysis, which we are not yet capable of, to be able to determine that an
-exception handler always suppresses all exceptions. This is partly because it is possible for
-statements in `except`, `else` and `finally` suites to raise exceptions as well as statements in
-`try` suites. This means that if an exception handler is nested inside the `try` statement of an
-enclosing exception handler, it should (at least for now) be treated the same as any other node: as
-a suite containing statements that could possibly raise exceptions, which would lead to control flow
-jumping out of that suite prior to the suite running to completion.
+A checkpoint in a nested `try` suite propagates to both the nested and enclosing handlers unless the
+nested statement has a bare handler. Checkpoints in its `except`, `else`, and `finally` suites
+propagate only to the enclosing handler, because exceptions raised there are not handled by the same
+`try` statement.
 
 ```py
 class A: ...
