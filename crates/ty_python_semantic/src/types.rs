@@ -1238,29 +1238,23 @@ impl<'db> Type<'db> {
         if let (Type::Intersection(current), Type::Intersection(previous)) = (self, previous)
             && current.negative(db) == previous.negative(db)
         {
-            let previous_elements = previous.positive(db);
-            if previous_elements
-                .iter()
-                .all(|element| matches!(element, Type::NominalInstance(_)))
-            {
-                let mut replacements = 0;
-                let normalized = current.map_positive(db, |element| {
-                    element
-                        .as_nominal_instance()
-                        .and_then(|instance| {
-                            Self::nominal_wrapper_normalized(
-                                db,
-                                instance,
-                                Type::Intersection(previous),
-                                div,
-                            )
-                        })
-                        .inspect(|_| replacements += 1)
-                        .unwrap_or(*element)
-                });
-                if replacements > 0 {
-                    return Some(normalized);
-                }
+            let mut replacements = 0;
+            let normalized = current.map_positive(db, |element| {
+                element
+                    .as_nominal_instance()
+                    .and_then(|instance| {
+                        Self::nominal_wrapper_normalized(
+                            db,
+                            instance,
+                            Type::Intersection(previous),
+                            div,
+                        )
+                    })
+                    .inspect(|_| replacements += 1)
+                    .unwrap_or(*element)
+            });
+            if replacements > 0 {
+                return Some(normalized);
             }
         }
 

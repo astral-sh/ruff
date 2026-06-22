@@ -502,6 +502,8 @@ python-version = "3.14"
 ```
 
 ```py
+from typing import Protocol
+
 from ty_extensions import Intersection, TypeOf
 
 direct: TypeOf[direct]
@@ -523,6 +525,9 @@ reveal_type(optional)  # revealed: list[Divergent]
 class Container[T]: ...
 class Stable: ...
 
+class P(Protocol):
+    value: int
+
 y: Container[TypeOf[y]]
 y = 1  # error: [invalid-assignment]
 reveal_type(y)  # revealed: Container[Divergent]
@@ -537,6 +542,14 @@ intersection: Intersection[
 ]
 intersection = [1]  # error: [invalid-assignment]
 reveal_type(intersection)  # revealed: list[Divergent] & Container[Divergent]
+
+with_protocol: Intersection[
+    list[TypeOf[with_protocol]],
+    Container[TypeOf[with_protocol]],
+    P,
+]
+with_protocol = [1]  # error: [invalid-assignment]
+reveal_type(with_protocol)  # revealed: list[Divergent] & Container[Divergent] & P
 
 union: list[TypeOf[union]] | Container[TypeOf[union]]
 union = [1]
