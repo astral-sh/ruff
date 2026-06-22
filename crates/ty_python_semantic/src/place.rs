@@ -1,6 +1,5 @@
 use itertools::Either;
 use ruff_db::files::File;
-use ruff_db::small_set::SmallIndexSet;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
@@ -16,7 +15,7 @@ use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -1373,7 +1372,7 @@ fn loop_header_reachability_impl<'db>(
     let place = loop_header_definition.place();
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
-    let mut reachable_bindings = SmallIndexSet::default();
+    let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
     let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
         <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
@@ -1429,15 +1428,8 @@ fn loop_header_reachability_impl<'db>(
 pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable loop-back bindings that are not `del`s.
-    pub(crate) reachable_bindings: SmallIndexSet<ReachableLoopBinding<'db>, 3>,
+    pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
-
-// Three bindings fit without making the enum larger than `FxIndexSet` in 64-bit release builds.
-#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
-static_assertions::const_assert_eq!(
-    std::mem::size_of::<SmallIndexSet<ReachableLoopBinding<'static>, 3>>(),
-    std::mem::size_of::<crate::FxIndexSet<ReachableLoopBinding<'static>>>()
-);
 
 impl<'db> LoopHeaderReachability<'db> {
     fn cycle_normalized(
