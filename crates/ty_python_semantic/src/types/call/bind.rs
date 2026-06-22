@@ -32,7 +32,8 @@ use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, PathBounds, Solutions,
+    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, OwnedConstraintSet, PathBounds,
+    Solutions,
 };
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -205,10 +206,17 @@ impl<'db> CallableItem<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        constraint_projection: Option<GenericContext<'db>>,
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.check_types(db, constraints, argument_types, call_expression_tcx);
+                binding.check_types(
+                    db,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    constraint_projection,
+                );
             }
             CallableItem::Constructor(binding) => {
                 binding.check_types(db, constraints, argument_types, call_expression_tcx);
@@ -383,9 +391,16 @@ impl<'db> BindingsElement<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        constraint_projection: Option<GenericContext<'db>>,
     ) {
         for item in &mut self.items {
-            item.check_types(db, constraints, call_arguments, call_expression_tcx);
+            item.check_types(
+                db,
+                constraints,
+                call_arguments,
+                call_expression_tcx,
+                constraint_projection,
+            );
         }
     }
 
@@ -1028,9 +1043,34 @@ impl<'db> Bindings<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<(), CallErrorKind> {
+        self.check_types_impl_with_projection(
+            db,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+            None,
+        )
+    }
+
+    pub(crate) fn check_types_impl_with_projection(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+        constraint_projection: Option<GenericContext<'db>>,
+    ) -> Result<(), CallErrorKind> {
         // Check types for each element (union variant)
         for element in &mut self.elements {
-            element.check_types(db, constraints, call_arguments, call_expression_tcx);
+            element.check_types(
+                db,
+                constraints,
+                call_arguments,
+                call_expression_tcx,
+                constraint_projection,
+            );
         }
 
         self.evaluate_known_cases(db, call_arguments, dataclass_field_specifiers);
@@ -3158,6 +3198,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        constraint_projection: Option<GenericContext<'db>>,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -3206,6 +3247,7 @@ impl<'db> CallableBinding<'db> {
                                 constraints,
                                 call_arguments.as_ref(),
                                 call_expression_tcx,
+                                constraint_projection,
                             );
                         }
                         return;
@@ -3219,6 +3261,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             call_arguments.as_ref(),
                             call_expression_tcx,
+                            constraint_projection,
                         );
                         return;
                     }
@@ -3234,6 +3277,7 @@ impl<'db> CallableBinding<'db> {
                 constraints,
                 call_arguments.as_ref(),
                 call_expression_tcx,
+                constraint_projection,
             );
         }
 
@@ -3403,7 +3447,13 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, constraints, expanded_arguments, call_expression_tcx);
+                    overload.check_types(
+                        db,
+                        constraints,
+                        expanded_arguments,
+                        call_expression_tcx,
+                        constraint_projection,
+                    );
                 }
 
                 tracing::trace!(
@@ -4714,6 +4764,7 @@ struct ArgumentTypeChecker<'a, 'db> {
 
     inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
+    projected_constraints: Option<OwnedConstraintSet<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
@@ -4792,6 +4843,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            projected_constraints: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
     }
@@ -4847,7 +4899,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .collect()
     }
 
-    fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+    fn infer_specialization(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        constraint_projection: Option<GenericContext<'db>>,
+    ) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
@@ -5083,6 +5139,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 maybe_promote(typevar, bounds)
             };
+
+        self.projected_constraints =
+            constraint_projection.map(|context| builder.projected_constraint_set(context));
 
         let specialization = builder.build_with(generic_context, choose_solution);
 
@@ -5546,6 +5605,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         InferableTypeVars<'db>,
         Option<Specialization<'db>>,
         Type<'db>,
+        Option<OwnedConstraintSet<'db>>,
     ) {
         for (parameter_ty, builder) in self
             .parameter_tys
@@ -5557,7 +5617,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        (self.inferable_typevars, self.specialization, self.return_ty)
+        (
+            self.inferable_typevars,
+            self.specialization,
+            self.return_ty,
+            self.projected_constraints,
+        )
     }
 }
 
@@ -5747,6 +5812,9 @@ pub(crate) struct Binding<'db> {
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
 
+    /// Constraints inferred for a caller-requested subset of this binding's generic context.
+    projected_constraints: Option<OwnedConstraintSet<'db>>,
+
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -5775,6 +5843,7 @@ impl<'db> Binding<'db> {
             constructor_context: None,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            projected_constraints: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -6214,6 +6283,7 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        constraint_projection: Option<GenericContext<'db>>,
     ) {
         let parameters = self.signature.parameters();
 
@@ -6247,10 +6317,15 @@ impl<'db> Binding<'db> {
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
-        checker.infer_specialization(constraints);
+        checker.infer_specialization(constraints, constraint_projection);
         checker.check_argument_types(constraints);
 
-        (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+        (
+            self.inferable_typevars,
+            self.specialization,
+            self.return_ty,
+            self.projected_constraints,
+        ) = checker.finish();
     }
 
     fn check_keyword_unpack_key_types(
@@ -6522,6 +6597,7 @@ impl<'db> Binding<'db> {
             return_ty: self.return_ty,
             inferable_typevars: self.inferable_typevars,
             specialization: self.specialization,
+            projected_constraints: self.projected_constraints.clone(),
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
@@ -6533,6 +6609,7 @@ impl<'db> Binding<'db> {
             return_ty,
             inferable_typevars,
             specialization,
+            projected_constraints,
             argument_matches,
             parameter_tys,
             errors,
@@ -6541,6 +6618,7 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
         self.inferable_typevars = inferable_typevars;
         self.specialization = specialization;
+        self.projected_constraints = projected_constraints;
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
@@ -6556,6 +6634,10 @@ impl<'db> Binding<'db> {
         self.specialization
     }
 
+    pub(crate) fn projected_constraints(&self) -> Option<&OwnedConstraintSet<'db>> {
+        self.projected_constraints.as_ref()
+    }
+
     pub(crate) fn errors(&self) -> &[BindingError<'db>] {
         &self.errors
     }
@@ -6565,6 +6647,7 @@ impl<'db> Binding<'db> {
         self.return_ty = self.initial_return_type(db);
         self.inferable_typevars = InferableTypeVars::None;
         self.specialization = None;
+        self.projected_constraints = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
@@ -6576,6 +6659,7 @@ struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
+    projected_constraints: Option<OwnedConstraintSet<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
@@ -6617,6 +6701,9 @@ impl<'db> CallableBindingSnapshot<'db> {
                 snapshot.return_ty = binding.return_ty;
                 snapshot.inferable_typevars = binding.inferable_typevars;
                 snapshot.specialization = binding.specialization;
+                snapshot
+                    .projected_constraints
+                    .clone_from(&binding.projected_constraints);
                 snapshot
                     .argument_matches
                     .clone_from(&binding.argument_matches);

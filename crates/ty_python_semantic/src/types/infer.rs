@@ -53,6 +53,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::types::constraints::OwnedConstraintSet;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -93,7 +94,14 @@ struct TypeAndRange<'db> {
     range: TextRange,
 }
 
-type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
+type CollectionUseConstraints<'db> =
+    FxHashMap<Definition<'db>, FxIndexSet<CollectionUseConstraint<'db>>>;
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum CollectionUseConstraint<'db> {
+    Type(Type<'db>),
+    Projected(OwnedConstraintSet<'db>),
+}
 
 /// Extends the current collection-use constraints with those from the previous cycle iteration.
 ///
@@ -111,7 +119,7 @@ fn extend_collection_use_constraints<'db>(
         current
             .entry(*collection_def)
             .or_default()
-            .extend(constraints);
+            .extend(constraints.iter().cloned());
     }
 }
 
@@ -1388,7 +1396,7 @@ impl<'db> DefinitionInference<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
         self.extra
             .as_deref()?
             .collection_use_constraints()?
@@ -1630,7 +1638,7 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
         self.extra
             .as_ref()?
             .collection_use_constraints
@@ -1655,7 +1663,7 @@ pub(crate) enum StatementInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(super) enum CollectionUseConstraintInference<'db> {
-    Constraints(Box<[Type<'db>]>),
+    Constraints(Box<[CollectionUseConstraint<'db>]>),
     RequiresCycle,
 }
 
@@ -1671,7 +1679,7 @@ impl<'db> StatementInference<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
         match self {
             StatementInference::Expression(inference) => {
                 inference.collection_use_constraints(collection_def)
@@ -1825,7 +1833,7 @@ impl<'db> StatementInferenceInner<'db> {
     pub(crate) fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
-    ) -> Option<&FxIndexSet<Type<'db>>> {
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
         self.extra
             .as_ref()?
             .collection_use_constraints

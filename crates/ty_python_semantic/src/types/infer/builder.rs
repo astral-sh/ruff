@@ -23,10 +23,10 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    CollectionUseConstraintInference, DeferredAndUndecorated, DefinitionInference,
-    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
+    CollectionUseConstraint, CollectionUseConstraintInference, DeferredAndUndecorated,
+    DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
+    ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference,
+    InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
     infer_collection_use_constraints, infer_deferred_types, infer_definition_types,
     infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
@@ -321,7 +321,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     // generic context and existentially quantify away the method-local typevars, so combining
     // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
-    collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+    collection_use_constraints:
+        FxHashMap<Definition<'db>, FxIndexSet<CollectionUseConstraint<'db>>>,
 
     /// The collection whose constraints are being inferred without depending on its definition.
     collection_constraint_target: Option<CollectionConstraintTarget<'db>>,
@@ -604,7 +605,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for (collection_def, constraints) in &extra.collection_use_constraints {
                         self.collection_use_constraints
                             .entry(*collection_def)
-                            .and_modify(|this| this.extend(constraints))
+                            .and_modify(|this| this.extend(constraints.iter().cloned()))
                             .or_insert(constraints.clone());
                     }
                 }
@@ -678,7 +679,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
                     .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
+                    .and_modify(|this| this.extend(constraints.iter().cloned()))
                     .or_insert(constraints.clone());
             }
 
@@ -708,7 +709,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
                     .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
+                    .and_modify(|this| this.extend(constraints.iter().cloned()))
                     .or_insert(constraints.clone());
             }
         }
@@ -5701,6 +5702,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bindings: &mut Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<(), CallErrorKind> {
+        self.infer_and_check_argument_types_with_projection(
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            call_expression_tcx,
+            None,
+        )
+    }
+
+    fn infer_and_check_argument_types_with_projection(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &mut Bindings<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        constraint_projection: Option<GenericContext<'db>>,
+    ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
 
@@ -5818,12 +5838,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
-        bindings.check_types_impl(
+        bindings.check_types_impl_with_projection(
             db,
             &constraints,
             argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
+            constraint_projection,
         )
     }
 
@@ -6279,7 +6300,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.collection_use_constraints
                 .entry(collection_def)
                 .or_default()
-                .insert(tcx);
+                .insert(CollectionUseConstraint::Type(tcx));
         }
 
         self.store_expression_type(expression, ty);
@@ -7355,13 +7376,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
             match infer_collection_use_constraints(self.db(), collection_def) {
-                CollectionUseConstraintInference::Constraints(constraints) => {
-                    for constraint in constraints {
-                        if constraint.has_unspecialized_type_var(self.db()) {
-                            continue;
+                CollectionUseConstraintInference::Constraints(use_constraints) => {
+                    for constraint in use_constraints {
+                        match constraint {
+                            CollectionUseConstraint::Type(constraint) => {
+                                if constraint.has_unspecialized_type_var(self.db()) {
+                                    continue;
+                                }
+                                builder.infer(identity_instance, *constraint).ok()?;
+                            }
+                            CollectionUseConstraint::Projected(projected) => {
+                                let projected = constraints.load(self.db(), projected);
+                                builder.intersect_constraint_set(projected);
+                            }
                         }
-
-                        builder.infer(identity_instance, *constraint).ok()?;
                     }
                 }
                 CollectionUseConstraintInference::RequiresCycle => {
@@ -7393,18 +7421,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let Some(constraints) =
+                        let Some(statement_constraints) =
                             statement_use_types.collection_use_constraints(collection_def)
                         else {
                             continue;
                         };
 
-                        for constraint in constraints {
-                            if constraint.has_unspecialized_type_var(self.db()) {
-                                continue;
+                        for constraint in statement_constraints {
+                            match constraint {
+                                CollectionUseConstraint::Type(constraint) => {
+                                    if constraint.has_unspecialized_type_var(self.db()) {
+                                        continue;
+                                    }
+                                    builder.infer(identity_instance, *constraint).ok()?;
+                                }
+                                CollectionUseConstraint::Projected(projected) => {
+                                    let projected = constraints.load(self.db(), projected);
+                                    builder.intersect_constraint_set(projected);
+                                }
                             }
-
-                            builder.infer(identity_instance, *constraint).ok()?;
                         }
                     }
                 }
@@ -8422,18 +8457,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
-    // TODO: This should not be needed once we use constraint sets to track the usages of each
-    // container literal across a scope.
-    // https://github.com/astral-sh/ty/issues/3507
     fn collection_use_constraint_from_specialization(
         &self,
         identity_instance: Type<'db>,
         receiver_generic_context: Option<GenericContext<'db>>,
         call_specialization: Specialization<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<CollectionUseConstraint<'db>> {
         let constraint = identity_instance.apply_specialization(self.db(), call_specialization);
         let Some(receiver_generic_context) = receiver_generic_context else {
-            return Some(constraint);
+            return Some(CollectionUseConstraint::Type(constraint));
         };
 
         // Method-local typevars describe requirements imposed by the method, not concrete element
@@ -8448,7 +8480,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        Some(constraint)
+        Some(CollectionUseConstraint::Type(constraint))
     }
 
     /// Records collection constraints and returns whether they are suitable for cycle-free
@@ -8489,7 +8521,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .with_generic_context(self.db(), collection_generic_context);
 
         let mut speculative = self.speculate();
-        let call_result = speculative.infer_and_check_argument_types(
+        let call_result = speculative.infer_and_check_argument_types_with_projection(
             ArgumentsIter::from_ast(arguments),
             call_arguments,
             // TODO: The argument types have already been inferred and stored in `call_arguments`.
@@ -8501,6 +8533,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
             &mut identity_bindings,
             call_expression_tcx,
+            self.collection_constraint_target
+                .as_ref()
+                .and(collection_generic_context),
         );
 
         if call_result.is_err() {
@@ -8517,25 +8552,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
         }
 
-        for call_specialization in identity_bindings
-            .iter_flat()
-            .flat_map(CallableBinding::matching_overloads)
-            .filter_map(|(_, identity_overload)| identity_overload.specialization())
-        {
-            // Record the constraints on the receiver's generic context formed by the arguments to
-            // this bound method call.
-            let Some(constraints) = self.collection_use_constraint_from_specialization(
-                identity_instance,
-                collection_generic_context,
-                call_specialization,
-            ) else {
-                continue;
-            };
+        if self.collection_constraint_target.is_some() {
+            for projected in identity_bindings
+                .iter_flat()
+                .flat_map(CallableBinding::matching_overloads)
+                .filter_map(|(_, overload)| overload.projected_constraints().cloned())
+            {
+                self.collection_use_constraints
+                    .entry(collection_def)
+                    .or_default()
+                    .insert(CollectionUseConstraint::Projected(projected));
+            }
+        } else {
+            for call_specialization in identity_bindings
+                .iter_flat()
+                .flat_map(CallableBinding::matching_overloads)
+                .filter_map(|(_, identity_overload)| identity_overload.specialization())
+            {
+                // Record the constraints on the receiver's generic context formed by the arguments
+                // to this bound method call.
+                let Some(constraints) = self.collection_use_constraint_from_specialization(
+                    identity_instance,
+                    collection_generic_context,
+                    call_specialization,
+                ) else {
+                    continue;
+                };
 
-            self.collection_use_constraints
-                .entry(collection_def)
-                .or_default()
-                .insert(constraints);
+                self.collection_use_constraints
+                    .entry(collection_def)
+                    .or_default()
+                    .insert(constraints);
+            }
         }
 
         true
@@ -11536,7 +11584,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (collection_def, constraints) in &collection_use_constraints {
             self.collection_use_constraints
                 .entry(*collection_def)
-                .and_modify(|this| this.extend(constraints))
+                .and_modify(|this| this.extend(constraints.iter().cloned()))
                 .or_insert(constraints.clone());
         }
     }

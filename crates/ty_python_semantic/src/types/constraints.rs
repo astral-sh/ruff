@@ -580,6 +580,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    /// Creates an owned snapshot of this constraint set without consuming its builder.
+    pub(crate) fn to_owned(self) -> OwnedConstraintSet<'db> {
+        ConstraintSetBuilder::owned_from_storage(self.node, self.builder.storage.borrow().clone())
+    }
+
     pub(crate) fn remove_noninferable(
         self,
         db: &'db dyn Db,
@@ -795,12 +800,17 @@ impl<'db> ConstraintSetBuilder<'db> {
         // constraint sets can only be used by adding them to a new builder. Operation caches from
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
-        let node = constraint.node;
+        Self::owned_from_storage(constraint.node, self.storage.into_inner())
+    }
+
+    fn owned_from_storage(
+        node: NodeId,
+        mut storage: ConstraintSetStorage<'db>,
+    ) -> OwnedConstraintSet<'db> {
         if node.is_terminal() {
             return OwnedConstraintSet { node, inner: None };
         }
 
-        let mut storage = self.storage.into_inner();
         let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
         let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
         let mut stack = vec![node];

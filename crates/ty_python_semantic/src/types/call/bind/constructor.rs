@@ -121,7 +121,7 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         self.entry
-            .check_types(db, constraints, argument_types, call_expression_tcx);
+            .check_types(db, constraints, argument_types, call_expression_tcx, None);
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.

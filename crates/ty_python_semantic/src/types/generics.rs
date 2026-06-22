@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBounds, Solutions,
+    OwnedConstraintSet, PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -2268,6 +2268,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
 
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
+    }
+
+    /// Adds an already-projected set of constraints to this specialization.
+    pub(crate) fn intersect_constraint_set(&mut self, set: ConstraintSet<'db, 'c>) {
+        self.pending.intersect(self.db, self.constraints, set);
+    }
+
+    /// Projects the accumulated constraints onto `generic_context` and returns an owned snapshot.
+    pub(crate) fn projected_constraint_set(
+        &self,
+        generic_context: GenericContext<'db>,
+    ) -> OwnedConstraintSet<'db> {
+        self.pending
+            .reduce_inferable(
+                self.db,
+                self.constraints,
+                self.inferable
+                    .iter(self.db)
+                    .filter(|typevar| !generic_context.contains(self.db, *typevar)),
+            )
+            .to_owned()
     }
 
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
