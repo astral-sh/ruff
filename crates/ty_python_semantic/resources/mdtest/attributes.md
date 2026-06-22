@@ -3061,6 +3061,30 @@ class ProjectionStarredListSuffix:
         reveal_type(middle)  # revealed: list[int]
         reveal_type(last)  # revealed: int
         reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionStarredTuple:
+    def __init__(self) -> None:
+        self.x = (0, str(), b"")
+
+    def read(self) -> None:
+        first, *middle, last = self.x
+        self.x = (first, middle[0], last)
+
+        reveal_type(first)  # revealed: int
+        reveal_type(middle)  # revealed: list[str]
+        reveal_type(last)  # revealed: bytes
+        reveal_type(self.x)  # revealed: tuple[int, str, bytes]
+
+class ProjectionStarredTupleEmptyRest:
+    def __init__(self) -> None:
+        self.x = (0, b"")
+
+    def read(self) -> None:
+        first, *middle, last = self.x
+        self.x = (first, last)
+
+        reveal_type(middle)  # revealed: list[Never]
+        reveal_type(self.x)  # revealed: tuple[int, bytes]
 ```
 
 Projection recovery works for other known generic containers:
@@ -3153,6 +3177,26 @@ class ProjectionMappingSubscript:
 Indexing and slicing cyclic attributes can recover consumed list element and slice types:
 
 ```py
+class ProjectionTupleIndex:
+    def __init__(self) -> None:
+        self.x = (0, str())
+
+    def read(self) -> None:
+        x = self.x[0]
+        self.x = (x, str())
+
+        reveal_type(self.x)  # revealed: tuple[int, str]
+
+class ProjectionTupleIndexFromEnd:
+    def __init__(self) -> None:
+        self.x = (int(), "")
+
+    def read(self) -> None:
+        text = self.x[-1]
+        self.x = (int(), text)
+
+        reveal_type(self.x)  # revealed: tuple[int, str]
+
 class ProjectionListIndex:
     def __init__(self) -> None:
         self.x = [0]
@@ -3162,6 +3206,27 @@ class ProjectionListIndex:
         self.x = [item]
 
         reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionNestedIndex:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        number = self.x[0][0]
+        self.x = [(number, "")]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]]
+
+class ProjectionSliceThenIndex:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        values = self.x[:]
+        number = values[0][0]
+        self.x = [(number, "")]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]]
 
 class ProjectionDirectSliceAssignment:
     def __init__(self) -> None:

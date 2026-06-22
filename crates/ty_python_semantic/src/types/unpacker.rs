@@ -10,7 +10,7 @@ use salsa::plumbing::AsId;
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::projection::{
-    ProjectionRecoverySlot, exact_unpack_projection_tuple, solve_projections_in_cycle_slots,
+    ProjectionRecoverySlot, solve_projections_in_cycle_slots, unpack_projection_tuple,
 };
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{
@@ -276,8 +276,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = if let TupleLength::Fixed(len) = target_len
-                        && let Some(tuple) = exact_unpack_projection_tuple(self.db(), ty, len)
+                    let tuple = if let Some(tuple) =
+                        unpack_projection_tuple(self.db(), ty, target_len)
                     {
                         Cow::Owned(tuple)
                     } else {

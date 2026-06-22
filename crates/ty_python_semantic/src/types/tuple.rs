@@ -815,7 +815,7 @@ impl<T> VariableLengthTuple<T> {
         }
     }
 
-    fn mixed(
+    pub(crate) fn mixed(
         prefix: impl IntoIterator<Item = T>,
         variable: T,
         suffix: impl IntoIterator<Item = T>,

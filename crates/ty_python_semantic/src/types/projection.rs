@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::EvaluationMode;
 
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleLength, TupleSpec, VariableLengthTuple};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, DivergentType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
@@ -25,11 +25,23 @@ pub enum ProjectionOp<'db> {
         len: u32,
         index: u32,
     },
+    UnpackStarred {
+        before: u32,
+        after: u32,
+        target: ProjectionUnpackTarget,
+    },
     Binary {
         op: ast::Operator,
         other: Type<'db>,
         is_reverse: bool,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum ProjectionUnpackTarget {
+    Prefix { index: u32 },
+    Starred,
+    Suffix { index: u32 },
 }
 
 impl<'db> ProjectionOp<'db> {
@@ -40,6 +52,10 @@ impl<'db> ProjectionOp<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if matches!(type_mapping, TypeMapping::Promote(..)) {
+            return self;
+        }
+
         match self {
             Self::Subscript {
                 slice,
@@ -57,7 +73,7 @@ impl<'db> ProjectionOp<'db> {
                 other: other.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 is_reverse,
             },
-            Self::IterItem { .. } | Self::UnpackExact { .. } => self,
+            Self::IterItem { .. } | Self::UnpackExact { .. } | Self::UnpackStarred { .. } => self,
         }
     }
 }
@@ -123,7 +139,9 @@ pub(crate) fn walk_projection_type<'db, V: TypeVisitor<'db> + ?Sized>(
         match *op {
             ProjectionOp::Subscript { slice, .. } => visitor.visit_type(db, slice),
             ProjectionOp::Binary { other, .. } => visitor.visit_type(db, other),
-            ProjectionOp::IterItem { .. } | ProjectionOp::UnpackExact { .. } => {}
+            ProjectionOp::IterItem { .. }
+            | ProjectionOp::UnpackExact { .. }
+            | ProjectionOp::UnpackStarred { .. } => {}
         }
     }
 }
@@ -369,6 +387,11 @@ fn apply_projection_op<'db>(db: &'db dyn Db, ty: Type<'db>, op: ProjectionOp<'db
         ProjectionOp::UnpackExact { len, index } => {
             apply_unpack_exact_projection(db, ty, len, index)
         }
+        ProjectionOp::UnpackStarred {
+            before,
+            after,
+            target,
+        } => apply_unpack_starred_projection(db, ty, before, after, target),
         ProjectionOp::Binary {
             op,
             other,
@@ -421,6 +444,53 @@ fn apply_unpack_exact_projection<'db>(
     )
 }
 
+fn apply_unpack_starred_projection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    before: u32,
+    after: u32,
+    target: ProjectionUnpackTarget,
+) -> Type<'db> {
+    if let Type::Union(union) = ty {
+        return UnionType::from_elements_cycle_recovery(
+            db,
+            union.elements(db).iter().map(|element| {
+                apply_unpack_starred_projection(db, *element, before, after, target)
+            }),
+        );
+    }
+
+    let Ok(before) = usize::try_from(before) else {
+        return Type::unknown();
+    };
+    let Ok(after) = usize::try_from(after) else {
+        return Type::unknown();
+    };
+
+    ty.try_iterate(db).map_or_else(
+        |err| err.fallback_element_type(db),
+        |tuple| {
+            let Ok(TupleSpec::Variable(tuple)) =
+                tuple.resize(db, TupleLength::Variable(before, after))
+            else {
+                return Type::unknown();
+            };
+
+            match target {
+                ProjectionUnpackTarget::Prefix { index } => usize::try_from(index)
+                    .ok()
+                    .and_then(|index| tuple.prefix_elements().get(index).copied())
+                    .unwrap_or_else(Type::unknown),
+                ProjectionUnpackTarget::Starred => tuple.variable(),
+                ProjectionUnpackTarget::Suffix { index } => usize::try_from(index)
+                    .ok()
+                    .and_then(|index| tuple.suffix_elements().get(index).copied())
+                    .unwrap_or_else(Type::unknown),
+            }
+        },
+    )
+}
+
 pub(crate) fn exact_unpack_projection_tuple<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -433,6 +503,54 @@ pub(crate) fn exact_unpack_projection_tuple<'db>(
         ty.project_cycle(db, ProjectionOp::UnpackExact { len, index })
             .unwrap_or_else(Type::unknown)
     })))
+}
+
+pub(crate) fn unpack_projection_tuple<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    target_len: TupleLength,
+) -> Option<TupleSpec<'db>> {
+    match target_len {
+        TupleLength::Fixed(len) => exact_unpack_projection_tuple(db, ty, len),
+        TupleLength::Variable(before, after) => {
+            let before = u32::try_from(before).ok()?;
+            let after = u32::try_from(after).ok()?;
+            let variable = ty.project_cycle(
+                db,
+                ProjectionOp::UnpackStarred {
+                    before,
+                    after,
+                    target: ProjectionUnpackTarget::Starred,
+                },
+            )?;
+
+            Some(VariableLengthTuple::mixed(
+                (0..before).map(|index| {
+                    ty.project_cycle(
+                        db,
+                        ProjectionOp::UnpackStarred {
+                            before,
+                            after,
+                            target: ProjectionUnpackTarget::Prefix { index },
+                        },
+                    )
+                    .unwrap_or_else(Type::unknown)
+                }),
+                variable,
+                (0..after).map(|index| {
+                    ty.project_cycle(
+                        db,
+                        ProjectionOp::UnpackStarred {
+                            before,
+                            after,
+                            target: ProjectionUnpackTarget::Suffix { index },
+                        },
+                    )
+                    .unwrap_or_else(Type::unknown)
+                }),
+            ))
+        }
+    }
 }
 
 fn solve_equations<'db>(
