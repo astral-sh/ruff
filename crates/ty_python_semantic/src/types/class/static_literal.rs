@@ -22,7 +22,7 @@ use crate::{
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        TypeMapping, TypeVarVariance, UnionBuilder, UnionType, binding_type,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -1918,15 +1918,56 @@ impl<'db> StaticClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
 
-            let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
-            else {
-                continue;
-            };
-
             match name.as_str() {
+                "__hash__" => {
+                    if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                        && self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH)
+                    {
+                        // Only report a single, definitely-bound runtime definition. Conditional
+                        // and multiple definitions remain false negatives.
+                        let Some(definition) = use_def
+                            .end_of_scope_symbol_bindings(symbol_id)
+                            .exactly_one()
+                            .ok()
+                            .and_then(|binding| binding.binding.definition())
+                        else {
+                            continue;
+                        };
+                        let definition_range = definition.focus_range(db, context.module());
+                        if semantic_index(db, class_body_scope.file(db)).is_in_type_checking_block(
+                            class_body_scope.file_scope_id(db),
+                            definition_range.range(),
+                        ) {
+                            continue;
+                        }
+
+                        // The type-checking binding model cannot correlate conditions across
+                        // symbols, so treat any `__eq__` definition as potentially paired.
+                        if binding_type(db, definition).is_none(db)
+                            && table.symbol_id("__eq__").is_some_and(|symbol_id| {
+                                use_def
+                                    .reachable_symbol_bindings(symbol_id)
+                                    .any(|binding| binding.binding.definition().is_some())
+                            })
+                        {
+                            continue;
+                        }
+                        if let Some(builder) =
+                            context.report_lint(&INVALID_DATACLASS_OVERRIDE, definition_range)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot overwrite attribute `__hash__` in dataclass `{}` with `unsafe_hash=True`",
+                                self.name(db)
+                            ));
+                            diagnostic.info(name);
+                        }
+                    }
+                }
                 "__setattr__" | "__delattr__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
                         && self.is_frozen_dataclass(db) == Some(true)
+                        && let Some(Type::FunctionLiteral(literal)) =
+                            attr.place.ignore_possibly_undefined()
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,
@@ -1944,6 +1985,8 @@ impl<'db> StaticClassLiteral<'db> {
                 "__lt__" | "__le__" | "__gt__" | "__ge__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
                         && self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER)
+                        && let Some(Type::FunctionLiteral(literal)) =
+                            attr.place.ignore_possibly_undefined()
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,

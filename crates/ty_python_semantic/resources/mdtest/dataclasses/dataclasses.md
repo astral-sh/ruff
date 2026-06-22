@@ -637,6 +637,68 @@ class WithUnsafeHash:
 reveal_type(WithUnsafeHash.__hash__)  # revealed: (self: WithUnsafeHash) -> int
 ```
 
+Defining `__hash__` when `unsafe_hash=True` raises an error:
+
+```py
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+@dataclass(unsafe_hash=True)
+class WithExplicitHash:
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__hash__` in dataclass `WithExplicitHash` with `unsafe_hash=True`"
+    def __hash__(self) -> int:
+        return 0
+
+@dataclass(unsafe_hash=True)
+class WithHashAssignment:
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__hash__` in dataclass `WithHashAssignment` with `unsafe_hash=True`"
+    __hash__ = None
+
+@dataclass(unsafe_hash=True)
+class WithImplicitHashAssignment:
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, WithImplicitHashAssignment)
+
+    __hash__ = None
+
+@dataclass(unsafe_hash=True)
+class WithTypeCheckingOnlyHash:
+    if TYPE_CHECKING:
+        def __hash__(self) -> int:
+            return 0
+
+@dataclass(unsafe_hash=True)
+class WithTypeCheckingOnlyEq:
+    if TYPE_CHECKING:
+        def __eq__(self, other: object) -> bool:
+            return False
+
+    __hash__ = None  # TODO: error: [invalid-dataclass-override]
+
+def conditional_dataclass(condition: bool) -> None:
+    @dataclass(unsafe_hash=True)
+    class WithConditionalImplicitHash:
+        if condition:
+            def __eq__(self, other: object) -> bool:
+                return False
+
+            __hash__ = None
+
+    @dataclass(unsafe_hash=True)
+    class WithConditionalExplicitHash:
+        if condition:
+            # TODO: error: [invalid-dataclass-override]
+            def __hash__(self) -> int:
+                return 0
+
+@dataclass(unsafe_hash=True)
+class WithNotTypeCheckingHash:
+    if not TYPE_CHECKING:
+        # TODO: error: [invalid-dataclass-override]
+        def __hash__(self) -> int:
+            return 0
+```
+
 ### `frozen`
 
 If true (the default is False), assigning to fields will generate a diagnostic.
