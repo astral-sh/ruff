@@ -832,7 +832,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn project(&mut self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
         type Id = ScopedNarrowingConstraint;
 
-        if let Some(cached) = self.project_cache.get(&id) {
+        if !id.is_terminal()
+            && let Some(cached) = self.project_cache.get(&id)
+        {
             return *cached;
         }
 
@@ -879,7 +881,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             }
         };
 
-        self.project_cache.insert(id, projected);
+        if !id.is_terminal() {
+            self.project_cache.insert(id, projected);
+        }
         projected
     }
 }
