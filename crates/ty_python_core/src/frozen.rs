@@ -124,11 +124,15 @@ struct FrozenValueIndex;
 
 fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
     entries.sort_by(|(left, _), (right, _)| left.cmp(right));
-
-    // Deduplicating in reverse preserves the last value for each key.
-    entries.reverse();
-    entries.dedup_by(|(left, _), (right, _)| left == right);
-    entries.reverse();
+    entries.dedup_by(|(later_key, later_value), (earlier_key, earlier_value)| {
+        if later_key == earlier_key {
+            // `dedup_by` removes the later entry, so move its value to the retained entry.
+            std::mem::swap(later_value, earlier_value);
+            true
+        } else {
+            false
+        }
+    });
 
     entries
 }
@@ -185,10 +189,12 @@ impl<K, V> FrozenValueMap<K, V> {
         V: Copy + Eq + Hash,
         F: FnMut(K, V) -> V,
     {
-        *self = self
-            .iter()
-            .map(|(key, value)| (key, map(key, value)))
-            .collect();
+        let (entries, values) =
+            index_values(self.iter().map(|(key, value)| (key, map(key, value))));
+        *self = Self {
+            entries: FrozenMap(entries.into_boxed_slice()),
+            values: values.into(),
+        };
     }
 }
 
