@@ -1293,10 +1293,15 @@ impl<'db> Type<'db> {
             }));
         }
 
-        let (Type::NominalInstance(current), Type::NominalInstance(previous_instance)) =
-            (self, previous)
-        else {
-            return None;
+        let (current, previous_instance) = match (self, previous) {
+            (Type::NominalInstance(current), Type::NominalInstance(previous)) => {
+                (current, previous)
+            }
+            (Type::ProtocolInstance(current), Type::ProtocolInstance(previous)) => (
+                current.to_nominal_instance()?,
+                previous.to_nominal_instance()?,
+            ),
+            _ => return None,
         };
 
         if current.class(db).class_literal(db) != previous_instance.class_literal(db) {
