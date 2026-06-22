@@ -1233,8 +1233,8 @@ impl<'db> Type<'db> {
         previous: Self,
         div: Self,
     ) -> Option<Self> {
-        // As with unions below, multiple intersection elements can each wrap the previous
-        // intersection. Requiring multiple replacements avoids ambiguous single-element matches.
+        // Unlike aligning different union elements below, replacing the complete previous
+        // intersection beneath a nominal specialization is unambiguous even for one element.
         if let (Type::Intersection(current), Type::Intersection(previous)) = (self, previous)
             && current.negative(db) == previous.negative(db)
         {
@@ -1258,7 +1258,7 @@ impl<'db> Type<'db> {
                         .inspect(|_| replacements += 1)
                         .unwrap_or(*element)
                 });
-                if replacements > 1 {
+                if replacements > 0 {
                     return Some(normalized);
                 }
             }

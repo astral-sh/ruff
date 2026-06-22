@@ -521,10 +521,15 @@ optional = [1]
 reveal_type(optional)  # revealed: list[Divergent]
 
 class Container[T]: ...
+class Stable: ...
 
 y: Container[TypeOf[y]]
 y = 1  # error: [invalid-assignment]
 reveal_type(y)  # revealed: Container[Divergent]
+
+single: Intersection[Container[TypeOf[single]], Stable]
+single = 1  # error: [invalid-assignment]
+reveal_type(single)  # revealed: Container[Divergent] & Stable
 
 intersection: Intersection[
     list[TypeOf[intersection]],
