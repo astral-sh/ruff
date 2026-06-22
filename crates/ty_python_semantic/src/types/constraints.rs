@@ -4552,7 +4552,7 @@ impl InteriorNode {
 }
 
 /// The result of solving a constraint set for per-typevar specializations.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) enum Solutions<'db> {
     Unsatisfiable,
     Unconstrained,
@@ -6692,16 +6692,13 @@ mod tests {
 
         let set = set.remove_noninferable(&db, &builder, inferable);
         let solutions = set.solutions(&db, &builder);
-        assert!(matches!(&solutions, Solutions::Constrained(_)));
-        if let Solutions::Constrained(solutions) = solutions {
-            assert_eq!(solutions.len(), 1);
-            assert_eq!(solutions[0].len(), 1);
-            assert_eq!(solutions[0][0].bound_typevar, t);
-            assert_eq!(
-                solutions[0][0].solution,
-                UnionType::from_elements(&db, [int, str])
-            );
-        }
+        assert_eq!(
+            solutions,
+            Solutions::Constrained(vec![vec![TypeVarSolution {
+                bound_typevar: t,
+                solution: UnionType::from_elements(&db, [int, str]),
+            }]])
+        );
 
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
