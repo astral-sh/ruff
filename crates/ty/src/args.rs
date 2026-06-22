@@ -119,10 +119,6 @@ pub(crate) struct CheckCommand {
     /// The Python version affects allowed syntax, type definitions of the standard library, and
     /// type definitions of first- and third-party modules that are conditional on the Python version.
     ///
-    /// ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
-    /// through 3.9 can still be selected, but ty may produce false positives or false negatives for
-    /// standard-library APIs because its bundled stubs do not fully describe those versions.
-    ///
     /// If a version is not specified on the command line or in a configuration file,
     /// ty will try the following techniques in order of preference to determine a value:
     /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
