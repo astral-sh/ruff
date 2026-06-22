@@ -129,19 +129,47 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
-/// Return `true` if union simplification should preserve this pair because one element is
-/// `Hashable` and the other is a non-final nominal instance.
+/// Return `true` if union simplification should preserve this pair because one element requires
+/// hashability and the other can contain unhashable values.
 ///
 /// Hashability does not obey normal inheritance rules: subclasses of hashable classes can be
 /// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
-fn should_preserve_hashable_union(db: &dyn Db, left: Type, right: Type) -> bool {
-    let is_hashable =
-        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(db));
-    let is_non_final_nominal_instance =
-        |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(db).is_final(db));
+///
+/// ```python
+/// from collections.abc import Hashable, Sequence
+///
+/// def f(value: Hashable | Sequence[Hashable]) -> None: ...
+/// ```
+fn should_preserve_hash_protocol_pair(db: &dyn Db, left: Type, right: Type) -> bool {
+    use super::super::hashability::Hashability;
 
-    (is_hashable(left) && is_non_final_nominal_instance(right))
-        || (is_hashable(right) && is_non_final_nominal_instance(left))
+    let other = match (left, right) {
+        (Type::ProtocolInstance(protocol), other) if protocol.requires_hash(db) => other,
+        (other, Type::ProtocolInstance(protocol)) if protocol.requires_hash(db) => other,
+        _ => return false,
+    };
+
+    if matches!(other, Type::ProtocolInstance(protocol) if protocol.is_equivalent_to_object(db)) {
+        return false;
+    }
+
+    other.hashability(db) != Hashability::Always
+}
+
+/// Return `true` if general complement coverage must run before a pair-specific preservation rule.
+fn requires_complement_coverage(db: &dyn Db, left: Type, right: Type) -> bool {
+    let is_simple_negation =
+        |ty| matches!(ty, Type::Intersection(intersection) if intersection.is_simple_negation(db));
+
+    is_simple_negation(left) || is_simple_negation(right)
+}
+
+/// Return `true` if normal redundancy simplification should preserve both types in this pair.
+///
+/// Pair-specific soundness exceptions belong here so literal and ordinary union elements apply
+/// the same preservation policy.
+fn should_preserve_union_pair(db: &dyn Db, left: Type, right: Type) -> bool {
+    should_preserve_hash_protocol_pair(db, left, right)
 }
 
 /// Combine union elements that cover more of the same enum class.
@@ -342,6 +370,9 @@ impl<'db> UnionElement<'db> {
         // both `ignore` and `collapse` are `false`. If either is `true`,
         // we skip the expensive redundancy check and return `true`.
         let mut should_retain_type = |ty| {
+            if should_preserve_union_pair(db, ty, other_type) {
+                return true;
+            }
             if ignore || other_type.is_redundant_with(db, ty) {
                 ignore = true;
                 return true;
@@ -354,6 +385,9 @@ impl<'db> UnionElement<'db> {
             }
             !ty.is_redundant_with(db, other_type)
         };
+        let should_retain_all = |ty| {
+            should_preserve_union_pair(db, ty, other_type) || !ty.is_redundant_with(db, other_type)
+        };
 
         let should_keep = match self {
             UnionElement::IntLiterals(literals) => {
@@ -364,8 +398,7 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, other_type)
+                    should_retain_all(LiteralValueType::new(*literal, *promotable).into())
                 }
             }
             UnionElement::StringLiterals(literals) => {
@@ -376,8 +409,7 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, other_type)
+                    should_retain_all(LiteralValueType::new(*literal, *promotable).into())
                 }
             }
             UnionElement::BytesLiterals(literals) => {
@@ -388,8 +420,7 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, other_type)
+                    should_retain_all(LiteralValueType::new(*literal, *promotable).into())
                 }
             }
             UnionElement::EnumLiterals {
@@ -406,8 +437,7 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, other_type)
+                    should_retain_all(LiteralValueType::new(*literal, *promotable).into())
                 }
             }
             UnionElement::Type(existing) => return ReduceResult::Type(*existing),
@@ -659,6 +689,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if should_preserve_union_pair(self.db, ty, *existing) {
+                                        continue;
+                                    }
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -706,6 +739,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if should_preserve_union_pair(self.db, ty, *existing) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -755,6 +791,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if should_preserve_union_pair(self.db, ty, *existing) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -838,6 +877,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if should_preserve_union_pair(self.db, ty, *existing) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -943,7 +985,20 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if should_preserve_hashable_union(self.db, ty, element_type) {
+            let should_preserve_pair = should_preserve_union_pair(self.db, ty, element_type);
+            if should_preserve_pair
+                && requires_complement_coverage(self.db, ty, element_type)
+                && should_simplify_full
+                && !matches!(element_type, Type::TypeAlias(_))
+            {
+                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                if negated.is_subtype_of(self.db, element_type) {
+                    self.collapse_to_object();
+                    return;
+                }
+            }
+
+            if should_preserve_pair {
                 continue;
             }
 

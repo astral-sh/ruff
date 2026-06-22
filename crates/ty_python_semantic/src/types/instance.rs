@@ -768,10 +768,73 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 }
 
 impl<'db> ProtocolInstanceType<'db> {
-    /// Return `true` if this is the standard-library `Hashable` protocol.
-    pub(super) fn is_hashable(self, db: &'db dyn Db) -> bool {
-        self.to_nominal_instance()
-            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Hashable))
+    /// Return `true` if `ty` structurally satisfies this protocol.
+    ///
+    /// This invokes the protocol checker directly, avoiding higher-level relation shortcuts for
+    /// protocols that are currently considered equivalent to `object`.
+    pub(super) fn is_satisfied_by(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        #[salsa::tracked(cycle_initial=|_, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+        fn is_satisfied_by_inner<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            ty: Type<'db>,
+        ) -> bool {
+            let constraints = ConstraintSetBuilder::new();
+            let relation_visitor = HasRelationToVisitor::default(&constraints);
+            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let signature_relation_visitor = SignatureRelationVisitor::default();
+            let materialization_visitor = ApplyTypeMappingVisitor::default();
+            let checker = TypeRelationChecker::subtyping(
+                &constraints,
+                InferableTypeVars::None,
+                &relation_visitor,
+                &disjointness_visitor,
+                &signature_relation_visitor,
+                &materialization_visitor,
+            );
+            checker
+                .check_type_satisfies_protocol(db, ty, protocol)
+                .is_always_satisfied(db)
+        }
+
+        is_satisfied_by_inner(db, self, ty)
+    }
+
+    /// Return `true` if this protocol explicitly requires a valid `__hash__` member.
+    ///
+    /// Merely inheriting `object.__hash__` does not make hashability part of a protocol's
+    /// interface. The declared member must also satisfy the standard-library `Hashable` protocol.
+    ///
+    /// ```python
+    /// from typing import Protocol
+    ///
+    /// class SupportsHash(Protocol):
+    ///     def __hash__(self) -> int: ...
+    /// ```
+    pub(super) fn requires_hash(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(cycle_initial=|_, _, _, ()| false, heap_size=ruff_memory_usage::heap_size)]
+        fn requires_hash_inner<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> bool {
+            let includes_hash = match protocol.inner {
+                Protocol::FromClass(class) => class.includes_member_name(db, "__hash__"),
+                Protocol::Synthesized(synthesized) => {
+                    synthesized.interface().includes_member(db, "__hash__")
+                }
+            };
+
+            includes_hash
+                && KnownClass::Hashable
+                    .to_instance(db)
+                    .as_protocol_instance()
+                    .is_some_and(|hashable| {
+                        hashable.is_satisfied_by(db, Type::ProtocolInstance(protocol))
+                    })
+        }
+
+        requires_hash_inner(db, self, ())
     }
 
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
@@ -841,22 +904,7 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
-            let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let signature_relation_visitor = SignatureRelationVisitor::default();
-            let materialization_visitor = ApplyTypeMappingVisitor::default();
-            let checker = TypeRelationChecker::subtyping(
-                &constraints,
-                InferableTypeVars::None,
-                &relation_visitor,
-                &disjointness_visitor,
-                &signature_relation_visitor,
-                &materialization_visitor,
-            );
-            checker
-                .check_type_satisfies_protocol(db, Type::object(), protocol)
-                .is_always_satisfied(db)
+            protocol.is_satisfied_by(db, Type::object())
         }
 
         is_equivalent_to_object_inner(db, self, ())

@@ -128,6 +128,7 @@ mod enums;
 mod equality;
 mod function;
 mod generics;
+mod hashability;
 pub mod ide_support;
 mod infer;
 mod instance;

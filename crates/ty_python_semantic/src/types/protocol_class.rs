@@ -68,6 +68,24 @@ impl<'db> ProtocolClass<'db> {
         cached_protocol_interface(db, *self)
     }
 
+    /// Return `true` if this protocol or an inherited protocol declares `name`.
+    ///
+    /// This is a name-only preflight that deliberately avoids constructing the full protocol
+    /// interface. Callers can use it to skip type-level protocol analysis for unrelated members,
+    /// including while resolving cyclic protocol annotations.
+    pub(super) fn includes_member_name(self, db: &'db dyn Db, name: &str) -> bool {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(|class| class.static_class_literal(db))
+            .map(|(class, _)| class)
+            .filter(|class| class.is_protocol(db))
+            .any(|class| {
+                place_table(db, class.body_scope(db))
+                    .symbol_id(name)
+                    .is_some()
+            })
+    }
+
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
         self.static_class_literal(db)
             .is_some_and(|(class_literal, _)| {
