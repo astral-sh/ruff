@@ -3,10 +3,11 @@ use smallvec::SmallVec;
 use crate::types::{DivergentType, KnownClass, Type, UnionType};
 use crate::{Db, FxIndexMap, FxIndexSet};
 
+use super::ProjectionContainer;
 use super::artifact::ProjectionPath;
 use super::evidence::ProjectionEvidenceSet;
+use super::recovery::{ProjectionRecoverySlot, ProjectionRecoverySlotRole};
 use super::term::ProjectionTerm;
-use super::{ProjectionContainer, ProjectionRecoverySlot, ProjectionRecoverySlotRole};
 
 /// A projection variable solved during cycle recovery.
 ///

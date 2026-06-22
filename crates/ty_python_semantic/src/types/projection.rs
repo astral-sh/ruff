@@ -25,6 +25,7 @@ use crate::{Db, FxIndexMap, FxIndexSet};
 mod artifact;
 mod equation;
 mod evidence;
+mod recovery;
 mod term;
 
 pub use artifact::ProjectionType;
@@ -33,80 +34,11 @@ use artifact::{
     StarUnpackPosition, UnpackProjection,
 };
 pub(crate) use equation::ProjectionSolutions;
-use equation::{
-    CycleRootSet, ProjectionEquationSystem, ProjectionVar, root_candidate_from_previous,
-};
+use equation::{CycleRootSet, ProjectionEquationSystem, ProjectionVar};
 pub(crate) use evidence::ProjectionEvidenceSet;
 use evidence::{ProjectionContainerFact, ProjectionEvidenceBuilder};
+pub(crate) use recovery::ProjectionRecoveryBuilder;
 use term::ProjectionTerm;
-
-/// A type slot participating in result-level projection cycle recovery.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ProjectionRecoverySlot<'db> {
-    pub(crate) previous: Option<Type<'db>>,
-    pub(crate) joined: Type<'db>,
-    role: ProjectionRecoverySlotRole,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum ProjectionRecoverySlotRole {
-    DemandOnly,
-    Candidate {
-        /// The cycle root this result slot represented in the previous iteration, if unique.
-        root_hint: Option<DivergentType>,
-    },
-}
-
-/// Cycle-recovery-time accumulator for result-wide projection solving.
-pub(crate) struct ProjectionRecoveryBuilder<'db> {
-    roots: CycleRootSet,
-    slots: Vec<ProjectionRecoverySlot<'db>>,
-}
-
-impl<'db> ProjectionRecoveryBuilder<'db> {
-    pub(crate) fn new(cycle: &salsa::Cycle) -> Self {
-        Self {
-            roots: CycleRootSet::from_cycle(cycle),
-            slots: Vec::new(),
-        }
-    }
-
-    /// Cycle-recovery-time API: records a joined result slot that can contain projection demands.
-    pub(crate) fn push(&mut self, previous: Option<Type<'db>>, joined: Type<'db>) -> Type<'db> {
-        self.slots.push(ProjectionRecoverySlot {
-            previous,
-            joined,
-            role: ProjectionRecoverySlotRole::DemandOnly,
-        });
-        joined
-    }
-
-    /// Cycle-recovery-time API: records a joined result slot that can also act as a root candidate.
-    pub(crate) fn push_candidate(
-        &mut self,
-        db: &'db dyn Db,
-        previous: Option<Type<'db>>,
-        joined: Type<'db>,
-    ) -> Type<'db> {
-        let root_hint =
-            previous.and_then(|previous| root_candidate_from_previous(db, previous, &self.roots));
-        self.slots.push(ProjectionRecoverySlot {
-            previous,
-            joined,
-            role: ProjectionRecoverySlotRole::Candidate { root_hint },
-        });
-        joined
-    }
-
-    /// Cycle-recovery-time API: solves all projection variables visible in the recorded slots.
-    pub(crate) fn finish(
-        &self,
-        db: &'db dyn Db,
-        evidence: Option<&ProjectionEvidenceSet<'db>>,
-    ) -> Option<ProjectionSolutions<'db>> {
-        ProjectionSolutions::from_recovery_slots(db, &self.roots, &self.slots, evidence)
-    }
-}
 
 impl<'db> Type<'db> {
     /// Inference-time API: projects an iterable value while recording cycle projection evidence.
