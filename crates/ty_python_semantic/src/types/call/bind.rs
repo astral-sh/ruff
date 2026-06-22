@@ -591,14 +591,19 @@ impl<'db> Bindings<'db> {
             combined.elements.extend(bindings.elements);
         }
 
-        assert!(!combined.elements.is_empty());
+        let Self {
+            callable_type: _,
+            implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound,
+            elements,
+            enclosing_binding_contexts: _,
+        } = combined;
+        assert!(!elements.is_empty());
         Self {
             callable_type,
-            implicit_dunder_new_is_possibly_unbound: combined
-                .implicit_dunder_new_is_possibly_unbound,
-            implicit_dunder_init_is_possibly_unbound: combined
-                .implicit_dunder_init_is_possibly_unbound,
-            elements: combined.elements,
+            implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound,
+            elements,
             enclosing_binding_contexts: None,
         }
     }
