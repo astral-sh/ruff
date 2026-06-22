@@ -82,12 +82,12 @@ over all configuration files.</p>
 <li>A Python interpreter, e.g. <code>.venv/bin/python3</code> - A virtual environment directory, e.g. <code>.venv</code> - A system Python <a href="https://docs.python.org/3/library/sys.html#sys.prefix"><code>sys.prefix</code></a> directory, e.g. <code>/usr</code></li>
 </ul>
 <p>If you're using a project management tool such as uv or you have an activated Conda or virtual environment, you should not generally need to specify this option.</p>
-<p>ty officially supports type checking code that targets Python 3.10 and later. When ty infers Python 3.7 through 3.9 from the selected environment, it will still use that version for version-dependent syntax, narrowing based on <code>sys.version_info</code>, and more, but may produce false positives or false negatives for standard-library APIs because its bundled stubs do not fully describe those Python versions.</p>
 
 </dd><dt id="ty-check--python-platform"><a href="#ty-check--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types.</p>
 <p>This is used to specialize the type of <code>sys.platform</code> and will affect the visibility of platform-specific functions and attributes. If the value is set to <code>all</code>, no assumptions are made about the target platform. If unspecified, the current system's platform will be used.</p>
 </dd><dt id="ty-check--python-version"><a href="#ty-check--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types.</p>
 <p>The Python version affects allowed syntax, type definitions of the standard library, and type definitions of first- and third-party modules that are conditional on the Python version.</p>
+<p>ty officially supports type checking code that targets Python 3.10 and later. Python 3.7 through 3.9 can still be selected, but ty may produce false positives or false negatives for standard-library APIs because its bundled stubs do not fully describe those versions.</p>
 <p>If a version is not specified on the command line or in a configuration file, ty will try the following techniques in order of preference to determine a value: 1. Check for the <code>project.requires-python</code> setting in a <code>pyproject.toml</code> file and use the minimum version from the specified range 2. Check for an activated or configured Python environment and attempt to infer the Python version of that environment 3. Fall back to the latest stable Python version supported by ty (see <code>ty check --help</code> output)</p>
 <p>Possible values:</p>
 <ul>

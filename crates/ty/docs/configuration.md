@@ -213,12 +213,6 @@ your environment from an activated Conda environment, and will look for a `.venv
 in the project root if none of the above apply. Failing that, ty will look for a `python3`
 or `python` binary available in `PATH`.
 
-ty officially supports type checking code that targets Python 3.10 and later. When ty infers
-Python 3.7 through 3.9 from the selected environment, it will still use that version for
-version-dependent syntax, narrowing based on `sys.version_info`, and more, but may produce
-false positives or false negatives for standard-library APIs because its bundled stubs do
-not fully describe those Python versions.
-
 [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
 **Default value**: `null`
@@ -288,6 +282,10 @@ The version should be specified as a string in the format `M.m` where `M` is the
 and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
 If a version is provided, ty will generate errors if the source code makes use of language features
 that are not supported in that version.
+
+ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+through 3.9 can still be selected, but ty may produce false positives or false negatives for
+standard-library APIs because its bundled stubs do not fully describe those versions.
 
 If a version is not specified, ty will try the following techniques in order of preference
 to determine a value:
