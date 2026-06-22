@@ -48,16 +48,21 @@ jobs:
   build-ty:
     name: Build ty (${{ matrix.revision }})
     strategy:
-      max-parallel: 2
       matrix:
-        revision: [base, pr]
+        include:
+          # For `pull_request`, `github.sha` is GitHub's synthetic merge commit;
+          # pair it with the base revision from the same event payload.
+          - revision: base
+            ref: ${{ github.event.pull_request.base.sha }}
+          - revision: pr
+            ref: ${{ github.sha }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-          ref: ${{ matrix.revision == 'base' && github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ matrix.ref }}
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -104,7 +109,6 @@ jobs:
   analyze-shards:
     needs: [build-ty]
     strategy:
-      max-parallel: 4
       matrix:
         shard: [0, 1, 2, 3]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
@@ -223,7 +227,8 @@ jobs:
 
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # NOTE: astral-bot deploys both HTML files in this artifact and uses the
+      # deployed URLs for the report links in its PR comment.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
