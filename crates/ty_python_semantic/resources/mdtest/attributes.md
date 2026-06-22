@@ -3565,6 +3565,28 @@ class MethodBox(Generic[ProjectionT]):
     def unwrap(self) -> ProjectionT:
         return self.value
 
+class ProjectionMemberTarget:
+    def __init__(self) -> None:
+        self.next = self
+
+class ProjectionMemberSource:
+    def __init__(self) -> None:
+        self.next = ProjectionMemberTarget()
+
+class ProjectionCustomMember:
+    def __init__(self) -> None:
+        self.x = MethodBox(ProjectionMemberSource())
+        self.y = ProjectionMemberTarget()
+
+    def read(self) -> None:
+        item = self.x.value.next
+        self.x = MethodBox(item)
+        self.y = item
+
+        reveal_type(item)  # revealed: ProjectionMemberTarget
+        reveal_type(self.x)  # revealed: MethodBox[ProjectionMemberTarget]
+        reveal_type(self.y)  # revealed: ProjectionMemberTarget
+
 class ProjectionCustomMethodCall:
     def __init__(self) -> None:
         self.x = MethodBox(0)

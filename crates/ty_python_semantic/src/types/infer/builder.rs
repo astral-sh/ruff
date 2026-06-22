@@ -10049,7 +10049,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, &attr.id).map_type(|ty| {
+        let fallback_place = if let Some(projected) =
+            value_type.try_member_projection_result(db, &attr.id, MemberLookupPolicy::default())
+        {
+            self.extend_projection_result(projected);
+            Place::bound(projected.ty()).into()
+        } else {
+            value_type.member(db, &attr.id)
+        }
+        .map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         });
 

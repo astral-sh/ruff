@@ -230,13 +230,27 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Inference-time API: projects an attribute lookup while recording cycle projection evidence.
+    pub(crate) fn try_member_projection_result(
+        self,
+        db: &'db dyn Db,
+        name: &Name,
+        policy: MemberLookupPolicy,
+    ) -> Option<ProjectionResult<'db>> {
+        let op = ProjectionOp::Member(ProjectionMember::new(db, name, policy));
+        self.try_projection_with_non_cycle_result(db, op, |ty| {
+            ProjectionContainer::infer_member_type_for_type(db, ty, name, policy)
+                .map(ProjectionTerm::Exact)
+        })
+    }
+
     /// Inference-time API: projects a zero-argument method call.
     pub(crate) fn try_method_call_projection_result(
         self,
         db: &'db dyn Db,
         method_name: &Name,
     ) -> Option<ProjectionResult<'db>> {
-        let op = ProjectionOp::CallMethod0(ProjectionMethodName::new(db, method_name));
+        let op = ProjectionOp::CallMethod0(ProjectionMemberName::new(db, method_name));
         self.try_projection_with_non_cycle_result(db, op, |ty| {
             ProjectionContainer::infer_method_call0_type_for_type(db, ty, method_name)
                 .map(ProjectionTerm::Exact)
@@ -332,7 +346,7 @@ impl<'db> Type<'db> {
             }
 
             let term = project_non_cycle(element)?;
-            projection_evidence.record_projected_container_arm(
+            projection_evidence.record_projected_arm(
                 db,
                 roots.iter().copied(),
                 element,
@@ -394,7 +408,7 @@ impl<'db> Type<'db> {
             }
 
             let term = project_non_cycle(element)?;
-            projection_evidence.record_projected_container_arm(db, [*root], element, &path, term);
+            projection_evidence.record_projected_arm(db, [*root], element, &path, term);
             terms[index] = Some(term);
         }
 
@@ -456,7 +470,7 @@ impl<'db> Type<'db> {
             } else {
                 project(element)?
             };
-            projection_evidence.record_projected_container_arm(
+            projection_evidence.record_projected_arm(
                 db,
                 roots.iter().copied(),
                 element,
@@ -1236,7 +1250,7 @@ impl<'db> ProjectionContainer<'db> {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
             Self::Generic(fact) => {
                 if let Some(term) = evidence
-                    .and_then(|evidence| evidence.project_generic_path(db, root, fact.arm, path))
+                    .and_then(|evidence| evidence.project_arm_path(db, root, fact.arm, path))
                 {
                     return Some(term);
                 }
@@ -1322,7 +1336,7 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         if let Some(term) =
-            evidence.and_then(|evidence| evidence.project_generic_path(db, root, ty, path))
+            evidence.and_then(|evidence| evidence.project_arm_path(db, root, ty, path))
         {
             return Some(term);
         }
@@ -1332,7 +1346,7 @@ impl<'db> ProjectionContainer<'db> {
 
         let single_op_path = ProjectionPath::from_op(op);
         let projected = evidence
-            .and_then(|evidence| evidence.project_generic_path(db, root, ty, &single_op_path))
+            .and_then(|evidence| evidence.project_arm_path(db, root, ty, &single_op_path))
             .or_else(|| Self::project_op(db, ty, op))?;
 
         if tail.is_empty() {
@@ -1403,7 +1417,8 @@ impl<'db> ProjectionContainer<'db> {
                 ProjectionTerm::Exact(KnownClass::List.to_specialized_instance(db, &[element])),
             ),
             ProjectionOp::Subscript(ProjectionSubscript::KeyType(_)) => None,
-            ProjectionOp::CallMethod0(_)
+            ProjectionOp::Member(_)
+            | ProjectionOp::CallMethod0(_)
             | ProjectionOp::ContextEnter { .. }
             | ProjectionOp::AwaitResult => None,
         }
@@ -1419,7 +1434,8 @@ impl<'db> ProjectionContainer<'db> {
             ProjectionOp::Iter { is_async } => Self::project_iter_item(db, ty, is_async),
             ProjectionOp::Unpack(unpack) => Self::project_unpack(db, ty, unpack),
             ProjectionOp::Subscript(subscript) => Self::project_subscript(db, ty, subscript),
-            ProjectionOp::CallMethod0(_)
+            ProjectionOp::Member(_)
+            | ProjectionOp::CallMethod0(_)
             | ProjectionOp::ContextEnter { .. }
             | ProjectionOp::AwaitResult => None,
         }
@@ -1659,6 +1675,24 @@ impl<'db> ProjectionContainer<'db> {
         )
     }
 
+    fn infer_member_type_for_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        name: &Name,
+        policy: MemberLookupPolicy,
+    ) -> Option<Type<'db>> {
+        let Place::Defined(DefinedPlace {
+            ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = ty.member_lookup_with_policy(db, name.clone(), policy).place
+        else {
+            return None;
+        };
+
+        Some(ty)
+    }
+
     fn infer_projection_path(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1706,6 +1740,9 @@ impl<'db> ProjectionContainer<'db> {
             ProjectionOp::Subscript(subscript) => Some(ProjectionTerm::Exact(
                 ty.subscript_without_projection(db, subscript.to_type(db), ast::ExprContext::Load)
                     .ok()?,
+            )),
+            ProjectionOp::Member(member) => Some(ProjectionTerm::Exact(
+                Self::infer_member_type_for_type(db, ty, member.name(db), member.policy())?,
             )),
             ProjectionOp::CallMethod0(method) => Some(ProjectionTerm::Exact(
                 Self::infer_method_call0_type_for_type(db, ty, method.name(db))?,
@@ -2634,7 +2671,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
     }
 
     /// Inference-time API: records the observed result of projecting a non-cycle arm.
-    fn record_projected_container_arm(
+    fn record_projected_arm(
         &mut self,
         db: &'db dyn Db,
         roots: impl IntoIterator<Item = DivergentType>,
@@ -2646,11 +2683,9 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
             return;
         }
 
-        let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, arm) else {
-            return;
-        };
-
-        self.push_container_fact(container_fact);
+        if let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, arm) {
+            self.push_container_fact(container_fact);
+        }
         for root in roots {
             self.push_projection_fact(ProjectionEvidenceFact {
                 root,
@@ -2807,8 +2842,8 @@ impl<'db> ProjectionEvidenceSet<'db> {
         })
     }
 
-    /// Cycle-recovery-time API: replays a generic projection from inference-time evidence.
-    fn project_generic_path(
+    /// Cycle-recovery-time API: replays a projection from inference-time evidence.
+    fn project_arm_path(
         self,
         db: &'db dyn Db,
         root: DivergentType,
@@ -2847,7 +2882,7 @@ struct ProjectionEvidenceSetInterned<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ProjectionEvidenceSetInterned<'_> {}
 
-/// The result of projecting one generic container arm during inference.
+/// The result of projecting one non-cycle arm during inference.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct ProjectionEvidenceFact<'db> {
     root: DivergentType,
@@ -2978,21 +3013,59 @@ impl<'db> ProjectionPath<'db> {
     }
 }
 
-/// An interned method name used by zero-argument method-call projections.
+/// An interned member name used by attribute and method-call projections.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-struct ProjectionMethodName<'db> {
+struct ProjectionMemberName<'db> {
     #[returns(ref)]
     name: Name,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for ProjectionMethodName<'_> {}
+impl get_size2::GetSize for ProjectionMemberName<'_> {}
 
-impl<'db> ProjectionMethodName<'db> {
+impl<'db> ProjectionMemberName<'db> {
     fn new(db: &'db dyn Db, name: &Name) -> Self {
         let mut name = name.clone();
         name.shrink_to_fit();
         Self::new_internal(db, name)
+    }
+}
+
+/// An attribute lookup projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct ProjectionMember<'db> {
+    name: ProjectionMemberName<'db>,
+    policy: ProjectionMemberLookupPolicy,
+}
+
+impl<'db> ProjectionMember<'db> {
+    fn new(db: &'db dyn Db, name: &Name, policy: MemberLookupPolicy) -> Self {
+        Self {
+            name: ProjectionMemberName::new(db, name),
+            policy: ProjectionMemberLookupPolicy::new(policy),
+        }
+    }
+
+    fn name(self, db: &'db dyn Db) -> &'db Name {
+        self.name.name(db)
+    }
+
+    fn policy(self) -> MemberLookupPolicy {
+        self.policy.to_policy()
+    }
+}
+
+/// Compact copyable member lookup policy stored in projection paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct ProjectionMemberLookupPolicy(u8);
+
+impl ProjectionMemberLookupPolicy {
+    const fn new(policy: MemberLookupPolicy) -> Self {
+        Self(policy.bits())
+    }
+
+    fn to_policy(self) -> MemberLookupPolicy {
+        MemberLookupPolicy::from_bits_retain(self.0)
     }
 }
 
@@ -3011,9 +3084,10 @@ enum ProjectionOp<'db> {
     Iter { is_async: bool },
     Unpack(UnpackProjection),
     Subscript(ProjectionSubscript<'db>),
+    Member(ProjectionMember<'db>),
     // There is no reason to target only 0-argument methods.
     // It would be nice to be able to scale it without compromising performance.
-    CallMethod0(ProjectionMethodName<'db>),
+    CallMethod0(ProjectionMemberName<'db>),
     ContextEnter { is_async: bool },
     AwaitResult,
 }
