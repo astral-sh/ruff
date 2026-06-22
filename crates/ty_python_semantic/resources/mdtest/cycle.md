@@ -255,6 +255,7 @@ while True:
         x = [x]  # error: [possibly-unresolved-reference]
     else:
         x = {x}  # error: [possibly-unresolved-reference]
+    reveal_type(x)  # revealed: list[list[Divergent] | set[Divergent]] | set[list[Divergent] | set[Divergent]]
 ```
 
 ## Type replacement with a lazy function signature
