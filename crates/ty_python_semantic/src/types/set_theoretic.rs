@@ -226,15 +226,25 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
-    /// Returns the shared fallback instance type for a union whose elements all have one.
+    /// Returns the shared fallback instance type for a union of literal-value types.
     ///
     /// The returned type is broader than the literal types themselves. For example, the fallback
     /// for `Literal["a"] | Literal["b"]` is `str`.
     pub(crate) fn common_literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // Do not use `Type::literal_fallback_instance` here: it also falls back from function
+        // literals to `FunctionType`. Since `FunctionType.__call__` is gradual, it can be
+        // assignable to a callable that the function literal's precise signature is not.
+        // Literal values have fully static fallbacks, so a successful relation check for the
+        // fallback proves the relation for every literal in the union.
+        let fallback_instance = |element: &Type<'db>| match element {
+            Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
+            _ => None,
+        };
+
         let mut elements = self.elements(db).iter();
-        let fallback = elements.next()?.literal_fallback_instance(db)?;
+        let fallback = fallback_instance(elements.next()?)?;
         elements.try_fold(fallback, |fallback, element| {
-            let next = element.literal_fallback_instance(db)?;
+            let next = fallback_instance(element)?;
             (next == fallback).then_some(fallback)
         })
     }

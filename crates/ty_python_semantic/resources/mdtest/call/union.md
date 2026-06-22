@@ -100,6 +100,25 @@ def _(flag: bool):
     reveal_type(x)  # revealed: int | str
 ```
 
+## Assigning function-literal unions to callables
+
+A union of function literals must satisfy the target callable with every element.
+
+```py
+from collections.abc import Callable
+
+def accepts_int(callback: Callable[[int], int]) -> None: ...
+def int_callback(value: int) -> int:
+    return value
+
+def str_callback(value: str) -> str:
+    return value
+
+def _(flag: bool) -> None:
+    callback = int_callback if flag else str_callback
+    accepts_int(callback)  # error: [invalid-argument-type]
+```
+
 ## Union of class constructors uses strict checking
 
 A call on a union of class objects must satisfy every constructor.
