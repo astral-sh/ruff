@@ -278,6 +278,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
+    // Collection literals with uses that require cycle-based inference.
+    collections_requiring_cycle: FxHashSet<Definition<'db>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -328,6 +330,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
+            collections_requiring_cycle: FxHashSet::default(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -2620,6 +2623,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope.shrink_to_fit();
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
+
+        // Replacing an existing binding can make later collection uses depend on the merge of all
+        // definitions for that place. The identity-specialized query deliberately bypasses that
+        // merge, so retain cycle-based inference for those collection definitions.
+        for use_def_map in &use_def_maps {
+            let mut defined_places = FxHashSet::default();
+            for (_, state, _) in use_def_map.all_definitions_with_usage() {
+                let Some(definition) = state.definition() else {
+                    continue;
+                };
+                let place = definition.place(self.db);
+                if self.uses_by_collection.contains_key(&definition)
+                    && defined_places.contains(&place)
+                {
+                    self.collections_requiring_cycle.insert(definition);
+                }
+                defined_places.insert(place);
+            }
+        }
+
         let uses_by_collection = FrozenMap::from_entries(
             self.uses_by_collection
                 .into_iter()
@@ -2642,6 +2665,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
+            collections_requiring_cycle: FrozenSet::from(self.collections_requiring_cycle),
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
@@ -4078,6 +4102,30 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // on collection literals. This restriction is mostly for performance reasons, as we
         // want to avoid "reads" of a collection contributing to the complexity of the cycles
         // created by full-scope collection inference.
+        match stmt {
+            ast::Stmt::AugAssign(_) => self.collections_requiring_cycle.extend(
+                current_statement
+                    .collection_uses
+                    .iter()
+                    .map(|(definition, _)| *definition),
+            ),
+            ast::Stmt::Assign(ast::StmtAssign { targets, value, .. })
+                if targets
+                    .iter()
+                    .any(|target| target.is_attribute_expr() || target.is_subscript_expr()) =>
+            {
+                let assigned_value = ExpressionNodeKey::from(value);
+                self.collections_requiring_cycle.extend(
+                    current_statement
+                        .collection_uses
+                        .iter()
+                        .filter(|(_, use_expression)| *use_expression == assigned_value)
+                        .map(|(definition, _)| *definition),
+                );
+            }
+            _ => {}
+        }
+
         current_statement
             .collection_uses
             .retain(|(_, use_expression)| {

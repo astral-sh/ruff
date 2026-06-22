@@ -338,6 +338,9 @@ pub struct SemanticIndex<'db> {
     // Map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
+    // Collection literals with uses that require cycle-based inference.
+    collections_requiring_cycle: FrozenSet<Definition<'db>>,
+
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
@@ -586,6 +589,11 @@ impl<'db> SemanticIndex<'db> {
             .get(&collection_def)
             .into_iter()
             .flat_map(|uses| uses.iter().copied())
+    }
+
+    /// Returns `true` if the collection has a use that requires cycle-based inference.
+    pub fn collection_requires_cycle_inference(&self, collection_def: Definition<'db>) -> bool {
+        self.collections_requiring_cycle.contains(&collection_def)
     }
 
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
