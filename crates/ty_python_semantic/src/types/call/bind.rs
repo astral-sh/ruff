@@ -580,30 +580,21 @@ impl<'db> Bindings<'db> {
         I: IntoIterator<Item = Bindings<'db>>,
     {
         let mut bindings_iter = bindings_iter.into_iter();
-        let first = bindings_iter.next().expect("bindings must not be empty");
-        let mut implicit_dunder_new_is_possibly_unbound =
-            first.implicit_dunder_new_is_possibly_unbound;
-        let mut implicit_dunder_init_is_possibly_unbound =
-            first.implicit_dunder_init_is_possibly_unbound;
-        let mut elements_acc = first.elements;
+        let mut combined = bindings_iter.next().expect("bindings must not be empty");
 
-        // Preserve each input's existing union/intersection structure.
-        for set in bindings_iter {
-            implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
-            implicit_dunder_init_is_possibly_unbound |=
-                set.implicit_dunder_init_is_possibly_unbound;
-            elements_acc.extend(set.elements);
+        // Use the first binding as the accumulator to reuse its elements buffer.
+        for bindings in bindings_iter {
+            combined.implicit_dunder_new_is_possibly_unbound |=
+                bindings.implicit_dunder_new_is_possibly_unbound;
+            combined.implicit_dunder_init_is_possibly_unbound |=
+                bindings.implicit_dunder_init_is_possibly_unbound;
+            combined.elements.extend(bindings.elements);
         }
 
-        let elements = elements_acc;
-        assert!(!elements.is_empty());
-        Self {
-            callable_type,
-            elements,
-            implicit_dunder_new_is_possibly_unbound,
-            implicit_dunder_init_is_possibly_unbound,
-            enclosing_binding_contexts: None,
-        }
+        assert!(!combined.elements.is_empty());
+        combined.callable_type = callable_type;
+        combined.enclosing_binding_contexts = None;
+        combined
     }
 
     /// Creates a new `Bindings` from an iterator of [`Bindings`]s for an intersection type.
