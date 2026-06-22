@@ -1367,39 +1367,30 @@ impl<'db> Type<'db> {
             db,
             ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
         );
-
-        if specialization != original_specialization {
-            return Some(normalized);
-        }
+        let original = Type::NominalInstance(current);
 
         if let Type::Union(wrapped_union) = wrapped {
-            let replacements: smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]> =
-                original_specialization
-                    .types(db)
-                    .iter()
-                    .copied()
-                    .filter(|position| {
-                        Self::is_union_distribution_position(db, *position, wrapped_union)
-                    })
-                    .map(|position| {
-                        (
+            let replacements: smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]> = specialization
+                .types(db)
+                .iter()
+                .copied()
+                .filter(|position| {
+                    Self::is_union_distribution_position(db, *position, wrapped_union)
+                })
+                .map(|position| {
+                    (
+                        position,
+                        Self::union_distribution_position_normalized(
+                            db,
                             position,
-                            Self::union_distribution_position_normalized(
-                                db,
-                                position,
-                                wrapped_union,
-                                div,
-                            ),
-                        )
-                    })
-                    .collect();
-            if replacements.is_empty() {
-                return None;
-            }
-
-            let original = Type::NominalInstance(current);
-            let normalized = replacements.iter().fold(
-                original,
+                            wrapped_union,
+                            div,
+                        ),
+                    )
+                })
+                .collect();
+            normalized = replacements.iter().fold(
+                normalized,
                 |normalized, (position, normalized_position)| {
                     normalized.apply_type_mapping(
                         db,
@@ -1450,7 +1441,7 @@ impl<'db> Type<'db> {
             );
         }
 
-        (normalized != Type::NominalInstance(current)).then_some(normalized)
+        (normalized != original).then_some(normalized)
     }
 
     /// Replaces the complete set of previous union arms within one validated distribution

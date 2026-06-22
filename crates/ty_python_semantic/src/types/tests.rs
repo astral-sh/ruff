@@ -290,6 +290,38 @@ fn recursive_nominal_growth_rejects_unrelated_union_and_intersection() {
     );
 }
 
+#[test]
+fn recursive_nominal_growth_normalizes_exact_and_distributed_occurrences() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distributed = UnionType::from_elements(
+        &db,
+        [
+            IntersectionType::from_two_elements(&db, list_int, Type::unknown()),
+            IntersectionType::from_two_elements(&db, list_str, Type::unknown()),
+        ],
+    );
+    let current = KnownClass::Dict.to_specialized_instance(&db, &[previous, distributed]);
+    let expected = KnownClass::Dict.to_specialized_instance(&db, &[div, div]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized dict should be a nominal instance"),
+            previous,
+            div,
+        ),
+        Some(expected)
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
