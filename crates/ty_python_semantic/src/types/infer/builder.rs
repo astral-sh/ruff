@@ -7348,6 +7348,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Ok(collection_def) =
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
             && let Some(collection_def) = self.index.try_definition(collection_def)
+            && self
+                .index
+                .constraining_collection_uses(collection_def)
+                .next()
+                .is_some()
         {
             // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
