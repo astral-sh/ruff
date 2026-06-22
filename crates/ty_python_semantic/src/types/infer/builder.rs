@@ -6957,7 +6957,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .filter(|ty| ty.class_specialization(db).is_some());
 
         if use_empty_list_consensus {
-            let mut narrowed_result = None;
+            let mut narrowed_result: Option<(Type<'db>, Self)> = None;
             let mut candidates_agree = true;
             let mut uses_empty_covariant_context = false;
 
@@ -6968,10 +6968,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 };
 
-                if let Some((previous_ty, _)) = &narrowed_result
-                    && inferred_ty != *previous_ty
-                {
-                    candidates_agree = false;
+                if let Some((previous_ty, _)) = &narrowed_result {
+                    candidates_agree &=
+                        if inferred_ty.has_dynamic(db) || previous_ty.has_dynamic(db) {
+                            inferred_ty == *previous_ty
+                        } else {
+                            inferred_ty.is_equivalent_to(db, *previous_ty)
+                        };
                 }
                 uses_empty_covariant_context |= candidate_uses_covariant_context;
                 narrowed_result.get_or_insert((inferred_ty, speculative_builder));

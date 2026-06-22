@@ -29,6 +29,31 @@ def conflicting(items: Sequence[str] | Sequence[bytes] | None = None) -> None:
         reveal_type(items)  # revealed: list[Unknown]
 ```
 
+Semantically equivalent fully static element types also count as agreement:
+
+```py
+from collections.abc import Iterable
+from typing import Protocol, TypeVar
+
+ElementT_co = TypeVar("ElementT_co", covariant=True)
+
+class SupportsGetItem(Protocol[ElementT_co]):
+    def __getitem__(self, index: int, /) -> ElementT_co: ...
+
+class P1(Protocol):
+    def method(self) -> int: ...
+
+class P2(Protocol):
+    def method(self) -> int: ...
+
+def equivalent_protocols(
+    items: Iterable[P1] | SupportsGetItem[P2] | None = None,
+) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[P1]
+```
+
 Dynamic element types, including nested dynamic types, retain the normal `Unknown` fallback
 independent of union order:
 
