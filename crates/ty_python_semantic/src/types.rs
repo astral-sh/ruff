@@ -1372,31 +1372,39 @@ impl<'db> Type<'db> {
             return Some(normalized);
         }
 
-        let contains_wrapped_elements = |intersection: IntersectionType<'db>| match wrapped {
-            Type::Union(wrapped) => intersection
-                .positive(db)
-                .iter()
-                .any(|element| wrapped.elements(db).contains(element)),
+        if let Type::Union(wrapped_union) = wrapped {
+            if !wrapped_union.elements(db).iter().all(|wrapped_element| {
+                any_over_type(db, normalized, false, |ty| ty == *wrapped_element)
+            }) {
+                return None;
+            }
+
+            return Self::nominal_wrapper_elements_normalized(
+                db,
+                current,
+                wrapped_union.elements(db),
+                div,
+            );
+        }
+
+        let contains_wrapped_intersection = |intersection: IntersectionType<'db>| match wrapped {
             Type::Intersection(wrapped) if wrapped.negative(db).is_empty() => wrapped
                 .positive(db)
                 .iter()
                 .all(|element| intersection.positive(db).contains(element)),
             _ => false,
         };
-        let is_wrapped_element = |element: &Type<'db>| match wrapped {
-            Type::Union(wrapped) => wrapped.elements(db).contains(element),
-            Type::Intersection(wrapped) => wrapped.positive(db).contains(element),
-            _ => false,
-        };
 
         while let Some(intersection) = find_over_type(db, normalized, false, |ty| match ty {
-            Type::Intersection(intersection) if contains_wrapped_elements(intersection) => {
+            Type::Intersection(intersection) if contains_wrapped_intersection(intersection) => {
                 Some(intersection)
             }
             _ => None,
         }) {
             let replacement = intersection.map_positive(db, |element| {
-                if is_wrapped_element(element) {
+                if let Type::Intersection(wrapped) = wrapped
+                    && wrapped.positive(db).contains(element)
+                {
                     div
                 } else {
                     *element
@@ -1416,6 +1424,30 @@ impl<'db> Type<'db> {
         }
 
         (normalized != Type::NominalInstance(current)).then_some(normalized)
+    }
+
+    /// Replaces the complete set of previous union arms after their coverage has been validated.
+    fn nominal_wrapper_elements_normalized(
+        db: &'db dyn Db,
+        current: NominalInstanceType<'db>,
+        wrapped_elements: &[Self],
+        div: Self,
+    ) -> Option<Self> {
+        let original = Type::NominalInstance(current);
+        let normalized = wrapped_elements
+            .iter()
+            .fold(original, |normalized, wrapped| {
+                normalized.apply_type_mapping(
+                    db,
+                    &TypeMapping::ReplaceType {
+                        from: *wrapped,
+                        to: div,
+                    },
+                    TypeContext::default(),
+                )
+            });
+
+        (normalized != original).then_some(normalized)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {

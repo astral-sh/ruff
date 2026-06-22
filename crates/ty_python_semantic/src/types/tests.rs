@@ -134,6 +134,62 @@ fn recursive_nominal_growth_preserves_unrelated_intersections() {
     assert_eq!(normalized, expected);
 }
 
+#[test]
+fn recursive_nominal_growth_normalizes_complete_union_distribution() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distributed = UnionType::from_elements(
+        &db,
+        [
+            IntersectionType::from_two_elements(&db, list_int, Type::unknown()),
+            IntersectionType::from_two_elements(&db, list_str, Type::unknown()),
+        ],
+    );
+    let current = KnownClass::List.to_specialized_instance(&db, &[distributed]);
+    let expected = KnownClass::List.to_specialized_instance(&db, &[div]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        Some(expected)
+    );
+}
+
+#[test]
+fn recursive_nominal_growth_requires_all_union_elements() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let partial = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
+    let current = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::List.to_specialized_instance(&db, &[partial]),
+            KnownClass::Set.to_specialized_instance(&db, &[partial]),
+        ],
+    );
+
+    assert_eq!(
+        current.recursive_nominal_growth_normalized(&db, previous, div),
+        None
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
