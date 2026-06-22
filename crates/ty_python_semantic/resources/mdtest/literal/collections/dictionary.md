@@ -48,6 +48,12 @@ reveal_type(unpacked_peers)  # revealed: list[dict[str, list[int | str]]]
 # An unspecialized generic call context does not override unpack peer context.
 reveal_type({**{"a": [1]}, **{"b": ["x"]}})  # revealed: dict[str, list[int | str]]
 
+# A useful covariant context takes precedence over unpack peer simplification.
+def accepts_separate_unpack_values(value: Mapping[str, list[int] | list[str]]) -> None:
+    pass
+
+accepts_separate_unpack_values({**{"a": [1]}, **{"b": ["x"]}})
+
 class HasKeysAndGetItem:
     def keys(self) -> KeysView[str]:
         return {}.keys()

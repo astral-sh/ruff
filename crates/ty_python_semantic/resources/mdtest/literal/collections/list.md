@@ -46,6 +46,8 @@ avoids retaining a separate invariant collection type for every sibling.
 Regression test for <https://github.com/astral-sh/ty/issues/3775>.
 
 ```py
+from typing import Sequence
+
 reveal_type([[1], ["a"]])  # revealed: list[list[int | str]]
 reveal_type([[1], ["a"], [1, "a"]])  # revealed: list[list[int | str]]
 
@@ -62,6 +64,12 @@ reveal_type([[None], [1]])  # revealed: list[list[None | int]]
 reveal_type([{1}, {"a"}])  # revealed: list[set[int | str]]
 reveal_type([{"a": 1}, {"b": "x"}])  # revealed: list[dict[str, int | str]]
 reveal_type({1: [1], 2: ["a"]})  # revealed: dict[int, list[int | str]]
+
+# A useful covariant context takes precedence over peer simplification.
+def accepts_separate_peers(value: Sequence[list[int] | list[str]]) -> None:
+    pass
+
+accepts_separate_peers([[1], ["a"]])
 
 # Effects from peer pre-inference are produced exactly once by the real inference pass.
 with_named_expression = [[(x := 1)], ["a"]]

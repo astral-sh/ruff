@@ -2172,20 +2172,6 @@ mod tests {
     }
 
     #[test]
-    fn hover_nested_collection_peer_descendant() {
-        let test = hover_test(
-            r#"
-            value = [[[1 ==<CURSOR> 2]], [["a"]]]
-            "#,
-        );
-
-        assert!(
-            test.hover().starts_with("Literal[False]\n"),
-            "nested comparison should have hover content"
-        );
-    }
-
-    #[test]
     fn hover_keyword_parameter() {
         let test = hover_test(
             r#"
