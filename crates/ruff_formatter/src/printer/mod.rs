@@ -898,10 +898,15 @@ struct PrinterState<'a> {
     fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,
 }
 
+/// Most fit checks need at most eight temporary stack frames. This avoids repeated small
+/// allocations while keeping the per-file cache modest.
+const FITS_STACK_INITIAL_CAPACITY: usize = 8;
+
 impl PrinterState<'_> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: String::with_capacity(capacity),
+            fits_stack: Vec::with_capacity(FITS_STACK_INITIAL_CAPACITY),
             ..Self::default()
         }
     }
