@@ -1105,11 +1105,46 @@ PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
 133 | # https://github.com/astral-sh/ruff/issues/18813
 134 | three = 1 if 1 else(3.0).__str__()
     |                    ^^^^^^^^^^^^^^^
+135 |
+136 | # https://github.com/astral-sh/ruff/issues/26221
     |
 help: Use `str()` builtin
     |
 133 | # https://github.com/astral-sh/ruff/issues/18813
     - three = 1 if 1 else(3.0).__str__()
 134 + three = 1 if 1 else str(3.0)
+135 |
     |
 note: This is an unsafe fix and may change runtime behavior
+
+PLC2801 Unnecessary dunder call to `__floor__`. Use `math.floor()` function.
+   --> unnecessary_dunder_call.py:137:7
+    |
+136 | # https://github.com/astral-sh/ruff/issues/26221
+137 | print((3.0).__floor__())  # PLC2801
+    |       ^^^^^^^^^^^^^^^^^
+138 | print((3.0).__ceil__())  # PLC2801
+139 | print((3.0).__trunc__())  # PLC2801
+    |
+help: Use `math.floor()` function
+
+PLC2801 Unnecessary dunder call to `__ceil__`. Use `math.ceil()` function.
+   --> unnecessary_dunder_call.py:138:7
+    |
+136 | # https://github.com/astral-sh/ruff/issues/26221
+137 | print((3.0).__floor__())  # PLC2801
+138 | print((3.0).__ceil__())  # PLC2801
+    |       ^^^^^^^^^^^^^^^^
+139 | print((3.0).__trunc__())  # PLC2801
+    |
+help: Use `math.ceil()` function
+
+PLC2801 Unnecessary dunder call to `__trunc__`. Use `math.trunc()` function.
+   --> unnecessary_dunder_call.py:139:7
+    |
+137 | print((3.0).__floor__())  # PLC2801
+138 | print((3.0).__ceil__())  # PLC2801
+139 | print((3.0).__trunc__())  # PLC2801
+    |       ^^^^^^^^^^^^^^^^^
+    |
+help: Use `math.trunc()` function

@@ -132,3 +132,8 @@ assert "abc".__str__() == "abc"
 
 # https://github.com/astral-sh/ruff/issues/18813
 three = 1 if 1 else(3.0).__str__()
+
+# https://github.com/astral-sh/ruff/issues/26221
+print((3.0).__floor__())  # PLC2801
+print((3.0).__ceil__())  # PLC2801
+print((3.0).__trunc__())  # PLC2801

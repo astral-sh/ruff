@@ -531,6 +531,7 @@ impl DunderReplacement {
             "__delattr__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
+            "__floor__" => Some(Self::MessageOnly("Use `math.floor()` function")),
             "__format__" => Some(Self::MessageOnly(
                 "Use `format` builtin, format string method, or f-string",
             )),
@@ -554,7 +555,7 @@ impl DunderReplacement {
                 "Mutate attribute directly or use setattr built-in function",
             )),
             "__setitem__" => Some(Self::MessageOnly("Use subscript assignment")),
-            "__truncate__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
+            "__trunc__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
 
             _ => None,
         }
