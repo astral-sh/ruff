@@ -15,8 +15,11 @@ impl<K, V> FrozenMap<K, V> {
         self.0.iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, (K, V)> {
-        self.0.iter_mut()
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = (&K, &mut V)> + ExactSizeIterator + std::iter::FusedIterator
+    {
+        self.into_iter()
     }
 
     pub fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
@@ -30,9 +33,7 @@ impl<K, V> FrozenMap<K, V> {
 
 impl<K: Ord, V> FromIterator<(K, V)> for FrozenMap<K, V> {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut entries = iter.into_iter().collect::<Vec<_>>();
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        entries.dedup_by(|(left, _), (right, _)| left == right);
+        let entries = sort_and_deduplicate(iter.into_iter().collect());
         Self(entries.into_boxed_slice())
     }
 }
@@ -104,17 +105,37 @@ impl<'a, K, V> IntoIterator for &'a FrozenMap<K, V> {
 }
 
 impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
-    type Item = &'a mut (K, V);
-    type IntoIter = std::slice::IterMut<'a, (K, V)>;
+    type Item = (&'a K, &'a mut V);
+    type IntoIter =
+        std::iter::Map<std::slice::IterMut<'a, (K, V)>, fn(&'a mut (K, V)) -> (&'a K, &'a mut V)>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
+        self.0.iter_mut().map(|(key, value)| (&*key, value))
     }
 }
 
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::Update)]
 struct FrozenValueIndex;
+
+/// Sorts entries by key and removes duplicate keys, retaining the last value for each key.
+///
+/// Stable sorting preserves the input order of equal-key entries, allowing the deduplication
+/// pass to provide last-entry-wins semantics like standard map collection.
+fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
+    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+    entries.dedup_by(|(later_key, later_value), (earlier_key, earlier_value)| {
+        if later_key == earlier_key {
+            // `dedup_by` removes the later entry, so move its value to the retained entry.
+            std::mem::swap(later_value, earlier_value);
+            true
+        } else {
+            false
+        }
+    });
+
+    entries
+}
 
 fn index_values<K, V>(
     entries: impl IntoIterator<Item = (K, V)>,
@@ -168,10 +189,12 @@ impl<K, V> FrozenValueMap<K, V> {
         V: Copy + Eq + Hash,
         F: FnMut(K, V) -> V,
     {
-        *self = self
-            .iter()
-            .map(|(key, value)| (key, map(key, value)))
-            .collect();
+        let (entries, values) =
+            index_values(self.iter().map(|(key, value)| (key, map(key, value))));
+        *self = Self {
+            entries: FrozenMap(entries.into_boxed_slice()),
+            values: values.into(),
+        };
     }
 }
 
@@ -181,9 +204,7 @@ where
     V: Copy + Eq + Hash,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut source_entries = iter.into_iter().collect::<Vec<_>>();
-        source_entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        source_entries.dedup_by(|(left, _), (right, _)| left == right);
+        let source_entries = sort_and_deduplicate(iter.into_iter().collect());
 
         let (entries, values) = index_values(source_entries);
 
@@ -266,6 +287,30 @@ mod tests {
     use super::{FrozenMap, FrozenValueMap};
 
     #[test]
+    fn frozen_map_preserves_last_value_for_duplicate_keys() {
+        let map = FrozenMap::from_iter([(2, "two"), (1, "first"), (1, "last")]);
+
+        assert_eq!(
+            map.iter().copied().collect::<Vec<_>>(),
+            vec![(1, "last"), (2, "two")]
+        );
+    }
+
+    #[test]
+    fn frozen_map_iterates_with_mutable_values() {
+        let mut map = FrozenMap::from_iter([(2, 20), (1, 10)]);
+
+        for (key, value) in &mut map {
+            *value += *key;
+        }
+
+        assert_eq!(
+            map.iter().copied().collect::<Vec<_>>(),
+            vec![(1, 11), (2, 22)]
+        );
+    }
+
+    #[test]
     fn frozen_value_map_deduplicates_values() {
         let map = FrozenValueMap::from_iter([(3, [1; 4]), (1, [2; 4]), (2, [1; 4])]);
 
@@ -276,6 +321,13 @@ mod tests {
             map.iter().collect::<Vec<_>>(),
             vec![(1, [2; 4]), (2, [1; 4]), (3, [1; 4])]
         );
+    }
+
+    #[test]
+    fn frozen_value_map_preserves_last_value_for_duplicate_keys() {
+        let map = FrozenValueMap::from_iter([(2, 20), (1, 10), (1, 11)]);
+
+        assert_eq!(map.iter().collect::<Vec<_>>(), vec![(1, 11), (2, 20)]);
     }
 
     #[test]
