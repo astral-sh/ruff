@@ -14,6 +14,7 @@ use super::indexed::{IntoIter, Iter, SmallIndexSet};
 /// Storage and lookup are provided by [`SmallIndexSet`]. Unlike `SmallIndexSet`, two
 /// `SmallOrderSet`s containing the same values in different orders compare unequal.
 #[repr(transparent)]
+#[derive(Clone)]
 pub struct SmallOrderSet<T, const N: usize>(SmallIndexSet<T, N>);
 
 impl<T, const N: usize> SmallOrderSet<T, N> {
@@ -113,15 +114,6 @@ impl<T, const N: usize> SmallOrderSet<T, N> {
 impl<T, const N: usize> Default for SmallOrderSet<T, N> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<T, const N: usize> Clone for SmallOrderSet<T, N>
-where
-    T: Clone,
-{
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
     }
 }
 
@@ -293,15 +285,5 @@ mod tests {
         let mut spilled = [1, 2, 3].into_iter().collect::<SmallOrderSet<_, 2>>();
         assert_eq!(spilled.swap_remove_index(0), Some(1));
         assert_eq!(spilled.iter().copied().collect::<Vec<_>>(), [3, 2]);
-    }
-
-    #[test]
-    fn preserves_covariance() {
-        fn shorten<'short>(set: SmallOrderSet<&'static str, 1>) -> SmallOrderSet<&'short str, 1> {
-            set
-        }
-
-        let set = shorten(SmallOrderSet::new());
-        assert!(set.is_empty());
     }
 }

@@ -3086,6 +3086,7 @@ version = "0.0.0"
 dependencies = [
  "anstyle",
  "arc-swap",
+ "arrayvec",
  "camino",
  "compact_str",
  "dashmap",

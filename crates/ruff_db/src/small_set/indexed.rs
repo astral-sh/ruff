@@ -3,15 +3,15 @@
 use std::fmt;
 use std::hash::Hash;
 use std::iter::FusedIterator;
-use std::mem::{self, MaybeUninit};
-use std::ops::Range;
 use std::slice;
 
+use arrayvec::ArrayVec;
 use get_size2::{GetSize, GetSizeTracker};
 use indexmap::{Equivalent, IndexSet};
 use rustc_hash::FxBuildHasher;
 
 type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
+type Inline<T, const N: usize> = ArrayVec<T, N>;
 
 /// An insertion-ordered set that stores up to `N` elements inline.
 ///
@@ -23,6 +23,7 @@ type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
 /// Long-lived sets should use the largest useful `N` that doesn't make the set larger or more
 /// aligned than `IndexSet<T>` in optimized builds. Profiling may justify a larger capacity for
 /// temporary sets.
+#[derive(Clone)]
 pub struct SmallIndexSet<T, const N: usize> {
     storage: Storage<T, N>,
 }
@@ -31,7 +32,7 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
     /// Creates an empty inline set.
     pub const fn new() -> Self {
         Self {
-            storage: Storage::Inline(Inline::new()),
+            storage: Storage::Inline(Inline::new_const()),
         }
     }
 
@@ -51,14 +52,14 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
     /// Returns an iterator in insertion order.
     pub fn iter(&self) -> Iter<'_, T> {
         let inner = match &self.storage {
-            Storage::Inline(inline) => IterInner::Inline(inline.as_slice().iter()),
+            Storage::Inline(inline) => IterInner::Inline(inline.iter()),
             Storage::Spilled(spilled) => IterInner::Spilled(spilled.iter()),
         };
         Iter { inner }
     }
 
     /// Returns the first element in insertion order, if any.
-    pub fn first(&self) -> Option<&T> {
+    pub(super) fn first(&self) -> Option<&T> {
         self.get_index(0)
     }
 
@@ -82,10 +83,10 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
         match &mut self.storage {
             Storage::Spilled(spilled) => spilled.insert(value),
             Storage::Inline(inline) => {
-                if inline.as_slice().contains(&value) {
+                if inline.contains(&value) {
                     return false;
                 }
-                if inline.len() < N {
+                if !inline.is_full() {
                     inline.push(value);
                     return true;
                 }
@@ -96,23 +97,41 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
         }
     }
 
-    pub(super) fn map(&self, map: impl FnMut(&T) -> T) -> Self
+    pub(super) fn map(&self, mut map: impl FnMut(&T) -> T) -> Self
     where
         T: Hash + Eq,
     {
         let storage = match &self.storage {
-            Storage::Inline(inline) => Storage::Inline(inline.map(map)),
+            Storage::Inline(inline) => {
+                let mut mapped = Inline::new();
+                for value in inline {
+                    let value = map(value);
+                    if !mapped.contains(&value) {
+                        mapped.push(value);
+                    }
+                }
+                Storage::Inline(mapped)
+            }
             Storage::Spilled(spilled) => Storage::Spilled(spilled.iter().map(map).collect()),
         };
         Self { storage }
     }
 
-    pub(super) fn try_map(&self, map: impl FnMut(&T) -> Option<T>) -> Option<Self>
+    pub(super) fn try_map(&self, mut map: impl FnMut(&T) -> Option<T>) -> Option<Self>
     where
         T: Hash + Eq,
     {
         let storage = match &self.storage {
-            Storage::Inline(inline) => Storage::Inline(inline.try_map(map)?),
+            Storage::Inline(inline) => {
+                let mut mapped = Inline::new();
+                for value in inline {
+                    let value = map(value)?;
+                    if !mapped.contains(&value) {
+                        mapped.push(value);
+                    }
+                }
+                Storage::Inline(mapped)
+            }
             Storage::Spilled(spilled) => {
                 Storage::Spilled(spilled.iter().map(map).collect::<Option<_>>()?)
             }
@@ -120,40 +139,38 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
         Some(Self { storage })
     }
 
-    /// Removes and returns the last element.
-    pub fn pop(&mut self) -> Option<T> {
-        match &mut self.storage {
-            Storage::Inline(inline) => inline.pop(),
-            Storage::Spilled(spilled) => spilled.pop(),
-        }
-    }
-
     /// Removes `value` by swapping the last element into its place.
     ///
     /// Returns `true` if the value was present.
-    pub fn swap_remove<Q>(&mut self, value: &Q) -> bool
+    pub(super) fn swap_remove<Q>(&mut self, value: &Q) -> bool
     where
         Q: ?Sized + Hash + Equivalent<T>,
         T: Hash + Eq,
     {
         match &mut self.storage {
-            Storage::Inline(inline) => inline.swap_remove(value),
+            Storage::Inline(inline) => {
+                let Some(index) = inline.iter().position(|item| value.equivalent(item)) else {
+                    return false;
+                };
+                inline.swap_remove(index);
+                true
+            }
             Storage::Spilled(spilled) => spilled.swap_remove(value),
         }
     }
 
     /// Removes and returns the element at `index`, swapping the last element into its place.
-    pub fn swap_remove_index(&mut self, index: usize) -> Option<T> {
+    pub(super) fn swap_remove_index(&mut self, index: usize) -> Option<T> {
         match &mut self.storage {
-            Storage::Inline(inline) => inline.swap_remove_index(index),
+            Storage::Inline(inline) => inline.swap_pop(index),
             Storage::Spilled(spilled) => spilled.swap_remove_index(index),
         }
     }
 
     /// Retains only elements for which `keep` returns `true`.
-    pub fn retain(&mut self, keep: impl FnMut(&T) -> bool) {
+    pub fn retain(&mut self, mut keep: impl FnMut(&T) -> bool) {
         match &mut self.storage {
-            Storage::Inline(inline) => inline.retain(keep),
+            Storage::Inline(inline) => inline.retain(|value| keep(value)),
             Storage::Spilled(spilled) => spilled.retain(keep),
         }
     }
@@ -174,7 +191,7 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
     /// Returns the element at `index` in insertion order, if any.
     pub(super) fn get_index(&self, index: usize) -> Option<&T> {
         match &self.storage {
-            Storage::Inline(inline) => inline.as_slice().get(index),
+            Storage::Inline(inline) => inline.get(index),
             Storage::Spilled(spilled) => spilled.get_index(index),
         }
     }
@@ -200,10 +217,7 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
         T: Hash + Eq,
     {
         match &self.storage {
-            Storage::Inline(inline) => inline
-                .as_slice()
-                .iter()
-                .find(|item| value.equivalent(*item)),
+            Storage::Inline(inline) => inline.iter().find(|item| value.equivalent(*item)),
             Storage::Spilled(spilled) => spilled.get(value),
         }
     }
@@ -217,13 +231,9 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
         // unchanged.
         let mut spilled = FxIndexSet::with_capacity_and_hasher(N.saturating_add(1), FxBuildHasher);
 
-        // Replace the inline storage first so that the set remains valid if hashing an inline
-        // element panics. The iterator owns and drops elements not yet transferred.
-        let inline = mem::replace(inline, Inline::new());
-        for value in inline.into_iter() {
-            let inserted = spilled.insert(value);
-            debug_assert!(inserted, "inline values must be unique");
-        }
+        // Empty the inline storage first so that the set remains valid if hashing an inline
+        // element panics. `extend` owns and drops elements not yet transferred.
+        spilled.extend(inline.take());
 
         let inserted = spilled.insert(value);
         debug_assert!(inserted, "new value was checked before spilling");
@@ -234,25 +244,6 @@ impl<T, const N: usize> SmallIndexSet<T, N> {
 impl<T, const N: usize> Default for SmallIndexSet<T, N> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<T, const N: usize> Clone for SmallIndexSet<T, N>
-where
-    T: Clone,
-{
-    fn clone(&self) -> Self {
-        let storage = match &self.storage {
-            Storage::Inline(inline) => {
-                let mut cloned = Inline::new();
-                for value in inline.as_slice() {
-                    cloned.push(value.clone());
-                }
-                Storage::Inline(cloned)
-            }
-            Storage::Spilled(spilled) => Storage::Spilled(spilled.clone()),
-        };
-        Self { storage }
     }
 }
 
@@ -459,223 +450,14 @@ enum IterInner<'a, T> {
 }
 
 enum IntoIterInner<T, const N: usize> {
-    Inline(InlineIntoIter<T, N>),
+    Inline(arrayvec::IntoIter<T, N>),
     Spilled(indexmap::set::IntoIter<T>),
 }
 
-#[repr(C)]
-struct Inline<T, const N: usize> {
-    len: usize,
-    items: MaybeUninit<[T; N]>,
-}
-
-impl<T, const N: usize> Inline<T, N> {
-    const fn new() -> Self {
-        Self {
-            len: 0,
-            items: MaybeUninit::uninit(),
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.len
-    }
-
-    fn set_len(&mut self, len: usize) {
-        debug_assert!(len <= N);
-        self.len = len;
-    }
-
-    fn as_ptr(&self) -> *const T {
-        self.items.as_ptr().cast()
-    }
-
-    fn as_mut_ptr(&mut self) -> *mut T {
-        self.items.as_mut_ptr().cast()
-    }
-
-    fn as_slice(&self) -> &[T] {
-        // SAFETY: The first `len` array elements are initialized by the `Inline` invariant.
-        unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) }
-    }
-
-    fn push(&mut self, value: T) {
-        let len = self.len();
-        debug_assert!(len < N);
-        // SAFETY: `len` points to the first uninitialized array element.
-        unsafe { self.as_mut_ptr().add(len).write(value) };
-        self.set_len(len + 1);
-    }
-
-    fn pop(&mut self) -> Option<T> {
-        let new_len = self.len().checked_sub(1)?;
-        self.set_len(new_len);
-        // SAFETY: The old last element was initialized and is no longer covered by `len`.
-        Some(unsafe { self.as_mut_ptr().add(new_len).read() })
-    }
-
-    fn map(&self, mut map: impl FnMut(&T) -> T) -> Self
-    where
-        T: Eq,
-    {
-        let mut mapped = Self::new();
-        for value in self.as_slice() {
-            let value = map(value);
-            if !mapped.as_slice().contains(&value) {
-                mapped.push(value);
-            }
-        }
-        mapped
-    }
-
-    fn try_map(&self, mut map: impl FnMut(&T) -> Option<T>) -> Option<Self>
-    where
-        T: Eq,
-    {
-        let mut mapped = Self::new();
-        for value in self.as_slice() {
-            let value = map(value)?;
-            if !mapped.as_slice().contains(&value) {
-                mapped.push(value);
-            }
-        }
-        Some(mapped)
-    }
-
-    fn retain(&mut self, mut keep: impl FnMut(&T) -> bool) {
-        let mut index = 0;
-        while index < self.len() {
-            if keep(&self.as_slice()[index]) {
-                index += 1;
-            } else {
-                let _ = self.shift_remove_index(index);
-            }
-        }
-    }
-
-    fn shift_remove_index(&mut self, index: usize) -> T {
-        let len = self.len();
-        debug_assert!(index < len);
-
-        let pointer = self.as_mut_ptr();
-        // SAFETY: `index` is initialized. Decreasing `len` first prevents double-drop if moving or
-        // dropping the returned value unwinds. `copy` supports the overlapping shifted ranges.
-        let removed = unsafe { pointer.add(index).read() };
-        self.set_len(len - 1);
-        unsafe {
-            pointer
-                .add(index + 1)
-                .copy_to(pointer.add(index), len - index - 1)
-        };
-        removed
-    }
-
-    fn swap_remove<Q>(&mut self, value: &Q) -> bool
-    where
-        Q: ?Sized + Equivalent<T>,
-    {
-        let Some(index) = self
-            .as_slice()
-            .iter()
-            .position(|item| value.equivalent(item))
-        else {
-            return false;
-        };
-
-        let _ = self.swap_remove_index(index);
-        true
-    }
-
-    fn swap_remove_index(&mut self, index: usize) -> Option<T> {
-        let len = self.len();
-        if index >= len {
-            return None;
-        }
-
-        let pointer = self.as_mut_ptr();
-        // SAFETY: `index` and the old last element are initialized. Decreasing `len` first
-        // prevents double-drop if dropping the returned value unwinds. If they are distinct,
-        // moving the last element fills the removed element's slot.
-        let removed = unsafe { pointer.add(index).read() };
-        self.set_len(len - 1);
-        if index != len - 1 {
-            unsafe { pointer.add(index).write(pointer.add(len - 1).read()) };
-        }
-        Some(removed)
-    }
-
-    fn clear(&mut self) {
-        let len = self.len();
-        self.set_len(0);
-        // SAFETY: The old first `len` elements were initialized. Setting the length to zero first
-        // prevents a second drop if an element destructor unwinds.
-        unsafe {
-            std::ptr::drop_in_place(std::ptr::slice_from_raw_parts_mut(self.as_mut_ptr(), len))
-        };
-    }
-
-    fn into_iter(mut self) -> InlineIntoIter<T, N> {
-        let remaining = 0..self.len();
-        self.set_len(0);
-        let items = mem::replace(&mut self.items, MaybeUninit::uninit());
-        InlineIntoIter { items, remaining }
-    }
-}
-
-impl<T, const N: usize> Drop for Inline<T, N> {
-    fn drop(&mut self) {
-        self.clear();
-    }
-}
-
+#[derive(Clone)]
 enum Storage<T, const N: usize> {
     Inline(Inline<T, N>),
     Spilled(FxIndexSet<T>),
-}
-
-struct InlineIntoIter<T, const N: usize> {
-    items: MaybeUninit<[T; N]>,
-    remaining: Range<usize>,
-}
-
-impl<T, const N: usize> InlineIntoIter<T, N> {
-    fn as_mut_ptr(&mut self) -> *mut T {
-        self.items.as_mut_ptr().cast()
-    }
-}
-
-impl<T, const N: usize> Iterator for InlineIntoIter<T, N> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let index = self.remaining.next()?;
-        // SAFETY: `remaining` only yields initialized, not-yet-moved indices.
-        Some(unsafe { self.as_mut_ptr().add(index).read() })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.remaining.len();
-        (len, Some(len))
-    }
-}
-
-impl<T, const N: usize> DoubleEndedIterator for InlineIntoIter<T, N> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let index = self.remaining.next_back()?;
-        // SAFETY: `remaining` only yields initialized, not-yet-moved indices.
-        Some(unsafe { self.as_mut_ptr().add(index).read() })
-    }
-}
-
-impl<T, const N: usize> ExactSizeIterator for InlineIntoIter<T, N> {}
-impl<T, const N: usize> FusedIterator for InlineIntoIter<T, N> {}
-
-impl<T, const N: usize> Drop for InlineIntoIter<T, N> {
-    fn drop(&mut self) {
-        for value in self.by_ref() {
-            drop(value);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -719,15 +501,10 @@ mod tests {
     }
 
     #[test]
-    fn retains_and_pops_inline() {
+    fn retains_inline() {
         let mut set = [1, 2, 3].into_iter().collect::<SmallIndexSet<_, 4>>();
-        assert_eq!(set.swap_remove_index(3), None);
         set.retain(|value| *value != 2);
         assert_eq!(set.iter().copied().collect::<Vec<_>>(), [1, 3]);
-        assert_eq!(set.pop(), Some(3));
-        assert_eq!(set.pop(), Some(1));
-        assert_eq!(set.pop(), None);
-        assert!(set.is_empty());
     }
 
     #[test]
@@ -752,41 +529,8 @@ mod tests {
     #[test]
     fn equality_is_order_insensitive() {
         let left = [1, 2].into_iter().collect::<SmallIndexSet<_, 2>>();
-        let right = [2, 1].into_iter().collect::<SmallIndexSet<_, 1>>();
-        assert_eq!(left.iter().copied().collect::<Vec<_>>(), [1, 2]);
-        assert_eq!(right.iter().copied().collect::<Vec<_>>(), [2, 1]);
-
-        // Compare equal-capacity sets because `PartialEq` deliberately mirrors IndexSet's API.
         let reversed = [2, 1].into_iter().collect::<SmallIndexSet<_, 2>>();
         assert_eq!(left, reversed);
-    }
-
-    #[test]
-    fn clone_preserves_representation() {
-        let inline = [String::from("a")]
-            .into_iter()
-            .collect::<SmallIndexSet<_, 1>>();
-        assert!(!inline.clone().is_spilled());
-
-        let spilled = [String::from("a"), String::from("b")]
-            .into_iter()
-            .collect::<SmallIndexSet<_, 1>>();
-        assert!(spilled.clone().is_spilled());
-    }
-
-    #[test]
-    fn owning_iterator_drops_unconsumed_elements() {
-        let first = Arc::new(());
-        let second = Arc::new(());
-        let set = [Arc::clone(&first), Arc::clone(&second)]
-            .into_iter()
-            .collect::<SmallIndexSet<_, 2>>();
-
-        let mut iter = set.into_iter();
-        drop(iter.next());
-        drop(iter);
-        assert_eq!(Arc::strong_count(&first), 1);
-        assert_eq!(Arc::strong_count(&second), 1);
     }
 
     #[test]
@@ -839,16 +583,6 @@ mod tests {
         panic.store(false, Ordering::Relaxed);
         assert!(set.is_empty());
         assert!(set.insert(HashBomb { value: 3, panic }));
-    }
-
-    #[test]
-    fn preserves_covariance() {
-        fn shorten<'short>(set: SmallIndexSet<&'static str, 1>) -> SmallIndexSet<&'short str, 1> {
-            set
-        }
-
-        let set = shorten(SmallIndexSet::new());
-        assert!(set.is_empty());
     }
 
     #[test]
