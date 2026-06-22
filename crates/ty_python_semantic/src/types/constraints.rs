@@ -589,7 +589,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         if self
             .node
-            .is_simple_lower_bound_conjunction_of_inferable_typevars(db, builder, inferable)
+            .visit_simple_lower_bound_conjunction(db, builder, |typevar, _, _| {
+                typevar.is_inferable(db, inferable)
+            })
         {
             return self;
         }
@@ -1982,13 +1984,14 @@ impl NodeId {
         }
     }
 
-    /// Returns whether this BDD is a single positive conjunction of concrete lower bounds on
-    /// inferable typevars.
-    fn is_simple_lower_bound_conjunction_of_inferable_typevars<'db>(
+    /// Visits the concrete lower bounds in this BDD if it is a single positive conjunction.
+    ///
+    /// Returns `true` if the BDD has the expected shape and `visit` accepts every lower bound.
+    fn visit_simple_lower_bound_conjunction<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        mut visit: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, usize) -> bool,
     ) -> bool {
         let mut node = self;
 
@@ -2006,49 +2009,16 @@ impl NodeId {
                     let Some(lower) = constraint.bounds.lower else {
                         return false;
                     };
-                    if !constraint.typevar.is_inferable(db, inferable)
-                        || constraint.bounds.upper.is_some()
+                    if constraint.bounds.upper.is_some()
                         || lower.has_typevar(db)
                         || lower.has_unspecialized_type_var(db)
                     {
                         return false;
                     }
-
-                    node = interior.if_true;
-                }
-            }
-        }
-    }
-
-    /// Returns the concrete lower bounds in this BDD if it is a single positive conjunction.
-    fn simple_lower_bound_conjunction<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> Option<Vec<(BoundTypeVarInstance<'db>, Type<'db>, usize)>> {
-        let mut constraints = Vec::new();
-        let mut node = self;
-
-        loop {
-            match node.node() {
-                Node::AlwaysTrue => return Some(constraints),
-                Node::AlwaysFalse => return None,
-                Node::Interior(_) => {
-                    let interior = builder.interior_node_data(node);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return None;
+                    if !visit(constraint.typevar, lower, interior.source_order) {
+                        return false;
                     }
 
-                    let constraint = builder.constraint_data(interior.constraint);
-                    let lower = constraint.bounds.lower?;
-                    if constraint.bounds.upper.is_some()
-                        || lower.has_typevar(db)
-                        || lower.has_unspecialized_type_var(db)
-                    {
-                        return None;
-                    }
-
-                    constraints.push((constraint.typevar, lower, interior.source_order));
                     node = interior.if_true;
                 }
             }
@@ -3417,7 +3387,17 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
     ) -> Option<Self> {
-        let mut constraints = node.simple_lower_bound_conjunction(db, builder)?;
+        let mut constraints = Vec::new();
+        if !node.visit_simple_lower_bound_conjunction(
+            db,
+            builder,
+            |typevar, lower, source_order| {
+                constraints.push((typevar, lower, source_order));
+                true
+            },
+        ) {
+            return None;
+        }
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
 
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
