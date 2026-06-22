@@ -627,7 +627,12 @@ impl<'db> Type<'db> {
             })
             .collect::<Option<Vec<_>>>()?;
 
-        Some(Self::union_projection_cycle_recovery(db, elements))
+        let ty = Self::union_projection_cycle_recovery(db, elements);
+        debug_assert!(
+            !ty.mentions_projection_artifact_in_roots(db, &CycleRootSet::single(root)),
+            "projection recovery must not leave unsolved projection artifacts"
+        );
+        Some(ty)
     }
 
     fn union_projection_cycle_recovery(db: &'db dyn Db, elements: Vec<(Self, bool)>) -> Self {
@@ -995,6 +1000,13 @@ impl<'db> Type<'db> {
     fn mentions_cycle_artifact_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
         any_over_type(db, self, false, |ty| match ty {
             Type::Divergent(root) => roots.contains(root),
+            Type::Projection(projection) => roots.contains(projection.root(db)),
+            _ => false,
+        })
+    }
+
+    fn mentions_projection_artifact_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
             Type::Projection(projection) => roots.contains(projection.root(db)),
             _ => false,
         })
@@ -1821,6 +1833,13 @@ impl<'db> ProjectionSolutions<'db> {
         Self { solved }
     }
 
+    fn contains_projection_artifact_in_roots(&self, db: &'db dyn Db) -> bool {
+        let roots = self.roots();
+        self.solved
+            .values()
+            .any(|ty| ty.mentions_projection_artifact_in_roots(db, &roots))
+    }
+
     fn roots(&self) -> CycleRootSet {
         let mut roots = SmallVec::new();
         for var in self.solved.keys() {
@@ -1836,6 +1855,10 @@ impl<'db> ProjectionSolutions<'db> {
 
     fn solved_type(&self, db: &'db dyn Db, var: &ProjectionVar<'db>) -> Option<Type<'db>> {
         if let Some(solved) = self.solved.get(var).copied() {
+            debug_assert!(
+                !solved.mentions_projection_artifact_in_roots(db, &CycleRootSet::single(var.root)),
+                "projection solver must not return an unsolved projection artifact"
+            );
             return Some(solved);
         }
 
@@ -1853,8 +1876,13 @@ impl<'db> ProjectionSolutions<'db> {
             if solved.same_divergent_marker(db, Type::Divergent(var.root)) {
                 return Some(*solved);
             }
-            return ProjectionContainer::project_type_path(db, *solved, var.root, None, &tail)
-                .map(|term| term.ty(db));
+            let solved = ProjectionContainer::project_type_path(db, *solved, var.root, None, &tail)
+                .map(|term| term.ty(db))?;
+            debug_assert!(
+                !solved.mentions_projection_artifact_in_roots(db, &CycleRootSet::single(var.root)),
+                "projection solver must not return an unsolved projection artifact"
+            );
+            return Some(solved);
         }
 
         None
@@ -2103,10 +2131,7 @@ impl<'db> ProjectionEquationSystem<'db> {
                         if term.mentions_projection_var_in(db, &scc_vars) {
                             continue;
                         }
-                        base.push(
-                            term.replace_solved_projection_vars(db, &solved_so_far)
-                                .unwrap_or(*term),
-                        );
+                        base.push(term.replace_solved_projection_vars(db, &solved_so_far)?);
                     }
                     for dependency in &equation.dependencies {
                         let dependency_index = var_indices[dependency];
@@ -2133,10 +2158,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             for &index in &scc {
                 let equation = &equations[&vars[index]];
                 for term in &equation.productive {
-                    base.push(
-                        term.replace_solved_projection_vars(db, &solved_so_far)
-                            .unwrap_or(*term),
-                    );
+                    base.push(term.replace_solved_projection_vars(db, &solved_so_far)?);
                 }
                 for dependency in &equation.dependencies {
                     let dependency_index = var_indices[dependency];
@@ -2179,7 +2201,12 @@ impl<'db> ProjectionEquationSystem<'db> {
             .map(|(index, var)| Some((var, solutions[index]?)))
             .collect::<Option<FxIndexMap<_, _>>>()?;
 
-        Some(ProjectionSolutions::new(solved))
+        let solutions = ProjectionSolutions::new(solved);
+        debug_assert!(
+            !solutions.contains_projection_artifact_in_roots(db),
+            "projection solver must not leave unsolved projection artifacts"
+        );
+        Some(solutions)
     }
 }
 
@@ -2313,6 +2340,11 @@ impl<'db> ProjectionEquation<'db> {
             return Some(());
         }
 
+        if term.mentions_cycle_artifact_outside_roots(db, roots) {
+            self.unsupported = true;
+            return Some(());
+        }
+
         if allow_dependencies {
             if let Type::Projection(projection) = term {
                 let root = projection.root(db);
@@ -2338,11 +2370,6 @@ impl<'db> ProjectionEquation<'db> {
                 self.dependencies.insert(var);
                 return Some(());
             }
-        }
-
-        if term.mentions_cycle_artifact_outside_roots(db, roots) {
-            self.unsupported = true;
-            return Some(());
         }
 
         if allow_dependencies {
