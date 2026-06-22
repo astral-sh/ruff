@@ -6913,39 +6913,92 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let use_empty_list_consensus = collection_class == KnownClass::List
+            && elts.is_empty()
+            && collection_expr.is_some_and(|collection_expr| {
+                matches!(
+                    self.region,
+                    InferenceRegion::Expression(current_expr, _)
+                        if current_expr.node_ref(db).index() == *collection_expr.node_index()
+                )
+            });
 
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
-            let inferred_ty = speculative_builder.infer_collection_literal_impl(
-                collection_class,
-                collection_expr,
-                elts,
-                infer_elt_expression,
-                TypeContext::new(Some(narrowed_ty)),
-            )?;
+            let (inferred_ty, uses_empty_covariant_context) = speculative_builder
+                .infer_collection_literal_impl(
+                    collection_class,
+                    collection_expr,
+                    elts,
+                    infer_elt_expression,
+                    TypeContext::new(Some(narrowed_ty)),
+                )?;
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
             if !inferred_ty.is_assignable_to(db, narrowed_ty) {
                 return None;
             }
 
-            // Successfully narrowed to an element of the union.
-            self.extend(speculative_builder);
-            Some(inferred_ty)
+            Some((
+                inferred_ty,
+                speculative_builder,
+                uses_empty_covariant_context,
+            ))
         };
 
         // If the type context is a union, attempt to narrow to a specific element.
-        for narrowed_ty in tcx
-            .narrow_targets(db)
+        let narrow_targets = tcx.narrow_targets(db);
+        let narrow_targets = narrow_targets
             .as_deref()
             .into_iter()
             .flatten()
-            .filter(|ty| ty.class_specialization(db).is_some())
-        {
-            if let Some(result) = try_narrow(*narrowed_ty) {
-                return Some(result);
+            .filter(|ty| ty.class_specialization(db).is_some());
+
+        if use_empty_list_consensus {
+            let mut narrowed_result = None;
+            let mut candidates_agree = true;
+            let mut uses_empty_covariant_context = false;
+
+            for narrowed_ty in narrow_targets {
+                let Some((inferred_ty, speculative_builder, candidate_uses_covariant_context)) =
+                    try_narrow(*narrowed_ty)
+                else {
+                    continue;
+                };
+
+                if let Some((previous_ty, _)) = &narrowed_result
+                    && inferred_ty != *previous_ty
+                {
+                    candidates_agree = false;
+                }
+                uses_empty_covariant_context |= candidate_uses_covariant_context;
+                narrowed_result.get_or_insert((inferred_ty, speculative_builder));
+            }
+
+            if let Some((inferred_ty, speculative_builder)) = narrowed_result {
+                if uses_empty_covariant_context && !candidates_agree {
+                    return self
+                        .infer_collection_literal_impl(
+                            collection_class,
+                            collection_expr,
+                            elts,
+                            infer_elt_expression,
+                            TypeContext::default(),
+                        )
+                        .map(|(ty, _)| ty);
+                }
+
+                self.extend(speculative_builder);
+                return Some(inferred_ty);
+            }
+        } else {
+            for narrowed_ty in narrow_targets {
+                if let Some((inferred_ty, speculative_builder, _)) = try_narrow(*narrowed_ty) {
+                    self.extend(speculative_builder);
+                    return Some(inferred_ty);
+                }
             }
         }
 
@@ -6956,9 +7009,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             infer_elt_expression,
             tcx,
         )
+        .map(|(ty, _)| ty)
     }
 
-    // Infer the type of a collection literal expression.
+    // Infer the type of a collection literal expression and whether it uses a fully static,
+    // covariant context for a directly contextualized empty list.
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
@@ -6966,7 +7021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<(Type<'db>, bool)> {
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
             let collection_alias = collection_class
@@ -6998,6 +7053,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
+        let inference_root = collection_expr.and_then(|collection_expr| match self.region {
+            InferenceRegion::Expression(current_expr, _)
+                if current_expr.node_ref(self.db()).index() == *collection_expr.node_index() =>
+            {
+                Some(current_expr)
+            }
+            _ => None,
+        });
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -7134,6 +7197,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && elts
                 .iter()
                 .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
+        let uses_empty_covariant_context = collection_class == KnownClass::List
+            && elts.is_empty()
+            && inference_root.is_some()
+            && elt_tcx_constraints.len() == 1
+            && elt_tcx_constraints
+                .values()
+                .all(|ty| !ty.has_dynamic(self.db()))
+            && elt_tcx_variance
+                .values()
+                .any(|variance| variance.is_covariant());
 
         let mut pre_inferred_elt_tys = None;
 
@@ -7152,6 +7225,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if elt_tcx_variance
                         .get(&identity)
                         .is_some_and(|variance| variance.is_covariant())
+                        && !uses_empty_covariant_context
                     {
                         return None;
                     }
@@ -7195,7 +7269,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .specialize_recursive(self.db(), specialization.into_iter().map(Some))
                     },
                 );
-                return Type::from(class_type).to_instance(self.db());
+                return Type::from(class_type)
+                    .to_instance(self.db())
+                    .map(|ty| (ty, uses_empty_covariant_context));
             }
 
             pre_inferred_elt_tys = Some(inferred_elts);
@@ -7230,6 +7306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if elt_tcx_variance
                 .get(&elt_ty_identity)
                 .is_some_and(|variance| variance.is_covariant())
+                && !uses_empty_covariant_context
             {
                 continue;
             }
@@ -7244,9 +7321,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if tcx.annotation.is_none()
-            && let Some(collection_expr) = collection_expr
-            && let InferenceRegion::Expression(current_expr, _) = self.region
-            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
+            && let Some(current_expr) = inference_root
             && let Some(assignment) = current_expr.assigned_to(self.db())
             && let Ok(collection_def) =
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
@@ -7436,7 +7511,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             });
 
-        Type::from(class_type).to_instance(self.db())
+        Type::from(class_type)
+            .to_instance(self.db())
+            .map(|ty| (ty, uses_empty_covariant_context))
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.

@@ -6,6 +6,128 @@
 reveal_type([])  # revealed: list[Unknown]
 ```
 
+A directly contextualized empty list uses a fully static covariant element type when every
+compatible union arm agrees:
+
+```py
+from collections.abc import Iterable, Reversible, Sequence
+
+def default_to_empty(items: Sequence[int] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[int]
+    reveal_type(items)  # revealed: Sequence[int]
+
+def agreeing(items: Iterable[int] | Reversible[int] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[int]
+
+def conflicting(items: Sequence[str] | Sequence[bytes] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+```
+
+Dynamic element types, including nested dynamic types, retain the normal `Unknown` fallback
+independent of union order:
+
+```py
+from collections.abc import Sequence
+from typing import Any
+from ty_extensions import Unknown
+
+def any_first(items: Sequence[Any] | Sequence[int] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def int_first(items: Sequence[int] | Sequence[Any] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def any_unknown_first(items: Sequence[Any] | Sequence[Unknown] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def unknown_any_first(items: Sequence[Unknown] | Sequence[Any] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def nested_any_first(
+    items: Sequence[list[Any]] | Sequence[list[Unknown]] | None = None,
+) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def nested_unknown_first(
+    items: Sequence[list[Unknown]] | Sequence[list[Any]] | None = None,
+) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+```
+
+The effective variance of a structural constraint determines whether the fallback applies. Mixed
+covariant and invariant arms remain order-independent:
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import Protocol, TypeVar
+
+ElementT = TypeVar("ElementT")
+
+class IterableConsumer(Protocol[ElementT]):
+    def __iter__(self) -> Iterator[ElementT]: ...
+    def __contains__(self, value: ElementT, /) -> bool: ...
+
+def protocol_int_first(
+    items: IterableConsumer[int] | IterableConsumer[str] | None = None,
+) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def protocol_str_first(
+    items: IterableConsumer[str] | IterableConsumer[int] | None = None,
+) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def covariant_first(items: Iterable[int] | list[str] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+
+def invariant_first(items: list[str] | Iterable[int] | None = None) -> None:
+    if items is None:
+        items = []
+        reveal_type(items)  # revealed: list[Unknown]
+```
+
+Covariant context is not propagated through an enclosing generic call:
+
+```py
+from collections.abc import Iterable, Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+wrapped_int_first: Iterable[int] | Sequence[str] = identity([])
+reveal_type(wrapped_int_first)  # revealed: list[Unknown]
+
+wrapped_str_first: Sequence[str] | Iterable[int] = identity([])
+reveal_type(wrapped_str_first)  # revealed: list[Unknown]
+```
+
 ## List of tuples
 
 ```py
