@@ -1452,11 +1452,42 @@ impl<'db> Type<'db> {
         wrapped: UnionType<'db>,
         div: Self,
     ) -> Self {
-        wrapped
-            .elements(db)
-            .iter()
-            .fold(current, |normalized, wrapped_element| {
-                normalized.apply_type_mapping(
+        let mut normalized = current;
+        while let Some((distributed, replacement)) =
+            find_over_type(db, normalized, false, |ty| match ty {
+                Type::Union(distributed) => {
+                    Self::union_distribution_normalized(db, distributed, wrapped, div)
+                        .map(|replacement| (distributed, replacement))
+                }
+                _ => None,
+            })
+        {
+            normalized = normalized.apply_type_mapping(
+                db,
+                &TypeMapping::ReplaceType {
+                    from: Type::Union(distributed),
+                    to: replacement,
+                },
+                TypeContext::default(),
+            );
+        }
+        normalized
+    }
+
+    /// Normalizes only the matched branches of one distributed union.
+    fn union_distribution_normalized(
+        db: &'db dyn Db,
+        current: UnionType<'db>,
+        wrapped: UnionType<'db>,
+        div: Self,
+    ) -> Option<Self> {
+        let matched = Self::matching_union_distribution(db, current, wrapped)?;
+        Some(current.map_leave_aliases(db, |branch| {
+            if let Some((_, wrapped_element)) = matched
+                .iter()
+                .find(|(matched_branch, _)| matched_branch == branch)
+            {
+                branch.apply_type_mapping(
                     db,
                     &TypeMapping::ReplaceType {
                         from: *wrapped_element,
@@ -1464,7 +1495,10 @@ impl<'db> Type<'db> {
                     },
                     TypeContext::default(),
                 )
-            })
+            } else {
+                *branch
+            }
+        }))
     }
 
     /// Returns whether one specialization position contains a complete, positive distribution
