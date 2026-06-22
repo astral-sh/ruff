@@ -157,15 +157,21 @@ pub(crate) struct CheckCommand {
     #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
-    /// Use exit code 1 if there are any warning-level diagnostics. Defaults to true.
+    /// Use exit code 1 if there are any warning-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--exit-zero` or `--exit-zero-on-warning`.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
     pub(crate) error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--error-on-warning`.
     #[arg(long)]
     pub(crate) exit_zero: bool,
 
-    /// Use exit code 0 if there are no error-level diagnostics. Defaults to false.
+    /// Use exit code 0 if there are no error-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--error-on-warning`.
     #[arg(long, conflicts_with = "error_on_warning")]
     pub(crate) exit_zero_on_warning: bool,
 
