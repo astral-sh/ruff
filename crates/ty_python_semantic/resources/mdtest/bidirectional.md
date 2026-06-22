@@ -992,6 +992,44 @@ def _() -> int:
     return invalid_x6  # error: [invalid-return-type]
 ```
 
+An unannotated return can still constrain a collection when the collection is passed directly to an
+annotated call:
+
+```py
+class Rule: ...
+class URule(Rule): ...
+
+class AlternativeRule:
+    def __init__(self, rules: list[Rule]) -> None: ...
+
+def _():
+    rules = []
+    rules.append(URule())
+    reveal_type(rules)  # revealed: list[Rule]
+    return AlternativeRule(rules)
+```
+
+Invalid bound-method calls should not retain diagnostics from the initial cycle iteration:
+
+```py
+def _(values: list[str] | None):
+    lines = []
+    lines.append("header")
+    lines.extend(values)  # error: [invalid-argument-type]
+    reveal_type(lines)  # revealed: list[str]
+```
+
+Starred uses in a return expression continue to participate in cycle recovery:
+
+```py
+def consume(*values: int) -> None: ...
+def _():
+    values = []
+    values.append(1)
+    reveal_type(values)  # revealed: list[int]
+    return consume(*values)
+```
+
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]

@@ -559,6 +559,24 @@ impl<'db> SemanticIndex<'db> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
 
+    /// If this expression is any use of an unconstrained collection literal, returns its
+    /// definition.
+    pub fn unannotated_collection_literal_at_any_use(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        let use_id = self.ast_ids.try_use_id(collection_use)?;
+        let scope_id = self.expression_scope_id(collection_use);
+        let use_def = self.use_def_map(scope_id);
+        let mut definitions = use_def
+            .bindings_at_use(use_id)
+            .filter_map(|binding| binding.binding.definition())
+            .filter(|definition| self.uses_by_collection.get(definition).is_some());
+
+        let definition = definitions.next()?;
+        definitions.next().is_none().then_some(definition)
+    }
+
     /// Returns all potentially constraining uses of the given unnannotated collection literal.
     pub fn constraining_collection_uses(
         &self,

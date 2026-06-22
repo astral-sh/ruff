@@ -502,6 +502,30 @@ fn infer_statement_types_impl<'db>(
         .finish_statement()
 }
 
+/// Infers the constraints that later statements place on an unconstrained collection literal.
+///
+/// The collection's receiver expression is inferred using the built-in collection's identity
+/// specialization, which avoids creating query cycles back to the collection literal's
+/// definition. Uses that also depend on an unconstrained collection are reported as requiring the
+/// regular cycle-based inference path.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn infer_collection_use_constraints<'db>(
+    db: &'db dyn Db,
+    collection_def: Definition<'db>,
+) -> CollectionUseConstraintInference<'db> {
+    let file = collection_def.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::Definition(collection_def),
+        index,
+        &module,
+    )
+    .finish_collection_use_constraints(collection_def)
+}
+
 /// An `Expression` with an optional `TypeContext`.
 ///
 /// This is a Salsa supertype used as the input to `infer_expression_types` to avoid
@@ -1627,6 +1651,12 @@ pub(crate) enum StatementInference<'db> {
     Expression(&'db ExpressionInference<'db>),
     Definition(Definition<'db>, &'db DefinitionInference<'db>),
     Other(&'db StatementInferenceInner<'db>),
+}
+
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(super) enum CollectionUseConstraintInference<'db> {
+    Constraints(Box<[Type<'db>]>),
+    RequiresCycle,
 }
 
 impl<'db> StatementInference<'db> {

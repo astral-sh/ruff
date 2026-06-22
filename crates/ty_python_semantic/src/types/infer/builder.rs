@@ -1,4 +1,4 @@
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
 
 use itertools::Itertools;
@@ -7,6 +7,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
     PythonVersion,
@@ -22,11 +23,12 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
-    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
-    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    CollectionUseConstraintInference, DeferredAndUndecorated, DefinitionInference,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
+    infer_collection_use_constraints, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -184,6 +186,45 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 
+#[derive(Clone)]
+struct CollectionConstraintTarget<'db> {
+    definition: Definition<'db>,
+    has_dependency: Rc<Cell<bool>>,
+}
+
+struct StarredUseVisitor {
+    target: ExpressionNodeKey,
+    starred_depth: usize,
+    found: bool,
+}
+
+impl<'ast> Visitor<'ast> for StarredUseVisitor {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if self.found {
+            return;
+        }
+        if self.starred_depth > 0 && ExpressionNodeKey::from(expression) == self.target {
+            self.found = true;
+            return;
+        }
+
+        let is_starred = matches!(expression, ast::Expr::Starred(_));
+        self.starred_depth += usize::from(is_starred);
+        walk_expr(self, expression);
+        self.starred_depth -= usize::from(is_starred);
+    }
+}
+
+fn expression_contains_starred_use(expression: &ast::Expr, target: ExpressionNodeKey) -> bool {
+    let mut visitor = StarredUseVisitor {
+        target,
+        starred_depth: 0,
+        found: false,
+    };
+    visitor.visit_expr(expression);
+    visitor.found
+}
+
 /// Builder to infer all types in a region.
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
@@ -269,6 +310,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+
+    /// The collection whose constraints are being inferred without depending on its definition.
+    collection_constraint_target: Option<CollectionConstraintTarget<'db>>,
 
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
@@ -384,6 +428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
             collection_use_constraints: FxHashMap::default(),
+            collection_constraint_target: None,
             string_annotations: FxHashSet::default(),
             expected_types: FxHashMap::default(),
             bindings: VecMap::default(),
@@ -411,6 +456,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             })
             .as_ref()
+    }
+
+    fn collection_constraint_override(&self, expression: &ast::Expr) -> Option<Type<'db>> {
+        let target = self.collection_constraint_target.as_ref()?;
+        let collection_def = self
+            .index
+            .unannotated_collection_literal(expression)
+            .or_else(|| {
+                self.index
+                    .unannotated_collection_literal_at_any_use(expression)
+            })?;
+
+        if self.index.unannotated_collection_literal(expression) != Some(target.definition) {
+            target.has_dependency.set(true);
+        }
+
+        self.unannotated_collection_identity_type(collection_def)
+    }
+
+    fn unannotated_collection_identity_type(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> Option<Type<'db>> {
+        let assignment = collection_def.kind(self.db()).as_unannotated_assignment()?;
+        let known_class = match assignment.value(self.module()) {
+            ast::Expr::List(list) if list.elts.is_empty() => KnownClass::List,
+            ast::Expr::Set(set) if set.elts.is_empty() => KnownClass::Set,
+            ast::Expr::Dict(dict) if dict.items.is_empty() => KnownClass::Dict,
+            _ => return None,
+        };
+        let collection_literal = known_class.try_to_class_literal(self.db())?;
+
+        Some(Type::instance(
+            self.db(),
+            collection_literal.identity_specialization(self.db()),
+        ))
     }
 
     fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {
@@ -6132,18 +6213,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_comprehension_expression(dictcomp, tcx)
             }
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => {
-                let ty = self.infer_name_expression(name);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
-            ast::Expr::Attribute(attribute) => {
-                let ty = self.infer_attribute_expression(attribute);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
+            ast::Expr::Name(name) => self
+                .collection_constraint_override(expression)
+                .unwrap_or_else(|| {
+                    let ty = self.infer_name_expression(name);
+                    tcx.annotation.map_or(ty, |target| {
+                        self.specialize_generic_class_from_context(ty, target)
+                    })
+                }),
+            ast::Expr::Attribute(attribute) => self
+                .collection_constraint_override(expression)
+                .unwrap_or_else(|| {
+                    let ty = self.infer_attribute_expression(attribute);
+                    tcx.annotation.map_or(ty, |target| {
+                        self.specialize_generic_class_from_context(ty, target)
+                    })
+                }),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
@@ -7254,38 +7339,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
-            for (statement, use_expression) in
-                self.index.constraining_collection_uses(collection_def)
-            {
-                let statement_use_types = infer_statement_types(self.db(), statement);
-
-                if let Some(divergent) = statement_use_types
-                    .expression_type(use_expression)
-                    .as_divergent()
-                {
-                    // Infer `collection[Divergent]` for the initial cycle result.
-                    let divergent_instance = collection_alias
-                        .origin(self.db())
-                        .apply_specialization(self.db(), |generic_context| {
-                            generic_context
-                                .repeat_specialization(self.db(), Type::Divergent(divergent))
-                        });
-
-                    builder
-                        .infer(
-                            identity_instance,
-                            Type::instance(self.db(), divergent_instance),
-                        )
-                        .ok()?;
-                } else if let Some(constraints) =
-                    statement_use_types.collection_use_constraints(collection_def)
-                {
+            match infer_collection_use_constraints(self.db(), collection_def) {
+                CollectionUseConstraintInference::Constraints(constraints) => {
                     for constraint in constraints {
                         if constraint.has_unspecialized_type_var(self.db()) {
                             continue;
                         }
 
                         builder.infer(identity_instance, *constraint).ok()?;
+                    }
+                }
+                CollectionUseConstraintInference::RequiresCycle => {
+                    for (statement, use_expression) in
+                        self.index.constraining_collection_uses(collection_def)
+                    {
+                        let statement_use_types = infer_statement_types(self.db(), statement);
+
+                        if let Some(divergent) = statement_use_types
+                            .expression_type(use_expression)
+                            .as_divergent()
+                        {
+                            // Infer `collection[Divergent]` for the initial cycle result.
+                            let divergent_instance = collection_alias
+                                .origin(self.db())
+                                .apply_specialization(self.db(), |generic_context| {
+                                    generic_context.repeat_specialization(
+                                        self.db(),
+                                        Type::Divergent(divergent),
+                                    )
+                                });
+
+                            builder
+                                .infer(
+                                    identity_instance,
+                                    Type::instance(self.db(), divergent_instance),
+                                )
+                                .ok()?;
+                            continue;
+                        }
+
+                        let Some(constraints) =
+                            statement_use_types.collection_use_constraints(collection_def)
+                        else {
+                            continue;
+                        };
+
+                        for constraint in constraints {
+                            if constraint.has_unspecialized_type_var(self.db()) {
+                                continue;
+                            }
+
+                            builder.infer(identity_instance, *constraint).ok()?;
+                        }
                     }
                 }
             }
@@ -8331,21 +8436,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(constraint)
     }
 
+    /// Records collection constraints and returns whether they are suitable for cycle-free
+    /// inference.
+    ///
+    /// Failed calls do not contribute constraints and can normally be ignored when another call
+    /// has already constrained the collection. A possibly-`None` argument requires the regular
+    /// cycle path, however, to avoid retaining the diagnostic from its initial `Divergent`
+    /// iteration alongside the stable diagnostic.
     fn record_bound_method_collection_constraints(
         &mut self,
         attribute: &ast::ExprAttribute,
         arguments: &ast::Arguments,
         call_arguments: &mut CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) {
+    ) -> bool {
         let value = &attribute.value;
         let value_type = self.expression_type(value);
 
         let Some(collection_def) = self.index.unannotated_collection_literal(value) else {
-            return;
+            return false;
         };
         let Some((collection_literal, _)) = value_type.class_specialization(self.db()) else {
-            return;
+            return false;
         };
 
         let identity_instance = Type::instance(
@@ -8361,7 +8473,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Perform inference against the type variables on the receiver's generic context.
             .with_generic_context(self.db(), collection_generic_context);
 
-        let call_result = self.speculate().infer_and_check_argument_types(
+        let mut speculative = self.speculate();
+        let call_result = speculative.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             call_arguments,
             // TODO: The argument types have already been inferred and stored in `call_arguments`.
@@ -8376,7 +8489,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if call_result.is_err() {
-            return;
+            return !call_arguments.iter_types().any(|types| {
+                types.iter().any(|(_, ty)| {
+                    ty.is_none(self.db())
+                        || ty.as_union().is_some_and(|union| {
+                            union
+                                .elements(self.db())
+                                .iter()
+                                .any(|element| element.is_none(self.db()))
+                        })
+                })
+            });
         }
 
         for call_specialization in identity_bindings
@@ -8399,6 +8522,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_default()
                 .insert(constraints);
         }
+
+        true
+    }
+
+    fn infer_bound_method_collection_use_constraints(
+        &mut self,
+        call_expression: &ast::ExprCall,
+        collection_def: Definition<'db>,
+    ) -> bool {
+        let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) =
+            call_expression.func.as_ref()
+        else {
+            return false;
+        };
+        if self.index.unannotated_collection_literal(value) != Some(collection_def) {
+            return false;
+        }
+
+        let Some(identity_instance) = self.unannotated_collection_identity_type(collection_def)
+        else {
+            return false;
+        };
+        self.store_expression_type(value, identity_instance);
+
+        let mut call_arguments = self.prepare_call_arguments(&call_expression.arguments);
+        let supports_cycle_free_inference = self.record_bound_method_collection_constraints(
+            attribute,
+            &call_expression.arguments,
+            &mut call_arguments,
+            TypeContext::default(),
+        );
+        supports_cycle_free_inference
+            && self
+                .collection_use_constraints
+                .get(&collection_def)
+                .is_some_and(|constraints| !constraints.is_empty())
     }
 
     fn infer_call_expression(
@@ -10705,6 +10864,80 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    pub(super) fn finish_collection_use_constraints(
+        mut self,
+        collection_def: Definition<'db>,
+    ) -> CollectionUseConstraintInference<'db> {
+        let has_dependency = Rc::new(Cell::new(false));
+        self.collection_constraint_target = Some(CollectionConstraintTarget {
+            definition: collection_def,
+            has_dependency: Rc::clone(&has_dependency),
+        });
+
+        let return_is_unconstrained = match self.scope.node(self.db()) {
+            NodeWithScopeKind::Function(function) => function.node(self.module()).returns.is_none(),
+            _ => false,
+        };
+
+        for (statement, use_expression) in self.index.constraining_collection_uses(collection_def) {
+            let used_fast_path = match statement {
+                Statement::Expression(expression) => {
+                    match expression.node_ref(self.db()).node(self.module()) {
+                        ast::Expr::Call(call_expression) => self
+                            .infer_bound_method_collection_use_constraints(
+                                call_expression,
+                                collection_def,
+                            ),
+                        _ => false,
+                    }
+                }
+                Statement::Other(statement) => {
+                    let statement = statement.node_ref(self.db()).node(self.module());
+                    match statement {
+                        // An unannotated return does not constrain its result, but a direct call can
+                        // still constrain the collection through an annotated argument. Starred
+                        // uses participate in iterable inference and need cycle recovery.
+                        ast::Stmt::Return(ast::StmtReturn {
+                            value: Some(value), ..
+                        }) if return_is_unconstrained => {
+                            if expression_contains_starred_use(value, use_expression) {
+                                false
+                            } else if matches!(value.as_ref(), ast::Expr::Call(_)) {
+                                self.infer_statement(statement);
+                                true
+                            } else {
+                                true
+                            }
+                        }
+                        ast::Stmt::Return(_) => return_is_unconstrained,
+                        _ => false,
+                    }
+                }
+                Statement::Definition(_) => false,
+            };
+
+            if !used_fast_path {
+                self.context.defuse();
+                return CollectionUseConstraintInference::RequiresCycle;
+            }
+        }
+
+        let constraints = self
+            .collection_use_constraints
+            .remove(&collection_def)
+            .unwrap_or_default()
+            .into_iter()
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        self.context.defuse();
+
+        if has_dependency.get() {
+            CollectionUseConstraintInference::RequiresCycle
+        } else {
+            CollectionUseConstraintInference::Constraints(constraints)
+        }
+    }
+
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
 
@@ -10728,6 +10961,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
 
             // builder only state
+            collection_constraint_target: _,
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
@@ -10810,6 +11044,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
 
             // builder only state
+            collection_constraint_target: _,
             expression_cache: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
@@ -10905,6 +11140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             bindings,
             called_functions,
+            collection_constraint_target: _,
             expression_cache: _,
             reachability_cache: _,
             declarations: _,
@@ -10963,6 +11199,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions,
 
             // builder only state
+            collection_constraint_target: _,
             expression_cache: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
@@ -11101,6 +11338,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
 
             // Builder only state
+            collection_constraint_target: _,
             expression_cache: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
@@ -11161,6 +11399,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ref reachability_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
+            ref collection_constraint_target,
 
             // These fields are type inference results, but do not affect the inference of a given
             // expression.
@@ -11191,6 +11430,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
+        builder
+            .collection_constraint_target
+            .clone_from(collection_constraint_target);
         builder.reachability_cache.clone_from(reachability_cache);
         builder
             .return_types_and_ranges
@@ -11223,6 +11465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
 
             // builder only state
+            collection_constraint_target: _,
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,

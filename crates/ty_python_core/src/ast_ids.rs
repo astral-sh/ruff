@@ -53,6 +53,10 @@ impl AstIds {
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
+
+    pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
+        self.uses_map.get(&key.into()).copied()
+    }
 }
 
 fn ast_ids(db: &dyn Db, file: File) -> &AstIds {
