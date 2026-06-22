@@ -926,6 +926,11 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
+                        // Avoid allocating the minimum `Vec` capacity of four only to shrink it
+                        // again for the common single-positional-argument case.
+                        if args.capacity() == 0 && parser.at(TokenKind::Rpar) {
+                            args.reserve_exact(1);
+                        }
                         args.push(parsed_expr.expr);
                     }
                 }
