@@ -78,6 +78,140 @@ def f3(x: UnionAB3) -> None:
         reveal_type(y)  # revealed: A | B
 ```
 
+## Exception suppression affects reachability
+
+The typing spec treats a context manager as potentially exception-suppressing only if its `__exit__`
+return type is specifically `bool` or `Literal[True]`. Code after the `with` statement is therefore
+reachable only for those return types.
+
+```py
+from contextlib import suppress
+from typing import Any, Literal
+from typing_extensions import Never
+
+class BoolManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> bool:
+        return True
+
+class OptionalBoolManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> bool | None:
+        return True
+
+class OptionalTrueManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> Literal[True] | None:
+        return True
+
+class TrueManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> Literal[True]:
+        return True
+
+class AnyManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> Any:
+        return True
+
+class NoneManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> None: ...
+
+class FalseManager:
+    def __enter__(self) -> None: ...
+    def __exit__(self, *args) -> Literal[False] | None: ...
+
+# error: [invalid-return-type]
+def bool_exit() -> Never:
+    with BoolManager():
+        raise RuntimeError
+
+def optional_bool_exit() -> Never:
+    with OptionalBoolManager():
+        raise RuntimeError
+
+def optional_true_exit() -> Never:
+    with OptionalTrueManager():
+        raise RuntimeError
+
+# error: [invalid-return-type]
+def true_exit() -> Never:
+    with TrueManager():
+        raise RuntimeError
+
+# error: [invalid-return-type]
+def contextlib_suppress_exit() -> Never:
+    with suppress(FileNotFoundError):
+        raise FileNotFoundError
+
+def any_exit() -> Never:
+    with AnyManager():
+        raise RuntimeError
+
+def none_exit() -> Never:
+    with NoneManager():
+        raise RuntimeError
+
+def false_exit() -> Never:
+    with FalseManager():
+        raise RuntimeError
+
+def binding_before_raise() -> int:
+    with BoolManager():
+        x = 1
+        raise RuntimeError
+    return x
+
+def caught_exception_does_not_reach_exit() -> None:
+    x = 1
+    with BoolManager():
+        try:
+            raise RuntimeError
+        except:
+            x = 2
+    reveal_type(x)  # revealed: Literal[2]
+
+def may_raise() -> None: ...
+def implicit_exception_can_be_suppressed() -> None:
+    with BoolManager():
+        may_raise()
+        x = 1
+    x  # error: [possibly-unresolved-reference]
+
+# error: [invalid-return-type]
+def contextlib_suppress_call_before_return() -> str:
+    with suppress(Exception):
+        may_raise()
+        return "bad"
+
+# error: [invalid-return-type]
+def later_item_suppresses() -> Never:
+    with NoneManager(), BoolManager():
+        raise RuntimeError
+
+# error: [invalid-return-type]
+def outer_manager_suppresses() -> Never:
+    with BoolManager():
+        with NoneManager():
+            raise RuntimeError
+
+# error: [invalid-return-type]
+def inner_manager_suppresses() -> Never:
+    with NoneManager():
+        with BoolManager():
+            raise RuntimeError
+
+# error: [invalid-return-type]
+def assertion_error_is_suppressed() -> Never:
+    with BoolManager():
+        assert False
+
+def return_is_not_suppressed() -> int:
+    with BoolManager():
+        return 1
+```
+
 ## Context manager without an `__enter__` or `__exit__` method
 
 ```py

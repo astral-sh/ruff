@@ -212,15 +212,15 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
-    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
+    FileScopeId, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
     predicate::{
-        CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        ScopedPredicateId,
+        CallableAndCallExpr, ContextManagerAndMode, PatternPredicate, PatternPredicateKind,
+        Predicate, PredicateNode, ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
@@ -1162,6 +1162,16 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             }
             .negate_if(!predicate.is_positive)
         }
+        PredicateNode::IsExceptionSuppressingContextManager(ContextManagerAndMode {
+            context_manager,
+            is_async,
+        }) => {
+            let context_manager_type =
+                infer_same_file_expression_type(db, context_manager, TypeContext::default());
+            context_manager_type
+                .exception_suppression_truthiness(db, EvaluationMode::from_is_async(is_async))
+                .negate_if(!predicate.is_positive)
+        }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)
@@ -1317,6 +1327,10 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(db)
             }
+            PredicateNode::IsExceptionSuppressingContextManager(ContextManagerAndMode {
+                context_manager,
+                ..
+            }) => context_manager.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)

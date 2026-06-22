@@ -40,9 +40,9 @@ use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
-    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    CallableAndCallExpr, ClassPatternKind, ContextManagerAndMode, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
+    SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -106,6 +106,12 @@ struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
+    /// Flow states immediately before exceptions that can reach each active `with` statement.
+    /// The innermost active `with` statement is stored last.
+    context_manager_exception_snapshots: Vec<Vec<FlowSnapshot>>,
+    /// Whether exceptions raised in the current `try` suite are caught before they can reach an
+    /// enclosing context manager.
+    context_manager_exceptions_are_caught: bool,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
     /// `global` and `nonlocal` declarations from scopes nested under this one. This is used for:
@@ -520,6 +526,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             current_loop: None,
+            context_manager_exception_snapshots: Vec::new(),
+            context_manager_exceptions_are_caught: false,
             narrowing_aliases: saved_aliases,
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
             this_scope_global_or_nonlocal_declarations: FxHashMap::default(),
@@ -1923,6 +1931,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::IsExceptionSuppressingContextManager(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -1959,6 +1968,47 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
         try_node_stack_manager.record_terminal_finally_entry(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
+    }
+
+    fn has_active_context_manager_exception_context(&self) -> bool {
+        !self
+            .current_scope_info()
+            .context_manager_exception_snapshots
+            .is_empty()
+    }
+
+    fn push_context_manager_exception_context(&mut self) {
+        self.current_scope_info_mut()
+            .context_manager_exception_snapshots
+            .push(Vec::new());
+    }
+
+    fn pop_context_manager_exception_context(&mut self) -> Vec<FlowSnapshot> {
+        self.current_scope_info_mut()
+            .context_manager_exception_snapshots
+            .pop()
+            .expect("Cannot pop a context manager off an empty stack")
+    }
+
+    /// Records the current flow state as a possible exception path for every active context
+    /// manager in this scope. Nested context managers can each independently suppress the same
+    /// propagating exception.
+    fn record_context_manager_exception_entry(&mut self) {
+        if !self.has_active_context_manager_exception_context()
+            || self
+                .current_scope_info()
+                .context_manager_exceptions_are_caught
+        {
+            return;
+        }
+
+        let snapshot = self.flow_snapshot();
+        for snapshots in &mut self
+            .current_scope_info_mut()
+            .context_manager_exception_snapshots
+        {
+            snapshots.push(snapshot.clone());
+        }
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
@@ -3098,12 +3148,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test);
 
-                if let Some(msg) = msg {
+                let has_active_context_manager =
+                    self.has_active_context_manager_exception_context();
+                if msg.is_some() || has_active_context_manager {
                     self.flow_restore(condition_flow_snapshot.falsy());
                     let negated_predicate = predicate.negated();
                     self.record_narrowing_constraint(negated_predicate);
                     self.record_reachability_constraint(negated_predicate);
-                    self.visit_expr(msg);
+                    if let Some(msg) = msg {
+                        self.visit_expr(msg);
+                    }
+                    if has_active_context_manager {
+                        self.record_context_manager_exception_entry();
+                    }
                 }
 
                 self.flow_restore(condition_flow_snapshot.truthy());
@@ -3410,6 +3467,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 is_async,
                 ..
             }) => {
+                let mut context_managers = Vec::with_capacity(items.len());
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -3418,9 +3476,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } in items
                 {
                     self.visit_expr(context_expr);
+                    let context_manager = self.add_standalone_expression(context_expr);
+                    context_managers.push(context_manager);
 
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
@@ -3431,7 +3490,40 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         );
                     }
                 }
+
+                self.push_context_manager_exception_context();
                 self.visit_body(body);
+
+                let exception_snapshots = self.pop_context_manager_exception_context();
+                if !exception_snapshots.is_empty() {
+                    let suppression_predicates = context_managers
+                        .into_iter()
+                        .map(|context_manager| {
+                            self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                                node: PredicateNode::IsExceptionSuppressingContextManager(
+                                    ContextManagerAndMode {
+                                        context_manager,
+                                        is_async: *is_async,
+                                    },
+                                ),
+                                is_positive: true,
+                            }))
+                        })
+                        .collect::<Vec<_>>();
+
+                    let mut post_with = self.flow_snapshot();
+                    for exception_snapshot in exception_snapshots {
+                        for predicate in &suppression_predicates {
+                            self.flow_restore(exception_snapshot.clone());
+                            self.record_reachability_constraint_id(*predicate);
+                            let suppressed_exception = self.flow_snapshot();
+
+                            self.flow_restore(post_with);
+                            self.flow_merge(suppressed_exception);
+                            post_with = self.flow_snapshot();
+                        }
+                    }
+                }
             }
 
             ast::Stmt::For(
@@ -3661,7 +3753,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.try_node_context_stack_manager.push_context();
 
                 // Visit the `try` block!
+                let has_bare_handler = handlers.iter().any(|handler| {
+                    let ast::ExceptHandler::ExceptHandler(handler) = handler;
+                    handler.type_.is_none()
+                });
+                let was_caught = self
+                    .current_scope_info()
+                    .context_manager_exceptions_are_caught;
+                if has_bare_handler {
+                    self.current_scope_info_mut()
+                        .context_manager_exceptions_are_caught = true;
+                }
                 self.visit_body(body);
+                if has_bare_handler {
+                    self.current_scope_info_mut()
+                        .context_manager_exceptions_are_caught = was_caught;
+                }
 
                 let mut post_except_states = vec![];
 
@@ -3790,6 +3897,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
+                if matches!(stmt, ast::Stmt::Raise(_)) {
+                    self.record_context_manager_exception_entry();
+                }
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
@@ -4188,6 +4298,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        if matches!(expr, ast::Expr::Call(_)) {
+            self.record_context_manager_exception_entry();
+        }
+
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         self.scopes_by_expression

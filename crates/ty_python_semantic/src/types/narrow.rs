@@ -19,8 +19,9 @@ use crate::types::{
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, SequencePatternPredicateKind, SubjectElementPatternPredicate,
+    CallableAndCallExpr, ClassPatternKind, ContextManagerAndMode, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
+    SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
@@ -197,9 +198,9 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             .and_then(|constraints| constraints.get(&place).cloned());
             (positive, None)
         }
-        PredicateNode::IsNonTerminalCall(_) | PredicateNode::StarImportPlaceholder(_) => {
-            (None, None)
-        }
+        PredicateNode::IsNonTerminalCall(_)
+        | PredicateNode::IsExceptionSuppressingContextManager(_)
+        | PredicateNode::StarImportPlaceholder(_) => (None, None),
     };
 
     if predicate.is_positive {
@@ -838,6 +839,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_subject_element_pattern(subject_element)
             }
             PredicateNode::IsNonTerminalCall(_) => return None,
+            PredicateNode::IsExceptionSuppressingContextManager(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -1035,6 +1037,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)
             }
+            PredicateNode::IsExceptionSuppressingContextManager(ContextManagerAndMode {
+                context_manager,
+                ..
+            }) => context_manager.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }

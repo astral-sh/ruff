@@ -1,12 +1,12 @@
 use crate::{
     Db, FxOrderSet,
     types::{
-        CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
+        CallArguments, CallDunderError, KnownClass, Type, TypeContext, call::CallErrorKind,
         context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
-use ty_python_core::EvaluationMode;
+use ty_python_core::{EvaluationMode, Truthiness};
 
 impl<'db> Type<'db> {
     /// Returns the type bound from a context manager with type `self`.
@@ -25,6 +25,47 @@ impl<'db> Type<'db> {
     pub(super) fn aenter(self, db: &'db dyn Db) -> Type<'db> {
         self.try_enter_with_mode(db, EvaluationMode::Async)
             .unwrap_or_else(|err| err.fallback_enter_type(db))
+    }
+
+    /// Returns whether the type checker should assume that `__exit__` or `__aexit__` may suppress
+    /// an exception.
+    ///
+    /// The typing spec uses a deliberately narrow convention: only `bool` and `Literal[True]`
+    /// indicate possible suppression. Invalid context managers already produce a diagnostic during
+    /// inference; they do not add a recovery path here.
+    pub(crate) fn exception_suppression_truthiness(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Truthiness {
+        let exit_method = match mode {
+            EvaluationMode::Async => "__aexit__",
+            EvaluationMode::Sync => "__exit__",
+        };
+
+        let Ok(exit) = self.try_call_dunder(
+            db,
+            exit_method,
+            CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            TypeContext::default(),
+        ) else {
+            return Truthiness::AlwaysFalse;
+        };
+
+        let exit_type = exit.return_type(db);
+        let exit_type = if mode.is_async() {
+            exit_type.try_await(db).unwrap_or(Type::unknown())
+        } else {
+            exit_type
+        };
+
+        if exit_type.is_equivalent_to(db, Type::bool_literal(true)) {
+            Truthiness::AlwaysTrue
+        } else if exit_type.is_equivalent_to(db, KnownClass::Bool.to_instance(db)) {
+            Truthiness::Ambiguous
+        } else {
+            Truthiness::AlwaysFalse
+        }
     }
 
     /// Given the type of an object that is used as a context manager (i.e. in a `with` statement),

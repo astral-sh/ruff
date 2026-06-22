@@ -110,6 +110,12 @@ pub struct CallableAndCallExpr<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct ContextManagerAndMode<'db> {
+    pub context_manager: Expression<'db>,
+    pub is_async: bool,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
@@ -130,6 +136,10 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
+    /// This predicate is recorded on exception paths that leave a `with` statement. It evaluates
+    /// to the truthiness of the context manager's `__exit__` or `__aexit__` return type, which
+    /// determines whether the exception may be suppressed.
+    IsExceptionSuppressingContextManager(ContextManagerAndMode<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),

@@ -35,6 +35,33 @@ async def test():
         reveal_type(y)  # revealed: str
 ```
 
+## Exception suppression affects reachability
+
+The return type of `__aexit__` is checked after awaiting it, using the same rule as `__exit__`.
+
+```py
+from typing_extensions import Never
+
+class BoolManager:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, *args) -> bool:
+        return True
+
+class OptionalBoolManager:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, *args) -> bool | None:
+        return True
+
+# error: [invalid-return-type]
+async def bool_exit() -> Never:
+    async with BoolManager():
+        raise RuntimeError
+
+async def optional_bool_exit() -> Never:
+    async with OptionalBoolManager():
+        raise RuntimeError
+```
+
 ## Context manager without an `__aenter__` or `__aexit__` method
 
 ```py
