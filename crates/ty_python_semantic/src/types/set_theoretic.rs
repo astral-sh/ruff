@@ -360,7 +360,7 @@ impl<'db> UnionType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db)
+        let mut builder = UnionBuilder::with_capacity(db, self.elements(db).len())
             .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
