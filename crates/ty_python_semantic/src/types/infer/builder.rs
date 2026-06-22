@@ -8503,10 +8503,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(collection_def) = self.index.unannotated_collection_literal(value) else {
             return false;
         };
-        let Some((collection_literal, _)) = value_type.class_specialization(self.db()) else {
+        let Some((collection_literal, _)) =
+            value_type.class_specialization(self.db()).or_else(|| {
+                // Truthiness narrowing wraps a collection used under `if collection` in an
+                // intersection with `~AlwaysFalsy`.
+                let Type::Intersection(intersection) = value_type else {
+                    return None;
+                };
+                intersection
+                    .positive(self.db())
+                    .iter()
+                    .filter_map(|positive| positive.class_specialization(self.db()))
+                    .exactly_one()
+                    .ok()
+            })
+        else {
             return false;
         };
-
         let identity_instance = Type::instance(
             self.db(),
             collection_literal.identity_specialization(self.db()),
@@ -8533,9 +8546,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
             &mut identity_bindings,
             call_expression_tcx,
-            self.collection_constraint_target
-                .as_ref()
-                .and(collection_generic_context),
+            collection_generic_context,
         );
 
         if call_result.is_err() {
@@ -8552,18 +8563,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
         }
 
-        if self.collection_constraint_target.is_some() {
-            for projected in identity_bindings
-                .iter_flat()
-                .flat_map(CallableBinding::matching_overloads)
-                .filter_map(|(_, overload)| overload.projected_constraints().cloned())
-            {
-                self.collection_use_constraints
-                    .entry(collection_def)
-                    .or_default()
-                    .insert(CollectionUseConstraint::Projected(projected));
-            }
-        } else {
+        for projected in identity_bindings
+            .iter_flat()
+            .flat_map(CallableBinding::matching_overloads)
+            .filter_map(|(_, overload)| overload.projected_constraints().cloned())
+        {
+            self.collection_use_constraints
+                .entry(collection_def)
+                .or_default()
+                .insert(CollectionUseConstraint::Projected(projected));
+        }
+
+        if self.collection_constraint_target.is_none() {
             for call_specialization in identity_bindings
                 .iter_flat()
                 .flat_map(CallableBinding::matching_overloads)
@@ -9075,6 +9086,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
+        // The collection can widen after combining constraints from all of its uses, so retain
+        // this call's constraints even if it is invalid against the type inferred by the current
+        // cycle iteration.
+        if let ast::Expr::Attribute(attribute) = func.as_ref() {
+            self.record_bound_method_collection_constraints(
+                attribute,
+                arguments,
+                &mut call_arguments,
+                call_expression_tcx,
+            );
+        }
+
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
             Err(_) => {
@@ -9128,17 +9151,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => {}
                 }
             }
-        }
-
-        // Record the constraints for the receiver of a bound method call, if the receiver is an
-        // unannotated collection literal.
-        if let ast::Expr::Attribute(attribute) = func.as_ref() {
-            self.record_bound_method_collection_constraints(
-                attribute,
-                arguments,
-                &mut call_arguments,
-                call_expression_tcx,
-            );
         }
 
         let db = self.db();

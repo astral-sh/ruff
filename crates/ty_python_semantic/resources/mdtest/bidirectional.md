@@ -1029,6 +1029,47 @@ def _(values: list[str] | None):
     reveal_type(lines)  # revealed: list[str]
 ```
 
+Full statement inference should also combine projected constraints from bound-method calls. Each of
+the following collections requires the full-statement path, but should still widen to include both
+tuple types:
+
+```py
+class Rule: ...
+class RewriteRule(Rule): ...
+class ArctanRule(Rule): ...
+
+class Holder:
+    pieces: object
+
+def escaped(include_rewrite: bool):
+    pieces = []
+    if include_rewrite:
+        pieces.append((RewriteRule(), True))
+    if pieces:
+        pieces.append((ArctanRule(), True))
+    reveal_type(pieces)  # revealed: list[tuple[RewriteRule, bool] | tuple[ArctanRule, bool]]
+    Holder().pieces = pieces
+
+def rebound(include_rewrite: bool):
+    pieces = None
+    if pieces is None:
+        pieces = []
+    if include_rewrite:
+        pieces.append((RewriteRule(), True))
+    if pieces:
+        pieces.append((ArctanRule(), True))
+    reveal_type(pieces)  # revealed: list[tuple[RewriteRule, bool] | tuple[ArctanRule, bool]]
+
+def augmented(include_rewrite: bool):
+    pieces = []
+    if include_rewrite:
+        pieces.append((RewriteRule(), True))
+    if pieces:
+        pieces.append((ArctanRule(), True))
+    reveal_type(pieces)  # revealed: list[tuple[RewriteRule, bool] | tuple[ArctanRule, bool]]
+    pieces += []
+```
+
 Uses that can refer to an intervening binding require cycle-based inference. Inferring these uses
 against the original collection's identity specialization can miss widening from an augmented
 assignment:
