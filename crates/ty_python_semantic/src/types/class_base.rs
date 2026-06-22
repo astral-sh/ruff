@@ -92,6 +92,11 @@ impl<'db> ClassBase<'db> {
         matches!(self, ClassBase::TypedDict)
     }
 
+    /// Return whether this is an explicit `Any` base.
+    pub(super) const fn is_explicit_any_base(self) -> bool {
+        matches!(self, ClassBase::Any)
+    }
+
     /// Convert an explicit base while preserving a direct use of the `Any` special form.
     pub(super) fn try_from_explicit_base(
         db: &'db dyn Db,
@@ -256,6 +261,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
+                | SpecialFormType::Divergent
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy
                 | SpecialFormType::TypeForm => None,

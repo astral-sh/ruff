@@ -12,6 +12,18 @@ def static_assert(condition: object, msg: LiteralString | None = None) -> None: 
 
 # Types
 Unknown: _SpecialForm
+Divergent: _SpecialForm
+"""
+`Divergent` represents type-level recursion that does not converge.
+
+Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a
+stable result. If each iteration produces a new type, ty replaces the non-convergent part
+with `Divergent`.
+
+Like `Any` and `Unknown`, `Divergent` is a gradual type, so ty allows any operation on it.
+Unlike `Unknown`, it does not represent missing type information. It is an internal type
+used by ty and cannot be used in annotations.
+"""
 AlwaysTruthy: _SpecialForm
 AlwaysFalsy: _SpecialForm
 

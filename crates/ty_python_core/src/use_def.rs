@@ -2323,7 +2323,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
-    pub(super) fn finish(mut self) -> UseDefMap<'db> {
+    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -2336,14 +2336,6 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
-
-        self.all_definitions.shrink_to_fit();
-        self.used_bindings.shrink_to_fit();
-        self.reachable_symbol_definitions.shrink_to_fit();
-        self.reachable_member_definitions.shrink_to_fit();
-        self.bindings_by_use.shrink_to_fit();
-        self.range_reachability.shrink_to_fit();
-        self.enclosing_snapshots.shrink_to_fit();
 
         let place_state_count = self.symbol_states.len()
             + self.member_states.len()
@@ -2545,7 +2537,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_use.push(interned_id);
         }
 
-        interned_ids_by_use.shrink_to_fit();
         interned_ids_by_use
     }
 
@@ -2562,7 +2553,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_place.push(interned_id);
         }
 
-        interned_ids_by_place.shrink_to_fit();
         interned_ids_by_place
     }
 
@@ -2590,7 +2580,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_member.push(interned_id);
         }
 
-        interned_ids_by_member.shrink_to_fit();
         interned_ids_by_member
     }
 
@@ -2616,7 +2605,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_snapshot.push(interned_id);
         }
 
-        interned_ids_by_snapshot.shrink_to_fit();
         interned_ids_by_snapshot
     }
 }

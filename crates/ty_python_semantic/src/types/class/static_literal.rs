@@ -26,9 +26,10 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
-            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
-            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassInstanceFlags, ClassMemberResult, CodeGeneratorKind, DisjointBase,
+            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, SlotsKind,
+            synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
@@ -696,22 +697,47 @@ impl<'db> StaticClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    /// Return `true` if this class constitutes a typed dict specification (inherits from
-    /// `typing.TypedDict`, either directly or indirectly).
-    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
-        fn is_typed_dict_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-            class.iter_mro(db, None).contains(&ClassBase::TypedDict)
+    /// Return the properties that affect how instances of this class are represented.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+        #[salsa::tracked(
+            cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn instance_flags_inner<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> ClassInstanceFlags {
+            let mut flags = ClassInstanceFlags::empty();
+            for base in class.iter_mro(db, None) {
+                if base.is_typed_dict() {
+                    flags.insert(ClassInstanceFlags::TYPED_DICT);
+                }
+                if base.is_explicit_any_base() {
+                    flags.insert(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY);
+                }
+            }
+            flags
         }
 
         if let Some(known) = self.known(db) {
-            return known.is_typed_dict_subclass();
+            return if known.is_typed_dict_subclass() {
+                ClassInstanceFlags::TYPED_DICT
+            } else {
+                ClassInstanceFlags::empty()
+            };
         }
 
         if !self.has_explicit_bases(db) {
-            return false;
+            return ClassInstanceFlags::empty();
         }
-        is_typed_dict_inner(db, self)
+        instance_flags_inner(db, self)
+    }
+
+    /// Return `true` if this class constitutes a typed dict specification (inherits from
+    /// `typing.TypedDict`, either directly or indirectly).
+    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.instance_flags(db)
+            .contains(ClassInstanceFlags::TYPED_DICT)
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from

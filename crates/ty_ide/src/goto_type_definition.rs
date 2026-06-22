@@ -166,6 +166,34 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_divergent() {
+        let test = cursor_test(
+            r#"
+            class D:
+                def copy(self, other: "D"):
+                    self.x = other.x
+
+            D().x<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:5
+           |
+        LL | D().x
+           |     ^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Divergent: _SpecialForm
+           | ---------
+           |
+        ");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_function_type() {
         let test = cursor_test(
             r#"

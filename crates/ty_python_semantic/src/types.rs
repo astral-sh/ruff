@@ -289,7 +289,7 @@ struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
+    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -370,13 +370,14 @@ impl Default for ApplyTypeMappingVisitor<'_> {
 }
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
-pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
+pub(crate) type FindLegacyTypeVarsVisitor<'db> =
+    CycleDetector<FindLegacyTypeVars, Type<'db>, (), 3>;
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
+pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, (), 3>;
 pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
@@ -1178,6 +1179,14 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(normalized) = cycle.head_ids().find_map(|id| {
+                self.recursive_nominal_growth_normalized(db, previous, Type::divergent(id))
+            })
+        {
+            return normalized.recursive_type_normalized(db, cycle);
+        }
+
         if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, self, false, |ty| {
@@ -1201,6 +1210,123 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
+    }
+
+    /// Normalizes nominal growth that wraps the previous cycle result in one or more
+    /// specializations, either directly or beneath an unambiguous union wrapper.
+    ///
+    /// For example, an inference cycle can otherwise grow indefinitely as
+    /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
+    /// tainted cycles, replace the recursive type argument with the cycle's `Divergent` marker so
+    /// that the existing recursive-type normalization can converge on `C[Divergent]`.
+    fn recursive_nominal_growth_normalized(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        div: Self,
+    ) -> Option<Self> {
+        if let (Type::Union(current), Type::Union(previous)) = (self, previous) {
+            let previous_elements = previous.elements(db);
+
+            // Multiple union arms may each grow by wrapping the entire previous union. Normalize
+            // only when every previous arm is nominal and at least two changed current arms are
+            // nominal wrappers; arms shared with the previous union remain unchanged.
+            if previous_elements
+                .iter()
+                .all(|element| matches!(element, Type::NominalInstance(_)))
+                && let Some(replacements) = current
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .filter(|element| !previous_elements.contains(element))
+                    .map(|element| {
+                        Self::nominal_wrapper_normalized(
+                            db,
+                            element.as_nominal_instance()?,
+                            Type::Union(previous),
+                            div,
+                        )
+                        .map(|normalized| (element, normalized))
+                    })
+                    .collect::<Option<smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]>>>()
+                && replacements.len() > 1
+            {
+                return Some(current.map_leave_aliases(db, |element| {
+                    replacements
+                        .iter()
+                        .find_map(|(original, normalized)| {
+                            (*original == *element).then_some(*normalized)
+                        })
+                        .unwrap_or(*element)
+                }));
+            }
+
+            // Only align unions when each iteration has exactly one changed arm. With multiple
+            // unmatched arms, pairing is ambiguous and can destabilize otherwise-convergent
+            // recursive cycles.
+            let current_element = current
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|element| !previous.elements(db).contains(element))
+                .exactly_one()
+                .ok()?;
+            let previous_element = previous
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|element| !current.elements(db).contains(element))
+                .exactly_one()
+                .ok()?;
+            let normalized_element =
+                current_element.recursive_nominal_growth_normalized(db, previous_element, div)?;
+            return Some(current.map_leave_aliases(db, |element| {
+                if *element == current_element {
+                    normalized_element
+                } else {
+                    *element
+                }
+            }));
+        }
+
+        let (Type::NominalInstance(current), Type::NominalInstance(previous_instance)) =
+            (self, previous)
+        else {
+            return None;
+        };
+
+        if current.class(db).class_literal(db) != previous_instance.class_literal(db) {
+            return None;
+        }
+
+        Self::nominal_wrapper_normalized(db, current, previous, div)
+    }
+
+    /// Replaces `wrapped` beneath the outer nominal specialization in `current`.
+    fn nominal_wrapper_normalized(
+        db: &'db dyn Db,
+        current: NominalInstanceType<'db>,
+        wrapped: Self,
+        div: Self,
+    ) -> Option<Self> {
+        let current_class = current.class(db);
+        let alias = current_class.into_generic_alias()?;
+        let original_specialization = alias.specialization(db);
+        let specialization = original_specialization.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceType {
+                from: wrapped,
+                to: div,
+            },
+        );
+        if specialization == original_specialization {
+            return None;
+        }
+
+        Some(Type::instance(
+            db,
+            ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
+        ))
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -1291,7 +1417,7 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.is_specialized_generic(db))
             }
-            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
+            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(db),
             Type::ProtocolInstance(protocol) => {
                 matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
             }
@@ -6092,6 +6218,12 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
+        if let TypeMapping::ReplaceType { from, to } = type_mapping
+            && self == *from
+        {
+            return *to;
+        }
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -6347,6 +6479,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceType { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6363,6 +6496,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceType { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6876,12 +7010,12 @@ impl<'db> Type<'db> {
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Divergent(_)
-            | Self::Dynamic(
+            Self::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoStarredExpression
@@ -7414,6 +7548,8 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
+    /// Replaces occurrences of one specific type with another.
+    ReplaceType { from: Type<'db>, to: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -7466,6 +7602,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::ReplaceType { .. }
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
@@ -7513,6 +7650,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceType { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),

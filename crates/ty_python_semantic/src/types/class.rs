@@ -65,6 +65,22 @@ mod named_tuple;
 mod static_literal;
 mod typed_dict;
 
+bitflags::bitflags! {
+    /// Properties that affect the representation of instances of a class.
+    ///
+    /// This combines properties derived from the MRO into the existing class-classification
+    /// query, avoiding a separate cached query for each property.
+    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash, salsa::Update)]
+    pub(super) struct ClassInstanceFlags: u8 {
+        /// The class is, or inherits from, a `TypedDict` specification.
+        const TYPED_DICT = 1 << 0;
+        /// The class directly or indirectly inherits from an explicit `Any` base.
+        const INHERITS_FROM_EXPLICIT_ANY = 1 << 1;
+    }
+}
+
+impl get_size2::GetSize for ClassInstanceFlags {}
+
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
@@ -154,7 +170,9 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn code_generator_of_dynamic_class<'db>(
             db: &'db dyn Db,
             class: DynamicClassLiteral<'db>,
@@ -396,23 +414,32 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
-    pub(crate) fn has_explicit_bases(self, db: &'db dyn Db) -> bool {
+    /// Return the properties that affect how instances of this class are represented.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         match self {
-            Self::Static(literal) => literal.has_explicit_bases(db),
-            Self::Dynamic(literal) => !literal.explicit_bases(db).is_empty(),
-            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
-            Self::DynamicEnum(literal) => !literal.explicit_bases(db).is_empty(),
+            Self::Static(literal) => literal.instance_flags(db),
+            Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
+            Self::DynamicNamedTuple(_) => ClassInstanceFlags::empty(),
+            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => {
+                ClassInstanceFlags::empty()
+            }
+            Self::DynamicEnum(literal) if literal.explicit_bases(db).is_empty() => {
+                ClassInstanceFlags::empty()
+            }
+            Self::Dynamic(_) | Self::DynamicEnum(_) => {
+                if self.iter_mro(db).any(ClassBase::is_explicit_any_base) {
+                    ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
+                } else {
+                    ClassInstanceFlags::empty()
+                }
+            }
         }
     }
 
-    /// Return whether this class directly or indirectly inherits from the `Any` special form.
-    ///
-    /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
-    /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
-    /// arbitrary types.
-    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db).any(|base| base == ClassBase::Any)
+    /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
+    pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        self.instance_flags(db)
+            .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }
 
     /// Returns the metaclass of this class.

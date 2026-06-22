@@ -31,6 +31,18 @@ impl Index {
         })
     }
 
+    /// Iterates over open documents that correspond to file-level documents.
+    ///
+    /// The index only stores documents that the client has opened. This filter keeps normal text
+    /// documents and whole notebook documents, but excludes notebook cell text documents (because
+    /// the file-level representation for a cell is its containing notebook).
+    pub(super) fn file_documents(&self) -> impl Iterator<Item = &Document> + '_ {
+        self.documents.values().filter(|document| match document {
+            Document::Text(text_document) => text_document.notebook().is_none(),
+            Document::Notebook(_) => true,
+        })
+    }
+
     pub(crate) fn document_handle(
         &self,
         uri: &lsp_types::Uri,
