@@ -331,18 +331,35 @@ struct PatternSuccessResult<'db> {
     bindings: BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
 }
 
+/// The candidate types for one name bound by a successful pattern.
+///
+/// Contributions from distinct subject or `or`-pattern arms remain separate until captures that
+/// alias the current subject have been restored to the original subject type:
+///
+/// ```python
+/// match value:
+///     case [item] as whole:
+///         ...
+/// ```
+///
+/// Here, `whole` aliases the subject, while `item` refers to a value extracted from it. Keeping
+/// that distinction prevents `item` from being restored as if it referred to `value`.
 #[derive(Clone)]
 struct PatternBindingTypes<'db> {
     contributions: SmallVec<[PatternBindingType<'db>; 2]>,
 }
 
+/// One successful pattern arm's contribution to a binding type.
 #[derive(Clone, Copy)]
 struct PatternBindingType<'db> {
+    /// The type inferred for the binding in this arm.
     ty: Type<'db>,
+    /// Whether the binding aliases the subject at the current level of pattern analysis.
     aliases_subject: bool,
 }
 
 impl<'db> PatternBindingTypes<'db> {
+    /// Create a binding that aliases the current subject.
     fn subject(subject_ty: Type<'db>) -> Self {
         Self {
             contributions: smallvec![PatternBindingType {
@@ -352,20 +369,24 @@ impl<'db> PatternBindingTypes<'db> {
         }
     }
 
+    /// Return the union of all contributions to this binding.
     fn ty(&self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements(db, self.contributions.iter().map(|binding| binding.ty))
     }
 
+    /// Mark every contribution as referring to a value extracted from the current subject.
     fn demote_subject(&mut self) {
         for contribution in &mut self.contributions {
             contribution.aliases_subject = false;
         }
     }
 
+    /// Add the contributions from another successful pattern arm.
     fn merge(&mut self, other: Self) {
         self.contributions.extend(other.contributions);
     }
 
+    /// Return the union of the contributions that alias the current subject.
     fn subject_ty(&self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements(
             db,
@@ -376,6 +397,9 @@ impl<'db> PatternBindingTypes<'db> {
         )
     }
 
+    /// Replace all subject-aliasing contributions with one restored subject type.
+    ///
+    /// Contributions for extracted values remain unchanged.
     fn restore_subject(&mut self, restored_subject_ty: Type<'db>) {
         let mut restored = false;
         self.contributions.retain_mut(|contribution| {

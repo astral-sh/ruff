@@ -17,6 +17,13 @@ use std::iter::FusedIterator;
 /// Return the expressions whose existing bindings a match pattern can narrow.
 ///
 /// In addition to the subject itself, matching an attribute or subscript can narrow its base.
+/// For example, this match can narrow both `value.kind` and `value`:
+///
+/// ```python
+/// match value.kind:
+///     case "ready":
+///         ...
+/// ```
 pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[&ast::Expr; 2]> {
     let mut expressions: SmallVec<[&ast::Expr; 2]> = SmallVec::new();
     expressions.push(subject);
