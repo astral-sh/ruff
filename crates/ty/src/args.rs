@@ -98,6 +98,12 @@ pub(crate) struct CheckCommand {
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
     ///
+    /// ty officially supports type checking code that targets Python 3.10 and later. When ty infers
+    /// Python 3.7 through 3.9 from the selected environment, it will still use that version for
+    /// version-dependent syntax, narrowing based on `sys.version_info`, and more, but may produce
+    /// false positives or false negatives for standard-library APIs because its bundled stubs do
+    /// not fully describe those Python versions.
+    ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,

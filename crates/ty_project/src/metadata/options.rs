@@ -865,6 +865,12 @@ pub struct EnvironmentOptions {
     /// in the project root if none of the above apply. Failing that, ty will look for a `python3`
     /// or `python` binary available in `PATH`.
     ///
+    /// ty officially supports type checking code that targets Python 3.10 and later. When ty infers
+    /// Python 3.7 through 3.9 from the selected environment, it will still use that version for
+    /// version-dependent syntax, narrowing based on `sys.version_info`, and more, but may produce
+    /// false positives or false negatives for standard-library APIs because its bundled stubs do
+    /// not fully describe those Python versions.
+    ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
