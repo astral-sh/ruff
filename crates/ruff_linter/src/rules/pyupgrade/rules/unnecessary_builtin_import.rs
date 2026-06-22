@@ -11,7 +11,7 @@ use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for imports of Python 3 builtins from Python 2 compatibility shims
-/// such as `builtins`, `io`, and `six`.
+/// such as `python-future` and `six`.
 ///
 /// ## Why is this bad?
 /// These shims existed to access Python 3 builtins from code that also ran on
