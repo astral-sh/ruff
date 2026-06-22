@@ -580,24 +580,23 @@ impl<'db> Bindings<'db> {
         I: IntoIterator<Item = Bindings<'db>>,
     {
         let mut bindings_iter = bindings_iter.into_iter();
-        let mut combined = bindings_iter.next().expect("bindings must not be empty");
-
         // Use the first binding as the accumulator to reuse its elements buffer.
-        for bindings in bindings_iter {
-            combined.implicit_dunder_new_is_possibly_unbound |=
-                bindings.implicit_dunder_new_is_possibly_unbound;
-            combined.implicit_dunder_init_is_possibly_unbound |=
-                bindings.implicit_dunder_init_is_possibly_unbound;
-            combined.elements.extend(bindings.elements);
-        }
-
         let Self {
             callable_type: _,
-            implicit_dunder_new_is_possibly_unbound,
-            implicit_dunder_init_is_possibly_unbound,
-            elements,
+            mut implicit_dunder_new_is_possibly_unbound,
+            mut implicit_dunder_init_is_possibly_unbound,
+            mut elements,
             enclosing_binding_contexts: _,
-        } = combined;
+        } = bindings_iter.next().expect("bindings must not be empty");
+
+        for bindings in bindings_iter {
+            implicit_dunder_new_is_possibly_unbound |=
+                bindings.implicit_dunder_new_is_possibly_unbound;
+            implicit_dunder_init_is_possibly_unbound |=
+                bindings.implicit_dunder_init_is_possibly_unbound;
+            elements.extend(bindings.elements);
+        }
+
         assert!(!elements.is_empty());
         Self {
             callable_type,
