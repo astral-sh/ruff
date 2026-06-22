@@ -524,19 +524,23 @@ impl TextWidth {
                 b'\t' => width += indent_width.value(),
                 b'\n' => return TextWidth::Multiline,
                 byte if is_printable_ascii(byte) => width += 1,
-                _ => {
-                    for c in text[index..].chars() {
-                        let char_width = match c {
-                            '\t' => indent_width.value(),
-                            '\n' => return TextWidth::Multiline,
-                            #[expect(clippy::cast_possible_truncation)]
-                            c => c.width().unwrap_or(0) as u32,
-                        };
-                        width += char_width;
-                    }
-                    break;
-                }
+                _ => return Self::from_text_slow(&text[index..], indent_width, width),
             }
+        }
+
+        Self::Width(Width::new(width))
+    }
+
+    #[cold]
+    fn from_text_slow(text: &str, indent_width: IndentWidth, mut width: u32) -> TextWidth {
+        for c in text.chars() {
+            let char_width = match c {
+                '\t' => indent_width.value(),
+                '\n' => return TextWidth::Multiline,
+                #[expect(clippy::cast_possible_truncation)]
+                c => c.width().unwrap_or(0) as u32,
+            };
+            width += char_width;
         }
 
         Self::Width(Width::new(width))
