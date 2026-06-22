@@ -45,6 +45,7 @@
 
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -509,19 +510,17 @@ fn infer_statement_types_impl<'db>(
         .finish_statement()
 }
 
-/// Infers the constraints that statements in a connected collection component place on its
-/// unannotated collection literals.
+/// Infers the constraints that later statements place on an unconstrained collection literal.
 ///
-/// Every collection is represented by its built-in identity specialization while the statements
-/// that use any collection are inferred. The resulting constraints share one merged generic
-/// context, so relationships between collections are preserved and solved together. The input
-/// definition selects the connected component without coupling unrelated collections in the same
-/// scope.
+/// The collection's receiver expression is inferred using the built-in collection's identity
+/// specialization, which avoids creating query cycles back to the collection literal's
+/// definition. Uses that also depend on an unconstrained collection are reported as requiring the
+/// regular cycle-based inference path.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn infer_collection_use_constraints<'db>(
     db: &'db dyn Db,
     collection_def: Definition<'db>,
-) -> Type<'db> {
+) -> CollectionUseConstraintInference<'db> {
     let file = collection_def.file(db);
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
@@ -1299,9 +1298,34 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
         cycle_recovery: Type<'db>,
     ) -> Self {
+        let mut types = DefinitionTypes::Empty;
+
+        // Eagerly store more precise types for collection literals to avoid an extra
+        // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
+        if let DefinitionKind::Assignment(assignment) = definition.kind(db) {
+            let module = parsed_module(db, definition.file(db)).load(db);
+            let known_collection = match assignment.value(&module) {
+                ast::Expr::Set(_) => Some(KnownClass::Set),
+                ast::Expr::List(_) => Some(KnownClass::List),
+                ast::Expr::Dict(_) => Some(KnownClass::Dict),
+                _ => None,
+            };
+
+            if let Some(collection_class) = known_collection
+                .and_then(|known_collection| known_collection.try_to_class_literal(db))
+            {
+                let divergent_collection = collection_class
+                    .apply_specialization(db, |generic_context| {
+                        generic_context.repeat_specialization(db, cycle_recovery)
+                    });
+
+                types = DefinitionTypes::Binding(Type::instance(db, divergent_collection));
+            }
+        }
+
         Self {
             expressions: FrozenMap::default(),
-            types: DefinitionTypes::Empty,
+            types,
             #[cfg(debug_assertions)]
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
@@ -1367,6 +1391,16 @@ impl<'db> DefinitionInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    pub(crate) fn collection_use_constraints(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
+        self.extra
+            .as_deref()?
+            .collection_use_constraints()?
+            .get(&collection_def)
     }
 
     /// Get qualifiers for an annotation expression
@@ -1601,6 +1635,16 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
+    pub(crate) fn collection_use_constraints(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
+        self.extra
+            .as_ref()?
+            .collection_use_constraints
+            .get(&collection_def)
+    }
+
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
@@ -1617,12 +1661,35 @@ pub(crate) enum StatementInference<'db> {
     Other(&'db StatementInferenceInner<'db>),
 }
 
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(super) enum CollectionUseConstraintInference<'db> {
+    Constraints(Box<[CollectionUseConstraint<'db>]>),
+    RequiresCycle,
+}
+
 impl<'db> StatementInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         match self {
             StatementInference::Expression(inference) => inference.expression_type(expression),
             StatementInference::Definition(_, inference) => inference.expression_type(expression),
             StatementInference::Other(inference) => inference.expression_type(expression),
+        }
+    }
+
+    pub(crate) fn collection_use_constraints(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
+        match self {
+            StatementInference::Expression(inference) => {
+                inference.collection_use_constraints(collection_def)
+            }
+            StatementInference::Definition(_, inference) => {
+                inference.collection_use_constraints(collection_def)
+            }
+            StatementInference::Other(inference) => {
+                inference.collection_use_constraints(collection_def)
+            }
         }
     }
 }
@@ -1761,6 +1828,16 @@ impl<'db> StatementInferenceInner<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    pub(crate) fn collection_use_constraints(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> Option<&FxIndexSet<CollectionUseConstraint<'db>>> {
+        self.extra
+            .as_ref()?
+            .collection_use_constraints
+            .get(&collection_def)
     }
 
     fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {

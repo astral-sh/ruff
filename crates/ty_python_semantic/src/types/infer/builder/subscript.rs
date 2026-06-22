@@ -19,7 +19,7 @@ use crate::types::diagnostic::{
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
-use crate::types::infer::{CollectionUseConstraint, InferenceFlags, TypeExpressionFlags};
+use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleType};
@@ -1254,17 +1254,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Record the constraints for the object of the subscript assignment, if the object is an
         // unannotated collection literal.
-        if self.collection_constraint_target.is_some()
+        if is_valid_assignment
             && let Some(collection_def) = self.index.unannotated_collection_literal(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db)
         {
-            self.record_collection_dependencies(collection_def, [target.slice.as_ref(), rhs_value]);
-            let identity_instance = self
-                .collection_constraint_identity(collection_def)
-                .unwrap_or_else(|| Type::instance(db, class_literal.identity_specialization(db)));
-            let collection_generic_context = self
-                .collection_constraint_generic_context(collection_def)
-                .or_else(|| class_literal.generic_context(db));
+            let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
+            let collection_generic_context = class_literal.generic_context(db);
 
             let ast_arguments = [
                 ArgOrKeyword::Arg(&target.slice),
@@ -1288,41 +1283,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut identity_bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, &call_arguments)
+                    // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(db, collection_generic_context);
 
-                let constraint_projection = self
-                    .collection_constraint_projection()
-                    .or(collection_generic_context);
-                let call_result = self
-                    .speculate()
-                    .infer_and_check_argument_types_with_projection(
-                        ArgumentsIter::synthesized(&ast_arguments),
-                        &mut call_arguments,
-                        &mut |builder, (_, expr, tcx)| {
-                            // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                            // However, `object` would have been inferred to a be a collection with `Divergent`
-                            // element types, meaning the type context for a given argument, by which the inferred
-                            // type is keyed, may not be the same as the type context we get here. It is not immediately
-                            // clear how to retrieve those types, and so we just re-infer the argument expressions
-                            // for simplicity.
-                            let ty = builder.infer_maybe_standalone_expression(expr, tcx);
-                            builder.normalize_collection_constraint_type(ty)
-                        },
-                        &mut identity_bindings,
-                        TypeContext::default(),
-                        constraint_projection,
-                    );
+                let call_result = self.speculate().infer_and_check_argument_types(
+                    ArgumentsIter::synthesized(&ast_arguments),
+                    &mut call_arguments,
+                    &mut |builder, (_, expr, tcx)| {
+                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                        // However, `object` would have been inferred to a be a collection with `Divergent`
+                        // element types, meaning the type context for a given argument, by which the inferred
+                        // type is keyed, may not be the same as the type context we get here. It is not immediately
+                        // clear how to retrieve those types, and so we just re-infer the argument expressions
+                        // for simplicity.
+                        builder.infer_maybe_standalone_expression(expr, tcx)
+                    },
+                    &mut identity_bindings,
+                    TypeContext::default(),
+                );
 
                 if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
-                    for projected in identity_bindings
+                    for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, overload)| overload.projected_constraints().cloned())
+                        .filter_map(|(_, identity_overload)| identity_overload.specialization())
                     {
+                        // Record the constraints on the receiver's generic context formed by
+                        // the arguments to this dunder call.
+                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                            identity_instance,
+                            collection_generic_context,
+                            call_specialization,
+                        ) else {
+                            continue;
+                        };
+
                         self.collection_use_constraints
                             .entry(collection_def)
                             .or_default()
-                            .insert(CollectionUseConstraint::Projected(projected));
+                            .insert(constraints);
                     }
                 }
             }

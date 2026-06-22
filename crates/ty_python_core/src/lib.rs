@@ -332,11 +332,14 @@ pub struct SemanticIndex<'db> {
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
-    // Map from each discovered use of a collection literal to its definition.
+    // Map from a constraining use of a collection literal to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
-    // Map from a collection literal definition to constraining statements that reference it.
+    // Map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
+
+    // Collection literals with uses that require cycle-based inference.
+    collections_requiring_cycle: FrozenSet<Definition<'db>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
@@ -550,7 +553,8 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
-    /// If this is a discovered use of an unannotated collection literal, returns its definition.
+    /// If this is a potentially constraining use of an unannotated collection literal, returns
+    /// its definition.
     pub fn unannotated_collection_literal(
         &self,
         collection_use: &ast::Expr,
@@ -587,9 +591,9 @@ impl<'db> SemanticIndex<'db> {
             .flat_map(|uses| uses.iter().copied())
     }
 
-    /// Returns all unannotated collection literals with uses in this file.
-    pub fn unannotated_collections(&self) -> impl Iterator<Item = Definition<'db>> + '_ {
-        self.collections_by_use.values().copied()
+    /// Returns `true` if the collection has a use that requires cycle-based inference.
+    pub fn collection_requires_cycle_inference(&self, collection_def: Definition<'db>) -> bool {
+        self.collections_requiring_cycle.contains(&collection_def)
     }
 
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
