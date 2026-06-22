@@ -338,6 +338,23 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
+fn unconstrained_collection_without_uses_skips_constraint_query() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/a.py", "x = []")?;
+
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    db.clear_salsa_events();
+    let x_ty = global_symbol(&db, file, "x").place.expect_type();
+    assert_eq!(x_ty.display(&db).to_string(), "list[Unknown]");
+
+    let events = db.take_salsa_events();
+    let x = first_public_binding(&db, file, "x");
+    assert_function_query_was_not_run(&db, infer_collection_use_constraints, x, &events);
+
+    Ok(())
+}
+
+#[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
