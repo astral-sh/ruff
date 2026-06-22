@@ -579,9 +579,13 @@ impl<'db> Bindings<'db> {
     where
         I: IntoIterator<Item = Bindings<'db>>,
     {
-        let mut implicit_dunder_new_is_possibly_unbound = false;
-        let mut implicit_dunder_init_is_possibly_unbound = false;
-        let mut elements_acc = SmallVec::new();
+        let mut bindings_iter = bindings_iter.into_iter();
+        let first = bindings_iter.next().expect("bindings must not be empty");
+        let mut implicit_dunder_new_is_possibly_unbound =
+            first.implicit_dunder_new_is_possibly_unbound;
+        let mut implicit_dunder_init_is_possibly_unbound =
+            first.implicit_dunder_init_is_possibly_unbound;
+        let mut elements_acc = first.elements;
 
         // Preserve each input's existing union/intersection structure.
         for set in bindings_iter {
