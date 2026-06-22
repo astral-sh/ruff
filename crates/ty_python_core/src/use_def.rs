@@ -1283,6 +1283,16 @@ impl PendingReachability {
             let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
             let mut current = target;
             while current != pending.reachability {
+                if unapplied.len() == unapplied.capacity() {
+                    // Reserve once for deep chains instead of repeatedly growing the spill buffer.
+                    let mut remaining = 0;
+                    let mut ancestor = current;
+                    while ancestor != pending.reachability {
+                        remaining += 1;
+                        ancestor = self.constraints[ancestor].parent;
+                    }
+                    unapplied.reserve_exact(remaining);
+                }
                 let event = &self.constraints[current];
                 unapplied.push(event.constraint);
                 assert_ne!(
