@@ -197,16 +197,16 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let node = NodeId::distributed_or(
+        let (node, source_order) = NodeId::distributed_or(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                constraint.node
+                (constraint.node, constraint.source_order)
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        ConstraintSet::from_node(builder, node, source_order)
     }
 
     fn when_all<'db, 'c>(
@@ -215,16 +215,16 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let node = NodeId::distributed_and(
+        let (node, source_order) = NodeId::distributed_and(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                constraint.node
+                (constraint.node, constraint.source_order)
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        ConstraintSet::from_node(builder, node, source_order)
     }
 }
 
@@ -242,6 +242,7 @@ where
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
+    source_order: Option<SourceOrderId>,
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
 }
 
@@ -252,12 +253,15 @@ struct OwnedConstraintSetInner<'db> {
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: Box<[InteriorNodeData]>,
     node_indices: RankBitBox,
+    source_orders: Box<[SourceOrder]>,
+    source_order_indices: RankBitBox,
 }
 
 impl Default for OwnedConstraintSet<'_> {
     fn default() -> Self {
         Self {
             node: ALWAYS_FALSE,
+            source_order: None,
             inner: None,
         }
     }
@@ -267,6 +271,7 @@ impl<'db> OwnedConstraintSet<'db> {
     pub(crate) fn always() -> Self {
         Self {
             node: ALWAYS_TRUE,
+            source_order: None,
             inner: None,
         }
     }
@@ -287,7 +292,7 @@ impl<'db> OwnedConstraintSet<'db> {
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
         };
-        let set = ConstraintSet::from_node(&builder, self.node);
+        let set = ConstraintSet::from_node(&builder, self.node, self.source_order);
         f(&builder, set)
     }
 }
@@ -312,6 +317,16 @@ impl OwnedConstraintSetInner<'_> {
         );
         self.constraint_indices.rank(index) as usize
     }
+
+    fn retained_source_order_index(&self, id: SourceOrderId) -> usize {
+        let index = id.index();
+        debug_assert_eq!(
+            self.source_order_indices.get_bit(index),
+            Some(true),
+            "should not access constraint set source_order that was marked unused",
+        );
+        self.source_order_indices.rank(index) as usize
+    }
 }
 
 /// A set of constraints under which a type property holds.
@@ -329,6 +344,10 @@ pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
+    /// The source ordering of the constraints in this constraint set. Will be `None` for terminal
+    /// nodes.
+    source_order: Option<SourceOrderId>,
+
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
 
@@ -337,20 +356,25 @@ pub struct ConstraintSet<'db, 'c> {
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
-    fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+    fn from_node(
+        builder: &'c ConstraintSetBuilder<'db>,
+        node: NodeId,
+        source_order: Option<SourceOrderId>,
+    ) -> Self {
         Self {
             node,
+            source_order,
             builder,
             _invariant: PhantomData,
         }
     }
 
     fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_FALSE)
+        Self::from_node(builder, ALWAYS_FALSE, None)
     }
 
     fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_TRUE)
+        Self::from_node(builder, ALWAYS_TRUE, None)
     }
 
     pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, b: bool) -> Self {
@@ -380,10 +404,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> Self {
-        Self::from_node(
-            builder,
-            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
-        )
+        let (node, source_order) =
+            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper);
+        Self::from_node(builder, node, source_order)
     }
 
     /// Returns a constraint set that constrains a typevar to be a supertype of `lower`.
@@ -433,7 +456,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.implies_subtype_of(db, builder, lhs, rhs))
+        let (node, extra_source_order) = self.node.implies_subtype_of(db, builder, lhs, rhs);
+        let source_order = builder.ordered_source_order(self.source_order, extra_source_order);
+        Self::from_node(builder, node, source_order)
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -472,6 +497,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         self.node = self.node.or_with_offset(builder, other.node);
+        self.source_order = builder.ordered_source_order(self.source_order, other.source_order);
         *self
     }
 
@@ -487,13 +513,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         self.node = self.node.and_with_offset(builder, other.node);
+        self.source_order = builder.ordered_source_order(self.source_order, other.source_order);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.negate(builder))
+        Self::from_node(builder, self.node.negate(builder), self.source_order)
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -562,7 +589,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
+        let node = self.node.iff_with_offset(builder, other.node);
+        let source_order = builder.ordered_source_order(self.source_order, other.source_order);
+        Self::from_node(builder, node, source_order)
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -577,7 +606,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists(db, builder, to_remove))
+        let node = self.node.exists(db, builder, to_remove);
+        Self::from_node(builder, node, self.source_order)
     }
 
     pub(crate) fn remove_noninferable(
@@ -594,10 +624,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         {
             return self;
         }
-        Self::from_node(
-            builder,
-            self.node.remove_noninferable(db, builder, inferable),
-        )
+        let node = self.node.remove_noninferable(db, builder, inferable);
+        Self::from_node(builder, node, self.source_order)
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
@@ -710,10 +738,20 @@ struct ConstraintSetStorage<'db> {
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
+    /// Encodes an ordering on the constraints in a constraint set, which is based on the order
+    /// that the constraints (or more accurately, the Python expressions they're derived from)
+    /// appear in the source code. This ensures that any union and intersections types that appear
+    /// in solutions are constructed in a stable (and source-consistent) order.
+    ///
+    /// This is encoded as a binary tree over [`ConstraintId`]s. The pre-walk of that tree defines
+    /// the ordering.
+    source_orders: IndexVec<SourceOrderId, SourceOrder>,
+
     // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache.
@@ -777,6 +815,13 @@ impl ConstraintSetStorage<'_> {
         id
     }
 
+    fn adjusted_source_order_id(&self, id: SourceOrderId) -> SourceOrderId {
+        if let Some(compacted) = &self.compacted {
+            return id + compacted.source_order_indices.len();
+        }
+        id
+    }
+
     fn adjusted_typevar_id(&self, id: TypeVarId) -> TypeVarId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.typevars.len();
@@ -803,12 +848,21 @@ impl<'db> ConstraintSetBuilder<'db> {
         let constraint = f(&self);
         let node = constraint.node;
         if node.is_terminal() {
-            return OwnedConstraintSet { node, inner: None };
+            return OwnedConstraintSet {
+                node,
+                source_order: None,
+                inner: None,
+            };
         }
+        let source_order = constraint
+            .source_order
+            .expect("non-terminal BDD should have source_order");
 
         let mut storage = self.storage.into_inner();
         let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
         let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
+        let mut used_source_orders = RankBitBox::bits_with_capacity(storage.source_orders.len());
+
         let mut stack = vec![node];
         while let Some(node) = stack.pop() {
             if node.is_terminal() || used_nodes[node.index()] {
@@ -821,8 +875,23 @@ impl<'db> ConstraintSetBuilder<'db> {
             stack.push(interior.if_uncertain);
             stack.push(interior.if_false);
         }
-        used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
-        used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
+
+        let mut stack = vec![source_order];
+        while let Some(source_order) = stack.pop() {
+            if used_source_orders[source_order.index()] {
+                continue;
+            }
+            used_source_orders.set(source_order.index(), true);
+            match storage.source_orders[source_order] {
+                SourceOrder::Ordered(left, right) => {
+                    stack.push(left);
+                    stack.push(right);
+                }
+                SourceOrder::Constraint(constraint) => {
+                    used_constraints.set(constraint.index(), true);
+                }
+            }
+        }
 
         let nodes = storage
             .nodes
@@ -831,6 +900,7 @@ impl<'db> ConstraintSetBuilder<'db> {
             .filter_map(|(node, used)| used.then_some(node))
             .collect();
         let node_indices = RankBitBox::from_bits(used_nodes);
+
         let constraints = storage
             .constraints
             .into_iter()
@@ -838,16 +908,28 @@ impl<'db> ConstraintSetBuilder<'db> {
             .filter_map(|(constraint, used)| used.then_some(constraint))
             .collect();
         let constraint_indices = RankBitBox::from_bits(used_constraints);
+
+        let source_orders = storage
+            .source_orders
+            .into_iter()
+            .zip(&used_source_orders)
+            .filter_map(|(source_order, used)| used.then_some(source_order))
+            .collect();
+        let source_order_indices = RankBitBox::from_bits(used_source_orders);
+
         storage.typevars.shrink_to_fit();
 
         OwnedConstraintSet {
             node,
+            source_order: Some(source_order),
             inner: Some(Arc::new(OwnedConstraintSetInner {
                 constraints,
                 constraint_indices,
                 typevars: storage.typevars,
                 nodes,
                 node_indices,
+                source_orders,
+                source_order_indices,
             })),
         }
     }
@@ -870,7 +952,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         fn rebuild_node<'db>(
             builder: &ConstraintSetBuilder<'db>,
             inner: &OwnedConstraintSetInner<'db>,
-            constraints: &[NodeId],
+            constraints: &[(NodeId, Option<SourceOrderId>)],
             cache: &mut FxHashMap<NodeId, NodeId>,
             old_node: NodeId,
         ) -> NodeId {
@@ -896,7 +978,8 @@ impl<'db> ConstraintSetBuilder<'db> {
             // Shift the reloaded condition back to the source order recorded in the owned set;
             // solution extraction uses this order for deterministic unions and intersections.
             let old_constraint_index = inner.retained_constraint_index(old_interior.constraint);
-            let condition = constraints[old_constraint_index]
+            let (constraint_node, _) = constraints[old_constraint_index];
+            let condition = constraint_node
                 .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
             let remapped = condition.ite_uncertain(builder, if_true, if_uncertain, if_false);
 
@@ -905,7 +988,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
 
         if other.node.is_terminal() {
-            return ConstraintSet::from_node(self, other.node);
+            return ConstraintSet::from_node(self, other.node, None);
         }
         let inner = other
             .inner
@@ -930,10 +1013,33 @@ impl<'db> ConstraintSetBuilder<'db> {
             })
             .collect();
 
+        let mut source_orders = vec![None; inner.source_orders.len()];
+        for (i, old_source_order) in inner.source_orders.iter().copied().enumerate() {
+            match old_source_order {
+                SourceOrder::Ordered(old_left, old_right) => {
+                    let old_left_index = inner.retained_source_order_index(old_left);
+                    let new_left = source_orders[old_left_index];
+                    let old_right_index = inner.retained_source_order_index(old_right);
+                    let new_right = source_orders[old_right_index];
+                    source_orders[i] = self.ordered_source_order(new_left, new_right);
+                }
+                SourceOrder::Constraint(old_constraint) => {
+                    let old_constraint_index = inner.retained_constraint_index(old_constraint);
+                    let (_, constraint_source_order) = constraints[old_constraint_index];
+                    source_orders[i] = constraint_source_order;
+                }
+            }
+        }
+
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(self, inner, &constraints, &mut cache, other.node);
-        ConstraintSet::from_node(self, node)
+        let old_source_order = other
+            .source_order
+            .expect("non-terminal constraint set should have a source_order");
+        let old_source_order_index = inner.retained_source_order_index(old_source_order);
+        let source_order = source_orders[old_source_order_index];
+        ConstraintSet::from_node(self, node, source_order)
     }
 
     /// Interns a single typevar, giving it a stable order in this builder
@@ -1107,6 +1213,36 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
         storage.nodes[node]
     }
+
+    fn intern_source_order(&self, data: SourceOrder) -> SourceOrderId {
+        let mut storage = self.storage.borrow_mut();
+        storage.ensure_overlay_identity_caches();
+        if let Some(id) = storage.source_order_cache.get(&data) {
+            return *id;
+        }
+        let id = storage.source_orders.push(data);
+        let id = storage.adjusted_source_order_id(id);
+        storage.source_order_cache.insert(data, id);
+        id
+    }
+
+    fn ordered_source_order(
+        &self,
+        left: Option<SourceOrderId>,
+        right: Option<SourceOrderId>,
+    ) -> Option<SourceOrderId> {
+        match (left, right) {
+            (None, None) => None,
+            (None, other) | (other, None) => other,
+            (Some(left), Some(right)) => {
+                Some(self.intern_source_order(SourceOrder::Ordered(left, right)))
+            }
+        }
+    }
+
+    fn constraint_source_order(&self, constraint: ConstraintId) -> SourceOrderId {
+        self.intern_source_order(SourceOrder::Constraint(constraint))
+    }
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
@@ -1151,6 +1287,23 @@ pub struct TypeVarId;
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
+
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct SourceOrderId;
+
+/// The nodes of the tree that defines the source ordering of the constraints in a constraint set.
+/// This is encoded as a binary tree over [`ConstraintId`]s. The pre-walk of that tree defines the
+/// ordering.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+enum SourceOrder {
+    /// Any constraint that appears in the left subtree should appear before any constraint in the
+    /// right subtree.
+    Ordered(SourceOrderId, SourceOrderId),
+
+    /// One of the constraints that appears in this ordering.
+    Constraint(ConstraintId),
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 enum NestedSubstitutionSide {
@@ -1422,7 +1575,7 @@ impl<'db> Constraint<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-    ) -> NodeId {
+    ) -> (NodeId, Option<SourceOrderId>) {
         Self::new_node_with_bounds(db, builder, typevar, Some(lower), Some(upper))
     }
 
@@ -1435,9 +1588,9 @@ impl<'db> Constraint<'db> {
         typevar: BoundTypeVarInstance<'db>,
         mut lower: Option<Type<'db>>,
         mut upper: Option<Type<'db>>,
-    ) -> NodeId {
+    ) -> (NodeId, Option<SourceOrderId>) {
         if lower.is_none() && upper.is_none() {
-            return ALWAYS_TRUE;
+            return (ALWAYS_TRUE, None);
         }
 
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
@@ -1450,19 +1603,19 @@ impl<'db> Constraint<'db> {
         //   (α | β) ≤ T   ⇔ (α ≤ T) ∧ (β ≤ T)
         if let Some(Type::Union(lower_union)) = lower {
             let mut result = ALWAYS_TRUE;
+            let mut source_order = None;
             for lower_element in lower_union.elements(db) {
-                result = result.and_with_offset(
+                let (element_node, element_source_order) = Constraint::new_node_with_bounds(
+                    db,
                     builder,
-                    Constraint::new_node_with_bounds(
-                        db,
-                        builder,
-                        typevar,
-                        Some(*lower_element),
-                        upper,
-                    ),
+                    typevar,
+                    Some(*lower_element),
+                    upper,
                 );
+                result = result.and_with_offset(builder, element_node);
+                source_order = builder.ordered_source_order(source_order, element_source_order);
             }
-            return result;
+            return (result, source_order);
         }
         // A negated type ¬α is represented as an intersection with no positive elements, and a
         // single negative element. We _don't_ want to treat that an "intersection" for the
@@ -1471,31 +1624,30 @@ impl<'db> Constraint<'db> {
             && !upper_intersection.is_simple_negation(db)
         {
             let mut result = ALWAYS_TRUE;
+            let mut source_order = None;
             for upper_element in upper_intersection.iter_positive(db) {
-                result = result.and_with_offset(
+                let (element_node, element_source_order) = Constraint::new_node_with_bounds(
+                    db,
                     builder,
-                    Constraint::new_node_with_bounds(
-                        db,
-                        builder,
-                        typevar,
-                        lower,
-                        Some(upper_element),
-                    ),
+                    typevar,
+                    lower,
+                    Some(upper_element),
                 );
+                result = result.and_with_offset(builder, element_node);
+                source_order = builder.ordered_source_order(source_order, element_source_order);
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                result = result.and_with_offset(
+                let (element_node, element_source_order) = Constraint::new_node_with_bounds(
+                    db,
                     builder,
-                    Constraint::new_node_with_bounds(
-                        db,
-                        builder,
-                        typevar,
-                        lower,
-                        Some(upper_element.negate(db)),
-                    ),
+                    typevar,
+                    lower,
+                    Some(upper_element.negate(db)),
                 );
+                result = result.and_with_offset(builder, element_node);
+                source_order = builder.ordered_source_order(source_order, element_source_order);
             }
-            return result;
+            return (result, source_order);
         }
 
         // Two identical typevars must always solve to the same type, so it is not useful to have
@@ -1522,12 +1674,11 @@ impl<'db> Constraint<'db> {
                     })
                 }) =>
             {
-                return Node::new_constraint(
-                    builder,
-                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object()),
-                    1,
-                )
-                .negate(builder);
+                let constraint =
+                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object());
+                let source_order = builder.constraint_source_order(constraint);
+                let node = Node::new_constraint(builder, constraint, 1).negate(builder);
+                return (node, Some(source_order));
             }
             _ => {}
         }
@@ -1561,7 +1712,7 @@ impl<'db> Constraint<'db> {
         let when = effective_lower.when_constraint_set_assignable_to_owned(db, effective_upper);
         let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
         if is_never_satisfied {
-            return ALWAYS_FALSE;
+            return (ALWAYS_FALSE, None);
         }
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
@@ -1578,17 +1729,16 @@ impl<'db> Constraint<'db> {
                 } else {
                     (typevar, lower)
                 };
-                Node::new_constraint(
+                let constraint = ConstraintId::new(
+                    db,
                     builder,
-                    ConstraintId::new(
-                        db,
-                        builder,
-                        typevar,
-                        Type::TypeVar(bound),
-                        Type::TypeVar(bound),
-                    ),
-                    1,
-                )
+                    typevar,
+                    Type::TypeVar(bound),
+                    Type::TypeVar(bound),
+                );
+                let source_order = builder.constraint_source_order(constraint);
+                let node = Node::new_constraint(builder, constraint, 1);
+                (node, Some(source_order))
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
@@ -1596,78 +1746,80 @@ impl<'db> Constraint<'db> {
                 if typevar.can_be_bound_for(db, builder, lower)
                     && typevar.can_be_bound_for(db, builder, upper) =>
             {
-                let lower = Node::new_constraint(
+                let lower_constraint = ConstraintId::new_with_bounds(
+                    db,
                     builder,
-                    ConstraintId::new_with_bounds(
-                        db,
-                        builder,
-                        lower,
-                        None,
-                        Some(Type::TypeVar(typevar)),
-                    ),
-                    1,
+                    lower,
+                    None,
+                    Some(Type::TypeVar(typevar)),
                 );
-                let upper = Node::new_constraint(
+                let lower_source_order = Some(builder.constraint_source_order(lower_constraint));
+                let lower_node = Node::new_constraint(builder, lower_constraint, 1);
+                let upper_constraint = ConstraintId::new_with_bounds(
+                    db,
                     builder,
-                    ConstraintId::new_with_bounds(
-                        db,
-                        builder,
-                        upper,
-                        Some(Type::TypeVar(typevar)),
-                        None,
-                    ),
-                    1,
+                    upper,
+                    Some(Type::TypeVar(typevar)),
+                    None,
                 );
-                lower.and(builder, upper)
+                let upper_source_order = Some(builder.constraint_source_order(upper_constraint));
+                let upper_node = Node::new_constraint(builder, upper_constraint, 1);
+                let node = lower_node.and(builder, upper_node);
+                let source_order =
+                    builder.ordered_source_order(lower_source_order, upper_source_order);
+                (node, source_order)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
-                let lower = Node::new_constraint(
+                let lower_constraint = ConstraintId::new_with_bounds(
+                    db,
                     builder,
-                    ConstraintId::new_with_bounds(
-                        db,
-                        builder,
-                        lower,
-                        None,
-                        Some(Type::TypeVar(typevar)),
-                    ),
-                    1,
+                    lower,
+                    None,
+                    Some(Type::TypeVar(typevar)),
                 );
-                let upper = if upper.is_none() {
-                    ALWAYS_TRUE
+                let lower_source_order = Some(builder.constraint_source_order(lower_constraint));
+                let lower_node = Node::new_constraint(builder, lower_constraint, 1);
+                let (upper_node, upper_source_order) = if upper.is_none() {
+                    (ALWAYS_TRUE, None)
                 } else {
                     Constraint::new_node_with_bounds(db, builder, typevar, None, upper)
                 };
-                lower.and(builder, upper)
+                let node = lower_node.and(builder, upper_node);
+                let source_order =
+                    builder.ordered_source_order(lower_source_order, upper_source_order);
+                (node, source_order)
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, builder, upper) => {
-                let lower = if lower.is_none() {
-                    ALWAYS_TRUE
+                let (lower_node, lower_source_order) = if lower.is_none() {
+                    (ALWAYS_TRUE, None)
                 } else {
                     Constraint::new_node_with_bounds(db, builder, typevar, lower, None)
                 };
-                let upper = Node::new_constraint(
+                let upper_constraint = ConstraintId::new_with_bounds(
+                    db,
                     builder,
-                    ConstraintId::new_with_bounds(
-                        db,
-                        builder,
-                        upper,
-                        Some(Type::TypeVar(typevar)),
-                        None,
-                    ),
-                    1,
+                    upper,
+                    Some(Type::TypeVar(typevar)),
+                    None,
                 );
-                lower.and(builder, upper)
+                let upper_source_order = Some(builder.constraint_source_order(upper_constraint));
+                let upper_node = Node::new_constraint(builder, upper_constraint, 1);
+                let node = lower_node.and(builder, upper_node);
+                let source_order =
+                    builder.ordered_source_order(lower_source_order, upper_source_order);
+                (node, source_order)
             }
 
-            _ => Node::new_constraint(
-                builder,
-                ConstraintId::new_with_bounds(db, builder, typevar, lower, upper),
-                1,
-            ),
+            _ => {
+                let constraint = ConstraintId::new_with_bounds(db, builder, typevar, lower, upper);
+                let source_order = Some(builder.constraint_source_order(constraint));
+                let node = Node::new_constraint(builder, constraint, 1);
+                (node, source_order)
+            }
         }
     }
 }
@@ -2467,11 +2619,11 @@ impl NodeId {
     fn tree_fold<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = Self>,
+        nodes: impl Iterator<Item = (Self, Option<SourceOrderId>)>,
         zero: Self,
         is_one: impl Fn(Self, &'db dyn Db, &ConstraintSetBuilder<'db>) -> bool,
         mut combine: impl FnMut(Self, &ConstraintSetBuilder<'db>, Self) -> Self,
-    ) -> Self {
+    ) -> (Self, Option<SourceOrderId>) {
         // To implement the "linear" shape described above, we could collect the iterator elements
         // into a vector, and then use the fold at the bottom of this method to combine the
         // elements using the operator.
@@ -2496,40 +2648,49 @@ impl NodeId {
         //
         // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
         // until the iterator passes 256 elements.
-        let mut accumulator: SmallVec<[(NodeId, u8); 8]> = SmallVec::default();
-        for node in nodes {
+        let mut accumulator: SmallVec<[(NodeId, Option<SourceOrderId>, u8); 8]> =
+            SmallVec::default();
+        for (node, source_order) in nodes {
             if is_one(node, db, builder) {
-                return node;
+                return (node, source_order);
             }
 
-            let (mut node, mut depth) = (node, 0);
+            let (mut node, mut source_order, mut depth) = (node, source_order, 0);
             while accumulator
                 .last()
-                .is_some_and(|(_, existing)| *existing == depth)
+                .is_some_and(|(_, _, existing)| *existing == depth)
             {
-                let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
-                node = combine(existing, builder, node);
+                let (existing_node, existing_source_order, _) =
+                    accumulator.pop().expect("accumulator should not be empty");
+                node = combine(existing_node, builder, node);
+                source_order = builder.ordered_source_order(existing_source_order, source_order);
                 if is_one(node, db, builder) {
-                    return node;
+                    return (node, source_order);
                 }
                 depth += 1;
             }
-            accumulator.push((node, depth));
+            accumulator.push((node, source_order, depth));
         }
 
         // At this point, we've consumed all of the iterator. The length of the accumulator will be
         // the same as the number of 1 bits in the length of the iterator. We do a final fold to
         // produce the overall result.
-        accumulator
-            .into_iter()
-            .fold(zero, |result, (node, _)| combine(result, builder, node))
+        accumulator.into_iter().fold(
+            (zero, None),
+            |(result_node, result_source_order), (node, source_order, _)| {
+                (
+                    combine(result_node, builder, node),
+                    builder.ordered_source_order(result_source_order, source_order),
+                )
+            },
+        )
     }
 
     fn distributed_or<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = NodeId>,
-    ) -> Self {
+        nodes: impl Iterator<Item = (NodeId, Option<SourceOrderId>)>,
+    ) -> (Self, Option<SourceOrderId>) {
         Self::tree_fold(
             db,
             builder,
@@ -2543,8 +2704,8 @@ impl NodeId {
     fn distributed_and<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        nodes: impl Iterator<Item = NodeId>,
-    ) -> Self {
+        nodes: impl Iterator<Item = (NodeId, Option<SourceOrderId>)>,
+    ) -> (Self, Option<SourceOrderId>) {
         Self::tree_fold(
             db,
             builder,
@@ -2709,7 +2870,7 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
         rhs: Type<'db>,
-    ) -> Self {
+    ) -> (Self, Option<SourceOrderId>) {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
@@ -2718,7 +2879,7 @@ impl NodeId {
         // these types are coming in from arbitrary subtyping checks that the caller might want to
         // perform. So we have to take the appropriate materialization when translating the check
         // into a constraint.
-        let constraint = match (lhs, rhs) {
+        let (constraint, constraint_source_order) = match (lhs, rhs) {
             (Type::TypeVar(bound_typevar), _) => Constraint::new_node_with_bounds(
                 db,
                 builder,
@@ -2736,7 +2897,8 @@ impl NodeId {
             _ => panic!("at least one type should be a typevar"),
         };
 
-        self.implies(builder, constraint)
+        let node = self.implies(builder, constraint);
+        (node, constraint_source_order)
     }
 
     fn satisfied_by_all_typevars<'db>(
@@ -6859,17 +7021,18 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => ALWAYS_TRUE,
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
-                Constraint::new_node_with_bounds(db, builder, self, None, Some(bound))
+                let (node, _) =
+                    Constraint::new_node_with_bounds(db, builder, self, None, Some(bound));
+                node
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = ALWAYS_FALSE;
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    specializations = specializations.or_with_offset(
-                        builder,
-                        Constraint::new_node(db, builder, self, constraint_lower, constraint_upper),
-                    );
+                    let (constraint_node, _) =
+                        Constraint::new_node(db, builder, self, constraint_lower, constraint_upper);
+                    specializations = specializations.or_with_offset(builder, constraint_node);
                 }
                 specializations
             }
@@ -6903,10 +7066,9 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => (ALWAYS_TRUE, Vec::new()),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.bottom_materialization(db);
-                (
-                    Constraint::new_node_with_bounds(db, builder, self, None, Some(bound)),
-                    Vec::new(),
-                )
+                let (node, _) =
+                    Constraint::new_node_with_bounds(db, builder, self, None, Some(bound));
+                (node, Vec::new())
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut non_gradual_constraints = ALWAYS_FALSE;
@@ -6914,7 +7076,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    let constraint =
+                    let (constraint, _) =
                         Constraint::new_node(db, builder, self, constraint_lower, constraint_upper);
                     if constraint_lower == constraint_upper {
                         non_gradual_constraints =
