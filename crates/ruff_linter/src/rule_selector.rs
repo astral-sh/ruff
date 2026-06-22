@@ -28,7 +28,7 @@ thread_local! {
     static VALUE_SOURCE: RefCell<Option<(RuleSelectorSource, bool)>> = const { RefCell::new(None) };
 }
 
-/// Guard to safely change the [`VALUE_SOURCE`] for the current thread.
+/// Guard to safely change the `VALUE_SOURCE` for the current thread.
 #[must_use]
 pub struct RuleSelectorSourceGuard {
     prev_value: Option<(RuleSelectorSource, bool)>,
