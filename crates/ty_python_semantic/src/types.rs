@@ -1478,21 +1478,61 @@ impl<'db> Type<'db> {
             matches!(
                 ty,
                 Type::Union(distributed)
-                    if wrapped.elements(db).iter().all(|wrapped_element| {
-                        distributed.elements(db).iter().any(|branch| {
-                            Self::contains_positive_type(db, *branch, *wrapped_element)
-                                && wrapped
-                                    .elements(db)
-                                    .iter()
-                                    .filter(|candidate| {
-                                        Self::contains_positive_type(db, *branch, **candidate)
-                                    })
-                                    .exactly_one()
-                                    .is_ok()
-                        })
-                    })
+                    if Self::matching_union_distribution(db, distributed, wrapped).is_some()
             )
         })
+    }
+
+    /// Returns the branches in a single structural distribution of `wrapped`.
+    fn matching_union_distribution(
+        db: &'db dyn Db,
+        current: UnionType<'db>,
+        wrapped: UnionType<'db>,
+    ) -> Option<Vec<(Self, Self)>> {
+        let representative = wrapped.elements(db).first().copied()?;
+        let mut groups: Vec<(Self, Vec<(Self, Self)>)> = Vec::new();
+
+        for branch in current.elements(db) {
+            let Ok(wrapped_element) = wrapped
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|candidate| Self::contains_positive_type(db, *branch, *candidate))
+                .exactly_one()
+            else {
+                continue;
+            };
+            let canonical = branch.apply_type_mapping(
+                db,
+                &TypeMapping::ReplaceType {
+                    from: wrapped_element,
+                    to: representative,
+                },
+                TypeContext::default(),
+            );
+
+            if let Some((_, branches)) = groups
+                .iter_mut()
+                .find(|(group_canonical, _)| *group_canonical == canonical)
+            {
+                branches.push((*branch, wrapped_element));
+            } else {
+                groups.push((canonical, vec![(*branch, wrapped_element)]));
+            }
+        }
+
+        groups
+            .into_iter()
+            .filter(|(_, branches)| {
+                wrapped.elements(db).iter().all(|wrapped_element| {
+                    branches
+                        .iter()
+                        .any(|(_, branch_element)| branch_element == wrapped_element)
+                })
+            })
+            .map(|(_, branches)| branches)
+            .exactly_one()
+            .ok()
     }
 
     /// Returns whether `current` contains `target` outside negative intersection elements.
