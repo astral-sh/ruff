@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::iter::FusedIterator;
 
+use memchr::{memchr, memchr3};
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
@@ -14,6 +15,29 @@ use crate::QuoteStyle;
 use crate::context::InterpolatedStringState;
 use crate::prelude::*;
 use crate::string::{Quote, StringQuotes, TripleQuotes};
+
+#[inline]
+fn first_normalization_offset(content: &str) -> Option<usize> {
+    const MEMCHR_THRESHOLD: usize = 32;
+
+    let bytes = content.as_bytes();
+
+    // Two memchr scans only pay off for longer string contents.
+    if bytes.len() < MEMCHR_THRESHOLD {
+        return bytes
+            .iter()
+            .position(|b| matches!(*b, b'\\' | b'"' | b'\'' | b'\r'));
+    }
+
+    // `memchr` has no four-needle variant. A carriage return after the first quote or escape will
+    // be found by `normalize_string`, so only search the preceding bytes.
+    let first_quote_or_escape = memchr3(b'\\', b'"', b'\'', bytes);
+    memchr(
+        b'\r',
+        &bytes[..first_quote_or_escape.unwrap_or(bytes.len())],
+    )
+    .or(first_quote_or_escape)
+}
 
 pub(crate) struct StringNormalizer<'a, 'src> {
     preferred_quote_style: Option<QuoteStyle>,
@@ -192,9 +216,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// Computes the strings preferred quotes.
     pub(crate) fn choose_quotes(&self, string: StringLikePart) -> QuoteSelection {
         let raw_content = &self.context.source()[string.content_range()];
-        let first_quote_or_normalized_char_offset = raw_content
-            .bytes()
-            .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r'));
+        let first_quote_or_normalized_char_offset = first_normalization_offset(raw_content);
         let string_flags = string.flags();
         let preferred_style = self.preferred_quote_style(string);
 
