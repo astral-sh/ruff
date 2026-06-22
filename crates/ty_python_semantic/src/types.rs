@@ -5157,7 +5157,9 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         };
 
-        bindings.with_generic_context(db, class_generic_context)
+        bindings
+            .with_generic_context(db, class_generic_context)
+            .with_constructor_source_class(class)
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if

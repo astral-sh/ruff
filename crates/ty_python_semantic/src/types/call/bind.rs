@@ -60,11 +60,12 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
+    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -72,6 +73,15 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_python_core::semantic_index;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
+
+/// Determines when call analysis retains a downstream constructor step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DownstreamConstructorPolicy {
+    /// Keep downstream steps only when type checking confirms an instance return.
+    RequireInstanceReturn,
+    /// Keep downstream steps whenever a declared return can produce an instance.
+    AllowPossibleInstanceReturn,
+}
 
 fn generic_contexts_mentioned_in_type<'db>(
     db: &'db dyn Db,
@@ -205,13 +215,20 @@ impl<'db> CallableItem<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        downstream_policy: DownstreamConstructorPolicy,
     ) {
         match self {
             CallableItem::Regular(binding) => {
                 binding.check_types(db, constraints, argument_types, call_expression_tcx);
             }
             CallableItem::Constructor(binding) => {
-                binding.check_types(db, constraints, argument_types, call_expression_tcx);
+                binding.check_types(
+                    db,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    downstream_policy,
+                );
             }
         }
     }
@@ -383,9 +400,16 @@ impl<'db> BindingsElement<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        downstream_policy: DownstreamConstructorPolicy,
     ) {
         for item in &mut self.items {
-            item.check_types(db, constraints, call_arguments, call_expression_tcx);
+            item.check_types(
+                db,
+                constraints,
+                call_arguments,
+                call_expression_tcx,
+                downstream_policy,
+            );
         }
     }
 
@@ -538,6 +562,15 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    fn set_constructor_source_class_in_place(&mut self, class: ClassType<'db>) {
+        for constructor in self.iter_constructor_items_mut() {
+            constructor.set_source_class(class);
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.set_constructor_source_class_in_place(class);
+            }
+        }
+    }
+
     fn apply_generic_context_in_place(
         &mut self,
         db: &'db dyn Db,
@@ -653,6 +686,12 @@ impl<'db> Bindings<'db> {
         self
     }
 
+    /// Retains the source class for every step in this constructor chain.
+    pub(crate) fn with_constructor_source_class(mut self, class: ClassType<'db>) -> Self {
+        self.set_constructor_source_class_in_place(class);
+        self
+    }
+
     pub(crate) fn into_constructor_bindings(
         mut self,
         constructor_instance_type: Type<'db>,
@@ -747,6 +786,40 @@ impl<'db> Bindings<'db> {
     fn iter_constructor_items(&self) -> impl Iterator<Item = &ConstructorBinding<'db>> {
         self.iter_callable_items()
             .filter_map(CallableItem::as_constructor)
+    }
+
+    /// Returns whether these bindings contain constructor call steps.
+    pub(crate) fn has_constructor_bindings(&self, db: &'db dyn Db) -> bool {
+        self.iter_callable_items().any(|item| {
+            item.as_constructor().is_some()
+                || item.callable().effective_constructor_source(db).is_some()
+        })
+    }
+
+    /// Visits the reachable constructor steps retained in this binding graph.
+    ///
+    /// The type-checking policy determines whether this contains only definitely reached steps or
+    /// every step that a runtime result may reach.
+    pub(crate) fn visit_reachable_constructors(
+        &self,
+        db: &'db dyn Db,
+        visit: &mut impl FnMut(ClassType<'db>, ConstructorCallableKind),
+    ) {
+        for item in self.iter_callable_items() {
+            let constructor = item.as_constructor();
+            if let Some((class, kind)) = item.callable().effective_constructor_source(db) {
+                visit(class, kind);
+            } else if let Some((class, kind)) =
+                constructor.and_then(|constructor| constructor.source_class_and_kind(db))
+            {
+                visit(class, kind);
+            }
+            if let Some(downstream) =
+                constructor.and_then(ConstructorBinding::downstream_constructor)
+            {
+                downstream.visit_reachable_constructors(db, visit);
+            }
+        }
     }
 
     fn iter_constructor_items_mut(&mut self) -> impl Iterator<Item = &mut ConstructorBinding<'db>> {
@@ -996,19 +1069,61 @@ impl<'db> Bindings<'db> {
     /// parameters, and any errors resulting from binding the call, all for each union element and
     /// overload (if any).
     pub(crate) fn check_types(
-        mut self,
+        self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
-        match self.check_types_impl(
+        self.check_types_with_downstream_policy(
             db,
             constraints,
             call_arguments,
             call_expression_tcx,
             dataclass_field_specifiers,
+            DownstreamConstructorPolicy::RequireInstanceReturn,
+        )
+    }
+
+    /// Type-checks a call while retaining every constructor step that may run.
+    ///
+    /// Unlike ordinary call analysis, invalid arguments and return types that only sometimes
+    /// produce the constructed instance do not discard downstream constructor steps.
+    pub(crate) fn check_types_for_constructor_references(
+        self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> Result<Self, CallError<'db>> {
+        self.check_types_with_downstream_policy(
+            db,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+            DownstreamConstructorPolicy::AllowPossibleInstanceReturn,
+        )
+    }
+
+    fn check_types_with_downstream_policy(
+        mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+        downstream_policy: DownstreamConstructorPolicy,
+    ) -> Result<Self, CallError<'db>> {
+        match self.check_types_impl_with_downstream_policy(
+            db,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+            downstream_policy,
         ) {
             Ok(()) => Ok(self),
             Err(err) => Err(CallError(err, Box::new(self))),
@@ -1023,9 +1138,34 @@ impl<'db> Bindings<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<(), CallErrorKind> {
+        self.check_types_impl_with_downstream_policy(
+            db,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+            DownstreamConstructorPolicy::RequireInstanceReturn,
+        )
+    }
+
+    fn check_types_impl_with_downstream_policy(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+        downstream_policy: DownstreamConstructorPolicy,
+    ) -> Result<(), CallErrorKind> {
         // Check types for each element (union variant)
         for element in &mut self.elements {
-            element.check_types(db, constraints, call_arguments, call_expression_tcx);
+            element.check_types(
+                db,
+                constraints,
+                call_arguments,
+                call_expression_tcx,
+                downstream_policy,
+            );
         }
 
         self.evaluate_known_cases(db, call_arguments, dataclass_field_specifiers);
@@ -1039,6 +1179,7 @@ impl<'db> Bindings<'db> {
                 call_arguments,
                 call_expression_tcx,
                 dataclass_field_specifiers,
+                downstream_policy,
             );
         }
 
@@ -2907,6 +3048,31 @@ impl<'db> CallableBinding<'db> {
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
         }
+    }
+
+    /// Returns the source represented by a synthesized, effective class-call signature.
+    ///
+    /// Bespoke known-class bindings retain their exact class as the callable type, so reference
+    /// analysis can recover constructor identity without changing their call semantics.
+    fn effective_constructor_source(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassType<'db>, ConstructorCallableKind)> {
+        let Type::ClassLiteral(class) = self.callable_type else {
+            return None;
+        };
+        let kind = match class.known(db)? {
+            KnownClass::Object | KnownClass::Property | KnownClass::Super => {
+                ConstructorCallableKind::Init
+            }
+            KnownClass::Bool
+            | KnownClass::Deprecated
+            | KnownClass::FunctoolsPartial
+            | KnownClass::Tuple
+            | KnownClass::TypeAliasType => ConstructorCallableKind::New,
+            _ => return None,
+        };
+        Some((ClassType::NonGeneric(class), kind))
     }
 
     /// Rewrites overload signatures as if an implicit bound receiver argument had already been
