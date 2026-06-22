@@ -36,7 +36,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -1650,7 +1650,7 @@
       "type": "object",
       "properties": {
         "error-on-warning": {
-          "description": "Use exit code 1 if there are any warning-level diagnostics.\n\nDefaults to `false`.",
+          "description": "Use exit code 1, even if all diagnostics only had `warning` severity.\n\nDefaults to `true`.",
           "type": [
             "boolean",
             "null"
