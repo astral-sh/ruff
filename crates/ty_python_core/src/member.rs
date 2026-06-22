@@ -11,6 +11,9 @@ use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
+// Selected using CodSpeed and measurements across the 162-project ecosystem corpus.
+// Member-expression equality is relatively expensive, and raising the cutoff to 16 regressed
+// performance for comparatively little additional memory savings.
 const LINEAR_SEARCH_THRESHOLD: usize = 8;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.

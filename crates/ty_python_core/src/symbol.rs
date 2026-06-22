@@ -6,6 +6,9 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
+// Selected using CodSpeed and measurements across the 162-project ecosystem corpus. Symbol-name
+// equality is cheap enough that raising the cutoff from 8 to 16 reduced retained memory without a
+// measurable performance regression.
 const LINEAR_SEARCH_THRESHOLD: usize = 16;
 
 /// Uniquely identifies a symbol in a given scope.
