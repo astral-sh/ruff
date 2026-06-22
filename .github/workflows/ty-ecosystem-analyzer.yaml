@@ -46,19 +46,18 @@ env:
 
 jobs:
   build-ty:
-    name: Analyze shard ${{ matrix.shard }}
+    name: Build ty (${{ matrix.revision }})
     strategy:
-      max-parallel: 4
+      max-parallel: 2
       matrix:
-        shard: [0, 1, 2, 3]
+        revision: [base, pr]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    env:
-      EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+          ref: ${{ matrix.revision == 'base' && github.event.pull_request.base.sha || github.sha }}
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -70,33 +69,61 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
+      - name: Build ty
+        env:
+          REVISION: ${{ matrix.revision }}
+        run: |
+          echo "Building ${REVISION} revision $(git rev-parse HEAD)"
+          cargo build --package ty --profile profiling
+          cp target/profiling/ty "ty-${REVISION}"
+
+          if [[ "${REVISION}" == "pr" ]]; then
+            cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
+            cp .github/ty-ecosystem.toml ty-ecosystem.toml
+          fi
+
+      - name: Upload base ty binary
+        if: matrix.revision == 'base'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-base
+          compression-level: 1
+          path: ty-base
+
+      - name: Upload PR ty binary, flaky project list, and config
+        if: matrix.revision == 'pr'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-pr
+          compression-level: 1
+          path: |
+            ty-pr
+            projects_flaky.txt
+            ty-ecosystem.toml
+
+  analyze-shards:
+    needs: [build-ty]
+    strategy:
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    env:
+      EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
+      MERGE_BASE: ${{ github.event.pull_request.base.sha }}
+    steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
           version: "0.11.21"
 
-      - name: Build ty for both commits
-        run: |
-          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-          git fetch --no-tags --filter=blob:none --unshallow origin
-
-          MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-          echo "MERGE_BASE=${MERGE_BASE}" >> "$GITHUB_ENV"
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: ${GITHUB_SHA}"
-
-          git checkout "${MERGE_BASE}"
-          cargo build --package ty --profile profiling
-          cp target/profiling/ty ty-base
-
-          git checkout "${GITHUB_SHA}"
-          cargo build --package ty --profile profiling
-          cp target/profiling/ty ty-pr
-
-          # Extract the flaky project list and config for the shard jobs
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-          cp .github/ty-ecosystem.toml ty-ecosystem.toml
+      - name: Download ty binaries, flaky project list, and config
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ty-build-*
+          merge-multiple: true
 
       - name: Analyze shard ${{ matrix.shard }}
         env:
@@ -133,7 +160,7 @@ jobs:
 
   generate-report:
     name: Generate diagnostic diff report
-    needs: [build-ty]
+    needs: [analyze-shards]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
