@@ -454,8 +454,12 @@ impl<'a> Printer<'a> {
 
             let buffer = &mut self.state.buffer;
             buffer.reserve(total_indent_char_count + align);
-            buffer.extend(std::iter::repeat_n(indent_char, total_indent_char_count));
-            buffer.extend(std::iter::repeat_n(' ', align));
+            for _ in 0..total_indent_char_count {
+                buffer.push(indent_char);
+            }
+            for _ in 0..align {
+                buffer.push(' ');
+            }
 
             self.state.line_width += line_width;
         }
