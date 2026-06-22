@@ -3297,6 +3297,7 @@ fn is_possibly_constraint_set_assignable<'db>(
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,
+    Single(Box<[PathBound<'db>]>),
     Constrained(Box<[Box<[PathBound<'db>]>]>),
 }
 
@@ -3389,7 +3390,9 @@ impl<'db> PathBounds<'db> {
             .simple_lower_bound_conjunction(db, builder)
             .collect::<Result<Vec<_>, _>>()
             .ok()?;
-        constraints.sort_by_key(|(_, _, source_order)| *source_order);
+        // Unlike derived `PathAssignment` constraints, constraints directly in a BDD have
+        // distinct `source_order`s, so this sort does not need to be stable.
+        constraints.sort_unstable_by_key(|(_, _, source_order)| *source_order);
 
         if let Some(&(typevar, _, _)) = constraints.first()
             && constraints
@@ -3400,7 +3403,7 @@ impl<'db> PathBounds<'db> {
                 UnionType::from_elements(db, constraints.into_iter().map(|(_, lower, _)| lower));
             let path: Box<[PathBound<'db>]> =
                 Box::new([(typevar, ConstraintBounds::new(Some(lower), None))]);
-            return Some(PathBounds::Constrained(Box::new([path])));
+            return Some(PathBounds::Single(path));
         }
 
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
@@ -3413,7 +3416,7 @@ impl<'db> PathBounds<'db> {
             .drain()
             .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
             .collect();
-        Some(PathBounds::Constrained(Box::new([path])))
+        Some(PathBounds::Single(path))
     }
 
     pub(crate) fn solve(
@@ -3443,6 +3446,7 @@ impl<'db> PathBounds<'db> {
         let paths = match self {
             PathBounds::Unsatisfiable => return Solutions::Unsatisfiable,
             PathBounds::Unconstrained => return Solutions::Unconstrained,
+            PathBounds::Single(path) => std::slice::from_ref(path),
             PathBounds::Constrained(paths) => paths,
         };
 
