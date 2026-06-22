@@ -3150,46 +3150,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     formal.tuple_instance_spec(self.db),
                     actual_nominal.tuple_spec(self.db),
                 ) {
-                    let formal_resized;
-                    let actual_resized;
-                    let (formal_tuple, actual_tuple) = if let TupleSpec::Variable(formal_variable) =
-                        formal_tuple.as_ref()
-                        && let Type::TypeVar(typevartuple) = formal_variable.variable()
-                        && typevartuple.is_typevartuple(self.db)
-                    {
-                        let formal_prefix_len = formal_variable.prefix_elements().len();
-                        let formal_suffix_len = formal_variable.suffix_elements().len();
-                        if let TupleSpec::Variable(actual_variable) = actual_tuple.as_ref()
-                            && (actual_variable.prefix_elements().len() < formal_prefix_len
-                                || actual_variable.suffix_elements().len() < formal_suffix_len)
-                        {
-                            return Ok(());
-                        }
-
-                        let Ok(resized) = actual_tuple.resize_with_variadic(
-                            self.db,
-                            formal_tuple.len(),
-                            |middle| middle.into_tuple_type(self.db),
-                        ) else {
-                            return Ok(());
-                        };
-                        actual_resized = resized;
-                        (formal_tuple.as_ref(), &actual_resized)
-                    } else {
-                        let Some(most_precise_length) =
-                            formal_tuple.len().most_precise(actual_tuple.len())
-                        else {
-                            return Ok(());
-                        };
-                        let Ok(resized) = formal_tuple.resize(self.db, most_precise_length) else {
-                            return Ok(());
-                        };
-                        formal_resized = resized;
-                        let Ok(resized) = actual_tuple.resize(self.db, most_precise_length) else {
-                            return Ok(());
-                        };
-                        actual_resized = resized;
-                        (&formal_resized, &actual_resized)
+                    let Some((formal_tuple, actual_tuple)) = formal_tuple
+                        .as_ref()
+                        .resize_for_inference(self.db, actual_tuple.as_ref())
+                    else {
+                        return Ok(());
                     };
 
                     for (formal_element, actual_element) in formal_tuple

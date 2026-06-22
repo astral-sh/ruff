@@ -16,6 +16,7 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
@@ -2123,9 +2124,47 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
+    /// Resizes a formal tuple (`self`) and an actual tuple to compatible shapes for generic
+    /// inference.
+    pub(crate) fn resize_for_inference<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        actual: &'a Self,
+    ) -> Option<(Cow<'a, Self>, Cow<'a, Self>)> {
+        if let Tuple::Variable(formal) = self
+            && let Type::TypeVar(typevartuple) = formal.variable()
+            && typevartuple.is_typevartuple(db)
+        {
+            if let Tuple::Variable(actual) = actual
+                && (actual.prefix_elements().len() < formal.prefix_elements().len()
+                    || actual.suffix_elements().len() < formal.suffix_elements().len())
+            {
+                return None;
+            }
+
+            let actual = actual
+                .resize_with_variadic(db, self.len(), |middle| middle.into_tuple_type(db))
+                .ok()?;
+            return Some((Cow::Borrowed(self), Cow::Owned(actual)));
+        }
+
+        let length = self.len().most_precise(actual.len())?;
+        let formal = if self.len() == length {
+            Cow::Borrowed(self)
+        } else {
+            Cow::Owned(self.resize(db, length).ok()?)
+        };
+        let actual = if actual.len() == length {
+            Cow::Borrowed(actual)
+        } else {
+            Cow::Owned(actual.resize(db, length).ok()?)
+        };
+        Some((formal, actual))
+    }
+
     /// Resizes this tuple while allowing the variable-length portion to be represented by a
     /// caller-provided type instead of its homogeneous element type.
-    pub(crate) fn resize_with_variadic<'a>(
+    fn resize_with_variadic<'a>(
         &'a self,
         db: &'db dyn Db,
         new_length: TupleLength,
@@ -2395,7 +2434,7 @@ pub(crate) enum TupleElement<T> {
 
 /// The portion of a tuple assigned to a variable-length target during resizing.
 #[derive(Clone, Copy)]
-pub(crate) enum TupleVariadicPart<'a, 'db> {
+enum TupleVariadicPart<'a, 'db> {
     Fixed(&'a [Type<'db>]),
     Variable {
         prefix: &'a [Type<'db>],
@@ -2426,7 +2465,7 @@ impl<'a, 'db: 'a> TupleVariadicPart<'a, 'db> {
         UnionType::from_elements_leave_aliases(db, self.iter_all_elements())
     }
 
-    pub(crate) fn into_tuple_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn into_tuple_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Fixed(elements) => Type::heterogeneous_tuple(db, elements.iter().copied()),
             Self::Variable {
@@ -2790,31 +2829,42 @@ impl<'db> From<&TupleSpec<'db>> for TupleSpecBuilder<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
+    use crate::types::typevar::{TypeVarIdentity, TypeVarInstance};
+    use crate::types::{BindingContext, TypeVarKind, TypeVarNonce};
+    use ruff_python_ast::name::Name;
 
     #[test]
-    fn resize_with_variadic_packs_mixed_middle() {
+    fn resize_for_inference_packs_typevartuple_middle() {
         let db = setup_db();
+        let identity = TypeVarIdentity::new(
+            &db,
+            Name::new_static("Ts"),
+            None,
+            TypeVarKind::Pep695TypeVarTuple,
+        );
+        let typevartuple = BoundTypeVarInstance::new(
+            &db,
+            TypeVarInstance::new(&db, identity, None, None, None),
+            BindingContext::Synthetic,
+            None,
+            TypeVarNonce::NONE,
+        );
+        let formal = VariableLengthTuple::mixed([], Type::TypeVar(typevartuple), []);
         let actual =
             VariableLengthTuple::mixed([Type::object()], Type::unknown(), [Type::literal_string()]);
 
-        let resized = actual
-            .resize_with_variadic(&db, TupleLength::Variable(0, 0), |middle| {
-                middle.into_tuple_type(&db)
-            })
-            .unwrap();
-        let Tuple::Variable(resized) = resized else {
+        let Some((_, resized)) = formal.resize_for_inference(&db, &actual) else {
+            panic!("expected the tuples to be compatible for inference");
+        };
+        let Tuple::Variable(resized) = resized.as_ref() else {
             panic!("expected a variable-length tuple");
         };
 
         assert!(resized.prefix_elements().is_empty());
         assert!(resized.suffix_elements().is_empty());
-        assert_eq!(
-            resized
-                .variable()
-                .exact_tuple_instance_spec(&db)
-                .unwrap()
-                .as_ref(),
-            &actual,
-        );
+        let Some(packed) = resized.variable().exact_tuple_instance_spec(&db) else {
+            panic!("expected the variable element to be a tuple instance");
+        };
+        assert_eq!(packed.as_ref(), &actual);
     }
 }
