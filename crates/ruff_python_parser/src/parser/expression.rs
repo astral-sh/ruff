@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use bitflags::bitflags;
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
@@ -805,6 +806,15 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
+        if self.eat(TokenKind::Rpar) {
+            return ast::Arguments {
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+                args: Box::default(),
+                keywords: ThinVec::default(),
+            };
+        }
+
         let mut args = vec![];
         let mut keywords = vec![];
         let mut seen_keyword_argument = false; // foo = 1
@@ -925,6 +935,11 @@ impl<'src> Parser<'src> {
                                     &parsed_expr,
                                 );
                             }
+                        }
+                        // Reserve exactly one slot for the first positional argument, while
+                        // avoiding any allocation for keyword-only calls.
+                        if args.is_empty() {
+                            args.reserve_exact(1);
                         }
                         args.push(parsed_expr.expr);
                     }
