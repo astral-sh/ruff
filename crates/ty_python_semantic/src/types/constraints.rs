@@ -589,12 +589,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         if self
             .node
-            .simple_lower_bound_conjunction(db, builder)
-            .is_some_and(|constraints| {
-                constraints
-                    .iter()
-                    .all(|(typevar, _, _)| typevar.is_inferable(db, inferable))
-            })
+            .is_simple_lower_bound_conjunction_of_inferable_typevars(db, builder, inferable)
         {
             return self;
         }
@@ -1982,6 +1977,44 @@ impl NodeId {
                     } else {
                         data.if_false.node()
                     };
+                }
+            }
+        }
+    }
+
+    /// Returns whether this BDD is a single positive conjunction of concrete lower bounds on
+    /// inferable typevars.
+    fn is_simple_lower_bound_conjunction_of_inferable_typevars<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        let mut node = self;
+
+        loop {
+            match node.node() {
+                Node::AlwaysTrue => return true,
+                Node::AlwaysFalse => return false,
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(node);
+                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
+                        return false;
+                    }
+
+                    let constraint = builder.constraint_data(interior.constraint);
+                    let Some(lower) = constraint.bounds.lower else {
+                        return false;
+                    };
+                    if !constraint.typevar.is_inferable(db, inferable)
+                        || constraint.bounds.upper.is_some()
+                        || lower.has_typevar(db)
+                        || lower.has_unspecialized_type_var(db)
+                    {
+                        return false;
+                    }
+
+                    node = interior.if_true;
                 }
             }
         }
