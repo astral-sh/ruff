@@ -443,16 +443,19 @@ impl<'db> Type<'db> {
         let elements = self.top_level_projection_union_elements(db);
         let mut projection_evidence = ProjectionEvidenceBuilder::default();
         let path = ProjectionPath::from_op(op);
-        let mut terms = vec![None; elements.len()];
-        let mut recursive_elements = Vec::new();
+        let mut terms = Vec::with_capacity(elements.len());
 
-        for (index, element) in elements.iter().copied().enumerate() {
-            if element.mentions_cycle_artifact_in_roots(db, &root_set) {
-                recursive_elements.push((index, element));
-                continue;
-            }
-
-            let term = project(element)?;
+        for element in elements {
+            let term = if element.mentions_cycle_artifact_in_roots(db, &root_set) {
+                // Recursive arms must replay structurally. Re-running the full operation can
+                // re-enter projection construction with the same recursive element.
+                roots.iter().find_map(|root| {
+                    let container = ProjectionContainer::try_from(db, *root, element, None)?;
+                    container.project_multi_root_path(db, *root, None, &path)
+                })?
+            } else {
+                project(element)?
+            };
             projection_evidence.record_projected_container_arm(
                 db,
                 roots.iter().copied(),
@@ -460,63 +463,12 @@ impl<'db> Type<'db> {
                 &path,
                 term,
             );
-            terms[index] = Some(term);
+            terms.push(term.ty(db));
         }
-
-        let mut evidence = projection_evidence.clone().finish(db);
-        while !recursive_elements.is_empty() {
-            let mut remaining = Vec::new();
-            let mut progressed = false;
-
-            for (index, element) in recursive_elements {
-                let Some(term) = roots.iter().find_map(|root| {
-                    let container = ProjectionContainer::try_from_multi_root(
-                        db,
-                        &root_set,
-                        *root,
-                        element,
-                        evidence.as_ref(),
-                    )?;
-                    container.project_multi_root_path(
-                        db,
-                        &root_set,
-                        *root,
-                        evidence.as_ref(),
-                        &path,
-                    )
-                }) else {
-                    remaining.push((index, element));
-                    continue;
-                };
-
-                projection_evidence.record_projected_container_arm(
-                    db,
-                    roots.iter().copied(),
-                    element,
-                    &path,
-                    term,
-                );
-                evidence = projection_evidence.clone().finish(db);
-                terms[index] = Some(term);
-                progressed = true;
-            }
-
-            if !progressed {
-                return None;
-            }
-            recursive_elements = remaining;
-        }
-
-        let terms = terms
-            .into_iter()
-            .collect::<Option<Vec<_>>>()?
-            .into_iter()
-            .map(|term| term.ty(db))
-            .collect::<Vec<_>>();
 
         Some(ProjectionResult {
             ty: UnionType::from_elements_cycle_recovery(db, terms),
-            projection_evidence: evidence,
+            projection_evidence: projection_evidence.finish(db),
         })
     }
 
@@ -967,82 +919,6 @@ impl<'db> Type<'db> {
         self.replace_solved_projection_artifacts(db, root, &solved_ops, None)
     }
 
-    /// Cycle-recovery-time helper: normalizes projection artifacts for every root in a cycle.
-    fn replace_projection_artifacts_with_roots(
-        self,
-        db: &'db dyn Db,
-        roots: &CycleRootSet,
-    ) -> Option<Self> {
-        if !self.mentions_cycle_artifact_in_roots(db, roots) {
-            return Some(self);
-        }
-
-        match self {
-            Type::Divergent(root) if roots.contains(root) => Some(self),
-            Type::Projection(projection) if roots.contains(projection.root(db)) => {
-                Some(Type::Divergent(projection.root(db)))
-            }
-            Type::Union(union) => {
-                let elements = union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.replace_projection_artifacts_with_roots(db, roots))
-                    .collect::<Option<Vec<_>>>()?;
-                Some(UnionType::from_elements_cycle_recovery(db, elements))
-            }
-            _ => {
-                if let Some(spec) = self.exact_tuple_instance_spec(db) {
-                    let ty = match spec.as_ref() {
-                        Tuple::Fixed(tuple) => Type::heterogeneous_tuple(
-                            db,
-                            tuple
-                                .iter_all_elements()
-                                .map(|element| {
-                                    element.replace_projection_artifacts_with_roots(db, roots)
-                                })
-                                .collect::<Option<Vec<_>>>()?,
-                        ),
-                        Tuple::Variable(tuple) => Type::tuple(TupleType::mixed(
-                            db,
-                            tuple
-                                .iter_prefix_elements()
-                                .map(|element| {
-                                    element.replace_projection_artifacts_with_roots(db, roots)
-                                })
-                                .collect::<Option<Vec<_>>>()?,
-                            tuple
-                                .variable()
-                                .replace_projection_artifacts_with_roots(db, roots)?,
-                            tuple
-                                .iter_suffix_elements()
-                                .map(|element| {
-                                    element.replace_projection_artifacts_with_roots(db, roots)
-                                })
-                                .collect::<Option<Vec<_>>>()?,
-                        )),
-                    };
-                    return Some(ty);
-                }
-
-                if let Some((class, specialization)) = self.direct_class_specialization(db) {
-                    let arguments = specialization
-                        .types(db)
-                        .iter()
-                        .map(|argument| {
-                            (*argument).replace_projection_artifacts_with_roots(db, roots)
-                        })
-                        .collect::<Option<Vec<_>>>()?;
-                    return Type::from(class.apply_specialization(db, |generic_context| {
-                        generic_context.specialize(db, arguments)
-                    }))
-                    .to_instance(db);
-                }
-
-                None
-            }
-        }
-    }
-
     fn mentions_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
         any_over_type(db, self, false, |ty| match ty {
             Type::Divergent(divergent) => divergent.same_marker(root),
@@ -1267,22 +1143,15 @@ enum ProjectionContainer<'db> {
     Generic(ProjectionContainerFact<'db>),
 }
 
-#[derive(Debug, Clone, Copy)]
-enum ProjectionReplayMode<'a> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectionReplayMode {
     SingleRoot,
-    MultiRoot { roots: &'a CycleRootSet },
+    MultiRoot,
 }
 
-impl<'a> ProjectionReplayMode<'a> {
+impl ProjectionReplayMode {
     const fn projects_cycle_artifacts(self) -> bool {
-        matches!(self, Self::MultiRoot { .. })
-    }
-
-    const fn cycle_roots(self) -> Option<&'a CycleRootSet> {
-        match self {
-            Self::SingleRoot => None,
-            Self::MultiRoot { roots } => Some(roots),
-        }
+        matches!(self, Self::MultiRoot)
     }
 }
 
@@ -1305,28 +1174,6 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         let fact = evidence?.container_fact_for_arm(db, root, ty)?;
-        Some(Self::Generic(fact.clone()))
-    }
-
-    /// Cycle-recovery-time API: builds a container while matching evidence across cycle roots.
-    fn try_from_multi_root(
-        db: &'db dyn Db,
-        roots: &CycleRootSet,
-        root: DivergentType,
-        ty: Type<'db>,
-        evidence: Option<&ProjectionEvidenceSet<'db>>,
-    ) -> Option<Self> {
-        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            return Some(Self::Tuple {
-                spec: spec.as_ref().clone(),
-            });
-        }
-
-        if let Some(fact) = ProjectionContainerFact::try_from_recovery_type(db, ty) {
-            return Some(Self::Generic(fact));
-        }
-
-        let fact = evidence?.container_fact_for_arm_multi_root(db, roots, root, ty)?;
         Some(Self::Generic(fact.clone()))
     }
 
@@ -1355,22 +1202,14 @@ impl<'db> ProjectionContainer<'db> {
         self.project_path_impl(db, root, evidence, path, ProjectionReplayMode::SingleRoot)
     }
 
-    /// Cycle-recovery-time API: replays one projection path in a multi-root cycle.
     fn project_multi_root_path(
         &self,
         db: &'db dyn Db,
-        roots: &CycleRootSet,
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
-        self.project_path_impl(
-            db,
-            root,
-            evidence,
-            path,
-            ProjectionReplayMode::MultiRoot { roots },
-        )
+        self.project_path_impl(db, root, evidence, path, ProjectionReplayMode::MultiRoot)
     }
 
     fn project_path_impl(
@@ -1379,19 +1218,14 @@ impl<'db> ProjectionContainer<'db> {
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
-        mode: ProjectionReplayMode<'_>,
+        mode: ProjectionReplayMode,
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
             Self::Generic(fact) => {
-                let term = evidence.and_then(|evidence| {
-                    if let Some(roots) = mode.cycle_roots() {
-                        evidence.project_generic_path_multi_root(db, roots, root, fact.arm, path)
-                    } else {
-                        evidence.project_generic_path(db, root, fact.arm, path)
-                    }
-                });
-                if let Some(term) = term {
+                if let Some(term) = evidence
+                    .and_then(|evidence| evidence.project_generic_path(db, root, fact.arm, path))
+                {
                     return Some(term);
                 }
 
@@ -1419,11 +1253,9 @@ impl<'db> ProjectionContainer<'db> {
         )
     }
 
-    /// Cycle-recovery-time API: structurally replays a projection path in a multi-root cycle.
     fn project_multi_root_type_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        roots: &CycleRootSet,
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
@@ -1434,7 +1266,7 @@ impl<'db> ProjectionContainer<'db> {
             root,
             evidence,
             path,
-            ProjectionReplayMode::MultiRoot { roots },
+            ProjectionReplayMode::MultiRoot,
         )
     }
 
@@ -1444,7 +1276,7 @@ impl<'db> ProjectionContainer<'db> {
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
-        mode: ProjectionReplayMode<'_>,
+        mode: ProjectionReplayMode,
     ) -> Option<ProjectionTerm<'db>> {
         if mode.projects_cycle_artifacts()
             && let Type::Divergent(divergent) = ty
@@ -1477,14 +1309,9 @@ impl<'db> ProjectionContainer<'db> {
             return ProjectionTerm::from_union_terms(db, &terms);
         }
 
-        let term = evidence.and_then(|evidence| {
-            if let Some(roots) = mode.cycle_roots() {
-                evidence.project_generic_path_multi_root(db, roots, root, ty, path)
-            } else {
-                evidence.project_generic_path(db, root, ty, path)
-            }
-        });
-        if let Some(term) = term {
+        if let Some(term) =
+            evidence.and_then(|evidence| evidence.project_generic_path(db, root, ty, path))
+        {
             return Some(term);
         }
 
@@ -1493,13 +1320,7 @@ impl<'db> ProjectionContainer<'db> {
 
         let single_op_path = ProjectionPath::from_op(op);
         let projected = evidence
-            .and_then(|evidence| {
-                if let Some(roots) = mode.cycle_roots() {
-                    evidence.project_generic_path_multi_root(db, roots, root, ty, &single_op_path)
-                } else {
-                    evidence.project_generic_path(db, root, ty, &single_op_path)
-                }
-            })
+            .and_then(|evidence| evidence.project_generic_path(db, root, ty, &single_op_path))
             .or_else(|| Self::project_op(db, ty, op))?;
 
         if tail.is_empty() {
@@ -1522,7 +1343,7 @@ impl<'db> ProjectionContainer<'db> {
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
         path: &ProjectionPath<'db>,
-        mode: ProjectionReplayMode<'_>,
+        mode: ProjectionReplayMode,
     ) -> Option<ProjectionTerm<'db>> {
         let ProjectionTerm::List(element) = term else {
             return Self::project_type_path_impl(db, term.ty(db), root, evidence, path, mode);
@@ -2080,7 +1901,7 @@ impl<'db> ProjectionEquationSystem<'db> {
                 if !demands.iter().any(|var| var.root.same_marker(root)) {
                     continue;
                 }
-                if !is_plausible_root_candidate(db, root, roots, slot.joined, evidence) {
+                if !is_plausible_root_candidate(db, root, slot.joined, evidence) {
                     continue;
                 }
                 candidates.insert(root, slot.joined);
@@ -2090,7 +1911,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             if slot.previous.is_none() {
                 for (root, _) in joined_demands {
                     if demands.iter().any(|var| var.root.same_marker(root))
-                        && is_plausible_root_candidate(db, root, roots, slot.joined, evidence)
+                        && is_plausible_root_candidate(db, root, slot.joined, evidence)
                     {
                         candidates.insert(root, slot.joined);
                     }
@@ -2134,14 +1955,7 @@ impl<'db> ProjectionEquationSystem<'db> {
                 for fact in evidence.projection_facts(db) {
                     if fact.root.same_marker(var.root) && fact.path == var.path {
                         has_equation_terms = true;
-                        equation.add_projection_term(
-                            db,
-                            roots,
-                            &var,
-                            fact.term,
-                            Some(evidence),
-                            true,
-                        )?;
+                        equation.add_projection_term(db, roots, &var, fact.term, true)?;
                     }
                 }
             }
@@ -2186,7 +2000,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             let terms = terms_by_op.get(&var.path)?;
             let mut equation = ProjectionEquation::default();
             for term in terms {
-                equation.add_projection_term(db, &roots, &var, *term, None, true)?;
+                equation.add_projection_term(db, &roots, &var, *term, true)?;
             }
             equation.wrap_in_list?;
             if equation.unsupported {
@@ -2218,15 +2032,13 @@ impl<'db> ProjectionEquationSystem<'db> {
                 continue;
             }
 
-            let container =
-                ProjectionContainer::try_from_multi_root(db, roots, var.root, element, evidence)?;
-            let term =
-                container.project_multi_root_path(db, roots, var.root, evidence, &var.path)?;
+            let container = ProjectionContainer::try_from(db, var.root, element, evidence)?;
+            let term = container.project_multi_root_path(db, var.root, evidence, &var.path)?;
             // Terms projected from an arm that already contains this root are recursive evidence,
             // not a productive base. Cross-root projection terms may still be productive because
             // they can be substituted once the other root is solved.
             let allow_productive = !element.mentions_cycle_artifact_direct(db, var.root);
-            equation.add_projection_term(db, roots, var, term, evidence, allow_productive)?;
+            equation.add_projection_term(db, roots, var, term, allow_productive)?;
         }
 
         Some(equation)
@@ -2430,7 +2242,6 @@ impl<'db> ProjectionEquation<'db> {
         roots: &CycleRootSet,
         var: &ProjectionVar<'db>,
         term: ProjectionTerm<'db>,
-        evidence: Option<&ProjectionEvidenceSet<'db>>,
         allow_productive: bool,
     ) -> Option<()> {
         let wrap_in_list = matches!(term, ProjectionTerm::List(_));
@@ -2450,7 +2261,7 @@ impl<'db> ProjectionEquation<'db> {
                 if !term.is_matching_projection(db, var.root, &var.path)
                     && term.mentions_matching_projection(db, var.root, &var.path)
                     && let Some(projected) = ProjectionContainer::project_multi_root_type_path(
-                        db, term, roots, var.root, evidence, &var.path,
+                        db, term, var.root, None, &var.path,
                     )
                 {
                     if projected
@@ -2460,14 +2271,7 @@ impl<'db> ProjectionEquation<'db> {
                         self.divergent = true;
                         return Some(());
                     }
-                    return self.add_projection_term(
-                        db,
-                        roots,
-                        var,
-                        projected,
-                        evidence,
-                        allow_productive,
-                    );
+                    return self.add_projection_term(db, roots, var, projected, allow_productive);
                 }
 
                 self.add_type_term(db, roots, var, term, true, allow_productive)
@@ -2617,16 +2421,13 @@ fn root_candidate_from_demands(
 fn is_plausible_root_candidate<'db>(
     db: &'db dyn Db,
     root: DivergentType,
-    roots: &CycleRootSet,
     ty: Type<'db>,
     evidence: Option<&ProjectionEvidenceSet<'db>>,
 ) -> bool {
     ty.top_level_projection_union_elements(db)
         .into_iter()
         .filter(|element| !element.same_divergent_marker(db, Type::Divergent(root)))
-        .any(|element| {
-            ProjectionContainer::try_from_multi_root(db, roots, root, element, evidence).is_some()
-        })
+        .any(|element| ProjectionContainer::try_from(db, root, element, evidence).is_some())
 }
 
 /// Returns strongly connected components (SCC) in dependency-first order for a graph whose edges point
@@ -2966,36 +2767,17 @@ impl<'db> ProjectionEvidenceSet<'db> {
         let normalized_arm = arm
             .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
-        self.container_facts(db)
-            .iter()
-            .find(|fact| fact.arm == arm)
-            .or_else(|| {
-                self.container_facts(db).iter().find(|fact| {
-                    let fact_arm = fact
-                        .arm
-                        .replace_projection_artifacts_with_root(db, root)
-                        .unwrap_or(fact.arm);
-                    fact_arm == normalized_arm
-                })
-            })
-    }
+        self.container_facts(db).iter().find(|fact| {
+            if fact.arm == arm {
+                return true;
+            }
 
-    /// Cycle-recovery-time API: looks up a generic container fact in a multi-root cycle.
-    fn container_fact_for_arm_multi_root(
-        self,
-        db: &'db dyn Db,
-        roots: &CycleRootSet,
-        root: DivergentType,
-        arm: Type<'db>,
-    ) -> Option<&'db ProjectionContainerFact<'db>> {
-        self.container_facts(db)
-            .iter()
-            .find(|fact| fact.arm == arm)
-            .or_else(|| {
-                self.container_facts(db).iter().find(|fact| {
-                    Self::generic_arm_matches_multi_root(db, roots, root, fact.arm, arm)
-                })
-            })
+            let fact_arm = fact
+                .arm
+                .replace_projection_artifacts_with_root(db, root)
+                .unwrap_or(fact.arm);
+            fact_arm == normalized_arm
+        })
     }
 
     /// Cycle-recovery-time API: replays a generic projection from inference-time evidence.
@@ -3006,75 +2788,23 @@ impl<'db> ProjectionEvidenceSet<'db> {
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
-        self.projection_facts(db)
-            .iter()
-            .find(|fact| fact.root.same_marker(root) && fact.path == *path && fact.arm == arm)
-            .map(|fact| fact.term)
-            .or_else(|| {
-                let normalized_arm = arm
-                    .replace_projection_artifacts_with_root(db, root)
-                    .unwrap_or(arm);
-                self.projection_facts(db).iter().find_map(|fact| {
-                    if !fact.root.same_marker(root) || fact.path != *path {
-                        return None;
-                    }
-
-                    let fact_arm = fact
-                        .arm
-                        .replace_projection_artifacts_with_root(db, root)
-                        .unwrap_or(fact.arm);
-                    (fact_arm == normalized_arm).then_some(fact.term)
-                })
-            })
-    }
-
-    /// Cycle-recovery-time API: replays a generic projection in a multi-root cycle.
-    fn project_generic_path_multi_root(
-        self,
-        db: &'db dyn Db,
-        roots: &CycleRootSet,
-        root: DivergentType,
-        arm: Type<'db>,
-        path: &ProjectionPath<'db>,
-    ) -> Option<ProjectionTerm<'db>> {
-        self.projection_facts(db)
-            .iter()
-            .find(|fact| fact.root.same_marker(root) && fact.path == *path && fact.arm == arm)
-            .map(|fact| fact.term)
-            .or_else(|| {
-                self.projection_facts(db).iter().find_map(|fact| {
-                    if !fact.root.same_marker(root) || fact.path != *path {
-                        return None;
-                    }
-
-                    let matches =
-                        Self::generic_arm_matches_multi_root(db, roots, root, fact.arm, arm);
-                    matches.then_some(fact.term)
-                })
-            })
-    }
-
-    /// Cycle-recovery-time helper: compares generic arms after normalizing all cycle roots.
-    fn generic_arm_matches_multi_root(
-        db: &'db dyn Db,
-        roots: &CycleRootSet,
-        root: DivergentType,
-        fact_arm: Type<'db>,
-        arm: Type<'db>,
-    ) -> bool {
-        if fact_arm == arm {
-            return true;
-        }
-
         let normalized_arm = arm
-            .replace_projection_artifacts_with_roots(db, roots)
-            .or_else(|| arm.replace_projection_artifacts_with_root(db, root))
+            .replace_projection_artifacts_with_root(db, root)
             .unwrap_or(arm);
-        let normalized_fact_arm = fact_arm
-            .replace_projection_artifacts_with_roots(db, roots)
-            .or_else(|| fact_arm.replace_projection_artifacts_with_root(db, root))
-            .unwrap_or(fact_arm);
-        normalized_fact_arm == normalized_arm
+        self.projection_facts(db).iter().find_map(|fact| {
+            if !fact.root.same_marker(root) || fact.path != *path {
+                return None;
+            }
+            if fact.arm == arm {
+                return Some(fact.term);
+            }
+
+            let fact_arm = fact
+                .arm
+                .replace_projection_artifacts_with_root(db, root)
+                .unwrap_or(fact.arm);
+            (fact_arm == normalized_arm).then_some(fact.term)
+        })
     }
 }
 
