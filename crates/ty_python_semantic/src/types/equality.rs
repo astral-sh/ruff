@@ -662,7 +662,11 @@ fn enum_literal_constraint<'db>(
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`.
-fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralType<'db>) -> bool {
+pub(super) fn is_same_enum_domain<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    right: EnumLiteralType<'db>,
+) -> bool {
     match ty.resolve_type_alias(db) {
         Type::LiteralValue(literal) => matches!(
             literal.kind(),

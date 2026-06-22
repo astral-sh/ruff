@@ -7,12 +7,12 @@ use ty_python_core::predicate::{
 
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::equality::evaluate_type_equality;
+use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
-    SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
+    CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
     infer_same_file_expression_type,
 };
 
@@ -332,6 +332,19 @@ pub(crate) fn pattern_fallthrough_type<'db>(
 ) -> Type<'db> {
     if let PatternPredicateKind::Value(value) = kind {
         let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
+        // A subject confined to the same enum cannot contain cross-type values that compare equal
+        // to the pattern, so direct subtraction avoids repeated equality evaluation in large enum
+        // matches. This includes narrowed intersections containing `Self` or another type variable
+        // whose upper bound is that enum.
+        if let Some(enum_literal) = value_ty.as_enum_literal()
+            && is_same_enum_pattern_domain(db, subject_ty, enum_literal)
+            && equality_truthiness(db, value_ty, value_ty) == Truthiness::AlwaysTrue
+        {
+            return IntersectionBuilder::new(db)
+                .add_positive(subject_ty)
+                .add_negative(value_ty)
+                .build();
+        }
         if let Some(constraint) = evaluate_type_equality(db, subject_ty, value_ty, false) {
             return IntersectionBuilder::new(db)
                 .add_positive(subject_ty)
@@ -346,6 +359,34 @@ pub(crate) fn pattern_fallthrough_type<'db>(
             db, kind, subject_ty,
         ))
         .build()
+}
+
+/// Return whether every possible value of `ty` belongs to the same enum as `right`, including
+/// bounded type variables nested inside unions or intersections.
+fn is_same_enum_pattern_domain<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    right: EnumLiteralType<'db>,
+) -> bool {
+    if is_same_enum_domain(db, ty, right) {
+        return true;
+    }
+
+    match ty.resolve_type_alias(db) {
+        Type::TypeVar(typevar) => typevar
+            .typevar(db)
+            .upper_bound(db)
+            .is_some_and(|bound| is_same_enum_domain(db, bound, right)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_same_enum_pattern_domain(db, *element, right)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| is_same_enum_pattern_domain(db, *element, right)),
+        _ => false,
+    }
 }
 
 /// Return the values that are guaranteed to match `kind`.
