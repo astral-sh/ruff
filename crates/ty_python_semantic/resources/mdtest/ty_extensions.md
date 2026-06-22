@@ -525,6 +525,14 @@ class Container[T]: ...
 y: Container[TypeOf[y]]
 y = 1  # error: [invalid-assignment]
 reveal_type(y)  # revealed: Container[Divergent]
+
+union: list[TypeOf[union]] | Container[TypeOf[union]]
+union = [1]
+reveal_type(union)  # revealed: list[Divergent]
+
+stable_union: list[TypeOf[stable_union]] | Container[TypeOf[stable_union]] | None
+stable_union = [1]
+reveal_type(stable_union)  # revealed: list[Divergent]
 ```
 
 ## Recursive `TypeOf` in returned callables
