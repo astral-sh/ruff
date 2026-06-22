@@ -1,5 +1,4 @@
 use std::backtrace::BacktraceStatus;
-use std::fmt::Display;
 use std::io::Write;
 use std::path::Path;
 
@@ -7,9 +6,9 @@ use ruff_db::panic::PanicError;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, FileResolver, Input, LintName, SecondaryCode, Severity, Span,
-    SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DiagnosticMessage,
+    DisplayDiagnosticConfig, DisplayDiagnostics, FileResolver, Input, LintName, SecondaryCode,
+    Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -87,13 +86,13 @@ pub fn create_lint_diagnostic<B, S>(
     rule: Rule,
 ) -> Diagnostic
 where
-    B: Display,
-    S: Display,
+    B: Into<DiagnosticMessage>,
+    S: Into<DiagnosticMessage>,
 {
     let mut diagnostic = Diagnostic::new(
         DiagnosticId::Lint(LintName::of(rule.into())),
         Severity::Error,
-        body,
+        body.into(),
     );
 
     let span = Span::from(file).with_range(range);
@@ -109,7 +108,7 @@ where
     diagnostic.annotate(annotation);
 
     if let Some(suggestion) = suggestion {
-        diagnostic.help(suggestion);
+        diagnostic.help(suggestion.into());
     }
 
     if let Some(fix) = fix {
