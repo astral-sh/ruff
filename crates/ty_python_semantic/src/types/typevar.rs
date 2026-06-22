@@ -782,7 +782,7 @@ impl<'db> TypeVarNonceGenerator<'db> {
 
 pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     db: &'db dyn Db,
-    ty: Type<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
     generic_context: GenericContext<'db>,
 ) -> Option<TypeVarNonce> {
     struct MatchingFreshnessCollector<'db> {
@@ -836,7 +836,9 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     }
 
     let collector = MatchingFreshnessCollector::new(db, generic_context);
-    collector.visit_type(db, ty);
+    for ty in types {
+        collector.visit_type(db, ty);
+    }
     collector.max_freshness.get()
 }
 

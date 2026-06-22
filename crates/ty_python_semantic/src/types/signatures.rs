@@ -852,42 +852,19 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> Option<TypeVarNonce> {
-        let mut max_freshness = None;
-        let mut update = |freshness| {
-            max_freshness = max_freshness.max(freshness);
-        };
+        let typevars = self
+            .generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .map(Type::TypeVar);
+        let parameters = self.parameters.iter().flat_map(|parameter| {
+            std::iter::once(parameter.annotated_type()).chain(parameter.default_type())
+        });
+        let types = typevars
+            .chain(parameters)
+            .chain(std::iter::once(self.return_ty));
 
-        if let Some(signature_generic_context) = self.generic_context {
-            for typevar in signature_generic_context.variables(db) {
-                update(max_typevar_freshness_matching_generic_context(
-                    db,
-                    Type::TypeVar(typevar),
-                    generic_context,
-                ));
-            }
-        }
-
-        for param in &self.parameters {
-            update(max_typevar_freshness_matching_generic_context(
-                db,
-                param.annotated_type(),
-                generic_context,
-            ));
-            if let Some(default_ty) = param.default_type() {
-                update(max_typevar_freshness_matching_generic_context(
-                    db,
-                    default_ty,
-                    generic_context,
-                ));
-            }
-        }
-        update(max_typevar_freshness_matching_generic_context(
-            db,
-            self.return_ty,
-            generic_context,
-        ));
-
-        max_freshness
+        max_typevar_freshness_matching_generic_context(db, types, generic_context)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
