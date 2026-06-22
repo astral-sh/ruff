@@ -582,6 +582,7 @@ def test_match_sequence_alias_keeps_matched_element_types(
 ) -> None:
     match value:
         case [1] as whole:
+            reveal_type(len(whole))  # revealed: Literal[1]
             reveal_type(whole[0])  # revealed: Literal[1]
 
 def test_match_starred_sequence_alias_keeps_matched_element_types(
@@ -597,6 +598,7 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
 ) -> None:
     match value:
         case [int(), str()] as whole:
+            reveal_type(len(whole))  # revealed: int
             whole.reverse()
             reveal_type(whole[0])  # revealed: int | str
 
