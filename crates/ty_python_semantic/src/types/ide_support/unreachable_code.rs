@@ -812,4 +812,40 @@ mod tests {
         assert_snapshot!(UnreachableTest::new().render(source)?, @"");
         Ok(())
     }
+
+    #[test]
+    fn protocol_operations_make_exception_handlers_reachable() -> anyhow::Result<()> {
+        let source = r#"
+            def f(value, iterable):
+                try:
+                    value.attribute
+                except:
+                    print("attribute access can raise")
+
+                try:
+                    value[0]
+                except:
+                    print("subscripting can raise")
+
+                try:
+                    value + 1
+                except:
+                    print("operators can raise")
+
+                try:
+                    if value:
+                        pass
+                except:
+                    print("truthiness can raise")
+
+                try:
+                    for _ in iterable:
+                        pass
+                except:
+                    print("iteration can raise")
+            "#;
+
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"");
+        Ok(())
+    }
 }
