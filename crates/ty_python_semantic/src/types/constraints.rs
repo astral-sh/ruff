@@ -587,6 +587,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         inferable: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
+        if self
+            .node
+            .is_simple_lower_bound_conjunction_of_inferable_typevars(db, builder, inferable)
+        {
+            return self;
+        }
         Self::from_node(
             builder,
             self.node.remove_noninferable(db, builder, inferable),
@@ -1976,6 +1982,79 @@ impl NodeId {
         }
     }
 
+    /// Returns whether this BDD is a single positive conjunction of concrete lower bounds on
+    /// inferable typevars.
+    fn is_simple_lower_bound_conjunction_of_inferable_typevars<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        let mut node = self;
+
+        loop {
+            match node.node() {
+                Node::AlwaysTrue => return true,
+                Node::AlwaysFalse => return false,
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(node);
+                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
+                        return false;
+                    }
+
+                    let constraint = builder.constraint_data(interior.constraint);
+                    let Some(lower) = constraint.bounds.lower else {
+                        return false;
+                    };
+                    if !constraint.typevar.is_inferable(db, inferable)
+                        || constraint.bounds.upper.is_some()
+                        || lower.has_typevar(db)
+                        || lower.has_unspecialized_type_var(db)
+                    {
+                        return false;
+                    }
+
+                    node = interior.if_true;
+                }
+            }
+        }
+    }
+
+    /// Returns the concrete lower bounds in this BDD if it is a single positive conjunction.
+    fn simple_lower_bound_conjunction<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Option<Vec<(BoundTypeVarInstance<'db>, Type<'db>, usize)>> {
+        let mut constraints = Vec::new();
+        let mut node = self;
+
+        loop {
+            match node.node() {
+                Node::AlwaysTrue => return Some(constraints),
+                Node::AlwaysFalse => return None,
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(node);
+                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
+                        return None;
+                    }
+
+                    let constraint = builder.constraint_data(interior.constraint);
+                    let lower = constraint.bounds.lower?;
+                    if constraint.bounds.upper.is_some()
+                        || lower.has_typevar(db)
+                        || lower.has_unspecialized_type_var(db)
+                    {
+                        return None;
+                    }
+
+                    constraints.push((constraint.typevar, lower, interior.source_order));
+                    node = interior.if_true;
+                }
+            }
+        }
+    }
+
     fn for_each_path<'db>(
         self,
         db: &'db dyn Db,
@@ -3265,6 +3344,10 @@ impl<'db> PathBounds<'db> {
             Node::Interior(_) => {}
         }
 
+        if let Some(path_bounds) = Self::compute_simple_lower_bound_conjunction(db, builder, node) {
+            return path_bounds;
+        }
+
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
@@ -3320,6 +3403,34 @@ impl<'db> PathBounds<'db> {
         }
 
         PathBounds::Constrained(result.into_boxed_slice())
+    }
+
+    /// Accumulates a conjunction of concrete lower-bound constraints without constructing a
+    /// [`PathAssignments`] or its sequent map.
+    ///
+    /// There are no relationships to derive between these constraints: each lower bound contains
+    /// no typevars, and an unconstrained upper bound cannot make the path unsatisfiable. The normal
+    /// solution-selection logic still validates each accumulated bound against the typevar's
+    /// declared bound or constraints.
+    fn compute_simple_lower_bound_conjunction(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+    ) -> Option<Self> {
+        let mut constraints = node.simple_lower_bound_conjunction(db, builder)?;
+        constraints.sort_by_key(|(_, _, source_order)| *source_order);
+
+        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxHashMap::default();
+        for (typevar, lower, _) in constraints {
+            mappings.entry(typevar).or_default().add_lower(db, lower);
+        }
+
+        let path = mappings
+            .drain()
+            .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
+            .collect();
+        Some(PathBounds::Constrained(Box::new([path])))
     }
 
     pub(crate) fn solve(
@@ -4474,7 +4585,7 @@ impl InteriorNode {
 }
 
 /// The result of solving a constraint set for per-typevar specializations.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) enum Solutions<'db> {
     Unsatisfiable,
     Unconstrained,
@@ -6588,6 +6699,43 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let ty = bound.to_instance(db);
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
+    }
+
+    #[test]
+    fn simple_lower_bound_conjunction_skips_sequent_analysis() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
+        );
+        let inferable =
+            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let (single_sequents, pair_sequents) = {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        let set = set.remove_noninferable(&db, &builder, inferable);
+        let solutions = set.solutions(&db, &builder);
+        assert_eq!(
+            solutions,
+            Solutions::Constrained(vec![vec![TypeVarSolution {
+                bound_typevar: t,
+                solution: UnionType::from_elements(&db, [int, str]),
+            }]])
+        );
+
+        let storage = builder.storage.borrow();
+        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
     }
 
     #[test]
