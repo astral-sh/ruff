@@ -70,9 +70,7 @@ pub(crate) fn hover(
     let line = &document.contents()[line_range];
 
     // Avoid parsing the document if the hovered line doesn't contain a comment.
-    if memchr::memchr(b'#', line.as_bytes()).is_none() {
-        return None;
-    }
+    memchr::memchr(b'#', line.as_bytes())?;
 
     let cursor = types::Range::new(position.position, position.position)
         .to_text_range(document.contents(), document.index(), snapshot.encoding())
