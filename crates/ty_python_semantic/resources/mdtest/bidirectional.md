@@ -1029,6 +1029,63 @@ def _(values: list[str] | None):
     reveal_type(lines)  # revealed: list[str]
 ```
 
+Uses that can refer to an intervening binding require cycle-based inference. Inferring these uses
+against the original collection's identity specialization can miss widening from an augmented
+assignment:
+
+```py
+class Node: ...
+class Name(Node): ...
+
+def nodes() -> list[Node]:
+    return []
+
+def _(flag: bool) -> None:
+    values = []
+    while flag:
+        values += nodes()
+    values.append(Name())
+    values += nodes()
+```
+
+Collections that replace an existing binding also require cycle-based inference:
+
+```py
+class Paths: ...
+class DataSource: ...
+
+class Handler:
+    def __init__(self, *, paths: Paths, datasource: DataSource) -> None: ...
+
+def _(options=None):
+    if options is None:
+        options = {}
+    options.update({"paths": Paths(), "datasource": DataSource()})
+    Handler(**options)
+```
+
+Collections stored in an attribute or subscript require cycle-based inference because the assignment
+can participate in later inference cycles:
+
+```py
+import inspect
+import types
+
+class C:
+    def collect(self, items):
+        values = []
+        for item in items:
+            if isinstance(item, types.FunctionType):
+                line = getattr(item, "co_firstlineno", item.__code__.co_firstlineno)
+                module = inspect.getmodule(item)
+                values.append((line, module))
+        self.values = values
+
+    def validate(self):
+        for _, module in self.values:
+            reveal_type(module)  # revealed: ModuleType | None
+```
+
 Starred uses in a return expression continue to participate in cycle recovery:
 
 ```py

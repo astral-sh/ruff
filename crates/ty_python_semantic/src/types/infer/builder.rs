@@ -10896,6 +10896,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => false,
         };
 
+        if self
+            .index
+            .collection_requires_cycle_inference(collection_def)
+        {
+            self.context.defuse();
+            return CollectionUseConstraintInference::RequiresCycle;
+        }
+
         for (statement, use_expression) in self.index.constraining_collection_uses(collection_def) {
             let used_fast_path = match statement {
                 Statement::Expression(expression) => {

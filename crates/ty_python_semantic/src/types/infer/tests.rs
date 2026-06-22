@@ -385,6 +385,36 @@ fn unconstrained_collection_with_use_uses_cycle_free_constraint_query() -> anyho
 }
 
 #[test]
+fn collection_escape_uses_cycle_based_constraints() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/a.py", "x = []\nx.append(1)\nd = {}\nd['x'] = x")?;
+
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    db.clear_salsa_events();
+    let x_ty = global_symbol(&db, file, "x").place.expect_type();
+    assert_eq!(x_ty.display(&db).to_string(), "list[int]");
+
+    let events = db.take_salsa_events();
+    let module = parsed_module(&db, file).load(&db);
+    let index = semantic_index(&db, file);
+    let x = first_public_binding(&db, file, "x");
+    let Statement::Expression(append) = index.try_statement(&module.syntax().body[1]).unwrap()
+    else {
+        panic!("expected `x.append(1)` to be a standalone expression");
+    };
+
+    assert_function_query_was_run(&db, infer_collection_use_constraints, x, &events);
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(append),
+        &events,
+    );
+
+    Ok(())
+}
+
+#[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
