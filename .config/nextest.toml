@@ -22,3 +22,7 @@ slow-timeout =  { period = "1s", terminate-after = 60 }
 
 # Show slow jobs in the final summary
 final-status-level = "slow"
+
+[profile.ci-macos]
+inherits = "ci"
+test-threads = 12

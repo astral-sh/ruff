@@ -405,9 +405,13 @@ jobs:
   cargo-test-other:
     strategy:
       matrix:
-        platform:
-          - ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
-          - macos-latest
+        include:
+          - platform: ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
+            cargo_profile: dev
+            nextest_profile: ci
+          - platform: depot-macos-15
+            cargo_profile: fast-test
+            nextest_profile: ci-macos
     name: "cargo test (${{ matrix.platform }})"
     runs-on: ${{ matrix.platform }}
     needs: determine_changes
@@ -438,8 +442,8 @@ jobs:
           enable-cache: "true"
       - name: "Run tests"
         run: |
-          cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
+          cargo nextest run --all-features --cargo-profile ${{ matrix.cargo_profile }} --profile ${{ matrix.nextest_profile }}
+          cargo test --all-features --doc --profile ${{ matrix.cargo_profile }}
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
