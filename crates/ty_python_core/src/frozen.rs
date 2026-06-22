@@ -19,7 +19,7 @@ impl<K, V> FrozenMap<K, V> {
         &mut self,
     ) -> impl DoubleEndedIterator<Item = (&K, &mut V)> + ExactSizeIterator + std::iter::FusedIterator
     {
-        self.0.iter_mut().map(split_entry_mut)
+        self.into_iter()
     }
 
     pub fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
@@ -110,12 +110,8 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
         std::iter::Map<std::slice::IterMut<'a, (K, V)>, fn(&'a mut (K, V)) -> (&'a K, &'a mut V)>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut().map(split_entry_mut)
+        self.0.iter_mut().map(|(key, value)| (&*key, value))
     }
-}
-
-fn split_entry_mut<K, V>((key, value): &mut (K, V)) -> (&K, &mut V) {
-    (&*key, value)
 }
 
 #[newtype_index]
