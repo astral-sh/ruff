@@ -190,6 +190,29 @@ fn recursive_nominal_growth_requires_all_union_elements() {
     );
 }
 
+#[test]
+fn recursive_nominal_growth_requires_structural_union_distribution() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let current = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Dict.to_specialized_instance(&db, &[list_int, list_str]),
+            KnownClass::Dict.to_specialized_instance(&db, &[list_str, list_int]),
+        ],
+    );
+
+    assert_eq!(
+        current.recursive_nominal_growth_normalized(&db, previous, div),
+        None
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.

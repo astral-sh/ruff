@@ -1373,9 +1373,11 @@ impl<'db> Type<'db> {
         }
 
         if let Type::Union(wrapped_union) = wrapped {
-            if !wrapped_union.elements(db).iter().all(|wrapped_element| {
-                any_over_type(db, normalized, false, |ty| ty == *wrapped_element)
-            }) {
+            if !original_specialization
+                .types(db)
+                .iter()
+                .any(|position| Self::is_union_distribution_position(db, *position, wrapped_union))
+            {
                 return None;
             }
 
@@ -1448,6 +1450,27 @@ impl<'db> Type<'db> {
             });
 
         (normalized != original).then_some(normalized)
+    }
+
+    /// Returns whether one specialization position contains a complete, positive distribution
+    /// of `wrapped`.
+    fn is_union_distribution_position(
+        db: &'db dyn Db,
+        current: Self,
+        wrapped: UnionType<'db>,
+    ) -> bool {
+        any_over_type(db, current, false, |ty| matches!(ty, Type::Union(_)))
+            && any_over_type(db, current, false, |ty| matches!(ty, Type::Intersection(_)))
+            && wrapped.elements(db).iter().all(|wrapped_element| {
+                any_over_type(db, current, false, |ty| ty == *wrapped_element)
+                    && !any_over_type(db, current, false, |ty| {
+                        matches!(
+                            ty,
+                            Type::Intersection(intersection)
+                                if intersection.negative(db).contains(wrapped_element)
+                        )
+                    })
+            })
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
