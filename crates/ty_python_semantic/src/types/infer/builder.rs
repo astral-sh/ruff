@@ -6909,14 +6909,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Expression(current_expr, _) => {
                 current_expr.node_ref(db).index() == *collection_expr.node_index()
             }
-            InferenceRegion::Definition(definition) => {
-                let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
-                    return false;
-                };
-                assignment.value(self.module()).is_some_and(|value| {
-                    value.node_index().load() == collection_expr.node_index().load()
-                })
-            }
+            InferenceRegion::Definition(definition) => matches!(
+                definition.kind(db),
+                DefinitionKind::AnnotatedAssignment(assignment)
+                    if assignment.value(self.module()).is_some_and(|value| {
+                        value.node_index().load() == collection_expr.node_index().load()
+                    })
+            ),
             _ => false,
         }
     }
@@ -6931,11 +6930,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let is_inference_root =
+            collection_expr.is_some_and(|expr| self.is_collection_literal_inference_root(expr));
         let use_empty_collection_consensus =
             matches!(collection_class, KnownClass::List | KnownClass::Dict)
                 && elts.is_empty()
-                && collection_expr
-                    .is_some_and(|expr| self.is_collection_literal_inference_root(expr));
+                && is_inference_root;
 
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
@@ -6944,7 +6944,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let (inferred_ty, uses_empty_covariant_context) = speculative_builder
                 .infer_collection_literal_impl(
                     collection_class,
-                    collection_expr,
+                    is_inference_root,
                     elts,
                     infer_elt_expression,
                     TypeContext::new(Some(narrowed_ty)),
@@ -7029,7 +7029,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return self
                         .infer_collection_literal_impl(
                             collection_class,
-                            collection_expr,
+                            is_inference_root,
                             elts,
                             infer_elt_expression,
                             TypeContext::new(Some(common_ty)),
@@ -7051,7 +7051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_collection_literal_impl(
             collection_class,
-            collection_expr,
+            is_inference_root,
             elts,
             infer_elt_expression,
             tcx,
@@ -7064,7 +7064,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
+        is_inference_root: bool,
         elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
@@ -7100,8 +7100,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
-        let is_inference_root =
-            collection_expr.is_some_and(|expr| self.is_collection_literal_inference_root(expr));
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -7238,25 +7236,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && elts
                 .iter()
                 .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
-        let empty_covariant_context: SmallVec<[BoundTypeVarIdentity<'db>; 2]> =
-            if matches!(collection_class, KnownClass::List | KnownClass::Dict)
+        let has_empty_collection_context =
+            matches!(collection_class, KnownClass::List | KnownClass::Dict)
                 && elts.is_empty()
-                && is_inference_root
-            {
-                elt_tcx_constraints
-                    .iter()
-                    .filter_map(|(identity, ty)| {
-                        (!ty.has_dynamic(self.db())
-                            && elt_tcx_variance
-                                .get(identity)
-                                .is_some_and(|variance| variance.is_covariant()))
-                        .then_some(*identity)
-                    })
-                    .collect()
-            } else {
-                SmallVec::new()
-            };
-        let uses_empty_covariant_context = !empty_covariant_context.is_empty();
+                && is_inference_root;
+        let db = self.db();
+        let allows_empty_covariant_context = |identity| {
+            has_empty_collection_context
+                && elt_tcx_constraints
+                    .get(&identity)
+                    .is_some_and(|ty| !ty.has_dynamic(db))
+                && elt_tcx_variance
+                    .get(&identity)
+                    .is_some_and(|variance| variance.is_covariant())
+        };
+        let uses_empty_covariant_context = elt_tys
+            .clone()
+            .any(|typevar| allows_empty_covariant_context(typevar.identity(self.db())));
 
         let mut pre_inferred_elt_tys = None;
 
@@ -7275,7 +7271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if elt_tcx_variance
                         .get(&identity)
                         .is_some_and(|variance| variance.is_covariant())
-                        && !empty_covariant_context.contains(&identity)
+                        && !allows_empty_covariant_context(identity)
                     {
                         return None;
                     }
@@ -7356,7 +7352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if elt_tcx_variance
                 .get(&elt_ty_identity)
                 .is_some_and(|variance| variance.is_covariant())
-                && !empty_covariant_context.contains(&elt_ty_identity)
+                && !allows_empty_covariant_context(elt_ty_identity)
             {
                 continue;
             }
