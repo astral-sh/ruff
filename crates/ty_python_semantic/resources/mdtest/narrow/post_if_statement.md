@@ -160,6 +160,31 @@ def _(val: int | None):
     reveal_type(val)  # revealed: int
 ```
 
+Narrowing from the terminal branch is also preserved when deciding whether a later overloaded call
+returns:
+
+```py
+from typing import Literal, overload
+from typing_extensions import Never
+
+def abort() -> Never:
+    raise RuntimeError
+
+@overload
+def terminal(value: Literal[0]) -> Never: ...
+@overload
+def terminal(value: Literal[1]) -> None: ...
+def terminal(value: Literal[0, 1]) -> None:
+    if value == 0:
+        raise RuntimeError
+
+def _(value: Literal[0, 1]) -> None:
+    if value == 1:
+        abort()
+    terminal(value)
+    return "unreachable"
+```
+
 This also works when the `NoReturn` function is called in the else branch:
 
 ```py
