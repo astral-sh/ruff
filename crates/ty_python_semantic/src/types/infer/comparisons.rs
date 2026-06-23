@@ -7,6 +7,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
+use crate::types::equality::{EnumComparison, compact_enum_comparison};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -169,6 +170,19 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
     };
+
+    if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
+        && let Some(comparison) = compact_enum_comparison(db, left, right, op == ast::CmpOp::Eq)
+    {
+        return match comparison {
+            EnumComparison::Known(truthiness) => Ok(match truthiness {
+                Truthiness::AlwaysTrue => Type::bool_literal(true),
+                Truthiness::AlwaysFalse => Type::bool_literal(false),
+                Truthiness::Ambiguous => KnownClass::Bool.to_instance(db),
+            }),
+            EnumComparison::Unmodeled => try_dunder(MemberLookupPolicy::default()),
+        };
+    }
 
     let comparison_result = match (left, right) {
         (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(

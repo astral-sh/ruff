@@ -600,6 +600,100 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3830>.
+fn benchmark_str_enum_comparison_after_truthiness_narrowing(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str(
+        "\n\ndef compare(left: LargeEnum, right: LargeEnum):\n    if right and left != right:\n        return\n    return left == right\n\n\ndef compare_after_excluding_member(left: LargeEnum, right: LargeEnum):\n    if right == LargeEnum.VALUE_0:\n        return\n    if left and left != right:\n        return\n    return left == right\n",
+    );
+
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[str_enum_comparison_after_truthiness_narrowing]",
+        &code,
+    );
+}
+
+/// Ensure non-exhaustive enum domains do not fall back to member expansion.
+fn benchmark_open_str_enum_comparison_after_truthiness_narrowing(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut open_code = "from enum import StrEnum\n\nclass OpenLargeEnum(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut open_code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    open_code.push_str(
+        "\n    @classmethod\n    def _missing_(cls, value: object) -> \"OpenLargeEnum\":\n        return str.__new__(cls, str(value))\n\n\ndef compare(left: OpenLargeEnum, right: OpenLargeEnum):\n    if right and left != right:\n        return\n    return left == right\n",
+    );
+
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[open_str_enum_comparison_after_truthiness_narrowing]",
+        &open_code,
+    );
+}
+
+/// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
+fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code =
+        "from enum import StrEnum\nfrom typing import Literal\n\nclass LargeEnum(StrEnum):\n"
+            .to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str("\nLeft = Literal[\n");
+    for index in 0..NUM_ENUM_MEMBERS / 2 {
+        writeln!(&mut code, "    LargeEnum.VALUE_{index},").ok();
+    }
+    code.push_str("]\nRight = Literal[\n");
+    for index in NUM_ENUM_MEMBERS / 2..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    LargeEnum.VALUE_{index},").ok();
+    }
+    code.push_str("]\n\n\ndef compare(left: Left, right: Right):\n    return left == right\n");
+
+    benchmark_enum_comparison(criterion, "ty_micro[enum_literal_union_comparison]", &code);
+}
+
+fn benchmark_enum_comparison(criterion: &mut Criterion, name: &str, code: &str) {
+    setup_rayon();
+
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Ensure the comparison profile is reused instead of scanning every member per expression.
+fn benchmark_repeated_str_enum_comparisons(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 1_024;
+    const NUM_COMPARISONS: usize = 1_000;
+
+    let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str("\n\ndef compare(left: LargeEnum, right: LargeEnum):\n");
+    for _ in 0..NUM_COMPARISONS {
+        code.push_str("    left == right\n");
+    }
+
+    benchmark_enum_comparison(criterion, "ty_micro[repeated_str_enum_comparisons]", &code);
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -1509,6 +1603,10 @@ criterion_group!(
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
+    benchmark_str_enum_comparison_after_truthiness_narrowing,
+    benchmark_open_str_enum_comparison_after_truthiness_narrowing,
+    benchmark_enum_literal_union_comparison,
+    benchmark_repeated_str_enum_comparisons,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
