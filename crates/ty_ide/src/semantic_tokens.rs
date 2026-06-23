@@ -361,6 +361,14 @@ impl<'db> SemanticTokenVisitor<'db> {
                 let parsed = parsed.load(db);
                 let value = match definition.kind(db) {
                     DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),
+                    DefinitionKind::AnnotatedAssignment(assignment)
+                        if matches!(
+                            assignment.annotation(&parsed).inferred_type(&model),
+                            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
+                        ) =>
+                    {
+                        Some(assignment.annotation(&parsed))
+                    }
                     _ => None,
                 };
 
@@ -375,6 +383,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                     if value_ty.is_class_literal()
                         || value_ty.is_subclass_of()
                         || value_ty.is_generic_alias()
+                        || matches!(value_ty, Type::SpecialForm(SpecialFormType::TypeAlias))
                     {
                         return Some((SemanticTokenType::Class, modifiers));
                     }
@@ -2832,6 +2841,36 @@ LegacyStyle: TypeAlias = IO[str]
                 .expect("semantic token for `IO` type-form use");
             assert_eq!(token.token_type, SemanticTokenType::Class);
         }
+    }
+
+    #[test]
+    fn type_alias_classified_consistently() {
+        let test = SemanticTokenTest::new(
+            "
+from typing import TypeAlias
+
+type NewAlias = int
+OldAlias: TypeAlias = int
+def f(x: NewAlias, y: OldAlias): ...
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "TypeAlias" @ 20..29: Variable
+        "NewAlias" @ 36..44: Class [definition]
+        "int" @ 47..50: Class
+        "OldAlias" @ 51..59: Class [definition]
+        "TypeAlias" @ 61..70: Variable
+        "int" @ 73..76: Class
+        "f" @ 81..82: Function [definition]
+        "x" @ 83..84: Parameter [definition]
+        "NewAlias" @ 86..94: TypeParameter
+        "y" @ 96..97: Parameter [definition]
+        "OldAlias" @ 99..107: Class
+        "#);
     }
 
     #[test]
