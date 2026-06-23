@@ -230,6 +230,9 @@ def _(mapping: Mapping[str, int], dictionary: dict[str, int], key: object) -> No
     dictionary.get(key)
     dictionary.get(key, 0)
     dictionary.get(key, "default")
+    dictionary.pop(key)  # error: [invalid-argument-type]
+    dictionary.pop(key, 0)
+    dictionary.pop(key, None)
     dictionary.keys().isdisjoint(key)
     dictionary.items().isdisjoint(key)
 ```

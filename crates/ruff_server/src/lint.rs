@@ -42,7 +42,7 @@ pub(crate) struct AssociatedDiagnosticData {
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
-    /// The NOQA code for the diagnostic.
+    /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
     /// Possible edit to add a `noqa` comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
@@ -56,7 +56,7 @@ pub(crate) struct DiagnosticFix {
     pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
     /// The message describing what the fix does.
     pub(crate) title: String,
-    /// The NOQA code for the diagnostic.
+    /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
@@ -272,13 +272,30 @@ fn to_lsp_diagnostic(
     let name = diagnostic.name();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
-    let code = diagnostic.secondary_code();
-
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
+
+    let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
+        let severity = severity(code);
+        let code = if is_human_readable_names_enabled(context.settings.preview) {
+            name.to_string()
+        } else {
+            code.to_string()
+        };
+        (severity, code)
+    } else {
+        (
+            match diagnostic.severity() {
+                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::Information,
+                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::Warning,
+                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,
+                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::Error,
+            },
+            diagnostic.id().to_string(),
+        )
+    };
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
-            let code = code?.to_string();
             let edits = fix
                 .into_iter()
                 .flat_map(Fix::edits)
@@ -305,7 +322,7 @@ fn to_lsp_diagnostic(
                 title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
-                code,
+                code: code.clone(),
             })
             .ok()
         })
@@ -329,26 +346,6 @@ fn to_lsp_diagnostic(
             context.encoding,
         );
     }
-
-    let (severity, code) = if let Some(code) = code {
-        let severity = severity(code);
-        let code = if is_human_readable_names_enabled(context.settings.preview) {
-            name.to_string()
-        } else {
-            code.to_string()
-        };
-        (severity, code)
-    } else {
-        (
-            match diagnostic.severity() {
-                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::Information,
-                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::Warning,
-                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,
-                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::Error,
-            },
-            diagnostic.id().to_string(),
-        )
-    };
 
     let related_information =
         if context.supports_related_information {

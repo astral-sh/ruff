@@ -10,14 +10,12 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
 13 |     var: T
    |
 help: Use type parameters
-8  | P = ParamSpec("P")
-9  |
+   |
 10 |
    - class A(Generic[T]):
 11 + class A[T: float]:
 12 |     # Comments in a class body are preserved
-13 |     var: T
-14 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
@@ -28,14 +26,12 @@ UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
 17 |     var: tuple[*Ts]
    |
 help: Use type parameters
-13 |     var: T
-14 |
+   |
 15 |
    - class B(Generic[*Ts]):
 16 + class B[*Ts]:
 17 |     var: tuple[*Ts]
-18 |
-19 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
@@ -46,14 +42,12 @@ UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
 21 |     var: P
    |
 help: Use type parameters
-17 |     var: tuple[*Ts]
-18 |
+   |
 19 |
    - class C(Generic[P]):
 20 + class C[**P]:
 21 |     var: P
-22 |
-23 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
@@ -64,14 +58,12 @@ UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type pa
 25 |     var: S
    |
 help: Use type parameters
-21 |     var: P
-22 |
+   |
 23 |
    - class Constrained(Generic[S]):
 24 + class Constrained[S: (str, bytes)]:
 25 |     var: S
-26 |
-27 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
@@ -96,14 +88,12 @@ UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type paramete
 38 |     s: AnyStr
    |
 help: Use type parameters
-34 |
-35 | # typing.AnyStr is a common external type variable, so treat it specially as a
+   |
 36 | # known TypeVar
    - class MyStr(Generic[AnyStr]):
 37 + class MyStr[AnyStr: (bytes, str)]:
 38 |     s: AnyStr
-39 |
-40 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
@@ -115,14 +105,12 @@ UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of ty
 43 |     typ: T
    |
 help: Use type parameters
-38 |     s: AnyStr
-39 |
+   |
 40 |
    - class MultipleGenerics(Generic[S, T, *Ts, P]):
 41 + class MultipleGenerics[S: (str, bytes), T: float, *Ts, **P]:
 42 |     var: S
-43 |     typ: T
-44 |     tup: tuple[*Ts]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` subclass instead of type parameters
@@ -133,14 +121,12 @@ UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` subclass instead of
 49 |     var: T
    |
 help: Use type parameters
-45 |     pep: P
-46 |
+   |
 47 |
    - class MultipleBaseClasses(list, Generic[T]):
 48 + class MultipleBaseClasses[T: float](list):
 49 |     var: T
-50 |
-51 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MoreBaseClasses` uses `Generic` subclass instead of type parameters
@@ -151,14 +137,12 @@ UP046 [*] Generic class `MoreBaseClasses` uses `Generic` subclass instead of typ
 63 |     var: T
    |
 help: Use type parameters
-59 | class Base3: ...
-60 |
+   |
 61 |
    - class MoreBaseClasses(Base1, Base2, Base3, Generic[T]):
 62 + class MoreBaseClasses[T: float](Base1, Base2, Base3):
 63 |     var: T
-64 |
-65 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generic` subclass instead of type parameters
@@ -170,14 +154,12 @@ UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generic` subclass instea
 68 |     typ: T
    |
 help: Use type parameters
-63 |     var: T
-64 |
+   |
 65 |
    - class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):
 66 + class MultipleBaseAndGenerics[S: (str, bytes), T: float, *Ts, **P](Base1, Base2, Base3):
 67 |     var: S
-68 |     typ: T
-69 |     tup: tuple[*Ts]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
@@ -187,14 +169,12 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |         ^^^^^^^^^^
    |
 help: Use type parameters
-70 |     pep: P
-71 |
+   |
 72 |
    - class A(Generic[T]): ...
 73 + class A[T: float]: ...
 74 |
-75 |
-76 | class B(A[S], Generic[S]):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
@@ -205,14 +185,12 @@ UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
 77 |     var: S
    |
 help: Use type parameters
-73 | class A(Generic[T]): ...
-74 |
+   |
 75 |
    - class B(A[S], Generic[S]):
 76 + class B[S: (str, bytes)](A[S]):
 77 |     var: S
-78 |
-79 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
@@ -223,14 +201,12 @@ UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
 81 |     var: tuple[S, T]
    |
 help: Use type parameters
-77 |     var: S
-78 |
+   |
 79 |
    - class C(A[S], Generic[S, T]):
 80 + class C[S: (str, bytes), T: float](A[S]):
 81 |     var: tuple[S, T]
-82 |
-83 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
@@ -241,14 +217,12 @@ UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
 85 |     var: T
    |
 help: Use type parameters
-81 |     var: tuple[S, T]
-82 |
+   |
 83 |
    - class D(A[int], Generic[T]):
 84 + class D[T: float](A[int]):
 85 |     var: T
-86 |
-87 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP046 Generic class `NotLast` uses `Generic` subclass instead of type parameters

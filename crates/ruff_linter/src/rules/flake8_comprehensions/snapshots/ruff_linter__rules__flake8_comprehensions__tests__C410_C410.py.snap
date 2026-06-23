@@ -10,11 +10,11 @@ C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `
 3 | l3 = list([])
   |
 help: Remove outer `list()` call
+  |
   - l1 = list([1, 2])
 1 + l1 = [1, 2]
 2 | l2 = list((1, 2))
-3 | l3 = list([])
-4 | l4 = list(())
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
@@ -27,12 +27,12 @@ C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list 
 4 | l4 = list(())
   |
 help: Rewrite as a single list literal
+  |
 1 | l1 = list([1, 2])
   - l2 = list((1, 2))
 2 + l2 = [1, 2]
 3 | l3 = list([])
-4 | l4 = list(())
-5 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
@@ -45,13 +45,12 @@ C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `
 4 | l4 = list(())
   |
 help: Remove outer `list()` call
-1 | l1 = list([1, 2])
+  |
 2 | l2 = list((1, 2))
   - l3 = list([])
 3 + l3 = []
 4 | l4 = list(())
-5 |
-6 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
@@ -63,14 +62,12 @@ C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list 
   |      ^^^^^^^^
   |
 help: Rewrite as a single list literal
-1 | l1 = list([1, 2])
-2 | l2 = list((1, 2))
+  |
 3 | l3 = list([])
   - l4 = list(())
 4 + l4 = []
 5 |
-6 |
-7 | list(  # comment
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
@@ -84,16 +81,14 @@ C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `
 11 |   list([  # comment
    |
 help: Remove outer `list()` call
-4  | l4 = list(())
-5  |
-6  |
-   - list(  # comment
-   -     [1, 2]
-   - )
-7  + [1, 2]
-8  |
-9  | list([  # comment
-10 |     1, 2
+  |
+6 |
+  - list(  # comment
+  -     [1, 2]
+  - )
+7 + [1, 2]
+8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
@@ -109,8 +104,7 @@ C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `
 15 |   # Skip when too many positional arguments
    |
 help: Remove outer `list()` call
-8  |     [1, 2]
-9  | )
+   |
 10 |
    - list([  # comment
 11 + [  # comment
@@ -118,6 +112,5 @@ help: Remove outer `list()` call
    - ])
 13 + ]
 14 |
-15 | # Skip when too many positional arguments
-16 | # See https://github.com/astral-sh/ruff/issues/15810
+   |
 note: This is an unsafe fix and may change runtime behavior

@@ -15,6 +15,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________________^
   |
 help: Organize imports
+   |
 1  | import sys
 2  +
 3  | import baz
@@ -28,3 +29,4 @@ help: Organize imports
    - import foo.bar
    - import foo.bar.baz
 10 + from foo import bar, baz
+   |

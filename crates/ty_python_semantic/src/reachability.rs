@@ -202,7 +202,7 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, equality_truthiness, infer_narrowing_constraints,
+        enum_metadata, equality_truthiness, expand_type, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
         singleton_pattern_type,
     },
@@ -475,7 +475,11 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
+    let coverage_subject_ty = expand_type(db, subject_ty)
+        .map(|types| UnionType::from_elements(db, types))
+        .unwrap_or(subject_ty);
+    let narrowed_subject_ty =
+        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -561,6 +565,12 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     base_ty: Type<'db>,
     place: ScopedPlaceId,
 ) -> Type<'db> {
+    match id {
+        ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
+        ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
+        _ => {}
+    }
+
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
@@ -832,50 +842,50 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn project(&mut self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
         type Id = ScopedNarrowingConstraint;
 
+        match id {
+            Id::ALWAYS_TRUE => return ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            Id::ALWAYS_FALSE => return ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            _ => {}
+        }
+
         if let Some(cached) = self.project_cache.get(&id) {
             return *cached;
         }
 
-        let projected = match id {
-            Id::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
-            Id::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
-            _ => {
-                let node = self.constraints.get_interior_node(id);
-                let predicate = self.predicates[node.atom];
+        let node = self.constraints.get_interior_node(id);
+        let predicate = self.predicates[node.atom];
 
-                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    let if_uncertain = self.project(node.if_uncertain);
-                    match analyze_single(self.db, &predicate) {
-                        Truthiness::AlwaysTrue => {
-                            let if_true = self.project(node.if_true);
-                            self.graph.or(if_true, if_uncertain)
-                        }
-                        Truthiness::AlwaysFalse => {
-                            let if_false = self.project(node.if_false);
-                            self.graph.or(if_false, if_uncertain)
-                        }
-                        Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
-                        }
-                    }
-                } else {
+        let projected = if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+            let if_uncertain = self.project(node.if_uncertain);
+            match analyze_single(self.db, &predicate) {
+                Truthiness::AlwaysTrue => {
                     let if_true = self.project(node.if_true);
-                    let if_uncertain = self.project(node.if_uncertain);
-                    let if_false = self.project(node.if_false);
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
-
-                    if pos_constraint.is_none() && neg_constraint.is_none() {
-                        let either = self.graph.or(if_true, if_false);
-                        self.graph.or(either, if_uncertain)
-                    } else {
-                        self.graph.add_node(ProjectedNarrowingNode {
-                            atom: node.atom,
-                            if_true,
-                            if_uncertain,
-                            if_false,
-                        })
-                    }
+                    self.graph.or(if_true, if_uncertain)
                 }
+                Truthiness::AlwaysFalse => {
+                    let if_false = self.project(node.if_false);
+                    self.graph.or(if_false, if_uncertain)
+                }
+                Truthiness::Ambiguous => {
+                    unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                }
+            }
+        } else {
+            let if_true = self.project(node.if_true);
+            let if_uncertain = self.project(node.if_uncertain);
+            let if_false = self.project(node.if_false);
+            let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
+
+            if pos_constraint.is_none() && neg_constraint.is_none() {
+                let either = self.graph.or(if_true, if_false);
+                self.graph.or(either, if_uncertain)
+            } else {
+                self.graph.add_node(ProjectedNarrowingNode {
+                    atom: node.atom,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                })
             }
         };
 

@@ -232,6 +232,24 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
+    /// Merge two cycle iterations that specialize the same class origin.
+    ///
+    /// A semantic union of these class objects is not a valid class base. Keep the shared class
+    /// identity and merge the approximations inside its specialization instead.
+    pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        let origin = self.origin(db);
+        if origin != previous.origin(db) {
+            return None;
+        }
+
+        Some(Self::new(
+            db,
+            origin,
+            self.specialization(db)
+                .merge_cycle_recovery(db, previous.specialization(db))?,
+        ))
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

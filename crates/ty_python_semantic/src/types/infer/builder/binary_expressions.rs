@@ -182,7 +182,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let db = self.db();
 
-        let update_ty = self.speculate().infer_expression(
+        let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
             TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
         );

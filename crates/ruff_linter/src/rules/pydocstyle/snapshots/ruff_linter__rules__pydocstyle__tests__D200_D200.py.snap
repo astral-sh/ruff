@@ -20,15 +20,13 @@ D200 [*] One-line docstring should fit on one line
   | |_______^
   |
 help: Reformat to one line
-4  |
-5  |
-6  | def func():
-   -     """\\
-   -     """
-7  +     """\\"""
-8  |
-9  |
-10 | def func():
+  |
+6 | def func():
+  -     """\\
+  -     """
+7 +     """\\"""
+8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 D200 One-line docstring should fit on one line

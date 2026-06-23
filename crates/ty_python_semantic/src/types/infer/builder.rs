@@ -5892,7 +5892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
 
-                let mut speculative_builder = self.speculate();
+                let mut speculative_builder = self.speculate_without_diagnostics();
                 let inferred_ty = infer_argument_ty(
                     &mut speculative_builder,
                     (
@@ -5997,7 +5997,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We use a speculative builder to silence any diagnostics emitted during multi-inference, as the
                     // type context is only used as a hint to infer a more assignable argument type, and should not lead
                     // to diagnostics for non-matching overloads.
-                    let mut speculative_builder = self.speculate();
+                    let mut speculative_builder = self.speculate_without_diagnostics();
                     let inferred_ty = infer_argument_ty(
                         &mut speculative_builder,
                         (
@@ -6145,14 +6145,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(self.db(), standalone_expression, tcx);
+        // `infer_expression_types` cache inference results for a given expression and type
+        // context. For expressions that are not directly affected by type context, we defer
+        // applying the type context until after the Salsa query runs, allowing us to reuse
+        // the memoized query result during multi-inference.
+        let inference_tcx = if can_defer_type_context(expression) {
+            TypeContext::default()
+        } else {
+            tcx
+        };
+
+        let types = infer_expression_types(self.db(), standalone_expression, inference_tcx);
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        types.expression_type(expression)
+        let ty = types.expression_type(expression);
+        if inference_tcx == tcx {
+            ty
+        } else {
+            let ty = self.apply_type_context(expression, ty, tcx);
+            self.expressions.insert(expression.into(), ty);
+            ty
+        }
     }
 
     /// Infer the type of an expression.
@@ -6223,18 +6240,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_comprehension_expression(dictcomp, tcx)
             }
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => {
-                let ty = self.infer_name_expression(name);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
-            ast::Expr::Attribute(attribute) => {
-                let ty = self.infer_attribute_expression(attribute);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
+            ast::Expr::Name(name) => self.infer_name_expression(name),
+            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
@@ -6258,6 +6265,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        ty = self.apply_type_context(expression, ty, tcx);
+        self.store_expression_type(expression, ty);
+
+        if let Some(expression_cache) = &self.expression_cache {
+            expression_cache
+                .borrow_mut()
+                .insert((expression.into(), tcx), ty);
+        }
+
+        ty
+    }
+
+    /// Applies the provided type context to an already inferred type.
+    fn apply_type_context(
+        &mut self,
+        expression: &ast::Expr,
+        mut ty: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && let Some(target) = tcx.annotation
+        {
+            ty = self.specialize_generic_class_from_context(ty, target);
+        }
+
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
@@ -6273,14 +6305,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(collection_def) = self.index.unannotated_collection_literal(expression)
         {
             self.record_collection_use_constraint(collection_def, tcx);
-        }
-
-        self.store_expression_type(expression, ty);
-
-        if let Some(expression_cache) = &self.expression_cache {
-            expression_cache
-                .borrow_mut()
-                .insert((expression.into(), tcx), ty);
         }
 
         ty
@@ -6903,7 +6927,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else if !has_dict_compatible_fallback {
                         // Suppress `TypedDict` diagnostics only if this literal is assignable to
                         // the non-`TypedDict` arm of the union.
-                        let mut speculative_builder = self.speculate();
+                        let mut speculative_builder = self.speculate_without_diagnostics();
                         has_dict_compatible_fallback = speculative_builder
                             .infer_dict_expression(dict, TypeContext::new(Some(element)))
                             .is_assignable_to(self.db(), element);
@@ -6937,15 +6961,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Reuse nested expressions that receive the same field context across candidates.
                     let teardown = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
-                        // Disable diagnostics as we attempt to narrow to specific `TypedDict`
-                        // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
-                        // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
+                        // Suppress diagnostics for discarded candidates. A mixed union like
+                        // `TypedDict | dict[str, Any]` should remain quiet when the dict arm accepts
                         // the literal.
-                        if let Some(inferred_ty) = self.speculate().infer_typed_dict_expression(
-                            dict,
-                            typed_dict,
-                            &mut item_types,
-                        ) {
+                        if let Some(inferred_ty) = self
+                            .speculate_without_diagnostics()
+                            .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                        {
                             narrowed_tys.push(inferred_ty);
                         }
 
@@ -8581,7 +8603,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }) => Some(key_literal.to_str()),
                     _ => self
-                        .speculate()
+                        .speculate_without_diagnostics()
                         .get_or_infer_expression(first_arg, TypeContext::default())
                         .as_string_literal()
                         .map(|key_literal| key_literal.value(self.db())),
@@ -8949,14 +8971,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 
-                let constraints = ConstraintSetBuilder::new();
-                let call_result = identity_bindings.check_types_impl(
-                    self.db(),
-                    &constraints,
-                    &call_arguments,
-                    call_expression_tcx,
-                    &self.dataclass_field_specifiers,
-                );
+                let call_result = self
+                    .speculate_without_diagnostics()
+                    .infer_and_check_argument_types(
+                        ArgumentsIter::from_ast(arguments),
+                        &mut call_arguments,
+                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                        // However, `value` would have been inferred to a be a collection with `Divergent`
+                        // element types, meaning the type context for a given argument, by which the inferred
+                        // type is keyed, may not be the same as the type context we get here. It is not immediately
+                        // clear how to retrieve those types, and so we just re-infer the argument expressions
+                        // for simplicity.
+                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+                        &mut identity_bindings,
+                        call_expression_tcx,
+                    );
 
                 if call_result.is_ok() {
                     for call_specialization in identity_bindings
@@ -11381,6 +11410,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder
     }
 
+    /// Returns a speculative builder that does not construct diagnostics.
+    fn speculate_without_diagnostics(&self) -> Self {
+        let mut builder = self.speculate();
+        builder.context.suppress_diagnostics();
+        builder
+    }
+
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
         let Self {
@@ -11506,7 +11542,7 @@ impl<'db, 'ast, 'infer> MultiInferenceGuard<'db, 'ast, 'infer> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         self.last_tcx = Some(tcx);
-        (self.infer_expr)(&mut builder.speculate(), tcx)
+        (self.infer_expr)(&mut builder.speculate_without_diagnostics(), tcx)
     }
 
     fn last_tcx(&self) -> TypeContext<'db> {
@@ -11532,6 +11568,50 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
         expression,
         ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
     )
+}
+
+/// Returns `true` if applying type context to the given expression may be deferred after inference.
+///
+/// For example, list literals must be inferred with type context directly, as the type context may
+/// influence the type assigned to an invariant generic type parameter. However, bare name expressions
+/// may be inferred without type context, and later specialized after inference.
+fn can_defer_type_context(expression: &ast::Expr) -> bool {
+    match expression {
+        ast::Expr::StringLiteral(_)
+        | ast::Expr::Tuple(_)
+        | ast::Expr::List(_)
+        | ast::Expr::Set(_)
+        | ast::Expr::Dict(_)
+        | ast::Expr::Generator(_)
+        | ast::Expr::ListComp(_)
+        | ast::Expr::DictComp(_)
+        | ast::Expr::SetComp(_)
+        | ast::Expr::BinOp(_)
+        | ast::Expr::BoolOp(_)
+        | ast::Expr::If(_)
+        | ast::Expr::Lambda(_)
+        | ast::Expr::Call(_)
+        | ast::Expr::Starred(_)
+        | ast::Expr::Await(_) => false,
+
+        ast::Expr::NoneLiteral(_)
+        | ast::Expr::NumberLiteral(_)
+        | ast::Expr::BooleanLiteral(_)
+        | ast::Expr::BytesLiteral(_)
+        | ast::Expr::FString(_)
+        | ast::Expr::TString(_)
+        | ast::Expr::EllipsisLiteral(_)
+        | ast::Expr::Name(_)
+        | ast::Expr::Attribute(_)
+        | ast::Expr::UnaryOp(_)
+        | ast::Expr::Compare(_)
+        | ast::Expr::Subscript(_)
+        | ast::Expr::Slice(_)
+        | ast::Expr::Yield(_)
+        | ast::Expr::YieldFrom(_)
+        | ast::Expr::Named(_)
+        | ast::Expr::IpyEscapeCommand(_) => true,
+    }
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.

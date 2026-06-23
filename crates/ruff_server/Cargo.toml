@@ -32,7 +32,7 @@ ignore = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
-regex = { workspace = true }
+memchr = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

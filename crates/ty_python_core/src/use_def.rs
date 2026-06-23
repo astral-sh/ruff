@@ -240,13 +240,14 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
+use std::hash::{Hash as _, Hasher as _};
 use std::ops::Index;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
@@ -301,7 +302,7 @@ impl InternedPlaceStateId {
 
 struct PlaceStateInterner {
     interned_bindings: RetainedBindingsBuilder,
-    interned_ids_by_bindings: FxHashMap<Bindings, InternedBindingsId>,
+    interned_ids_by_bindings: hashbrown::HashTable<InternedBindingsId>,
     interned_declarations: RetainedDeclarationsBuilder,
     interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
     // Undeclared states are common and can be interned by their dense constraint IDs.
@@ -316,7 +317,7 @@ impl PlaceStateInterner {
     fn with_capacity(bindings: usize, declaration_map: usize, declarations: usize) -> Self {
         Self {
             interned_bindings: RetainedBindingsBuilder::with_capacity(bindings),
-            interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(bindings, FxBuildHasher),
+            interned_ids_by_bindings: hashbrown::HashTable::with_capacity(bindings),
             interned_declarations: RetainedDeclarationsBuilder::with_capacity(declarations),
             interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
                 declaration_map,
@@ -328,25 +329,40 @@ impl PlaceStateInterner {
         }
     }
 
-    fn intern_bindings(&mut self, bindings: Bindings) -> InternedBindingsId {
+    fn intern_bindings(&mut self, bindings: &Bindings) -> InternedBindingsId {
         if bindings.is_always_unbound() {
             if let Some(interned_id) = self.always_unbound_bindings {
                 return interned_id;
             }
 
-            let interned_id = self.interned_bindings.push(&bindings);
+            let interned_id = self.interned_bindings.push(bindings);
             self.always_unbound_bindings = Some(interned_id);
             return interned_id;
         }
 
-        match self.interned_ids_by_bindings.entry(bindings) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => {
-                let interned_id = self.interned_bindings.push(entry.key());
+        // The retained representation discards the unbound narrowing constraint, so it isn't
+        // part of the interned identity.
+        let hash = Self::hash_bindings(bindings.as_slice());
+        let interned_bindings = &mut self.interned_bindings;
+        let entry = self.interned_ids_by_bindings.entry(
+            hash,
+            |id| interned_bindings.get(*id) == bindings.as_slice(),
+            |id| Self::hash_bindings(interned_bindings.get(*id)),
+        );
+        match entry {
+            hashbrown::hash_table::Entry::Occupied(entry) => *entry.get(),
+            hashbrown::hash_table::Entry::Vacant(entry) => {
+                let interned_id = interned_bindings.push(bindings);
                 entry.insert(interned_id);
                 interned_id
             }
         }
+    }
+
+    fn hash_bindings(live_bindings: &[LiveBinding]) -> u64 {
+        let mut hasher = FxHasher::default();
+        live_bindings.hash(&mut hasher);
+        hasher.finish()
     }
 
     fn intern_declarations(&mut self, declarations: Declarations) -> InternedDeclarationsId {
@@ -391,7 +407,7 @@ impl PlaceStateInterner {
 
     fn intern_place_state(
         &mut self,
-        bindings: Bindings,
+        bindings: &Bindings,
         declarations: Declarations,
     ) -> InternedPlaceStateId {
         InternedPlaceStateId(
@@ -402,7 +418,7 @@ impl PlaceStateInterner {
 
     fn retain_place_state(
         &mut self,
-        bindings: Bindings,
+        bindings: &Bindings,
         declarations: Declarations,
     ) -> InternedPlaceStateId {
         // Other retained declarations rarely repeat. Keep the compact IDs without hashing every
@@ -447,6 +463,16 @@ impl RetainedBindingsBuilder {
         let end = u32::try_from(self.live_bindings.len())
             .expect("Expected live-bindings length to fit into a u32");
         self.ends.push(end)
+    }
+
+    fn get(&self, index: InternedBindingsId) -> &[LiveBinding] {
+        let end = self.ends[index];
+        let start = if index.index() == 0 {
+            0
+        } else {
+            self.ends[InternedBindingsId::new(index.index() - 1)]
+        };
+        &self.live_bindings[start as usize..end as usize]
     }
 
     fn finish(
@@ -2510,7 +2536,7 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
-            let bindings = place_state_interner.intern_bindings(bindings);
+            let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));
             interned_ids_by_definition.push((
@@ -2533,7 +2559,7 @@ impl<'db> UseDefMapBuilder<'db> {
             IndexVec::with_capacity(bindings_by_use.len());
 
         for bindings in bindings_by_use {
-            let interned_id = place_state_interner.intern_bindings(bindings);
+            let interned_id = place_state_interner.intern_bindings(&bindings);
             interned_ids_by_use.push(interned_id);
         }
 
@@ -2549,7 +2575,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         for place_state in place_states {
             let (bindings, declarations) = get_parts(place_state);
-            let interned_id = place_state_interner.retain_place_state(bindings, declarations);
+            let interned_id = place_state_interner.retain_place_state(&bindings, declarations);
             interned_ids_by_place.push(interned_id);
         }
 
@@ -2570,7 +2596,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 Entry::Vacant(entry) => {
                     let place_state = entry.key();
                     let interned_id = place_state_interner.intern_place_state(
-                        place_state.bindings().clone(),
+                        place_state.bindings(),
                         place_state.declarations().clone(),
                     );
                     entry.insert(interned_id);
@@ -2595,7 +2621,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for snapshot in enclosing_snapshots {
             let interned_id = match snapshot {
                 EnclosingSnapshot::Bindings(bindings) => {
-                    let interned_bindings_id = place_state_interner.intern_bindings(bindings);
+                    let interned_bindings_id = place_state_interner.intern_bindings(&bindings);
                     InternedEnclosingSnapshotId::Bindings(interned_bindings_id)
                 }
                 EnclosingSnapshot::Constraint(constraint) => {

@@ -9,7 +9,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_____________^
   |
 help: Organize imports
+  |
   - import requests
 1 + # Third party imports
 2 | import pandas
 3 + import requests
+  |

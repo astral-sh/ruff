@@ -2757,6 +2757,13 @@ impl<'a> Checker<'a> {
     fn bind_builtins(&mut self) {
         let target_version = self.target_version();
         let settings = self.settings();
+        let builtin_count = python_builtins(target_version.minor, self.source_type.is_ipynb())
+            .count()
+            + python_magic_globals(target_version.minor).count()
+            + settings.builtins.len();
+
+        self.semantic.reserve_builtin_bindings(builtin_count);
+
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
@@ -3426,18 +3433,14 @@ pub(crate) fn check_ast(
 /// a [`Violation`] to the contained [`Diagnostic`] collection on `Drop`.
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<Diagnostic>>,
-    source_file: SourceFile,
+    source_file: LazySourceFile<'a>,
     rules: RuleTable,
     settings: &'a LinterSettings,
 }
 
 impl<'a> LintContext<'a> {
-    /// Create a new collector with the given `source_file` and an empty collection of
-    /// `Diagnostic`s.
-    pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
-        let source_file =
-            SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
-
+    /// Create a new collector for `path` with an empty collection of `Diagnostic`s.
+    pub(crate) fn new(path: &'a Path, contents: &'a str, settings: &'a LinterSettings) -> Self {
         // Ignore diagnostics based on per-file-ignores.
         let mut rules = settings.rules.clone();
         for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
@@ -3446,7 +3449,7 @@ impl<'a> LintContext<'a> {
 
         Self {
             diagnostics: RefCell::default(),
-            source_file,
+            source_file: LazySourceFile::new(path, contents),
             rules,
             settings,
         }
@@ -3463,7 +3466,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
+            diagnostic: Some(kind.into_diagnostic(range, self.source_file())),
             rule: T::rule(),
             before_drop_fns: SmallVec::new(),
         }
@@ -3483,7 +3486,7 @@ impl<'a> LintContext<'a> {
         if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
+                diagnostic: Some(kind.into_diagnostic(range, self.source_file())),
                 rule,
                 before_drop_fns: SmallVec::new(),
             })
@@ -3508,7 +3511,7 @@ impl<'a> LintContext<'a> {
             range,
             None,
             None,
-            self.source_file.clone(),
+            self.source_file().clone(),
             None,
             T::rule(),
         );
@@ -3558,7 +3561,7 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
-    pub(crate) fn into_parts(self) -> (Vec<Diagnostic>, SourceFile) {
+    pub(crate) fn into_parts(self) -> (Vec<Diagnostic>, LazySourceFile<'a>) {
         (self.diagnostics.into_inner(), self.source_file)
     }
 
@@ -3577,9 +3580,30 @@ impl<'a> LintContext<'a> {
         self.settings
     }
 
-    #[cfg(any(feature = "test-rules", test))]
-    pub(crate) const fn source_file(&self) -> &SourceFile {
-        &self.source_file
+    pub(crate) fn source_file(&self) -> &SourceFile {
+        self.source_file.get()
+    }
+}
+
+pub(crate) struct LazySourceFile<'a> {
+    path: &'a Path,
+    contents: &'a str,
+    file: OnceCell<SourceFile>,
+}
+
+impl LazySourceFile<'_> {
+    fn new<'a>(path: &'a Path, contents: &'a str) -> LazySourceFile<'a> {
+        LazySourceFile {
+            path,
+            contents,
+            file: OnceCell::new(),
+        }
+    }
+
+    pub(crate) fn get(&self) -> &SourceFile {
+        self.file.get_or_init(|| {
+            SourceFileBuilder::new(self.path.to_string_lossy().as_ref(), self.contents).finish()
+        })
     }
 }
 
@@ -3737,7 +3761,7 @@ impl DiagnosticGuard<'_, '_> {
         message: impl IntoDiagnosticMessage + 'a,
         range: impl Ranged,
     ) {
-        let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let span = Span::from(self.context.source_file().clone()).with_range(range.range());
         let message = message.into_diagnostic_message();
         debug_assert!(
             !message.as_str().is_empty(),
@@ -3749,7 +3773,7 @@ impl DiagnosticGuard<'_, '_> {
 
     /// Add a secondary annotation without a message at the given range.
     pub(crate) fn secondary_annotation_without_message(&mut self, range: impl Ranged) {
-        let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let span = Span::from(self.context.source_file().clone()).with_range(range.range());
         let ann = Annotation::secondary(span);
         self.diagnostic.as_mut().unwrap().annotate(ann);
     }
