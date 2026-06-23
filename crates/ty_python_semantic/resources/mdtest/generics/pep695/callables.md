@@ -261,6 +261,146 @@ def body_annotation[**P]() -> Callable[P, None]:
     return local
 ```
 
+## Inferring an explicit `object` upper bound from a callable
+
+A type variable in a callable parameter position is constrained from above because callable
+parameters are contravariant. An explicit `object` upper bound is still inference evidence; it is
+different from having no inferred bound at all.
+
+```py
+from typing import Callable
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_object(value: object) -> None: ...
+
+reveal_type(infer_from_consumer(consume_object))  # revealed: object
+```
+
+## Intersecting inferred union upper bounds
+
+Multiple callable arguments can infer multiple union upper bounds for the same type variable. We
+keep those bounds factored and infer a compact type satisfying every bound rather than losing the
+inference result while materializing their full cross product.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+def consume_left(value: A | B | C) -> None: ...
+def consume_right(value: B | D | E) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: B
+```
+
+## Incompatible inferred union upper bounds
+
+If no type satisfying all inferred union upper bounds can be found, the type variable remains
+unsolved and receives the usual `Unknown` fallback.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+def consume_left(value: A | B) -> None: ...
+def consume_right(value: C | D) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+```
+
+## Combining inferred and declared upper bounds
+
+A declared type-variable bound also participates when selecting a type that satisfies an inferred
+union upper bound.
+
+```py
+from typing import Callable
+
+def infer_str[T: str](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_str(consume_int_or_str))  # revealed: str
+```
+
+## Inferring `Never` from a callable parameter
+
+`Never` is a valid upper-bound inference result and should not be replaced with the fallback for an
+unsolved type variable.
+
+```py
+from typing import Callable, NoReturn
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_never(value: NoReturn) -> None: ...
+
+reveal_type(infer_from_consumer(consume_never))  # revealed: Never
+```
+
+## Conflicting inferred lower and upper bounds
+
+A concrete argument can infer a lower bound that is incompatible with an upper bound inferred from a
+callable argument. Such a call is invalid rather than producing a solution outside the inferred
+upper bound.
+
+```py
+from typing import Callable, final
+
+def infer_with_consumer[T](value: T, consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+def consume_b(value: B) -> None: ...
+
+infer_with_consumer(A(), consume_b)  # error: [invalid-argument-type]
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set

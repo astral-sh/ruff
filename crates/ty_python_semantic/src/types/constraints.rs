@@ -6889,33 +6889,6 @@ mod tests {
     }
 
     #[test]
-    fn upper_bound_tracks_explicit_object_until_redundant() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let mut upper = UpperBound::none();
-
-        assert!(upper.is_empty());
-        assert!(!upper.has_explicit_bound());
-        assert_eq!(upper.materialize_exact(&db), Type::object());
-        assert_eq!(
-            upper.materialize_exact_if_no_visible_unions(&db),
-            Some(Type::object())
-        );
-
-        upper.add_clause(&db, Type::object());
-        upper.shrink_to_fit();
-        assert!(!upper.is_empty());
-        assert!(upper.has_explicit_bound());
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::object()]));
-
-        upper.add_clause(&db, int);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([int]));
-
-        upper.add_clause(&db, Type::object());
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([int]));
-    }
-
-    #[test]
     fn upper_bound_prunes_duplicates_and_redundant_supertypes() {
         let db = setup_db();
         let int = known_instance(&db, KnownClass::Int);
@@ -6969,58 +6942,6 @@ mod tests {
     }
 
     #[test]
-    fn upper_bound_bounded_witness_returns_single_clause() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let upper = UpperBound::from_clause(int);
-
-        let witness = upper
-            .bounded_partial_dnf_witness(&db, None)
-            .expect("expected a witness");
-
-        assert_eq!(witness, int);
-    }
-
-    #[test]
-    fn upper_bound_bounded_witness_handles_union_overlap() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
-        let upper = UpperBound::from_clauses(&db, [int_or_str, str_or_bytes]);
-
-        let witness = upper
-            .bounded_partial_dnf_witness(&db, None)
-            .expect("expected a witness");
-
-        assert_eq!(witness, str);
-        assert!(witness.is_constraint_set_assignable_to(&db, int_or_str));
-        assert!(witness.is_constraint_set_assignable_to(&db, str_or_bytes));
-    }
-
-    #[test]
-    fn upper_bound_bounded_witness_finds_product_term() {
-        let db = setup_db();
-        let bool_ty = known_instance(&db, KnownClass::Bool);
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let bool_or_bytes = UnionType::from_two_elements(&db, bool_ty, bytes);
-        let upper = UpperBound::from_clauses(&db, [int_or_str, bool_or_bytes]);
-
-        let witness = upper
-            .bounded_partial_dnf_witness(&db, None)
-            .expect("expected a witness");
-
-        assert_eq!(witness, bool_ty);
-        assert!(witness.is_constraint_set_assignable_to(&db, int_or_str));
-        assert!(witness.is_constraint_set_assignable_to(&db, bool_or_bytes));
-    }
-
-    #[test]
     fn upper_bound_bounded_witness_respects_budget() {
         let db = setup_db();
         let bool_ty = known_instance(&db, KnownClass::Bool);
@@ -7045,47 +6966,6 @@ mod tests {
         assert!(witness_union_size <= MAX_PARTIAL_DNF_TERMS);
         assert!(witness.is_constraint_set_assignable_to(&db, left));
         assert!(witness.is_constraint_set_assignable_to(&db, right));
-    }
-
-    #[test]
-    fn upper_bound_bounded_witness_materializes_never_clause() {
-        let db = setup_db();
-        let upper = UpperBound::from_clause(Type::Never);
-
-        let witness = upper
-            .bounded_partial_dnf_witness(&db, None)
-            .expect("expected an exact never witness");
-
-        assert_eq!(witness, Type::Never);
-    }
-
-    #[test]
-    fn upper_bound_bounded_witness_includes_declared_upper() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let upper = UpperBound::from_clause(int_or_str);
-
-        let witness = upper
-            .bounded_partial_dnf_witness(&db, Some(str))
-            .expect("expected a witness");
-
-        assert_eq!(witness, str);
-    }
-
-    #[test]
-    fn upper_bound_bounded_witness_returns_none_when_no_candidate_survives() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let bytearray = known_instance(&db, KnownClass::Bytearray);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let bytes_or_bytearray = UnionType::from_two_elements(&db, bytes, bytearray);
-        let upper = UpperBound::from_clauses(&db, [int_or_str, bytes_or_bytearray]);
-
-        assert_eq!(upper.bounded_partial_dnf_witness(&db, None), None);
     }
 
     #[test]
@@ -7126,47 +7006,6 @@ mod tests {
     }
 
     #[test]
-    fn default_solve_validates_lower_against_accumulated_upper() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let path_bound = PathBound {
-            bound_typevar: t,
-            lower: Some(int),
-            upper: UpperBound::from_clause(str),
-        };
-
-        assert_eq!(
-            PathBounds::default_solve(&db, &builder, &path_bound),
-            Err(())
-        );
-    }
-
-    #[test]
-    fn default_solve_uses_bounded_witness_for_upper_only_bounds() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
-        let path_bound = PathBound {
-            bound_typevar: t,
-            lower: None,
-            upper: UpperBound::from_clauses(&db, [int_or_str, str_or_bytes]),
-        };
-
-        assert_eq!(
-            PathBounds::default_solve(&db, &builder, &path_bound),
-            Ok(Some(str))
-        );
-    }
-
-    #[test]
     fn default_solve_leaves_unbounded_typevar_unsolved_without_bounds() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
@@ -7180,60 +7019,6 @@ mod tests {
         assert_eq!(
             PathBounds::default_solve(&db, &builder, &path_bound),
             Ok(None)
-        );
-    }
-
-    #[test]
-    fn default_solve_leaves_upper_only_typevar_unsolved_without_compact_witness() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let bytearray = known_instance(&db, KnownClass::Bytearray);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let bytes_or_bytearray = UnionType::from_two_elements(&db, bytes, bytearray);
-        let path_bound = PathBound {
-            bound_typevar: t,
-            lower: None,
-            upper: UpperBound::from_clauses(&db, [int_or_str, bytes_or_bytearray]),
-        };
-
-        assert_eq!(
-            PathBounds::default_solve(&db, &builder, &path_bound),
-            Ok(None)
-        );
-    }
-
-    #[test]
-    fn path_bounds_preserve_factored_upper_bounds() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
-        let mut constraints =
-            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, int_or_str);
-        let other = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, str_or_bytes);
-        constraints.intersect(&db, &builder, other);
-
-        let path_bounds = PathBounds::compute(&db, &builder, constraints.node);
-        let PathBounds::Constrained(paths) = path_bounds else {
-            panic!("expected constrained path bounds");
-        };
-        assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0].len(), 1);
-
-        let path_bound = &paths[0][0];
-        assert_eq!(path_bound.bound_typevar, t);
-        assert_eq!(path_bound.lower, None);
-        assert_eq!(
-            path_bound.upper.clauses,
-            FxOrderSet::from_iter([int_or_str, str_or_bytes])
         );
     }
 

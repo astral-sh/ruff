@@ -504,7 +504,7 @@ Temporary note: some bounded-witness helpers still have `dead_code` expectations
 - [x] Change `ConstraintBoundsBuilder::finish` so it returns a `PathBound`, moving the accumulated `UpperBound` directly into `PathBound.upper` instead of exact materialization or the current `Unknown` fallback heuristic.
 - [x] Call `upper.shrink_to_fit()` directly in `ConstraintBoundsBuilder::finish` before constructing the `PathBound`; do not add a `PathBound::shrink_to_fit` helper unless future fields need it.
 - [x] Ensure `PathBounds::compute` still produces stable results.
-    - Added `path_bounds_preserve_factored_upper_bounds`, which checks that two union upper clauses remain as two `UpperBound` clauses in extracted path bounds.
+    - Initially covered by `path_bounds_preserve_factored_upper_bounds`; Phase 7 replaced that structural unit test with end-to-end inference mdtests and the `ty_micro[factored_upper_bounds]` performance benchmark.
 - [x] Update path-bound display/debug code at the same time as the `PathBound` representation change, rendering factored upper bounds clearly and directly without materializing `UpperBound` into a single ordinary `Type`.
     - There is no dedicated path-bound display helper; derived debug output now renders the raw `UpperBound` field.
 - [x] Audit the touched display/debug helpers for accidental exact materialization.
@@ -536,6 +536,7 @@ Completed early as part of the initial `UpperBound` implementation. Wiring the w
     - large cross-product cases stay within the compile-time budget
     - `Never` clause behavior
     - fallback behavior when no candidate survives within the compile-time budget
+    - Phase 7 moved observable solution behavior into mdtests while retaining the compile-time budget as a focused unit test.
 
 ### Phase 6: Update solution extraction
 
@@ -553,17 +554,32 @@ Completed early as part of the initial `UpperBound` implementation. Wiring the w
 - [x] Ensure `TypeVarSolution` can remain `solution: Type<'db>` for this iteration.
     - Focused test command: `cargo test -p ty_python_semantic types::constraints::tests::`.
 
+### Phase 7: Prefer end-to-end coverage for factored upper-bound solving
+
+- [x] Replace helper-level solution-extraction tests with distinct mdtest sections that exercise observable generic-call inference behavior.
+- [x] Cover explicit `object` inference evidence, intersecting union upper bounds, incompatible upper bounds, declared upper bounds, `Never`, and conflicting lower/upper inference.
+- [x] Keep focused unit tests only for load-bearing representation and algorithm invariants that mdtests cannot express without depending on implementation details.
+- [x] Replace the structural `path_bounds_preserve_factored_upper_bounds` unit test with a `ty_micro[factored_upper_bounds]` benchmark that exercises many union-bearing upper clauses without exact DNF materialization.
+    - The benchmark generates 12 distinct upper clauses with 8 alternatives each.
+    - `cargo bench -p ruff_benchmark --bench ty -- factored_upper_bounds --noplot` passed, measuring approximately 14.1–14.6 ms.
+- [x] Run the focused constraint tests, affected callable mdtest, new microbenchmark, and repository hooks.
+    - Focused constraint tests: 23 passed.
+    - `mdtest::generics/pep695/callables.md`: passed.
+    - Full `ty_python_semantic` suite: 710 passed, 35 skipped.
+    - `/home/dcreager/bin/jpk run --files ...`: passed for all four changed files.
+    - No snapshots changed and no `.pending-snap` files were created.
+
 ## Checkpoint validation (not a separate phase)
 
 Perform validation whenever a phase is completed, and before each checkpoint that becomes a separate jj revision:
 
-- [ ] Check for local style issues while editing, including opportunities to use let-chains.
-- [ ] Run focused Rust tests for the code changed in the checkpoint.
-- [ ] Run affected mdtests, especially generics/call/protocol/overload tests when solution behavior changes.
-- [ ] Keep tests passing before checkpointing; do not defer broken tests to a later cleanup phase.
-- [ ] Review any added or updated snapshots.
-- [ ] Check for `.pending-snap` files if inline snapshots are affected.
-- [ ] Run `/home/dcreager/bin/jpk` or the repo-prescribed prek command on changed files before handoff.
+- [x] Check for local style issues while editing, including opportunities to use let-chains.
+- [x] Run focused Rust tests for the code changed in the checkpoint.
+- [x] Run affected mdtests, especially generics/call/protocol/overload tests when solution behavior changes.
+- [x] Keep tests passing before checkpointing; do not defer broken tests to a later cleanup phase.
+- [x] Review any added or updated snapshots.
+- [x] Check for `.pending-snap` files if inline snapshots are affected.
+- [x] Run `/home/dcreager/bin/jpk` or the repo-prescribed prek command on changed files before handoff.
 
 Before final handoff, run the `ty_python_semantic` test suite:
 
