@@ -489,7 +489,7 @@ pub(crate) fn server_capabilities(
                     filters: vec![lsp_types::FileOperationFilter {
                         scheme: Some("file".to_string()),
                         pattern: lsp_types::FileOperationPattern {
-                            glob: "**/*.py".to_string(),
+                            glob: "**/*.{py,pyi}".to_string(),
                             matches: Some(lsp_types::FileOperationPatternKind::File),
                             options: None,
                         },

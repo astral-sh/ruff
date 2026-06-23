@@ -1,8 +1,9 @@
 use crate::goto::GotoTarget;
 use crate::references::{ReferencesMode, references};
 use ruff_db::files::{File, system_path_to_file};
+use ruff_db::source::source_text;
 use ruff_db::system::SystemPath;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 use ty_module_resolver::{Module, ModuleName, file_to_module};
 use ty_project::Db;
 
@@ -49,6 +50,7 @@ pub fn will_rename_file(
         .next()
         .unwrap_or(new_name_str)
         .to_string();
+    let old_components: Vec<&str> = old_name_str.split('.').collect();
 
     let goto_target = GotoTarget::ImportModuleComponent {
         module_name: old_name_str.to_string(),
@@ -63,12 +65,70 @@ pub fn will_rename_file(
 
     refs.into_iter()
         .filter(|r| r.file() != old_file)
-        .map(|r| FileRenameEdit {
-            file: r.file(),
-            range: r.range(),
-            new_text: new_last.clone(),
+        .map(|r| {
+            let (range, new_text) = expand_dotted_range(
+                db,
+                r.file(),
+                r.range(),
+                &old_components,
+                new_name_str,
+                &new_last,
+            );
+            FileRenameEdit {
+                file: r.file(),
+                range,
+                new_text,
+            }
         })
         .collect()
+}
+
+/// Expand a reference range to cover the full dotted module path when the
+/// reference is part of a larger path (e.g. `pkg.old_sub` in `import pkg.old_sub`).
+///
+/// For standalone references (e.g. `old_sub` in `from pkg import old_sub`),
+/// returns the original range with just the last component as replacement.
+fn expand_dotted_range(
+    db: &dyn Db,
+    file: File,
+    component_range: TextRange,
+    old_components: &[&str],
+    new_module_name: &str,
+    new_last: &str,
+) -> (TextRange, String) {
+    let source = source_text(db, file);
+    let text = source.as_str();
+    let ref_start = usize::from(component_range.start());
+
+    // Walk backwards through parent components of the old module path,
+    // checking that each ".<component>" prefix matches.
+    let mut expanded_start = ref_start;
+    for i in (0..old_components.len().saturating_sub(1)).rev() {
+        let component = old_components[i];
+        let Some(dot_pos) = expanded_start.checked_sub(1) else {
+            break;
+        };
+        if text.as_bytes().get(dot_pos) != Some(&b'.') {
+            break;
+        }
+        let Some(comp_start) = dot_pos.checked_sub(component.len()) else {
+            break;
+        };
+        if text.get(comp_start..dot_pos) != Some(component) {
+            break;
+        }
+        expanded_start = comp_start;
+    }
+
+    if expanded_start < ref_start {
+        let expanded_range = TextRange::new(
+            TextSize::try_from(expanded_start).unwrap(),
+            component_range.end(),
+        );
+        (expanded_range, new_module_name.to_string())
+    } else {
+        (component_range, new_last.to_string())
+    }
 }
 
 /// Infer the new module name from old/new file paths.
@@ -83,7 +143,8 @@ fn infer_new_module_name(
     old_module: &Module<'_>,
 ) -> Option<ModuleName> {
     let new_stem = new_path.file_stem()?;
-    if new_stem == "__init__" {
+    let old_stem = old_path.file_stem()?;
+    if new_stem == "__init__" || old_stem == "__init__" {
         return None;
     }
 
@@ -457,5 +518,132 @@ mod tests {
         let consumer = system_path_to_file(&db, "consumer.py").unwrap();
         let result = apply_edits(&db, &edits, consumer);
         assert_eq!(result, "import pkg.new_sub\n\nprint(pkg.new_sub.x)\n");
+    }
+
+    #[test]
+    fn rename_cross_directory() {
+        let db = create_test_db(&[
+            ("/old_package/__init__.py", ""),
+            ("/old_package/old_module.py", "x = 1\n"),
+            ("/new_package/__init__.py", ""),
+            (
+                "/consumer.py",
+                "import old_package.old_module\n\nprint(old_package.old_module.x)\n",
+            ),
+        ]);
+
+        let edits = will_rename_file(
+            &db,
+            SystemPath::new("/old_package/old_module.py"),
+            SystemPath::new("/new_package/new_module.py"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(
+            result,
+            "import new_package.new_module\n\nprint(new_package.new_module.x)\n"
+        );
+    }
+
+    #[test]
+    fn rename_cross_directory_from_import() {
+        let db = create_test_db(&[
+            ("/old_package/__init__.py", ""),
+            ("/old_package/old_module.py", "x = 1\n"),
+            ("/new_package/__init__.py", ""),
+            ("/consumer.py", "from old_package.old_module import x\n"),
+        ]);
+
+        let edits = will_rename_file(
+            &db,
+            SystemPath::new("/old_package/old_module.py"),
+            SystemPath::new("/new_package/new_module.py"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "from new_package.new_module import x\n");
+    }
+
+    #[test]
+    fn rename_cross_directory_standalone_import() {
+        let db = create_test_db(&[
+            ("/old_package/__init__.py", ""),
+            ("/old_package/old_module.py", "x = 1\n"),
+            ("/new_package/__init__.py", ""),
+            ("/consumer.py", "from old_package import old_module\n"),
+        ]);
+
+        let edits = will_rename_file(
+            &db,
+            SystemPath::new("/old_package/old_module.py"),
+            SystemPath::new("/new_package/new_module.py"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "from old_package import new_module\n");
+    }
+
+    #[test]
+    fn rename_init_file_returns_no_edits() {
+        let db = create_test_db(&[
+            ("pkg/__init__.py", "x = 1\n"),
+            ("consumer.py", "import pkg\n"),
+        ]);
+
+        let edits = will_rename_file(
+            &db,
+            SystemPath::new("pkg/__init__.py"),
+            SystemPath::new("pkg/new.py"),
+        );
+
+        assert!(edits.is_empty());
+    }
+
+    #[test]
+    fn rename_shadowed_module_not_rewritten() {
+        let db = create_test_db(&[
+            ("pkg/__init__.py", ""),
+            ("pkg/foo.py", "x = 1\n"),
+            (
+                "consumer.py",
+                "from pkg import foo\n\ndef f(pkg):\n    return pkg.foo\n",
+            ),
+        ]);
+
+        let edits = will_rename_file(
+            &db,
+            SystemPath::new("pkg/foo.py"),
+            SystemPath::new("pkg/bar.py"),
+        );
+
+        let consumer = system_path_to_file(&db, "consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        // `from pkg import foo` → `from pkg import bar`, but `pkg.foo` inside
+        // `f(pkg)` should NOT be rewritten because `pkg` is a parameter.
+        assert_eq!(
+            result,
+            "from pkg import bar\n\ndef f(pkg):\n    return pkg.foo\n"
+        );
+    }
+
+    #[test]
+    fn rename_pyi_file() {
+        let db = create_test_db(&[
+            ("old_module.pyi", "x: int\n"),
+            ("consumer.py", "import old_module\n\nprint(old_module.x)\n"),
+        ]);
+
+        let edits = will_rename_file(
+            &db,
+            SystemPath::new("old_module.pyi"),
+            SystemPath::new("new_module.pyi"),
+        );
+
+        let consumer = system_path_to_file(&db, "consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "import new_module\n\nprint(new_module.x)\n");
     }
 }

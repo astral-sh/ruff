@@ -22,7 +22,8 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeKind;
-use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::{HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -564,6 +565,17 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         };
 
+        // Verify the root expression is actually a module, not a local variable
+        // that shadows the module import (e.g. a parameter named `pkg`).
+        if let Some(root_name) = root_name_of_chain(&attr_expr.value) {
+            if !root_name
+                .inferred_type(self.model)
+                .is_some_and(|ty| matches!(ty, Type::ModuleLiteral(_)))
+            {
+                return;
+            }
+        }
+
         let component_index = chain_name.matches('.').count();
         let goto_target = GotoTarget::ImportModuleComponent {
             module_name: chain_name,
@@ -737,6 +749,16 @@ impl<'a> LocalReferencesFinder<'a> {
                     DefinitionState::Deleted | DefinitionState::Undefined
                 )
             })
+    }
+}
+
+/// Walk an expression chain to find the root `ExprName`.
+/// E.g. for `a.b.c`, returns `ExprName("a")`.
+fn root_name_of_chain(expr: &ast::Expr) -> Option<&ast::ExprName> {
+    match expr {
+        ast::Expr::Name(name) => Some(name),
+        ast::Expr::Attribute(attr) => root_name_of_chain(&attr.value),
+        _ => None,
     }
 }
 

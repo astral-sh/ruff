@@ -1792,7 +1792,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        // TODO(submodule-imports): this should also light up the assignment `x = subpkg`
         assert_snapshot!(test.references(), @r"
         info[references]: Found 1 references
          --> mypackage/__init__.py:2:7
@@ -1847,7 +1847,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        // No references is actually correct (or it should only see itself)
+        // Correctly sees only itself (the `submod` component in the import path)
         assert_snapshot!(test.references(), @r"
         info[references]: Found 1 references
          --> mypackage/__init__.py:2:14
