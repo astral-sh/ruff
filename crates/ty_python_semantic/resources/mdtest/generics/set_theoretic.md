@@ -130,8 +130,8 @@ top-materializations, we replace covariant/contravariant uses of dynamic types w
 `object`/`Never`. In bottom-materializations, we do the opposite. Therefore, we get:
 
 ```ignore
-    Co[Any] = Co[Never]      | Co[object]    & Any    (3)
-Contra[Any] = Contra[object] | Contra[Never] & Any    (4)
+    Co[Any] = Co[Never]      | Co[object]    & Any    (3a)
+Contra[Any] = Contra[object] | Contra[Never] & Any    (3b)
 ```
 
 These representations lead to interesting simplifications in unions and intersections. For example,
