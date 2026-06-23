@@ -188,7 +188,7 @@ def test_match_star(x: Sequence[int] | int) -> None:
             # TODO: After https://github.com/astral-sh/ty/issues/3314 is
             # fixed, the `Sequence[int] & str` intersection should simplify to
             # `Never`.
-            reveal_type(x)  # revealed: (int & ~Sequence[object]) | (Sequence[int] & str) | bytes | bytearray
+            reveal_type(x)  # revealed: (Sequence[int] & str) | bytes | bytearray | (int & ~Sequence[object])
 
 def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
     match x:
@@ -224,49 +224,49 @@ def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int])
 def test_match_exact_object_sequence(value: object) -> None:
     match value:
         case int(), str():
-            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: Literal[2]
-            reveal_type(value[0])  # revealed: int
-            reveal_type(value[1])  # revealed: str
+            reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: object
+            reveal_type(value[1])  # revealed: object
 
 def test_match_empty_object_sequence(value: object) -> None:
     match value:
         case []:
-            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: Literal[0]
+            reveal_type(len(value))  # revealed: int
 
 def test_match_singleton_object_sequence(value: object) -> None:
     match value:
         case [int()]:
-            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: Literal[1]
-            reveal_type(value[0])  # revealed: int
+            reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: object
 
 def test_match_prefix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest]:
-            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
             reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: int
+            reveal_type(value[0])  # revealed: object
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest, str()]:
-            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(value[0])  # revealed: int
-            reveal_type(value[-1])  # revealed: str
+            reveal_type(value[0])  # revealed: object
+            reveal_type(value[-1])  # revealed: object
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
     match value:
         case [int(), *rest]:
-            reveal_type(value[0])  # revealed: int
+            reveal_type(value[0])  # revealed: int | str
             reveal_type(value[1])  # revealed: int | str
             reveal_type(rest)  # revealed: list[int | str]
 ```
@@ -641,6 +641,17 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
             whole.reverse()
             reveal_type(whole[0])  # revealed: int | str
 
+def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
+    value: list[int],
+) -> None:
+    match value:
+        case []:
+            pass
+        case whole:
+            whole.clear()
+            match whole:
+                case []:
+                    reveal_type(whole)  # revealed: list[int]
 ```
 
 ## Indirect class patterns
@@ -774,20 +785,19 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
         case [int()]:
             pass
         case _:
-            # revealed: list[int] & ~<Protocol with members '__getitem__', '__len__'>
-            reveal_type(value)
+            reveal_type(value)  # revealed: list[int]
 ```
 
 ## Nested sequence patterns
 
-Nested patterns narrow the fixed positions they inspect. The narrowed element types remain available
-through later indexing and destructuring.
+Nested patterns narrow values captured from the positions they inspect. For subjects without a known
+tuple shape, length and indexed-element facts are not retained on the original subject.
 
 ```py
 def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
     match value:
-        case [None, [int()], {}]:
-            ret = value[0], value[1][0], len(value[2])
+        case [None as first, [int() as number], {} as mapping]:
+            ret = first, number, len(mapping)
             reveal_type(ret)  # revealed: tuple[None, int, int]
             return ret
     return None
@@ -795,8 +805,8 @@ def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
 def unwrap_number_or_label(value: object) -> int | str | None:
     match value:
         case [(int() | str()) as item]:
-            reveal_type(value[0])  # revealed: int | str
-            return value[0]
+            reveal_type(item)  # revealed: int | str
+            return item
     return None
 ```
 
@@ -984,6 +994,15 @@ def match_capture_shadows_subject() -> None:
     match x:
         case [x]:
             reveal_type(x)  # revealed: Literal[1]
+
+def later_case_uses_saved_subject_after_guarded_capture(flag: bool) -> None:
+    x = (1,)
+    match x:
+        case [x] if flag:
+            pass
+        case [1]:
+            reveal_type(x)  # revealed: Literal[1]
+            x + "bad"  # error: [unsupported-operator]
 
 def match_tuple_expression_guard_rebinding(
     a: TupleSubjectA,

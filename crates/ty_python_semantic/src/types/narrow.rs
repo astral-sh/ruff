@@ -15,8 +15,8 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    UnionBuilder, callable_pattern_type, exact_sequence_pattern_type, has_known_tuple_shape,
+    infer_expression_types, mapping_pattern_type, pattern_binding_fallthrough_type,
     pattern_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type,
 };
@@ -326,7 +326,8 @@ struct PatternSuccessResult<'db> {
     /// The subject type safe to assign to a binding created by this pattern.
     ///
     /// Exact tuples can retain matched length and element facts. Other sequence types can have
-    /// mutable or stateful length and item access, so their bindings retain only durable facts.
+    /// mutable or stateful length and item access, so their bindings retain only facts that remain
+    /// valid after the pattern finishes.
     binding_subject_ty: Type<'db>,
     bindings: BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
 }
@@ -1104,6 +1105,19 @@ fn necessary_sequence_pattern_type<'db>(
     }
 }
 
+fn sequence_pattern_narrowing_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    let resolved = subject_ty.resolve_type_alias(db);
+    if has_known_tuple_shape(db, resolved) {
+        necessary_sequence_pattern_type(db, kind)
+    } else {
+        sequence_pattern_type_builder(db).build()
+    }
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -1653,8 +1667,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
-        let sequence_ty = necessary_sequence_pattern_type(self.db, kind);
         self.analyze_pattern_subject_arms(subject_ty, |analyzer, subject_ty| {
+            let sequence_ty = sequence_pattern_narrowing_type(analyzer.db, kind, subject_ty);
             let (narrowed_subject_ty, element_types) =
                 analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
             let mut bindings = BTreeMap::new();
@@ -2045,6 +2059,32 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             _ => None,
         }
+    }
+
+    /// Narrow a successful sequence-pattern subject without retaining observed length or indexed
+    /// element types for mutable or stateful sequences.
+    fn narrow_type_by_sequence_pattern(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        kind: &SequencePatternPredicateKind<'db>,
+    ) -> Type<'db> {
+        let resolved = ty.resolve_type_alias(db);
+        let narrowed = match resolved {
+            Type::Union(union) => union.map(db, |element| {
+                Self::narrow_type_by_sequence_pattern(db, *element, kind)
+            }),
+            Type::Intersection(intersection) if !intersection.positive(db).is_empty() => {
+                intersection.map_positive(db, |element| {
+                    Self::narrow_type_by_sequence_pattern(db, *element, kind)
+                })
+            }
+            _ => IntersectionBuilder::new(db)
+                .add_positive(resolved)
+                .add_positive(sequence_pattern_narrowing_type(db, kind, resolved))
+                .build(),
+        };
+
+        if narrowed == resolved { ty } else { narrowed }
     }
 
     /// Filter a type based on an equality or inequality comparison against an exact length.
@@ -3008,24 +3048,29 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             );
         }
 
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
         let Some(subject) = PlaceExpr::try_from_expr(subject_node) else {
             return PatternNarrowingResult::Possible(None);
         };
 
-        let constraint = if is_positive {
-            NarrowingConstraint::intersection(necessary_sequence_pattern_type(self.db, kind))
+        let narrowed_ty = if is_positive {
+            Self::narrow_type_by_sequence_pattern(self.db, subject_ty, kind)
         } else {
-            let sequence_type = definite_sequence_pattern_type(self.db, kind);
-            if sequence_type.is_never() {
-                return PatternNarrowingResult::Possible(None);
-            }
-            NarrowingConstraint::intersection(sequence_type.negate(self.db))
+            pattern_binding_fallthrough_type(
+                self.db,
+                &PatternPredicateKind::Sequence(kind.clone()),
+                subject_ty,
+            )
         };
+        if narrowed_ty == subject_ty {
+            return PatternNarrowingResult::Possible(None);
+        }
 
         let place = self.expect_place(&subject);
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
-            place, constraint,
+            place,
+            NarrowingConstraint::replacement(narrowed_ty),
         )])))
     }
 

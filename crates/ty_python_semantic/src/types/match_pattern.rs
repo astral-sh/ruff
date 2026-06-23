@@ -44,6 +44,16 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Bytearray.to_instance(db))
 }
 
+pub(crate) fn has_known_tuple_shape(db: &dyn Db, ty: Type<'_>) -> bool {
+    let resolved = ty.resolve_type_alias(db);
+    match resolved {
+        Type::Intersection(intersection) => intersection
+            .iter_positive(db)
+            .any(|positive| has_known_tuple_shape(db, positive)),
+        _ => resolved.exact_tuple_instance_spec(db).is_some(),
+    }
+}
+
 fn sequence_pattern_getitem_method<'db>(
     db: &'db dyn Db,
     indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
@@ -359,6 +369,72 @@ pub(crate) fn pattern_fallthrough_type<'db>(
             db, kind, subject_ty,
         ))
         .build()
+}
+
+/// Return the fallthrough type for a binding that can reach a later match case.
+///
+/// Failure of a sequence pattern establishes length and indexed-element facts at the instant of
+/// matching, but those facts can become stale for mutable or stateful sequences. Exact tuples are
+/// immutable, so they retain normal sequence-pattern fallthrough narrowing.
+pub(crate) fn pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    match kind {
+        PatternPredicateKind::Sequence(sequence) => {
+            sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty)
+        }
+        PatternPredicateKind::Or(patterns) => {
+            patterns.iter().fold(subject_ty, |remaining, pattern| {
+                pattern_binding_fallthrough_type(db, pattern, remaining)
+            })
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            pattern_binding_fallthrough_type(db, pattern, subject_ty)
+        }
+        _ => pattern_fallthrough_type(db, kind, subject_ty),
+    }
+}
+
+fn sequence_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    let resolved = subject_ty.resolve_type_alias(db);
+    let narrowed = match resolved {
+        Type::Union(union) => union.map(db, |element| {
+            sequence_pattern_binding_fallthrough_type(db, kind, *element)
+        }),
+        Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+            sequence_pattern_binding_fallthrough_type(db, kind, *element)
+        }),
+        Type::TypeVar(typevar)
+            if typevar.typevar(db).upper_bound(db).is_some_and(|bound| {
+                pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), bound)
+                    .is_never()
+            }) =>
+        {
+            Type::Never
+        }
+        _ if has_known_tuple_shape(db, resolved) => {
+            pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), resolved)
+        }
+        // An irrefutable sequence pattern can only fail if the subject is not eligible for sequence
+        // matching. Unlike length and indexed-element facts, eligibility is unaffected by mutation.
+        _ if kind.is_irrefutable() => IntersectionBuilder::new(db)
+            .add_positive(resolved)
+            .add_negative(sequence_pattern_type_builder(db).build())
+            .build(),
+        _ => resolved,
+    };
+
+    if narrowed == resolved {
+        subject_ty
+    } else {
+        narrowed
+    }
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`, including

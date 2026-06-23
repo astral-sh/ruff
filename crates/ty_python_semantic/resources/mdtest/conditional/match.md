@@ -66,10 +66,8 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
         case [_first, _second, *_paths]:
             raise ValueError
 
-    # Exact sequence alternatives and the definitely matched tuple subset of the
-    # starred alternative remain as negative constraints.
-    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'> & ~tuple[object, object, *tuple[object, ...]]) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
-    reveal_type(paths)
+    # The failed length checks are not retained for a sequence whose length can change.
+    reveal_type(paths)  # revealed: Sequence[str]
 
 def normalize_version(
     version: str | tuple[int, int] | tuple[int, int, int],
@@ -547,7 +545,7 @@ the subject after that pattern succeeds.
 Value patterns use `==`, and `as` binds the original subject rather than the value written in the
 pattern. An `int` or `str` subclass can define `__eq__` so that it compares equal to `1`, so `x`
 remains `int | str` in the first branch. If that branch fails, we can rule out the exact integer
-literal `1`, but not the rest of either class.
+literal `1` and `True`, which compares equal to `1`, but not the rest of either class.
 
 ```py
 def _(target: int | str):
@@ -559,7 +557,7 @@ def _(target: int | str):
             reveal_type(x)  # revealed: int | str
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: (int & ~Literal[1]) | str
+            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
         case _:
             y = 4
 
