@@ -1218,6 +1218,15 @@ impl<'db> Type<'db> {
         .recursive_type_normalized(db, cycle)
     }
 
+    /// Returns the nominal representation of a nominal or class-backed protocol instance.
+    fn as_cycle_recovery_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
+        match self {
+            Type::NominalInstance(instance) => Some(instance),
+            Type::ProtocolInstance(protocol) => protocol.to_nominal_instance(),
+            _ => None,
+        }
+    }
+
     /// Normalizes nominal growth that wraps the previous cycle result in one or more
     /// specializations, either directly or beneath an unambiguous union or intersection wrapper.
     ///
@@ -1241,7 +1250,7 @@ impl<'db> Type<'db> {
             let mut replacements = 0;
             let normalized = current.map_positive(db, |element| {
                 element
-                    .as_nominal_instance()
+                    .as_cycle_recovery_nominal_instance()
                     .and_then(|instance| {
                         Self::nominal_wrapper_normalized(
                             db,
@@ -1322,21 +1331,8 @@ impl<'db> Type<'db> {
             }));
         }
 
-        let (current, previous_instance) = match (self, previous) {
-            (Type::NominalInstance(current), Type::NominalInstance(previous)) => {
-                (current, previous)
-            }
-            (Type::ProtocolInstance(current), Type::ProtocolInstance(previous)) => {
-                // A class-backed protocol shares a nominal specialization with its runtime class.
-                // `nominal_wrapper_normalized` reconstructs the result through `Type::instance`,
-                // which recognizes the protocol class and restores a protocol instance.
-                (
-                    current.to_nominal_instance()?,
-                    previous.to_nominal_instance()?,
-                )
-            }
-            _ => return None,
-        };
+        let current = self.as_cycle_recovery_nominal_instance()?;
+        let previous_instance = previous.as_cycle_recovery_nominal_instance()?;
 
         if current.class(db).class_literal(db) != previous_instance.class_literal(db) {
             return None;

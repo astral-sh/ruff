@@ -528,6 +528,9 @@ class Stable: ...
 class P(Protocol):
     value: int
 
+class GenericProtocol[T](Protocol):
+    value: T
+
 y: Container[TypeOf[y]]
 y = 1  # error: [invalid-assignment]
 reveal_type(y)  # revealed: Container[Divergent]
@@ -535,6 +538,10 @@ reveal_type(y)  # revealed: Container[Divergent]
 single: Intersection[Container[TypeOf[single]], Stable]
 single = 1  # error: [invalid-assignment]
 reveal_type(single)  # revealed: Container[Divergent] & Stable
+
+protocol_single: Intersection[GenericProtocol[TypeOf[protocol_single]], Stable]
+protocol_single = 1  # error: [invalid-assignment]
+reveal_type(protocol_single)  # revealed: GenericProtocol[Divergent] & Stable
 
 intersection: Intersection[
     list[TypeOf[intersection]],

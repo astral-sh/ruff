@@ -134,6 +134,24 @@ fn protocol_cycle_recovery_widens_unrelated_specializations() {
 }
 
 #[test]
+fn recursive_nominal_growth_normalizes_protocol_intersection_arm() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let previous = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
+    let protocol = KnownClass::Iterable.to_specialized_instance(&db, &[previous]);
+    let current = IntersectionType::from_two_elements(&db, protocol, Type::unknown());
+    let normalized_protocol = KnownClass::Iterable.to_specialized_instance(&db, &[div]);
+    let expected = IntersectionType::from_two_elements(&db, normalized_protocol, Type::unknown());
+
+    assert_eq!(
+        current.recursive_nominal_growth_normalized(&db, previous, div),
+        Some(expected)
+    );
+}
+
+#[test]
 fn recursive_nominal_growth_preserves_unrelated_intersections() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
