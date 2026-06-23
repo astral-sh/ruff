@@ -113,6 +113,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<ProjectionResult<'db>> {
+        if !self.needs_projection_operation(db, true) {
+            return None;
+        }
+
         let subscript = ProjectionSubscript::from_type(db, slice_ty)?;
         let op = ProjectionOp::Subscript(subscript);
         self.try_projection_with_non_cycle_result(db, op, |ty| {
@@ -132,6 +136,10 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Option<Result<Self, SubscriptError<'db>>> {
+        if !self.needs_projection_operation(db, true) {
+            return None;
+        }
+
         if !matches!(
             ProjectionSubscript::from_type(db, slice_ty)?,
             ProjectionSubscript::KeyType(_)
@@ -154,6 +162,10 @@ impl<'db> Type<'db> {
         name: &Name,
         policy: MemberLookupPolicy,
     ) -> Option<ProjectionResult<'db>> {
+        if !self.needs_projection_operation(db, true) {
+            return None;
+        }
+
         let op = ProjectionOp::Member(ProjectionMember::new(db, name, policy));
         self.try_projection_with_non_cycle_result(db, op, |ty| {
             ProjectionContainer::infer_member_type_for_type(db, ty, name, policy)
@@ -167,6 +179,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         method_name: &Name,
     ) -> Option<ProjectionResult<'db>> {
+        if !self.needs_projection_operation(db, true) {
+            return None;
+        }
+
         let op = ProjectionOp::CallMethod0(ProjectionMemberName::new(db, method_name));
         self.try_projection_with_non_cycle_result(db, op, |ty| {
             ProjectionContainer::infer_method_call0_type_for_type(db, ty, method_name)

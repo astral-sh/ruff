@@ -57,6 +57,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns whether applying a projection operation can observe a cycle artifact.
+    fn needs_projection_operation(self, db: &'db dyn Db, include_nested_divergent: bool) -> bool {
+        if self.has_top_level_cycle_artifact(db) || !self.projection_artifact_roots(db).is_empty() {
+            return true;
+        }
+
+        include_nested_divergent && !self.cycle_artifact_roots(db).is_empty()
+    }
+
     /// Returns `true` if both types originate from the same cycle root, regardless
     /// of whether either occurrence is a direct marker or a projection of it.
     pub(crate) fn same_divergent_marker(self, db: &'db dyn Db, other: Type<'db>) -> bool {
