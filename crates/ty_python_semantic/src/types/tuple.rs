@@ -993,17 +993,18 @@ struct FixedSlice {
 
 /// A fixed-length slice in the result of slicing a variable-length tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FixedPositionSlice {
-    FrontForward {
-        start: usize,
-        exclusive_stop: usize,
-        step: NonZeroUsize,
-    },
-    Back {
-        start: usize,
-        exclusive_stop: usize,
-        step: NonZeroUsize,
-    },
+struct FixedPositionSlice {
+    origin: FixedPositionOrigin,
+    start: usize,
+    exclusive_stop: usize,
+    step: NonZeroUsize,
+}
+
+/// Whether a fixed-position slice is indexed from the front or the back of the tuple.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FixedPositionOrigin {
+    Front,
+    Back,
 }
 
 /// The elements folded into the variable part of a sliced variable-length tuple.
@@ -1061,16 +1062,18 @@ impl FixedSlice {
 }
 
 impl FixedPositionSlice {
-    fn front_forward(start: usize, stop: usize, step: NonZeroUsize) -> Self {
-        Self::FrontForward {
+    fn from_front(start: usize, stop: usize, step: NonZeroUsize) -> Self {
+        Self {
+            origin: FixedPositionOrigin::Front,
             start,
             exclusive_stop: stop,
             step,
         }
     }
 
-    fn back(start: usize, stop: usize, step: NonZeroUsize) -> Self {
-        Self::Back {
+    fn from_back(start: usize, stop: usize, step: NonZeroUsize) -> Self {
+        Self {
+            origin: FixedPositionOrigin::Back,
             start,
             exclusive_stop: stop,
             step,
@@ -1207,17 +1210,19 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     where
         'db: 'a,
     {
-        match slice {
-            FixedPositionSlice::FrontForward {
-                start,
-                exclusive_stop,
-                step,
-            } => Either::Left(self.slice_front_forward(db, start, exclusive_stop, step)),
-            FixedPositionSlice::Back {
-                start,
-                exclusive_stop,
-                step,
-            } => Either::Right(self.slice_back(db, start, exclusive_stop, step)),
+        let FixedPositionSlice {
+            origin,
+            start,
+            exclusive_stop,
+            step,
+        } = slice;
+        match origin {
+            FixedPositionOrigin::Front => {
+                Either::Left(self.slice_front_forward(db, start, exclusive_stop, step))
+            }
+            FixedPositionOrigin::Back => {
+                Either::Right(self.slice_back(db, start, exclusive_stop, step))
+            }
         }
     }
 
@@ -1360,7 +1365,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 .is_some_and(|last| last < minimum_len)
             {
                 return Some(VariableTupleSlicePlan::Fixed(
-                    FixedPositionSlice::front_forward(start, stop, step),
+                    FixedPositionSlice::from_front(start, stop, step),
                 ));
             }
         }
@@ -1388,11 +1393,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             }
 
             if start_distance <= minimum_len {
-                return Some(VariableTupleSlicePlan::Fixed(FixedPositionSlice::back(
-                    start_distance,
-                    stop_distance,
-                    step,
-                )));
+                return Some(VariableTupleSlicePlan::Fixed(
+                    FixedPositionSlice::from_back(start_distance, stop_distance, step),
+                ));
             }
         }
 
