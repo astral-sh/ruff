@@ -2,7 +2,7 @@ use ty_module_resolver::KnownModule;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
-use super::{IntersectionType, KnownClass, Type, TypeQualifiers};
+use super::{IntersectionType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers};
 use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
 
@@ -140,6 +140,7 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::AlwaysFalsy
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
+        | Type::TypeForm(_)
         | Type::TypedDict(_)
         | Type::NewTypeInstance(_) => AttributeWriteRequirement::Instance(object_ty),
 
@@ -268,8 +269,9 @@ fn explicit_attribute_write_requirement<'db>(
     attr_ty: Type<'db>,
     qualifiers: TypeQualifiers,
 ) -> ExplicitAttributeWriteRequirement<'db> {
-    if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) =
-        attr_ty.class_member(db, "__set__".into()).place
+    if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
+        .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
     {
         ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty: attr_ty,
@@ -424,11 +426,12 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => object_ty
-                .find_name_in_mro(db, attribute)
-                .expect("called on Type::ClassLiteral, Type::GenericAlias, or Type::SubclassOf"),
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
+            }
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)
