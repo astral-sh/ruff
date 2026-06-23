@@ -1160,6 +1160,7 @@ PLC2801 Unnecessary dunder call to `__length_hint__`. Use `operator.length_hint(
 140 | Foo().__length_hint__()  # PLC2801
     | ^^^^^^^^^^^^^^^^^^^^^^^
 141 | Foo().__matmul__(Foo())  # PLC2801
+142 | foo.__rmatmul__(a)  # PLC2801
     |
 help: Use `operator.length_hint()` function
 
@@ -1170,11 +1171,48 @@ PLC2801 [*] Unnecessary dunder call to `__matmul__`. Use `@` operator.
 140 | Foo().__length_hint__()  # PLC2801
 141 | Foo().__matmul__(Foo())  # PLC2801
     | ^^^^^^^^^^^^^^^^^^^^^^^
+142 | foo.__rmatmul__(a)  # PLC2801
+143 | foo.__imatmul__(foo)  # PLC2801
     |
 help: Use `@` operator
     |
 140 | Foo().__length_hint__()  # PLC2801
     - Foo().__matmul__(Foo())  # PLC2801
 141 + Foo() @ Foo()  # PLC2801
+142 | foo.__rmatmul__(a)  # PLC2801
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PLC2801 [*] Unnecessary dunder call to `__rmatmul__`. Use `@` operator.
+   --> unnecessary_dunder_call.py:142:1
+    |
+140 | Foo().__length_hint__()  # PLC2801
+141 | Foo().__matmul__(Foo())  # PLC2801
+142 | foo.__rmatmul__(a)  # PLC2801
+    | ^^^^^^^^^^^^^^^^^^
+143 | foo.__imatmul__(foo)  # PLC2801
+    |
+help: Use `@` operator
+    |
+141 | Foo().__matmul__(Foo())  # PLC2801
+    - foo.__rmatmul__(a)  # PLC2801
+142 + a @ foo  # PLC2801
+143 | foo.__imatmul__(foo)  # PLC2801
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PLC2801 [*] Unnecessary dunder call to `__imatmul__`. Use `@=` operator.
+   --> unnecessary_dunder_call.py:143:1
+    |
+141 | Foo().__matmul__(Foo())  # PLC2801
+142 | foo.__rmatmul__(a)  # PLC2801
+143 | foo.__imatmul__(foo)  # PLC2801
+    | ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use `@=` operator
+    |
+142 | foo.__rmatmul__(a)  # PLC2801
+    - foo.__imatmul__(foo)  # PLC2801
+143 + foo @= foo  # PLC2801
     |
 note: This is an unsafe fix and may change runtime behavior

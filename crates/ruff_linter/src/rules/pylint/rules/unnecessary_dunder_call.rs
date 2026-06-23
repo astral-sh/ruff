@@ -352,6 +352,11 @@ impl DunderReplacement {
                 "Use `<<=` operator",
                 OperatorPrecedence::Assign,
             )),
+            "__imatmul__" => Some(Self::Operator(
+                "@=",
+                "Use `@=` operator",
+                OperatorPrecedence::Assign,
+            )),
             "__imod__" => Some(Self::Operator(
                 "%=",
                 "Use `%=` operator",
@@ -472,6 +477,11 @@ impl DunderReplacement {
                 "<<",
                 "Use `<<` operator",
                 OperatorPrecedence::LeftRightShift,
+            )),
+            "__rmatmul__" => Some(Self::ROperator(
+                "@",
+                "Use `@` operator",
+                OperatorPrecedence::MulDivRemain,
             )),
             "__rmod__" => Some(Self::ROperator(
                 "%",

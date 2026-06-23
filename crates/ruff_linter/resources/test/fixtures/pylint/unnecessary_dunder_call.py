@@ -139,3 +139,5 @@ print((3.0).__ceil__())  # PLC2801
 print((3.0).__trunc__())  # PLC2801
 Foo().__length_hint__()  # PLC2801
 Foo().__matmul__(Foo())  # PLC2801
+foo.__rmatmul__(a)  # PLC2801
+foo.__imatmul__(foo)  # PLC2801
