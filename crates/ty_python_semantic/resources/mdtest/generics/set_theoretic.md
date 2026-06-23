@@ -248,8 +248,7 @@ supertypes of `Invariant[P]`, like `Invariant[P] | Invariant[Q]`, which are poss
 materializations of the gradual type `Invariant[P] | Invariant[Any]`. So we encode two findings:
 
 ```pyi
-# TODO: this should pass
-static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 ```
