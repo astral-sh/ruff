@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::ops::Range;
 
-use ruff_annotate_snippets::renderer::DEFAULT_TERM_WIDTH;
+use ruff_annotate_snippets::renderer::{AnsiColor, DEFAULT_TERM_WIDTH, Effects, Style};
 use ruff_annotate_snippets::{Annotation, Level, Message, Renderer, Snippet};
 
 #[derive(Deserialize)]
@@ -119,7 +119,13 @@ impl From<RendererDef> for Renderer {
         } = val;
 
         let renderer = if color {
+            // Keep fixture output identical across platforms without enabling the crate's own
+            // `testing-colors` feature through a self dev-dependency.
             Renderer::styled()
+                .warning(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
+                .info(AnsiColor::BrightBlue.on_default().effects(Effects::BOLD))
+                .line_no(AnsiColor::BrightBlue.on_default().effects(Effects::BOLD))
+                .emphasis(Style::new().effects(Effects::BOLD))
         } else {
             Renderer::plain()
         };
