@@ -2337,6 +2337,24 @@ class CustomIteration(IterationBase):
 reveal_type(tuple(CustomIteration.A))  # revealed: tuple[CustomIteration, ...]
 ```
 
+## Flag `auto()` before Python 3.11
+
+Before Python 3.11, `Flag._generate_next_value_` uses the most recently assigned value rather than
+the largest value assigned so far.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Flag, auto
+
+LegacyOrder = Flag("LegacyOrder", {"HIGH": 8, "LOW": 1, "NEXT": auto()})
+
+reveal_type(LegacyOrder.NEXT.value)  # revealed: Literal[2]
+```
+
 ## Function syntax
 
 ### String names (positional)

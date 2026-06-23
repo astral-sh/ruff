@@ -323,10 +323,11 @@ enum FlagConstruction {
     Unknown,
 }
 
-/// Running maximum used by the standard `Flag._generate_next_value_` implementation.
+/// Values used by the standard `Flag._generate_next_value_` implementation.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FlagAutoValueState {
     maximum: Option<i64>,
+    last: Option<i64>,
     all_values_are_known: bool,
     has_values: bool,
 }
@@ -335,6 +336,7 @@ impl FlagAutoValueState {
     pub(crate) const fn new() -> Self {
         Self {
             maximum: None,
+            last: None,
             all_values_are_known: true,
             has_values: false,
         }
@@ -344,7 +346,9 @@ impl FlagAutoValueState {
         self.has_values = true;
         if let Some(value) = value.as_int_like_literal() {
             self.maximum = Some(self.maximum.map_or(value, |maximum| maximum.max(value)));
+            self.last = Some(value);
         } else {
+            self.last = None;
             self.all_values_are_known = false;
         }
     }
@@ -353,10 +357,15 @@ impl FlagAutoValueState {
         if !self.has_values {
             return Type::int_literal(1);
         }
-        let Some(maximum) = self.maximum.filter(|_| self.all_values_are_known) else {
+        let value = if Program::get(db).python_version(db) < PythonVersion::PY311 {
+            self.last
+        } else {
+            self.maximum.filter(|_| self.all_values_are_known)
+        };
+        let Some(value) = value else {
             return KnownClass::Int.to_instance(db);
         };
-        let bit_length = i64::BITS - maximum.unsigned_abs().leading_zeros();
+        let bit_length = i64::BITS - value.unsigned_abs().leading_zeros();
         1_u64
             .checked_shl(bit_length)
             .and_then(|value| i64::try_from(value).ok())
