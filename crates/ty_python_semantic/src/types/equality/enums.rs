@@ -6,9 +6,9 @@ use ty_python_core::Truthiness;
 
 use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
-    LiteralValueTypeKind, Type, UnionBuilder,
+    LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 
 use super::{ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics};
 
@@ -185,10 +185,10 @@ struct EnumValueSet<'db> {
 enum EnumValueSetMembers<'db> {
     /// The entire enum domain, including undeclared runtime values when the enum is open.
     All,
-    /// One canonical member name after resolving aliases.
-    One(&'db Name),
-    /// An exact set of canonical member names.
-    Included(FxOrderSet<&'db Name>),
+    /// One canonical member name after resolving aliases, and whether its literal is promotable.
+    One { name: &'db Name, promotable: bool },
+    /// An exact set of canonical member names and their literal promotability.
+    Included(FxOrderMap<&'db Name, bool>),
     /// The enum domain except for the declared members excluded by an enum complement.
     AllExcept(EnumComplementType<'db>),
 }
@@ -201,14 +201,17 @@ impl<'db> EnumValueSet<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         let value_set = match ty.resolve_type_alias(db) {
             Type::LiteralValue(literal) => {
-                let LiteralValueTypeKind::Enum(literal) = literal.kind() else {
+                let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
                     return None;
                 };
-                let enum_class = literal.enum_class_literal(db);
-                let name = enum_class.resolve_member(db, literal.name(db))?;
+                let enum_class = enum_literal.enum_class_literal(db);
+                let name = enum_class.resolve_member(db, enum_literal.name(db))?;
                 Self {
                     enum_class,
-                    members: EnumValueSetMembers::One(name),
+                    members: EnumValueSetMembers::One {
+                        name,
+                        promotable: literal.is_promotable(),
+                    },
                 }
             }
             Type::NominalInstance(instance) => Self {
@@ -231,7 +234,7 @@ impl<'db> EnumValueSet<'db> {
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
     fn from_union(db: &'db dyn Db, elements: &[Type<'db>]) -> Option<Self> {
         let mut enum_class = None;
-        let mut included = FxOrderSet::default();
+        let mut included = FxOrderMap::default();
         for element in elements {
             let value_set = Self::from_type(db, *element)?;
             if let Some(enum_class) = enum_class
@@ -241,17 +244,22 @@ impl<'db> EnumValueSet<'db> {
             }
             enum_class = Some(value_set.enum_class);
             match value_set.members {
-                EnumValueSetMembers::One(name) => {
-                    included.insert(name);
+                EnumValueSetMembers::One { name, promotable } => {
+                    Self::insert_member(&mut included, name, promotable);
                 }
-                EnumValueSetMembers::Included(names) => included.extend(names),
+                EnumValueSetMembers::Included(members) => {
+                    for (name, promotable) in members {
+                        Self::insert_member(&mut included, name, promotable);
+                    }
+                }
                 EnumValueSetMembers::All | EnumValueSetMembers::AllExcept(_) => return None,
             }
         }
 
         let enum_class = enum_class?;
         let members = if included.len() == 1 {
-            EnumValueSetMembers::One(included.into_iter().next()?)
+            let (name, promotable) = included.into_iter().next()?;
+            EnumValueSetMembers::One { name, promotable }
         } else {
             EnumValueSetMembers::Included(included)
         };
@@ -259,6 +267,22 @@ impl<'db> EnumValueSet<'db> {
             enum_class,
             members,
         })
+    }
+
+    /// Insert a member, preserving unpromotable literal provenance if either occurrence has it.
+    fn insert_member(
+        included: &mut FxOrderMap<&'db Name, bool>,
+        name: &'db Name,
+        promotable: bool,
+    ) {
+        match included.entry(name) {
+            ordermap::map::Entry::Vacant(entry) => {
+                entry.insert(promotable);
+            }
+            ordermap::map::Entry::Occupied(mut entry) => {
+                *entry.get_mut() &= promotable;
+            }
+        }
     }
 
     /// Extract the enum restriction while discarding unrelated positive intersection state.
@@ -282,7 +306,7 @@ impl<'db> EnumValueSet<'db> {
     fn member_count(&self, db: &'db dyn Db) -> usize {
         match &self.members {
             EnumValueSetMembers::All => self.enum_class.member_count(db),
-            EnumValueSetMembers::One(_) => 1,
+            EnumValueSetMembers::One { .. } => 1,
             EnumValueSetMembers::Included(names) => names.len(),
             EnumValueSetMembers::AllExcept(complement) => {
                 self.enum_class.member_count(db) - complement.excluded_names(db).len()
@@ -298,7 +322,7 @@ impl<'db> EnumValueSet<'db> {
         members_are_exhaustive
             || matches!(
                 self.members,
-                EnumValueSetMembers::One(_) | EnumValueSetMembers::Included(_)
+                EnumValueSetMembers::One { .. } | EnumValueSetMembers::Included(_)
             )
     }
 
@@ -310,10 +334,13 @@ impl<'db> EnumValueSet<'db> {
         debug_assert_eq!(self.enum_class, other.enum_class);
         match (&self.members, &other.members) {
             (EnumValueSetMembers::All, _) | (_, EnumValueSetMembers::All) => true,
-            (EnumValueSetMembers::One(left), EnumValueSetMembers::One(right)) => left == right,
-            (EnumValueSetMembers::One(name), EnumValueSetMembers::Included(names))
-            | (EnumValueSetMembers::Included(names), EnumValueSetMembers::One(name)) => {
-                names.contains(name)
+            (
+                EnumValueSetMembers::One { name: left, .. },
+                EnumValueSetMembers::One { name: right, .. },
+            ) => left == right,
+            (EnumValueSetMembers::One { name, .. }, EnumValueSetMembers::Included(names))
+            | (EnumValueSetMembers::Included(names), EnumValueSetMembers::One { name, .. }) => {
+                names.contains_key(name)
             }
             (EnumValueSetMembers::Included(left), EnumValueSetMembers::Included(right)) => {
                 let (smaller, larger) = if left.len() < right.len() {
@@ -321,16 +348,16 @@ impl<'db> EnumValueSet<'db> {
                 } else {
                     (right, left)
                 };
-                smaller.iter().any(|name| larger.contains(name))
+                smaller.keys().any(|name| larger.contains_key(name))
             }
-            (EnumValueSetMembers::One(name), EnumValueSetMembers::AllExcept(complement))
-            | (EnumValueSetMembers::AllExcept(complement), EnumValueSetMembers::One(name)) => {
+            (EnumValueSetMembers::One { name, .. }, EnumValueSetMembers::AllExcept(complement))
+            | (EnumValueSetMembers::AllExcept(complement), EnumValueSetMembers::One { name, .. }) => {
                 !complement.excluded_names(db).contains(*name)
             }
             (EnumValueSetMembers::Included(names), EnumValueSetMembers::AllExcept(complement))
             | (EnumValueSetMembers::AllExcept(complement), EnumValueSetMembers::Included(names)) => {
                 names
-                    .iter()
+                    .keys()
                     .any(|name| !complement.excluded_names(db).contains(*name))
             }
             (EnumValueSetMembers::AllExcept(left), EnumValueSetMembers::AllExcept(right)) => {
@@ -350,17 +377,13 @@ impl<'db> EnumValueSet<'db> {
                 .enum_class
                 .class_literal(db)
                 .to_non_generic_instance(db),
-            EnumValueSetMembers::One(name) => {
-                Type::enum_literal(EnumLiteralType::new(db, self.enum_class, (*name).clone()))
+            EnumValueSetMembers::One { name, promotable } => {
+                self.member_type(db, name, *promotable)
             }
-            EnumValueSetMembers::Included(names) => names
+            EnumValueSetMembers::Included(members) => members
                 .iter()
-                .fold(UnionBuilder::new(db), |builder, name| {
-                    builder.add(Type::enum_literal(EnumLiteralType::new(
-                        db,
-                        self.enum_class,
-                        (*name).clone(),
-                    )))
+                .fold(UnionBuilder::new(db), |builder, (name, promotable)| {
+                    builder.add(self.member_type(db, name, *promotable))
                 })
                 .build(),
             EnumValueSetMembers::AllExcept(complement) => {
@@ -386,20 +409,29 @@ impl<'db> EnumValueSet<'db> {
         if self.member_count(db) != 1 {
             return None;
         }
-        let name = match &self.members {
-            EnumValueSetMembers::All => self.enum_class.member_names(db).next()?,
-            EnumValueSetMembers::One(name) => name,
-            EnumValueSetMembers::Included(names) => names.first()?,
-            EnumValueSetMembers::AllExcept(complement) => self
-                .enum_class
-                .member_names(db)
-                .find(|name| !complement.excluded_names(db).contains(*name))?,
+        let (name, promotable) = match &self.members {
+            EnumValueSetMembers::All => (self.enum_class.member_names(db).next()?, true),
+            EnumValueSetMembers::One { name, promotable } => (*name, *promotable),
+            EnumValueSetMembers::Included(members) => {
+                let (name, promotable) = members.first()?;
+                (*name, *promotable)
+            }
+            EnumValueSetMembers::AllExcept(complement) => (
+                self.enum_class
+                    .member_names(db)
+                    .find(|name| !complement.excluded_names(db).contains(*name))?,
+                true,
+            ),
         };
-        Some(Type::enum_literal(EnumLiteralType::new(
-            db,
-            self.enum_class,
-            (*name).clone(),
-        )))
+        Some(self.member_type(db, name, promotable))
+    }
+
+    fn member_type(&self, db: &'db dyn Db, name: &Name, promotable: bool) -> Type<'db> {
+        LiteralValueType::new(
+            EnumLiteralType::new(db, self.enum_class, name.clone()),
+            promotable,
+        )
+        .into()
     }
 }
 

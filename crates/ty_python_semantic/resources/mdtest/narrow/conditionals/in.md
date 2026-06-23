@@ -281,6 +281,7 @@ def _(x: LiteralString | int):
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Color(Enum):
     RED = "red"
@@ -308,6 +309,21 @@ def after_excluding_red_mixed(x: Color | int):
         reveal_type(x)  # revealed: Literal[Color.GREEN] | int
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
+
+SelectedColor = Literal[Color.RED, Color.GREEN]
+SELECTED_COLORS: tuple[SelectedColor, ...] = (Color.RED, Color.GREEN)
+
+def selected_colors(colors: list[Color]) -> list[SelectedColor]:
+    result: list[SelectedColor] = []
+    result.extend([color for color in colors if color in SELECTED_COLORS])
+    return result
+
+def _(colors: list[Color]):
+    annotated = [color for color in colors if color in SELECTED_COLORS]
+    reveal_type(annotated)  # revealed: list[Literal[Color.RED, Color.GREEN]]
+
+    inline = [color for color in colors if color in (Color.RED, Color.GREEN)]
+    reveal_type(inline)  # revealed: list[Color]
 ```
 
 An enum that can have additional runtime members can still be narrowed by a membership test against
