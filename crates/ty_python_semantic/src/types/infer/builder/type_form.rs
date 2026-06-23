@@ -35,7 +35,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Suppress contextual `TypeForm` evaluation only if ordinary inference already
         // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
         let value_ty = self
-            .speculate()
+            .speculate_without_diagnostics()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
         if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
             || self.contains_type_form_value(expression, value_ty)
@@ -49,12 +49,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // try ordinary contextual inference. This lets existing bidirectional
         // inference propagate `TypeForm` through conditionals, calls, and `await`.
         if self
-            .speculate()
+            .speculate_without_diagnostics()
             .infer_type_expression_no_store(expression)
             .is_unknown()
         {
             let contextual_ty = self
-                .speculate()
+                .speculate_without_diagnostics()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
             // TODO: Remove this exception once `Unpack` produces a precise type instead of a
             // dynamic placeholder in ordinary expression inference.
@@ -88,7 +88,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // interpreted as a `TypeForm`. Preserve its ordinary value type only when
                 // it was produced by an expression that is not itself a type expression.
                 Type::ClassLiteral(_) => builder
-                    .speculate()
+                    .speculate_without_diagnostics()
                     .infer_type_expression_no_store(expression)
                     .is_unknown(),
                 Type::NominalInstance(instance)
