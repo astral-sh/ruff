@@ -989,6 +989,16 @@ enum FixedPositionBound {
     Position(usize),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ForwardSliceStop {
+    /// The default stop at the end of the tuple.
+    End,
+    /// A non-negative stop index, measured from the front of the tuple.
+    Absolute(usize),
+    /// A negative stop index that is known to land in the suffix.
+    Suffix(usize),
+}
+
 /// A fixed prefix or suffix slice in the result of slicing a variable-length tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct FixedSlice {
@@ -1195,6 +1205,22 @@ impl FixedPositionSlice {
         }
 
         elements
+    }
+}
+
+impl ForwardSliceStop {
+    fn suffix_stop(self, tuple: &VariableLengthTuple<Type<'_>>) -> usize {
+        match self {
+            ForwardSliceStop::End => tuple.suffix_len(),
+            ForwardSliceStop::Absolute(stop) => stop
+                .saturating_sub(tuple.prefix_len())
+                .min(tuple.suffix_len()),
+            ForwardSliceStop::Suffix(stop) => stop,
+        }
+    }
+
+    fn allows_fixed_suffix(self) -> bool {
+        matches!(self, ForwardSliceStop::End | ForwardSliceStop::Suffix(_))
     }
 }
 
@@ -1461,7 +1487,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         fixed_suffix: Some(FixedSlice::suffix(None, None, step)),
                     });
                 }
-                return Some(self.mixed_forward_approximation(start, None, step));
+                return Some(self.mixed_forward_approximation(start, ForwardSliceStop::End, step));
             }
 
             if let Some(start) = Self::front_start_index(start)
@@ -1480,7 +1506,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 if let Some(stop) = Self::nonnegative_slice_index(stop)
                     && stop > self.prefix_len()
                 {
-                    return Some(self.mixed_forward_approximation(start, Some(stop), step));
+                    return Some(self.mixed_forward_approximation(
+                        start,
+                        ForwardSliceStop::Absolute(stop),
+                        step,
+                    ));
                 }
 
                 if start > self.prefix_len()
@@ -1490,7 +1520,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 {
                     return Some(self.mixed_forward_approximation(
                         start,
-                        Some(self.prefix_len() + stop),
+                        ForwardSliceStop::Suffix(stop),
                         step,
                     ));
                 }
@@ -1562,16 +1592,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     fn mixed_forward_approximation(
         &self,
         start: usize,
-        stop: Option<usize>,
+        stop: ForwardSliceStop,
         step: NonZeroI32,
     ) -> VariableTupleSlicePlan {
-        let suffix_stop = stop.map_or_else(
-            || self.suffix_len(),
-            |stop| {
-                stop.saturating_sub(self.prefix_len())
-                    .min(self.suffix_len())
-            },
-        );
+        let suffix_stop = stop.suffix_stop(self);
 
         if start <= self.prefix_len() {
             return VariableTupleSlicePlan::Mixed {
@@ -1589,6 +1613,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
 
         let suffix_start = start.saturating_sub(self.prefix_len());
         let fixed_suffix_start = suffix_start.min(suffix_stop);
+        let variable_suffix_stop = if stop.allows_fixed_suffix() {
+            fixed_suffix_start
+        } else {
+            suffix_stop
+        };
         VariableTupleSlicePlan::Mixed {
             fixed_prefix: None,
             variable: VariableSlice {
@@ -1596,9 +1625,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 prefix_start: self.prefix_len(),
                 prefix_stop: self.prefix_len(),
                 suffix_start: 0,
-                suffix_stop: fixed_suffix_start,
+                suffix_stop: variable_suffix_stop,
             },
-            fixed_suffix: (fixed_suffix_start < suffix_stop)
+            fixed_suffix: (stop.allows_fixed_suffix() && fixed_suffix_start < suffix_stop)
                 .then(|| FixedSlice::suffix(Some(fixed_suffix_start), Some(suffix_stop), step)),
         }
     }
