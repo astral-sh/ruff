@@ -974,12 +974,6 @@ impl<T> VariableLengthTuple<T> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FixedSegment {
-    Prefix,
-    Suffix,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ForwardSliceStop {
     /// The default stop at the end of the tuple.
     End,
@@ -992,7 +986,6 @@ enum ForwardSliceStop {
 /// A fixed prefix or suffix slice in the result of slicing a variable-length tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct FixedSlice {
-    segment: FixedSegment,
     start: Option<i32>,
     stop: Option<i32>,
     step: NonZeroUsize,
@@ -1019,18 +1012,6 @@ struct VariableSlice {
     include_variable: bool,
     suffix_start: usize,
     suffix_stop: usize,
-}
-
-/// A private operand accepted by `VariableLengthTuple::slice`.
-trait VariableTupleSlice<'db> {
-    fn apply_to<'a>(
-        self,
-        db: &'db dyn Db,
-        tuple: &'a VariableLengthTuple<Type<'db>>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a
-    where
-        Self: 'a,
-        'db: 'a;
 }
 
 /// How to approximate a static slice into a variable-length tuple.
@@ -1063,18 +1044,8 @@ enum TupleSliceDirection {
 }
 
 impl FixedSlice {
-    fn prefix(start: Option<usize>, stop: Option<usize>, step: NonZeroUsize) -> Self {
+    fn new(start: Option<usize>, stop: Option<usize>, step: NonZeroUsize) -> Self {
         Self {
-            segment: FixedSegment::Prefix,
-            start: start.and_then(|start| i32::try_from(start).ok()),
-            stop: stop.and_then(|stop| i32::try_from(stop).ok()),
-            step,
-        }
-    }
-
-    fn suffix(start: Option<usize>, stop: Option<usize>, step: NonZeroUsize) -> Self {
-        Self {
-            segment: FixedSegment::Suffix,
             start: start.and_then(|start| i32::try_from(start).ok()),
             stop: stop.and_then(|stop| i32::try_from(stop).ok()),
             step,
@@ -1086,20 +1057,6 @@ impl FixedSlice {
             i32::try_from(self.step.get()).expect("slice steps originate from an i32 slice index"),
         )
         .expect("a non-zero usize step remains non-zero as an i32")
-    }
-}
-
-impl<'db> VariableTupleSlice<'db> for FixedSlice {
-    fn apply_to<'a>(
-        self,
-        db: &'db dyn Db,
-        tuple: &'a VariableLengthTuple<Type<'db>>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a
-    where
-        Self: 'a,
-        'db: 'a,
-    {
-        tuple.slice_fixed(db, self)
     }
 }
 
@@ -1118,20 +1075,6 @@ impl FixedPositionSlice {
             exclusive_stop: stop,
             step,
         }
-    }
-}
-
-impl<'db> VariableTupleSlice<'db> for FixedPositionSlice {
-    fn apply_to<'a>(
-        self,
-        db: &'db dyn Db,
-        tuple: &'a VariableLengthTuple<Type<'db>>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a
-    where
-        Self: 'a,
-        'db: 'a,
-    {
-        tuple.slice_fixed_position(db, self)
     }
 }
 
@@ -1184,7 +1127,7 @@ impl VariableTupleSlicePlan {
             }
 
             VariableTupleSlicePlan::Fixed(fixed) => {
-                Type::heterogeneous_tuple(db, tuple.slice(db, fixed))
+                Type::heterogeneous_tuple(db, tuple.slice_fixed_position(db, fixed))
             }
 
             VariableTupleSlicePlan::Mixed {
@@ -1193,9 +1136,9 @@ impl VariableTupleSlicePlan {
                 fixed_suffix,
             } => Type::tuple(TupleType::mixed(
                 db,
-                tuple.optional_slice(db, fixed_prefix),
+                VariableLengthTuple::optional_fixed_slice(tuple.prefix_elements(), fixed_prefix),
                 variable.ty(db, tuple),
-                tuple.optional_slice(db, fixed_suffix),
+                VariableLengthTuple::optional_fixed_slice(tuple.suffix_elements(), fixed_suffix),
             )),
 
             VariableTupleSlicePlan::Homogeneous => tuple.homogeneous_type(db),
@@ -1241,40 +1184,19 @@ impl TupleSliceDirection {
 }
 
 impl<'db> VariableLengthTuple<Type<'db>> {
-    fn slice<'a, S>(&'a self, db: &'db dyn Db, slice: S) -> impl Iterator<Item = Type<'db>> + 'a
-    where
-        S: VariableTupleSlice<'db> + 'a,
-        'db: 'a,
-    {
-        slice.apply_to(db, self)
-    }
-
-    fn optional_slice<'a, S>(
-        &'a self,
-        db: &'db dyn Db,
-        slice: Option<S>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a
-    where
-        S: VariableTupleSlice<'db> + 'a,
-        'db: 'a,
-    {
+    fn optional_fixed_slice<'a>(
+        elements: &'a [Type<'db>],
+        slice: Option<FixedSlice>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a {
         match slice {
-            Some(slice) => Either::Left(self.slice(db, slice)),
+            Some(slice) => Either::Left(py_slice_with_step(
+                elements,
+                slice.start,
+                slice.stop,
+                slice.step_i32(),
+            )),
             None => Either::Right(std::iter::empty()),
         }
-    }
-
-    fn slice_fixed(
-        &self,
-        _db: &'db dyn Db,
-        slice: FixedSlice,
-    ) -> impl Iterator<Item = Type<'db>> + '_ {
-        let elements = match slice.segment {
-            FixedSegment::Prefix => self.prefix_elements(),
-            FixedSegment::Suffix => self.suffix_elements(),
-        };
-
-        py_slice_with_step(elements, slice.start, slice.stop, slice.step_i32())
     }
 
     fn slice_fixed_position<'a>(
@@ -1503,9 +1425,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             {
                 if start <= self.prefix_len() {
                     return Some(VariableTupleSlicePlan::Mixed {
-                        fixed_prefix: Some(FixedSlice::prefix(Some(start), None, step)),
+                        fixed_prefix: Some(FixedSlice::new(Some(start), None, step)),
                         variable: VariableSlice::variable_only(),
-                        fixed_suffix: Some(FixedSlice::suffix(None, None, step)),
+                        fixed_suffix: Some(FixedSlice::new(None, None, step)),
                     });
                 }
                 return Some(self.mixed_forward_approximation(start, ForwardSliceStop::End, step));
@@ -1517,9 +1439,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 && let Ok(stop) = usize::try_from(stop)
             {
                 return Some(VariableTupleSlicePlan::Mixed {
-                    fixed_prefix: Some(FixedSlice::prefix(Some(start), None, step)),
+                    fixed_prefix: Some(FixedSlice::new(Some(start), None, step)),
                     variable: VariableSlice::variable_only(),
-                    fixed_suffix: Some(FixedSlice::suffix(None, Some(stop), step)),
+                    fixed_suffix: Some(FixedSlice::new(None, Some(stop), step)),
                 });
             }
 
@@ -1596,7 +1518,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
 
         Some(VariableTupleSlicePlan::Mixed {
             fixed_prefix: prefix_start
-                .map(|prefix_start| FixedSlice::prefix(Some(prefix_start), None, step)),
+                .map(|prefix_start| FixedSlice::new(Some(prefix_start), None, step)),
             variable: VariableSlice {
                 include_variable: true,
                 suffix_start: 0,
@@ -1616,7 +1538,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
 
         if start <= self.prefix_len() {
             return VariableTupleSlicePlan::Mixed {
-                fixed_prefix: Some(FixedSlice::prefix(Some(start), None, step)),
+                fixed_prefix: Some(FixedSlice::new(Some(start), None, step)),
                 variable: VariableSlice {
                     include_variable: true,
                     suffix_start: 0,
@@ -1641,7 +1563,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 suffix_stop: variable_suffix_stop,
             },
             fixed_suffix: (stop.allows_fixed_suffix() && fixed_suffix_start < suffix_stop)
-                .then(|| FixedSlice::suffix(Some(fixed_suffix_start), Some(suffix_stop), step)),
+                .then(|| FixedSlice::new(Some(fixed_suffix_start), Some(suffix_stop), step)),
         }
     }
 
