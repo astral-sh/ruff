@@ -45,6 +45,52 @@ impl<'db> Type<'db> {
         self.try_upcast_to_callable_with_policy(db, UpcastPolicy::default())
     }
 
+    /// Returns the single explicit callable alternative in this type, allowing non-callable union
+    /// alternatives and aliases.
+    ///
+    /// This only recognizes callable shapes that are already represented as [`Type::Callable`]. It
+    /// does not synthesize callables from class objects, `__call__` members, or other
+    /// call-compatible runtime values.
+    pub(crate) fn single_explicit_callable_alternative(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<CallableType<'db>> {
+        self.single_explicit_callable_alternative_impl(db)
+            .into_option()
+    }
+
+    fn single_explicit_callable_alternative_impl(
+        self,
+        db: &'db dyn Db,
+    ) -> SingleCallableAlternative<'db> {
+        match self.resolve_type_alias(db) {
+            Type::Callable(callable) => SingleCallableAlternative::One(callable),
+            Type::Union(union) => {
+                let mut single_callable = None;
+                for element in union.elements(db) {
+                    let callable = match element.single_explicit_callable_alternative_impl(db) {
+                        SingleCallableAlternative::One(callable) => callable,
+                        SingleCallableAlternative::None => continue,
+                        SingleCallableAlternative::Ambiguous => {
+                            return SingleCallableAlternative::Ambiguous;
+                        }
+                    };
+
+                    if single_callable.replace(callable).is_some() {
+                        return SingleCallableAlternative::Ambiguous;
+                    }
+                }
+
+                single_callable.map_or(
+                    SingleCallableAlternative::None,
+                    SingleCallableAlternative::One,
+                )
+            }
+            Type::Dynamic(_) | Type::Divergent(_) => SingleCallableAlternative::Ambiguous,
+            _ => SingleCallableAlternative::None,
+        }
+    }
+
     pub(crate) fn try_upcast_to_callable_with_recursive_fallback(
         self,
         db: &'db dyn Db,
@@ -388,6 +434,24 @@ pub(crate) enum UpcastPolicy {
     /// `Callable[<constructor signature of T>, T`.
     #[default]
     Unsound,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SingleCallableAlternative<'db> {
+    One(CallableType<'db>),
+    None,
+    // A dynamic element or multiple callable alternatives makes contextual typing unsafe: picking
+    // one callable shape would hide a real ambiguity from lambda/body inference.
+    Ambiguous,
+}
+
+impl<'db> SingleCallableAlternative<'db> {
+    fn into_option(self) -> Option<CallableType<'db>> {
+        match self {
+            Self::One(callable) => Some(callable),
+            Self::None | Self::Ambiguous => None,
+        }
+    }
 }
 
 impl From<TypeRelation> for UpcastPolicy {
