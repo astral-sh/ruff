@@ -10,27 +10,101 @@ from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
 
+# -----
 # Types
+# -----
+
 Unknown: _SpecialForm
+"""
+`Unknown` is a dynamic type inferred due to missing type information or an inference error.
+
+ty infers `Unknown` for unannotated values with insufficient type information. It also uses it as a
+fallback after certain type errors. This contrasts with `Any`, which represents an *explicitly*
+annotated dynamic type. Like `Any`, however, it is a dynamic type, so ty allows any operation on it.
+"""
+
 Divergent: _SpecialForm
 """
-`Divergent` represents type-level recursion that does not converge.
+`Divergent` is a dynamic type inferred due to type-level recursion that does not converge.
 
 Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a
 stable result. If each iteration produces a new type, ty replaces the non-convergent part
 with `Divergent`.
 
-Like `Any` and `Unknown`, `Divergent` is a gradual type, so ty allows any operation on it.
+Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operation on it.
 Unlike `Unknown`, it does not represent missing type information. It is an internal type
 used by ty and cannot be used in annotations.
 """
-AlwaysTruthy: _SpecialForm
-AlwaysFalsy: _SpecialForm
 
+AlwaysTruthy: _SpecialForm
+"""
+`AlwaysTruthy` represents the set of all objects that always evaluate to `True` in a boolean
+context.
+
+Most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since their boolean
+evaluation may be uncertain or depend on runtime state. For example, although an instance of
+*exactly* `object` is always truthy, a variable annotated as having type `object` could
+also be an instance of an arbitrary subclass of `object` that is always falsy. This means that
+the boolean evaluation of a variable inferred as `object` is uncertain, so `object` is not a
+subtype of `AlwaysTruthy`.
+
+In practice, `AlwaysTruthy` is mostly inhabited by truthy literal strings, integers and
+bytestrings, as well as singleton objects such as `True` and `...`. However, it can also be
+inhabited by instances of classes with `__bool__` methods returning `Literal[True]`.
+"""
+
+AlwaysFalsy: _SpecialForm
+"""
+`AlwaysFalsy` represents the set of all objects that always evaluate to `False` in a boolean
+context.
+
+Most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since their boolean
+evaluation may be uncertain or depend on runtime state. For example, although an empty list
+is falsy while it is empty, it will no longer be falsy after an item has been appended to the
+list. This means that the boolean evaluation of a variable inferred as `list[int]` is uncertain,
+so `list[int]` is not a subtype of `AlwaysFalsy`.
+
+In practice, `AlwaysFalsy` is mostly inhabited by the literals `""`, `b""` and `0`, as well as
+singleton objects such as `False` and `None`. However, it can also be inhabited by instances of
+classes with `__bool__` methods returning `Literal[False]`.
+"""
+
+# -------------
 # Special forms
+# -------------
+
 Not: _SpecialForm
+"""`Not[T]` represents the set of all objects that do not inhabit the type `T`."""
+
 Intersection: _SpecialForm
+"""
+`Intersection[T, U, ...]` represents an intersection type: the set of all objects that inhabit
+every provided type. An intersection type is a subtype of each of the types in the intersection.
+
+For example, although neither `P` nor `Q` is a subtype of the other, an instance of `S` inhabits
+`Intersection[P, Q]` because `S` inherits from both `P` and `Q`:
+
+```python
+class P: ...
+class Q: ...
+class S(P, Q): ...
+
+s: Intersection[P, Q] = S()
+```
+"""
+
 TypeOf: _SpecialForm
+"""
+`TypeOf[expression]` is the inferred type of `expression`.
+
+Unlike a regular [type expression], the argument to `TypeOf` is interpreted as a
+["value expression"][value expression]: an ordinary Python expression whose type ty infers. For
+example, `TypeOf[str]` is the literal class type of `str`, whereas `str` is the instance type.
+
+[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+[value expression]: https://docs.python.org/3/reference/expressions.html
+"""
+
 CallableTypeOf: _SpecialForm
 """
 `CallableTypeOf[T]` extracts the callable type of `T` while preserving any function-like
@@ -130,18 +204,18 @@ class ConstraintSet:
         lower_bound: TypeForm[object],
         typevar: TypeForm[object],
         upper_bound: TypeForm[object],
-    ) -> Self:
+    ) -> ConstraintSet:
         """
         Returns a constraint set that requires `typevar` to specialize to a type
         that is a supertype of `lower_bound` and a subtype of `upper_bound`.
         """
 
     @staticmethod
-    def always() -> Self:
+    def always() -> ConstraintSet:
         """Returns a constraint set that is always satisfied"""
 
     @staticmethod
-    def never() -> Self:
+    def never() -> ConstraintSet:
         """Returns a constraint set that is never satisfied"""
 
     def implies_subtype_of(self, ty: TypeForm[object], of: TypeForm[object]) -> Self:
