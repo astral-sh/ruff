@@ -1218,8 +1218,8 @@ impl<'db> Type<'db> {
         .recursive_type_normalized(db, cycle)
     }
 
-    /// Normalizes nominal growth that wraps the previous cycle result in one or more
-    /// specializations, either directly or beneath an unambiguous union wrapper.
+    /// Normalizes nominal growth that wraps the previous cycle result in a specialization, either
+    /// directly or beneath an unambiguous union wrapper.
     ///
     /// For example, an inference cycle can otherwise grow indefinitely as
     /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
@@ -1234,41 +1234,6 @@ impl<'db> Type<'db> {
         div: Self,
     ) -> Option<Self> {
         if let (Type::Union(current), Type::Union(previous)) = (self, previous) {
-            let previous_elements = previous.elements(db);
-
-            // Multiple union arms may each grow by wrapping the entire previous union. Normalize
-            // only when every previous arm is nominal and at least two changed current arms are
-            // nominal wrappers; arms shared with the previous union remain unchanged.
-            if previous_elements
-                .iter()
-                .all(|element| matches!(element, Type::NominalInstance(_)))
-                && let Some(replacements) = current
-                    .elements(db)
-                    .iter()
-                    .copied()
-                    .filter(|element| !previous_elements.contains(element))
-                    .map(|element| {
-                        Self::nominal_wrapper_normalized(
-                            db,
-                            element.as_nominal_instance()?,
-                            Type::Union(previous),
-                            div,
-                        )
-                        .map(|normalized| (element, normalized))
-                    })
-                    .collect::<Option<smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]>>>()
-                && replacements.len() > 1
-            {
-                return Some(current.map_leave_aliases(db, |element| {
-                    replacements
-                        .iter()
-                        .find_map(|(original, normalized)| {
-                            (*original == *element).then_some(*normalized)
-                        })
-                        .unwrap_or(*element)
-                }));
-            }
-
             // Only align unions when each iteration has exactly one changed arm. With multiple
             // unmatched arms, pairing is ambiguous and can destabilize otherwise-convergent
             // recursive cycles.
@@ -1303,8 +1268,8 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(current), Type::ProtocolInstance(previous)) => {
                 // A class-backed protocol shares a nominal specialization with its runtime class.
-                // `nominal_wrapper_normalized` reconstructs the result through `Type::instance`,
-                // which recognizes the protocol class and restores a protocol instance.
+                // Reconstructing the result through `Type::instance` recognizes the protocol class
+                // and restores a protocol instance.
                 (
                     current.to_nominal_instance()?,
                     previous.to_nominal_instance()?,
@@ -1313,27 +1278,17 @@ impl<'db> Type<'db> {
             _ => return None,
         };
 
-        if current.class(db).class_literal(db) != previous_instance.class_literal(db) {
+        let current_class = current.class(db);
+        if current_class.class_literal(db) != previous_instance.class_literal(db) {
             return None;
         }
 
-        Self::nominal_wrapper_normalized(db, current, previous, div)
-    }
-
-    /// Replaces `wrapped` beneath the outer nominal specialization in `current`.
-    fn nominal_wrapper_normalized(
-        db: &'db dyn Db,
-        current: NominalInstanceType<'db>,
-        wrapped: Self,
-        div: Self,
-    ) -> Option<Self> {
-        let current_class = current.class(db);
         let alias = current_class.into_generic_alias()?;
         let original_specialization = alias.specialization(db);
         let specialization = original_specialization.apply_type_mapping(
             db,
             &TypeMapping::ReplaceType {
-                from: wrapped,
+                from: previous,
                 to: div,
             },
         );
