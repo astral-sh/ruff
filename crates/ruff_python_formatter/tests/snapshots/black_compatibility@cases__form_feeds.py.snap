@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 183
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/form_feeds.py
 ---
 ## Input
@@ -221,14 +222,7 @@ a = [
  pass
  
  
-@@ -80,14 +79,13 @@
- 
- 
- class Baz:
--
-     def __init__(self):
-         pass
- 
+@@ -87,7 +86,7 @@
      def something(self):
          pass
  
@@ -323,6 +317,7 @@ def bar(a=1, b: bool = False):
 
 
 class Baz:
+
     def __init__(self):
         pass
 

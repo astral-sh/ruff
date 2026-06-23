@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 183
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/stub.pyi
 ---
 ## Input
@@ -87,7 +88,15 @@ class Conditional:
 ```diff
 --- Black
 +++ Ruff
-@@ -57,12 +57,10 @@
+@@ -26,6 +26,7 @@
+         def f(self): ...
+ 
+     class F:
++
+         def f(self): ...
+ 
+     class G: ...
+@@ -57,12 +58,10 @@
          def g(self): ...
      else:
          def g(self): ...
@@ -133,6 +142,7 @@ if sys.version_info >= (3, 8):
         def f(self): ...
 
     class F:
+
         def f(self): ...
 
     class G: ...

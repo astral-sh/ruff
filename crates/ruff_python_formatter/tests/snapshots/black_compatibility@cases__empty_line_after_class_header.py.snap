@@ -1,0 +1,100 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 183
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/empty_line_after_class_header.py
+---
+## Input
+
+```python
+class Foo:
+
+    x = 1
+
+
+class Bar:
+
+    # leading comment should still strip the blank line
+    y = 2
+
+
+class Baz:
+    # no blank line, leave as-is
+    z = 3
+
+
+class Qux:
+    """docstring takes precedence over the blank-line rule."""
+
+    a = 1```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -5,7 +5,7 @@
+ 
+ class Bar:
+ 
+-    # leading comment also allows a blank line (matches function behavior)
++    # leading comment should still strip the blank line
+     y = 2
+ 
+ 
+@@ -17,4 +17,4 @@
+ class Qux:
+     """docstring takes precedence over the blank-line rule."""
+ 
+-    a = 1
+\ No newline at end of file
++    a = 1
+```
+
+## Ruff Output
+
+```python
+class Foo:
+
+    x = 1
+
+
+class Bar:
+
+    # leading comment should still strip the blank line
+    y = 2
+
+
+class Baz:
+    # no blank line, leave as-is
+    z = 3
+
+
+class Qux:
+    """docstring takes precedence over the blank-line rule."""
+
+    a = 1
+```
+
+## Black Output
+
+```python
+class Foo:
+
+    x = 1
+
+
+class Bar:
+
+    # leading comment also allows a blank line (matches function behavior)
+    y = 2
+
+
+class Baz:
+    # no blank line, leave as-is
+    z = 3
+
+
+class Qux:
+    """docstring takes precedence over the blank-line rule."""
+
+    a = 1```

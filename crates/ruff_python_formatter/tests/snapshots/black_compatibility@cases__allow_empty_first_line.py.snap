@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 183
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/allow_empty_first_line.py
 ---
 ## Input
@@ -129,14 +130,6 @@ def top_level(
              """also this"""
              a = 123
  
-@@ -57,7 +50,6 @@
- 
- 
- class Cls:
--
-     def method(self):
- 
-         pass
 ```
 
 ## Ruff Output
@@ -194,6 +187,7 @@ def quux():
 
 
 class Cls:
+
     def method(self):
 
         pass
