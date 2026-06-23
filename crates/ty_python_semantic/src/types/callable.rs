@@ -125,6 +125,9 @@ impl<'db> Type<'db> {
                     place
                         .ty
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                        // The callable instance itself doesn't inherit the descriptor behavior of
+                        // its `__call__` method.
+                        .map(|callables| callables.map(|callable| callable.into_regular(db)))
                 } else {
                     None
                 }
