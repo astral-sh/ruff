@@ -2199,7 +2199,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// LoopHeader` in the semantic index for more on how all this fits together.
     fn infer_loop_header_definition(
         &mut self,
-        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
+        loop_header_kind: &LoopHeaderDefinitionKind,
         definition: Definition<'db>,
     ) {
         // This cutoff was chosen by benchmarking real isort to keep loop analysis

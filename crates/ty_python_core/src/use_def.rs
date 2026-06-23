@@ -269,13 +269,20 @@ use crate::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState,
 };
-use crate::{BoundnessAnalysis, EnclosingSnapshotResult, PossiblyNarrowedPlaces, SemanticIndex};
+use crate::{
+    BoundnessAnalysis, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces, SemanticIndex,
+};
 
 mod place_state;
 
 pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
+
+/// Identifies a [`LoopHeader`] within a single scope's [`UseDefMap`].
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+pub struct LoopHeaderId;
 
 /// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
 #[newtype_index]
@@ -589,7 +596,7 @@ struct ConstraintTables<'db> {
 
 /// Fields that are empty in most use-def maps.
 ///
-/// These fields share an allocation to avoid storing four collection headers in every
+/// These fields share an allocation to avoid storing five collection headers in every
 /// [`UseDefMap`]. They are not otherwise semantically related.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct UseDefMapExtra {
@@ -607,6 +614,9 @@ struct UseDefMapExtra {
 
     /// Snapshots of bindings used to resolve references from nested scopes.
     enclosing_snapshots: FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
+
+    /// Completed loop headers in this scope.
+    loop_headers: FrozenIndexVec<LoopHeaderId, LoopHeader>,
 }
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
@@ -729,7 +739,11 @@ impl<'db> UseDefMap<'db> {
     fn extra(&self) -> &UseDefMapExtra {
         self.extra
             .as_deref()
-            .expect("bindings and member states should have been retained")
+            .expect("extra use-def data should have been retained")
+    }
+
+    pub fn loop_header(&self, id: LoopHeaderId) -> &LoopHeader {
+        &self.extra().loop_headers[id]
     }
 
     pub fn reachability_constraints(&self) -> &ReachabilityConstraints {
@@ -1534,6 +1548,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// nested scope.
     enclosing_snapshots: EnclosingSnapshots,
 
+    /// Loop headers reserved before walking a loop and populated afterward.
+    loop_headers: IndexVec<LoopHeaderId, LoopHeader>,
+
     /// Is this a class scope?
     is_class_scope: bool,
 }
@@ -1557,8 +1574,17 @@ impl<'db> UseDefMapBuilder<'db> {
             reachable_member_definitions: IndexVec::new(),
             reachable_symbol_definitions: IndexVec::new(),
             enclosing_snapshots: EnclosingSnapshots::default(),
+            loop_headers: IndexVec::new(),
             is_class_scope,
         }
+    }
+
+    pub(super) fn reserve_loop_header(&mut self) -> LoopHeaderId {
+        self.loop_headers.push(LoopHeader::new())
+    }
+
+    pub(super) fn set_loop_header(&mut self, id: LoopHeaderId, header: LoopHeader) {
+        self.loop_headers[id] = header;
     }
 
     fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
@@ -2483,15 +2509,18 @@ impl<'db> UseDefMapBuilder<'db> {
         let member_states =
             Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
+        let loop_headers = self.loop_headers;
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
-            || !enclosing_snapshots.is_empty())
+            || !enclosing_snapshots.is_empty()
+            || !loop_headers.is_empty())
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
                 multi_bindings_by_use,
                 member_states,
                 enclosing_snapshots: enclosing_snapshots.into(),
+                loop_headers: loop_headers.into(),
             })
         });
         let predicates = self.predicates.build();
