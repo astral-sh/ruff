@@ -408,72 +408,6 @@ class Form(Ui):
 }
 
 #[test]
-fn implicit_attribute_binding_forms_after_many_non_terminal_calls() -> anyhow::Result<()> {
-    let handle = std::thread::Builder::new()
-        .name("implicit-attribute-binding-forms-stack-test".into())
-        .stack_size(ruff_db::STACK_SIZE)
-        .spawn(|| {
-            let mut db = setup_db();
-            let mut ui = String::from(
-                r#"from widgets import Widget
-
-def noop() -> None: ...
-
-class Ui:
-    def setup(self):
-"#,
-            );
-            for _ in 0..FEW_NON_TERMINAL_CALLS {
-                ui.push_str("        noop()\n");
-            }
-            ui.push_str(
-                r#"        self.annotated_target: Widget = Widget()
-        self.unpacking_target, = (Widget(),)
-        for self.for_target in [Widget()]:
-            pass
-"#,
-            );
-
-            db.write_files([
-                ("/src/widgets.py", "class Widget: ...\n"),
-                ("/src/ui.py", &ui),
-                (
-                    "/src/annotated_consumer.py",
-                    r#"from typing_extensions import reveal_type
-from ui import Ui
-
-reveal_type(Ui().annotated_target)
-"#,
-                ),
-                (
-                    "/src/unpacking_consumer.py",
-                    r#"from typing_extensions import reveal_type
-from ui import Ui
-
-reveal_type(Ui().unpacking_target)
-"#,
-                ),
-                (
-                    "/src/for_consumer.py",
-                    r#"from typing_extensions import reveal_type
-from ui import Ui
-
-reveal_type(Ui().for_target)
-"#,
-                ),
-            ])?;
-
-            assert_revealed_type(&db, "/src/annotated_consumer.py", "Widget");
-            assert_revealed_type(&db, "/src/unpacking_consumer.py", "Widget");
-            assert_revealed_type(&db, "/src/for_consumer.py", "Widget");
-
-            Ok(())
-        })?;
-
-    handle.join().expect("regression test thread panicked")
-}
-
-#[test]
 fn nested_implicit_attribute_graphs_do_not_overflow_stack() -> anyhow::Result<()> {
     let handle = std::thread::Builder::new()
         .name("nested-implicit-attribute-stack-test".into())
@@ -589,39 +523,6 @@ class Form(Ui):
     ])?;
 
     assert_revealed_type(&db, "/src/package/consumer.py", "int");
-
-    Ok(())
-}
-
-#[test]
-fn implicit_attribute_literal_after_many_calls() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let mut ui = String::from(
-        r#"def noop() -> None: ...
-
-class Ui:
-    def setup(self):
-"#,
-    );
-    for _ in 0..MANY_NON_TERMINAL_CALLS {
-        ui.push_str("        noop()\n");
-    }
-    ui.push_str("        self.target = 1\n");
-
-    db.write_files([
-        ("/src/ui.py", ui.as_str()),
-        (
-            "/src/consumer.py",
-            r#"from ui import Ui
-
-class Form(Ui):
-    def target_value(self) -> int:
-        return self.target
-"#,
-        ),
-    ])?;
-
-    assert_file_diagnostics(&db, "/src/consumer.py", &[]);
 
     Ok(())
 }

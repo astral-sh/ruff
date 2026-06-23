@@ -634,9 +634,6 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
-    let root_predicate = constraints.get_interior_node(id).atom;
-    analyze_non_terminal_call_prefix(db, predicates, root_predicate);
-
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
