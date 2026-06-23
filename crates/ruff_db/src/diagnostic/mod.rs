@@ -562,9 +562,13 @@ impl Ord for RenderingSortKey<'_> {
             self.diagnostic.primary_span(),
             other.diagnostic.primary_span(),
         ) {
-            let order = span1.file().path(&self.db).cmp(span2.file().path(&self.db));
-            if order.is_ne() {
-                return order;
+            let file1 = span1.file();
+            let file2 = span2.file();
+            if file1 != file2 {
+                let order = file1.path(&self.db).cmp(file2.path(&self.db));
+                if order.is_ne() {
+                    return order;
+                }
             }
 
             if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
