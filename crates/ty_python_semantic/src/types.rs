@@ -1234,16 +1234,22 @@ impl<'db> Type<'db> {
         div: Self,
     ) -> Option<Self> {
         if let (Type::Union(current), Type::Union(previous)) = (self, previous) {
+            let current_elements = current.elements(db);
             let previous_elements = previous.elements(db);
+            let same_nominal_class = |left: Type<'db>, right: Type<'db>| {
+                left.as_nominal_instance()
+                    .zip(right.as_nominal_instance())
+                    .is_some_and(|(left, right)| left.class_literal(db) == right.class_literal(db))
+            };
 
             // Multiple union arms may each grow by wrapping the entire previous union. Normalize
-            // only when every previous arm is nominal and at least two changed current arms are
-            // nominal wrappers; arms shared with the previous union remain unchanged.
+            // only when every previous arm is nominal, at least two changed current arms are
+            // nominal wrappers, and each previous arm either remains unchanged or has a changed
+            // wrapper with the same nominal class.
             if previous_elements
                 .iter()
                 .all(|element| matches!(element, Type::NominalInstance(_)))
-                && let Some(replacements) = current
-                    .elements(db)
+                && let Some(replacements) = current_elements
                     .iter()
                     .copied()
                     .filter(|element| !previous_elements.contains(element))
@@ -1258,6 +1264,12 @@ impl<'db> Type<'db> {
                     })
                     .collect::<Option<smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]>>>()
                 && replacements.len() > 1
+                && previous_elements.iter().all(|previous_element| {
+                    current_elements.contains(previous_element)
+                        || replacements.iter().any(|(current_element, _)| {
+                            same_nominal_class(*current_element, *previous_element)
+                        })
+                })
             {
                 return Some(current.map_leave_aliases(db, |element| {
                     replacements
