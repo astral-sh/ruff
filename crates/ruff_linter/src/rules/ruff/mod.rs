@@ -72,6 +72,7 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_3.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
@@ -255,6 +256,34 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
             },
         );
+        Ok(())
+    }
+
+    /// Regression test for https://github.com/astral-sh/ruff/issues/20803.
+    ///
+    /// When both RUF027 (`missing-fstring-syntax`) and F401 (`unused-import`) fire
+    /// on the same module — RUF027 promoting a string literal to an f-string that
+    /// interpolates a name only bound by the unused import — applying both fixes
+    /// on the same pass produces a `NameError` at runtime. Sorting RUF027 first in
+    /// the fixer means the f-string fix applies first and F401's fix is skipped on
+    /// the same pass; on the next pass the f-string interpolation marks the import
+    /// as used and F401 does not fire.
+    #[test]
+    fn missing_fstring_syntax_and_unused_import() -> Result<()> {
+        use ruff_python_ast::{PySourceType, SourceType};
+
+        let path = test_resource_path("fixtures").join("ruff/RUF027_F401.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings = settings::LinterSettings::for_rules(vec![
+            Rule::MissingFStringSyntax,
+            Rule::UnusedImport,
+        ]);
+
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_diagnostics!(diagnostics);
+
+        insta::assert_snapshot!(transformed.source_code());
         Ok(())
     }
 

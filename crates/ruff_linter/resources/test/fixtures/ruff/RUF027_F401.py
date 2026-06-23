@@ -1,0 +1,20 @@
+"""Regression test for https://github.com/astral-sh/ruff/issues/20803.
+
+When `missing-fstring-syntax` (RUF027) and `unused-import` (F401) both fire
+on the same module — RUF027 promoting a string literal to an f-string that
+interpolates a name only bound by the unused import — applying both fixes
+on the same pass produces code that raises `NameError` at runtime:
+
+    from sys import byteorder
+    print("Byte order: {byteorder}-endian")
+    # F401 fix removes the import; RUF027 fix inserts `f`.
+    # Result: print(f"...") but `byteorder` is no longer defined.
+
+The fix sorts RUF027 before F401 in the fixer, so the f-string fix applies
+first; F401's fix is then skipped on the same pass (the fixer has advanced
+past the import's start position). On the next pass the f-string
+interpolation marks the import as used and F401 does not fire.
+"""
+from sys import byteorder
+
+print("Byte order: {byteorder}-endian")

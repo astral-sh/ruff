@@ -140,6 +140,24 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     } else {
         std::cmp::Ordering::Equal
     }
+    // Always apply `MissingFStringSyntax` (RUF027) before `UnusedImport` (F401). If both fixes
+    // apply to the same module, RUF027 may promote a string literal to an f-string whose only
+    // reference to the imported name is the interpolation. Removing the import on the same pass
+    // would leave a `NameError` at runtime. Sorting RUF027 first causes the F401 fix to be
+    // skipped on this pass (because the fixer has advanced past the import's start position),
+    // and on the next pass the f-string interpolation marks the import as used.
+    // See https://github.com/astral-sh/ruff/issues/20803
+    .then_with(|| {
+        let missing_fstring_syntax = Rule::MissingFStringSyntax.name().as_str();
+        let unused_import = Rule::UnusedImport.name().as_str();
+        if (name1, name2) == (missing_fstring_syntax, unused_import) {
+            std::cmp::Ordering::Less
+        } else if (name1, name2) == (unused_import, missing_fstring_syntax) {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    })
     // Apply fixes in order of their start position.
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
     // Break ties in the event of overlapping rules, for some specific combinations.
