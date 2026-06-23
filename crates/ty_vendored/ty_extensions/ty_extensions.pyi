@@ -78,8 +78,8 @@ Not: _SpecialForm
 
 Intersection: _SpecialForm
 """
-`Intersection[T, U, ...]` represents an intersection type: the set of all objects that inhabit
-every provided type. An intersection type is a subtype of each of the types in the intersection.
+`Intersection[T1, T2, ..., Tn]` represents an intersection type: the set of all objects that inhabit
+all of the types `T1`, `T2`, ..., `Tn`. An intersection type is a subtype of each of the types in the intersection.
 
 For example, although neither `P` nor `Q` is a subtype of the other, an instance of `S` inhabits
 `Intersection[P, Q]` because `S` inherits from both `P` and `Q`:
