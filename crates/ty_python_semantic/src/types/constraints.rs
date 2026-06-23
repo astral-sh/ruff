@@ -2341,31 +2341,7 @@ impl NodeId {
     /// nodes.
     fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
         match (self.node(), other.node()) {
-            (Node::AlwaysTrue, Node::AlwaysTrue) => ALWAYS_TRUE,
-            (Node::AlwaysTrue, Node::Interior(_)) => {
-                let other_interior = builder.interior_node_data(other);
-                // If lhs is always true, then the overall result is true for any assignment of
-                // rhs.
-                NodeId::with_uncertain(
-                    builder,
-                    other_interior.constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_TRUE,
-                    ALWAYS_FALSE,
-                )
-            }
-            (Node::Interior(_), Node::AlwaysTrue) => {
-                let self_interior = builder.interior_node_data(self);
-                // If rhs is always true, then the overall result is true for any assignment of
-                // lhs.
-                NodeId::with_uncertain(
-                    builder,
-                    self_interior.constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_TRUE,
-                    ALWAYS_FALSE,
-                )
-            }
+            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => ALWAYS_TRUE,
             (Node::AlwaysFalse, _) => other,
             (_, Node::AlwaysFalse) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -2495,25 +2471,7 @@ impl NodeId {
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
         match (self.node(), other.node()) {
-            (Node::AlwaysFalse, Node::AlwaysFalse) => ALWAYS_FALSE,
-            (Node::AlwaysFalse, Node::Interior(_)) => {
-                let other_interior = builder.interior_node_data(other);
-                NodeId::new(
-                    builder,
-                    other_interior.constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_FALSE,
-                )
-            }
-            (Node::Interior(_), Node::AlwaysFalse) => {
-                let self_interior = builder.interior_node_data(self);
-                NodeId::new(
-                    builder,
-                    self_interior.constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_FALSE,
-                )
-            }
+            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => ALWAYS_FALSE,
             (Node::AlwaysTrue, _) => other,
             (_, Node::AlwaysTrue) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
