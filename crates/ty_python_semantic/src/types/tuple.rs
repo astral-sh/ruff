@@ -995,7 +995,7 @@ struct FixedSlice {
     segment: FixedSegment,
     start: Option<i32>,
     stop: Option<i32>,
-    step: NonZeroI32,
+    step: NonZeroUsize,
 }
 
 /// A fixed-length slice in the result of slicing a variable-length tuple.
@@ -1009,7 +1009,7 @@ enum FixedPositionSlice {
     Back {
         start: usize,
         exclusive_stop: usize,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     },
 }
 
@@ -1017,8 +1017,6 @@ enum FixedPositionSlice {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct VariableSlice {
     include_variable: bool,
-    prefix_start: usize,
-    prefix_stop: usize,
     suffix_start: usize,
     suffix_stop: usize,
 }
@@ -1065,7 +1063,7 @@ enum TupleSliceDirection {
 }
 
 impl FixedSlice {
-    fn prefix(start: Option<usize>, stop: Option<usize>, step: NonZeroI32) -> Self {
+    fn prefix(start: Option<usize>, stop: Option<usize>, step: NonZeroUsize) -> Self {
         Self {
             segment: FixedSegment::Prefix,
             start: start.and_then(|start| i32::try_from(start).ok()),
@@ -1074,13 +1072,20 @@ impl FixedSlice {
         }
     }
 
-    fn suffix(start: Option<usize>, stop: Option<usize>, step: NonZeroI32) -> Self {
+    fn suffix(start: Option<usize>, stop: Option<usize>, step: NonZeroUsize) -> Self {
         Self {
             segment: FixedSegment::Suffix,
             start: start.and_then(|start| i32::try_from(start).ok()),
             stop: stop.and_then(|stop| i32::try_from(stop).ok()),
             step,
         }
+    }
+
+    fn step_i32(self) -> NonZeroI32 {
+        NonZeroI32::new(
+            i32::try_from(self.step.get()).expect("slice steps originate from an i32 slice index"),
+        )
+        .expect("a non-zero usize step remains non-zero as an i32")
     }
 }
 
@@ -1107,7 +1112,7 @@ impl FixedPositionSlice {
         }
     }
 
-    fn back(start: usize, stop: usize, step: NonZeroI32) -> Self {
+    fn back(start: usize, stop: usize, step: NonZeroUsize) -> Self {
         Self::Back {
             start,
             exclusive_stop: stop,
@@ -1150,8 +1155,6 @@ impl VariableSlice {
     fn variable_only() -> Self {
         Self {
             include_variable: true,
-            prefix_start: 0,
-            prefix_stop: 0,
             suffix_start: 0,
             suffix_stop: 0,
         }
@@ -1163,12 +1166,6 @@ impl VariableSlice {
             self.include_variable
                 .then_some(tuple.variable())
                 .into_iter()
-                .chain(
-                    tuple
-                        .iter_prefix_elements()
-                        .skip(self.prefix_start)
-                        .take(self.prefix_stop.saturating_sub(self.prefix_start)),
-                )
                 .chain(
                     tuple
                         .iter_suffix_elements()
@@ -1215,14 +1212,22 @@ impl TupleSliceDirection {
         }
     }
 
-    fn positive_step(self, step: NonZeroI32) -> NonZeroI32 {
-        match self {
-            TupleSliceDirection::Forward => step,
+    fn positive_step(self, step: NonZeroI32) -> NonZeroUsize {
+        let step = match self {
+            TupleSliceDirection::Forward => {
+                usize::try_from(step.get()).expect("a forward slice has a positive step")
+            }
             // `i32::MIN.abs()` cannot be represented as `i32`; saturating is enough for the
             // finite fixed segments we model exactly, and leaves the variable segment approximate.
-            TupleSliceDirection::Backward => NonZeroI32::new(step.get().saturating_abs())
-                .expect("a non-zero step has a non-zero absolute value"),
-        }
+            TupleSliceDirection::Backward => usize::try_from(
+                NonZeroI32::new(step.get().saturating_abs())
+                    .expect("a non-zero step has a non-zero absolute value")
+                    .get(),
+            )
+            .expect("a positive i32 step is representable as a usize"),
+        };
+
+        NonZeroUsize::new(step).expect("a positive i32 step is representable as a non-zero usize")
     }
 
     fn reverse_index(index: i32) -> i32 {
@@ -1269,7 +1274,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             FixedSegment::Suffix => self.suffix_elements(),
         };
 
-        py_slice_with_step(elements, slice.start, slice.stop, slice.step)
+        py_slice_with_step(elements, slice.start, slice.stop, slice.step_i32())
     }
 
     fn slice_fixed_position<'a>(
@@ -1320,18 +1325,16 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         start: usize,
         exclusive_stop: usize,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     ) -> impl Iterator<Item = Type<'db>> + 'a
     where
         'db: 'a,
     {
         let step = step.get();
-        let step_abs = step.unsigned_abs() as usize;
         let mut distance = start;
 
         std::iter::from_fn(move || {
-            if (step > 0 && distance <= exclusive_stop) || (step < 0 && distance >= exclusive_stop)
-            {
+            if distance <= exclusive_stop {
                 return None;
             }
 
@@ -1343,16 +1346,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     )
                 });
 
-            if step > 0 {
-                if distance.saturating_sub(exclusive_stop) <= step_abs {
-                    distance = exclusive_stop;
-                } else {
-                    distance -= step_abs;
-                }
-            } else if exclusive_stop - distance <= step_abs {
+            if distance.saturating_sub(exclusive_stop) <= step {
                 distance = exclusive_stop;
             } else {
-                distance += step_abs;
+                distance -= step;
             }
 
             Some(element)
@@ -1413,7 +1410,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     ) -> VariableTupleSlicePlan {
         self.fixed_front_slice_plan(start, stop, step)
             .or_else(|| self.fixed_back_slice_plan(start, stop, step))
@@ -1426,9 +1423,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     ) -> Option<VariableTupleSlicePlan> {
-        debug_assert!(step.get() > 0);
         let minimum_len = self.len().minimum();
 
         if let Some(stop) = Self::nonnegative_slice_index(stop)
@@ -1438,13 +1434,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 return Some(VariableTupleSlicePlan::Empty);
             }
 
-            if let Ok(step_usize) = usize::try_from(step.get())
-                && let Some(nonzero_step) = NonZeroUsize::new(step_usize)
-                && Self::last_forward_slice_index(start, stop, nonzero_step)
-                    .is_some_and(|last| last < minimum_len)
+            if Self::last_forward_slice_index(start, stop, step)
+                .is_some_and(|last| last < minimum_len)
             {
                 return Some(VariableTupleSlicePlan::Fixed(
-                    FixedPositionSlice::front_forward(start, stop, nonzero_step),
+                    FixedPositionSlice::front_forward(start, stop, step),
                 ));
             }
         }
@@ -1456,9 +1450,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     ) -> Option<VariableTupleSlicePlan> {
-        debug_assert!(step.get() > 0);
         let minimum_len = self.len().minimum();
 
         let start_distance = Self::distance_from_end(start?)?;
@@ -1500,7 +1493,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     ) -> Option<VariableTupleSlicePlan> {
         let step_value = step.get();
 
@@ -1571,8 +1564,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     fixed_prefix: None,
                     variable: VariableSlice {
                         include_variable: false,
-                        prefix_start: self.prefix_len(),
-                        prefix_stop: self.prefix_len(),
                         suffix_start: start,
                         suffix_stop: suffix_union_stop,
                     },
@@ -1608,8 +1599,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 .map(|prefix_start| FixedSlice::prefix(Some(prefix_start), None, step)),
             variable: VariableSlice {
                 include_variable: true,
-                prefix_start: self.prefix_len(),
-                prefix_stop: self.prefix_len(),
                 suffix_start: 0,
                 suffix_stop: suffix_stop.unwrap_or_else(|| self.suffix_len()),
             },
@@ -1621,7 +1610,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         start: usize,
         stop: ForwardSliceStop,
-        step: NonZeroI32,
+        step: NonZeroUsize,
     ) -> VariableTupleSlicePlan {
         let suffix_stop = stop.suffix_stop(self);
 
@@ -1630,8 +1619,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 fixed_prefix: Some(FixedSlice::prefix(Some(start), None, step)),
                 variable: VariableSlice {
                     include_variable: true,
-                    prefix_start: self.prefix_len(),
-                    prefix_stop: self.prefix_len(),
                     suffix_start: 0,
                     suffix_stop,
                 },
@@ -1650,8 +1637,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             fixed_prefix: None,
             variable: VariableSlice {
                 include_variable: true,
-                prefix_start: self.prefix_len(),
-                prefix_stop: self.prefix_len(),
                 suffix_start: 0,
                 suffix_stop: variable_suffix_stop,
             },
