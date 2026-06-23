@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
 use ty_python_core::predicate::{
-    ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
+    ClassPatternPredicateKind, MappingPatternEntryPredicateKind, PatternPredicateKind,
     SequencePatternPredicateKind,
 };
 
@@ -59,6 +59,129 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Bytearray.to_instance(db))
 }
 
+fn sequence_pattern_getitem_method<'db>(
+    db: &'db dyn Db,
+    indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
+    fallback_return_type: Option<Type<'db>>,
+) -> CallableType<'db> {
+    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
+
+    let overloads = indexed_element_types
+        .into_iter()
+        .map(|(index, element_type)| {
+            Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        self_parameter(),
+                        Parameter::positional_only(Some(Name::new_static("index")))
+                            .with_annotated_type(Type::int_literal(index)),
+                    ],
+                ),
+                element_type,
+            )
+        });
+    let fallback_overload = fallback_return_type.map(|fallback_return_type| {
+        Signature::new(
+            Parameters::new(
+                db,
+                [
+                    self_parameter(),
+                    Parameter::positional_only(Some(Name::new_static("index")))
+                        .with_annotated_type(KnownClass::Int.to_instance(db)),
+                ],
+            ),
+            fallback_return_type,
+        )
+    });
+
+    CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads.chain(fallback_overload)),
+        CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
+    )
+}
+
+/// Build the structural type used for a fixed-length sequence pattern.
+///
+/// For a pattern like:
+///
+/// ```python
+/// match value:
+///     case [int(), str()]:
+///         ...
+/// ```
+///
+/// this returns the sequence-pattern runtime type plus a synthesized protocol
+/// whose `__len__` and indexed `__getitem__` methods encode the fixed length
+/// and element types.
+pub(crate) fn exact_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    element_types: impl ExactSizeIterator<Item = Type<'db>>,
+) -> Type<'db> {
+    let Ok(length) = i64::try_from(element_types.len()) else {
+        return sequence_pattern_type_builder(db).build();
+    };
+
+    // `False == 0` and `True == 1`, so the protocol must accept both literals.
+    let length_type = match length {
+        0 => UnionType::from_two_elements(db, Type::int_literal(0), Type::bool_literal(false)),
+        1 => UnionType::from_two_elements(db, Type::int_literal(1), Type::bool_literal(true)),
+        _ => Type::int_literal(length),
+    };
+
+    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
+
+    let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
+    let len_method = CallableType::function_like(db, len_signature);
+
+    let getitem_method = (element_types.len() > 0).then(|| {
+        (
+            "__getitem__",
+            sequence_pattern_getitem_method(db, (0..length).zip(element_types), None),
+        )
+    });
+
+    let protocol = Type::protocol_with_methods(
+        db,
+        std::iter::once(("__len__", len_method)).chain(getitem_method),
+    );
+
+    sequence_pattern_type_builder(db)
+        .add_positive(protocol)
+        .build()
+}
+
+/// Build the structural type used for a sequence pattern containing `*rest`.
+///
+/// Fixed prefix elements use non-negative indices and fixed suffix elements use
+/// negative indices. Other integer indices retain the sequence's element type.
+pub(crate) fn starred_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    prefix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
+    suffix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
+) -> Type<'db> {
+    if prefix_element_types.len() == 0 && suffix_element_types.len() == 0 {
+        return sequence_pattern_type_builder(db).build();
+    }
+
+    let Ok(suffix_length) = i64::try_from(suffix_element_types.len()) else {
+        return sequence_pattern_type_builder(db).build();
+    };
+
+    let indexed_element_types = (0_i64..)
+        .zip(prefix_element_types)
+        .chain((-suffix_length..0).zip(suffix_element_types));
+    let getitem_method =
+        sequence_pattern_getitem_method(db, indexed_element_types, Some(Type::object()));
+    let protocol = Type::protocol_with_methods(db, [("__getitem__", getitem_method)]);
+
+    sequence_pattern_type_builder(db)
+        .add_positive(protocol)
+        .build()
+}
+
 /// Return whether every value in `subject_ty` is statically guaranteed to match this class pattern.
 ///
 /// Attribute subpatterns are checked recursively against their statically known member types. A
@@ -110,8 +233,7 @@ fn class_pattern_is_exhaustive(
         return !subject_is_non_final_subclass;
     }
 
-    let positional_sources =
-        class_pattern_positional_sources(db, Some(class), kind.positional.len());
+    let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
     let extracts_attribute = !kind.keywords.is_empty()
         || positional_sources
             .iter()
@@ -146,7 +268,6 @@ enum ClassMatchArgs<'db> {
     PossiblyUndefined,
 }
 
-#[derive(Clone)]
 enum ClassPatternPositionalSource {
     MatchSelf,
     Attribute(Name),
@@ -184,21 +305,30 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
         .any(|base| {
-            base.class_literal(db)
-                .known(db)
-                .is_some_and(KnownClass::has_match_self_flag)
+            matches!(
+                base.class_literal(db).known(db),
+                Some(
+                    KnownClass::Bool
+                        | KnownClass::Bytearray
+                        | KnownClass::Bytes
+                        | KnownClass::Dict
+                        | KnownClass::Float
+                        | KnownClass::FrozenSet
+                        | KnownClass::Int
+                        | KnownClass::List
+                        | KnownClass::Set
+                        | KnownClass::Str
+                        | KnownClass::Tuple
+                )
+            )
         })
 }
 
 fn class_pattern_positional_sources(
     db: &dyn Db,
-    class: Option<ClassLiteral<'_>>,
+    class: ClassLiteral<'_>,
     positional_count: usize,
 ) -> Vec<ClassPatternPositionalSource> {
-    let Some(class) = class else {
-        return vec![ClassPatternPositionalSource::Unknown; positional_count];
-    };
-
     let fixed = match class_match_args_type(db, class) {
         ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
             return (0..positional_count)
@@ -264,10 +394,10 @@ fn pattern_is_exhaustive_for_subject(
 /// guarantee that a particular key is present.
 fn mapping_pattern_is_exhaustive(
     db: &dyn Db,
-    kind: &MappingPatternPredicateKind<'_>,
+    entries: &[MappingPatternEntryPredicateKind<'_>],
     subject_ty: Type<'_>,
 ) -> bool {
-    if kind.is_irrefutable() {
+    if entries.is_empty() {
         return subject_ty.is_subtype_of(db, mapping_pattern_type(db));
     }
 
@@ -275,7 +405,7 @@ fn mapping_pattern_is_exhaustive(
         return false;
     };
 
-    kind.entries.iter().all(|entry| {
+    entries.iter().all(|entry| {
         let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
         let Some(key) = key_ty.as_string_literal() else {
             return false;
@@ -623,7 +753,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
             })
         }
         PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
+            if kind.is_empty() {
                 Some(mapping_pattern_type(db))
             } else {
                 None
@@ -640,129 +770,6 @@ fn subject_independent_definite_match_pattern_type<'db>(
         PatternPredicateKind::Value(_) => None,
         _ => Some(definite_match_pattern_type(db, kind)),
     }
-}
-
-fn sequence_pattern_getitem_method<'db>(
-    db: &'db dyn Db,
-    indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
-    fallback_return_type: Option<Type<'db>>,
-) -> CallableType<'db> {
-    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
-
-    let overloads = indexed_element_types
-        .into_iter()
-        .map(|(index, element_type)| {
-            Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        self_parameter(),
-                        Parameter::positional_only(Some(Name::new_static("index")))
-                            .with_annotated_type(Type::int_literal(index)),
-                    ],
-                ),
-                element_type,
-            )
-        });
-    let fallback_overload = fallback_return_type.map(|fallback_return_type| {
-        Signature::new(
-            Parameters::new(
-                db,
-                [
-                    self_parameter(),
-                    Parameter::positional_only(Some(Name::new_static("index")))
-                        .with_annotated_type(KnownClass::Int.to_instance(db)),
-                ],
-            ),
-            fallback_return_type,
-        )
-    });
-
-    CallableType::new(
-        db,
-        CallableSignature::from_overloads(overloads.chain(fallback_overload)),
-        CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
-    )
-}
-
-/// Build the structural type used for a fixed-length sequence pattern.
-///
-/// For a pattern like:
-///
-/// ```python
-/// match value:
-///     case [int(), str()]:
-///         ...
-/// ```
-///
-/// this returns the sequence-pattern runtime type plus a synthesized protocol
-/// whose `__len__` and indexed `__getitem__` methods encode the fixed length
-/// and element types.
-pub(crate) fn exact_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
-    element_types: impl ExactSizeIterator<Item = Type<'db>>,
-) -> Type<'db> {
-    let Ok(length) = i64::try_from(element_types.len()) else {
-        return sequence_pattern_type_builder(db).build();
-    };
-
-    // `False == 0` and `True == 1`, so the protocol must accept both literals.
-    let length_type = match length {
-        0 => UnionType::from_two_elements(db, Type::int_literal(0), Type::bool_literal(false)),
-        1 => UnionType::from_two_elements(db, Type::int_literal(1), Type::bool_literal(true)),
-        _ => Type::int_literal(length),
-    };
-
-    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
-
-    let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
-    let len_method = CallableType::function_like(db, len_signature);
-
-    let getitem_method = (element_types.len() > 0).then(|| {
-        (
-            "__getitem__",
-            sequence_pattern_getitem_method(db, (0..length).zip(element_types), None),
-        )
-    });
-
-    let protocol = Type::protocol_with_methods(
-        db,
-        std::iter::once(("__len__", len_method)).chain(getitem_method),
-    );
-
-    sequence_pattern_type_builder(db)
-        .add_positive(protocol)
-        .build()
-}
-
-/// Build the structural type used for a sequence pattern containing `*rest`.
-///
-/// Fixed prefix elements use non-negative indices and fixed suffix elements use
-/// negative indices. Other integer indices retain the sequence's element type.
-pub(crate) fn starred_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
-    prefix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
-    suffix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
-) -> Type<'db> {
-    if prefix_element_types.len() == 0 && suffix_element_types.len() == 0 {
-        return sequence_pattern_type_builder(db).build();
-    }
-
-    let Ok(suffix_length) = i64::try_from(suffix_element_types.len()) else {
-        return sequence_pattern_type_builder(db).build();
-    };
-
-    let indexed_element_types = (0_i64..)
-        .zip(prefix_element_types)
-        .chain((-suffix_length..0).zip(suffix_element_types));
-    let getitem_method =
-        sequence_pattern_getitem_method(db, indexed_element_types, Some(Type::object()));
-    let protocol = Type::protocol_with_methods(db, [("__getitem__", getitem_method)]);
-
-    sequence_pattern_type_builder(db)
-        .add_positive(protocol)
-        .build()
 }
 
 /// Return the values that are guaranteed to match `kind`.
@@ -799,7 +806,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
             }
         }
         PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
+            if kind.is_empty() {
                 mapping_pattern_type(db)
             } else {
                 Type::Never
