@@ -167,6 +167,47 @@ fn recursive_nominal_growth_normalizes_complete_union_distribution() {
 }
 
 #[test]
+fn recursive_nominal_growth_normalizes_multiple_distribution_groups() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distributed = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[list_int]),
+            KnownClass::Set.to_specialized_instance(&db, &[list_str]),
+            KnownClass::List.to_specialized_instance(&db, &[list_int]),
+            KnownClass::List.to_specialized_instance(&db, &[list_str]),
+        ],
+    );
+    let current = KnownClass::List.to_specialized_instance(&db, &[distributed]);
+    let normalized_distribution = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[div]),
+            KnownClass::List.to_specialized_instance(&db, &[div]),
+        ],
+    );
+    let expected = KnownClass::List.to_specialized_instance(&db, &[normalized_distribution]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        Some(expected)
+    );
+}
+
+#[test]
 fn recursive_nominal_growth_requires_all_union_elements() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));

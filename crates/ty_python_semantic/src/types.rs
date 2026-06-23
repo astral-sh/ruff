@@ -1471,7 +1471,7 @@ impl<'db> Type<'db> {
         }))
     }
 
-    /// Returns the branches in a single structural distribution of `wrapped`.
+    /// Returns the branches in every complete structural distribution of `wrapped`.
     fn matching_union_distribution(
         db: &'db dyn Db,
         current: UnionType<'db>,
@@ -1509,7 +1509,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        groups
+        let matched: Vec<_> = groups
             .into_iter()
             .filter(|(_, branches)| {
                 wrapped.elements(db).iter().all(|wrapped_element| {
@@ -1518,9 +1518,10 @@ impl<'db> Type<'db> {
                         .any(|(_, branch_element)| branch_element == wrapped_element)
                 })
             })
-            .map(|(_, branches)| branches)
-            .exactly_one()
-            .ok()
+            .flat_map(|(_, branches)| branches)
+            .collect();
+
+        (!matched.is_empty()).then_some(matched)
     }
 
     /// Returns whether `current` contains `target` outside negative intersection elements.

@@ -258,6 +258,35 @@ while True:
     reveal_type(x)  # revealed: list[list[Divergent] | set[Divergent]] | set[list[Divergent] | set[Divergent]]
 ```
 
+## Recursive intersection growth with multiple narrowing targets
+
+When narrowing creates multiple complete DNF distributions of the previous union, cycle recovery
+should normalize every complete group.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeIs
+
+class Container[T]: ...
+class Other[T]: ...
+
+def is_container_or_other[T](x: object, y: T) -> TypeIs[Container[T] | Other[T]]:
+    return True
+
+while True:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    if is_container_or_other(x, type(x)):
+        x = [x]  # error: [possibly-unresolved-reference]
+    else:
+        x = {x}  # error: [possibly-unresolved-reference]
+    reveal_type(x)  # revealed: list[list[Divergent] | set[Divergent]] | set[list[Divergent] | set[Divergent]]
+```
+
 ## Type replacement with a lazy function signature
 
 Type replacement while recovering the first `function` definition must not evaluate its lazy
