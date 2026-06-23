@@ -677,7 +677,7 @@ If the match pattern is not an instance of `type`, we raise a diagnostic:
 from typing import Any
 from ty_extensions import Intersection
 
-def _(val: object, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
+def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
     Invalid1 = "foo"
 
     match val:
@@ -688,7 +688,8 @@ def _(val: object, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: 
 
     match val:
         # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
-        case Invalid2(): ...
+        case Invalid2():
+            pass
         case Valid1():  # fine
             pass
         case Valid2():  # fine

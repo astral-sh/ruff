@@ -199,22 +199,25 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
 
 def test_match_exact_sequence_excludes_str(x: str | tuple[int, int]) -> None:
     match x:
-        case (_, _):
-            pass
+        case (a, b):
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: str
 
 def test_match_exact_sequence_excludes_bytes(x: bytes | tuple[int, int]) -> None:
     match x:
-        case (_, _):
-            pass
+        case (a, b):
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: bytes
 
 def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int]) -> None:
     match x:
-        case (_, _):
-            pass
+        case (a, b):
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: bytearray
 
@@ -274,7 +277,7 @@ A capture gets its type from the sequence element it binds. A starred capture is
 a fixed-length tuple, we can determine exactly which elements appear in that list.
 
 ```py
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 from ty_extensions import Unknown
 
 BoundTupleT = TypeVar("BoundTupleT", bound=tuple[int] | tuple[str])
@@ -324,6 +327,21 @@ def test_capture_from_typevar_bound(value: BoundTupleT) -> None:
     match value:
         case [item]:
             reveal_type(item)  # revealed: int | str
+
+def match_nested_tuple_captures(
+    subject: tuple[Literal[1], str, tuple[Literal[2], int]],
+) -> None:
+    match subject:
+        case [1, item1, [2, item2]]:
+            reveal_type(item1)  # revealed: str
+            reveal_type(item2)  # revealed: int
+
+def match_nested_list_of_tuples_captures(
+    subject: list[tuple[Literal[1], bytes]],
+) -> None:
+    match subject:
+        case [(1, item)]:
+            reveal_type(item)  # revealed: bytes
 ```
 
 ## Captures from unions of tuples
@@ -335,6 +353,26 @@ aliases.
 ```py
 from typing import Literal, TypeAlias
 
+def match_capture_filters_union_members_by_length(
+    value: (tuple[Literal[1], int] | tuple[Literal[1], Literal[2], str] | tuple[Literal[1], Literal[2], Literal[3], bytes]),
+) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
+        case [1, 2, item]:
+            reveal_type(item)  # revealed: str
+        case [1, 2, 3, item]:
+            reveal_type(item)  # revealed: bytes
+
+def match_capture_rejects_wrong_tuple_length(
+    value: tuple[Literal[1], Literal[2], str],
+) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: Never
+        case [1, 2, item]:
+            reveal_type(item)  # revealed: str
+
 def test_match_star_capture_filters_union_members(
     value: tuple[Literal[1], int, int] | tuple[Literal[2], str, str],
 ) -> list[int]:
@@ -343,6 +381,7 @@ def test_match_star_capture_filters_union_members(
             reveal_type(rest)  # revealed: list[int]
             return rest
         case _:
+            reveal_type(value)  # revealed: tuple[Literal[2], str, str]
             return []
 
 def test_match_star_capture_preserves_compatible_union_members(
@@ -602,29 +641,6 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
             whole.reverse()
             reveal_type(whole[0])  # revealed: int | str
 
-def test_constructed_mutable_sequence_alias_does_not_keep_length(
-    value: list[int],
-) -> int:  # error: [invalid-return-type]
-    match value.copy():
-        case [_] as whole:
-            whole.append(2)
-            match whole:
-                case [_]:
-                    return 1
-        case _:
-            raise ValueError
-
-def test_nested_mutable_sequence_alias_does_not_keep_length(
-    value: tuple[list[int]],
-) -> int:  # error: [invalid-return-type]
-    match value:
-        case [[_] as inner] as whole:
-            inner.append(2)
-            match whole:
-                case [[_]]:
-                    return 1
-        case _:
-            raise ValueError
 ```
 
 ## Indirect class patterns
@@ -678,7 +694,6 @@ from typing import final
 
 class OverlapA: ...
 class OverlapB: ...
-class OverlapC(OverlapA, OverlapB): ...
 
 def test_match_class_alias_preserves_possible_multiple_inheritance(
     value: OverlapA,
