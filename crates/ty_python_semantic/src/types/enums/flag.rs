@@ -67,6 +67,7 @@ impl FlagBoundary {
 pub(crate) struct FlagMetadata<'db> {
     boundary: FlagBoundary,
     member_type: Option<Type<'db>>,
+    preserves_negative_values: bool,
     canonical_members_are_known: bool,
     member_values: FxHashMap<Name, i64>,
     named_values: FxHashMap<i64, Name>,
@@ -165,6 +166,8 @@ impl<'db> FlagMetadata<'db> {
         let mut all_values_are_known = true;
         let mut masks_are_known = true;
         let member_type = flag_member_type(db, class);
+        let preserves_negative_values = Program::get(db).python_version(db) < PythonVersion::PY311
+            && Type::ClassLiteral(class).is_subtype_of(db, KnownClass::IntFlag.to_subclass_of(db));
 
         if member_type.values_are_known {
             for name in metadata.members.keys() {
@@ -214,6 +217,7 @@ impl<'db> FlagMetadata<'db> {
         Self {
             boundary,
             member_type: member_type.ty,
+            preserves_negative_values,
             canonical_members_are_known: all_values_are_known,
             member_values,
             named_values,
@@ -287,6 +291,9 @@ impl<'db> FlagMetadata<'db> {
         // boundary policy. This matters for explicitly declared negative values that would not
         // otherwise satisfy the class's effective mask.
         if self.named_member(value).is_some() {
+            return FlagConstruction::Flag(value);
+        }
+        if self.preserves_negative_values && value < 0 {
             return FlagConstruction::Flag(value);
         }
 

@@ -2355,6 +2355,27 @@ LegacyOrder = Flag("LegacyOrder", {"HIGH": 8, "LOW": 1, "NEXT": auto()})
 reveal_type(LegacyOrder.NEXT.value)  # revealed: Literal[2]
 ```
 
+## IntFlag negative values before Python 3.11
+
+Before Python 3.11, `IntFlag` preserves negative pseudo-member values instead of normalizing them
+to the class's positive mask.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import IntFlag
+
+class LegacyIntFlag(IntFlag):
+    A = 1
+    NOT_A = 6
+
+reveal_type(LegacyIntFlag(-2))  # revealed: LegacyIntFlag
+reveal_type(~LegacyIntFlag.A)  # revealed: LegacyIntFlag
+```
+
 ## Function syntax
 
 ### String names (positional)
