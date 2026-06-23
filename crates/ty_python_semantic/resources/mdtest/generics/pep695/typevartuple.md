@@ -309,16 +309,20 @@ def variadic1(*args: int) -> tuple[int, ...]:
 def variadic2(*args: int) -> tuple[str, ...]:
     raise NotImplementedError
 
+def accepts_object(value: object, /) -> tuple[int]:
+    raise NotImplementedError
+
 def keyword_only(*, x: int) -> tuple[int]:
     raise NotImplementedError
 
 def gradual(callback: Callable[..., tuple[int, ...]]) -> None:
-    reveal_type(simple(callback))  # revealed: tuple[Any, ...]
+    reveal_type(simple(callback))  # revealed: tuple[int, ...]
 
 reveal_type(simple(positional_only))  # revealed: tuple[int, str]
 reveal_type(simple(standard))  # revealed: tuple[int, str]
 reveal_type(simple(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(simple(variadic1))  # revealed: tuple[int, ...]
+reveal_type(simple(accepts_object))  # revealed: tuple[int]
 
 # TODO: Report the incompatible return type after callable specialization fails.
 reveal_type(simple(variadic2))  # revealed: tuple[Unknown, ...]
