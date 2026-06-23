@@ -1397,7 +1397,7 @@ impl<'db> Type<'db> {
             if replacement == Type::Intersection(intersection) {
                 break;
             }
-            normalized = normalized.apply_type_mapping(
+            let next = normalized.apply_type_mapping(
                 db,
                 &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                     from: Type::Intersection(intersection),
@@ -1405,6 +1405,10 @@ impl<'db> Type<'db> {
                 },
                 TypeContext::default(),
             );
+            if next == normalized {
+                break;
+            }
+            normalized = next;
         }
 
         (normalized != original).then_some(normalized)
@@ -1428,7 +1432,7 @@ impl<'db> Type<'db> {
                 _ => None,
             })
         {
-            normalized = normalized.apply_type_mapping(
+            let next = normalized.apply_type_mapping(
                 db,
                 &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                     from: Type::Union(distributed),
@@ -1436,6 +1440,10 @@ impl<'db> Type<'db> {
                 },
                 TypeContext::default(),
             );
+            if next == normalized {
+                break;
+            }
+            normalized = next;
         }
         normalized
     }

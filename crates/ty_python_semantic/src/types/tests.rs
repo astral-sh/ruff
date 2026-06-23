@@ -258,6 +258,64 @@ fn recursive_nominal_growth_normalizes_multiple_distribution_groups() {
 }
 
 #[test]
+fn recursive_nominal_growth_stops_at_opaque_distributed_union() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distributed = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[list_int]),
+            KnownClass::Set.to_specialized_instance(&db, &[list_str]),
+        ],
+    );
+    let literal = Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
+        &db,
+        distributed,
+    )));
+    let current = KnownClass::List.to_specialized_instance(&db, &[literal]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        None
+    );
+}
+
+#[test]
+fn recursive_nominal_growth_stops_at_opaque_flattened_intersection() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let previous = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
+    let literal = Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(&db, previous)));
+    let current = KnownClass::List.to_specialized_instance(&db, &[literal]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        None
+    );
+}
+
+#[test]
 fn recursive_nominal_growth_requires_all_union_elements() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
