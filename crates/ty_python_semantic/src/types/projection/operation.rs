@@ -201,6 +201,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         method_name: &Name,
     ) -> Self {
+        if !self.has_top_level_cycle_artifact(db) {
+            return self;
+        }
+
         match self {
             Type::Projection(projection)
                 if projection.path(db).ops().last().is_some_and(|op| {

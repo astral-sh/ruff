@@ -46,7 +46,7 @@ impl<'db> Type<'db> {
 
     /// Inference-time API: returns whether this type still contains a cycle artifact.
     pub(crate) fn contains_cycle_artifact(self, db: &'db dyn Db) -> bool {
-        !self.cycle_artifact_roots(db).is_empty()
+        self.contains_nested_cycle_artifact(db, true)
     }
 
     fn has_top_level_cycle_artifact(self, db: &'db dyn Db) -> bool {
@@ -59,11 +59,8 @@ impl<'db> Type<'db> {
 
     /// Returns whether applying a projection operation can observe a cycle artifact.
     fn needs_projection_operation(self, db: &'db dyn Db, include_nested_divergent: bool) -> bool {
-        if self.has_top_level_cycle_artifact(db) || !self.projection_artifact_roots(db).is_empty() {
-            return true;
-        }
-
-        include_nested_divergent && !self.cycle_artifact_roots(db).is_empty()
+        self.has_top_level_cycle_artifact(db)
+            || self.contains_nested_cycle_artifact(db, include_nested_divergent)
     }
 
     /// Returns `true` if both types originate from the same cycle root, regardless
@@ -411,6 +408,31 @@ impl<'db> Type<'db> {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn contains_nested_cycle_artifact(self, db: &'db dyn Db, include_divergent: bool) -> bool {
+        match self {
+            Type::Divergent(_) => include_divergent,
+            Type::Projection(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| element.contains_nested_cycle_artifact(db, include_divergent)),
+            Type::NominalInstance(_) => {
+                if let Some(spec) = self.exact_tuple_instance_spec(db) {
+                    spec.as_ref().iter_all_elements().any(|element| {
+                        element.contains_nested_cycle_artifact(db, include_divergent)
+                    })
+                } else if let Some((_, specialization)) = self.direct_class_specialization(db) {
+                    specialization.types(db).iter().any(|argument| {
+                        argument.contains_nested_cycle_artifact(db, include_divergent)
+                    })
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
     }
 
