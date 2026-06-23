@@ -2446,8 +2446,8 @@ reveal_type(LegacyOrder.NEXT.value)  # revealed: Literal[2]
 
 ## IntFlag negative values before Python 3.11
 
-Before Python 3.11, `IntFlag` preserves negative pseudo-member values instead of normalizing them
-to the class's positive mask.
+Before Python 3.11, `IntFlag` preserves negative pseudo-member values instead of normalizing them to
+the class's positive mask.
 
 ```toml
 [environment]

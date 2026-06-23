@@ -60,6 +60,19 @@ impl FlagBoundary {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update)]
+    struct FlagMetadataFlags: u8 {
+        const PRESERVES_ASSIGNED_VALUE_TYPE = 1 << 0;
+        const PRESERVES_NEGATIVE_VALUES = 1 << 1;
+        const USES_LEGACY_INVERSION = 1 << 2;
+        const CANONICAL_MEMBERS_ARE_KNOWN = 1 << 3;
+        const CANONICAL_MEMBERS_ARE_IN_VALUE_ORDER = 1 << 4;
+    }
+}
+
+impl get_size2::GetSize for FlagMetadataFlags {}
+
 /// Cached integer semantics for a `Flag` class.
 ///
 /// A profile stores only masks and direct lookup tables. It never enumerates the combinations of
@@ -68,14 +81,10 @@ impl FlagBoundary {
 pub(crate) struct FlagMetadata<'db> {
     boundary: FlagBoundary,
     member_type: Option<Type<'db>>,
-    preserves_assigned_value_type: bool,
-    preserves_negative_values: bool,
-    uses_legacy_inversion: bool,
-    canonical_members_are_known: bool,
+    flags: FlagMetadataFlags,
     member_values: FxHashMap<Name, i64>,
     named_values: FxHashMap<i64, Name>,
     canonical_members: Box<[(Name, i64)]>,
-    canonical_members_are_in_value_order: bool,
     flag_mask: Option<i64>,
     singles_mask: Option<i64>,
 }
@@ -227,18 +236,35 @@ impl<'db> FlagMetadata<'db> {
         let canonical_members_are_in_value_order = canonical_members
             .windows(2)
             .all(|members| members[0].1 < members[1].1);
+        let mut flags = FlagMetadataFlags::empty();
+        flags.set(
+            FlagMetadataFlags::PRESERVES_ASSIGNED_VALUE_TYPE,
+            preserves_assigned_value_type,
+        );
+        flags.set(
+            FlagMetadataFlags::PRESERVES_NEGATIVE_VALUES,
+            preserves_negative_values,
+        );
+        flags.set(
+            FlagMetadataFlags::USES_LEGACY_INVERSION,
+            uses_legacy_inversion,
+        );
+        flags.set(
+            FlagMetadataFlags::CANONICAL_MEMBERS_ARE_KNOWN,
+            all_values_are_known,
+        );
+        flags.set(
+            FlagMetadataFlags::CANONICAL_MEMBERS_ARE_IN_VALUE_ORDER,
+            canonical_members_are_in_value_order,
+        );
 
         Self {
             boundary,
             member_type: member_type.ty,
-            preserves_assigned_value_type,
-            preserves_negative_values,
-            uses_legacy_inversion,
-            canonical_members_are_known: all_values_are_known,
+            flags,
             member_values,
             named_values,
             canonical_members: canonical_members.into_boxed_slice(),
-            canonical_members_are_in_value_order,
             flag_mask: masks_are_known.then_some(flag_mask),
             singles_mask: masks_are_known.then_some(singles_mask),
         }
@@ -249,7 +275,8 @@ impl<'db> FlagMetadata<'db> {
     }
 
     pub(super) const fn preserves_assigned_value_type(&self) -> bool {
-        self.preserves_assigned_value_type
+        self.flags
+            .contains(FlagMetadataFlags::PRESERVES_ASSIGNED_VALUE_TYPE)
     }
 
     fn accepts_operand(&self, db: &dyn Db, operand: Type<'db>) -> bool {
@@ -258,7 +285,8 @@ impl<'db> FlagMetadata<'db> {
     }
 
     pub(crate) const fn canonical_members_are_known(&self) -> bool {
-        self.canonical_members_are_known
+        self.flags
+            .contains(FlagMetadataFlags::CANONICAL_MEMBERS_ARE_KNOWN)
     }
 
     pub(crate) fn canonical_members(&self) -> &[(Name, i64)] {
@@ -266,7 +294,8 @@ impl<'db> FlagMetadata<'db> {
     }
 
     const fn canonical_members_are_in_value_order(&self) -> bool {
-        self.canonical_members_are_in_value_order
+        self.flags
+            .contains(FlagMetadataFlags::CANONICAL_MEMBERS_ARE_IN_VALUE_ORDER)
     }
 
     fn value_has_missing_single_bit_member(&self, value: i64) -> Option<bool> {
@@ -322,7 +351,11 @@ impl<'db> FlagMetadata<'db> {
         if self.named_member(value).is_some() {
             return FlagConstruction::Flag(value);
         }
-        if self.preserves_negative_values && value < 0 {
+        if self
+            .flags
+            .contains(FlagMetadataFlags::PRESERVES_NEGATIVE_VALUES)
+            && value < 0
+        {
             return FlagConstruction::Flag(value);
         }
 
@@ -351,7 +384,7 @@ impl<'db> FlagMetadata<'db> {
     }
 
     fn legacy_invert(&self, value: i64) -> FlagConstruction {
-        if !self.canonical_members_are_known {
+        if !self.canonical_members_are_known() {
             return FlagConstruction::Unknown;
         }
         let inverted = self
@@ -717,15 +750,12 @@ fn flag_integer_binary_result<'db>(
     enum_class: EnumClassLiteral<'db>,
     literal: Option<EnumLiteralType<'db>>,
     operand: Type<'db>,
-    standard_dispatch: bool,
     integer_value: Option<i64>,
-    ejected_type: Option<Type<'db>>,
     method: &str,
     operation: fn(i64, i64) -> i64,
 ) -> Option<Type<'db>> {
     let (_, flag) = enum_metadata_and_flag(db, enum_class)?;
     if !flag.accepts_operand(db, operand)
-        || !standard_dispatch
         || !class_uses_standard_flag_operation(db, enum_class, method)
     {
         return None;
@@ -745,7 +775,7 @@ fn flag_integer_binary_result<'db>(
     }
 
     Some(match exact {
-        Some(value) => construction_type(db, enum_class, flag.construct(value), ejected_type),
+        Some(value) => construction_type(db, enum_class, flag.construct(value), None),
         None if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) => {
             possible_flag_or_int(db, enum_class)
         }
@@ -879,14 +909,15 @@ pub(crate) fn flag_binary_result<'db>(
                 op.reflected_dunder()
             };
             let standard_dispatch = flag_on_left || is_builtin_int_operand(db, integer);
+            if !standard_dispatch {
+                return None;
+            }
             flag_integer_binary_result(
                 db,
                 enum_class,
                 literal,
                 integer,
-                standard_dispatch,
                 integer.as_int_like_literal(),
-                None,
                 method,
                 operation,
             )
@@ -921,7 +952,10 @@ pub(crate) fn flag_invert_result<'db>(db: &'db dyn Db, operand: Type<'db>) -> Op
             },
         );
     };
-    let construction = if flag.uses_legacy_inversion {
+    let construction = if flag
+        .flags
+        .contains(FlagMetadataFlags::USES_LEGACY_INVERSION)
+    {
         flag.legacy_invert(value)
     } else {
         match flag.boundary() {
