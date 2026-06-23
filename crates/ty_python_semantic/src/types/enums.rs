@@ -444,6 +444,10 @@ impl<'db> EnumMetadata<'db> {
         };
 
         if let Some(EnumValueAnnotation::StandardLibrary(annotation)) = self.value_annotation
+            && !self
+                .flag
+                .as_ref()
+                .is_some_and(flag::FlagMetadata::preserves_assigned_value_type)
             && !known_constructor_preserves_value_type(db, value, annotation)
         {
             Some(annotation)
@@ -1157,7 +1161,9 @@ pub(crate) fn enum_metadata<'db>(
                 if is_direct_auto {
                     auto_members.insert(name.clone());
                 }
-                if let Some(symbolic_value) = symbolic_value {
+                if let Some(symbolic_value) = symbolic_value
+                    && value_ty.as_int_like_literal() != Some(symbolic_value)
+                {
                     value_ty = Type::int_literal(symbolic_value);
                 }
             }

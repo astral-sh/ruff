@@ -2145,6 +2145,7 @@ class BooleanValue(Flag):
     TRUE = True
     ONE = 1
 
+reveal_type(BooleanValue.TRUE.value)  # revealed: Literal[True]
 reveal_type(BooleanValue.ONE)  # revealed: Literal[BooleanValue.TRUE]
 reveal_type(enum_members(BooleanValue))  # revealed: tuple[Literal["TRUE"]]
 

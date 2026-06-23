@@ -67,6 +67,7 @@ impl FlagBoundary {
 pub(crate) struct FlagMetadata<'db> {
     boundary: FlagBoundary,
     member_type: Option<Type<'db>>,
+    preserves_assigned_value_type: bool,
     preserves_negative_values: bool,
     canonical_members_are_known: bool,
     member_values: FxHashMap<Name, i64>,
@@ -166,6 +167,8 @@ impl<'db> FlagMetadata<'db> {
         let mut all_values_are_known = true;
         let mut masks_are_known = true;
         let member_type = flag_member_type(db, class);
+        let preserves_assigned_value_type =
+            member_type.ty.is_none() && member_type.values_are_known;
         let preserves_negative_values = Program::get(db).python_version(db) < PythonVersion::PY311
             && Type::ClassLiteral(class).is_subtype_of(db, KnownClass::IntFlag.to_subclass_of(db));
 
@@ -217,6 +220,7 @@ impl<'db> FlagMetadata<'db> {
         Self {
             boundary,
             member_type: member_type.ty,
+            preserves_assigned_value_type,
             preserves_negative_values,
             canonical_members_are_known: all_values_are_known,
             member_values,
@@ -229,6 +233,10 @@ impl<'db> FlagMetadata<'db> {
 
     pub(crate) const fn boundary(&self) -> FlagBoundary {
         self.boundary
+    }
+
+    pub(super) const fn preserves_assigned_value_type(&self) -> bool {
+        self.preserves_assigned_value_type
     }
 
     fn accepts_operand(&self, db: &dyn Db, operand: Type<'db>) -> bool {
