@@ -140,17 +140,17 @@ we can transform `Co[P] | Co[Any]` in the following way:
 ```ignore
 Co[P] | Co[Any] = Co[P] | Co[Never] | Co[object] & Any
                 = Co[P] | Co[object] & Any
+                = Bottom[Co[P | Any]] | Top[Co[P | Any]] & Any
                 = Co[P | Any]
 ```
 
-The last step in this derivation is better followed in reverse. The second-to-last line is just the
-canonical interval representation of `Co[P | Any]`. For intersections, we need to do slightly more
-work to arrive at a structurally similar result:
+For intersections, we need to do slightly more work to arrive at a structurally similar result:
 
 ```ignore
 Co[P] & Co[Any] = Co[P] & (Co[Never] | Co[object] & Any)
                 = Co[P] & Co[Never] | Co[P] & Co[object] & Any
                 = Co[Never] | Co[P] & Any
+                = Bottom[Co[P & Any]] | Top[Co[P & Any]] & Any
                 = Co[P & Any]
 ```
 
@@ -159,11 +159,13 @@ For contravariant types, we get similar relations, where unions and intersection
 ```ignore
 Contra[P] | Contra[Any] = Contra[P] | Contra[object] | Contra[Never] & Any
                         = Contra[P] | Contra[Never] & Any
+                        = Bottom[Contra[P & Any]] | Top[Contra[P & Any]] & Any
                         = Contra[P & Any]
 
 Contra[P] & Contra[Any] = Contra[P] & (Contra[object] | Contra[Never] & Any)
                         = Contra[P] & Contra[object] | Contra[P] & Contra[Never] & Any
                         = Contra[object] | Contra[P] & Any
+                        = Bottom[Contra[P | Any]] | Top[Contra[P | Any]] & Any
                         = Contra[P | Any]
 ```
 
