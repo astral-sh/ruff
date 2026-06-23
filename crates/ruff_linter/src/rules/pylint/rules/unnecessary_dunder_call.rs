@@ -417,6 +417,11 @@ impl DunderReplacement {
                 "Use `*` operator",
                 OperatorPrecedence::MulDivRemain,
             )),
+            "__matmul__" => Some(Self::Operator(
+                "@",
+                "Use `@` operator",
+                OperatorPrecedence::MulDivRemain,
+            )),
             "__ne__" => Some(Self::Operator(
                 "!=",
                 "Use `!=` operator",
@@ -546,6 +551,7 @@ impl DunderReplacement {
             "__init__" => Some(Self::MessageOnly("Instantiate class directly")),
             "__instancecheck__" => Some(Self::MessageOnly("Use `isinstance()` builtin")),
             "__invert__" => Some(Self::MessageOnly("Use `~` operator")),
+            "__length_hint__" => Some(Self::MessageOnly("Use `operator.length_hint()` function")),
             "__neg__" => Some(Self::MessageOnly("Multiply by -1 instead")),
             "__pos__" => Some(Self::MessageOnly("Multiply by +1 instead")),
             "__pow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),

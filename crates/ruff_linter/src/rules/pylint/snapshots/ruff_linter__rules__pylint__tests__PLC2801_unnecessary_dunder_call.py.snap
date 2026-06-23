@@ -1136,6 +1136,7 @@ PLC2801 Unnecessary dunder call to `__ceil__`. Use `math.ceil()` function.
 138 | print((3.0).__ceil__())  # PLC2801
     |       ^^^^^^^^^^^^^^^^
 139 | print((3.0).__trunc__())  # PLC2801
+140 | Foo().__length_hint__()  # PLC2801
     |
 help: Use `math.ceil()` function
 
@@ -1146,5 +1147,34 @@ PLC2801 Unnecessary dunder call to `__trunc__`. Use `math.trunc()` function.
 138 | print((3.0).__ceil__())  # PLC2801
 139 | print((3.0).__trunc__())  # PLC2801
     |       ^^^^^^^^^^^^^^^^^
+140 | Foo().__length_hint__()  # PLC2801
+141 | Foo().__matmul__(Foo())  # PLC2801
     |
 help: Use `math.trunc()` function
+
+PLC2801 Unnecessary dunder call to `__length_hint__`. Use `operator.length_hint()` function.
+   --> unnecessary_dunder_call.py:140:1
+    |
+138 | print((3.0).__ceil__())  # PLC2801
+139 | print((3.0).__trunc__())  # PLC2801
+140 | Foo().__length_hint__()  # PLC2801
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+141 | Foo().__matmul__(Foo())  # PLC2801
+    |
+help: Use `operator.length_hint()` function
+
+PLC2801 [*] Unnecessary dunder call to `__matmul__`. Use `@` operator.
+   --> unnecessary_dunder_call.py:141:1
+    |
+139 | print((3.0).__trunc__())  # PLC2801
+140 | Foo().__length_hint__()  # PLC2801
+141 | Foo().__matmul__(Foo())  # PLC2801
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use `@` operator
+    |
+140 | Foo().__length_hint__()  # PLC2801
+    - Foo().__matmul__(Foo())  # PLC2801
+141 + Foo() @ Foo()  # PLC2801
+    |
+note: This is an unsafe fix and may change runtime behavior

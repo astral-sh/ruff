@@ -137,3 +137,5 @@ three = 1 if 1 else(3.0).__str__()
 print((3.0).__floor__())  # PLC2801
 print((3.0).__ceil__())  # PLC2801
 print((3.0).__trunc__())  # PLC2801
+Foo().__length_hint__()  # PLC2801
+Foo().__matmul__(Foo())  # PLC2801
