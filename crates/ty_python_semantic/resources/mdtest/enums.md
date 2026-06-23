@@ -2194,6 +2194,17 @@ def attributes(value: Permission):
 def gradual(left: Permission, right: Any):
     if isinstance(right, Permission):
         reveal_type(left | right)  # revealed: Permission
+
+class IntValue(int):
+    pass
+
+class MixedFlag(IntValue, Flag):
+    A = 1
+    B = 2
+
+# A Flag with a custom integer member type accepts that type, not every integer.
+reveal_type(MixedFlag.A | 2)  # revealed: int
+reveal_type(MixedFlag.A | IntValue(2))  # revealed: MixedFlag
 ```
 
 The boundary policy determines what happens to undeclared bits. `CONFORM` removes them, `EJECT`

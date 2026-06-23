@@ -162,7 +162,7 @@ pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 
-    pub(crate) flag: Option<flag::FlagMetadata>,
+    pub(crate) flag: Option<flag::FlagMetadata<'db>>,
 
     /// Members whose values were defined using `auto()`.
     pub(crate) auto_members: FxHashSet<Name>,

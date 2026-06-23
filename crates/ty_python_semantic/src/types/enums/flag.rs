@@ -62,9 +62,9 @@ impl FlagBoundary {
 /// A profile stores only masks and direct lookup tables. It never enumerates the combinations of
 /// declared flags, so its size and construction cost are linear in the number of declared names.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct FlagMetadata {
+pub(crate) struct FlagMetadata<'db> {
     boundary: FlagBoundary,
-    accepts_int_operands: bool,
+    member_type: Option<Type<'db>>,
     canonical_members_are_known: bool,
     member_values: FxHashMap<Name, i64>,
     named_values: FxHashMap<i64, Name>,
@@ -73,7 +73,12 @@ pub(crate) struct FlagMetadata {
     singles_mask: Option<i64>,
 }
 
-fn flag_member_type_is_known(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+struct FlagMemberType<'db> {
+    ty: Option<Type<'db>>,
+    values_are_known: bool,
+}
+
+fn flag_member_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> FlagMemberType<'db> {
     match class {
         ClassLiteral::Static(class) => {
             for base in class
@@ -83,27 +88,68 @@ fn flag_member_type_is_known(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
                 .filter_map(|base| base.class_literal(db).as_static())
             {
                 match base.known(db) {
-                    Some(KnownClass::Flag | KnownClass::IntFlag | KnownClass::Int) => return true,
+                    Some(KnownClass::Flag) => {
+                        return FlagMemberType {
+                            ty: None,
+                            values_are_known: true,
+                        };
+                    }
+                    Some(KnownClass::IntFlag | KnownClass::Int) => {
+                        return FlagMemberType {
+                            ty: Some(KnownClass::Int.to_instance(db)),
+                            values_are_known: true,
+                        };
+                    }
                     _ if Type::ClassLiteral(ClassLiteral::Static(base))
                         .is_subtype_of(db, KnownClass::Flag.to_subclass_of(db)) => {}
-                    _ => return false,
+                    _ => {
+                        let base = ClassLiteral::Static(base);
+                        return FlagMemberType {
+                            ty: Type::ClassLiteral(base)
+                                .is_subtype_of(db, KnownClass::Int.to_subclass_of(db))
+                                .then(|| base.to_non_generic_instance(db)),
+                            values_are_known: false,
+                        };
+                    }
                 }
             }
-            false
+            FlagMemberType {
+                ty: None,
+                values_are_known: false,
+            }
         }
-        ClassLiteral::DynamicEnum(enum_lit) => enum_lit.mixin_type(db).is_none_or(|mixin| {
-            mixin
-                .to_class_type(db)
-                .is_some_and(|mixin| mixin.known(db) == Some(KnownClass::Int))
-        }),
+        ClassLiteral::DynamicEnum(enum_lit) => match enum_lit.mixin_type(db) {
+            Some(mixin)
+                if mixin
+                    .to_class_type(db)
+                    .is_some_and(|mixin| mixin.known(db) == Some(KnownClass::Int)) =>
+            {
+                FlagMemberType {
+                    ty: Some(KnownClass::Int.to_instance(db)),
+                    values_are_known: true,
+                }
+            }
+            Some(_) => FlagMemberType {
+                ty: None,
+                values_are_known: false,
+            },
+            None => FlagMemberType {
+                ty: (enum_lit.base_class(db) == KnownClass::IntFlag)
+                    .then(|| KnownClass::Int.to_instance(db)),
+                values_are_known: true,
+            },
+        },
         ClassLiteral::Dynamic(_)
         | ClassLiteral::DynamicNamedTuple(_)
-        | ClassLiteral::DynamicTypedDict(_) => false,
+        | ClassLiteral::DynamicTypedDict(_) => FlagMemberType {
+            ty: None,
+            values_are_known: false,
+        },
     }
 }
 
-impl FlagMetadata {
-    pub(super) fn from_enum_metadata<'db>(
+impl<'db> FlagMetadata<'db> {
+    pub(super) fn from_enum_metadata(
         db: &'db dyn Db,
         class: ClassLiteral<'db>,
         metadata: &EnumMetadata<'db>,
@@ -116,9 +162,9 @@ impl FlagMetadata {
         let mut singles_mask = 0_i64;
         let mut all_values_are_known = true;
         let mut masks_are_known = true;
-        let member_type_is_known = flag_member_type_is_known(db, class);
+        let member_type = flag_member_type(db, class);
 
-        if member_type_is_known {
+        if member_type.values_are_known {
             for name in metadata.members.keys() {
                 if metadata.member_value_may_be_transformed(name) {
                     all_values_are_known = false;
@@ -149,7 +195,7 @@ impl FlagMetadata {
             }
         }
 
-        if !member_type_is_known {
+        if !member_type.values_are_known {
             all_values_are_known = false;
             masks_are_known = false;
         }
@@ -163,12 +209,9 @@ impl FlagMetadata {
         member_values.shrink_to_fit();
         named_values.shrink_to_fit();
 
-        let accepts_int_operands =
-            Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Int.to_subclass_of(db));
-
         Self {
             boundary,
-            accepts_int_operands,
+            member_type: member_type.ty,
             canonical_members_are_known: all_values_are_known,
             member_values,
             named_values,
@@ -182,8 +225,9 @@ impl FlagMetadata {
         self.boundary
     }
 
-    pub(crate) const fn accepts_int_operands(&self) -> bool {
-        self.accepts_int_operands
+    fn accepts_operand(&self, db: &dyn Db, operand: Type<'db>) -> bool {
+        self.member_type
+            .is_some_and(|member_type| operand.is_assignable_to(db, member_type))
     }
 
     pub(crate) const fn canonical_members_are_known(&self) -> bool {
@@ -466,7 +510,7 @@ fn flag_operand<'db>(
 fn enum_metadata_and_flag<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
-) -> Option<(&'db EnumMetadata<'db>, &'db FlagMetadata)> {
+) -> Option<(&'db EnumMetadata<'db>, &'db FlagMetadata<'db>)> {
     let metadata = super::enum_metadata(db, enum_class.class_literal(db))?;
     Some((metadata, metadata.flag.as_ref()?))
 }
@@ -583,14 +627,15 @@ fn flag_integer_binary_result<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
     literal: Option<EnumLiteralType<'db>>,
-    integer_is_int: bool,
+    operand: Type<'db>,
+    standard_dispatch: bool,
     integer_value: Option<i64>,
     method: &str,
     operation: fn(i64, i64) -> i64,
 ) -> Option<Type<'db>> {
     let (_, flag) = enum_metadata_and_flag(db, enum_class)?;
-    if !flag.accepts_int_operands()
-        || !integer_is_int
+    if !flag.accepts_operand(db, operand)
+        || !standard_dispatch
         || !class_uses_standard_flag_operation(db, enum_class, method)
     {
         return None;
@@ -660,12 +705,12 @@ pub(crate) fn flag_binary_result<'db>(
             ))
         }
         (Some((left_class, left_literal)), Some((right_class, right_literal))) => {
-            let (_, right_flag) = enum_metadata_and_flag(db, right_class)?;
             flag_integer_binary_result(
                 db,
                 left_class,
                 left_literal,
-                right_flag.accepts_int_operands(),
+                right,
+                true,
                 right_literal.and_then(|literal| literal_value(db, right_class, literal)),
                 op.dunder(),
                 operation,
@@ -679,18 +724,13 @@ pub(crate) fn flag_binary_result<'db>(
             } else {
                 op.reflected_dunder()
             };
-            let integer_is_int = if flag_on_left {
-                integer
-                    .resolve_type_alias(db)
-                    .is_assignable_to(db, KnownClass::Int.to_instance(db))
-            } else {
-                is_builtin_int_operand(db, integer)
-            };
+            let standard_dispatch = flag_on_left || is_builtin_int_operand(db, integer);
             flag_integer_binary_result(
                 db,
                 enum_class,
                 literal,
-                integer_is_int,
+                integer,
+                standard_dispatch,
                 integer.as_int_like_literal(),
                 method,
                 operation,
