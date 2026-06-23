@@ -976,10 +976,18 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
+        self.match_parameters_with_freshening_in_place(db, arguments);
+        self
+    }
+
+    pub(in crate::types) fn match_parameters_with_freshening_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) {
         let nonce_generator = TypeVarNonceGenerator::default();
         self.freshen_generic_contexts_in_place(db, &nonce_generator);
         self.match_parameters_in_place(db, arguments);
-        self
     }
 
     fn match_parameters_in_place(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {

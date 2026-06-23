@@ -8779,9 +8779,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = self
-            .bindings_for_call(callable_type)
-            .match_parameters(self.db(), &call_arguments);
+        let mut bindings = self.bindings_for_call(callable_type);
+        bindings.match_parameters_with_freshening_in_place(self.db(), &call_arguments);
 
         report_missing_implicit_constructor_call(
             &self.context,
@@ -8805,13 +8804,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
-        let mut bindings = match bindings_result {
-            Ok(()) => bindings,
-            Err(_) => {
-                bindings.report_diagnostics(&self.context, call_expression.into());
-                return bindings.return_type(self.db());
-            }
-        };
+        if bindings_result.is_err() {
+            bindings.report_diagnostics(&self.context, call_expression.into());
+            return bindings.return_type(self.db());
+        }
 
         for binding in bindings.iter_flat_mut() {
             let binding_type = binding.callable_type;
