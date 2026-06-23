@@ -495,7 +495,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        self.node = self.node.or_with_offset(builder, other.node);
+        self.node = self.node.or(builder, other.node);
         self.source_order = builder.ordered_source_order(self.source_order, other.source_order);
         *self
     }
@@ -511,7 +511,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        self.node = self.node.and_with_offset(builder, other.node);
+        self.node = self.node.and(builder, other.node);
         self.source_order = builder.ordered_source_order(self.source_order, other.source_order);
         *self
     }
@@ -588,7 +588,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        let node = self.node.iff_with_offset(builder, other.node);
+        let node = self.node.iff(builder, other.node);
         let source_order = builder.ordered_source_order(self.source_order, other.source_order);
         Self::from_node(builder, node, source_order)
     }
@@ -620,7 +620,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         if self
             .node
             .simple_lower_bound_conjunction(db, builder)
-            .all(|bound| bound.is_ok_and(|(typevar, _, _)| typevar.is_inferable(db, inferable)))
+            .all(|bound| {
+                bound.is_ok_and(|(constraint, _)| {
+                    let constraint = builder.constraint_data(constraint);
+                    constraint.typevar.is_inferable(db, inferable)
+                })
+            })
         {
             return self;
         }
@@ -760,8 +765,8 @@ struct ConstraintSetStorage<'db> {
     never_satisfied_cache: FxHashMap<NodeId, bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
-    or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
+    or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
+    and_cache: FxHashMap<(NodeId, NodeId), NodeId>,
     exists_one_cache:
         FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), (NodeId, Option<SourceOrderId>)>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
@@ -981,9 +986,7 @@ impl<'db> ConstraintSetBuilder<'db> {
             // Shift the reloaded condition back to the source order recorded in the owned set;
             // solution extraction uses this order for deterministic unions and intersections.
             let old_constraint_index = inner.retained_constraint_index(old_interior.constraint);
-            let (constraint_node, _) = constraints[old_constraint_index];
-            let condition = constraint_node
-                .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
+            let (condition, _) = constraints[old_constraint_index];
             let remapped = condition.ite_uncertain(builder, if_true, if_uncertain, if_false);
 
             cache.insert(old_node, remapped);
@@ -1656,7 +1659,7 @@ impl<'db> Constraint<'db> {
                     Some(*lower_element),
                     upper,
                 );
-                result = result.and_with_offset(builder, element_node);
+                result = result.and(builder, element_node);
                 source_order = builder.ordered_source_order(source_order, element_source_order);
             }
             return (result, source_order);
@@ -1677,7 +1680,7 @@ impl<'db> Constraint<'db> {
                     lower,
                     Some(upper_element),
                 );
-                result = result.and_with_offset(builder, element_node);
+                result = result.and(builder, element_node);
                 source_order = builder.ordered_source_order(source_order, element_source_order);
             }
             for upper_element in upper_intersection.iter_negative(db) {
@@ -1688,7 +1691,7 @@ impl<'db> Constraint<'db> {
                     lower,
                     Some(upper_element.negate(db)),
                 );
-                result = result.and_with_offset(builder, element_node);
+                result = result.and(builder, element_node);
                 source_order = builder.ordered_source_order(source_order, element_source_order);
             }
             return (result, source_order);
@@ -1720,7 +1723,7 @@ impl<'db> Constraint<'db> {
             {
                 let constraint =
                     ConstraintId::new(db, builder, typevar, Type::Never, Type::object());
-                let (node, source_order) = Node::new_constraint(builder, constraint, 1);
+                let (node, source_order) = Node::new_constraint(builder, constraint);
                 let node = node.negate(builder);
                 return (node, source_order);
             }
@@ -1780,7 +1783,7 @@ impl<'db> Constraint<'db> {
                     Type::TypeVar(bound),
                     Type::TypeVar(bound),
                 );
-                Node::new_constraint(builder, constraint, 1)
+                Node::new_constraint(builder, constraint)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
@@ -1796,7 +1799,7 @@ impl<'db> Constraint<'db> {
                     Some(Type::TypeVar(typevar)),
                 );
                 let (lower_node, lower_source_order) =
-                    Node::new_constraint(builder, lower_constraint, 1);
+                    Node::new_constraint(builder, lower_constraint);
                 let upper_constraint = ConstraintId::new_with_bounds(
                     db,
                     builder,
@@ -1805,7 +1808,7 @@ impl<'db> Constraint<'db> {
                     None,
                 );
                 let (upper_node, upper_source_order) =
-                    Node::new_constraint(builder, upper_constraint, 1);
+                    Node::new_constraint(builder, upper_constraint);
                 let node = lower_node.and(builder, upper_node);
                 let source_order =
                     builder.ordered_source_order(lower_source_order, upper_source_order);
@@ -1822,7 +1825,7 @@ impl<'db> Constraint<'db> {
                     Some(Type::TypeVar(typevar)),
                 );
                 let (lower_node, lower_source_order) =
-                    Node::new_constraint(builder, lower_constraint, 1);
+                    Node::new_constraint(builder, lower_constraint);
                 let (upper_node, upper_source_order) = if upper.is_none() {
                     (ALWAYS_TRUE, None)
                 } else {
@@ -1849,7 +1852,7 @@ impl<'db> Constraint<'db> {
                     None,
                 );
                 let (upper_node, upper_source_order) =
-                    Node::new_constraint(builder, upper_constraint, 1);
+                    Node::new_constraint(builder, upper_constraint);
                 let node = lower_node.and(builder, upper_node);
                 let source_order =
                     builder.ordered_source_order(lower_source_order, upper_source_order);
@@ -1858,7 +1861,7 @@ impl<'db> Constraint<'db> {
 
             _ => {
                 let constraint = ConstraintId::new_with_bounds(db, builder, typevar, lower, upper);
-                Node::new_constraint(builder, constraint, 1)
+                Node::new_constraint(builder, constraint)
             }
         }
     }
@@ -2041,7 +2044,7 @@ enum Node {
     Interior(InteriorNode),
 }
 
-type SimpleLowerBound<'db> = (BoundTypeVarInstance<'db>, Type<'db>, usize);
+type SimpleLowerBound<'db> = (ConstraintId, Type<'db>);
 
 impl NodeId {
     /// Creates a new BDD node, applying local TDD reductions.
@@ -2050,16 +2053,8 @@ impl NodeId {
         constraint: ConstraintId,
         if_true: NodeId,
         if_false: NodeId,
-        source_order: usize,
     ) -> NodeId {
-        Self::with_uncertain(
-            builder,
-            constraint,
-            if_true,
-            ALWAYS_FALSE,
-            if_false,
-            source_order,
-        )
+        Self::with_uncertain(builder, constraint, if_true, ALWAYS_FALSE, if_false)
     }
 
     /// Creates a new TDD node with an explicit `if_uncertain` branch, applying local reductions.
@@ -2069,7 +2064,6 @@ impl NodeId {
         if_true: NodeId,
         if_uncertain: NodeId,
         if_false: NodeId,
-        source_order: usize,
     ) -> NodeId {
         debug_assert!(
             if_true
@@ -2121,17 +2115,11 @@ impl NodeId {
             return if_uncertain;
         }
 
-        let max_source_order = source_order
-            .max(if_true.max_source_order(builder))
-            .max(if_uncertain.max_source_order(builder))
-            .max(if_false.max_source_order(builder));
         builder.intern_interior_node(InteriorNodeData {
             constraint,
             if_true,
             if_uncertain,
             if_false,
-            source_order,
-            max_source_order,
         })
     }
 }
@@ -2142,17 +2130,9 @@ impl Node {
     fn new_constraint(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
-        source_order: usize,
     ) -> (NodeId, Option<SourceOrderId>) {
         (
-            NodeId::with_uncertain(
-                builder,
-                constraint,
-                ALWAYS_TRUE,
-                ALWAYS_FALSE,
-                ALWAYS_FALSE,
-                source_order,
-            ),
+            NodeId::with_uncertain(builder, constraint, ALWAYS_TRUE, ALWAYS_FALSE, ALWAYS_FALSE),
             Some(builder.constraint_source_order(constraint)),
         )
     }
@@ -2165,7 +2145,6 @@ impl Node {
     fn new_satisfied_constraint(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintAssignment,
-        source_order: usize,
     ) -> (NodeId, Option<SourceOrderId>) {
         match constraint {
             ConstraintAssignment::Positive(constraint) => (
@@ -2175,7 +2154,6 @@ impl Node {
                     ALWAYS_TRUE,
                     ALWAYS_FALSE,
                     ALWAYS_FALSE,
-                    source_order,
                 ),
                 Some(builder.constraint_source_order(constraint)),
             ),
@@ -2186,7 +2164,6 @@ impl Node {
                     ALWAYS_FALSE,
                     ALWAYS_FALSE,
                     ALWAYS_TRUE,
-                    source_order,
                 ),
                 Some(builder.constraint_source_order(constraint)),
             ),
@@ -2201,7 +2178,6 @@ impl Node {
                     ALWAYS_FALSE,
                     ALWAYS_TRUE,
                     ALWAYS_FALSE,
-                    source_order,
                 ),
                 Some(builder.constraint_source_order(constraint)),
             ),
@@ -2238,37 +2214,6 @@ impl NodeId {
         }
         let interior = builder.interior_node_data(self);
         Some(interior.constraint)
-    }
-
-    fn max_source_order(self, builder: &ConstraintSetBuilder<'_>) -> usize {
-        if self.is_terminal() {
-            return 0;
-        }
-        let interior = builder.interior_node_data(self);
-        interior.max_source_order
-    }
-
-    /// Returns a copy of this BDD node with all `source_order`s adjusted by the given amount.
-    fn with_adjusted_source_order(self, builder: &ConstraintSetBuilder<'_>, delta: usize) -> Self {
-        if delta == 0 {
-            return self;
-        }
-        match self.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
-            Node::Interior(_) => {
-                let interior = builder.interior_node_data(self);
-                NodeId::with_uncertain(
-                    builder,
-                    interior.constraint,
-                    interior.if_true.with_adjusted_source_order(builder, delta),
-                    interior
-                        .if_uncertain
-                        .with_adjusted_source_order(builder, delta),
-                    interior.if_false.with_adjusted_source_order(builder, delta),
-                    interior.source_order + delta,
-                )
-            }
-        }
     }
 
     /// Checks whether this BDD represents a single conjunction (of an arbitrary number of
@@ -2348,7 +2293,7 @@ impl NodeId {
                     }
 
                     node = Some(interior.if_true);
-                    Some(Ok((constraint.typevar, lower, interior.source_order)))
+                    Some(Ok((interior.constraint, lower)))
                 }
             }
         })
@@ -2559,28 +2504,7 @@ impl NodeId {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    fn or_with_offset(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
-        // To ensure that `self` appears before `other` in `source_order`, we add the maximum
-        // `source_order` of the lhs to all of the `source_order`s in the rhs.
-        //
-        // TODO: If we store `other_offset` as a new field on InteriorNode, we might be able to
-        // avoid all of the extra work in the calls to with_adjusted_source_order, and apply the
-        // adjustment lazily when walking a BDD tree. (ditto below in the other _with_offset
-        // methods)
-        let other_offset = self.max_source_order(builder);
-        self.or_inner(builder, other, other_offset)
-    }
-
     fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
-        self.or_inner(builder, other, 0)
-    }
-
-    fn or_inner(
-        self,
-        builder: &ConstraintSetBuilder<'_>,
-        other: Self,
-        other_offset: usize,
-    ) -> Self {
         match (self.node(), other.node()) {
             (Node::AlwaysTrue, Node::AlwaysTrue) => ALWAYS_TRUE,
             (Node::AlwaysTrue, Node::Interior(_)) => {
@@ -2593,7 +2517,6 @@ impl NodeId {
                     ALWAYS_FALSE,
                     ALWAYS_TRUE,
                     ALWAYS_FALSE,
-                    other_interior.source_order + other_offset,
                 )
             }
             (Node::Interior(_), Node::AlwaysTrue) => {
@@ -2606,13 +2529,12 @@ impl NodeId {
                     ALWAYS_FALSE,
                     ALWAYS_TRUE,
                     ALWAYS_FALSE,
-                    self_interior.source_order,
                 )
             }
-            (Node::AlwaysFalse, _) => other.with_adjusted_source_order(builder, other_offset),
+            (Node::AlwaysFalse, _) => other,
             (_, Node::AlwaysFalse) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
-                self_interior.or(builder, other_interior, other_offset)
+                self_interior.or(builder, other_interior)
             }
         }
     }
@@ -2716,7 +2638,7 @@ impl NodeId {
             nodes,
             ALWAYS_FALSE,
             Self::is_always_satisfied,
-            Self::or_with_offset,
+            Self::or,
         )
     }
 
@@ -2731,31 +2653,12 @@ impl NodeId {
             nodes,
             ALWAYS_TRUE,
             Self::is_never_satisfied,
-            Self::and_with_offset,
+            Self::and,
         )
     }
 
     /// Returns the `and` or intersection of two BDDs.
-    ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
-    fn and_with_offset(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
-        // To ensure that `self` appears before `other` in `source_order`, we add the maximum
-        // `source_order` of the lhs to all of the `source_order`s in the rhs.
-        let other_offset = self.max_source_order(builder);
-        self.and_inner(builder, other, other_offset)
-    }
-
     fn and(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
-        self.and_inner(builder, other, 0)
-    }
-
-    fn and_inner(
-        self,
-        builder: &ConstraintSetBuilder<'_>,
-        other: Self,
-        other_offset: usize,
-    ) -> Self {
         match (self.node(), other.node()) {
             (Node::AlwaysFalse, Node::AlwaysFalse) => ALWAYS_FALSE,
             (Node::AlwaysFalse, Node::Interior(_)) => {
@@ -2765,7 +2668,6 @@ impl NodeId {
                     other_interior.constraint,
                     ALWAYS_FALSE,
                     ALWAYS_FALSE,
-                    other_interior.source_order + other_offset,
                 )
             }
             (Node::Interior(_), Node::AlwaysFalse) => {
@@ -2775,13 +2677,12 @@ impl NodeId {
                     self_interior.constraint,
                     ALWAYS_FALSE,
                     ALWAYS_FALSE,
-                    self_interior.source_order,
                 )
             }
-            (Node::AlwaysTrue, _) => other.with_adjusted_source_order(builder, other_offset),
+            (Node::AlwaysTrue, _) => other,
             (_, Node::AlwaysTrue) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
-                self_interior.and(builder, other_interior, other_offset)
+                self_interior.and(builder, other_interior)
             }
         }
     }
@@ -2796,28 +2697,10 @@ impl NodeId {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    fn iff_with_offset(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
-        // To ensure that `self` appears before `other` in `source_order`, we add the maximum
-        // `source_order` of the lhs to all of the `source_order`s in the rhs.
-        let other_offset = self.max_source_order(builder);
-        self.iff_inner(builder, other, other_offset)
-    }
-
     fn iff(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
-        self.iff_inner(builder, other, 0)
-    }
-
-    fn iff_inner(
-        self,
-        builder: &ConstraintSetBuilder<'_>,
-        other: Self,
-        other_offset: usize,
-    ) -> Self {
         // iff(a, b) = (a ∧ b) ∨ (¬a ∧ ¬b)
-        let a_and_b = self.and_inner(builder, other, other_offset);
-        let not_a_and_not_b =
-            self.negate(builder)
-                .and_inner(builder, other.negate(builder), other_offset);
+        let a_and_b = self.and(builder, other);
+        let not_a_and_not_b = self.negate(builder).and(builder, other.negate(builder));
         a_and_b.or(builder, not_a_and_not_b)
     }
 
@@ -2869,7 +2752,6 @@ impl NodeId {
                         then_node,
                         uncertain_node,
                         else_node,
-                        interior.source_order,
                     );
                 }
 
@@ -2933,7 +2815,7 @@ impl NodeId {
         }
 
         let mut typevars = FxHashSet::default();
-        self.for_each_unique_constraint(builder, &mut |constraint, _| {
+        self.for_each_unique_constraint(builder, &mut |constraint| {
             let constraint = builder.constraint_data(constraint);
             typevars.insert(constraint.typevar);
         });
@@ -3096,15 +2978,12 @@ impl NodeId {
     }
 
     /// Returns a new BDD with any occurrence of `left ∧ right` replaced with `replacement`.
-    #[expect(clippy::too_many_arguments)]
     fn substitute_intersection<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         left: ConstraintAssignment,
-        left_source_order: usize,
         right: ConstraintAssignment,
-        right_source_order: usize,
         replacement: NodeId,
     ) -> Self {
         // We perform a Shannon expansion to find out what the input BDD evaluates to when:
@@ -3138,8 +3017,8 @@ impl NodeId {
         //     false
         //
         //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
-        let (left_node, _) = Node::new_satisfied_constraint(builder, left, left_source_order);
-        let (right_node, _) = Node::new_satisfied_constraint(builder, right, right_source_order);
+        let (left_node, _) = Node::new_satisfied_constraint(builder, left);
+        let (right_node, _) = Node::new_satisfied_constraint(builder, right);
         let right_result = right_node.ite(builder, ALWAYS_FALSE, when_left_but_not_right);
         let left_result = left_node.ite(builder, right_result, when_not_left);
         let result = replacement.ite(builder, when_left_and_right, left_result);
@@ -3158,15 +3037,12 @@ impl NodeId {
     }
 
     /// Returns a new BDD with any occurrence of `left ∨ right` replaced with `replacement`.
-    #[expect(clippy::too_many_arguments)]
     fn substitute_union<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         left: ConstraintAssignment,
-        left_source_order: usize,
         right: ConstraintAssignment,
-        right_source_order: usize,
         replacement: NodeId,
     ) -> Self {
         // We perform a Shannon expansion to find out what the input BDD evaluates to when:
@@ -3206,8 +3082,8 @@ impl NodeId {
         // Lastly, verify that the result is consistent with the input. (It must produce the same
         // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
         // return the original BDD unmodified.
-        let (left_node, _) = Node::new_satisfied_constraint(builder, left, left_source_order);
-        let (right_node, _) = Node::new_satisfied_constraint(builder, right, right_source_order);
+        let (left_node, _) = Node::new_satisfied_constraint(builder, left);
+        let (right_node, _) = Node::new_satisfied_constraint(builder, right);
         let validity = replacement.iff(builder, left_node.or(builder, right_node));
         let constrained_original = self.and(builder, validity);
         let constrained_replacement = result.and(builder, validity);
@@ -3226,19 +3102,19 @@ impl NodeId {
     fn for_each_unique_constraint(
         self,
         builder: &ConstraintSetBuilder<'_>,
-        f: &mut dyn FnMut(ConstraintId, usize),
+        f: &mut dyn FnMut(ConstraintId),
     ) {
         fn walk(
             node: NodeId,
             builder: &ConstraintSetBuilder<'_>,
             seen: &mut FxHashSet<NodeId>,
-            f: &mut dyn FnMut(ConstraintId, usize),
+            f: &mut dyn FnMut(ConstraintId),
         ) {
             if node.is_terminal() || !seen.insert(node) {
                 return;
             }
             let interior = builder.interior_node_data(node);
-            f(interior.constraint, interior.source_order);
+            f(interior.constraint);
             walk(interior.if_true, builder, seen, f);
             walk(interior.if_uncertain, builder, seen, f);
             walk(interior.if_false, builder, seen, f);
@@ -3399,13 +3275,7 @@ impl NodeId {
                         return write!(f, "<{index}> SHARED");
                     }
                     let interior = builder.interior_node_data(node);
-                    write!(
-                        f,
-                        "<{index}> {} {}/{}",
-                        interior.constraint.display(db, builder),
-                        interior.source_order,
-                        interior.max_source_order,
-                    )?;
+                    write!(f, "<{index}> {}", interior.constraint.display(db, builder))?;
                     // Calling display_graph recursively here causes rustc to claim that the
                     // expect(unused) up above is unfulfilled!
                     write!(f, "\n{prefix}┡━₁ ")?;
@@ -3503,16 +3373,6 @@ struct InteriorNodeData {
     if_true: NodeId,
     if_uncertain: NodeId,
     if_false: NodeId,
-
-    /// Represents the order in which this node's constraint was added to the containing constraint
-    /// set, relative to all of the other constraints in the set. This starts off at 1 for a simple
-    /// single-constraint set (e.g. created with [`Node::new_constraint`] or
-    /// [`Node::new_satisfied_constraint`]). It will get incremented, if needed, as that simple BDD
-    /// is combined into larger BDDs.
-    source_order: usize,
-
-    /// The maximum `source_order` across this node and all of its descendants.
-    max_source_order: usize,
 }
 
 /// Accumulates lower and upper bounds for a single typevar on a single BDD path.
@@ -3687,7 +3547,10 @@ impl<'db> PathBounds<'db> {
             Node::Interior(_) => {}
         }
 
-        if let Some(path_bounds) = Self::compute_simple_lower_bound_conjunction(db, builder, node) {
+        let mut source_orders = builder.calculate_source_orders(source_order);
+        if let Some(path_bounds) =
+            Self::compute_simple_lower_bound_conjunction(db, builder, &source_orders, node)
+        {
             return path_bounds;
         }
 
@@ -3696,7 +3559,6 @@ impl<'db> PathBounds<'db> {
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        let mut source_orders = builder.calculate_source_orders(source_order);
         let mut sorted_paths = Vec::new();
         node.for_each_path(db, builder, |path| {
             let mut path: Vec<_> = path
@@ -3768,18 +3630,32 @@ impl<'db> PathBounds<'db> {
     fn compute_simple_lower_bound_conjunction(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        source_orders: &FxIndexSet<ConstraintId>,
         node: NodeId,
     ) -> Option<Self> {
         let mut constraints = node
             .simple_lower_bound_conjunction(db, builder)
+            .map_ok(|(constraint, lower)| {
+                (
+                    constraint,
+                    lower,
+                    source_orders
+                        .get_index_of(&constraint)
+                        .expect("every BDD constraint should have a source_order"),
+                )
+            })
             .collect::<Result<Vec<_>, _>>()
             .ok()?;
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
 
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxHashMap::default();
-        for (typevar, lower, _) in constraints {
-            mappings.entry(typevar).or_default().add_lower(db, lower);
+        for (constraint, lower, _) in constraints {
+            let constraint = builder.constraint_data(constraint);
+            mappings
+                .entry(constraint.typevar)
+                .or_default()
+                .add_lower(db, lower);
         }
 
         let path = mappings
@@ -4043,7 +3919,6 @@ impl InteriorNode {
             interior.constraint,
             not_true.and(builder, not_uncertain),
             not_false.and(builder, not_uncertain),
-            interior.source_order,
         );
 
         let mut storage = builder.storage.borrow_mut();
@@ -4051,8 +3926,8 @@ impl InteriorNode {
         result
     }
 
-    fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self, other_offset: usize) -> NodeId {
-        let key = (self.node(), other.node(), other_offset);
+    fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> NodeId {
+        let key = (self.node(), other.node());
         let storage = builder.storage.borrow();
         if let Some(result) = storage.or_cache.get(&key) {
             return *result;
@@ -4067,18 +3942,11 @@ impl InteriorNode {
             Ordering::Equal => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
+                self_interior.if_true.or(builder, other_interior.if_true),
                 self_interior
-                    .if_true
-                    .or_inner(builder, other_interior.if_true, other_offset),
-                self_interior.if_uncertain.or_inner(
-                    builder,
-                    other_interior.if_uncertain,
-                    other_offset,
-                ),
-                self_interior
-                    .if_false
-                    .or_inner(builder, other_interior.if_false, other_offset),
-                self_interior.source_order,
+                    .if_uncertain
+                    .or(builder, other_interior.if_uncertain),
+                self_interior.if_false.or(builder, other_interior.if_false),
             ),
             // This is from Frisch's original description of TDDs. If self < other, we check self
             // first. Instead of distributing other into the if_true and if_false branches, we
@@ -4088,21 +3956,16 @@ impl InteriorNode {
                 builder,
                 self_interior.constraint,
                 self_interior.if_true,
-                self_interior
-                    .if_uncertain
-                    .or_inner(builder, other.node(), other_offset),
+                self_interior.if_uncertain.or(builder, other.node()),
                 self_interior.if_false,
-                self_interior.source_order,
             ),
             // Ditto above but for the other variable ordering
             Ordering::Greater => NodeId::with_uncertain(
                 builder,
                 other_interior.constraint,
                 other_interior.if_true,
-                self.node()
-                    .or_inner(builder, other_interior.if_uncertain, other_offset),
+                self.node().or(builder, other_interior.if_uncertain),
                 other_interior.if_false,
-                other_interior.source_order + other_offset,
             ),
         };
 
@@ -4111,8 +3974,8 @@ impl InteriorNode {
         result
     }
 
-    fn and(self, builder: &ConstraintSetBuilder<'_>, other: Self, other_offset: usize) -> NodeId {
-        let key = (self.node(), other.node(), other_offset);
+    fn and(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> NodeId {
+        let key = (self.node(), other.node());
         let storage = builder.storage.borrow();
         if let Some(result) = storage.and_cache.get(&key) {
             return *result;
@@ -4136,48 +3999,34 @@ impl InteriorNode {
             Ordering::Equal => {
                 let if_true = self_interior
                     .if_true
-                    .and_inner(
+                    .and(
                         builder,
-                        other_interior.if_true.or_inner(
-                            builder,
-                            other_interior.if_uncertain,
-                            other_offset,
-                        ),
-                        other_offset,
+                        other_interior
+                            .if_true
+                            .or(builder, other_interior.if_uncertain),
                     )
-                    .or_inner(
+                    .or(
                         builder,
-                        self_interior.if_uncertain.and_inner(
-                            builder,
-                            other_interior.if_true,
-                            other_offset,
-                        ),
-                        0,
+                        self_interior
+                            .if_uncertain
+                            .and(builder, other_interior.if_true),
                     );
-                let if_uncertain = self_interior.if_uncertain.and_inner(
-                    builder,
-                    other_interior.if_uncertain,
-                    other_offset,
-                );
+                let if_uncertain = self_interior
+                    .if_uncertain
+                    .and(builder, other_interior.if_uncertain);
                 let if_false = self_interior
                     .if_false
-                    .and_inner(
+                    .and(
                         builder,
-                        other_interior.if_uncertain.or_inner(
-                            builder,
-                            other_interior.if_false,
-                            other_offset,
-                        ),
-                        other_offset,
+                        other_interior
+                            .if_uncertain
+                            .or(builder, other_interior.if_false),
                     )
-                    .or_inner(
+                    .or(
                         builder,
-                        self_interior.if_uncertain.and_inner(
-                            builder,
-                            other_interior.if_false,
-                            other_offset,
-                        ),
-                        0,
+                        self_interior
+                            .if_uncertain
+                            .and(builder, other_interior.if_false),
                     );
                 NodeId::with_uncertain(
                     builder,
@@ -4185,33 +4034,21 @@ impl InteriorNode {
                     if_true,
                     if_uncertain,
                     if_false,
-                    self_interior.source_order,
                 )
             }
             Ordering::Less => NodeId::with_uncertain(
                 builder,
                 self_interior.constraint,
-                self_interior
-                    .if_true
-                    .and_inner(builder, other.node(), other_offset),
-                self_interior
-                    .if_uncertain
-                    .and_inner(builder, other.node(), other_offset),
-                self_interior
-                    .if_false
-                    .and_inner(builder, other.node(), other_offset),
-                self_interior.source_order,
+                self_interior.if_true.and(builder, other.node()),
+                self_interior.if_uncertain.and(builder, other.node()),
+                self_interior.if_false.and(builder, other.node()),
             ),
             Ordering::Greater => NodeId::with_uncertain(
                 builder,
                 other_interior.constraint,
-                self.node()
-                    .and_inner(builder, other_interior.if_true, other_offset),
-                self.node()
-                    .and_inner(builder, other_interior.if_uncertain, other_offset),
-                self.node()
-                    .and_inner(builder, other_interior.if_false, other_offset),
-                other_interior.source_order + other_offset,
+                self.node().and(builder, other_interior.if_true),
+                self.node().and(builder, other_interior.if_uncertain),
+                self.node().and(builder, other_interior.if_false),
             ),
         };
 
@@ -4354,7 +4191,7 @@ impl InteriorNode {
                                 (branch, branch_source_order),
                                 |(branch, branch_source_order), assignment| {
                                     let (assignment_node, assignment_source_order) =
-                                        Node::new_satisfied_constraint(builder, *assignment, 0);
+                                        Node::new_satisfied_constraint(builder, *assignment);
                                     (
                                         branch.and(builder, assignment_node),
                                         builder.ordered_source_order(
@@ -4387,7 +4224,7 @@ impl InteriorNode {
                                 (branch, branch_source_order),
                                 |(branch, branch_source_order), assignment| {
                                     let (assignment_node, assignment_source_order) =
-                                        Node::new_satisfied_constraint(builder, *assignment, 0);
+                                        Node::new_satisfied_constraint(builder, *assignment);
                                     (
                                         branch.and(builder, assignment_node),
                                         builder.ordered_source_order(
@@ -4416,7 +4253,7 @@ impl InteriorNode {
                                 (branch, branch_source_order),
                                 |(branch, branch_source_order), assignment| {
                                     let (assignment_node, assignment_source_order) =
-                                        Node::new_satisfied_constraint(builder, *assignment, 0);
+                                        Node::new_satisfied_constraint(builder, *assignment);
                                     (
                                         branch.and(builder, assignment_node),
                                         builder.ordered_source_order(
@@ -4484,11 +4321,8 @@ impl InteriorNode {
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
-            let (constraint_node, constraint_source_order) = Node::new_constraint(
-                builder,
-                self_interior.constraint,
-                self_interior.source_order,
-            );
+            let (constraint_node, constraint_source_order) =
+                Node::new_constraint(builder, self_interior.constraint);
             let node = constraint_node.ite(
                 builder,
                 if_true.or(builder, if_uncertain),
@@ -4567,7 +4401,6 @@ impl InteriorNode {
                         if_true,
                         if_uncertain,
                         if_false,
-                        self_interior.source_order,
                     ),
                     found_in_true || found_in_uncertain || found_in_false,
                 )
@@ -4580,18 +4413,12 @@ impl InteriorNode {
     }
 
     fn path_assignments(self, builder: &ConstraintSetBuilder<'_>) -> PathAssignments {
-        // Sort the constraints in this BDD by their `source_order`s before adding them to the
-        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
-        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
-        // unstable sort is fine.
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
         self.node()
-            .for_each_unique_constraint(builder, &mut |constraint, source_order| {
-                constraints.push((constraint, source_order));
+            .for_each_unique_constraint(builder, &mut |constraint| {
+                constraints.push(constraint);
             });
-        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
-
-        PathAssignments::new(constraints.into_iter().map(|(constraint, _)| constraint))
+        PathAssignments::new(constraints)
     }
 
     /// Returns a simplified version of a BDD.
@@ -4623,14 +4450,9 @@ impl InteriorNode {
         // visit queue with all pairs of those constraints. (We use "combinations" because we don't
         // need to compare a constraint against itself, and because ordering doesn't matter.)
         let mut seen_constraints = FxHashSet::default();
-        let mut source_orders = FxHashMap::default();
         self.node()
-            .for_each_unique_constraint(builder, &mut |constraint, source_order| {
+            .for_each_unique_constraint(builder, &mut |constraint| {
                 seen_constraints.insert(constraint);
-                source_orders
-                    .entry(constraint)
-                    .and_modify(|existing: &mut usize| *existing = (*existing).min(source_order))
-                    .or_insert(source_order);
             });
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
             .array_combinations()
@@ -4638,17 +4460,9 @@ impl InteriorNode {
             .collect();
 
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
-        // be simplified. If we add any derived constraints, we will place them at the end in
-        // source order. (We do not have any test cases that depend on constraint sets being
-        // displayed in a consistent ordering, so we don't need to be clever in assigning these
-        // `source_order`s.)
+        // be simplified.
         let mut simplified = self.node();
-        let self_interior = builder.interior_node_data(self.node());
-        let mut next_source_order = self_interior.max_source_order + 1;
         while let Some((left_constraint, right_constraint)) = to_visit.pop() {
-            let left_source_order = source_orders[&left_constraint];
-            let right_source_order = source_orders[&right_constraint];
-
             // If the constraints refer to different typevars, the only simplifications we can make
             // are of the form `S ≤ T ∧ T ≤ int → S ≤ int`.
             let left_constraint_data = builder.constraint_data(left_constraint);
@@ -4720,19 +4534,11 @@ impl InteriorNode {
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
-                let (new_node, _) =
-                    Node::new_constraint(builder, new_constraint, next_source_order);
-                next_source_order += 1;
-                let (positive_left_node, _) = Node::new_satisfied_constraint(
-                    builder,
-                    left_constraint.when_true(),
-                    left_source_order,
-                );
-                let (positive_right_node, _) = Node::new_satisfied_constraint(
-                    builder,
-                    right_constraint.when_true(),
-                    right_source_order,
-                );
+                let (new_node, _) = Node::new_constraint(builder, new_constraint);
+                let (positive_left_node, _) =
+                    Node::new_satisfied_constraint(builder, left_constraint.when_true());
+                let (positive_right_node, _) =
+                    Node::new_satisfied_constraint(builder, right_constraint.when_true());
                 let lhs = positive_left_node.and(builder, positive_right_node);
                 let intersection = new_node.ite(builder, lhs, ALWAYS_FALSE);
                 simplified = simplified.and(builder, intersection);
@@ -4767,48 +4573,24 @@ impl InteriorNode {
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.
             let larger_smaller = if left_constraint.implies(db, builder, right_constraint) {
-                Some((
-                    right_constraint,
-                    right_source_order,
-                    left_constraint,
-                    left_source_order,
-                ))
+                Some((right_constraint, left_constraint))
             } else if right_constraint.implies(db, builder, left_constraint) {
-                Some((
-                    left_constraint,
-                    left_source_order,
-                    right_constraint,
-                    right_source_order,
-                ))
+                Some((left_constraint, right_constraint))
             } else {
                 None
             };
-            if let Some((
-                larger_constraint,
-                larger_source_order,
-                smaller_constraint,
-                smaller_source_order,
-            )) = larger_smaller
-            {
-                let (positive_larger_node, _) = Node::new_satisfied_constraint(
-                    builder,
-                    larger_constraint.when_true(),
-                    larger_source_order,
-                );
-                let (negative_larger_node, _) = Node::new_satisfied_constraint(
-                    builder,
-                    larger_constraint.when_false(),
-                    larger_source_order,
-                );
+            if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
+                let (positive_larger_node, _) =
+                    Node::new_satisfied_constraint(builder, larger_constraint.when_true());
+                let (negative_larger_node, _) =
+                    Node::new_satisfied_constraint(builder, larger_constraint.when_false());
 
                 // larger ∨ smaller = larger
                 simplified = simplified.substitute_union(
                     db,
                     builder,
                     larger_constraint.when_true(),
-                    larger_source_order,
                     smaller_constraint.when_true(),
-                    smaller_source_order,
                     positive_larger_node,
                 );
 
@@ -4817,9 +4599,7 @@ impl InteriorNode {
                     db,
                     builder,
                     larger_constraint.when_false(),
-                    larger_source_order,
                     smaller_constraint.when_false(),
-                    smaller_source_order,
                     negative_larger_node,
                 );
 
@@ -4829,9 +4609,7 @@ impl InteriorNode {
                     db,
                     builder,
                     larger_constraint.when_false(),
-                    larger_source_order,
                     smaller_constraint.when_true(),
-                    smaller_source_order,
                     ALWAYS_FALSE,
                 );
 
@@ -4841,9 +4619,7 @@ impl InteriorNode {
                     db,
                     builder,
                     larger_constraint.when_true(),
-                    larger_source_order,
                     smaller_constraint.when_false(),
-                    smaller_source_order,
                     ALWAYS_TRUE,
                 );
             }
@@ -4860,7 +4636,6 @@ impl InteriorNode {
                     // represent that intersection. We also need to add the new constraint to our
                     // seen set and (if we haven't already seen it) to the to-visit queue.
                     if seen_constraints.insert(intersection_constraint) {
-                        source_orders.insert(intersection_constraint, next_source_order);
                         to_visit.extend(
                             (seen_constraints.iter().copied())
                                 .filter(|seen| *seen != intersection_constraint)
@@ -4870,45 +4645,28 @@ impl InteriorNode {
                     let (positive_intersection_node, _) = Node::new_satisfied_constraint(
                         builder,
                         intersection_constraint.when_true(),
-                        next_source_order,
                     );
                     let (negative_intersection_node, _) = Node::new_satisfied_constraint(
                         builder,
                         intersection_constraint.when_false(),
-                        next_source_order,
-                    );
-                    next_source_order += 1;
-
-                    let (positive_left_node, _) = Node::new_satisfied_constraint(
-                        builder,
-                        left_constraint.when_true(),
-                        left_source_order,
-                    );
-                    let (negative_left_node, _) = Node::new_satisfied_constraint(
-                        builder,
-                        left_constraint.when_false(),
-                        left_source_order,
                     );
 
-                    let (positive_right_node, _) = Node::new_satisfied_constraint(
-                        builder,
-                        right_constraint.when_true(),
-                        right_source_order,
-                    );
-                    let (negative_right_node, _) = Node::new_satisfied_constraint(
-                        builder,
-                        right_constraint.when_false(),
-                        right_source_order,
-                    );
+                    let (positive_left_node, _) =
+                        Node::new_satisfied_constraint(builder, left_constraint.when_true());
+                    let (negative_left_node, _) =
+                        Node::new_satisfied_constraint(builder, left_constraint.when_false());
+
+                    let (positive_right_node, _) =
+                        Node::new_satisfied_constraint(builder, right_constraint.when_true());
+                    let (negative_right_node, _) =
+                        Node::new_satisfied_constraint(builder, right_constraint.when_false());
 
                     // left ∧ right = intersection
                     simplified = simplified.substitute_intersection(
                         db,
                         builder,
                         left_constraint.when_true(),
-                        left_source_order,
                         right_constraint.when_true(),
-                        right_source_order,
                         positive_intersection_node,
                     );
 
@@ -4917,9 +4675,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_false(),
-                        left_source_order,
                         right_constraint.when_false(),
-                        right_source_order,
                         negative_intersection_node,
                     );
 
@@ -4930,9 +4686,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_true(),
-                        left_source_order,
                         right_constraint.when_false(),
-                        right_source_order,
                         positive_left_node.and(builder, negative_intersection_node),
                     );
 
@@ -4942,9 +4696,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_false(),
-                        left_source_order,
                         right_constraint.when_true(),
-                        right_source_order,
                         positive_right_node.and(builder, negative_intersection_node),
                     );
 
@@ -4955,9 +4707,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_true(),
-                        left_source_order,
                         right_constraint.when_false(),
-                        right_source_order,
                         negative_right_node.or(builder, positive_intersection_node),
                     );
 
@@ -4967,9 +4717,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_false(),
-                        left_source_order,
                         right_constraint.when_true(),
-                        right_source_order,
                         negative_left_node.or(builder, positive_intersection_node),
                     );
                 }
@@ -4982,25 +4730,17 @@ impl InteriorNode {
                     // All of the below hold because we just proved that the intersection of left
                     // and right is empty.
 
-                    let (positive_left_node, _) = Node::new_satisfied_constraint(
-                        builder,
-                        left_constraint.when_true(),
-                        left_source_order,
-                    );
-                    let (positive_right_node, _) = Node::new_satisfied_constraint(
-                        builder,
-                        right_constraint.when_true(),
-                        right_source_order,
-                    );
+                    let (positive_left_node, _) =
+                        Node::new_satisfied_constraint(builder, left_constraint.when_true());
+                    let (positive_right_node, _) =
+                        Node::new_satisfied_constraint(builder, right_constraint.when_true());
 
                     // left ∧ right = false
                     simplified = simplified.substitute_intersection(
                         db,
                         builder,
                         left_constraint.when_true(),
-                        left_source_order,
                         right_constraint.when_true(),
-                        right_source_order,
                         ALWAYS_FALSE,
                     );
 
@@ -5009,9 +4749,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_false(),
-                        left_source_order,
                         right_constraint.when_false(),
-                        right_source_order,
                         ALWAYS_TRUE,
                     );
 
@@ -5021,9 +4759,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_true(),
-                        left_source_order,
                         right_constraint.when_false(),
-                        right_source_order,
                         positive_left_node,
                     );
 
@@ -5033,9 +4769,7 @@ impl InteriorNode {
                         db,
                         builder,
                         left_constraint.when_false(),
-                        left_source_order,
                         right_constraint.when_true(),
-                        right_source_order,
                         positive_right_node,
                     );
                 }
@@ -7062,7 +6796,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                     let constraint_upper = constraint.top_materialization(db);
                     let (constraint_node, _) =
                         Constraint::new_node(db, builder, self, constraint_lower, constraint_upper);
-                    specializations = specializations.or_with_offset(builder, constraint_node);
+                    specializations = specializations.or(builder, constraint_node);
                 }
                 specializations
             }
@@ -7109,8 +6843,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                     let (constraint, _) =
                         Constraint::new_node(db, builder, self, constraint_lower, constraint_upper);
                     if constraint_lower == constraint_upper {
-                        non_gradual_constraints =
-                            non_gradual_constraints.or_with_offset(builder, constraint);
+                        non_gradual_constraints = non_gradual_constraints.or(builder, constraint);
                     } else {
                         gradual_constraints.push(constraint);
                     }
@@ -7376,15 +7109,15 @@ mod tests {
             &constraints,
             set,
             indoc! {r#"
-                <0> (U = bool) 2/4
-                ┡━₁ <1> (T = bool) 4/4
+                <0> (U = bool)
+                ┡━₁ <1> (T = bool)
                 │   ┡━₁ always
-                │   ├─? <2> (T = str) 3/3
+                │   ├─? <2> (T = str)
                 │   │   ┡━₁ always
                 │   │   ├─? never
                 │   │   └─₀ never
                 │   └─₀ never
-                ├─? <3> (U = str) 1/4
+                ├─? <3> (U = str)
                 │   ┡━₁ <1> SHARED
                 │   ├─? never
                 │   └─₀ never
@@ -7407,7 +7140,7 @@ mod tests {
             &builder,
             t_int,
             indoc! {r#"
-                <0> (T = int) 1/1
+                <0> (T = int)
                 ┡━₁ always
                 ├─? never
                 └─₀ never
@@ -7435,9 +7168,9 @@ mod tests {
             &builder,
             union,
             indoc! {r#"
-                <0> (U = str) 2/2
+                <0> (U = str)
                 ┡━₁ always
-                ├─? <1> (T = int) 1/1
+                ├─? <1> (T = int)
                 │   ┡━₁ always
                 │   ├─? never
                 │   └─₀ never
@@ -7469,15 +7202,15 @@ mod tests {
             &builder,
             intersection,
             indoc! {r#"
-                <0> (U = int) 4/4
-                ┡━₁ <1> (U = str) 2/2
+                <0> (U = int)
+                ┡━₁ <1> (U = str)
                 │   ┡━₁ always
-                │   ├─? <2> (T = int) 1/1
+                │   ├─? <2> (T = int)
                 │   │   ┡━₁ always
                 │   │   ├─? never
                 │   │   └─₀ never
                 │   └─₀ never
-                ├─? <3> (T = bool) 3/3
+                ├─? <3> (T = bool)
                 │   ┡━₁ <1> SHARED
                 │   ├─? never
                 │   └─₀ never
@@ -7502,10 +7235,10 @@ mod tests {
             &builder,
             negated,
             indoc! {r#"
-                <0> (U = str) 2/2
+                <0> (U = str)
                 ┡━₁ never
                 ├─? never
-                └─₀ <1> (T = int) 1/1
+                └─₀ <1> (T = int)
                     ┡━₁ never
                     ├─? never
                     └─₀ always
@@ -7614,7 +7347,7 @@ mod tests {
                 builder,
                 set,
                 indoc! {r#"
-                    <0> (V = bool) 1/1
+                    <0> (V = bool)
                     ┡━₁ always
                     ├─? never
                     └─₀ never
@@ -7681,7 +7414,7 @@ mod tests {
             &builder,
             loaded,
             indoc! {r#"
-                <0> (V = bool) 1/1
+                <0> (V = bool)
                 ┡━₁ always
                 ├─? never
                 └─₀ never
@@ -7733,9 +7466,9 @@ mod tests {
                 builder,
                 result,
                 indoc! {r#"
-                    <0> (U = str) 2/2
+                    <0> (U = str)
                     ┡━₁ always
-                    ├─? <1> (T = int) 1/1
+                    ├─? <1> (T = int)
                     │   ┡━₁ always
                     │   ├─? never
                     │   └─₀ never
@@ -7753,9 +7486,9 @@ mod tests {
             &builder,
             loaded,
             indoc! {r#"
-                <0> (U = str) 2/2
+                <0> (U = str)
                 ┡━₁ always
-                ├─? <1> (T = int) 1/1
+                ├─? <1> (T = int)
                 │   ┡━₁ always
                 │   ├─? never
                 │   └─₀ never
