@@ -176,9 +176,8 @@ impl<'db> FlagMetadata<'db> {
         let mut canonical_members = Vec::new();
         let mut flag_mask = 0_i64;
         let mut singles_mask = 0_i64;
-        let mut all_values_are_known = true;
-        let mut masks_are_known = true;
         let member_type = flag_member_type(db, class);
+        let mut all_values_are_known = member_type.values_are_known;
         let preserves_assigned_value_type =
             member_type.ty.is_none() && member_type.values_are_known;
         let before_python_311 = Program::get(db).python_version(db) < PythonVersion::PY311;
@@ -191,7 +190,6 @@ impl<'db> FlagMetadata<'db> {
             for name in metadata.members.keys() {
                 if metadata.member_value_may_be_transformed(name) {
                     all_values_are_known = false;
-                    masks_are_known = false;
                     continue;
                 }
                 let value_ty = metadata.value_type(db, name);
@@ -204,7 +202,6 @@ impl<'db> FlagMetadata<'db> {
                 });
                 let Some(value) = value else {
                     all_values_are_known = false;
-                    masks_are_known = false;
                     continue;
                 };
 
@@ -220,14 +217,8 @@ impl<'db> FlagMetadata<'db> {
             }
         }
 
-        if !member_type.values_are_known {
-            all_values_are_known = false;
-            masks_are_known = false;
-        }
-
         if metadata.value_construction.metaclass_may_transform_values {
             all_values_are_known = false;
-            masks_are_known = false;
             boundary = FlagBoundary::Unknown;
         }
 
@@ -265,8 +256,8 @@ impl<'db> FlagMetadata<'db> {
             member_values,
             named_values,
             canonical_members: canonical_members.into_boxed_slice(),
-            flag_mask: masks_are_known.then_some(flag_mask),
-            singles_mask: masks_are_known.then_some(singles_mask),
+            flag_mask: all_values_are_known.then_some(flag_mask),
+            singles_mask: all_values_are_known.then_some(singles_mask),
         }
     }
 
@@ -620,20 +611,6 @@ fn literal_value<'db>(
     flag.member_value(name)
 }
 
-fn type_for_flag_value<'db>(
-    db: &'db dyn Db,
-    enum_class: EnumClassLiteral<'db>,
-    value: i64,
-) -> Type<'db> {
-    let Some((_, flag)) = enum_metadata_and_flag(db, enum_class) else {
-        return enum_class.class_literal(db).to_non_generic_instance(db);
-    };
-    flag.named_member(value).map_or_else(
-        || enum_class.class_literal(db).to_non_generic_instance(db),
-        |name| Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone())),
-    )
-}
-
 fn class_uses_standard_flag_method(
     db: &dyn Db,
     enum_class: EnumClassLiteral<'_>,
@@ -709,13 +686,13 @@ fn nonstandard_flag_construction_result<'db>(
     }
     if !class_uses_standard_flag_construction(db, enum_class) {
         let (_, flag) = enum_metadata_and_flag(db, enum_class)?;
-        return Some(
-            if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) {
-                possible_flag_or_int(db, enum_class)
-            } else {
-                class.to_non_generic_instance(db)
-            },
-        );
+        return Some(construction_type(
+            db,
+            enum_class,
+            flag,
+            FlagConstruction::Unknown,
+            None,
+        ));
     }
     None
 }
@@ -723,25 +700,24 @@ fn nonstandard_flag_construction_result<'db>(
 fn construction_type<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
+    flag: &FlagMetadata<'db>,
     construction: FlagConstruction,
     ejected_type: Option<Type<'db>>,
 ) -> Type<'db> {
+    let nominal = enum_class.class_literal(db).to_non_generic_instance(db);
     match construction {
-        FlagConstruction::Flag(value) => type_for_flag_value(db, enum_class, value),
+        FlagConstruction::Flag(value) => flag.named_member(value).map_or(nominal, |name| {
+            Type::enum_literal(EnumLiteralType::new(db, enum_class, name.clone()))
+        }),
         FlagConstruction::Ejected(value) => {
             ejected_type.unwrap_or_else(|| Type::int_literal(value))
         }
-        FlagConstruction::Raises => enum_class.class_literal(db).to_non_generic_instance(db),
-        FlagConstruction::Unknown => enum_metadata_and_flag(db, enum_class).map_or_else(
-            || enum_class.class_literal(db).to_non_generic_instance(db),
-            |(_, flag)| {
-                if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) {
-                    possible_flag_or_int(db, enum_class)
-                } else {
-                    enum_class.class_literal(db).to_non_generic_instance(db)
-                }
-            },
-        ),
+        FlagConstruction::Unknown
+            if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) =>
+        {
+            possible_flag_or_int(db, enum_class)
+        }
+        FlagConstruction::Raises | FlagConstruction::Unknown => nominal,
     }
 }
 
@@ -750,7 +726,6 @@ fn flag_integer_binary_result<'db>(
     enum_class: EnumClassLiteral<'db>,
     literal: Option<EnumLiteralType<'db>>,
     operand: Type<'db>,
-    integer_value: Option<i64>,
     method: &str,
     operation: fn(i64, i64) -> i64,
 ) -> Option<Type<'db>> {
@@ -762,7 +737,7 @@ fn flag_integer_binary_result<'db>(
     }
     let exact = literal
         .and_then(|literal| literal_value(db, enum_class, literal))
-        .zip(integer_value)
+        .zip(operand.as_int_like_literal())
         .map(|(left, right)| operation(left, right));
     if let Some(result) = nonstandard_flag_construction_result(
         db,
@@ -775,11 +750,8 @@ fn flag_integer_binary_result<'db>(
     }
 
     Some(match exact {
-        Some(value) => construction_type(db, enum_class, flag.construct(value), None),
-        None if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) => {
-            possible_flag_or_int(db, enum_class)
-        }
-        None => enum_class.class_literal(db).to_non_generic_instance(db),
+        Some(value) => construction_type(db, enum_class, flag, flag.construct(value), None),
+        None => construction_type(db, enum_class, flag, FlagConstruction::Unknown, None),
     })
 }
 
@@ -836,6 +808,7 @@ pub(crate) fn flag_binary_result<'db>(
                     construction_type(
                         db,
                         left_class,
+                        flag,
                         flag.construct(value),
                         Some(Type::int_literal(value)),
                     )
@@ -871,6 +844,7 @@ pub(crate) fn flag_binary_result<'db>(
                     construction_type(
                         db,
                         right_class,
+                        right_flag,
                         construction,
                         Some(Type::int_literal(raw_value)),
                     ),
@@ -887,17 +861,16 @@ pub(crate) fn flag_binary_result<'db>(
             }
             let (exact_value, ejected_type) = exact.unzip();
             Some(match exact_value {
-                Some(value) => {
-                    construction_type(db, left_class, left_flag.construct(value), ejected_type)
+                Some(value) => construction_type(
+                    db,
+                    left_class,
+                    left_flag,
+                    left_flag.construct(value),
+                    ejected_type,
+                ),
+                None => {
+                    construction_type(db, left_class, left_flag, FlagConstruction::Unknown, None)
                 }
-                None if matches!(
-                    left_flag.boundary(),
-                    FlagBoundary::Eject | FlagBoundary::Unknown
-                ) =>
-                {
-                    possible_flag_or_int(db, left_class)
-                }
-                None => left_class.class_literal(db).to_non_generic_instance(db),
             })
         }
         (Some((enum_class, literal)), None) | (None, Some((enum_class, literal))) => {
@@ -912,15 +885,7 @@ pub(crate) fn flag_binary_result<'db>(
             if !standard_dispatch {
                 return None;
             }
-            flag_integer_binary_result(
-                db,
-                enum_class,
-                literal,
-                integer,
-                integer.as_int_like_literal(),
-                method,
-                operation,
-            )
+            flag_integer_binary_result(db, enum_class, literal, integer, method, operation)
         }
         _ => None,
     }
@@ -944,13 +909,13 @@ pub(crate) fn flag_invert_result<'db>(db: &'db dyn Db, operand: Type<'db>) -> Op
         return Some(result);
     }
     let Some(value) = value else {
-        return Some(
-            if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) {
-                possible_flag_or_int(db, enum_class)
-            } else {
-                enum_class.class_literal(db).to_non_generic_instance(db)
-            },
-        );
+        return Some(construction_type(
+            db,
+            enum_class,
+            flag,
+            FlagConstruction::Unknown,
+            None,
+        ));
     };
     let construction = if flag
         .flags
@@ -970,6 +935,7 @@ pub(crate) fn flag_invert_result<'db>(db: &'db dyn Db, operand: Type<'db>) -> Op
     Some(construction_type(
         db,
         enum_class,
+        flag,
         construction,
         Some(Type::int_literal(!value)),
     ))
@@ -992,20 +958,17 @@ pub(crate) fn flag_constructor_result<'db>(
         return Some(literal.map_or_else(|| class.to_non_generic_instance(db), Type::enum_literal));
     }
     if !class_uses_standard_flag_construction(db, enum_class) {
-        return Some(
-            if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) {
-                possible_flag_or_int(db, enum_class)
-            } else {
-                class.to_non_generic_instance(db)
-            },
-        );
+        return Some(construction_type(
+            db,
+            enum_class,
+            flag,
+            FlagConstruction::Unknown,
+            None,
+        ));
     }
     Some(match argument.and_then(Type::as_int_like_literal) {
-        Some(value) => construction_type(db, enum_class, flag.construct(value), argument),
-        None if matches!(flag.boundary(), FlagBoundary::Eject | FlagBoundary::Unknown) => {
-            possible_flag_or_int(db, enum_class)
-        }
-        None => class.to_non_generic_instance(db),
+        Some(value) => construction_type(db, enum_class, flag, flag.construct(value), argument),
+        None => construction_type(db, enum_class, flag, FlagConstruction::Unknown, None),
     })
 }
 

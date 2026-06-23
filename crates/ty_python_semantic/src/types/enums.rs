@@ -520,16 +520,13 @@ impl<'db> EnumMetadata<'db> {
         Some(union)
     }
 
-    pub(crate) fn canonical_members_are_known(&self) -> bool {
-        self.flag
-            .as_ref()
-            .is_none_or(flag::FlagMetadata::canonical_members_are_known)
-    }
-
-    pub(crate) fn canonical_member_names(&self) -> impl Iterator<Item = &Name> {
+    pub(crate) fn canonical_member_names(&self) -> Option<impl Iterator<Item = &Name>> {
         match &self.flag {
-            Some(flag) => Either::Left(flag.canonical_members().iter().map(|(name, _)| name)),
-            None => Either::Right(self.members.keys()),
+            Some(flag) if flag.canonical_members_are_known() => Some(Either::Left(
+                flag.canonical_members().iter().map(|(name, _)| name),
+            )),
+            Some(_) => None,
+            None => Some(Either::Right(self.members.keys())),
         }
     }
 }

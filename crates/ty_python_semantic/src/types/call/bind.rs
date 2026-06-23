@@ -2065,17 +2065,14 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
-                                            if metadata.canonical_members_are_known() {
-                                                Type::heterogeneous_tuple(
-                                                    db,
-                                                    metadata.canonical_member_names().map(
-                                                        |member| Type::string_literal(db, member),
-                                                    ),
-                                                )
-                                            } else {
-                                                Type::unknown()
-                                            }
+                                        if let Some(metadata) = enums::enum_metadata(db, *class)
+                                            && let Some(members) = metadata.canonical_member_names()
+                                        {
+                                            Type::heterogeneous_tuple(
+                                                db,
+                                                members
+                                                    .map(|member| Type::string_literal(db, member)),
+                                            )
                                         } else {
                                             Type::unknown()
                                         }
