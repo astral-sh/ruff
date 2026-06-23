@@ -567,6 +567,10 @@ class Answer(Enum):
 python-version = "3.12"
 ```
 
+A type variable can be specialized to a dynamic type regardless of its bound or constraints, so
+eliminating every inhabitant of the declared bound or constraints does not necessarily make the
+remaining branch unreachable.
+
 ```py
 from typing import assert_never, Literal
 
@@ -577,8 +581,8 @@ def f[T: bool](x: T) -> T:
         case False:
             return x
         case _:
-            reveal_type(x)  # revealed: Never
-            assert_never(x)
+            reveal_type(x)  # revealed: T@f & ~Literal[True] & ~Literal[False]
+            assert_never(x)  # error: [type-assertion-failure]
 
 def g[T: Literal["foo", "bar"]](x: T) -> T:
     match x:
@@ -587,8 +591,8 @@ def g[T: Literal["foo", "bar"]](x: T) -> T:
         case "bar":
             return x
         case _:
-            reveal_type(x)  # revealed: Never
-            assert_never(x)
+            reveal_type(x)  # revealed: T@g & ~Literal["foo"] & ~Literal["bar"]
+            assert_never(x)  # error: [type-assertion-failure]
 
 def h[T: int | str](x: T) -> T:
     if isinstance(x, int):
@@ -606,7 +610,7 @@ def i[T: (int, str)](x: T) -> T:
         case str():
             pass
         case _:
-            assert_never(x)
+            assert_never(x)  # error: [type-assertion-failure]
 
     return x
 
@@ -617,7 +621,7 @@ def eq_narrow_match_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
         case "bar":
             pass
         case _:
-            assert_never(x)
+            assert_never(x)  # error: [type-assertion-failure]
 
     return x
 
@@ -627,7 +631,7 @@ def eq_narrow_if_bounded[T: Literal["foo", "bar"]](x: T) -> T:
     elif x == "bar":
         pass
     else:
-        assert_never(x)
+        assert_never(x)  # error: [type-assertion-failure]
 
     return x
 
@@ -637,15 +641,16 @@ def eq_narrow_if_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
     elif x == "bar":
         pass
     else:
-        assert_never(x)
+        assert_never(x)  # error: [type-assertion-failure]
 
     return x
 ```
 
-In these examples, no `invalid-return-type` diagnostics are emitted, despite the fact there are no
-`else` clauses. Note that these examples deliberately also do *not* have any `assert_never` or
+Some of these examples are exhaustive despite having no `else` clause. The match and equality
+examples that rely on a typevar's bound or constraints are not exhaustive because of possible
+dynamic specializations. These examples deliberately do *not* have any `assert_never` or
 `assert_type` calls, since these call expressions can create their own `IsNonTerminalCall`
-predicates in our reachability infrastructure!
+predicates in our reachability infrastructure.
 
 ```py
 class A: ...
@@ -669,40 +674,40 @@ def l[T](x: T) -> bool:
     elif not isinstance(x, int):
         return False
 
-def m[T: A | B](x: T) -> bool:
+def m[T: A | B](x: T) -> bool:  # error: [invalid-return-type]
     match x:
         case A():
             return True
         case B():
             return False
 
-def n[T: (A, B)](x: T) -> bool:
+def n[T: (A, B)](x: T) -> bool:  # error: [invalid-return-type]
     match x:
         case A():
             return True
         case B():
             return False
 
-def o[T: Literal["foo", "bar"]](x: T) -> bool:
+def o[T: Literal["foo", "bar"]](x: T) -> bool:  # error: [invalid-return-type]
     if x == "foo":
         return True
     elif x == "bar":
         return False
 
-def p[T: Literal["foo", "bar"]](x: T) -> bool:
+def p[T: Literal["foo", "bar"]](x: T) -> bool:  # error: [invalid-return-type]
     match x:
         case "foo":
             return True
         case "bar":
             return False
 
-def q[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+def q[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:  # error: [invalid-return-type]
     if x == "foo":
         return True
     elif x == "bar":
         return False
 
-def r[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+def r[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:  # error: [invalid-return-type]
     match x:
         case "foo":
             return True

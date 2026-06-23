@@ -208,11 +208,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
 
         (Type::Intersection(intersection), right)
-            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+            if intersection.positive(db).iter().any(
+                |ty| matches!(ty, Type::TypeVar(tvar) if tvar.typevar(db).is_self(db)),
+            ) =>
         {
             Some(infer_binary_type_comparison(
                 context,
-                intersection.with_expanded_typevars_and_newtypes(db),
+                intersection.with_expanded_newtypes_and_self_typevars(db),
                 op,
                 right,
                 range,
@@ -220,13 +222,15 @@ pub(super) fn infer_binary_type_comparison<'db>(
             ))
         }
         (left, Type::Intersection(intersection))
-            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+            if intersection.positive(db).iter().any(
+                |ty| matches!(ty, Type::TypeVar(tvar) if tvar.typevar(db).is_self(db)),
+            ) =>
         {
             Some(infer_binary_type_comparison(
                 context,
                 left,
                 op,
-                intersection.with_expanded_typevars_and_newtypes(db),
+                intersection.with_expanded_newtypes_and_self_typevars(db),
                 range,
                 visitor
             ))

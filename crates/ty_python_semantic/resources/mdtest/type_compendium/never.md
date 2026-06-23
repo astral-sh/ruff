@@ -10,7 +10,8 @@ python-version = "3.14"
 ## `Never` is a subtype of every type
 
 The `Never` type is the bottom type of Python's type system. It is a subtype of every type, but no
-type is a subtype of `Never`, except for `Never` itself or type variables with upper bound `Never`.
+type is a subtype of `Never` except for `Never` itself. A typevar with upper bound `Never` can still
+be explicitly specialized to a dynamic type, so it is assignable to but not a subtype of `Never`.
 
 ```py
 from ty_extensions import static_assert, is_subtype_of
@@ -28,7 +29,7 @@ static_assert(not is_subtype_of(int, Never))
 T = TypeVar("T", bound=Never)
 
 def _(t: T):
-    static_assert(is_subtype_of(T, Never))
+    static_assert(not is_subtype_of(T, Never))
 ```
 
 ## `Never` is assignable to every type

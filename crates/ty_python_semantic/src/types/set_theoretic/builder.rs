@@ -42,7 +42,7 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
-    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
+    SubclassOfType, Type, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -1685,89 +1685,26 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    /// Tries to simplify any constrained typevars in the intersection.
-    ///
-    /// We must preserve the constrained `TypeVar` itself in the result, even if only a single
-    /// compatible constraint remains, because other occurrences of the same `TypeVar` still need
-    /// to correlate with it (for example, when returning a narrowed value as `T`).
-    ///
-    /// - If the intersection contains negative entries for all but one of the constraints, we can
-    ///   add that remaining constraint as a positive entry.
-    ///
-    /// - If the intersection contains negative entries for all of the constraints, the overall
-    ///   intersection is `Never`.
-    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
-        let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
-
-        for ty in &self.positive {
-            let Type::TypeVar(bound_typevar) = ty else {
-                continue;
-            };
-            let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                bound_typevar.typevar(db).bound_or_constraints(db)
-            else {
-                continue;
-            };
-
-            // Determine which constraints appear as negative entries in the intersection.
-            let constraints = constraints.elements(db);
-            let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
-            for negative in &self.negative {
-                // This linear search should be fine as long as we don't encounter typevars with
-                // thousands of constraints.
-                let matching_constraints = constraints
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, c)| c.is_subtype_of(db, *negative));
-                for (constraint_index, _) in matching_constraints {
-                    remaining_constraints[constraint_index] = None;
-                }
-            }
-
-            let mut iter = remaining_constraints.into_iter().flatten();
-            let Some(remaining_constraint) = iter.next() else {
-                // All of the typevar constraints have been removed, so the entire intersection is
-                // `Never`.
-                *self = Self::default();
-                self.positive.insert(Type::Never);
-                return;
-            };
-
-            let more_than_one_remaining_constraint = iter.next().is_some();
-            if more_than_one_remaining_constraint {
-                // This typevar cannot be simplified.
-                continue;
-            }
-
-            // Only one typevar constraint remains. Adding it as a positive element lets the normal
-            // intersection simplification remove any incompatible negatives, while keeping the
-            // original typevar in the result.
-            to_add.push(remaining_constraint);
-        }
-
-        for remaining_constraint in to_add {
-            self.add_positive(db, remaining_constraint);
-        }
-    }
-
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         if self.has_empty_enum_complement(db) {
             return Type::Never;
         }
 
-        self.simplify_constrained_typevars(db);
-
-        // If any typevars are in `self.positive`, speculatively solve all bounded type variables
-        // to their upper bound and all constrained type variables to the union of their constraints.
-        // If that speculative intersection simplifies to `Never`, this intersection must also simplify
-        // to `Never`.
-        if self
-            .positive
-            .iter()
-            .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
-        {
-            let speculative =
-                expand_intersection_typevars_and_newtypes(db, &self.positive, &self.negative);
+        // A `NewType` instance has the same inhabitants as its concrete base type, and `Self`
+        // cannot be explicitly specialized to a dynamic type. If replacing those types with their
+        // bases or bounds makes the intersection uninhabited, the original intersection is also
+        // uninhabited.
+        if self.positive.iter().any(|ty| match ty {
+            Type::NewTypeInstance(_) => true,
+            Type::TypeVar(tvar) => tvar.typevar(db).is_self(db),
+            _ => false,
+        }) {
+            let speculative = expand_intersection_typevars_and_newtypes(
+                db,
+                &self.positive,
+                &self.negative,
+                false,
+            );
             if speculative.is_never() {
                 return Type::Never;
             }

@@ -103,7 +103,7 @@ def _[T: int](x: type | type[T]):
     reveal_type(x())  # revealed: Any
 
 def _[T: int](x: type[int] | type[T]):
-    reveal_type(x())  # revealed: int
+    reveal_type(x())  # revealed: int | T@_
 
 def _[T](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int | T@_
@@ -123,10 +123,10 @@ def narrow_a[B: A](a: A, b: B):
     reveal_type(type_of_a)  # revealed: type[A]
 
     if isinstance(a, type(b)):
-        reveal_type(a)  # revealed: B@narrow_a
+        reveal_type(a)  # revealed: A & B@narrow_a
 
     if issubclass(type_of_a, type(b)):
-        reveal_type(type_of_a)  # revealed: type[B@narrow_a]
+        reveal_type(type_of_a)  # revealed: type[A] & type[B@narrow_a]
 ```
 
 Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed
@@ -177,7 +177,9 @@ class B:
 
 ## Subtyping
 
-A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
+A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`. Bounds and
+constraints make `type[T]` assignable to the corresponding class-object types, but do not make it a
+subtype or disjoint from `T` because `T` can be explicitly specialized to a dynamic type.
 
 ```py
 from typing import Any, Callable, Protocol
@@ -207,17 +209,18 @@ def _[T](_: T):
 def _[T: int](_: T):
     static_assert(not is_subtype_of(type[T], T))
     static_assert(not is_subtype_of(T, type[T]))
-    static_assert(is_disjoint_from(type[T], T))
+    static_assert(not is_disjoint_from(type[T], T))
 
     static_assert(not is_subtype_of(type[T], int))
     static_assert(not is_subtype_of(int, type[T]))
     static_assert(is_disjoint_from(type[T], int))
 
     static_assert(not is_subtype_of(type[int], type[T]))
-    static_assert(is_subtype_of(type[T], type[int]))
+    static_assert(not is_subtype_of(type[T], type[int]))
+    static_assert(is_assignable_to(type[T], type[int]))
     static_assert(not is_disjoint_from(type[T], type[int]))
 
-    static_assert(is_subtype_of(type[T], type[int] | None))
+    static_assert(not is_subtype_of(type[T], type[int] | None))
     static_assert(not is_disjoint_from(type[T], type[int] | None))
 
     static_assert(is_subtype_of(type[T], type[T]))
@@ -244,7 +247,7 @@ def _[T: int](_: T):
 def _[T: (int, str)](_: T):
     static_assert(not is_subtype_of(type[T], T))
     static_assert(not is_subtype_of(T, type[T]))
-    static_assert(is_disjoint_from(type[T], T))
+    static_assert(not is_disjoint_from(type[T], T))
 
     static_assert(is_subtype_of(type[T], type[T]))
     static_assert(not is_disjoint_from(type[T], type[T]))
@@ -274,13 +277,13 @@ def _[T: (int, str)](_: T):
     static_assert(not is_disjoint_from(type[T], type[int]))
     static_assert(not is_disjoint_from(type[T], type[str]))
 
-    static_assert(is_subtype_of(type[T], type[int] | type[str]))
-    static_assert(is_subtype_of(type[T], type[int | str]))
+    static_assert(not is_subtype_of(type[T], type[int] | type[str]))
+    static_assert(not is_subtype_of(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int] | type[str]))
 
 def _[T: (int | str, int)](_: T):
-    static_assert(is_subtype_of(type[int], type[T]))
+    static_assert(not is_subtype_of(type[int], type[T]))
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 

@@ -1100,10 +1100,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .positive(db)
                 .iter()
                 .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                    Type::TypeVar(tvar) => {
+                        !tvar.is_inferable(db, self.inferable)
+                            && (self.relation.is_assignability() || tvar.typevar(db).is_self(db))
+                    }
                     Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
                     _ => false,
                 })
+        };
+
+        let expand_intersection = |intersection: IntersectionType<'db>| {
+            if self.relation.is_assignability() {
+                intersection.with_expanded_typevars_and_newtypes_for_assignability(db)
+            } else {
+                intersection.with_expanded_newtypes_and_self_typevars(db)
+            }
         };
 
         match (source, target) {
@@ -1332,13 +1343,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 },
             ),
 
-            // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
-            // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
-            //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
-            // 2. `T` is a constrained TypeVar and all of `T`'s constraints are subtypes of `S`.
-            //
-            // However, there is one exception to this general rule: for any given typevar `T`,
-            // `T` will always be a subtype of any union containing `T`.
+            // A typevar can be explicitly specialized to a dynamic type, regardless of its bound
+            // or constraints. It is therefore not generally redundant with its bound or the union
+            // of its constraints when simplifying unions and intersections. However, a typevar `T`
+            // is always redundant with a union that already contains `T`.
             (_, Type::Union(union))
                 if self.relation.can_safely_assume_reflexivity(source)
                     && union.elements(db).contains(&source) =>
@@ -1422,11 +1430,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // A fully static typevar is a subtype of its upper bound, and to something similar to
-            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled above).
+            // A typevar is assignable to its upper bound, or to something similar to the union of
+            // its constraints. It is not generally a subtype of or redundant with those types,
+            // because it can be explicitly specialized to a dynamic type. `Self` cannot be
+            // explicitly specialized, so it retains those relations with its upper bound.
+            // `object` is the other exception and is handled above.
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable)
+                if (self.is_eager_assignability() || bound_typevar.typevar(db).is_self(db))
+                    && !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -1446,9 +1457,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
-            // disjoint, which means an lhs type might be a subtype of all of the constraints.
+            // disjoint, which means an lhs type might be assignable to all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.inferable)
+                if self.is_eager_assignability()
+                    && !bound_typevar.is_inferable(db, self.inferable)
                     && !bound_typevar
                         .typevar(db)
                         .constraints(db)
@@ -1545,17 +1557,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
                     // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
-                    // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
-                    // constraints that exposes a union; this requires special handling.
+                    // `Self` (possibly inside an intersection) to widen to a bound that exposes a
+                    // union. Ordinary typevars can also widen under assignability. These cases
+                    // require special handling.
                     match source {
                         Type::Intersection(intersection)
                             if should_expand_intersection(intersection) =>
                         {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
+                            self.check_type_pair(db, expand_intersection(intersection), target)
                         }
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
@@ -1693,11 +1702,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
                     .or(db, self.constraints, || {
                         if should_expand_intersection(intersection) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
+                            self.check_type_pair(db, expand_intersection(intersection), target)
                         } else {
                             self.never()
                         }
@@ -2596,8 +2601,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
             // be specialized to the same type. (This is an important difference between typevars
-            // and `Any`!) Different typevars might be disjoint, depending on their bounds and
-            // constraints, which are handled below.
+            // and `Any`!)
             (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
                 if !left_tvar.is_inferable(db, self.inferable)
                     && left_tvar.is_same_typevar_as(db, right_tvar) =>
@@ -2613,25 +2617,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // An unbounded typevar is never disjoint from any other type, since it might be
-            // specialized to any type. A bounded typevar is not disjoint from its bound, and is
-            // only disjoint from other types if its bound is. A constrained typevar is disjoint
-            // from a type if all of its constraints are.
+            // A typevar is never disjoint from another type based only on its bound or
+            // constraints, because it can be explicitly specialized to a dynamic type. `Self` is
+            // the exception: it cannot be explicitly specialized, so its bound remains usable.
             (Type::TypeVar(tvar), other) | (other, Type::TypeVar(tvar))
                 if !tvar.is_inferable(db, self.inferable) =>
             {
-                match tvar.typevar(db).bound_or_constraints(db) {
-                    None => self.never(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.check_type_pair(db, bound, other)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
-                        typevar_constraints.elements(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |constraint| self.check_type_pair(db, *constraint, other),
-                        )
-                    }
+                if tvar.typevar(db).is_self(db) {
+                    tvar.typevar(db)
+                        .upper_bound(db)
+                        .when_none_or(db, self.constraints, |bound| {
+                            self.check_type_pair(db, bound, other)
+                        })
+                } else {
+                    self.never()
                 }
             }
 

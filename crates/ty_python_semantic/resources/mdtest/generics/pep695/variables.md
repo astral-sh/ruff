@@ -335,11 +335,11 @@ def unbounded_unconstrained[T, U](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U, T))
 ```
 
-A bounded typevar is assignable to its bound, and a bounded, fully static typevar is a subtype of
-its bound. (A typevar with a non-fully-static bound is itself non-fully-static, and therefore does
-not participate in subtyping.) A fully static bound is not assignable to, nor a subtype of, the
-typevar, since the typevar might be specialized to a smaller type. (This is true even if the bound
-is a final class, since the typevar can still be specialized to `Never`.)
+A bounded typevar is assignable to its bound, but it is not a subtype of the bound because it can be
+explicitly specialized to a dynamic type. All typevars remain subtypes of `object`, since all types,
+including dynamic types, are subtypes of `object`. A fully static bound is not assignable to, nor a
+subtype of, the typevar, since the typevar might be specialized to a smaller type. (This is true
+even if the bound is a final class, since the typevar can still be specialized to `Never`.)
 
 ```py
 from typing import Any
@@ -349,13 +349,15 @@ def bounded[T: Super](t: T) -> None:
     static_assert(is_assignable_to(T, Any))
     static_assert(is_assignable_to(Any, T))
     static_assert(is_assignable_to(T, Super))
+    static_assert(is_assignable_to(T, object))
     static_assert(not is_assignable_to(T, Sub))
     static_assert(not is_assignable_to(Super, T))
     static_assert(not is_assignable_to(Sub, T))
 
     static_assert(not is_subtype_of(T, Any))
     static_assert(not is_subtype_of(Any, T))
-    static_assert(is_subtype_of(T, Super))
+    static_assert(not is_subtype_of(T, Super))
+    static_assert(is_subtype_of(T, object))
     static_assert(not is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Sub, T))
@@ -386,7 +388,7 @@ def bounded_final[T: FinalClass](t: T) -> None:
 
     static_assert(not is_subtype_of(T, Any))
     static_assert(not is_subtype_of(Any, T))
-    static_assert(is_subtype_of(T, FinalClass))
+    static_assert(not is_subtype_of(T, FinalClass))
     static_assert(not is_subtype_of(FinalClass, T))
 ```
 
@@ -411,9 +413,10 @@ def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U, T))
 ```
 
-A constrained fully static typevar is assignable to the union of its constraints, but not to any of
-the constraints individually. None of the constraints are subtypes of the typevar, though the
-intersection of all of its constraints is a subtype of the typevar.
+A constrained fully static typevar is assignable to the union of its constraints, but it is not a
+subtype of that union because it can be explicitly specialized to a dynamic type. None of the
+constraints are subtypes of the typevar. The intersection of all constraints is assignable to the
+typevar, but it is not a subtype of the typevar.
 
 ```py
 from ty_extensions import Intersection
@@ -438,14 +441,14 @@ def constrained[T: (Base, Unrelated)](t: T) -> None:
     static_assert(not is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(T, Unrelated))
     static_assert(not is_subtype_of(T, Any))
-    static_assert(is_subtype_of(T, Super | Unrelated))
-    static_assert(is_subtype_of(T, Base | Unrelated))
+    static_assert(not is_subtype_of(T, Super | Unrelated))
+    static_assert(not is_subtype_of(T, Base | Unrelated))
     static_assert(not is_subtype_of(T, Sub | Unrelated))
     static_assert(not is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Unrelated, T))
     static_assert(not is_subtype_of(Super | Unrelated, T))
-    static_assert(is_subtype_of(Intersection[Base, Unrelated], T))
+    static_assert(not is_subtype_of(Intersection[Base, Unrelated], T))
 
 def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
     static_assert(is_assignable_to(T, Super))
@@ -649,6 +652,7 @@ there is no guarantee what type the typevar will be specialized to.
 
 ```py
 from typing import Any
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
 
 class Super: ...
 class Base(Super): ...
@@ -672,17 +676,16 @@ def unbounded_unconstrained[T](t: T) -> None:
         reveal_type(x)  # revealed: T@unbounded_unconstrained | Any
 ```
 
-The union of a bounded typevar with its bound is that bound. (The typevar is guaranteed to be
-specialized to a subtype of the bound.) The union of a bounded typevar with a subtype of its bound
-cannot be simplified. (The typevar might be specialized to a different subtype of the bound.)
+The union of a bounded typevar with another type cannot be simplified based on its bound. The
+typevar might be explicitly specialized to a dynamic type.
 
 ```py
 def bounded[T: Base](t: T) -> None:
     def _(x: T | Super) -> None:
-        reveal_type(x)  # revealed: Super
+        reveal_type(x)  # revealed: T@bounded | Super
 
     def _(x: T | Base) -> None:
-        reveal_type(x)  # revealed: Base
+        reveal_type(x)  # revealed: T@bounded | Base
 
     def _(x: T | Sub) -> None:
         reveal_type(x)  # revealed: T@bounded | Sub
@@ -692,29 +695,39 @@ def bounded[T: Base](t: T) -> None:
 
     def _(x: T | Any) -> None:
         reveal_type(x)  # revealed: T@bounded | Any
+
+    def _(x: T | object) -> None:
+        reveal_type(x)  # revealed: object
+
+    static_assert(not is_subtype_of(T | Base, Base))
+    static_assert(is_subtype_of(Base, T | Base))
+    static_assert(not is_equivalent_to(T | Base, Base))
+    static_assert(is_equivalent_to(T | object, object))
 ```
 
-The union of a constrained typevar with a type depends on how that type relates to the constraints.
-If all of the constraints are a subtype of that type, the union simplifies to that type. Inversely,
-if the type is a subtype of every constraint, the union simplifies to the typevar. Otherwise, the
-union cannot be simplified.
+The union of a constrained typevar with another type cannot be simplified based on its constraints.
+The typevar might be explicitly specialized to a dynamic type.
 
 ```py
 def constrained[T: (Base, Sub)](t: T) -> None:
     def _(x: T | Super) -> None:
-        reveal_type(x)  # revealed: Super
+        reveal_type(x)  # revealed: T@constrained | Super
 
     def _(x: T | Base) -> None:
-        reveal_type(x)  # revealed: Base
+        reveal_type(x)  # revealed: T@constrained | Base
 
     def _(x: T | Sub) -> None:
-        reveal_type(x)  # revealed: T@constrained
+        reveal_type(x)  # revealed: T@constrained | Sub
 
     def _(x: T | Unrelated) -> None:
         reveal_type(x)  # revealed: T@constrained | Unrelated
 
     def _(x: T | Any) -> None:
         reveal_type(x)  # revealed: T@constrained | Any
+
+    static_assert(not is_subtype_of(T | Sub, T))
+    static_assert(is_subtype_of(T, T | Sub))
+    static_assert(not is_equivalent_to(T | Sub, T))
 ```
 
 ## Intersections involving typevars
@@ -723,7 +736,7 @@ The intersection of an unbounded unconstrained typevar with any other type canno
 since there is no guarantee what type the typevar will be specialized to.
 
 ```py
-from ty_extensions import Intersection
+from ty_extensions import Intersection, is_subtype_of, static_assert
 from typing import Any
 
 class Super: ...
@@ -748,28 +761,41 @@ def unbounded_unconstrained[T](t: T) -> None:
         reveal_type(x)  # revealed: T@unbounded_unconstrained & Any
 ```
 
-The intersection of a bounded typevar with its bound or a supertype of its bound is the typevar
-itself. (The typevar might be specialized to a subtype of the bound.) The intersection of a bounded
-typevar with a subtype of its bound cannot be simplified. (The typevar might be specialized to a
-different subtype of the bound.) The intersection of a bounded typevar with a type that is disjoint
-from its bound is `Never`.
+The intersection of a bounded typevar with another type cannot be simplified based on subtyping or
+disjointness relationships with its bound. The typevar can be explicitly specialized to a dynamic
+type, which may overlap with a type that is disjoint from the bound.
 
 ```py
 def bounded[T: Base](t: T) -> None:
     def _(x: Intersection[T, Super]) -> None:
-        reveal_type(x)  # revealed: T@bounded
+        reveal_type(x)  # revealed: T@bounded & Super
 
     def _(x: Intersection[T, Base]) -> None:
-        reveal_type(x)  # revealed: T@bounded
+        reveal_type(x)  # revealed: T@bounded & Base
 
     def _(x: Intersection[T, Sub]) -> None:
         reveal_type(x)  # revealed: T@bounded & Sub
 
     def _(x: Intersection[T, None]) -> None:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: T@bounded & None
 
     def _(x: Intersection[T, Any]) -> None:
         reveal_type(x)  # revealed: T@bounded & Any
+```
+
+This also means that we must preserve the typevar until a generic alias is specialized:
+
+```py
+type StrPart[T: int] = Intersection[T, str]
+
+def accept_str_part(value: StrPart[Any]) -> None:
+    reveal_type(value)  # revealed: Any & str
+
+accept_str_part("")
+
+def downstream_relations[T: int](value: Intersection[T, str]) -> None:
+    static_assert(not is_subtype_of(Intersection[T, str], bytes))
+    reveal_type(value == "")  # revealed: bool
 ```
 
 Constrained typevars can be modeled using a hypothetical `OneOf` connector, where the typevar must
@@ -781,11 +807,10 @@ runtime objects. This is one reason we have not actually added this connector to
 Nevertheless, describing constrained typevars this way helps explain how we simplify intersections
 involving them.
 
-This means that when intersecting a constrained typevar with a type `T`, constraints that are
-supertypes of `T` can be simplified to `T`, since intersection distributes over `OneOf`. Moreover,
-constraints that are disjoint from `T` are no longer valid specializations of the typevar, since
-`Never` is an identity for `OneOf`. Even if only one compatible constraint remains, we preserve the
-typevar itself in the intersection so other occurrences of the same typevar stay correlated.
+Without dynamic specializations, intersecting a constrained typevar with a type `T` could eliminate
+constraints that are disjoint from `T`. However, the typevar can be explicitly specialized to a
+dynamic type, so the intersection must preserve both the typevar and `T` even when all declared
+constraints are disjoint from `T`.
 
 ```py
 def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
@@ -800,21 +825,21 @@ def constrained[T: (Base, Sub, Unrelated)](t: T) -> None:
         reveal_type(x)  # revealed: T@constrained & Sub
 
     def _(x: Intersection[T, None]) -> None:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: T@constrained & None
 
     def _(x: Intersection[T, Any]) -> None:
         reveal_type(x)  # revealed: T@constrained & Any
 ```
 
-We can simplify the intersection similarly when removing a type from a constrained typevar, since
-this is modeled internally as an intersection with a negation.
+For the same reason, removing a type from a constrained typevar cannot be simplified based only on
+the declared constraints.
 
 ```py
 from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
-        reveal_type(x)  # revealed: T@remove_constraint & str
+        reveal_type(x)  # revealed: T@remove_constraint & ~int
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]
@@ -824,10 +849,10 @@ def remove_constraint[T: (int, str, bool)](t: T) -> None:
         reveal_type(x)  # revealed: T@remove_constraint & ~bool
 
     def _(x: Intersection[T, Not[int], Not[str]]) -> None:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: T@remove_constraint & ~int & ~str
 
     def _(x: Intersection[T, Not[None]]) -> None:
-        reveal_type(x)  # revealed: T@remove_constraint
+        reveal_type(x)  # revealed: T@remove_constraint & ~None
 
     def _(x: Intersection[T, Not[Any]]) -> None:
         reveal_type(x)  # revealed: T@remove_constraint & Any
@@ -919,7 +944,7 @@ class SomeClass[T: (int, str)]:
     def narrowed1(self) -> None:
         narrowed: int | str
         assert not isinstance(self.field, int)
-        reveal_type(self.field)  # revealed: T@SomeClass & str
+        reveal_type(self.field)  # revealed: T@SomeClass & ~int
         narrowed = self.field
 
     def narrowed2(self) -> None:
@@ -943,14 +968,14 @@ def f[T: (P, Q)](t: T) -> None:
         reveal_type(t)  # revealed: T@f & P
         p: P = t
     else:
-        reveal_type(t)  # revealed: T@f & Q & ~P
+        reveal_type(t)  # revealed: T@f & ~P
         q: Q = t
 
     if isinstance(t, Q):
         reveal_type(t)  # revealed: T@f & Q
         q: Q = t
     else:
-        reveal_type(t)  # revealed: T@f & P & ~Q
+        reveal_type(t)  # revealed: T@f & ~Q
         p: P = t
 
 def g[T: (P, Q, R)](t: T) -> None:
@@ -961,7 +986,7 @@ def g[T: (P, Q, R)](t: T) -> None:
         reveal_type(t)  # revealed: T@g & Q & ~P
         q: Q = t
     else:
-        reveal_type(t)  # revealed: T@g & R & ~P & ~Q
+        reveal_type(t)  # revealed: T@g & ~P & ~Q
         r: R = t
 
     if isinstance(t, P):
@@ -977,7 +1002,8 @@ def g[T: (P, Q, R)](t: T) -> None:
         reveal_type(t)  # revealed: Never
 ```
 
-If the constraints are disjoint, simplification does eliminate the redundant negative:
+Even if the constraints are disjoint, we preserve the negative element because the typevar may be
+explicitly specialized to a dynamic type:
 
 ```py
 def h[T: (P, None)](t: T) -> None:
@@ -985,7 +1011,7 @@ def h[T: (P, None)](t: T) -> None:
         reveal_type(t)  # revealed: T@h & None
         p: None = t
     else:
-        reveal_type(t)  # revealed: T@h & P
+        reveal_type(t)  # revealed: T@h & ~None
         p: P = t
 ```
 
