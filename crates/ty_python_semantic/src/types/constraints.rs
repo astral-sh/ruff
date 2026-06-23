@@ -686,6 +686,10 @@ pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
 }
 
+/// Empty sequent maps are common. Cache those as `None`, while boxing non-empty maps to
+/// keep the outer cache entries small.
+type CachedSequentMap = Option<Box<SequentMap>>;
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
 struct ConstraintSetStorage<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
@@ -731,8 +735,8 @@ struct ConstraintSetStorage<'db> {
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
-    single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
-    pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap>,
+    single_sequent_cache: FxHashMap<ConstraintId, CachedSequentMap>,
+    pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), CachedSequentMap>,
     constraint_set_subtype_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
 }
 
@@ -4827,7 +4831,7 @@ impl SequentMap {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         constraint: ConstraintId,
-    ) -> Ref<'c, Self> {
+    ) -> Ref<'c, CachedSequentMap> {
         let key = constraint;
         let storage = builder.storage.borrow();
         if let Ok(map) = Ref::filter_map(storage, |storage| storage.single_sequent_cache.get(&key))
@@ -4843,6 +4847,7 @@ impl SequentMap {
         let mut map = SequentMap::default();
         map.add_sequents_for_single(db, builder, constraint);
 
+        let map = (!map.is_empty()).then(|| Box::new(map));
         let mut storage = builder.storage.borrow_mut();
         storage.single_sequent_cache.insert(key, map);
         drop(storage);
@@ -4862,7 +4867,7 @@ impl SequentMap {
         builder: &'c ConstraintSetBuilder<'db>,
         left: ConstraintId,
         right: ConstraintId,
-    ) -> Ref<'c, Self> {
+    ) -> Ref<'c, CachedSequentMap> {
         let key = (left, right);
         let storage = builder.storage.borrow();
         if let Ok(map) = Ref::filter_map(storage, |storage| storage.pair_sequent_cache.get(&key)) {
@@ -4878,6 +4883,7 @@ impl SequentMap {
         let mut map = SequentMap::default();
         map.add_sequents_for_pair(db, builder, left, right);
 
+        let map = (!map.is_empty()).then(|| Box::new(map));
         let mut storage = builder.storage.borrow_mut();
         storage.pair_sequent_cache.insert(key, map);
         drop(storage);
@@ -4903,6 +4909,13 @@ impl SequentMap {
                 .or_default()
                 .extend(post);
         }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.single_tautologies.is_empty()
+            && self.pair_impossibilities.is_empty()
+            && self.pair_implications.is_empty()
+            && self.single_implications.is_empty()
     }
 
     fn pair_key(ante1: ConstraintId, ante2: ConstraintId) -> (ConstraintId, ConstraintId) {
@@ -6178,12 +6191,16 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, builder, constraint);
-        self.map.merge(&single_map);
+        if let Some(single_map) = single_map.as_deref() {
+            self.map.merge(single_map);
+        }
         drop(single_map);
 
         for existing in self.discovered.keys().dropping_back(1) {
             let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
-            self.map.merge(&pair_map);
+            if let Some(pair_map) = pair_map.as_deref() {
+                self.map.merge(pair_map);
+            }
         }
     }
 
