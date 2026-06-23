@@ -656,7 +656,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
-        self.node.solutions_with(db, builder, choose)
+        self.node
+            .solutions_with(db, builder, self.source_order, choose)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -1247,7 +1248,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         self.intern_source_order(SourceOrder::Constraint(constraint))
     }
 
-    #[expect(dead_code)]
     fn source_order_data(&self, source_order: SourceOrderId) -> SourceOrder {
         let storage = self.storage.borrow();
         if let Some(compacted) = &storage.compacted {
@@ -1260,6 +1260,33 @@ impl<'db> ConstraintSetBuilder<'db> {
             return storage.source_orders[SourceOrderId::from_usize(index - split)];
         }
         storage.source_orders[source_order]
+    }
+
+    fn calculate_source_orders(
+        &self,
+        source_order: Option<SourceOrderId>,
+    ) -> FxIndexSet<ConstraintId> {
+        fn walk(
+            builder: &ConstraintSetBuilder,
+            current: SourceOrderId,
+            result: &mut FxIndexSet<ConstraintId>,
+        ) {
+            match builder.source_order_data(current) {
+                SourceOrder::Ordered(left, right) => {
+                    walk(builder, left, result);
+                    walk(builder, right, result);
+                }
+                SourceOrder::Constraint(constraint) => {
+                    result.insert(constraint);
+                }
+            }
+        }
+
+        let mut result = FxIndexSet::default();
+        if let Some(source_order) = source_order {
+            walk(self, source_order, &mut result);
+        }
+        result
     }
 }
 
@@ -2545,9 +2572,10 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        source_order: Option<SourceOrderId>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        let path_bounds = PathBounds::compute(db, builder, self);
+        let path_bounds = PathBounds::compute(db, builder, self, source_order);
         path_bounds.solve_with(choose)
     }
 
@@ -3645,7 +3673,7 @@ impl<'db> Type<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
             when.query(|builder, when| {
                 let when = when.remove_noninferable(db, builder, inferable);
-                PathBounds::compute(db, builder, when.node)
+                PathBounds::compute(db, builder, when.node, when.source_order)
             })
         }
 
@@ -3680,7 +3708,12 @@ impl<'db> PathBounds<'db> {
     ///
     /// Returns a list of paths, where each path contains the explicit lower/upper bounds for each
     /// typevar that appears in the path's constraints.
-    fn compute(db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+    fn compute(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        source_order: Option<SourceOrderId>,
+    ) -> Self {
         match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
@@ -3696,9 +3729,19 @@ impl<'db> PathBounds<'db> {
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
+        let mut source_orders = builder.calculate_source_orders(source_order);
         let mut sorted_paths = Vec::new();
         node.for_each_path(db, builder, |path| {
-            let mut path: Vec<_> = path.positive_constraints().collect();
+            let mut path: Vec<_> = path
+                .positive_constraints()
+                .map(|(constraint, _)| {
+                    source_orders.insert(constraint);
+                    let source_order = source_orders
+                        .get_index_of(&constraint)
+                        .expect("every BDD constraint should have a source_order");
+                    (constraint, source_order)
+                })
+                .collect();
             path.sort_by_key(|(_, source_order)| *source_order);
             sorted_paths.push(path);
         });
