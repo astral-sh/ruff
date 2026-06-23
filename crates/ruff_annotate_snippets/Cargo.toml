@@ -16,6 +16,8 @@ memchr = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
+ruff_annotate_snippets = { path = ".", features = ["testing-colors"] }
+
 anstream = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 snapbox = { workspace = true, features = ["diff", "term-svg", "cmd", "examples"] }

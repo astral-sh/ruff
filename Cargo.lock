@@ -3034,6 +3034,7 @@ dependencies = [
  "anstream 1.0.0",
  "anstyle",
  "memchr",
+ "ruff_annotate_snippets",
  "serde",
  "snapbox",
  "toml 1.1.2+spec-1.1.0",
