@@ -2243,7 +2243,7 @@ reveal_type(Ejecting(2))  # revealed: Literal[2]
 reveal_type(Ejecting.A | 2)  # revealed: Literal[3]
 reveal_type(2 | Ejecting.A)  # revealed: Literal[3]
 reveal_type(True | Ejecting.A)  # revealed: int
-reveal_type(Ejecting.A | OtherIntFlag.B)  # revealed: Literal[3]
+reveal_type(Ejecting.A | OtherIntFlag.B)  # revealed: OtherIntFlag
 reveal_type(OtherIntFlag.B | Ejecting.A)  # revealed: OtherIntFlag
 reveal_type(~Ejecting.A)  # revealed: Literal[-2]
 reveal_type(SignedEjecting(-1))  # revealed: Literal[SignedEjecting.NEGATIVE]
