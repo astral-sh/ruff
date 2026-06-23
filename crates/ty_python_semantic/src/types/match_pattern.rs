@@ -2,7 +2,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
 use ty_python_core::predicate::{
-    ClassPatternPredicateKind, PatternPredicateKind, SequencePatternPredicateKind,
+    ClassPatternPredicateKind, MappingPatternEntryPredicateKind, PatternPredicateKind,
+    SequencePatternPredicateKind,
 };
 
 use crate::Db;
@@ -33,6 +34,19 @@ pub(crate) fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
 
 pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
     Type::Callable(CallableType::unknown(db)).top_materialization(db)
+}
+
+/// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
+///
+/// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
+/// value is a dictionary. A `TypedDict` therefore matches class patterns such as `dict()`,
+/// `Mapping()`, and `MutableMapping()`.
+fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    let Some(dict) = KnownClass::Dict.to_class_literal(db).as_class_literal() else {
+        return false;
+    };
+    Type::instance(db, dict.top_materialization(db))
+        .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
 }
 
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
@@ -189,7 +203,9 @@ fn class_pattern_is_exhaustive(
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
     let class_instance_ty = Type::instance(db, class.top_materialization(db));
-    if !subject_ty.is_subtype_of(db, class_instance_ty) {
+    let is_typed_dict_match =
+        matches!(subject_ty, Type::TypedDict(_)) && typed_dict_matches_class_pattern(db, class);
+    if !is_typed_dict_match && !subject_ty.is_subtype_of(db, class_instance_ty) {
         return false;
     }
 
@@ -379,6 +395,36 @@ fn pattern_is_exhaustive_for_subject(
     )
 }
 
+/// Return whether every value in `subject_ty` is guaranteed to match a mapping pattern.
+///
+/// A nonempty mapping pattern is exhaustive for a `TypedDict` only when every key names a required
+/// field and every nested pattern exhausts that field's declared type. Other mapping types do not
+/// guarantee that a particular key is present.
+fn mapping_pattern_is_exhaustive(
+    db: &dyn Db,
+    entries: &[MappingPatternEntryPredicateKind<'_>],
+    subject_ty: Type<'_>,
+) -> bool {
+    if entries.is_empty() {
+        return subject_ty.is_subtype_of(db, mapping_pattern_type(db));
+    }
+
+    let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(db) else {
+        return false;
+    };
+
+    entries.iter().all(|entry| {
+        let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
+        let Some(key) = key_ty.as_string_literal() else {
+            return false;
+        };
+        typed_dict.item(db, key.value(db)).is_some_and(|field| {
+            field.is_required()
+                && pattern_is_exhaustive_for_subject(db, &entry.pattern, field.declared_ty)
+        })
+    })
+}
+
 /// Return whether an exact tuple subject is fully consumed by a sequence pattern.
 ///
 /// Each aligned element is checked with the subject-aware matcher so nested class patterns use the
@@ -433,8 +479,11 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// even for a `Child` subject. Class patterns need the current subject type when member extraction
 /// depends on the subject's statically known members.
 /// A subject-independent pattern can return its context-free definite-match type directly. A
-/// definitely bound descriptor is treated as successful even though it could raise at runtime.
-/// The same rule is propagated through nested sequence, `or`, and `as` patterns.
+/// mapping pattern can use required `TypedDict` fields to establish that every subject value
+/// contains its keys.
+/// This treats access to a definitely bound descriptor as successful even though the descriptor
+/// could raise at runtime. The same rule is propagated through nested sequence, `or`, and `as`
+/// patterns.
 ///
 /// ```python
 /// class Base:
@@ -498,6 +547,13 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
+                Type::Never
+            };
+        }
+        PatternPredicateKind::Mapping(kind) => {
+            return if mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
+                subject_ty
+            } else {
                 Type::Never
             };
         }
@@ -678,7 +734,9 @@ fn subject_independent_definite_match_pattern_type<'db>(
     match kind {
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class) if kind.is_empty() => {
+                Type::ClassLiteral(class)
+                    if kind.is_empty() && !typed_dict_matches_class_pattern(db, class) =>
+                {
                     Some(Type::instance(db, class.top_materialization(db)))
                 }
                 Type::ClassLiteral(_) => None,
@@ -694,7 +752,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
             })
         }
         PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
+            if kind.is_empty() {
                 Some(mapping_pattern_type(db))
             } else {
                 None
@@ -745,7 +803,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
             }
         }
         PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
+            if kind.is_empty() {
                 mapping_pattern_type(db)
             } else {
                 Type::Never

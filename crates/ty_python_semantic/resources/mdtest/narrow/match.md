@@ -771,6 +771,80 @@ def builtin_positional_patterns_are_exhaustive(
             return 1
 ```
 
+## Runtime dictionary class patterns
+
+A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapping` patterns always
+match it. The positional `dict` pattern does as well:
+
+```py
+from collections.abc import Mapping
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def typed_dict_argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict():
+            return 1
+
+def typed_dict_mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case Mapping():
+            return 1
+
+def typed_dict_positional_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict(_):
+            return 1
+```
+
+## Required `TypedDict` keys
+
+A mapping pattern is exhaustive for a `TypedDict` when every key in the pattern names a required
+field and every nested pattern accepts the field's complete type. Optional, absent, and non-string
+keys are not guaranteed to be present.
+
+```py
+from typing import Literal, TypedDict
+
+class RequiredPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class OptionalPayload(TypedDict, total=False):
+    value: int
+
+def required_keys_are_exhaustive(value: RequiredPayload) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def optional_key_is_not_exhaustive(
+    value: OptionalPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {"value": _}:
+            return 1
+
+def absent_key_is_not_exhaustive(
+    value: RequiredPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {"missing": _}:
+            return 1
+
+def non_string_key_is_not_exhaustive(
+    value: RequiredPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {1: _}:
+            return 1
+```
+
 ## `NamedTuple` positional patterns
 
 A `NamedTuple` provides a generated `__match_args__` tuple containing all of its fields:
