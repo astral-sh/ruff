@@ -126,7 +126,7 @@ Comparisons between values of the same enum preserve existing narrowing. They ca
 members shared by both operands, or determine that groups with no members in common are unequal:
 
 ```py
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from typing import Literal
 
 class Choice(StrEnum):
@@ -169,6 +169,26 @@ def compare_non_overlapping_literal_unions(
     right: Literal[Choice.THIRD, Choice.FOURTH],
 ):
     reveal_type(left == right)  # revealed: Literal[False]
+
+def make_value() -> Literal["value"]:
+    return "value"
+
+class RuntimeAlias(StrEnum):
+    FIRST = make_value()
+    SECOND = "value"
+
+# These members have equal runtime values, but the inferred value literals have different
+# promotability. We therefore cannot conclude that the members compare unequal.
+reveal_type(RuntimeAlias.FIRST == RuntimeAlias.SECOND)  # revealed: bool
+
+def make_int_value() -> Literal[1]:
+    return 1
+
+class RuntimeIntAlias(IntEnum):
+    FIRST = make_int_value()
+    SECOND = 1
+
+reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: bool
 ```
 
 Equality narrowing must not copy unrelated parts of one operand's type to the other:

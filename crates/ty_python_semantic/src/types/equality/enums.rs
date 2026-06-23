@@ -4,6 +4,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_python_core::Truthiness;
 
+use crate::types::literal::IntLiteralType;
 use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
     LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
@@ -487,6 +488,7 @@ fn enum_comparison_profile<'db>(
 
 /// Return whether every declared member has a unique modeled runtime comparison key.
 ///
+/// Keys exclude literal metadata such as promotability, which does not affect runtime equality.
 /// Boolean keys are normalized to integers because Python considers `False == 0` and `True == 1`.
 fn enum_members_have_distinct_value_keys<'db>(
     db: &'db dyn Db,
@@ -495,12 +497,14 @@ fn enum_members_have_distinct_value_keys<'db>(
     let mut keys = FxHashSet::default();
     enum_class.members(db).iter().all(|(_, value)| {
         let key = match value.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bool(value)) => Type::int_literal(i64::from(value)),
+            Some(LiteralValueTypeKind::Bool(value)) => {
+                LiteralValueTypeKind::Int(IntLiteralType::from_i64(i64::from(value)))
+            }
             Some(
-                LiteralValueTypeKind::Int(_)
+                kind @ (LiteralValueTypeKind::Int(_)
                 | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_),
-            ) => *value,
+                | LiteralValueTypeKind::Bytes(_)),
+            ) => kind,
             Some(LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_)) | None => {
                 return false;
             }
