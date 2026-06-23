@@ -752,24 +752,55 @@ pub(crate) fn flag_binary_result<'db>(
         }
         (Some((left_class, left_literal)), Some((right_class, right_literal))) => {
             let (_, left_flag) = enum_metadata_and_flag(db, left_class)?;
-            let ejected_type = if left_flag.boundary() == FlagBoundary::Eject {
-                left_literal
-                    .and_then(|literal| literal_value(db, left_class, literal))
-                    .and_then(|value| flag_binary_result(db, Type::int_literal(value), right, op))
-            } else {
-                None
-            };
-            flag_integer_binary_result(
-                db,
-                left_class,
-                left_literal,
-                right,
-                true,
-                right_literal.and_then(|literal| literal_value(db, right_class, literal)),
-                ejected_type,
-                op.dunder(),
-                operation,
-            )
+            if !left_flag.accepts_operand(db, right)
+                || !class_uses_standard_flag_operation(db, left_class, op.dunder())
+            {
+                return None;
+            }
+            if !class_uses_standard_flag_construction(db, left_class) {
+                return Some(left_class.class_literal(db).to_non_generic_instance(db));
+            }
+
+            let exact = left_literal.zip(right_literal).and_then(|(left, right)| {
+                if !class_uses_standard_flag_operation(db, right_class, op.reflected_dunder())
+                    || !class_uses_standard_flag_construction(db, right_class)
+                    || !enum_uses_standard_metaclass_call(db, right_class.class_literal(db))
+                {
+                    return None;
+                }
+                let left = literal_value(db, left_class, left)?;
+                let right = literal_value(db, right_class, right)?;
+                let (_, right_flag) = enum_metadata_and_flag(db, right_class)?;
+                let raw_value = operation(left, right);
+                let construction = right_flag.construct(raw_value);
+                let value = match construction {
+                    FlagConstruction::Flag(value) | FlagConstruction::Ejected(value) => value,
+                    FlagConstruction::Raises | FlagConstruction::Unknown => return None,
+                };
+                Some((
+                    value,
+                    construction_type(
+                        db,
+                        right_class,
+                        construction,
+                        Some(Type::int_literal(raw_value)),
+                    ),
+                ))
+            });
+            let (exact_value, ejected_type) = exact.unzip();
+            Some(match exact_value {
+                Some(value) => {
+                    construction_type(db, left_class, left_flag.construct(value), ejected_type)
+                }
+                None if matches!(
+                    left_flag.boundary(),
+                    FlagBoundary::Eject | FlagBoundary::Unknown
+                ) =>
+                {
+                    possible_flag_or_int(db, left_class)
+                }
+                None => left_class.class_literal(db).to_non_generic_instance(db),
+            })
         }
         (Some((enum_class, literal)), None) | (None, Some((enum_class, literal))) => {
             let flag_on_left = left_flag.is_some();

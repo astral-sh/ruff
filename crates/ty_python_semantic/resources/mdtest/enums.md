@@ -2239,6 +2239,21 @@ class Keeping(IntFlag):
 class OtherIntFlag(IntFlag):
     B = 2
 
+class CrossLeft(IntFlag):
+    A = 1
+    B = 2
+    AB = 3
+    C = 4
+
+class CrossConforming(IntFlag, boundary=CONFORM):
+    B = 2
+
+class CustomReflected(IntFlag):
+    B = 2
+
+    def __ror__(self, other: int) -> Any:
+        return 4
+
 reveal_type(~Strict.A)  # revealed: Literal[Strict.C]
 reveal_type(Conforming(2))  # revealed: Literal[Conforming.NONE]
 reveal_type(Ejecting(2))  # revealed: Literal[2]
@@ -2248,6 +2263,8 @@ reveal_type(2 | Ejecting.A)  # revealed: Literal[3]
 reveal_type(True | Ejecting.A)  # revealed: int
 reveal_type(Ejecting.A | OtherIntFlag.B)  # revealed: OtherIntFlag
 reveal_type(OtherIntFlag.B | Ejecting.A)  # revealed: OtherIntFlag
+reveal_type(CrossLeft.A | CrossConforming.B)  # revealed: Literal[CrossLeft.B]
+reveal_type(CrossLeft.A | CustomReflected.B)  # revealed: CrossLeft
 reveal_type(~Ejecting.A)  # revealed: Literal[-2]
 reveal_type(SignedEjecting(-1))  # revealed: Literal[SignedEjecting.NEGATIVE]
 reveal_type(SignedEjecting(3))  # revealed: Literal[3]
