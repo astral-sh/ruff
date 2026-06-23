@@ -70,6 +70,7 @@ pub(crate) struct FlagMetadata<'db> {
     member_type: Option<Type<'db>>,
     preserves_assigned_value_type: bool,
     preserves_negative_values: bool,
+    uses_legacy_inversion: bool,
     canonical_members_are_known: bool,
     member_values: FxHashMap<Name, i64>,
     named_values: FxHashMap<i64, Name>,
@@ -171,8 +172,11 @@ impl<'db> FlagMetadata<'db> {
         let member_type = flag_member_type(db, class);
         let preserves_assigned_value_type =
             member_type.ty.is_none() && member_type.values_are_known;
-        let preserves_negative_values = Program::get(db).python_version(db) < PythonVersion::PY311
-            && Type::ClassLiteral(class).is_subtype_of(db, KnownClass::IntFlag.to_subclass_of(db));
+        let before_python_311 = Program::get(db).python_version(db) < PythonVersion::PY311;
+        let is_int_flag =
+            Type::ClassLiteral(class).is_subtype_of(db, KnownClass::IntFlag.to_subclass_of(db));
+        let preserves_negative_values = before_python_311 && is_int_flag;
+        let uses_legacy_inversion = before_python_311 && !is_int_flag;
 
         if member_type.values_are_known {
             for name in metadata.members.keys() {
@@ -200,6 +204,8 @@ impl<'db> FlagMetadata<'db> {
                 flag_mask |= value;
                 if is_positive_power_of_two(value) {
                     singles_mask |= value;
+                }
+                if before_python_311 || is_positive_power_of_two(value) {
                     canonical_members.push((name.clone(), value));
                 }
             }
@@ -227,6 +233,7 @@ impl<'db> FlagMetadata<'db> {
             member_type: member_type.ty,
             preserves_assigned_value_type,
             preserves_negative_values,
+            uses_legacy_inversion,
             canonical_members_are_known: all_values_are_known,
             member_values,
             named_values,
@@ -337,6 +344,18 @@ impl<'db> FlagMetadata<'db> {
 
         self.normalize_negative(value)
             .map_or(FlagConstruction::Unknown, FlagConstruction::Flag)
+    }
+
+    fn legacy_invert(&self, value: i64) -> FlagConstruction {
+        if !self.canonical_members_are_known {
+            return FlagConstruction::Unknown;
+        }
+        let inverted = self
+            .canonical_members
+            .iter()
+            .filter(|(_, member)| member & value == 0)
+            .fold(0, |inverted, (_, member)| inverted | member);
+        self.construct(inverted)
     }
 }
 
@@ -897,13 +916,17 @@ pub(crate) fn flag_invert_result<'db>(db: &'db dyn Db, operand: Type<'db>) -> Op
             },
         );
     };
-    let construction = match flag.boundary() {
-        FlagBoundary::Strict | FlagBoundary::Conform => flag
-            .singles_mask
-            .map(|mask| FlagConstruction::Flag(mask & !value))
-            .unwrap_or(FlagConstruction::Unknown),
-        FlagBoundary::Eject | FlagBoundary::Keep => flag.construct(!value),
-        FlagBoundary::Unknown => FlagConstruction::Unknown,
+    let construction = if flag.uses_legacy_inversion {
+        flag.legacy_invert(value)
+    } else {
+        match flag.boundary() {
+            FlagBoundary::Strict | FlagBoundary::Conform => flag
+                .singles_mask
+                .map(|mask| FlagConstruction::Flag(mask & !value))
+                .unwrap_or(FlagConstruction::Unknown),
+            FlagBoundary::Eject | FlagBoundary::Keep => flag.construct(!value),
+            FlagBoundary::Unknown => FlagConstruction::Unknown,
+        }
     };
     Some(construction_type(
         db,

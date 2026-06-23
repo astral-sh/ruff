@@ -2437,6 +2437,30 @@ reveal_type(LegacyIntFlag(-2))  # revealed: LegacyIntFlag
 reveal_type(~LegacyIntFlag.A)  # revealed: LegacyIntFlag
 ```
 
+## Flag members before Python 3.11
+
+Before Python 3.11, class iteration includes every non-alias `Flag` name, including zero and
+composite values. Inversion uses that member set.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Flag
+from ty_extensions import enum_members
+
+class LegacyMembers(Flag):
+    ZERO = 0
+    A = 1
+    AB = 3
+
+# revealed: tuple[Literal["ZERO"], Literal["A"], Literal["AB"]]
+reveal_type(enum_members(LegacyMembers))
+reveal_type(~LegacyMembers.ZERO)  # revealed: Literal[LegacyMembers.AB]
+```
+
 ## Function syntax
 
 ### String names (positional)
