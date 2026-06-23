@@ -50,6 +50,30 @@ fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
         .expect("a specialized `list` should be a generic alias")
 }
 
+fn recursive_union_types(db: &dyn Db) -> (Type<'_>, Type<'_>, Type<'_>, Type<'_>) {
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int = KnownClass::List.to_specialized_instance(db, &[KnownClass::Int.to_instance(db)]);
+    let list_str = KnownClass::List.to_specialized_instance(db, &[KnownClass::Str.to_instance(db)]);
+    let previous = UnionType::from_elements(db, [list_int, list_str]);
+    (div, list_int, list_str, previous)
+}
+
+fn normalize_nominal_wrapper<'db>(
+    db: &'db dyn Db,
+    current: Type<'db>,
+    wrapped: Type<'db>,
+    div: Type<'db>,
+) -> Option<Type<'db>> {
+    Type::nominal_wrapper_normalized(
+        db,
+        current
+            .as_nominal_instance()
+            .expect("the outer wrapper should be a nominal instance"),
+        wrapped,
+        div,
+    )
+}
+
 fn oscillating_type_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -136,9 +160,7 @@ fn protocol_cycle_recovery_widens_unrelated_specializations() {
 #[test]
 fn recursive_nominal_growth_normalizes_protocol_intersection_arm() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let (div, list_int, _, _) = recursive_union_types(&db);
     let previous = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
     let protocol = KnownClass::Iterable.to_specialized_instance(&db, &[previous]);
     let current = IntersectionType::from_two_elements(&db, protocol, Type::unknown());
@@ -154,12 +176,7 @@ fn recursive_nominal_growth_normalizes_protocol_intersection_arm() {
 #[test]
 fn recursive_nominal_growth_preserves_unrelated_intersections() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let int_intersection = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
     let str_intersection = IntersectionType::from_two_elements(&db, list_str, Type::unknown());
     let current = UnionType::from_elements(
@@ -187,12 +204,7 @@ fn recursive_nominal_growth_preserves_unrelated_intersections() {
 #[test]
 fn recursive_nominal_growth_normalizes_complete_union_distribution() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distributed = UnionType::from_elements(
         &db,
         [
@@ -204,14 +216,7 @@ fn recursive_nominal_growth_normalizes_complete_union_distribution() {
     let expected = KnownClass::List.to_specialized_instance(&db, &[div]);
 
     assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
+        normalize_nominal_wrapper(&db, current, previous, div),
         Some(expected)
     );
 }
@@ -219,12 +224,7 @@ fn recursive_nominal_growth_normalizes_complete_union_distribution() {
 #[test]
 fn recursive_nominal_growth_normalizes_multiple_distribution_groups() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distributed = UnionType::from_elements(
         &db,
         [
@@ -245,14 +245,7 @@ fn recursive_nominal_growth_normalizes_multiple_distribution_groups() {
     let expected = KnownClass::List.to_specialized_instance(&db, &[normalized_distribution]);
 
     assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
+        normalize_nominal_wrapper(&db, current, previous, div),
         Some(expected)
     );
 }
@@ -260,12 +253,7 @@ fn recursive_nominal_growth_normalizes_multiple_distribution_groups() {
 #[test]
 fn recursive_nominal_growth_stops_at_opaque_distributed_union() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distributed = UnionType::from_elements(
         &db,
         [
@@ -279,51 +267,24 @@ fn recursive_nominal_growth_stops_at_opaque_distributed_union() {
     )));
     let current = KnownClass::List.to_specialized_instance(&db, &[literal]);
 
-    assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
-        None
-    );
+    assert_eq!(normalize_nominal_wrapper(&db, current, previous, div), None);
 }
 
 #[test]
 fn recursive_nominal_growth_stops_at_opaque_flattened_intersection() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let (div, list_int, _, _) = recursive_union_types(&db);
     let previous = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
     let literal = Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(&db, previous)));
     let current = KnownClass::List.to_specialized_instance(&db, &[literal]);
 
-    assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
-        None
-    );
+    assert_eq!(normalize_nominal_wrapper(&db, current, previous, div), None);
 }
 
 #[test]
 fn recursive_nominal_growth_requires_all_union_elements() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, _, previous) = recursive_union_types(&db);
     let partial = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
     let current = UnionType::from_elements(
         &db,
@@ -342,12 +303,7 @@ fn recursive_nominal_growth_requires_all_union_elements() {
 #[test]
 fn recursive_nominal_growth_requires_structural_union_distribution() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let current = UnionType::from_elements(
         &db,
         [
@@ -365,12 +321,7 @@ fn recursive_nominal_growth_requires_structural_union_distribution() {
 #[test]
 fn recursive_nominal_growth_only_replaces_distributed_position() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distributed = UnionType::from_elements(
         &db,
         [
@@ -403,12 +354,7 @@ fn recursive_nominal_growth_only_replaces_distributed_position() {
 #[test]
 fn recursive_nominal_growth_rejects_unrelated_union_and_intersection() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let unrelated_union = UnionType::from_elements(
         &db,
         [
@@ -426,28 +372,13 @@ fn recursive_nominal_growth_rejects_unrelated_union_and_intersection() {
     );
     let current = KnownClass::List.to_specialized_instance(&db, &[position]);
 
-    assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
-        None
-    );
+    assert_eq!(normalize_nominal_wrapper(&db, current, previous, div), None);
 }
 
 #[test]
 fn recursive_nominal_growth_requires_matching_branch_structure() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let unrelated = UnionType::from_elements(
         &db,
         [
@@ -457,28 +388,13 @@ fn recursive_nominal_growth_requires_matching_branch_structure() {
     );
     let current = KnownClass::List.to_specialized_instance(&db, &[unrelated]);
 
-    assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
-        None
-    );
+    assert_eq!(normalize_nominal_wrapper(&db, current, previous, div), None);
 }
 
 #[test]
 fn recursive_nominal_growth_only_normalizes_matched_union_subtree() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distributed = UnionType::from_elements(
         &db,
         [
@@ -492,14 +408,7 @@ fn recursive_nominal_growth_only_normalizes_matched_union_subtree() {
     let expected = KnownClass::List.to_specialized_instance(&db, &[normalized_position]);
 
     assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
+        normalize_nominal_wrapper(&db, current, previous, div),
         Some(expected)
     );
 }
@@ -507,12 +416,7 @@ fn recursive_nominal_growth_only_normalizes_matched_union_subtree() {
 #[test]
 fn recursive_nominal_growth_normalizes_exact_and_distributed_occurrences() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distributed = UnionType::from_elements(
         &db,
         [
@@ -524,14 +428,7 @@ fn recursive_nominal_growth_normalizes_exact_and_distributed_occurrences() {
     let expected = KnownClass::Dict.to_specialized_instance(&db, &[div, div]);
 
     assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized dict should be a nominal instance"),
-            previous,
-            div,
-        ),
+        normalize_nominal_wrapper(&db, current, previous, div),
         Some(expected)
     );
 }
@@ -539,12 +436,7 @@ fn recursive_nominal_growth_normalizes_exact_and_distributed_occurrences() {
 #[test]
 fn recursive_nominal_growth_rejects_nested_negative_occurrences() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let excluded_int = IntersectionBuilder::new(&db)
         .add_positive(Type::object())
         .add_negative(KnownClass::Set.to_specialized_instance(&db, &[list_int]))
@@ -571,29 +463,14 @@ fn recursive_nominal_growth_rejects_nested_negative_occurrences() {
         ),
     ] {
         let current = KnownClass::List.to_specialized_instance(&db, &[position]);
-        assert_eq!(
-            Type::nominal_wrapper_normalized(
-                &db,
-                current
-                    .as_nominal_instance()
-                    .expect("a specialized list should be a nominal instance"),
-                previous,
-                div,
-            ),
-            None
-        );
+        assert_eq!(normalize_nominal_wrapper(&db, current, previous, div), None);
     }
 }
 
 #[test]
 fn recursive_nominal_growth_rejects_distributions_under_negation() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distribution = UnionType::from_elements(
         &db,
         [
@@ -607,25 +484,13 @@ fn recursive_nominal_growth_rejects_distributions_under_negation() {
         .build();
     let current = KnownClass::List.to_specialized_instance(&db, &[excluded]);
 
-    assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
-        None
-    );
+    assert_eq!(normalize_nominal_wrapper(&db, current, previous, div), None);
 }
 
 #[test]
 fn recursive_nominal_growth_rejects_exact_intersection_under_negation() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let (div, list_int, _, _) = recursive_union_types(&db);
     let previous = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
     let excluded = IntersectionBuilder::new(&db)
         .add_positive(Type::object())
@@ -643,12 +508,7 @@ fn recursive_nominal_growth_rejects_exact_intersection_under_negation() {
 #[test]
 fn recursive_nominal_growth_preserves_negative_distribution_copies() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let distribution = UnionType::from_elements(
         &db,
         [
@@ -672,14 +532,7 @@ fn recursive_nominal_growth_preserves_negative_distribution_copies() {
     let expected = KnownClass::List.to_specialized_instance(&db, &[normalized_position]);
 
     assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized list should be a nominal instance"),
-            previous,
-            div,
-        ),
+        normalize_nominal_wrapper(&db, current, previous, div),
         Some(expected)
     );
 }
@@ -687,12 +540,7 @@ fn recursive_nominal_growth_preserves_negative_distribution_copies() {
 #[test]
 fn recursive_nominal_growth_recomputes_overlapping_positions() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let list_int =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
-    let list_str =
-        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
-    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let (div, list_int, list_str, previous) = recursive_union_types(&db);
     let first_distribution = UnionType::from_elements(
         &db,
         [
@@ -716,14 +564,7 @@ fn recursive_nominal_growth_recomputes_overlapping_positions() {
     let expected = KnownClass::Dict.to_specialized_instance(&db, &[div, normalized_nested]);
 
     assert_eq!(
-        Type::nominal_wrapper_normalized(
-            &db,
-            current
-                .as_nominal_instance()
-                .expect("a specialized dict should be a nominal instance"),
-            previous,
-            div,
-        ),
+        normalize_nominal_wrapper(&db, current, previous, div),
         Some(expected)
     );
 }
