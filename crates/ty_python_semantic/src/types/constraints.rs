@@ -1478,7 +1478,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         self.intern_source_order(SourceOrder::Constraint(constraint))
     }
 
-    #[expect(dead_code)]
     fn source_order_data(&self, source_order: SourceOrderId) -> SourceOrder {
         let storage = self.storage.borrow();
         if let Some(compacted) = &storage.compacted {
@@ -1491,6 +1490,33 @@ impl<'db> ConstraintSetBuilder<'db> {
             return storage.source_orders[SourceOrderId::from_usize(index - split)];
         }
         storage.source_orders[source_order]
+    }
+
+    fn calculate_source_orders(
+        &self,
+        source_order: Option<SourceOrderId>,
+    ) -> FxIndexSet<ConstraintId> {
+        fn walk(
+            builder: &ConstraintSetBuilder,
+            current: SourceOrderId,
+            result: &mut FxIndexSet<ConstraintId>,
+        ) {
+            match builder.source_order_data(current) {
+                SourceOrder::Ordered(left, right) => {
+                    walk(builder, left, result);
+                    walk(builder, right, result);
+                }
+                SourceOrder::Constraint(constraint) => {
+                    result.insert(constraint);
+                }
+            }
+        }
+
+        let mut result = FxIndexSet::default();
+        if let Some(source_order) = source_order {
+            walk(self, source_order, &mut result);
+        }
+        result
     }
 }
 
