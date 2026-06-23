@@ -73,6 +73,7 @@ pub(crate) struct FlagMetadata<'db> {
     member_values: FxHashMap<Name, i64>,
     named_values: FxHashMap<i64, Name>,
     canonical_members: Box<[(Name, i64)]>,
+    canonical_members_are_in_value_order: bool,
     flag_mask: Option<i64>,
     singles_mask: Option<i64>,
 }
@@ -216,6 +217,9 @@ impl<'db> FlagMetadata<'db> {
 
         member_values.shrink_to_fit();
         named_values.shrink_to_fit();
+        let canonical_members_are_in_value_order = canonical_members
+            .windows(2)
+            .all(|members| members[0].1 < members[1].1);
 
         Self {
             boundary,
@@ -226,6 +230,7 @@ impl<'db> FlagMetadata<'db> {
             member_values,
             named_values,
             canonical_members: canonical_members.into_boxed_slice(),
+            canonical_members_are_in_value_order,
             flag_mask: masks_are_known.then_some(flag_mask),
             singles_mask: masks_are_known.then_some(singles_mask),
         }
@@ -250,6 +255,10 @@ impl<'db> FlagMetadata<'db> {
 
     pub(crate) fn canonical_members(&self) -> &[(Name, i64)] {
         &self.canonical_members
+    }
+
+    const fn canonical_members_are_in_value_order(&self) -> bool {
+        self.canonical_members_are_in_value_order
     }
 
     fn member_value(&self, name: &Name) -> Option<i64> {
@@ -890,6 +899,13 @@ pub(crate) fn flag_literal_iteration<'db>(
     if !class_uses_standard_flag_method(db, enum_class, "_iter_member_")
         || !flag.canonical_members_are_known()
     {
+        return Some(FlagIteration::Unknown(nominal));
+    }
+    let generated_iteration_hook_is_custom = !flag.canonical_members_are_in_value_order()
+        && ["_iter_member_by_def_", "_iter_member_by_value_"]
+            .into_iter()
+            .any(|name| !class_uses_standard_flag_method(db, enum_class, name));
+    if generated_iteration_hook_is_custom {
         return Some(FlagIteration::Unknown(nominal));
     }
     let Some(value) = literal_value(db, enum_class, literal) else {

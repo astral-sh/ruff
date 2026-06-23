@@ -2340,6 +2340,33 @@ class CustomIteration(IterationBase):
 reveal_type(tuple(CustomIteration.A))  # revealed: tuple[CustomIteration, ...]
 ```
 
+When canonical members are declared out of value order, `EnumMeta` generates `_iter_member_` from
+the two helper methods. Overrides of either helper can change iteration:
+
+```py
+class CustomDefinitionIteration(Flag):
+    @classmethod
+    def _iter_member_by_def_(cls, value: int):
+        return iter(())
+
+    HIGH = 2
+    LOW = 1
+    BOTH = HIGH | LOW
+
+reveal_type(tuple(CustomDefinitionIteration.BOTH))  # revealed: tuple[CustomDefinitionIteration, ...]
+
+class CustomValueIteration(Flag):
+    @classmethod
+    def _iter_member_by_value_(cls, value: int):
+        return iter(())
+
+    HIGH = 2
+    LOW = 1
+    BOTH = HIGH | LOW
+
+reveal_type(tuple(CustomValueIteration.BOTH))  # revealed: tuple[CustomValueIteration, ...]
+```
+
 ## Flag `auto()` before Python 3.11
 
 Before Python 3.11, `Flag._generate_next_value_` uses the most recently assigned value rather than
