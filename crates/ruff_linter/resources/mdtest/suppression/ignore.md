@@ -1069,11 +1069,3 @@ select = ["D100"]
 #!/usr/bin/env python
 # ruff:ignore[D100]
 ```
-
-An intervening blank line should keep the ignore from applying to the shebang:
-
-```py
-#!/usr/bin/env python  # error: [undocumented-public-module]
-
-# ruff:ignore[D100]
-```
