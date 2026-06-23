@@ -23,7 +23,9 @@ use std::num::{NonZeroI32, NonZeroUsize};
 use itertools::{Either, EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
-use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
+use crate::subscript::{
+    Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError, py_slice_with_step,
+};
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
@@ -978,18 +980,6 @@ enum FixedSegment {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FixedPositionOrigin {
-    Front,
-    Back,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FixedPositionBound {
-    BeforeFront,
-    Position(usize),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ForwardSliceStop {
     /// The default stop at the end of the tuple.
     End,
@@ -1010,11 +1000,22 @@ struct FixedSlice {
 
 /// A fixed-length slice in the result of slicing a variable-length tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct FixedPositionSlice {
-    origin: FixedPositionOrigin,
-    start: usize,
-    exclusive_stop: FixedPositionBound,
-    step: NonZeroI32,
+enum FixedPositionSlice {
+    FrontForward {
+        start: usize,
+        exclusive_stop: usize,
+        step: NonZeroUsize,
+    },
+    FrontBackward {
+        start: usize,
+        exclusive_stop: Option<usize>,
+        step: NonZeroUsize,
+    },
+    Back {
+        start: usize,
+        exclusive_stop: usize,
+        step: NonZeroI32,
+    },
 }
 
 /// The elements folded into the variable part of a sliced variable-length tuple.
@@ -1065,40 +1066,37 @@ impl FixedSlice {
         }
     }
 
-    fn elements<'db>(
-        self,
-        db: &'db dyn Db,
-        tuple: &VariableLengthTuple<Type<'db>>,
-    ) -> Result<Vec<Type<'db>>, StepSizeZeroError> {
+    fn elements<'db>(self, tuple: &VariableLengthTuple<Type<'db>>) -> Vec<Type<'db>> {
         let elements = match self.segment {
             FixedSegment::Prefix => tuple.prefix_elements(),
             FixedSegment::Suffix => tuple.suffix_elements(),
         };
 
-        Ok(elements
-            .py_slice(db, self.start, self.stop, Some(self.step.get()))?
-            .collect())
+        py_slice_with_step(elements, self.start, self.stop, self.step).collect()
     }
 }
 
 impl FixedPositionSlice {
-    fn front(start: usize, stop: Option<usize>, step: NonZeroI32) -> Self {
-        Self {
-            origin: FixedPositionOrigin::Front,
+    fn front_forward(start: usize, stop: usize, step: NonZeroUsize) -> Self {
+        Self::FrontForward {
             start,
-            exclusive_stop: stop.map_or(
-                FixedPositionBound::BeforeFront,
-                FixedPositionBound::Position,
-            ),
+            exclusive_stop: stop,
+            step,
+        }
+    }
+
+    fn front_backward(start: usize, stop: Option<usize>, step: NonZeroUsize) -> Self {
+        Self::FrontBackward {
+            start,
+            exclusive_stop: stop,
             step,
         }
     }
 
     fn back(start: usize, stop: usize, step: NonZeroI32) -> Self {
-        Self {
-            origin: FixedPositionOrigin::Back,
+        Self::Back {
             start,
-            exclusive_stop: FixedPositionBound::Position(stop),
+            exclusive_stop: stop,
             step,
         }
     }
@@ -1108,42 +1106,55 @@ impl FixedPositionSlice {
         db: &'db dyn Db,
         tuple: &VariableLengthTuple<Type<'db>>,
     ) -> Vec<Type<'db>> {
-        match self.origin {
-            FixedPositionOrigin::Front => self.front_elements(db, tuple),
-            FixedPositionOrigin::Back => self.back_elements(db, tuple),
+        match self {
+            FixedPositionSlice::FrontForward {
+                start,
+                exclusive_stop,
+                step,
+            } => Self::front_forward_elements(db, tuple, start, exclusive_stop, step),
+            FixedPositionSlice::FrontBackward {
+                start,
+                exclusive_stop,
+                step,
+            } => Self::front_backward_elements(db, tuple, start, exclusive_stop, step),
+            FixedPositionSlice::Back {
+                start,
+                exclusive_stop,
+                step,
+            } => Self::back_elements(db, tuple, start, exclusive_stop, step),
         }
     }
 
-    fn front_elements<'db>(
-        self,
+    fn front_forward_elements<'db>(
         db: &'db dyn Db,
         tuple: &VariableLengthTuple<Type<'db>>,
+        start: usize,
+        exclusive_stop: usize,
+        step: NonZeroUsize,
     ) -> Vec<Type<'db>> {
-        let step = self.step.get();
-        let step_abs = step.unsigned_abs() as usize;
-
-        if step > 0 {
-            let FixedPositionBound::Position(stop) = self.exclusive_stop else {
-                unreachable!("positive front-origin fixed slices always have a stop index");
-            };
-            return (self.start..stop)
-                .step_by(step_abs)
-                .map(|index| {
-                    tuple.type_at_nonnegative_index(db, index).unwrap_or_else(|| {
-                        unreachable!(
-                            "front-origin fixed slice positions are validated during plan construction"
-                        )
-                    })
+        (start..exclusive_stop)
+            .step_by(step.get())
+            .map(|index| {
+                tuple.type_at_nonnegative_index(db, index).unwrap_or_else(|| {
+                    unreachable!(
+                        "front-origin fixed slice positions are validated during plan construction"
+                    )
                 })
-                .collect();
-        }
+            })
+            .collect()
+    }
 
-        let mut index = self.start;
+    fn front_backward_elements<'db>(
+        db: &'db dyn Db,
+        tuple: &VariableLengthTuple<Type<'db>>,
+        start: usize,
+        exclusive_stop: Option<usize>,
+        step: NonZeroUsize,
+    ) -> Vec<Type<'db>> {
+        let mut index = start;
         let mut elements = Vec::new();
         loop {
-            if let FixedPositionBound::Position(stop) = self.exclusive_stop
-                && index <= stop
-            {
+            if exclusive_stop.is_some_and(|stop| index <= stop) {
                 break;
             }
 
@@ -1153,7 +1164,7 @@ impl FixedPositionSlice {
                 )
             }));
 
-            let Some(next_index) = index.checked_sub(step_abs) else {
+            let Some(next_index) = index.checked_sub(step.get()) else {
                 break;
             };
             index = next_index;
@@ -1163,41 +1174,39 @@ impl FixedPositionSlice {
     }
 
     fn back_elements<'db>(
-        self,
         db: &'db dyn Db,
         tuple: &VariableLengthTuple<Type<'db>>,
+        start: usize,
+        exclusive_stop: usize,
+        step: NonZeroI32,
     ) -> Vec<Type<'db>> {
-        let FixedPositionBound::Position(stop) = self.exclusive_stop else {
-            unreachable!("back-origin fixed slices always have a stop distance");
-        };
-
-        let step = self.step.get();
+        let step = step.get();
         let step_abs = step.unsigned_abs() as usize;
-        let mut distance = self.start;
+        let mut distance = start;
         let mut elements = Vec::new();
 
         if step > 0 {
-            while distance > stop {
+            while distance > exclusive_stop {
                 elements.push(tuple.type_at_negative_distance(db, distance).unwrap_or_else(|| {
                     unreachable!(
                         "back-origin fixed slice positions are validated during plan construction"
                     )
                 }));
 
-                if distance.saturating_sub(stop) <= step_abs {
+                if distance.saturating_sub(exclusive_stop) <= step_abs {
                     break;
                 }
                 distance -= step_abs;
             }
         } else {
-            while distance < stop {
+            while distance < exclusive_stop {
                 elements.push(tuple.type_at_negative_distance(db, distance).unwrap_or_else(|| {
                     unreachable!(
                         "back-origin fixed slice positions are validated during plan construction"
                     )
                 }));
 
-                if stop - distance <= step_abs {
+                if exclusive_stop - distance <= step_abs {
                     break;
                 }
                 distance += step_abs;
@@ -1258,39 +1267,32 @@ impl VariableSlice {
 }
 
 impl VariableTupleSlicePlan {
-    fn into_type<'db>(
-        self,
-        db: &'db dyn Db,
-        tuple: &VariableLengthTuple<Type<'db>>,
-    ) -> Result<Type<'db>, StepSizeZeroError> {
+    fn into_type<'db>(self, db: &'db dyn Db, tuple: &VariableLengthTuple<Type<'db>>) -> Type<'db> {
         match self {
-            VariableTupleSlicePlan::Empty => Ok(Type::heterogeneous_tuple(
-                db,
-                std::iter::empty::<Type<'db>>(),
-            )),
+            VariableTupleSlicePlan::Empty => {
+                Type::heterogeneous_tuple(db, std::iter::empty::<Type<'db>>())
+            }
 
             VariableTupleSlicePlan::Fixed(fixed) => {
-                Ok(Type::heterogeneous_tuple(db, fixed.elements(db, tuple)))
+                Type::heterogeneous_tuple(db, fixed.elements(db, tuple))
             }
 
             VariableTupleSlicePlan::Mixed {
                 fixed_prefix,
                 variable,
                 fixed_suffix,
-            } => Ok(Type::tuple(TupleType::mixed(
+            } => Type::tuple(TupleType::mixed(
                 db,
                 fixed_prefix
-                    .map(|fixed_prefix| fixed_prefix.elements(db, tuple))
-                    .transpose()?
+                    .map(|fixed_prefix| fixed_prefix.elements(tuple))
                     .unwrap_or_default(),
                 variable.ty(db, tuple),
                 fixed_suffix
-                    .map(|fixed_suffix| fixed_suffix.elements(db, tuple))
-                    .transpose()?
+                    .map(|fixed_suffix| fixed_suffix.elements(tuple))
                     .unwrap_or_default(),
-            ))),
+            )),
 
-            VariableTupleSlicePlan::Homogeneous => Ok(tuple.homogeneous_type(db)),
+            VariableTupleSlicePlan::Homogeneous => tuple.homogeneous_type(db),
         }
     }
 }
@@ -1314,7 +1316,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             return Err(StepSizeZeroError);
         };
 
-        self.py_slice_plan(start, stop, step).into_type(db, self)
+        Ok(self.py_slice_plan(start, stop, step).into_type(db, self))
     }
 
     fn py_slice_plan(
@@ -1368,11 +1370,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     && Self::last_forward_slice_index(start, stop, nonzero_step)
                         .is_some_and(|last| last < minimum_len)
                 {
-                    return Some(VariableTupleSlicePlan::Fixed(FixedPositionSlice::front(
-                        start,
-                        Some(stop),
-                        step,
-                    )));
+                    return Some(VariableTupleSlicePlan::Fixed(
+                        FixedPositionSlice::front_forward(start, stop, nonzero_step),
+                    ));
                 }
             }
 
@@ -1390,9 +1390,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             }
 
             if start < minimum_len {
-                return Some(VariableTupleSlicePlan::Fixed(FixedPositionSlice::front(
-                    start, stop, step,
-                )));
+                let step = NonZeroUsize::new(step.get().unsigned_abs() as usize)?;
+                return Some(VariableTupleSlicePlan::Fixed(
+                    FixedPositionSlice::front_backward(start, stop, step),
+                ));
             }
         }
 
