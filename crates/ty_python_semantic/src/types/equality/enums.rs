@@ -13,6 +13,9 @@ use crate::{Db, FxOrderSet};
 use super::{ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics};
 
 /// Compare two compact domains from the same enum without expanding their members.
+///
+/// Any narrowing constraint produced here contains only enum-membership facts. In particular,
+/// equality never transfers gradual or nominal intersection state from one operand to the other.
 pub(super) fn evaluate_same_enum_domains<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
@@ -100,6 +103,10 @@ pub(in crate::types) fn enum_membership_constraint<'db>(
     }
 }
 
+/// Two non-empty value domains from the same enum and the semantics used to compare them.
+///
+/// Keeping the operands compact avoids constructing and pairwise comparing unions of every
+/// declared member.
 struct SameEnumComparison<'db> {
     left: EnumValueSet<'db>,
     right: EnumValueSet<'db>,
@@ -150,6 +157,10 @@ impl<'db> SameEnumComparison<'db> {
         Some(equality.negate_if(operator == ComparisonOperator::Inequality))
     }
 
+    /// Return whether equality can soundly transfer the right-hand enum restriction to the left.
+    ///
+    /// The right domain must be closed, and the left must either be closed as well or use identity
+    /// comparison, for which undeclared runtime members cannot equal a declared member.
     fn supports_domain_narrowing(&self) -> bool {
         matches!(
             self.profile.comparison_keys,
@@ -170,10 +181,15 @@ struct EnumValueSet<'db> {
     members: EnumValueSetMembers<'db>,
 }
 
+/// Compact representation of the member names admitted by an [`EnumValueSet`].
 enum EnumValueSetMembers<'db> {
+    /// The entire enum domain, including undeclared runtime values when the enum is open.
     All,
+    /// One canonical member name after resolving aliases.
     One(&'db Name),
+    /// An exact set of canonical member names.
     Included(FxOrderSet<&'db Name>),
+    /// The enum domain except for the declared members excluded by an enum complement.
     AllExcept(EnumComplementType<'db>),
 }
 
@@ -210,6 +226,9 @@ impl<'db> EnumValueSet<'db> {
         (value_set.member_count(db) > 0).then_some(value_set)
     }
 
+    /// Extract an exact included-member set from a union of enum domains.
+    ///
+    /// Whole-domain and complement arms are rejected because they are not exact included sets.
     fn from_union(db: &'db dyn Db, elements: &[Type<'db>]) -> Option<Self> {
         let mut enum_class = None;
         let mut included = FxOrderSet::default();
@@ -242,6 +261,7 @@ impl<'db> EnumValueSet<'db> {
         })
     }
 
+    /// Extract the enum restriction while discarding unrelated positive intersection state.
     fn from_intersection(db: &'db dyn Db, intersection: IntersectionType<'db>) -> Option<Self> {
         if let Some(complement) = intersection.enum_complement(db) {
             return Self::from_type(db, Type::EnumComplement(complement));
@@ -270,6 +290,10 @@ impl<'db> EnumValueSet<'db> {
         }
     }
 
+    /// Return whether this set excludes every value not named by its representation.
+    ///
+    /// A whole-domain or complement representation is not closed for an enum that can create
+    /// undeclared members at runtime.
     fn is_closed(&self, members_are_exhaustive: bool) -> bool {
         members_are_exhaustive
             || matches!(
@@ -354,6 +378,10 @@ impl<'db> EnumValueSet<'db> {
         }
     }
 
+    /// Reconstruct the only declared member left in this set.
+    ///
+    /// The caller must separately establish that the domain is closed before treating this as the
+    /// operand's only possible runtime value.
     fn singleton_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.member_count(db) != 1 {
             return None;
@@ -375,9 +403,12 @@ impl<'db> EnumValueSet<'db> {
     }
 }
 
+/// Whether distinct declared members are known to have distinct runtime comparison keys.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 enum EnumComparisonKeys {
+    /// Different member names cannot compare equal.
     Distinct,
+    /// Values are unknown or repeated, so different member names may compare equal.
     UnknownOrRepeated,
 }
 
@@ -422,6 +453,9 @@ fn enum_comparison_profile<'db>(
     }
 }
 
+/// Return whether every declared member has a unique modeled runtime comparison key.
+///
+/// Boolean keys are normalized to integers because Python considers `False == 0` and `True == 1`.
 fn enum_members_have_distinct_value_keys<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
