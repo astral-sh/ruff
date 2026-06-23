@@ -732,13 +732,214 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
             reveal_type(item)  # revealed: Never
 ```
 
+## Properties and declared attributes
+
+Properties and declared attributes count as present when checking exhaustiveness, even though
+descriptor access can raise `AttributeError` and an annotated attribute can be absent at runtime:
+
+```py
+from typing import Literal
+
+class FallibleProperty:
+    @property
+    def x(self) -> Literal[1]:
+        raise AttributeError
+
+def fallible_property_value_pattern_is_statically_exhaustive(value: FallibleProperty) -> int:
+    match value:
+        case FallibleProperty(x=1):
+            return 1
+
+class DeclaredLiteralAttribute:
+    x: Literal[1]
+
+def declared_literal_attribute_subpattern_is_exhaustive(
+    value: DeclaredLiteralAttribute,
+) -> int:
+    match value:
+        case DeclaredLiteralAttribute(x=1):
+            return 1
+```
+
+## Non-final subclasses
+
+Exhaustiveness follows the static member model, so a member inherited by a non-final subclass is
+treated as present. The same rule applies inside a sequence pattern:
+
+```py
+class BaseWithX:
+    x: int = 0
+
+class NonFinalChild(BaseWithX): ...
+
+def non_final_subclass_member_is_exhaustive(value: NonFinalChild) -> int:
+    match value:
+        case BaseWithX(x=_):
+            return 1
+
+def nested_non_final_subclass_member_is_exhaustive(value: tuple[NonFinalChild]) -> int:
+    match value:
+        case [BaseWithX(x=_)]:
+            return 1
+```
+
+## Runtime-checkable protocol patterns
+
+Runtime-checkable protocol patterns also follow the static member model. A subject that statically
+satisfies the protocol is treated as exhaustive regardless of whether its class is final:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocolWithX(Protocol):
+    x: int
+
+class RuntimeProtocolImplementer:
+    x: int = 0
+
+def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) -> int:
+    match value:
+        case RuntimeProtocolWithX(x=_):
+            return 1
+
+class DeclaredRuntimeProtocolImplementer:
+    x: int
+
+def argumentless_runtime_protocol_pattern_is_exhaustive(
+    value: DeclaredRuntimeProtocolImplementer,
+) -> int:
+    match value:
+        case RuntimeProtocolWithX():
+            return 1
+
+def nested_argumentless_runtime_protocol_pattern_is_exhaustive(
+    value: tuple[DeclaredRuntimeProtocolImplementer],
+) -> int:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            return 1
+
+def nested_argumentless_runtime_protocol_union_preserves_fallback(
+    value: tuple[DeclaredRuntimeProtocolImplementer | int],
+) -> None:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            pass
+        case [DeclaredRuntimeProtocolImplementer()]:
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
+
+def nested_argumentless_runtime_protocol_list_does_not_narrow_fallthrough(
+    value: list[DeclaredRuntimeProtocolImplementer | int],
+) -> None:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            pass
+        case [DeclaredRuntimeProtocolImplementer()]:
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer | int
+```
+
+## Subject-class members
+
+A member known on the static subject type can make a base-class pattern exhaustive:
+
+```py
+class BaseWithoutX: ...
+
+class ChildWithX(BaseWithoutX):
+    x: int = 0
+
+def subclass_member_is_exhaustive(value: ChildWithX) -> int:
+    match value:
+        case BaseWithoutX(x=_):
+            return 1
+
+def nested_subclass_member_is_exhaustive(
+    value: tuple[ChildWithX],
+) -> int:
+    match value:
+        case [BaseWithoutX(x=_)]:
+            return 1
+```
+
+## Nested class patterns
+
+Every nested pattern must match all possible values of the attribute it receives:
+
+```py
+from typing import Literal
+
+class Inner:
+    x: int = 0
+
+class Outer:
+    inner: Inner = Inner()
+
+def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
+    match value:
+        case [Outer(inner=Inner(x=_))]:
+            return 1
+
+class LiteralAttribute:
+    x: Literal[1] = 1
+
+def literal_attribute_subpattern_is_exhaustive(value: LiteralAttribute) -> int:
+    match value:
+        case LiteralAttribute(x=1):
+            return 1
+```
+
+## Missing class-pattern attributes
+
+A class pattern can fail after its `isinstance` check if a requested attribute is missing. This
+preserves both direct fallthrough and fallthrough from a nested sequence pattern:
+
+```py
+from typing import final
+
+class MissingAttributes: ...
+class OtherClass: ...
+
+def keyword_class_pattern_preserves_direct_fallback(
+    value: MissingAttributes | OtherClass,
+) -> None:
+    match value:
+        case MissingAttributes(missing=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: MissingAttributes | OtherClass
+
+def attribute_condition() -> bool:
+    return bool()
+
+@final
+class PossiblyMissingAttribute:
+    if attribute_condition():
+        x: int = 0
+
+def possibly_missing_attribute_is_not_exhaustive(
+    value: PossiblyMissingAttribute,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PossiblyMissingAttribute(x=_):
+            return 1
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
 make a match exhaustive.
 
 ```py
+from typing import final
 from typing_extensions import assert_never
+
+class LengthBase:
+    x: int
+
+@final
+class LengthChild(LengthBase): ...
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
@@ -769,6 +970,16 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
             return left + right
         case _:
             assert_never(value)
+
+# Checking an element against its subject type does not replace the sequence pattern's length
+# check. This one-element pattern cannot match a two-element tuple.
+def subject_aware_element_keeps_length_check(
+    value: tuple[LengthChild, LengthChild],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [LengthBase(x=_)]:
+            return 1
 
 def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
