@@ -470,30 +470,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     }
 
-                    let mut result = self.always();
-                    for (&source_ty, &target_ty) in source_prefix.iter().zip(target_prefix) {
-                        let constraints = self.check_type_pair(db, source_ty, target_ty);
-                        if result
-                            .intersect(db, self.constraints, constraints)
-                            .is_never_satisfied(db)
-                        {
-                            return result;
-                        }
-                    }
-
                     let source_suffix_start = source_suffix.len() - target_suffix.len();
-                    for (&source_ty, &target_ty) in source_suffix[source_suffix_start..]
+                    let boundary_constraints = source_prefix
                         .iter()
-                        .zip(target_suffix)
-                    {
-                        let constraints = self.check_type_pair(db, source_ty, target_ty);
-                        if result
-                            .intersect(db, self.constraints, constraints)
-                            .is_never_satisfied(db)
-                        {
-                            return result;
-                        }
-                    }
+                        .zip(target_prefix)
+                        .chain(
+                            source_suffix[source_suffix_start..]
+                                .iter()
+                                .zip(target_suffix),
+                        )
+                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
+                            self.check_type_pair(db, source_ty, target_ty)
+                        });
 
                     let packed = Type::tuple(TupleType::mixed(
                         db,
@@ -501,7 +489,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source.variable(),
                         source_suffix[..source_suffix_start].iter().copied(),
                     ));
-                    return result.and(db, self.constraints, || {
+                    return boundary_constraints.and(db, self.constraints, || {
                         self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
                     });
                 }

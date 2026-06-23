@@ -2144,6 +2144,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             None
         };
+        let as_target_typevartuple = |parameter: &Parameter<'db>| match target_typevartuple {
+            Some(typevartuple)
+                if parameter.is_variadic()
+                    && parameter.has_starred_annotation()
+                    && parameter.annotated_type() == Type::TypeVar(typevartuple) =>
+            {
+                Some(typevartuple)
+            }
+            _ => None,
+        };
 
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
         // without checking return types or individual parameter types. The full parameter
@@ -3112,11 +3122,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 EitherOrBoth::Right(target_parameter) => {
-                    if let Some(typevartuple) = target_typevartuple
-                        && target_parameter.is_variadic()
-                        && target_parameter.has_starred_annotation()
-                        && target_parameter.annotated_type() == Type::TypeVar(typevartuple)
-                    {
+                    if let Some(typevartuple) = as_target_typevartuple(target_parameter) {
                         let typevartuple_matches = self.check_type_pair(
                             db,
                             Type::TypeVar(typevartuple),
@@ -3138,41 +3144,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 EitherOrBoth::Both(source_param, target_param) => {
-                    if let Some(typevartuple) = target_typevartuple
-                        && target_param.is_variadic()
-                        && target_param.has_starred_annotation()
-                        && target_param.annotated_type() == Type::TypeVar(typevartuple)
-                    {
-                        let current_source_is_positional =
-                            source_param.is_positional() || source_param.is_variadic();
+                    if let Some(typevartuple) = as_target_typevartuple(target_param) {
                         let source_tail = parameters.source_iter.as_slice();
-                        let source_tail_positional_len = if current_source_is_positional {
-                            source_tail
-                                .iter()
-                                .take_while(|parameter| {
-                                    parameter.is_positional() || parameter.is_variadic()
-                                })
-                                .count()
-                        } else {
-                            0
-                        };
-                        let current_source_len = usize::from(current_source_is_positional);
-                        let source_positional_len = current_source_len + source_tail_positional_len;
                         let source_positional = || {
-                            std::iter::once(source_param)
-                                .take(current_source_len)
-                                .chain(source_tail[..source_tail_positional_len].iter())
+                            std::iter::once(source_param).chain(source_tail).take_while(
+                                |parameter| parameter.is_positional() || parameter.is_variadic(),
+                            )
                         };
+                        let source_positional_len = source_positional().count();
                         let target_suffix_len = parameters
                             .target_iter
                             .clone()
                             .take_while(|parameter| parameter.is_positional())
                             .count();
 
-                        let source_variadic_index =
-                            source_positional().position(Parameter::is_variadic);
                         let (inferred_tuple, consumed_source_len) =
-                            if let Some(source_variadic_index) = source_variadic_index {
+                            if let Some((source_variadic_index, source_variadic)) =
+                                source_positional()
+                                    .find_position(|parameter| parameter.is_variadic())
+                            {
                                 let source_suffix_len =
                                     source_positional_len - source_variadic_index - 1;
                                 if source_suffix_len < target_suffix_len {
@@ -3180,11 +3170,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
 
                                 let inferred_suffix_len = source_suffix_len - target_suffix_len;
-                                let Some(source_variadic) =
-                                    source_positional().nth(source_variadic_index)
-                                else {
-                                    return self.never();
-                                };
                                 (
                                     Type::tuple(TupleType::mixed(
                                         db,
@@ -3216,12 +3201,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 )
                             };
 
-                        if consumed_source_len == 0 {
-                            reuse_current_source = true;
-                        } else {
-                            for _ in 1..consumed_source_len {
-                                parameters.next_source();
-                            }
+                        reuse_current_source = consumed_source_len == 0;
+                        for _ in 1..consumed_source_len {
+                            parameters.next_source();
                         }
                         target_index += 1;
 
@@ -3341,10 +3323,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // checked against the variadic parameter in `source`. This loop does
                             // that by only moving the `other` iterator forward.
                             while let Some(target_parameter) = parameters.peek_target() {
-                                if target_typevartuple.is_some()
-                                    && target_parameter.is_variadic()
-                                    && target_parameter.has_starred_annotation()
-                                {
+                                if as_target_typevartuple(target_parameter).is_some() {
                                     break;
                                 }
                                 match target_parameter.kind() {
