@@ -10869,7 +10869,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         if !assignable && emit_diagnostics {
             report_invalid_attribute_assignment(
                 &self.builder.context,
-                self.target.into(),
+                self.target.range(),
                 target_ty,
                 value_ty,
                 self.attribute,
