@@ -6054,14 +6054,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(self.db(), standalone_expression, tcx);
+        // `infer_expression_types` cache inference results for a given expression and type
+        // context. For expressions that are not directly affected by type context, we defer
+        // applying the type context until after the Salsa query runs, allowing us to reuse
+        // the memoized query result during multi-inference.
+        let inference_tcx = if can_defer_type_context(expression) {
+            TypeContext::default()
+        } else {
+            tcx
+        };
+
+        let types = infer_expression_types(self.db(), standalone_expression, inference_tcx);
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        types.expression_type(expression)
+        let ty = types.expression_type(expression);
+        if inference_tcx == tcx {
+            ty
+        } else {
+            let ty = self.apply_type_context(expression, ty, tcx);
+            self.expressions.insert(expression.into(), ty);
+            ty
+        }
     }
 
     /// Infer the type of an expression.
@@ -6132,18 +6149,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_comprehension_expression(dictcomp, tcx)
             }
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => {
-                let ty = self.infer_name_expression(name);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
-            ast::Expr::Attribute(attribute) => {
-                let ty = self.infer_attribute_expression(attribute);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
+            ast::Expr::Name(name) => self.infer_name_expression(name),
+            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
@@ -6167,6 +6174,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        ty = self.apply_type_context(expression, ty, tcx);
+        self.store_expression_type(expression, ty);
+
+        if let Some(expression_cache) = &self.expression_cache {
+            expression_cache
+                .borrow_mut()
+                .insert((expression.into(), tcx), ty);
+        }
+
+        ty
+    }
+
+    /// Applies the provided type context to an already inferred type.
+    fn apply_type_context(
+        &mut self,
+        expression: &ast::Expr,
+        mut ty: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && let Some(target) = tcx.annotation
+        {
+            ty = self.specialize_generic_class_from_context(ty, target);
+        }
+
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
@@ -6185,14 +6217,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .entry(collection_def)
                 .or_default()
                 .insert(tcx);
-        }
-
-        self.store_expression_type(expression, ty);
-
-        if let Some(expression_cache) = &self.expression_cache {
-            expression_cache
-                .borrow_mut()
-                .insert((expression.into(), tcx), ty);
         }
 
         ty
@@ -11328,6 +11352,50 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
         expression,
         ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
     )
+}
+
+/// Returns `true` if applying type context to the given expression may be deferred after inference.
+///
+/// For example, list literals must be inferred with type context directly, as the type context may
+/// influence the type assigned to an invariant generic type parameter. However, bare name expressions
+/// may be inferred without type context, and later specialized after inference.
+fn can_defer_type_context(expression: &ast::Expr) -> bool {
+    match expression {
+        ast::Expr::StringLiteral(_)
+        | ast::Expr::Tuple(_)
+        | ast::Expr::List(_)
+        | ast::Expr::Set(_)
+        | ast::Expr::Dict(_)
+        | ast::Expr::Generator(_)
+        | ast::Expr::ListComp(_)
+        | ast::Expr::DictComp(_)
+        | ast::Expr::SetComp(_)
+        | ast::Expr::BinOp(_)
+        | ast::Expr::BoolOp(_)
+        | ast::Expr::If(_)
+        | ast::Expr::Lambda(_)
+        | ast::Expr::Call(_)
+        | ast::Expr::Starred(_)
+        | ast::Expr::Await(_) => false,
+
+        ast::Expr::NoneLiteral(_)
+        | ast::Expr::NumberLiteral(_)
+        | ast::Expr::BooleanLiteral(_)
+        | ast::Expr::BytesLiteral(_)
+        | ast::Expr::FString(_)
+        | ast::Expr::TString(_)
+        | ast::Expr::EllipsisLiteral(_)
+        | ast::Expr::Name(_)
+        | ast::Expr::Attribute(_)
+        | ast::Expr::UnaryOp(_)
+        | ast::Expr::Compare(_)
+        | ast::Expr::Subscript(_)
+        | ast::Expr::Slice(_)
+        | ast::Expr::Yield(_)
+        | ast::Expr::YieldFrom(_)
+        | ast::Expr::Named(_)
+        | ast::Expr::IpyEscapeCommand(_) => true,
+    }
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.
