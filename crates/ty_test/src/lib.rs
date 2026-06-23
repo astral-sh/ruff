@@ -1,12 +1,6 @@
 use crate::config::{Log, MarkdownTestConfig, SystemKind};
 use anyhow::{anyhow, bail};
 use camino::Utf8Path;
-pub use mdtest::RunOptions;
-use mdtest::matcher::{self, Failure};
-use mdtest::parser::{self};
-use mdtest::{
-    Failures, FileFailures, MarkdownEdit, OutputFormat, TestFile, TestOutcome, attempt_test,
-};
 use ruff_db::Db;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
@@ -14,6 +8,12 @@ use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
+pub use ruff_mdtest::RunOptions;
+use ruff_mdtest::matcher::{self, Failure};
+use ruff_mdtest::parser::{self};
+use ruff_mdtest::{
+    Failures, FileFailures, MarkdownEdit, OutputFormat, TestFile, TestOutcome, attempt_test,
+};
 use ruff_source_file::OneIndexed;
 use std::fmt::Write;
 use ty_module_resolver::{
@@ -57,7 +57,7 @@ pub fn run(
     let suite =
         parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
-    mdtest::run(
+    ruff_mdtest::run(
         absolute_fixture_path,
         relative_fixture_path,
         source,
@@ -350,7 +350,7 @@ fn run_test(
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
                 .and_then(|inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
+                    ruff_mdtest::validate_inline_snapshot(
                         db,
                         "ty",
                         test_file,
@@ -389,7 +389,7 @@ fn run_test(
         })
         .collect();
 
-    mdtest::check_panic(test, panic_info);
+    ruff_mdtest::check_panic(test, panic_info);
 
     if test.should_skip_pulling_types() && !any_pull_types_failures {
         let mut by_line = matcher::FailuresByLine::default();
@@ -409,7 +409,7 @@ fn run_test(
 
     // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
     // since they make snapshots very noisy!
-    mdtest::snapshot_diagnostics(
+    ruff_mdtest::snapshot_diagnostics(
         test,
         db,
         "ty",
@@ -452,7 +452,7 @@ fn run_test(
                 OneIndexed::from_zero_indexed(0),
                 vec![Failure::new(format_args!(
                     "Fixing the diagnostics caused a fatal error:\n{}",
-                    mdtest::render_diagnostic(db, "ty", &diagnostic)
+                    ruff_mdtest::render_diagnostic(db, "ty", &diagnostic)
                 ))],
             );
             let failure = FileFailures {

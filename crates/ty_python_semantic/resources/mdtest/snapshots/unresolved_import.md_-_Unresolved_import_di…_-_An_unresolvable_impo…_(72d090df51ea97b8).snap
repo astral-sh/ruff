@@ -1,5 +1,5 @@
 ---
-source: crates/mdtest/src/lib.rs
+source: crates/ruff_mdtest/src/lib.rs
 expression: snapshot
 ---
 

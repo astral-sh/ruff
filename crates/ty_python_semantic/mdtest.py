@@ -31,7 +31,7 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
     TY_VENDORED,
     CRATE_ROOT.parent / "ty_test/src",
-    CRATE_ROOT.parent / "mdtest/src",
+    CRATE_ROOT.parent / "ruff_mdtest/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 LINT_DOCS_DIR: Final = CRATE_ROOT / "resources" / "lint_docs"
