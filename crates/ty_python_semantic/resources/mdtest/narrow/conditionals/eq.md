@@ -122,6 +122,89 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+Comparisons between values of the same enum preserve existing narrowing. They can also narrow to
+members shared by both operands, or determine that groups with no members in common are unequal:
+
+```py
+from enum import StrEnum
+from typing import Literal
+
+class Choice(StrEnum):
+    FIRST = "first"
+    SECOND = "second"
+    THIRD = "third"
+    FOURTH = "fourth"
+
+def compare_after_truthiness_check(left: Choice, right: Choice):
+    if right and left != right:
+        reveal_type(right)  # revealed: Choice & ~AlwaysFalsy
+        return
+
+    reveal_type(right)  # revealed: Choice
+
+def compare_with_narrowed_right(left: Choice, right: Choice):
+    if right == Choice.FIRST:
+        return
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Choice.SECOND, Choice.THIRD, Choice.FOURTH]
+
+def compare_non_overlapping_narrowed_values(left: Choice, right: Choice):
+    if left == Choice.FIRST or left == Choice.SECOND:
+        return
+    if right == Choice.THIRD or right == Choice.FOURTH:
+        return
+
+    reveal_type(left == right)  # revealed: Literal[False]
+
+def compare_literal_unions(
+    left: Literal[Choice.FIRST, Choice.SECOND],
+    right: Literal[Choice.SECOND, Choice.THIRD],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Choice.SECOND]
+        reveal_type(right)  # revealed: Literal[Choice.SECOND]
+
+def compare_non_overlapping_literal_unions(
+    left: Literal[Choice.FIRST, Choice.SECOND],
+    right: Literal[Choice.THIRD, Choice.FOURTH],
+):
+    reveal_type(left == right)  # revealed: Literal[False]
+```
+
+Equality narrowing must not copy unrelated parts of one operand's type to the other:
+
+```py
+from enum import StrEnum
+from typing import Any, NewType
+from ty_extensions import Intersection
+
+class Response(StrEnum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+
+Tag = NewType("Tag", str)
+
+def compare_any(left: Response, right: Any):
+    if isinstance(right, Response):
+        if left != right:
+            return
+        left.does_not_exist  # error: [unresolved-attribute]
+
+def compare_narrowed_any(left: Response, right: Any):
+    if isinstance(right, Response):
+        if right == Response.ACCEPT:
+            return
+        if left != right:
+            return
+        reveal_type(left)  # revealed: Literal[Response.REJECT]
+        reveal_type(right)  # revealed: Response & Any & ~Literal[Response.ACCEPT]
+
+def compare_newtype(left: Response, right: Intersection[Response, Tag]):
+    if left != right:
+        return
+    reveal_type(left)  # revealed: Response
+```
+
 `Flag` and `IntFlag` values can include zero and unnamed combinations, so their named members do not
 cover every possible value:
 
@@ -201,6 +284,54 @@ class TransformedEnum(Enum, metaclass=InjectingEnumMeta):
     ONLY = 1
 
 def compare_transformed_enums(left: TransformedEnum, right: TransformedEnum):
+    reveal_type(left == right)  # revealed: bool
+```
+
+A custom comparison method determines the result even when both operands have the same enum type:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class NeverEqual(Enum):
+    FIRST = 1
+    SECOND = 2
+    THIRD = 3
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+def compare_custom(left: NeverEqual, right: NeverEqual):
+    reveal_type(left == right)  # revealed: Literal[False]
+
+    if left is NeverEqual.FIRST:
+        return
+    reveal_type(left == right)  # revealed: Literal[False]
+
+def compare_custom_subsets(
+    left: Literal[NeverEqual.FIRST, NeverEqual.SECOND],
+    right: Literal[NeverEqual.SECOND, NeverEqual.THIRD],
+):
+    reveal_type(left == right)  # revealed: Literal[False]
+```
+
+When member values are not known statically, two different members may still compare equal:
+
+```py
+from enum import StrEnum
+from typing import Literal
+
+def runtime_value(value: str) -> str:
+    return value
+
+class UnknownValues(StrEnum):
+    FIRST = runtime_value("first")
+    SECOND = runtime_value("second")
+
+def compare_unknown_values(
+    left: Literal[UnknownValues.FIRST],
+    right: Literal[UnknownValues.SECOND],
+):
     reveal_type(left == right)  # revealed: bool
 ```
 

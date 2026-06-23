@@ -15,6 +15,12 @@ use super::{
     enums::{enum_member_literals, enum_metadata},
 };
 
+mod enums;
+
+pub(super) use self::enums::enum_membership_constraint;
+use self::enums::evaluate_same_enum_domains;
+pub(super) use self::enums::{EnumComparison, compact_enum_comparison};
+
 /// The result of evaluating a runtime comparison between two types.
 ///
 /// Definite truthiness is represented separately from a constraint for the operand currently being
@@ -392,6 +398,10 @@ fn evaluate_comparison_once<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
+
+    if let Some(result) = evaluate_same_enum_domains(db, left, right, branch, operator) {
+        return result;
+    }
 
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
