@@ -598,6 +598,28 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
 
+        // Analyze statement-level calls through this root one by one in source order, so any
+        // earlier call needed while inferring a later one is already cached instead of deepening
+        // the Salsa query stack. This avoids growing an excessive stack for deeply nested
+        // reachability queries.
+        //
+        // Without this prefix analysis, given:
+        //
+        //   call_a()  # predicate 0
+        //   call_b()  # predicate 1
+        //   call_c()  # predicate 2
+        //
+        // we'd analyze them backwards:
+        //
+        //   analyze call_c
+        //   └─ analyze call_b
+        //      └─ analyze call_a
+        //
+        // The prefix pass explicitly analyzes them forwards:
+        //
+        //   analyze call_a  → cached
+        //   analyze call_b  → call_a is already cached
+        //   analyze call_c  → call_b is already cached
         if !id.is_terminal() {
             let root_predicate = self.get_interior_node(id).atom();
             analyze_non_terminal_call_prefix(db, predicates, root_predicate);
