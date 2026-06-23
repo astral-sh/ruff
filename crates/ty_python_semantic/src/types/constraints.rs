@@ -3307,12 +3307,9 @@ impl<'db> PathBounds<'db> {
             let mut path: Vec<_> = path
                 .positive_constraints()
                 .map(|(constraint, source_constraint)| {
-                    let source_order = match source_orders.get_index_of(&constraint) {
-                        Some(source_order) => source_order,
-                        None => source_orders
-                            .get_index_of(&source_constraint)
-                            .expect("every BDD constraint should have a source_order"),
-                    };
+                    let source_order = source_orders
+                        .get_index_of(&source_constraint)
+                        .expect("every BDD constraint should have a source_order");
                     (constraint, source_order)
                 })
                 .collect();
