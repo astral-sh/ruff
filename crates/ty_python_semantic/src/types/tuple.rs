@@ -1770,12 +1770,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     fn homogeneous_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let element = UnionType::from_elements_leave_aliases(
-            db,
-            self.iter_prefix_elements()
-                .chain(std::iter::once(self.variable()))
-                .chain(self.iter_suffix_elements()),
-        );
+        let element = UnionType::from_elements_leave_aliases(db, self.all_elements());
         Type::homogeneous_tuple(db, element)
     }
 
