@@ -1284,6 +1284,27 @@ fn enum_metaclass_may_transform_values<'db>(
         })
 }
 
+/// Return whether enum construction uses the standard `EnumMeta.__call__` implementation.
+pub(crate) fn enum_uses_standard_metaclass_call<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> bool {
+    let ClassLiteral::Static(class) = class else {
+        return matches!(class, ClassLiteral::DynamicEnum(_));
+    };
+    let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
+        return false;
+    };
+
+    !metaclass
+        .class_literal(db)
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.class_literal(db).as_static())
+        .take_while(|base| base.known(db) != Some(KnownClass::EnumType))
+        .any(|base| custom_enum_method(db, base.body_scope(db), "__call__").is_some())
+}
+
 /// Iterates over parent enum classes in the MRO, skipping known enum
 /// infrastructure classes but including `IntEnum`, `Flag`, and `IntFlag`
 /// which declare `_value_` annotations that normally should be inherited.

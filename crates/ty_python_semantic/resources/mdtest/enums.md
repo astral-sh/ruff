@@ -2107,7 +2107,7 @@ python-version = "3.13"
 ```
 
 ```py
-from enum import CONFORM, EJECT, Flag, FlagBoundary, IntFlag, auto, member
+from enum import CONFORM, EJECT, EnumMeta, Flag, FlagBoundary, IntFlag, auto, member
 from typing import Any, Literal
 from ty_extensions import enum_members
 
@@ -2294,6 +2294,15 @@ class CustomOperator(Flag):
         return "custom"
 
 reveal_type(CustomOperator.A | CustomOperator.A)  # revealed: str
+
+class CallingMeta(EnumMeta):
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        return "custom"
+
+class CustomCall(Flag, metaclass=CallingMeta):
+    A = 1
+
+reveal_type(CustomCall(1))  # revealed: Any
 ```
 
 Inherited behavioral methods and custom iteration hooks also take precedence over the standard Flag

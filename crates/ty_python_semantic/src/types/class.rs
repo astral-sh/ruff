@@ -23,7 +23,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{enum_metadata, enum_uses_standard_metaclass_call};
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
@@ -1985,7 +1985,7 @@ impl<'db> ClassType<'db> {
             // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
-            if !is_actual_enum {
+            if !is_actual_enum || !enum_uses_standard_metaclass_call(db, self.class_literal(db)) {
                 return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
             }
         }

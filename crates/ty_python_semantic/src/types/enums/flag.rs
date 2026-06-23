@@ -10,7 +10,9 @@ use crate::types::{
 };
 use ty_python_core::definition::Definition;
 
-use super::{EnumClassLiteral, EnumMetadata, custom_enum_method};
+use super::{
+    EnumClassLiteral, EnumMetadata, custom_enum_method, enum_uses_standard_metaclass_call,
+};
 
 /// The policy used when a `Flag` constructor receives bits that are not declared by the class.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -779,6 +781,9 @@ pub(crate) fn flag_constructor_result<'db>(
 ) -> Option<Type<'db>> {
     let enum_class = class.into_enum_class(db)?;
     let (_, flag) = enum_metadata_and_flag(db, enum_class)?;
+    if !enum_uses_standard_metaclass_call(db, class) {
+        return None;
+    }
     if !class_uses_standard_flag_construction(db, enum_class) {
         return Some(class.to_non_generic_instance(db));
     }

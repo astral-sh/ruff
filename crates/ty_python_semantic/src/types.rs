@@ -5151,6 +5151,7 @@ impl<'db> Type<'db> {
             .to_class_literal(db)
             .to_class_type(db)
             .is_some_and(|enum_class| class.is_subclass_of(db, enum_class))
+            && enums::enum_uses_standard_metaclass_call(db, class_literal)
         {
             return fallback_bindings();
         }
