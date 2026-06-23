@@ -437,6 +437,41 @@ fn recursive_nominal_growth_rejects_nested_negative_occurrences() {
 }
 
 #[test]
+fn recursive_nominal_growth_rejects_distributions_under_negation() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distribution = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[list_int]),
+            KnownClass::Set.to_specialized_instance(&db, &[list_str]),
+        ],
+    );
+    let excluded = IntersectionBuilder::new(&db)
+        .add_positive(Type::object())
+        .add_negative(KnownClass::List.to_specialized_instance(&db, &[distribution]))
+        .build();
+    let current = KnownClass::List.to_specialized_instance(&db, &[excluded]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        None
+    );
+}
+
+#[test]
 fn recursive_nominal_growth_recomputes_overlapping_positions() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));

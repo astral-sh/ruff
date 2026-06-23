@@ -98,7 +98,7 @@ pub use crate::types::typevar::{
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_positive_type, any_over_type, find_over_type};
+use crate::types::visitor::{any_over_positive_type, any_over_type, find_over_positive_type};
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -1383,11 +1383,11 @@ impl<'db> Type<'db> {
             _ => false,
         };
 
-        while let Some(intersection) = find_over_type(db, normalized, false, |ty| match ty {
-            Type::Intersection(intersection) if contains_wrapped_intersection(intersection) => {
-                Some(intersection)
-            }
-            _ => None,
+        while let Some(intersection) = find_over_positive_type(db, normalized, false, |ty| {
+            let Type::Intersection(intersection) = ty else {
+                return None;
+            };
+            contains_wrapped_intersection(intersection).then_some(intersection)
         }) {
             let replacement = intersection.map_positive(db, |element| {
                 if let Type::Intersection(wrapped) = wrapped
@@ -1424,7 +1424,7 @@ impl<'db> Type<'db> {
     ) -> Self {
         let mut normalized = current;
         while let Some((distributed, replacement)) =
-            find_over_type(db, normalized, false, |ty| match ty {
+            find_over_positive_type(db, normalized, false, |ty| match ty {
                 Type::Union(distributed) => {
                     Self::union_distribution_normalized(db, distributed, wrapped, div)
                         .map(|replacement| (distributed, replacement))

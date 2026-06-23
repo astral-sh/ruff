@@ -308,7 +308,7 @@ impl<'db> TypeCollector<'db> {
     }
 }
 
-/// Implementation for `any_over_type` and `find_over_type`.
+/// Implementation for the `any_over_type` and `find_over_type` variants.
 fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -423,4 +423,18 @@ where
     T: Copy + PartialEq,
 {
     any_over_type_impl(db, ty, should_visit_lazy_type_attributes, true, query)
+}
+
+/// Recurse into positive intersection elements and return the first non-`None` value returned by
+/// the closure.
+pub(super) fn find_over_positive_type<'db, T>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_visit_lazy_type_attributes: bool,
+    query: impl Fn(Type<'db>) -> Option<T>,
+) -> Option<T>
+where
+    T: Copy + PartialEq,
+{
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, false, query)
 }
