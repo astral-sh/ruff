@@ -191,6 +191,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::FallibleContextManager) {
                 ruff::rules::fallible_context_manager(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::NoBlankLineAtFunctionStart) {
+                ruff::rules::no_blank_line_at_function_start(checker, function_def);
+            }
             if checker.any_rule_enabled(&[
                 Rule::UnnecessaryReturnNone,
                 Rule::ImplicitReturnValue,

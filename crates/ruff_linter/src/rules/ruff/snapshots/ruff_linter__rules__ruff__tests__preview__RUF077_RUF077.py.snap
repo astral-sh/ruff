@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 853
+---
+RUF077 [*] Blank line at the start of a function body
+  --> RUF077.py:29:5
+   |
+27 | async def async_function_with_blank():
+28 |
+29 |     return "done"
+   |     ^^^^^^^^^^^^^
+   |
+help: Remove blank line
+   |
+27 | async def async_function_with_blank():
+   -
+28 |     return "done"
+   |
