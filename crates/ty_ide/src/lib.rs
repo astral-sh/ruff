@@ -62,7 +62,7 @@ pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, Symbol
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };
-pub use will_rename::{FileRenameEdit, will_rename_file};
+pub use will_rename::{FileRenameEdit, will_rename_directory, will_rename_file};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::{

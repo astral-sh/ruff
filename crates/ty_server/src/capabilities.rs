@@ -486,14 +486,24 @@ pub(crate) fn server_capabilities(
             }),
             file_operations: Some(lsp_types::FileOperationOptions {
                 will_rename: Some(lsp_types::FileOperationRegistrationOptions {
-                    filters: vec![lsp_types::FileOperationFilter {
-                        scheme: Some("file".to_string()),
-                        pattern: lsp_types::FileOperationPattern {
-                            glob: "**/*.{py,pyi}".to_string(),
-                            matches: Some(lsp_types::FileOperationPatternKind::File),
-                            options: None,
+                    filters: vec![
+                        lsp_types::FileOperationFilter {
+                            scheme: Some("file".to_string()),
+                            pattern: lsp_types::FileOperationPattern {
+                                glob: "**/*.{py,pyi}".to_string(),
+                                matches: Some(lsp_types::FileOperationPatternKind::File),
+                                options: None,
+                            },
                         },
-                    }],
+                        lsp_types::FileOperationFilter {
+                            scheme: Some("file".to_string()),
+                            pattern: lsp_types::FileOperationPattern {
+                                glob: "**".to_string(),
+                                matches: Some(lsp_types::FileOperationPatternKind::Folder),
+                                options: None,
+                            },
+                        },
+                    ],
                 }),
                 ..Default::default()
             }),

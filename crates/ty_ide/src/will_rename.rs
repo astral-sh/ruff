@@ -38,11 +38,24 @@ pub fn will_rename_file(
         return vec![];
     };
 
-    let old_module_name = old_module.name(db).clone();
     let Some(new_module_name) = infer_new_module_name(db, old_path, new_path, &old_module) else {
         return vec![];
     };
 
+    compute_rename_edits(db, old_file, &old_module, &new_module_name)
+}
+
+/// Core logic shared by [`will_rename_file`] and [`will_rename_directory`].
+///
+/// Finds all references to `old_module` and produces edits that replace the
+/// old module name with `new_module_name`.
+fn compute_rename_edits(
+    db: &dyn Db,
+    anchor_file: File,
+    old_module: &Module<'_>,
+    new_module_name: &ModuleName,
+) -> Vec<FileRenameEdit> {
+    let old_module_name = old_module.name(db);
     let old_name_str = old_module_name.as_str();
     let new_name_str = new_module_name.as_str();
     let new_last = new_name_str
@@ -59,12 +72,17 @@ pub fn will_rename_file(
         component_range: TextRange::default(),
     };
 
-    let Some(refs) = references(db, old_file, &goto_target, ReferencesMode::RenameMultiFile) else {
+    let Some(refs) = references(
+        db,
+        anchor_file,
+        &goto_target,
+        ReferencesMode::RenameMultiFile,
+    ) else {
         return vec![];
     };
 
     refs.into_iter()
-        .filter(|r| r.file() != old_file)
+        .filter(|r| r.file() != anchor_file)
         .map(|r| {
             let (range, new_text) = expand_dotted_range(
                 db,
@@ -129,6 +147,51 @@ fn expand_dotted_range(
     } else {
         (component_range, new_last.to_string())
     }
+}
+
+/// Compute the edits needed when renaming a directory (package).
+///
+/// Finds the package's `__init__.py`, resolves its module name, then uses
+/// the find-references infrastructure to update all import references.
+/// Skips namespace packages (directories without `__init__.py`).
+pub fn will_rename_directory(
+    db: &dyn Db,
+    old_dir: &SystemPath,
+    new_dir: &SystemPath,
+) -> Vec<FileRenameEdit> {
+    let init_path = old_dir.join("__init__.py");
+    let init_pyi_path = old_dir.join("__init__.pyi");
+
+    let init_file =
+        system_path_to_file(db, &init_path).or_else(|_| system_path_to_file(db, &init_pyi_path));
+    let Ok(init_file) = init_file else {
+        return vec![];
+    };
+
+    let Some(old_module) = file_to_module(db, init_file) else {
+        return vec![];
+    };
+
+    let Some(new_module_name) = infer_directory_module_name(db, new_dir, &old_module) else {
+        return vec![];
+    };
+
+    compute_rename_edits(db, init_file, &old_module, &new_module_name)
+}
+
+/// Infer the new module name for a renamed directory from its search path.
+fn infer_directory_module_name(
+    db: &dyn Db,
+    new_dir: &SystemPath,
+    old_module: &Module<'_>,
+) -> Option<ModuleName> {
+    let search_path = old_module.search_path(db)?.as_system_path()?;
+    let new_relative = new_dir.strip_prefix(search_path).ok()?;
+    let components: Vec<&str> = new_relative.components().map(|c| c.as_str()).collect();
+    if components.is_empty() {
+        return None;
+    }
+    ModuleName::from_components(components)
 }
 
 /// Infer the new module name from old/new file paths.
@@ -645,5 +708,149 @@ mod tests {
         let consumer = system_path_to_file(&db, "consumer.py").unwrap();
         let result = apply_edits(&db, &edits, consumer);
         assert_eq!(result, "import new_module\n\nprint(new_module.x)\n");
+    }
+
+    #[test]
+    fn rename_directory_simple() {
+        let db = create_test_db(&[
+            ("/old_pkg/__init__.py", ""),
+            ("/old_pkg/sub.py", "x = 1\n"),
+            ("/consumer.py", "import old_pkg\n\nprint(old_pkg.sub)\n"),
+        ]);
+
+        let edits = will_rename_directory(
+            &db,
+            SystemPath::new("/old_pkg"),
+            SystemPath::new("/new_pkg"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "import new_pkg\n\nprint(new_pkg.sub)\n");
+    }
+
+    #[test]
+    fn rename_directory_from_import() {
+        let db = create_test_db(&[
+            ("/old_pkg/__init__.py", "x = 1\n"),
+            ("/consumer.py", "from old_pkg import x\n"),
+        ]);
+
+        let edits = will_rename_directory(
+            &db,
+            SystemPath::new("/old_pkg"),
+            SystemPath::new("/new_pkg"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "from new_pkg import x\n");
+    }
+
+    #[test]
+    fn rename_directory_dotted_import() {
+        let db = create_test_db(&[
+            ("/old_pkg/__init__.py", ""),
+            ("/old_pkg/sub.py", "x = 1\n"),
+            (
+                "/consumer.py",
+                "import old_pkg.sub\nfrom old_pkg.sub import x\n",
+            ),
+        ]);
+
+        let edits = will_rename_directory(
+            &db,
+            SystemPath::new("/old_pkg"),
+            SystemPath::new("/new_pkg"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "import new_pkg.sub\nfrom new_pkg.sub import x\n");
+    }
+
+    #[test]
+    fn rename_directory_no_init_skipped() {
+        let db = create_test_db(&[
+            ("/ns_pkg/sub.py", "x = 1\n"),
+            ("/consumer.py", "from ns_pkg import sub\n"),
+        ]);
+
+        let edits =
+            will_rename_directory(&db, SystemPath::new("/ns_pkg"), SystemPath::new("/new_ns"));
+
+        assert!(edits.is_empty());
+    }
+
+    #[test]
+    fn rename_directory_nested_package() {
+        let db = create_test_db(&[
+            ("/parent/__init__.py", ""),
+            ("/parent/old_child/__init__.py", "x = 1\n"),
+            ("/parent/old_child/mod.py", "y = 2\n"),
+            (
+                "/consumer.py",
+                "from parent.old_child import x\nimport parent.old_child.mod\n",
+            ),
+        ]);
+
+        let edits = will_rename_directory(
+            &db,
+            SystemPath::new("/parent/old_child"),
+            SystemPath::new("/parent/new_child"),
+        );
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(
+            result,
+            "from parent.new_child import x\nimport parent.new_child.mod\n"
+        );
+    }
+
+    #[test]
+    fn rename_directory_relative_imports_unchanged() {
+        let db = create_test_db(&[
+            ("/old_pkg/__init__.py", ""),
+            ("/old_pkg/a.py", "from . import b\n"),
+            ("/old_pkg/b.py", "x = 1\n"),
+            ("/consumer.py", "from old_pkg import a\n"),
+        ]);
+
+        let edits = will_rename_directory(
+            &db,
+            SystemPath::new("/old_pkg"),
+            SystemPath::new("/new_pkg"),
+        );
+
+        // Only consumer.py should be modified; files inside the package must not
+        // appear in edits (relative imports are unaffected by package rename).
+        for edit in &edits {
+            let path = edit.file.path(&db);
+            assert!(
+                !path.as_str().contains("old_pkg"),
+                "unexpected edit in package-internal file: {path}"
+            );
+        }
+
+        let consumer = system_path_to_file(&db, "/consumer.py").unwrap();
+        let result = apply_edits(&db, &edits, consumer);
+        assert_eq!(result, "from new_pkg import a\n");
+    }
+
+    #[test]
+    fn rename_directory_invalid_identifier_returns_no_edits() {
+        let db = create_test_db(&[
+            ("/old_pkg/__init__.py", "x = 1\n"),
+            ("/consumer.py", "from old_pkg import x\n"),
+        ]);
+
+        let edits = will_rename_directory(
+            &db,
+            SystemPath::new("/old_pkg"),
+            SystemPath::new("/123-bad"),
+        );
+
+        assert!(edits.is_empty());
     }
 }

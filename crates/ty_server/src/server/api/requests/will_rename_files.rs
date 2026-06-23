@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use lsp_types::WillRenameFilesRequest;
-use lsp_types::{RenameFilesParams, TextEdit, Uri, WorkspaceEdit};
+use lsp_types::{
+    DocumentChange, OptionalVersionedTextDocumentIdentifier, RenameFilesParams, TextDocumentEdit,
+    TextDocumentIdentifier, TextEdit, Uri, WillRenameFilesRequest, WorkspaceEdit,
+};
 use ruff_db::system::SystemPathBuf;
-use ty_ide::will_rename_file;
+use ty_ide::{will_rename_directory, will_rename_file};
 
 use crate::document::ToRangeExt;
 use crate::server::api::traits::{
@@ -50,8 +52,17 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
                 continue;
             };
 
+            let has_python_extension = matches!(old_path.extension(), Some("py" | "pyi"));
+
             for db in snapshot.projects() {
-                let rename_edits = will_rename_file(db, &old_path, &new_path);
+                // Paths with a Python extension are always files.
+                // Everything else is treated as a directory (package).
+                // Both functions gracefully return empty results on mismatch.
+                let rename_edits = if has_python_extension {
+                    will_rename_file(db, &old_path, &new_path)
+                } else {
+                    will_rename_directory(db, &old_path, &new_path)
+                };
 
                 for edit in rename_edits {
                     let Some(uri) = file_to_uri(db, edit.file) else {
@@ -73,10 +84,22 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
         if all_changes.is_empty() {
             Ok(None)
         } else {
+            let document_changes: Vec<DocumentChange> = all_changes
+                .into_iter()
+                .map(|(uri, edits)| {
+                    DocumentChange::TextDocumentEdit(TextDocumentEdit {
+                        text_document: OptionalVersionedTextDocumentIdentifier {
+                            text_document_identifier: TextDocumentIdentifier { uri },
+                            version: None,
+                        },
+                        edits: edits.into_iter().map(lsp_types::Edit::TextEdit).collect(),
+                    })
+                })
+                .collect();
+
             Ok(Some(WorkspaceEdit {
-                changes: Some(all_changes),
-                document_changes: None,
-                change_annotations: None,
+                document_changes: Some(document_changes),
+                ..Default::default()
             }))
         }
     }
