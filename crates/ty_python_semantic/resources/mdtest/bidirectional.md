@@ -710,7 +710,7 @@ If a lambda expression is annotated as a `Callable` type, the body of the lambda
 the annotated return type as type context, and the annotated parameter types are respected:
 
 ```py
-from typing import Callable, TypedDict
+from typing import Any, Callable, Literal, Protocol, TypedDict, overload
 
 class Bar(TypedDict):
     bar: int
@@ -742,6 +742,169 @@ def id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
 f5_paramspec: Callable[[int], int] = id_callable(lambda x: reveal_type(x))  # revealed: int
 reveal_type(f5_paramspec)  # revealed: (x: int) -> int
 
+# Generic callable contexts can be specialized from other arguments, regardless of source order.
+class A:
+    def f(self) -> int:
+        return 1
+
+def g[T, U](x: T, y: Callable[[T], U]) -> U:
+    raise NotImplementedError
+
+reveal_type(g(A(), lambda z: z.f()))  # revealed: int
+
+def h[T, U](y: Callable[[T], U], x: T) -> U:
+    raise NotImplementedError
+
+reveal_type(h(lambda z: z.f(), A()))  # revealed: int
+reveal_type(h(y=lambda z: z.f(), x=A()))  # revealed: int
+
+@overload
+def h_overloaded[T, U](y: Callable[[T], U], x: T) -> U: ...
+@overload
+def h_overloaded(y: Callable[[str], int], *, x: str) -> int: ...
+def h_overloaded(y, x):
+    raise NotImplementedError
+
+reveal_type(h_overloaded(lambda z: z.f(), A()))  # revealed: int
+
+def i[T, S, U](z: Callable[[T, S], U], x: T, y: S) -> U:
+    raise NotImplementedError
+
+reveal_type(i(lambda a, b: a.f() + b, A(), 1))  # revealed: int
+
+def j[T, U](x: list[T], y: Callable[[list[T]], U]) -> U:
+    raise NotImplementedError
+
+reveal_type(j([A()], lambda z: z[0].f()))  # revealed: int
+
+def k[T, U](x: T | None, y: Callable[[T], U]) -> U:
+    raise NotImplementedError
+
+reveal_type(k(A(), lambda z: z.f()))  # revealed: int
+
+type CallableAlias[T, U] = Callable[[T], U]
+
+def l[T, U](x: T, y: CallableAlias[T, U]) -> U:
+    raise NotImplementedError
+
+reveal_type(l(A(), lambda z: z.f()))  # revealed: int
+
+def m[T, U](x: T, y: Callable[[T], U] | None) -> U:
+    raise NotImplementedError
+
+reveal_type(m(A(), lambda z: z.f()))  # revealed: int
+
+type OptionalCallableAlias[T, U] = Callable[[T], U] | None
+
+def n[T, U](x: T, y: OptionalCallableAlias[T, U]) -> U:
+    raise NotImplementedError
+
+reveal_type(n(A(), lambda z: z.f()))  # revealed: int
+
+def callable_or_list[T, U](x: T, y: Callable[[T], U] | list[Literal["a", "b"]]) -> U | None:
+    raise NotImplementedError
+
+reveal_type(callable_or_list(A(), lambda z: z.f()))  # revealed: int | None
+reveal_type(callable_or_list(A(), ["a"]))  # revealed: Unknown | None
+
+def callable_or_dict[T, U](x: T, y: Callable[[T], U] | dict[str | int, str]) -> U | None:
+    raise NotImplementedError
+
+reveal_type(callable_or_dict(A(), lambda z: z.f()))  # revealed: int | None
+reveal_type(callable_or_dict(A(), {"a": "b"}))  # revealed: Unknown | None
+
+def o[T, U](x: T, y: Callable[[T], U] | Callable[[str], U]) -> U:
+    raise NotImplementedError
+
+reveal_type(o(A(), lambda z: z.f()))  # revealed: Unknown
+
+def p[T, U](x: T, y: Callable[[T], U] | Any) -> U:
+    raise NotImplementedError
+
+reveal_type(p(A(), lambda z: z.f()))  # revealed: Unknown
+
+class CallableProtocol[T, U](Protocol):
+    def __call__(self, value: T) -> U: ...
+
+def p_protocol[T, U](x: T, y: CallableProtocol[T, U]) -> U:
+    raise NotImplementedError
+
+# Only explicit `Callable` shapes currently provide argument-derived lambda context.
+# error: [invalid-argument-type]
+reveal_type(p_protocol(A(), lambda z: z.f()))  # revealed: Unknown
+
+type AmbiguousCallableAlias[T, U] = Callable[[T], U] | Callable[[str], U]
+
+def q[T, U](x: T, y: AmbiguousCallableAlias[T, U]) -> U:
+    raise NotImplementedError
+
+reveal_type(q(A(), lambda z: z.f()))  # revealed: Unknown
+
+type NestedAmbiguousCallableAlias[T, U] = Callable[[T], U] | AmbiguousCallableAlias[T, U]
+
+def q_nested[T, U](x: T, y: NestedAmbiguousCallableAlias[T, U] | None) -> U:
+    raise NotImplementedError
+
+reveal_type(q_nested(A(), lambda z: z.f()))  # revealed: Unknown
+
+class Narrow(TypedDict):
+    value: int
+
+def choose[T, U](x: T, y: Callable[[T], U]) -> U:
+    raise NotImplementedError
+
+# Argument-derived specialization should refine the lambda parameter without overriding the
+# return-context solution for `U`.
+narrow: Narrow = choose(1, lambda value: {"value": value})
+reveal_type(narrow)  # revealed: Narrow
+
+# Self-referential aliases.
+type RecursiveCallableAlias = RecursiveCallableAlias | Callable[[int], int]
+
+def rec_direct[T](x: T, y: RecursiveCallableAlias) -> T:
+    raise NotImplementedError
+
+reveal_type(rec_direct(A(), lambda z: z + 1))  # revealed: A
+
+type MutualAliasA = MutualAliasB | None
+type MutualAliasB = MutualAliasA | Callable[[int], int]
+
+def rec_mutual[T](x: T, y: MutualAliasA) -> T:
+    raise NotImplementedError
+
+reveal_type(rec_mutual(A(), lambda z: z + 1))  # revealed: A
+
+# Argument-derived specialization also applies to generic bound methods, where the synthetic
+# `self` argument shifts argument indices.
+class Holder:
+    def apply[T, U](self, x: T, y: Callable[[T], U]) -> U:
+        raise NotImplementedError
+
+    def apply_rev[T, U](self, y: Callable[[T], U], x: T) -> U:
+        raise NotImplementedError
+
+holder = Holder()
+reveal_type(holder.apply(A(), lambda z: z.f()))  # revealed: int
+reveal_type(holder.apply_rev(lambda z: z.f(), A()))  # revealed: int
+
+def solve_from_list[T, U](y: Callable[[T], U], x: list[T]) -> U:
+    raise NotImplementedError
+
+reveal_type(solve_from_list(lambda z: z + 1, [1, 2]))  # revealed: int
+
+# An argument after the lambda is pre-seeded *without* type context, so its seeded type can be
+# less precise than the type inferred with the parameter's context during the final call check
+# (`[]` seeds `list[Unknown]`). Solutions containing dynamic components are therefore discarded
+# rather than used as lambda context, unlike return-context solutions.
+def append_int(x: list[int]) -> None:
+    x.append(1)
+
+reveal_type(solve_from_list(lambda z: append_int([z]), []))  # revealed: None
+
+def _(xs: list[Any]):
+    # The same filtering applies to explicit dynamic components in a sibling argument's type.
+    reveal_type(solve_from_list(lambda z: z, xs))  # revealed: Unknown
+
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
 f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
@@ -766,10 +929,9 @@ reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
 f11: Callable[[*tuple[int, ...]], tuple[int, ...]] = lambda *args: reveal_type(args)  # revealed: tuple[Unknown, ...]
 reveal_type(f11)  # revealed: (*args) -> tuple[Unknown, ...]
 
-# TODO: Better generic call inference.
 def _(x: list[int]):
     f12 = list(map(lambda y: y + 1, x))
-    reveal_type(f12)  # revealed: list[Unknown]
+    reveal_type(f12)  # revealed: list[int]
 
 def _() -> Callable[[int], int]:
     return id(lambda x: reveal_type(x))  # revealed: int

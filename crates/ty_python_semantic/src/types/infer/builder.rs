@@ -39,7 +39,7 @@ use crate::place::{
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::call::bind::{ArgumentTypeContextParams, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
@@ -5785,6 +5785,135 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
         });
 
+        // Generic callable argument context can depend on type variables solved by other arguments,
+        // regardless of source order. Seed only arguments matched to parameters that mention a
+        // type variable used by a callable context, and only when that callable context is needed
+        // for a lambda argument. The callable argument itself is inferred later with the
+        // specialized context.
+        //
+        // Only lambda arguments benefit from this analysis, so find the first lambda up front and
+        // skip the more expensive signature analysis entirely for calls without one. Arguments
+        // before the first lambda never need pre-seeding: the main inference loop below processes
+        // arguments in source order and records each inferred type in `arguments_types`, so those
+        // types are already available when a later lambda's context is computed.
+        let first_lambda_argument_index =
+            ast_arguments
+                .clone()
+                .enumerate()
+                .find_map(|(argument_index, ast_argument)| {
+                    (!ast_argument.is_variadic()
+                        && matches!(ast_argument.value(), ast::Expr::Lambda(_)))
+                    .then_some(argument_index)
+                });
+
+        let mut arguments_to_seed = Vec::new();
+        if let Some(first_lambda_argument_index) = first_lambda_argument_index
+            && overloads_with_binding
+                .iter()
+                .any(|(overload, _)| overload.signature.generic_context.is_some())
+        {
+            let overload_has_eligible_callable_context: Vec<bool> = overloads_with_binding
+                .iter()
+                .map(|(overload, binding)| {
+                    ast_arguments
+                        .clone()
+                        .enumerate()
+                        .any(|(argument_index, ast_argument)| {
+                            !ast_argument.is_variadic()
+                                && matches!(ast_argument.value(), ast::Expr::Lambda(_))
+                                && overload.has_specializable_callable_parameter_context(
+                                    db,
+                                    binding,
+                                    argument_index,
+                                )
+                        })
+                })
+                .collect();
+
+            if overload_has_eligible_callable_context
+                .iter()
+                .any(|eligible| *eligible)
+            {
+                let callable_context_typevars: Vec<_> = overloads_with_binding
+                    .iter()
+                    .zip(&overload_has_eligible_callable_context)
+                    .map(|((overload, _), eligible)| {
+                        if *eligible {
+                            overload.callable_parameter_context_typevars(db)
+                        } else {
+                            Vec::new()
+                        }
+                    })
+                    .collect();
+
+                for (argument_index, ast_argument) in ast_arguments
+                    .clone()
+                    .enumerate()
+                    .skip(first_lambda_argument_index + 1)
+                {
+                    // Splatted arguments are inferred before parameter matching to determine
+                    // their length, so there is no default expression type to pre-seed here.
+                    if ast_argument.is_variadic() {
+                        continue;
+                    }
+
+                    let has_default_type = matches!(
+                        arguments_types.argument_types(argument_index),
+                        Some(argument_types) if argument_types.get_default().is_some()
+                    );
+                    if has_default_type {
+                        continue;
+                    }
+
+                    // In an overloaded call, the same source argument can be forwarded through
+                    // `P.args` for one overload and still solve an ordinary `T` for another. Only
+                    // skip pre-seeding when no candidate overload can use the argument as a normal
+                    // solver.
+                    let can_seed_any_overload = overloads_with_binding
+                        .iter()
+                        .zip(&overload_has_eligible_callable_context)
+                        .zip(&callable_context_typevars)
+                        .any(
+                            |(((overload, binding), eligible), callable_context_typevars)| {
+                                *eligible
+                                    && overload.can_specialize_callable_parameter_context(
+                                        db,
+                                        binding,
+                                        argument_index,
+                                        callable_context_typevars,
+                                    )
+                                    && !overload
+                                        .is_paramspec_component_argument(binding, argument_index)
+                            },
+                        );
+
+                    if can_seed_any_overload {
+                        arguments_to_seed.push((argument_index, ast_argument));
+                    }
+                }
+            }
+        }
+
+        if !arguments_to_seed.is_empty() {
+            // The cache is torn down again before the main inference loop below: real (non-
+            // speculative) inference must not be short-circuited by speculatively cached results,
+            // or it would skip recording sub-expression types and emitting diagnostics.
+            let teardown = self.setup_expression_cache();
+
+            for (argument_index, ast_argument) in arguments_to_seed {
+                let mut speculative_builder = self.speculate_without_diagnostics();
+                let inferred_ty = infer_argument_ty(
+                    &mut speculative_builder,
+                    (argument_index, ast_argument.value(), TypeContext::default()),
+                );
+                arguments_types.insert_type(argument_index, TypeContext::default(), inferred_ty);
+            }
+
+            if teardown {
+                self.teardown_expression_cache();
+            }
+        }
+
         // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
         // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
         // types first so the normal ParamSpec context path below is not source-order dependent.
@@ -5830,14 +5959,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let parameter_tcx = |overload: &'bindings Binding<'db>,
                                  binding: &CallableBinding<'db>| {
-                overload.argument_type_context(
+                overload.argument_type_context(ArgumentTypeContextParams {
                     db,
-                    &constraints,
+                    constraints: &constraints,
                     binding,
                     arguments_types,
                     argument_index,
                     call_expression_tcx,
-                )
+                    argument_is_lambda: matches!(ast_argument, ast::Expr::Lambda(_)),
+                })
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with

@@ -56,7 +56,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -5715,6 +5715,21 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
     call_expression_tcx: TypeContext<'db>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ArgumentTypeContextParams<'a, 'call, 'db> {
+    pub(crate) db: &'db dyn Db,
+    pub(crate) constraints: &'a ConstraintSetBuilder<'db>,
+    pub(crate) binding: &'a CallableBinding<'db>,
+    pub(crate) arguments_types: &'a CallArguments<'call, 'db>,
+    pub(crate) argument_index: usize,
+    pub(crate) call_expression_tcx: TypeContext<'db>,
+    /// Whether the argument is a lambda expression. Lambdas are the only expressions that
+    /// benefit from argument-derived specialization of a callable parameter context, and
+    /// deriving that specialization requires an extra binding check, so it is skipped for
+    /// all other argument expressions.
+    pub(crate) argument_is_lambda: bool,
+}
+
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug, Clone)]
 pub(crate) struct Binding<'db> {
@@ -5849,15 +5864,46 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<CallableType<'db>> {
+        let Type::Callable(callable) = self
+            .inferred_specialization_from_arguments(
+                db,
+                constraints,
+                binding,
+                arguments_types,
+                call_expression_tcx,
+            )
+            .and_then(|specialization| specialization.get(db, paramspec))?
+        else {
+            return None;
+        };
+
+        (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
+    }
+
+    /// Infers a specialization from call arguments that have already been inferred.
+    ///
+    /// This is used while inferring a later argument's type context. For example, in
+    /// `g(A(), lambda z: z.f())` with `g[T, U](x: T, y: Callable[[T], U]) -> U`, the first
+    /// argument can specialize `T` to `A` before the lambda is inferred, giving the lambda
+    /// parameter the useful context `A`.
+    pub(crate) fn inferred_specialization_from_arguments(
+        &self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        binding: &CallableBinding<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<Specialization<'db>> {
         let mut specialized_binding =
             CallableBinding::from_overloads(self.signature_type, [self.signature.clone()]);
         if let Some(bound_type) = binding.bound_type {
             specialized_binding = specialized_binding.with_bound_type(bound_type);
         }
 
-        // Reuse the normal binding checker to infer `P` from the arguments that have already
-        // been inferred. This avoids duplicating specialization logic here; the current
-        // `P.args`/`P.kwargs` argument is still uninferred, so it only contributes `Unknown`.
+        // Reuse the normal binding checker so argument-derived specialization follows the same
+        // constraint logic as the eventual call check. Arguments that have not been inferred yet
+        // only contribute `Unknown`, which keeps this usable while inferring a later argument's
+        // contextual type.
         let mut specialized_bindings =
             Bindings::from(specialized_binding).match_parameters(db, arguments_types);
         let _ = specialized_bindings.check_types_impl(
@@ -5868,16 +5914,10 @@ impl<'db> Binding<'db> {
             &[],
         );
 
-        let Type::Callable(callable) = specialized_bindings
+        specialized_bindings
             .single_element()
             .and_then(|binding| binding.matching_overloads().exactly_one().ok())
             .and_then(|(_, overload)| overload.specialization())
-            .and_then(|specialization| specialization.get(db, paramspec))?
-        else {
-            return None;
-        };
-
-        (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
     }
 
     /// Returns the specialized wrapped-call parameter type for a forwarded argument.
@@ -5996,6 +6036,111 @@ impl<'db> Binding<'db> {
             .then_some(parameter_type)
     }
 
+    /// Returns true if a source call argument is forwarded through a `ParamSpec` component.
+    pub(crate) fn is_paramspec_component_argument(
+        &self,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+    ) -> bool {
+        let Some((prefix, _)) = self.signature.parameters().as_paramspec_with_prefix() else {
+            return false;
+        };
+
+        self.matched_argument_for_call_argument(binding, argument_index)
+            .is_some_and(|argument| {
+                argument
+                    .parameters
+                    .iter()
+                    .any(|parameter| parameter.index >= prefix.len())
+            })
+    }
+
+    /// Returns true if this argument can use another argument's inferred type to specialize a
+    /// callable parameter context.
+    pub(crate) fn has_specializable_callable_parameter_context(
+        &self,
+        db: &'db dyn Db,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+    ) -> bool {
+        self.matched_argument_for_call_argument(binding, argument_index)
+            .is_some_and(|argument| {
+                argument.parameters.iter().any(|parameter| {
+                    self.signature.parameters()[parameter.index]
+                        .annotated_type()
+                        .single_explicit_callable_alternative(db)
+                        .is_some()
+                })
+            })
+    }
+
+    /// Returns the type variables used by any single explicit callable parameter context in this
+    /// overload.
+    ///
+    /// Signatures rarely have more than a couple such type variables, so this returns a small
+    /// deduplicated `Vec` rather than allocating a hash set per overload.
+    pub(crate) fn callable_parameter_context_typevars(
+        &self,
+        db: &'db dyn Db,
+    ) -> Vec<TypeVarIdentity<'db>> {
+        let Some(generic_context) = self.signature.generic_context else {
+            return Vec::new();
+        };
+
+        let mut callable_context_typevars = Vec::new();
+        for parameter in self.signature.parameters() {
+            let Some(callable) = parameter
+                .annotated_type()
+                .single_explicit_callable_alternative(db)
+            else {
+                continue;
+            };
+
+            for typevar in generic_context.variables(db) {
+                let identity = typevar.typevar(db).identity(db);
+                if !callable_context_typevars.contains(&identity)
+                    && Type::Callable(callable).references_typevar(db, identity)
+                {
+                    callable_context_typevars.push(identity);
+                }
+            }
+        }
+
+        callable_context_typevars
+    }
+
+    /// Returns true if this argument's matched parameter can solve a type variable used by any
+    /// single explicit callable parameter context in this overload.
+    pub(crate) fn can_specialize_callable_parameter_context(
+        &self,
+        db: &'db dyn Db,
+        binding: &CallableBinding<'db>,
+        argument_index: usize,
+        callable_context_typevars: &[TypeVarIdentity<'db>],
+    ) -> bool {
+        if callable_context_typevars.is_empty() {
+            return false;
+        }
+
+        self.matched_argument_for_call_argument(binding, argument_index)
+            .is_some_and(|argument| {
+                argument.parameters.iter().any(|parameter| {
+                    let parameter_type =
+                        self.signature.parameters()[parameter.index].annotated_type();
+                    if parameter_type
+                        .single_explicit_callable_alternative(db)
+                        .is_some()
+                    {
+                        return false;
+                    }
+
+                    callable_context_typevars
+                        .iter()
+                        .any(|typevar| parameter_type.references_typevar(db, *typevar))
+                })
+            })
+    }
+
     /// Returns the type context to use for bidirectional inference of a source call argument.
     ///
     /// This covers the normal parameter annotation path, generic return-context specialization, and
@@ -6009,13 +6154,18 @@ impl<'db> Binding<'db> {
     /// ```
     pub(crate) fn argument_type_context(
         &self,
-        db: &'db dyn Db,
-        constraints: &ConstraintSetBuilder<'db>,
-        binding: &CallableBinding<'db>,
-        arguments_types: &CallArguments<'_, 'db>,
-        argument_index: usize,
-        call_expression_tcx: TypeContext<'db>,
+        context: ArgumentTypeContextParams<'_, '_, 'db>,
     ) -> Option<ArgumentTypeContext<'db>> {
+        let ArgumentTypeContextParams {
+            db,
+            constraints,
+            binding,
+            arguments_types,
+            argument_index,
+            call_expression_tcx,
+            argument_is_lambda,
+        } = context;
+
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [parameter] = argument_matches.parameters.as_slice() else {
             return None;
@@ -6083,6 +6233,48 @@ impl<'db> Binding<'db> {
                 }
             }
 
+            let callable_parameter_context = argument_is_lambda
+                && original_parameter_type
+                    .single_explicit_callable_alternative(db)
+                    .is_some();
+
+            // Only lambdas matched to callable parameters benefit from argument-derived
+            // specialization here: the extra precision is used to contextually type the lambda
+            // body, not to change ordinary argument inference for every generic parameter.
+            // Deriving the specialization runs a full extra binding check, so skip it whenever
+            // the expected return type already solved every type variable. Keep return-context
+            // solutions authoritative; argument-derived specialization only fills type variables
+            // that the expected return type did not solve.
+            if callable_parameter_context
+                && generic_context
+                    .variables(db)
+                    .any(|typevar| !return_type_solutions.contains_key(&typevar.identity(db)))
+                && let Some(argument_specialization) = self.inferred_specialization_from_arguments(
+                    db,
+                    constraints,
+                    binding,
+                    arguments_types,
+                    call_expression_tcx,
+                )
+            {
+                for typevar in generic_context.variables(db) {
+                    // Reject solutions with any dynamic or unspecialized component wholesale:
+                    // unlike return-context solutions, these are derived from arguments that may
+                    // not have been inferred yet (contributing `Unknown`), so a partially-dynamic
+                    // solution usually means the solver lacked information rather than that the
+                    // user wrote an explicitly dynamic type.
+                    if let Some(ty) = argument_specialization.get(db, typevar)
+                        && !ty.is_unknown()
+                        && !ty.has_dynamic(db)
+                        && !ty.has_unspecialized_type_var(db)
+                    {
+                        return_type_solutions
+                            .entry(typevar.identity(db))
+                            .or_insert(ty);
+                    }
+                }
+            }
+
             // Default specialize any type variables to a marker type, which will be ignored
             // during argument inference, allowing the concrete subset of the parameter
             // type to still affect argument inference.
@@ -6134,6 +6326,14 @@ impl<'db> Binding<'db> {
             }
 
             parameter_type = parameter_type.apply_specialization(db, specialization);
+            // Preserve an optional/non-callable fallback around the parameter while solving
+            // typevars, but infer lambdas against the single callable alternative when that
+            // alternative remains unambiguous after specialization.
+            if callable_parameter_context
+                && let Some(callable) = parameter_type.single_explicit_callable_alternative(db)
+            {
+                parameter_type = Type::Callable(callable);
+            }
         }
 
         Some(ArgumentTypeContext::standard(
