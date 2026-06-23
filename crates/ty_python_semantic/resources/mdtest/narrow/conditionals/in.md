@@ -310,6 +310,28 @@ def after_excluding_red_mixed(x: Color | int):
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
 ```
 
+An enum that can have additional runtime members can still be narrowed by a membership test against
+an explicit member. The other branch excludes that member without assuming that the declared members
+are exhaustive.
+
+```py
+from enum import Enum, EnumMeta
+
+class InjectingEnumMeta(EnumMeta):
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        namespace["INJECTED"] = 2
+        return super().__new__(metacls, name, bases, namespace, **kwargs)
+
+class OpenEnum(Enum, metaclass=InjectingEnumMeta):
+    ONLY = 1
+
+def _(value: OpenEnum):
+    if value in (OpenEnum.ONLY,):
+        reveal_type(value)  # revealed: Literal[OpenEnum.ONLY]
+    else:
+        reveal_type(value)  # revealed: OpenEnum & ~Literal[OpenEnum.ONLY]
+```
+
 ## Union with enum and `int`
 
 ```py

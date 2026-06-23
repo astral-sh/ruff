@@ -122,6 +122,88 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+`Flag` and `IntFlag` values can include zero and unnamed combinations, so their named members do not
+cover every possible value:
+
+```py
+from enum import Flag, IntFlag
+from typing import Literal
+
+class Permission(Flag):
+    READ = 1
+
+class Mode(IntFlag):
+    READ = 1
+
+FunctionalPermission = Flag("FunctionalPermission", {"READ": 1})
+
+def compare_flags(left: Permission, right: Permission):
+    reveal_type(left == right)  # revealed: bool
+
+    if left != right:
+        reveal_type(left)  # revealed: Permission
+
+def exclude_declared_flag(value: Permission):
+    if value is Permission.READ:
+        return
+    reveal_type(value)  # revealed: Permission & ~Literal[Permission.READ]
+
+def compare_flag_literals(
+    left: Literal[Permission.READ],
+    right: Literal[Permission.READ],
+):
+    reveal_type(left == right)  # revealed: Literal[True]
+
+def compare_int_flags(left: Mode, right: Mode):
+    reveal_type(left == right)  # revealed: bool
+
+def compare_functional_flags(left: FunctionalPermission, right: FunctionalPermission):
+    reveal_type(left == right)  # revealed: bool
+```
+
+An enum with a custom `_missing_` method can create unnamed members, so two values need not be equal
+even when only one member is declared:
+
+```py
+from enum import Enum
+
+class OpenEnum(Enum):
+    ONLY = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> "OpenEnum":
+        return object.__new__(cls)
+
+def compare_open_enums(left: OpenEnum, right: OpenEnum):
+    reveal_type(left == right)  # revealed: bool
+
+    if left != right:
+        reveal_type(left)  # revealed: OpenEnum
+
+def exclude_declared_member(value: OpenEnum):
+    if value is OpenEnum.ONLY:
+        return
+    reveal_type(value)  # revealed: OpenEnum & ~Literal[OpenEnum.ONLY]
+```
+
+A custom enum metaclass can add members that do not appear in the class body. Two values of a
+one-member class therefore need not be equal:
+
+```py
+from enum import Enum, EnumMeta
+
+class InjectingEnumMeta(EnumMeta):
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        namespace["INJECTED"] = 2
+        return super().__new__(metacls, name, bases, namespace, **kwargs)
+
+class TransformedEnum(Enum, metaclass=InjectingEnumMeta):
+    ONLY = 1
+
+def compare_transformed_enums(left: TransformedEnum, right: TransformedEnum):
+    reveal_type(left == right)  # revealed: bool
+```
+
 Unlike plain `Enum` members, `IntEnum` members inherit integer equality. Members of different
 `IntEnum` classes therefore compare equal when they have the same integer value, so both equality
 and inequality narrowing must account for matching members from every class in the union:
@@ -298,9 +380,9 @@ def _(new: Any, init: Any, prepare: Any):
 
     def transformed_by_metaclass(value: Literal[TransformedByMeta.MEMBER] | Literal["member"]):
         if value == "member":
-            reveal_type(value)  # revealed: TransformedByMeta | Literal["member"]
+            reveal_type(value)  # revealed: Literal[TransformedByMeta.MEMBER, "member"]
         else:
-            reveal_type(value)  # revealed: TransformedByMeta
+            reveal_type(value)  # revealed: Literal[TransformedByMeta.MEMBER]
 ```
 
 An opaque `_generate_next_value_` affects `auto()` members, but explicit members still have their
