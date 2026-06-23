@@ -93,6 +93,7 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use std::sync::Arc;
 
+use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -3300,16 +3301,18 @@ impl<'db> PathBounds<'db> {
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        let mut source_orders = builder.calculate_source_orders(source_order);
+        let source_orders = builder.calculate_source_orders(source_order);
         let mut sorted_paths = Vec::new();
         node.for_each_path(db, builder, |path| {
             let mut path: Vec<_> = path
                 .positive_constraints()
-                .map(|constraint| {
-                    source_orders.insert(constraint);
-                    let source_order = source_orders
-                        .get_index_of(&constraint)
-                        .expect("every BDD constraint should have a source_order");
+                .map(|(constraint, source_constraint)| {
+                    let source_order = match source_orders.get_index_of(&constraint) {
+                        Some(source_order) => source_order,
+                        None => source_orders
+                            .get_index_of(&source_constraint)
+                            .expect("every BDD constraint should have a source_order"),
+                    };
                     (constraint, source_order)
                 })
                 .collect();
@@ -3814,14 +3817,14 @@ impl InteriorNode {
                             .abstract_one_inner(db, builder, should_remove, path);
                         path.assignments[new_range]
                             .iter()
-                            .filter(|assignment| {
+                            .filter(|(assignment, _)| {
                                 // Don't add back any derived facts if they are ones that we would have
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
                             .fold(
                                 (branch, branch_source_order),
-                                |(branch, branch_source_order), assignment| {
+                                |(branch, branch_source_order), (assignment, _)| {
                                     let (assignment_node, assignment_source_order) =
                                         Node::new_satisfied_constraint(builder, *assignment);
                                     (
@@ -3847,14 +3850,14 @@ impl InteriorNode {
                             .abstract_one_inner(db, builder, should_remove, path);
                         path.assignments[new_range]
                             .iter()
-                            .filter(|assignment| {
+                            .filter(|(assignment, _)| {
                                 // Don't add back any derived facts if they are ones that we would have
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
                             .fold(
                                 (branch, branch_source_order),
-                                |(branch, branch_source_order), assignment| {
+                                |(branch, branch_source_order), (assignment, _)| {
                                     let (assignment_node, assignment_source_order) =
                                         Node::new_satisfied_constraint(builder, *assignment);
                                     (
@@ -3880,10 +3883,10 @@ impl InteriorNode {
                             .abstract_one_inner(db, builder, should_remove, path);
                         path.assignments[new_range]
                             .iter()
-                            .filter(|assignment| !should_remove(assignment.constraint()))
+                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
                             .fold(
                                 (branch, branch_source_order),
-                                |(branch, branch_source_order), assignment| {
+                                |(branch, branch_source_order), (assignment, _)| {
                                     let (assignment_node, assignment_source_order) =
                                         Node::new_satisfied_constraint(builder, *assignment);
                                     (
@@ -5880,7 +5883,7 @@ impl SequentMap {
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     map: SequentMap,
-    assignments: FxIndexSet<ConstraintAssignment>,
+    assignments: FxIndexMap<ConstraintAssignment, ConstraintId>,
     /// Nested substitutions that we have already applied on the current root→terminal path.
     nested_substitutions: FxIndexSet<NestedSubstitution>,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
@@ -5897,7 +5900,7 @@ impl PathAssignments {
             .collect();
         Self {
             map: SequentMap::default(),
-            assignments: FxIndexSet::default(),
+            assignments: FxIndexMap::default(),
             nested_substitutions: FxIndexSet::default(),
             discovered,
         }
@@ -5943,14 +5946,15 @@ impl PathAssignments {
             target: "ty_python_semantic::types::constraints::PathAssignment",
             before = %format_args!(
                 "[{}]",
-                self.assignments[..start].iter().map(|assignment| {
+                self.assignments[..start].iter().map(|(assignment, _)| {
                     assignment.display(db, builder)
                 }).format(", "),
             ),
             edge = %assignment.display(db, builder),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, builder, assignment);
+        let source_constraint = assignment.constraint();
+        let found_conflict = self.add_assignment(db, builder, assignment, source_constraint, false);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -5965,7 +5969,7 @@ impl PathAssignments {
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 new = %format_args!(
                     "[{}]",
-                    self.assignments[start..].iter().map(|assignment| {
+                    self.assignments[start..].iter().map(|(assignment, _)| {
                         assignment.display(db, builder)
                     }).format(", "),
                 ),
@@ -5983,17 +5987,21 @@ impl PathAssignments {
         result
     }
 
-    pub(crate) fn positive_constraints(&self) -> impl Iterator<Item = ConstraintId> + '_ {
+    pub(crate) fn positive_constraints(
+        &self,
+    ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
         self.assignments
             .iter()
-            .filter_map(|assignment| match assignment {
-                ConstraintAssignment::Positive(constraint) => Some(*constraint),
+            .filter_map(|(assignment, source_constraint)| match assignment {
+                ConstraintAssignment::Positive(constraint) => {
+                    Some((*constraint, *source_constraint))
+                }
                 ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             })
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
-        self.assignments.contains(&assignment)
+        self.assignments.contains_key(&assignment)
     }
 
     fn contains_constraint(&self, constraint: ConstraintId) -> bool {
@@ -6038,6 +6046,8 @@ impl PathAssignments {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
+        source_constraint: ConstraintId,
+        derived: bool,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
@@ -6051,19 +6061,19 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
-            self.assignments.insert(assignment);
+            self.assignments.insert(assignment, source_constraint);
             return Ok(());
         }
 
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
-        if self.assignments.contains(&assignment.negated()) {
+        if self.assignment_holds(assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 assignment = %assignment.display(db, builder),
                 facts = %format_args!(
                     "[{}]",
-                    self.assignments.iter().map(|assignment| {
+                    self.assignments.iter().map(|(assignment, _)| {
                         assignment.display(db, builder)
                     }).format(", "),
                 ),
@@ -6072,9 +6082,19 @@ impl PathAssignments {
             return Err(PathAssignmentConflict);
         }
 
-        if !self.assignments.insert(assignment) {
-            return Ok(());
-        }
+        match self.assignments.entry(assignment) {
+            Entry::Vacant(entry) => entry.insert(source_constraint),
+            Entry::Occupied(mut entry) => {
+                // If a constraint appears both as an "origin" constraint (it actually appears in
+                // the BDD structure) and as a "derived" constraint (we infer it from other
+                // constraints), we should prefer the origin source_order, regardless of which
+                // order we encounter the various constraints in the BDD.
+                if !derived {
+                    *entry.get_mut() = source_constraint;
+                }
+                return Ok(());
+            }
+        };
 
         // Then use our sequents to add additional facts that we know to be true.
         //
@@ -6097,7 +6117,7 @@ impl PathAssignments {
                     ante = %ante.display(db, builder),
                     facts = %format_args!(
                         "[{}]",
-                        self.assignments.iter().map(|assignment| {
+                        self.assignments.iter().map(|(assignment, _)| {
                             assignment.display(db, builder)
                         }).format(", "),
                     ),
@@ -6122,7 +6142,7 @@ impl PathAssignments {
                     ante2 = %ante2.display(db, builder),
                     facts = %format_args!(
                         "[{}]",
-                        self.assignments.iter().map(|assignment| {
+                        self.assignments.iter().map(|(assignment, _)| {
                             assignment.display(db, builder)
                         }).format(", "),
                     ),
@@ -6165,7 +6185,13 @@ impl PathAssignments {
         }
 
         for new_constraint in new_constraints {
-            self.add_assignment(db, builder, new_constraint.when_true())?;
+            self.add_assignment(
+                db,
+                builder,
+                new_constraint.when_true(),
+                source_constraint,
+                true,
+            )?;
         }
 
         Ok(())
@@ -6895,6 +6921,8 @@ mod tests {
             Some(KnownClass::Int.to_instance(&db)),
         );
         let t_upper_int_source_order = Some(builder.constraint_source_order(t_upper_int));
+        let source_order =
+            builder.ordered_source_order(t_upper_int_source_order, u_lower_str.source_order);
         let wrapped = ConstraintSet::from_node(
             &builder,
             NodeId::with_uncertain(
@@ -6904,12 +6932,12 @@ mod tests {
                 u_lower_str.node,
                 ALWAYS_FALSE,
             ),
-            t_upper_int_source_order,
+            source_order,
         );
 
-        // A future local reduction can drop the outer `T ≤ int` node entirely: its true and false
-        // branches are both `never`, so this TDD is semantically just the uncertain branch. That
-        // graph-shape change must not affect solved types.
+        // Local reduction drops the outer `T ≤ int` node entirely: its true and false branches are
+        // both `never`, so this TDD is semantically just the uncertain branch. That graph-shape
+        // change must not affect solved types.
         assert_eq!(
             render_solutions(&db, u_lower_str.solutions(&db, &builder)),
             render_solutions(&db, wrapped.solutions(&db, &builder)),
