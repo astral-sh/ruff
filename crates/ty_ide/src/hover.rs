@@ -3793,10 +3793,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        @Todo
+        str
         ---------------------------------------------
         ```python
-        @Todo
+        str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3837,10 +3837,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        @Todo
+        list[str]
         ---------------------------------------------
         ```python
-        @Todo
+        list[str]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3881,10 +3881,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        @Todo
+        str
         ---------------------------------------------
         ```python
-        @Todo
+        str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3937,10 +3937,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        @Todo
+        Unknown
         ---------------------------------------------
         ```python
-        @Todo
+        Unknown
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

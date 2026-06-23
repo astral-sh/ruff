@@ -411,16 +411,41 @@ static_assert(is_equivalent_to(Bottom[(Any | int) & tuple[str, Unknown]], Never)
 class Foo: ...
 
 static_assert(is_equivalent_to(Bottom[(Any | Foo) & tuple[str]], Foo & tuple[str]))
+```
+
+## Intersections of invariant generics
+
+The intersection `list[Any] & list[int]` is eagerly simplified to `list[int]`. Therefore, this is
+just a fully-static type where bottom and top materialization are the same:
+
+```pyi
+from typing import Any
+from ty_extensions import Bottom, Top
 
 def _(
     top: Top[list[Any] & list[int]],
     bottom: Bottom[list[Any] & list[int]],
 ):
-    # Top[list[Any] & list[int]] = Top[list[Any]] & list[int] = list[int]
     reveal_type(top)  # revealed: list[int]
-    # Bottom[list[Any] & list[int]] = Bottom[list[Any]] & list[int] = Bottom[list[Any]]
+    reveal_type(bottom)  # revealed: list[int]
+```
+
+Unfortunately, we get a seemingly different result when we distribute `Top[..]` and `Bottom[..]`
+over the intersection first:
+
+```pyi
+def _(
+    top: Top[list[Any]] & Top[list[int]],
+    bottom: Bottom[list[Any]] & Bottom[list[int]],
+):
+    reveal_type(top)  # revealed: list[int]
     reveal_type(bottom)  # revealed: Bottom[list[Any]]
 ```
+
+This is not a contradiction to what we have above if we view `Bottom[list[Any]]` as an empty
+"marker" type that adds no additional materializations. In other words, the gradual type
+`Bottom[list[Any]] | list[int] & Any` (i.e. the interval that is spanned by the types of the two
+bounds `bottom` and `top`) is equivalent to just `list[int]`.
 
 ## Negation
 

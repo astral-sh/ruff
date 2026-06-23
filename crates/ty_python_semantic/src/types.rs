@@ -35,9 +35,9 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    callable_pattern_type, definite_match_pattern_type, definite_sequence_pattern_type,
-    exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    callable_pattern_type, definite_match_pattern_type, exact_sequence_pattern_type,
+    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_fallthrough_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -66,7 +66,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-pub(crate) use crate::types::enums::{EnumComplementType, enum_metadata};
+pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::equality_truthiness;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
@@ -1218,8 +1218,8 @@ impl<'db> Type<'db> {
         .recursive_type_normalized(db, cycle)
     }
 
-    /// Normalizes nominal growth that wraps the previous cycle result in one or more
-    /// specializations, either directly or beneath an unambiguous union wrapper.
+    /// Normalizes nominal growth that wraps the previous cycle result in a specialization, either
+    /// directly or beneath an unambiguous union wrapper.
     ///
     /// For example, an inference cycle can otherwise grow indefinitely as
     /// `C[int]`, `C[C[int]]`, `C[C[C[int]]]`, and so on. Once fixed-point iteration has passed its
@@ -1234,41 +1234,6 @@ impl<'db> Type<'db> {
         div: Self,
     ) -> Option<Self> {
         if let (Type::Union(current), Type::Union(previous)) = (self, previous) {
-            let previous_elements = previous.elements(db);
-
-            // Multiple union arms may each grow by wrapping the entire previous union. Normalize
-            // only when every previous arm is nominal and at least two changed current arms are
-            // nominal wrappers; arms shared with the previous union remain unchanged.
-            if previous_elements
-                .iter()
-                .all(|element| matches!(element, Type::NominalInstance(_)))
-                && let Some(replacements) = current
-                    .elements(db)
-                    .iter()
-                    .copied()
-                    .filter(|element| !previous_elements.contains(element))
-                    .map(|element| {
-                        Self::nominal_wrapper_normalized(
-                            db,
-                            element.as_nominal_instance()?,
-                            Type::Union(previous),
-                            div,
-                        )
-                        .map(|normalized| (element, normalized))
-                    })
-                    .collect::<Option<smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]>>>()
-                && replacements.len() > 1
-            {
-                return Some(current.map_leave_aliases(db, |element| {
-                    replacements
-                        .iter()
-                        .find_map(|(original, normalized)| {
-                            (*original == *element).then_some(*normalized)
-                        })
-                        .unwrap_or(*element)
-                }));
-            }
-
             // Only align unions when each iteration has exactly one changed arm. With multiple
             // unmatched arms, pairing is ambiguous and can destabilize otherwise-convergent
             // recursive cycles.
@@ -1303,8 +1268,8 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(current), Type::ProtocolInstance(previous)) => {
                 // A class-backed protocol shares a nominal specialization with its runtime class.
-                // `nominal_wrapper_normalized` reconstructs the result through `Type::instance`,
-                // which recognizes the protocol class and restores a protocol instance.
+                // Reconstructing the result through `Type::instance` recognizes the protocol class
+                // and restores a protocol instance.
                 (
                     current.to_nominal_instance()?,
                     previous.to_nominal_instance()?,
@@ -1313,27 +1278,17 @@ impl<'db> Type<'db> {
             _ => return None,
         };
 
-        if current.class(db).class_literal(db) != previous_instance.class_literal(db) {
+        let current_class = current.class(db);
+        if current_class.class_literal(db) != previous_instance.class_literal(db) {
             return None;
         }
 
-        Self::nominal_wrapper_normalized(db, current, previous, div)
-    }
-
-    /// Replaces `wrapped` beneath the outer nominal specialization in `current`.
-    fn nominal_wrapper_normalized(
-        db: &'db dyn Db,
-        current: NominalInstanceType<'db>,
-        wrapped: Self,
-        div: Self,
-    ) -> Option<Self> {
-        let current_class = current.class(db);
         let alias = current_class.into_generic_alias()?;
         let original_specialization = alias.specialization(db);
         let specialization = original_specialization.apply_type_mapping(
             db,
             &TypeMapping::ReplaceType {
-                from: wrapped,
+                from: previous,
                 to: div,
             },
         );
@@ -3968,24 +3923,23 @@ impl<'db> Type<'db> {
                         }) =>
                 {
                     let enum_literal = literal.as_enum().unwrap();
-                    let enum_class = enum_literal.enum_class(db);
-                    let is_enum_subclass = Type::ClassLiteral(enum_class)
+                    let enum_class = enum_literal.enum_class_literal(db);
+                    let is_enum_subclass = Type::ClassLiteral(enum_class.class_literal(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-                    enum_metadata(db, enum_class)
-                        .and_then(|metadata| match name_str {
-                            "name" if is_enum_subclass => {
-                                metadata.name_type(db, enum_literal.name(db))
-                            }
-                            "_name_" => metadata.name_type(db, enum_literal.name(db)),
-                            "value" if is_enum_subclass => {
-                                metadata.value_type(db, enum_literal.name(db))
-                            }
-                            "_value_" => metadata.value_type(db, enum_literal.name(db)),
-                            _ => None,
-                        })
-                        .map_or_else(|| Place::Undefined, Place::bound)
-                        .into()
+                    (match name_str {
+                        "name" if is_enum_subclass => {
+                            enum_class.name_type(db, enum_literal.name(db))
+                        }
+                        "_name_" => enum_class.name_type(db, enum_literal.name(db)),
+                        "value" if is_enum_subclass => {
+                            enum_class.value_type(db, enum_literal.name(db))
+                        }
+                        "_value_" => enum_class.value_type(db, enum_literal.name(db)),
+                        _ => None,
+                    })
+                    .map_or_else(|| Place::Undefined, Place::bound)
+                    .into()
                 }
 
                 Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
@@ -4080,10 +4034,15 @@ impl<'db> Type<'db> {
 
                     // Enum members can be accessed through enum instances and other enum members,
                     // e.g. `answer.YES` or `Answer.YES.NO`.
-                    if let Some(enum_class) =
-                        this.nominal_class(db).map(|class| class.class_literal(db))
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                    if let Some(enum_class) = match this {
+                        Type::LiteralValue(literal) => literal
+                            .as_enum()
+                            .map(|enum_literal| enum_literal.enum_class_literal(db)),
+                        _ => this
+                            .nominal_class(db)
+                            .map(|class| class.class_literal(db))
+                            .and_then(|class| class.into_enum_class(db)),
+                    } && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
@@ -4117,16 +4076,15 @@ impl<'db> Type<'db> {
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     let enum_class = match this {
-                        Type::ClassLiteral(literal) => Some(literal),
+                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
                             .into_class(db)
-                            .map(|class| class.class_literal(db)),
+                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                        && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
