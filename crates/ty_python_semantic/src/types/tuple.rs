@@ -28,7 +28,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
@@ -378,6 +378,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && let Type::TypeVar(typevartuple) = target.variable()
+                    && typevartuple.is_typevartuple(db)
+                {
+                    let packed = Type::heterogeneous_tuple(db, source_iter.copied());
+                    return result.and(db, self.constraints, || {
+                        self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                    });
+                }
+
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
                 result.and(db, self.constraints, || {
@@ -446,6 +456,56 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             Tuple::Variable(target) => {
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && let Type::TypeVar(typevartuple) = target.variable()
+                    && typevartuple.is_typevartuple(db)
+                {
+                    let source_prefix = source.prefix_elements();
+                    let source_suffix = source.suffix_elements();
+                    let target_prefix = target.prefix_elements();
+                    let target_suffix = target.suffix_elements();
+                    if source_prefix.len() < target_prefix.len()
+                        || source_suffix.len() < target_suffix.len()
+                    {
+                        return self.never();
+                    }
+
+                    let mut result = self.always();
+                    for (&source_ty, &target_ty) in source_prefix.iter().zip(target_prefix) {
+                        let constraints = self.check_type_pair(db, source_ty, target_ty);
+                        if result
+                            .intersect(db, self.constraints, constraints)
+                            .is_never_satisfied(db)
+                        {
+                            return result;
+                        }
+                    }
+
+                    let source_suffix_start = source_suffix.len() - target_suffix.len();
+                    for (&source_ty, &target_ty) in source_suffix[source_suffix_start..]
+                        .iter()
+                        .zip(target_suffix)
+                    {
+                        let constraints = self.check_type_pair(db, source_ty, target_ty);
+                        if result
+                            .intersect(db, self.constraints, constraints)
+                            .is_never_satisfied(db)
+                        {
+                            return result;
+                        }
+                    }
+
+                    let packed = Type::tuple(TupleType::mixed(
+                        db,
+                        source_prefix[target_prefix.len()..].iter().copied(),
+                        source.variable(),
+                        source_suffix[..source_suffix_start].iter().copied(),
+                    ));
+                    return result.and(db, self.constraints, || {
+                        self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                    });
+                }
+
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
                 // one tuple materializes to the variable-length portion of the other tuple.
                 let source_prenormalize_variable = match source.variable() {

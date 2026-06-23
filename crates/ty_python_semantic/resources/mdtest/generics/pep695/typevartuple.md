@@ -326,6 +326,45 @@ reveal_type(simple(variadic2))  # revealed: tuple[Unknown, ...]
 reveal_type(simple(keyword_only))  # revealed: tuple[Unknown, ...]
 ```
 
+### Callable return inference
+
+An unpacked `TypeVarTuple` in a callable return type is inferred as one packed tuple, including
+fixed elements surrounding it.
+
+```py
+from typing import Callable
+
+def infer_return[*Ts](callback: Callable[[], tuple[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def empty_return() -> tuple[()]:
+    raise NotImplementedError
+
+def fixed_return() -> tuple[int, str]:
+    raise NotImplementedError
+
+def mixed_return() -> tuple[int, *tuple[str, ...]]:
+    raise NotImplementedError
+
+reveal_type(infer_return(empty_return))  # revealed: tuple[()]
+reveal_type(infer_return(fixed_return))  # revealed: tuple[int, str]
+reveal_type(infer_return(mixed_return))  # revealed: tuple[int, *tuple[str, ...]]
+
+def infer_return_middle[*Ts](
+    callback: Callable[[], tuple[int, *Ts, bytes]],
+) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def fixed_middle() -> tuple[int, str, bytes]:
+    raise NotImplementedError
+
+def mixed_middle() -> tuple[int, *tuple[str, ...], bytes]:
+    raise NotImplementedError
+
+reveal_type(infer_return_middle(fixed_middle))  # revealed: tuple[str]
+reveal_type(infer_return_middle(mixed_middle))  # revealed: tuple[str, ...]
+```
+
 ### Callable inference with sub-call checking
 
 This usage pattern is similar to how `ParamSpec` can be used to accept a callable and its arguments
