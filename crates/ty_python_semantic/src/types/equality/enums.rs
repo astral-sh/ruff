@@ -471,10 +471,10 @@ fn enum_comparison_profile<'db>(
         None => (None, false),
         Some(KnownComparisonSemantics::Object) => (Some(EnumComparisonKeys::Distinct), true),
         Some(
-            KnownComparisonSemantics::Int
+            semantics @ (KnownComparisonSemantics::Int
             | KnownComparisonSemantics::Str
-            | KnownComparisonSemantics::Bytes,
-        ) if enum_members_have_distinct_value_keys(db, enum_class) => {
+            | KnownComparisonSemantics::Bytes),
+        ) if enum_members_have_distinct_value_keys(db, enum_class, semantics) => {
             (Some(EnumComparisonKeys::Distinct), false)
         }
         Some(_) => (Some(EnumComparisonKeys::UnknownOrRepeated), false),
@@ -488,26 +488,27 @@ fn enum_comparison_profile<'db>(
 
 /// Return whether every declared member has a unique modeled runtime comparison key.
 ///
+/// A value is only used when its literal kind matches the inherited scalar semantics; other values
+/// may be normalized by the scalar constructor before enum alias detection.
 /// Keys exclude literal metadata such as promotability, which does not affect runtime equality.
 /// Boolean keys are normalized to integers because Python considers `False == 0` and `True == 1`.
 fn enum_members_have_distinct_value_keys<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
+    semantics: KnownComparisonSemantics,
 ) -> bool {
     let mut keys = FxHashSet::default();
     enum_class.members(db).iter().all(|(_, value)| {
-        let key = match value.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bool(value)) => {
+        let key = match (semantics, value.as_literal_value_kind()) {
+            (KnownComparisonSemantics::Int, Some(LiteralValueTypeKind::Bool(value))) => {
                 LiteralValueTypeKind::Int(IntLiteralType::from_i64(i64::from(value)))
             }
-            Some(
-                kind @ (LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)),
-            ) => kind,
-            Some(LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_)) | None => {
-                return false;
+            (KnownComparisonSemantics::Int, Some(kind @ LiteralValueTypeKind::Int(_)))
+            | (KnownComparisonSemantics::Str, Some(kind @ LiteralValueTypeKind::String(_)))
+            | (KnownComparisonSemantics::Bytes, Some(kind @ LiteralValueTypeKind::Bytes(_))) => {
+                kind
             }
+            _ => return false,
         };
         keys.insert(key)
     })
