@@ -5801,7 +5801,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
 
-                let mut speculative_builder = self.speculate();
+                let mut speculative_builder = self.speculate_without_diagnostics();
                 let inferred_ty = infer_argument_ty(
                     &mut speculative_builder,
                     (
@@ -5906,7 +5906,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We use a speculative builder to silence any diagnostics emitted during multi-inference, as the
                     // type context is only used as a hint to infer a more assignable argument type, and should not lead
                     // to diagnostics for non-matching overloads.
-                    let mut speculative_builder = self.speculate();
+                    let mut speculative_builder = self.speculate_without_diagnostics();
                     let inferred_ty = infer_argument_ty(
                         &mut speculative_builder,
                         (
@@ -6815,7 +6815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else if !has_dict_compatible_fallback {
                         // Suppress `TypedDict` diagnostics only if this literal is assignable to
                         // the non-`TypedDict` arm of the union.
-                        let mut speculative_builder = self.speculate();
+                        let mut speculative_builder = self.speculate_without_diagnostics();
                         has_dict_compatible_fallback = speculative_builder
                             .infer_dict_expression(dict, TypeContext::new(Some(element)))
                             .is_assignable_to(self.db(), element);
@@ -8489,7 +8489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }) => Some(key_literal.to_str()),
                     _ => self
-                        .speculate()
+                        .speculate_without_diagnostics()
                         .get_or_infer_expression(first_arg, TypeContext::default())
                         .as_string_literal()
                         .map(|key_literal| key_literal.value(self.db())),
@@ -8857,19 +8857,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 
-                let call_result = self.speculate().infer_and_check_argument_types(
-                    ArgumentsIter::from_ast(arguments),
-                    &mut call_arguments,
-                    // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                    // However, `value` would have been inferred to a be a collection with `Divergent`
-                    // element types, meaning the type context for a given argument, by which the inferred
-                    // type is keyed, may not be the same as the type context we get here. It is not immediately
-                    // clear how to retrieve those types, and so we just re-infer the argument expressions
-                    // for simplicity.
-                    &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
-                    &mut identity_bindings,
-                    call_expression_tcx,
-                );
+                let call_result = self
+                    .speculate_without_diagnostics()
+                    .infer_and_check_argument_types(
+                        ArgumentsIter::from_ast(arguments),
+                        &mut call_arguments,
+                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                        // However, `value` would have been inferred to a be a collection with `Divergent`
+                        // element types, meaning the type context for a given argument, by which the inferred
+                        // type is keyed, may not be the same as the type context we get here. It is not immediately
+                        // clear how to retrieve those types, and so we just re-infer the argument expressions
+                        // for simplicity.
+                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+                        &mut identity_bindings,
+                        call_expression_tcx,
+                    );
 
                 if call_result.is_ok() {
                     for call_specialization in identity_bindings
@@ -11307,7 +11309,7 @@ impl<'db, 'ast, 'infer> MultiInferenceGuard<'db, 'ast, 'infer> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         self.last_tcx = Some(tcx);
-        (self.infer_expr)(&mut builder.speculate(), tcx)
+        (self.infer_expr)(&mut builder.speculate_without_diagnostics(), tcx)
     }
 
     fn last_tcx(&self) -> TypeContext<'db> {
