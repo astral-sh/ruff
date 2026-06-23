@@ -1358,7 +1358,7 @@ impl<'db> Type<'db> {
         let original_specialization = alias.specialization(db);
         let specialization = original_specialization.apply_type_mapping(
             db,
-            &TypeMapping::ReplaceType {
+            &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                 from: wrapped,
                 to: div,
             },
@@ -1403,7 +1403,7 @@ impl<'db> Type<'db> {
             }
             normalized = normalized.apply_type_mapping(
                 db,
-                &TypeMapping::ReplaceType {
+                &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                     from: Type::Intersection(intersection),
                     to: replacement,
                 },
@@ -1434,7 +1434,7 @@ impl<'db> Type<'db> {
         {
             normalized = normalized.apply_type_mapping(
                 db,
-                &TypeMapping::ReplaceType {
+                &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                     from: Type::Union(distributed),
                     to: replacement,
                 },
@@ -1459,7 +1459,7 @@ impl<'db> Type<'db> {
             {
                 branch.apply_type_mapping(
                     db,
-                    &TypeMapping::ReplaceType {
+                    &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                         from: *wrapped_element,
                         to: div,
                     },
@@ -1492,7 +1492,7 @@ impl<'db> Type<'db> {
             };
             let canonical = branch.apply_type_mapping(
                 db,
-                &TypeMapping::ReplaceType {
+                &TypeMapping::ReplaceTypeOutsideNegativeIntersections {
                     from: wrapped_element,
                     to: representative,
                 },
@@ -6426,7 +6426,7 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
-        if let TypeMapping::ReplaceType { from, to } = type_mapping
+        if let TypeMapping::ReplaceTypeOutsideNegativeIntersections { from, to } = type_mapping
             && self == *from
         {
             return *to;
@@ -6575,13 +6575,24 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-                // Promotion should remove negative contributions from intersections,
-                // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
-                    for negative in intersection.negative(db) {
-                        builder = builder.add_negative(
-                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
-                        );
+                match type_mapping {
+                    // Promotion should remove negative contributions from intersections,
+                    // so we don't preserve them here when promotion is enabled.
+                    TypeMapping::Promote(PromotionMode::On, _) => {}
+                    TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. } => {
+                        for negative in intersection.negative(db) {
+                            builder = builder.add_negative(*negative);
+                        }
+                    }
+                    _ => {
+                        for negative in intersection.negative(db) {
+                            builder = builder.add_negative(negative.apply_type_mapping_impl(
+                                db,
+                                &type_mapping.flip(),
+                                tcx,
+                                visitor,
+                            ));
+                        }
                     }
                 }
                 builder.build()
@@ -6687,7 +6698,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::ReplaceType { .. } |
+                TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6704,7 +6715,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::ReplaceType { .. } |
+                TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -7756,8 +7767,9 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
-    /// Replaces occurrences of one specific type with another.
-    ReplaceType { from: Type<'db>, to: Type<'db> },
+    /// Replaces occurrences of one specific type with another without descending into negative
+    /// intersection elements.
+    ReplaceTypeOutsideNegativeIntersections { from: Type<'db>, to: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -7810,7 +7822,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::ReplaceType { .. }
+            | TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. }
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
@@ -7858,7 +7870,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::ReplaceType { .. }
+            | TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),

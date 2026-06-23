@@ -375,7 +375,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
-                | TypeMapping::ReplaceType { .. }
+                | TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. }
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion

@@ -1103,7 +1103,7 @@ impl<'db> FunctionType<'db> {
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_signature) = if matches!(
             type_mapping,
-            TypeMapping::ReplaceType { .. }
+            TypeMapping::ReplaceTypeOutsideNegativeIntersections { .. }
                 | TypeMapping::ApplySpecialization(
                     ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
                 )

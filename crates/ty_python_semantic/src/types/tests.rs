@@ -472,6 +472,70 @@ fn recursive_nominal_growth_rejects_distributions_under_negation() {
 }
 
 #[test]
+fn recursive_nominal_growth_rejects_exact_intersection_under_negation() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let previous = IntersectionType::from_two_elements(&db, list_int, Type::unknown());
+    let excluded = IntersectionBuilder::new(&db)
+        .add_positive(Type::object())
+        .add_negative(KnownClass::Set.to_specialized_instance(&db, &[previous]))
+        .build();
+    let wrapper = KnownClass::List.to_specialized_instance(&db, &[excluded]);
+    let current = IntersectionType::from_two_elements(&db, wrapper, Type::unknown());
+
+    assert_eq!(
+        current.recursive_nominal_growth_normalized(&db, previous, div),
+        None
+    );
+}
+
+#[test]
+fn recursive_nominal_growth_preserves_negative_distribution_copies() {
+    let db = setup_db();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_int =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let list_str =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let previous = UnionType::from_elements(&db, [list_int, list_str]);
+    let distribution = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[list_int]),
+            KnownClass::Set.to_specialized_instance(&db, &[list_str]),
+        ],
+    );
+    let excluded = IntersectionBuilder::new(&db)
+        .add_positive(Type::object())
+        .add_negative(KnownClass::List.to_specialized_instance(&db, &[distribution]))
+        .build();
+    let position = Type::heterogeneous_tuple(&db, [distribution, excluded]);
+    let current = KnownClass::List.to_specialized_instance(&db, &[position]);
+    let normalized_position = Type::heterogeneous_tuple(
+        &db,
+        [
+            KnownClass::Set.to_specialized_instance(&db, &[div]),
+            excluded,
+        ],
+    );
+    let expected = KnownClass::List.to_specialized_instance(&db, &[normalized_position]);
+
+    assert_eq!(
+        Type::nominal_wrapper_normalized(
+            &db,
+            current
+                .as_nominal_instance()
+                .expect("a specialized list should be a nominal instance"),
+            previous,
+            div,
+        ),
+        Some(expected)
+    );
+}
+
+#[test]
 fn recursive_nominal_growth_recomputes_overlapping_positions() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
