@@ -1045,8 +1045,8 @@ def declared_literal_attribute_subpattern_is_exhaustive(
 
 ## Non-final subclasses
 
-A non-final subclass can have a runtime subclass that overrides attribute access, so the fallback
-remains reachable. The same rule applies inside a sequence pattern:
+Exhaustiveness follows the static member model, so a member inherited by a non-final subclass is
+treated as present. The same rule applies inside a sequence pattern:
 
 ```py
 class BaseWithX:
@@ -1054,17 +1054,12 @@ class BaseWithX:
 
 class NonFinalChild(BaseWithX): ...
 
-def non_final_subclass_preserves_fallback(value: NonFinalChild) -> None:
+def non_final_subclass_member_is_exhaustive(value: NonFinalChild) -> int:
     match value:
         case BaseWithX(x=_):
-            pass
-        case _:
-            reveal_type(value)  # revealed: NonFinalChild
+            return 1
 
-def nested_non_final_subclass_is_not_exhaustive(
-    value: tuple[NonFinalChild],
-    # error: [invalid-return-type]
-) -> int:
+def nested_non_final_subclass_member_is_exhaustive(value: tuple[NonFinalChild]) -> int:
     match value:
         case [BaseWithX(x=_)]:
             return 1
@@ -1072,12 +1067,11 @@ def nested_non_final_subclass_is_not_exhaustive(
 
 ## Runtime-checkable protocol patterns
 
-Runtime-checkable protocols use `isinstance` at runtime. A non-final subject class can have a
-runtime subclass whose member behavior differs, so the fallback remains reachable even when the
-class defines or declares every protocol member:
+Runtime-checkable protocol patterns also follow the static member model. A subject that statically
+satisfies the protocol is treated as exhaustive regardless of whether its class is final:
 
 ```py
-from typing import Protocol, final, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class RuntimeProtocolWithX(Protocol):
@@ -1086,10 +1080,7 @@ class RuntimeProtocolWithX(Protocol):
 class RuntimeProtocolImplementer:
     x: int = 0
 
-def runtime_protocol_pattern_is_not_exhaustive_for_non_final_implementer(
-    value: RuntimeProtocolImplementer,
-    # error: [invalid-return-type]
-) -> int:
+def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) -> int:
     match value:
         case RuntimeProtocolWithX(x=_):
             return 1
@@ -1097,31 +1088,15 @@ def runtime_protocol_pattern_is_not_exhaustive_for_non_final_implementer(
 class DeclaredRuntimeProtocolImplementer:
     x: int
 
-def argumentless_runtime_protocol_pattern_is_not_exhaustive(
+def argumentless_runtime_protocol_pattern_is_exhaustive(
     value: DeclaredRuntimeProtocolImplementer,
-    # error: [invalid-return-type]
 ) -> int:
     match value:
         case RuntimeProtocolWithX():
             return 1
 
-@final
-class FinalDeclaredRuntimeProtocolImplementer:
-    x: int
-
-# TODO: This is currently considered exhaustive because the declared `x` member counts as present
-# on a final class. At runtime, however, `x` may never have been initialized, so the protocol check
-# can fail.
-def final_declared_runtime_protocol_implementer(
-    value: FinalDeclaredRuntimeProtocolImplementer,
-) -> int:
-    match value:
-        case RuntimeProtocolWithX():
-            return 1
-
-def nested_argumentless_runtime_protocol_pattern_is_not_exhaustive(
+def nested_argumentless_runtime_protocol_pattern_is_exhaustive(
     value: tuple[DeclaredRuntimeProtocolImplementer],
-    # error: [invalid-return-type]
 ) -> int:
     match value:
         case [RuntimeProtocolWithX()]:
@@ -1136,46 +1111,41 @@ def nested_argumentless_runtime_protocol_union_preserves_fallback(
         case [DeclaredRuntimeProtocolImplementer()]:
             reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
 
-def nested_argumentless_runtime_protocol_list_preserves_fallback(
+def nested_argumentless_runtime_protocol_list_does_not_narrow_fallthrough(
     value: list[DeclaredRuntimeProtocolImplementer | int],
 ) -> None:
     match value:
         case [RuntimeProtocolWithX()]:
             pass
         case [DeclaredRuntimeProtocolImplementer()]:
-            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer | int
 ```
 
-## Final subclasses
+## Subject-class members
 
-A final class has no subclasses, so an attribute known on the subject can make a base-class pattern
-exhaustive. The special positional behavior of built-in classes still comes from the pattern class,
-not from another base of the subject class:
+A member known on the static subject type can make a base-class pattern exhaustive. The special
+positional behavior of built-in classes still comes from the pattern class, not from another base of
+the subject class:
 
 ```py
-from typing import final
-
 class BaseWithoutX: ...
 
-@final
-class FinalChildWithX(BaseWithoutX):
+class ChildWithX(BaseWithoutX):
     x: int = 0
 
-def final_subclass_member_is_exhaustive(value: FinalChildWithX) -> int:
+def subclass_member_is_exhaustive(value: ChildWithX) -> int:
     match value:
         case BaseWithoutX(x=_):
             return 1
 
-def nested_final_subclass_member_is_exhaustive(
-    value: tuple[FinalChildWithX],
+def nested_subclass_member_is_exhaustive(
+    value: tuple[ChildWithX],
 ) -> int:
     match value:
         case [BaseWithoutX(x=_)]:
             return 1
 
 class PlainBase: ...
-
-@final
 class IntPlainChild(int, PlainBase): ...
 
 def builtin_positional_behavior_comes_from_pattern_class(

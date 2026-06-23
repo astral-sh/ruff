@@ -184,14 +184,12 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
 
 /// Return whether every value in `subject_ty` is statically guaranteed to match this class pattern.
 ///
-/// Attribute subpatterns are checked recursively against their statically known member types. A
-/// non-final subclass can override attribute access, so the pattern is not guaranteed to match it.
-/// A final subclass can provide members that are absent from the class named in the pattern.
+/// Attribute subpatterns are checked recursively against their statically known member types. The
+/// subject's class can provide members that are absent from the class named in the pattern.
 ///
 /// ```python
 /// class Base: ...
 ///
-/// @final
 /// class Child(Base):
 ///     x: int
 ///
@@ -211,37 +209,11 @@ fn class_pattern_is_exhaustive(
         return false;
     }
 
-    let is_protocol = class.is_protocol(db);
-    if kind.is_argumentless() && !is_protocol {
+    if kind.is_argumentless() {
         return true;
     }
 
-    let subject_is_non_final_subclass = if is_typed_dict_match {
-        false
-    } else {
-        let Some(subject_class) = subject_ty.nominal_class(db) else {
-            return false;
-        };
-        let subject_class_literal = subject_class.class_literal(db);
-        subject_class_literal != class && !subject_class_literal.is_final(db)
-    };
-
-    // TODO: A non-final subject class also admits subclasses that can override attribute access.
-    // Decide whether it should remain exhaustive under the static member model or be treated like
-    // a non-final subclass of the class named in the pattern.
-    if kind.is_argumentless() {
-        return !subject_is_non_final_subclass;
-    }
-
     let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
-    let extracts_attribute = !kind.keywords.is_empty()
-        || positional_sources
-            .iter()
-            .any(|source| !matches!(source, ClassPatternPositionalSource::MatchSelf));
-    if subject_is_non_final_subclass && (is_protocol || extracts_attribute) {
-        return false;
-    }
-
     if !kind.keywords.iter().all(|keyword| {
         member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
     }) {
@@ -468,8 +440,8 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// This is an under-approximation used for negative narrowing and ordered alternatives: callers
 /// may subtract the result from `subject_ty` under ty's static member model. A subject-independent
 /// pattern can return a type wider than `subject_ty`; for example, `case Base()` returns `Base`
-/// even for a `Child` subject. Class patterns need the current subject type when the subject is a
-/// non-final subclass, while an exact or final class can make member extraction exhaustive.
+/// even for a `Child` subject. Class patterns need the current subject type when member extraction
+/// depends on the subject's statically known members.
 /// A subject-independent pattern can return its context-free definite-match type directly. A
 /// mapping pattern can use required `TypedDict` fields to establish that every subject value
 /// contains its keys.
@@ -481,7 +453,6 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// class Base:
 ///     x: int
 ///
-/// @final
 /// class Child(Base):
 ///     pass
 ///
@@ -722,8 +693,8 @@ fn is_same_enum_pattern_domain<'db>(
 /// Return the definite-match type when it does not depend on the current subject type.
 ///
 /// `None` means that callers must use subject-aware analysis instead of falling back to the
-/// context-free approximation. In particular, protocol and attribute class patterns are not
-/// guaranteed to match a non-final subclass even when static subtyping says otherwise.
+/// context-free approximation. In particular, attribute class patterns can depend on members of
+/// the static subject type.
 fn subject_independent_definite_match_pattern_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
@@ -732,9 +703,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class)
-                    if kind.is_argumentless()
-                        && !class.is_protocol(db)
-                        && !typed_dict_matches_class_pattern(db, class) =>
+                    if kind.is_argumentless() && !typed_dict_matches_class_pattern(db, class) =>
                 {
                     Some(Type::instance(db, class.top_materialization(db)))
                 }
