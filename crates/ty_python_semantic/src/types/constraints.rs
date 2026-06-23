@@ -901,6 +901,10 @@ impl<'db> ConstraintSetBuilder<'db> {
             }
         }
 
+        used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
+        used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
+        used_source_orders.truncate(used_source_orders.last_one().map_or(0, |last| last + 1));
+
         let nodes = storage
             .nodes
             .into_iter()
