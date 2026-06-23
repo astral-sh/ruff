@@ -43,6 +43,7 @@ mod rename;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;
+mod will_rename_files;
 mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -73,9 +74,10 @@ use lsp_types::{
     SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
     SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
     TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
-    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
+    VersionedTextDocumentIdentifier, WillRenameFilesRequest, WorkDoneProgressParams,
+    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticRequest, WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    WorkspaceFoldersInitializeParams,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -930,6 +932,15 @@ impl TestServer {
                 work_done_progress_params: WorkDoneProgressParams::default(),
             }),
         )
+    }
+
+    pub(crate) fn will_rename_files(
+        &mut self,
+        renames: Vec<lsp_types::FileRename>,
+    ) -> Option<WorkspaceEdit> {
+        self.send_request_await::<WillRenameFilesRequest>(lsp_types::RenameFilesParams {
+            files: renames,
+        })
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
