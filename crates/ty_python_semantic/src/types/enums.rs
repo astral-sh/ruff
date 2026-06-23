@@ -255,14 +255,23 @@ impl<'db> EnumClassLiteral<'db> {
         self.members(db).iter().map(|(name, _)| name)
     }
 
+    fn resolve_member_entry(self, db: &'db dyn Db, name: &Name) -> Option<&'db (Name, Type<'db>)> {
+        let members = self.members(db);
+        if let Some(member) = members.iter().find(|(member, _)| member == name) {
+            return Some(member);
+        }
+
+        let aliases = self.aliases(db);
+        let alias_index = aliases
+            .binary_search_by(|(alias, _)| alias.cmp(name))
+            .ok()?;
+        let canonical_name = &aliases[alias_index].1;
+        members.iter().find(|(member, _)| member == canonical_name)
+    }
+
     pub(crate) fn resolve_member(self, db: &'db dyn Db, name: &Name) -> Option<&'db Name> {
-        self.member_names(db)
-            .find(|member| *member == name)
-            .or_else(|| {
-                self.aliases(db)
-                    .iter()
-                    .find_map(|(alias, member)| (alias == name).then_some(member))
-            })
+        self.resolve_member_entry(db, name)
+            .map(|(member, _)| member)
     }
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
@@ -274,10 +283,8 @@ impl<'db> EnumClassLiteral<'db> {
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
-        let name = self.resolve_member(db, name)?;
-        self.members(db)
-            .iter()
-            .find_map(|(member, value_type)| (member == name).then_some(*value_type))
+        self.resolve_member_entry(db, name)
+            .map(|(_, value_type)| *value_type)
     }
 }
 
