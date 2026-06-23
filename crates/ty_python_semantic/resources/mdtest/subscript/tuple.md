@@ -326,7 +326,9 @@ def mixed_static_slices(
     reveal_type(t[:0:-2])  # revealed: tuple[S2, S0, *tuple[V | P1 | P2, ...]]
     reveal_type(t[-3:1:-2])  # revealed: tuple[S0, *tuple[V | P2, ...]]
 
-    reveal_type(t[-4:])  # revealed: tuple[P0 | P1 | P2 | V | S0 | S1 | S2, ...]
+    reveal_type(t[-4:])  # revealed: tuple[P2 | V, S0, S1, S2]
+    reveal_type(t[3::-1])  # revealed: tuple[V | S0, P2, P1, P0]
+    reveal_type(t[-1:-5:-1])  # revealed: tuple[S2, S1, S0, P2 | V]
     reveal_type(t[2147483647::-1])  # revealed: tuple[P0 | P1 | P2 | V | S0 | S1 | S2, ...]
 
 def homogeneous_static_slices(t: tuple[*tuple[V, ...]]) -> None:
