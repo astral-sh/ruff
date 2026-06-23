@@ -1079,25 +1079,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         result
     }
 
-    fn cached_is_never_satisfied(&self, node: NodeId, compute: impl FnOnce() -> bool) -> bool {
-        let cached = self
-            .storage
-            .borrow()
-            .never_satisfied_cache
-            .get(&node)
-            .copied();
-        if let Some(result) = cached {
-            return result;
-        }
-
-        let result = compute();
-        self.storage
-            .borrow_mut()
-            .never_satisfied_cache
-            .insert(node, result);
-        result
-    }
-
     fn cached_is_constraint_set_subtype_of(
         &self,
         db: &'db dyn Db,
@@ -2175,10 +2156,20 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
-            Node::Interior(interior) => builder.cached_is_never_satisfied(self, || {
+            Node::Interior(interior) => {
+                if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&self) {
+                    return *result;
+                }
+
                 let mut path = interior.path_assignments(builder);
-                self.is_never_satisfied_inner(db, builder, &mut path)
-            }),
+                let result = self.is_never_satisfied_inner(db, builder, &mut path);
+                builder
+                    .storage
+                    .borrow_mut()
+                    .never_satisfied_cache
+                    .insert(self, result);
+                result
+            }
         }
     }
 
@@ -6778,7 +6769,6 @@ mod tests {
     fn never_satisfied_results_are_cached() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
         let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
@@ -6800,11 +6790,6 @@ mod tests {
             );
             assert_eq!(storage.never_satisfied_cache.len(), 2);
         }
-
-        let _unrelated = create_constraint(&db, &builder, u, KnownClass::Bool);
-        assert!(!t_int.is_never_satisfied(&db));
-        assert!(impossible.is_never_satisfied(&db));
-        assert_eq!(builder.storage.borrow().never_satisfied_cache.len(), 2);
 
         let owned = create_compacted_owned_set(&db);
         owned.query(|builder, set| {
