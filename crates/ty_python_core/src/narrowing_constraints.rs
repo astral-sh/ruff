@@ -97,6 +97,17 @@ pub struct NarrowingConstraints {
 }
 
 impl NarrowingConstraints {
+    /// Creates a constraint graph from compacted interior nodes for use by downstream tests.
+    ///
+    /// The nodes must satisfy the same ordering and allocation invariants as graphs produced by
+    /// [`NarrowingConstraintsBuilder`].
+    pub fn from_test_nodes(nodes: Vec<InteriorNode>) -> Self {
+        Self {
+            used_interiors: nodes.into_boxed_slice(),
+            used_indices: None,
+        }
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.used_interiors.is_empty()
     }
