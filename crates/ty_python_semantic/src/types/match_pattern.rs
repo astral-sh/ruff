@@ -44,16 +44,6 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Bytearray.to_instance(db))
 }
 
-pub(crate) fn has_known_tuple_shape(db: &dyn Db, ty: Type<'_>) -> bool {
-    let resolved = ty.resolve_type_alias(db);
-    match resolved {
-        Type::Intersection(intersection) => intersection
-            .iter_positive(db)
-            .any(|positive| has_known_tuple_shape(db, positive)),
-        _ => resolved.exact_tuple_instance_spec(db).is_some(),
-    }
-}
-
 fn sequence_pattern_getitem_method<'db>(
     db: &'db dyn Db,
     indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
@@ -418,7 +408,7 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
         {
             Type::Never
         }
-        _ if has_known_tuple_shape(db, resolved) => {
+        _ if resolved.exact_tuple_instance_spec(db).is_some() => {
             pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), resolved)
         }
         // An irrefutable sequence pattern can only fail if the subject is not eligible for sequence

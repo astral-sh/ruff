@@ -15,10 +15,9 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, exact_sequence_pattern_type, has_known_tuple_shape,
-    infer_expression_types, mapping_pattern_type, pattern_binding_fallthrough_type,
-    pattern_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type,
+    UnionBuilder, callable_pattern_type, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_fallthrough_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -1105,19 +1104,6 @@ fn necessary_sequence_pattern_type<'db>(
     }
 }
 
-fn sequence_pattern_narrowing_type<'db>(
-    db: &'db dyn Db,
-    kind: &SequencePatternPredicateKind<'db>,
-    subject_ty: Type<'db>,
-) -> Type<'db> {
-    let resolved = subject_ty.resolve_type_alias(db);
-    if has_known_tuple_shape(db, resolved) {
-        necessary_sequence_pattern_type(db, kind)
-    } else {
-        sequence_pattern_type_builder(db).build()
-    }
-}
-
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -1668,9 +1654,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> PatternSuccessResult<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
         self.analyze_pattern_subject_arms(subject_ty, |analyzer, subject_ty| {
-            let sequence_ty = sequence_pattern_narrowing_type(analyzer.db, kind, subject_ty);
             let (narrowed_subject_ty, element_types) =
-                analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
+                analyzer.sequence_pattern_arm(subject_ty, target_len)?;
             let mut bindings = BTreeMap::new();
             let mut matched_element_types = Vec::with_capacity(kind.patterns.len());
             let mut binding_element_types = Vec::with_capacity(kind.patterns.len());
@@ -1770,9 +1755,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         &self,
         subject_ty: Type<'db>,
         target_len: TupleLength,
-        sequence_ty: Type<'db>,
     ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
-        let narrowed_subject_ty = self.intersect_types(subject_ty, sequence_ty);
+        let narrowed_subject_ty =
+            self.intersect_types(subject_ty, sequence_pattern_type_builder(self.db).build());
         if narrowed_subject_ty.is_never() {
             return None;
         }
@@ -2078,10 +2063,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     Self::narrow_type_by_sequence_pattern(db, *element, kind)
                 })
             }
-            _ => IntersectionBuilder::new(db)
-                .add_positive(resolved)
-                .add_positive(sequence_pattern_narrowing_type(db, kind, resolved))
-                .build(),
+            _ => {
+                let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
+                    necessary_sequence_pattern_type(db, kind)
+                } else {
+                    sequence_pattern_type_builder(db).build()
+                };
+                IntersectionBuilder::new(db)
+                    .add_positive(resolved)
+                    .add_positive(sequence_ty)
+                    .build()
+            }
         };
 
         if narrowed == resolved { ty } else { narrowed }
