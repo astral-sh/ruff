@@ -16,7 +16,6 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
@@ -694,25 +693,18 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
             TupleLength::Variable(prefix, suffix) => {
                 // The number of rhs values that will be consumed by the starred target.
-                let Some(middle_end) = self.len().checked_sub(suffix) else {
+                let Some(variable) = self.len().checked_sub(prefix + suffix) else {
                     return Err(ResizeTupleError::TooFewValues);
                 };
-                if middle_end < prefix {
-                    return Err(ResizeTupleError::TooFewValues);
-                }
 
                 // Extract rhs values into the prefix, then into the starred target, then into the
                 // suffix.
-                let elements = self.elements_slice();
-                let variable = UnionType::from_elements_leave_aliases(
-                    db,
-                    elements[prefix..middle_end].iter().copied(),
-                );
-                Ok(VariableLengthTuple::mixed(
-                    elements[..prefix].iter().copied(),
-                    variable,
-                    elements[middle_end..].iter().copied(),
-                ))
+                let mut elements = self.iter_all_elements();
+                let prefix: Vec<_> = elements.by_ref().take(prefix).collect();
+                let variable =
+                    UnionType::from_elements_leave_aliases(db, elements.by_ref().take(variable));
+                let suffix = elements.by_ref().take(suffix);
+                Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
         }
     }
@@ -2109,75 +2101,6 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    /// Resizes a formal tuple (`self`) and an actual tuple to compatible shapes for generic
-    /// inference.
-    pub(crate) fn resize_for_inference<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        actual: &'a Self,
-    ) -> Option<(Cow<'a, Self>, Cow<'a, Self>)> {
-        if let Tuple::Variable(formal) = self
-            && let Type::TypeVar(typevartuple) = formal.variable()
-            && typevartuple.is_typevartuple(db)
-        {
-            let formal_prefix_len = formal.prefix_elements().len();
-            let formal_suffix_len = formal.suffix_elements().len();
-            let actual = match actual {
-                Tuple::Fixed(actual) => {
-                    let middle_end = actual.len().checked_sub(formal_suffix_len)?;
-                    if middle_end < formal_prefix_len {
-                        return None;
-                    }
-
-                    let elements = actual.elements_slice();
-                    VariableLengthTuple::mixed(
-                        elements[..formal_prefix_len].iter().copied(),
-                        Type::heterogeneous_tuple(
-                            db,
-                            elements[formal_prefix_len..middle_end].iter().copied(),
-                        ),
-                        elements[middle_end..].iter().copied(),
-                    )
-                }
-                Tuple::Variable(actual) => {
-                    let actual_prefix = actual.prefix_elements();
-                    let actual_suffix = actual.suffix_elements();
-                    if actual_prefix.len() < formal_prefix_len
-                        || actual_suffix.len() < formal_suffix_len
-                    {
-                        return None;
-                    }
-
-                    let suffix_start = actual_suffix.len() - formal_suffix_len;
-                    VariableLengthTuple::mixed(
-                        actual_prefix[..formal_prefix_len].iter().copied(),
-                        Type::tuple(TupleType::mixed(
-                            db,
-                            actual_prefix[formal_prefix_len..].iter().copied(),
-                            actual.variable(),
-                            actual_suffix[..suffix_start].iter().copied(),
-                        )),
-                        actual_suffix[suffix_start..].iter().copied(),
-                    )
-                }
-            };
-            return Some((Cow::Borrowed(self), Cow::Owned(actual)));
-        }
-
-        let length = self.len().most_precise(actual.len())?;
-        let formal = if self.len() == length {
-            Cow::Borrowed(self)
-        } else {
-            Cow::Owned(self.resize(db, length).ok()?)
-        };
-        let actual = if actual.len() == length {
-            Cow::Borrowed(actual)
-        } else {
-            Cow::Owned(actual.resize(db, length).ok()?)
-        };
-        Some((formal, actual))
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -2774,49 +2697,5 @@ impl<'db> From<&TupleSpec<'db>> for TupleSpecBuilder<'db> {
                 suffix: variable.suffix_elements().to_vec(),
             },
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::tests::setup_db;
-    use crate::types::typevar::{TypeVarIdentity, TypeVarInstance};
-    use crate::types::{BindingContext, TypeVarKind, TypeVarNonce};
-    use ruff_python_ast::name::Name;
-
-    #[test]
-    fn resize_for_inference_packs_typevartuple_middle() {
-        let db = setup_db();
-        let identity = TypeVarIdentity::new(
-            &db,
-            Name::new_static("Ts"),
-            None,
-            TypeVarKind::Pep695TypeVarTuple,
-        );
-        let typevartuple = BoundTypeVarInstance::new(
-            &db,
-            TypeVarInstance::new(&db, identity, None, None, None),
-            BindingContext::Synthetic,
-            None,
-            TypeVarNonce::NONE,
-        );
-        let formal = VariableLengthTuple::mixed([], Type::TypeVar(typevartuple), []);
-        let actual =
-            VariableLengthTuple::mixed([Type::object()], Type::unknown(), [Type::literal_string()]);
-
-        let Some((_, resized)) = formal.resize_for_inference(&db, &actual) else {
-            panic!("expected the tuples to be compatible for inference");
-        };
-        let Tuple::Variable(resized) = resized.as_ref() else {
-            panic!("expected a variable-length tuple");
-        };
-
-        assert!(resized.prefix_elements().is_empty());
-        assert!(resized.suffix_elements().is_empty());
-        let Some(packed) = resized.variable().exact_tuple_instance_spec(&db) else {
-            panic!("expected the variable element to be a tuple instance");
-        };
-        assert_eq!(packed.as_ref(), &actual);
     }
 }

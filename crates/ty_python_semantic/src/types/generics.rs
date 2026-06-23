@@ -3150,13 +3150,80 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     formal.tuple_instance_spec(self.db),
                     actual_nominal.tuple_spec(self.db),
                 ) {
-                    let Some((formal_tuple, actual_tuple)) = formal_tuple
-                        .as_ref()
-                        .resize_for_inference(self.db, actual_tuple.as_ref())
+                    if let TupleSpec::Variable(formal_variable) = formal_tuple.as_ref()
+                        && let Type::TypeVar(typevartuple) = formal_variable.variable()
+                        && typevartuple.is_typevartuple(self.db)
+                    {
+                        let formal_prefix_len = formal_variable.prefix_elements().len();
+                        let formal_suffix_len = formal_variable.suffix_elements().len();
+                        let (actual_prefix, packed, actual_suffix) = match actual_tuple.as_ref() {
+                            TupleSpec::Fixed(actual) => {
+                                let Some(middle_end) = actual.len().checked_sub(formal_suffix_len)
+                                else {
+                                    return Ok(());
+                                };
+                                if middle_end < formal_prefix_len {
+                                    return Ok(());
+                                }
+
+                                let elements = actual.elements_slice();
+                                (
+                                    &elements[..formal_prefix_len],
+                                    Type::heterogeneous_tuple(
+                                        self.db,
+                                        elements[formal_prefix_len..middle_end].iter().copied(),
+                                    ),
+                                    &elements[middle_end..],
+                                )
+                            }
+                            TupleSpec::Variable(actual) => {
+                                let actual_prefix_elements = actual.prefix_elements();
+                                let actual_suffix_elements = actual.suffix_elements();
+                                if actual_prefix_elements.len() < formal_prefix_len
+                                    || actual_suffix_elements.len() < formal_suffix_len
+                                {
+                                    return Ok(());
+                                }
+
+                                let suffix_start = actual_suffix_elements.len() - formal_suffix_len;
+                                (
+                                    &actual_prefix_elements[..formal_prefix_len],
+                                    Type::tuple(TupleType::mixed(
+                                        self.db,
+                                        actual_prefix_elements[formal_prefix_len..].iter().copied(),
+                                        actual.variable(),
+                                        actual_suffix_elements[..suffix_start].iter().copied(),
+                                    )),
+                                    &actual_suffix_elements[suffix_start..],
+                                )
+                            }
+                        };
+                        let variance = TypeVarVariance::Covariant.compose(polarity);
+                        for (formal_element, actual_element) in
+                            formal_variable.prefix_elements().iter().zip(actual_prefix)
+                        {
+                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        }
+                        for (formal_element, actual_element) in
+                            formal_variable.suffix_elements().iter().zip(actual_suffix)
+                        {
+                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        }
+                        self.add_type_mapping(typevartuple, packed, variance);
+                        return Ok(());
+                    }
+
+                    let Some(most_precise_length) =
+                        formal_tuple.len().most_precise(actual_tuple.len())
                     else {
                         return Ok(());
                     };
-
+                    let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
                     for (formal_element, actual_element) in formal_tuple
                         .all_elements()
                         .iter()
