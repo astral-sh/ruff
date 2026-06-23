@@ -1006,11 +1006,6 @@ enum FixedPositionSlice {
         exclusive_stop: usize,
         step: NonZeroUsize,
     },
-    FrontBackward {
-        start: usize,
-        exclusive_stop: Option<usize>,
-        step: NonZeroUsize,
-    },
     Back {
         start: usize,
         exclusive_stop: usize,
@@ -1059,6 +1054,16 @@ enum VariableTupleSlicePlan {
     Homogeneous,
 }
 
+/// The direction of a static slice into a variable-length tuple.
+///
+/// Backward slices are planned as forward slices over a reversed tuple, so that there is only one
+/// mixed-tuple slice planner.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TupleSliceDirection {
+    Forward,
+    Backward,
+}
+
 impl FixedSlice {
     fn prefix(start: Option<usize>, stop: Option<usize>, step: NonZeroI32) -> Self {
         Self {
@@ -1096,14 +1101,6 @@ impl<'db> VariableTupleSlice<'db> for FixedSlice {
 impl FixedPositionSlice {
     fn front_forward(start: usize, stop: usize, step: NonZeroUsize) -> Self {
         Self::FrontForward {
-            start,
-            exclusive_stop: stop,
-            step,
-        }
-    }
-
-    fn front_backward(start: usize, stop: Option<usize>, step: NonZeroUsize) -> Self {
-        Self::FrontBackward {
             start,
             exclusive_stop: stop,
             step,
@@ -1209,6 +1206,35 @@ impl VariableTupleSlicePlan {
     }
 }
 
+impl TupleSliceDirection {
+    fn from_step(step: NonZeroI32) -> Self {
+        if step.get() > 0 {
+            Self::Forward
+        } else {
+            Self::Backward
+        }
+    }
+
+    fn positive_step(self, step: NonZeroI32) -> NonZeroI32 {
+        match self {
+            TupleSliceDirection::Forward => step,
+            // `i32::MIN.abs()` cannot be represented as `i32`; saturating is enough for the
+            // finite fixed segments we model exactly, and leaves the variable segment approximate.
+            TupleSliceDirection::Backward => NonZeroI32::new(step.get().saturating_abs())
+                .expect("a non-zero step has a non-zero absolute value"),
+        }
+    }
+
+    fn reverse_index(index: i32) -> i32 {
+        let reversed = -i64::from(index) - 1;
+        i32::try_from(reversed).expect("reversing an i32 slice index produces another i32")
+    }
+
+    fn reverse_bound(bound: Option<i32>) -> Option<i32> {
+        bound.map(Self::reverse_index)
+    }
+}
+
 impl<'db> VariableLengthTuple<Type<'db>> {
     fn slice<'a, S>(&'a self, db: &'db dyn Db, slice: S) -> impl Iterator<Item = Type<'db>> + 'a
     where
@@ -1260,26 +1286,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 exclusive_stop,
                 step,
             } => Either::Left(self.slice_front_forward(db, start, exclusive_stop, step)),
-            FixedPositionSlice::FrontBackward {
-                start,
-                exclusive_stop,
-                step,
-            } => Either::Right(Either::Left(self.slice_front_backward(
-                db,
-                start,
-                exclusive_stop,
-                step,
-            ))),
             FixedPositionSlice::Back {
                 start,
                 exclusive_stop,
                 step,
-            } => Either::Right(Either::Right(self.slice_back(
-                db,
-                start,
-                exclusive_stop,
-                step,
-            ))),
+            } => Either::Right(self.slice_back(db, start, exclusive_stop, step)),
         }
     }
 
@@ -1302,37 +1313,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     )
                 })
             })
-    }
-
-    fn slice_front_backward<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        start: usize,
-        exclusive_stop: Option<usize>,
-        step: NonZeroUsize,
-    ) -> impl Iterator<Item = Type<'db>> + 'a
-    where
-        'db: 'a,
-    {
-        let mut next_index = Some(start);
-        std::iter::from_fn(move || {
-            let index = next_index?;
-            if exclusive_stop.is_some_and(|stop| index <= stop) {
-                next_index = None;
-                return None;
-            }
-
-            let element = self
-                .type_at_nonnegative_index(db, index)
-                .unwrap_or_else(|| {
-                    unreachable!(
-                        "front-origin fixed slice positions are validated during plan construction"
-                    )
-                });
-
-            next_index = index.checked_sub(step.get());
-            Some(element)
-        })
     }
 
     fn slice_back<'a>(
@@ -1379,6 +1359,14 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         })
     }
 
+    fn reversed(&self) -> Self {
+        Self::new(
+            self.iter_suffix_elements().rev(),
+            self.variable(),
+            self.iter_prefix_elements().rev(),
+        )
+    }
+
     /// Returns a sound static slice result for a mixed tuple.
     ///
     /// We preserve fixed-length results exactly, unioning each output position when it can come
@@ -1397,24 +1385,28 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             return Err(StepSizeZeroError);
         };
 
-        Ok(self.py_slice_plan(start, stop, step).into_type(db, self))
-    }
-
-    fn py_slice_plan(
-        &self,
-        start: Option<i32>,
-        stop: Option<i32>,
-        step: NonZeroI32,
-    ) -> VariableTupleSlicePlan {
         if start.is_some() && start == stop {
-            return VariableTupleSlicePlan::Empty;
+            return Ok(VariableTupleSlicePlan::Empty.into_type(db, self));
         }
 
-        if step.get() > 0 {
-            self.forward_slice_plan(start, stop, step)
-        } else {
-            self.backward_slice_plan(start, stop, step)
-        }
+        let direction = TupleSliceDirection::from_step(step);
+        let step = direction.positive_step(step);
+
+        Ok(match direction {
+            TupleSliceDirection::Forward => self
+                .forward_slice_plan(start, stop, step)
+                .into_type(db, self),
+            TupleSliceDirection::Backward => {
+                let reversed = self.reversed();
+                reversed
+                    .forward_slice_plan(
+                        TupleSliceDirection::reverse_bound(start),
+                        TupleSliceDirection::reverse_bound(stop),
+                        step,
+                    )
+                    .into_type(db, &reversed)
+            }
+        })
     }
 
     fn forward_slice_plan(
@@ -1436,44 +1428,23 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         stop: Option<i32>,
         step: NonZeroI32,
     ) -> Option<VariableTupleSlicePlan> {
+        debug_assert!(step.get() > 0);
         let minimum_len = self.len().minimum();
 
-        if step.get() > 0 {
-            if let Some(stop) = Self::nonnegative_slice_index(stop)
-                && let Some(start) = Self::front_start_index(start)
-            {
-                if start >= stop {
-                    return Some(VariableTupleSlicePlan::Empty);
-                }
-
-                if let Ok(step_usize) = usize::try_from(step.get())
-                    && let Some(nonzero_step) = NonZeroUsize::new(step_usize)
-                    && Self::last_forward_slice_index(start, stop, nonzero_step)
-                        .is_some_and(|last| last < minimum_len)
-                {
-                    return Some(VariableTupleSlicePlan::Fixed(
-                        FixedPositionSlice::front_forward(start, stop, nonzero_step),
-                    ));
-                }
-            }
-
-            return None;
-        }
-
-        if let Some(start) = Self::nonnegative_slice_index(start) {
-            let stop = match stop {
-                None => None,
-                Some(_) => Some(Self::nonnegative_slice_index(stop)?),
-            };
-
-            if stop.is_some_and(|stop| start <= stop) {
+        if let Some(stop) = Self::nonnegative_slice_index(stop)
+            && let Some(start) = Self::front_start_index(start)
+        {
+            if start >= stop {
                 return Some(VariableTupleSlicePlan::Empty);
             }
 
-            if start < minimum_len {
-                let step = NonZeroUsize::new(step.get().unsigned_abs() as usize)?;
+            if let Ok(step_usize) = usize::try_from(step.get())
+                && let Some(nonzero_step) = NonZeroUsize::new(step_usize)
+                && Self::last_forward_slice_index(start, stop, nonzero_step)
+                    .is_some_and(|last| last < minimum_len)
+            {
                 return Some(VariableTupleSlicePlan::Fixed(
-                    FixedPositionSlice::front_backward(start, stop, step),
+                    FixedPositionSlice::front_forward(start, stop, nonzero_step),
                 ));
             }
         }
@@ -1487,52 +1458,27 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         stop: Option<i32>,
         step: NonZeroI32,
     ) -> Option<VariableTupleSlicePlan> {
+        debug_assert!(step.get() > 0);
         let minimum_len = self.len().minimum();
 
-        if step.get() > 0 {
-            let start_distance = Self::distance_from_end(start?)?;
-            let stop_distance = match stop {
-                None => Some(0),
-                Some(stop) => Self::distance_from_end(stop),
-            };
+        let start_distance = Self::distance_from_end(start?)?;
+        let stop_distance = match stop {
+            None => Some(0),
+            Some(stop) => Self::distance_from_end(stop),
+        };
 
-            if let Some(stop_distance) = stop_distance {
-                if start_distance <= stop_distance {
-                    return Some(VariableTupleSlicePlan::Empty);
-                }
-
-                if start_distance <= minimum_len {
-                    return Some(VariableTupleSlicePlan::Fixed(FixedPositionSlice::back(
-                        start_distance,
-                        stop_distance,
-                        step,
-                    )));
-                }
+        if let Some(stop_distance) = stop_distance {
+            if start_distance <= stop_distance {
+                return Some(VariableTupleSlicePlan::Empty);
             }
 
-            return None;
-        }
-
-        let start_distance = match start {
-            None => Some(1),
-            Some(start) => Self::distance_from_end(start),
-        }?;
-        let stop_distance = Self::distance_from_end(stop?)?;
-
-        if start_distance >= stop_distance {
-            return Some(VariableTupleSlicePlan::Empty);
-        }
-
-        let step_abs = step.get().unsigned_abs() as usize;
-        if let Some(nonzero_step) = NonZeroUsize::new(step_abs)
-            && Self::last_forward_slice_index(start_distance, stop_distance, nonzero_step)
-                .is_some_and(|last| last <= minimum_len)
-        {
-            return Some(VariableTupleSlicePlan::Fixed(FixedPositionSlice::back(
-                start_distance,
-                stop_distance,
-                step,
-            )));
+            if start_distance <= minimum_len {
+                return Some(VariableTupleSlicePlan::Fixed(FixedPositionSlice::back(
+                    start_distance,
+                    stop_distance,
+                    step,
+                )));
+            }
         }
 
         None
@@ -1548,22 +1494,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         let first_start = self.len().minimum().saturating_sub(start_distance);
 
         (first_start >= stop).then_some(VariableTupleSlicePlan::Empty)
-    }
-
-    fn backward_empty_slice_plan(
-        &self,
-        start: Option<i32>,
-        stop: Option<i32>,
-    ) -> Option<VariableTupleSlicePlan> {
-        let start = Self::nonnegative_slice_index(start)?;
-        let stop_distance = Self::distance_from_end(stop?)?;
-        if stop_distance == 1 {
-            return Some(VariableTupleSlicePlan::Empty);
-        }
-
-        let first_stop = self.len().minimum().checked_sub(stop_distance)?;
-
-        (start <= first_stop).then_some(VariableTupleSlicePlan::Empty)
     }
 
     fn mixed_forward_slice_plan(
@@ -1728,133 +1658,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             fixed_suffix: (stop.allows_fixed_suffix() && fixed_suffix_start < suffix_stop)
                 .then(|| FixedSlice::suffix(Some(fixed_suffix_start), Some(suffix_stop), step)),
         }
-    }
-
-    fn mixed_backward_slice_plan(
-        &self,
-        start: Option<i32>,
-        stop: Option<i32>,
-        step: NonZeroI32,
-    ) -> Option<VariableTupleSlicePlan> {
-        let step_value = step.get();
-        let suffix_start = match start {
-            None => None,
-            Some(start) => {
-                if let Some(suffix_start) = self.suffix_slice_index(Some(start)) {
-                    Some(suffix_start)
-                } else if Self::distance_from_end(start)
-                    .is_some_and(|distance| distance > self.suffix_len())
-                {
-                    return self.mixed_backward_from_variable_slice_plan(stop);
-                } else {
-                    return None;
-                }
-            }
-        };
-
-        if stop
-            .and_then(Self::distance_from_end)
-            .is_some_and(|distance| distance > self.len().minimum())
-        {
-            return Some(VariableTupleSlicePlan::Mixed {
-                fixed_prefix: Some(FixedSlice::suffix(
-                    suffix_start.and_then(|start| usize::try_from(start).ok()),
-                    None,
-                    step,
-                )),
-                variable: VariableSlice {
-                    include_variable: true,
-                    prefix_start: 0,
-                    prefix_stop: self.prefix_len(),
-                    suffix_start: 0,
-                    suffix_stop: 0,
-                },
-                fixed_suffix: None,
-            });
-        }
-
-        let prefix_stop = match stop {
-            None => None,
-            Some(stop) if stop >= 0 => Some(Self::nonnegative_slice_index(Some(stop))?),
-            Some(_) => return None,
-        };
-
-        if step_value == -1 && prefix_stop.is_none_or(|stop| stop < self.prefix_len()) {
-            return Some(VariableTupleSlicePlan::Mixed {
-                fixed_prefix: Some(FixedSlice::suffix(
-                    suffix_start.and_then(|start| usize::try_from(start).ok()),
-                    None,
-                    step,
-                )),
-                variable: VariableSlice::variable_only(),
-                fixed_suffix: Some(FixedSlice::prefix(None, prefix_stop, step)),
-            });
-        }
-
-        let suffix_stop = prefix_stop
-            .filter(|stop| *stop >= self.prefix_len())
-            .map(|stop| stop - self.prefix_len());
-        let suffix_union_stop = suffix_stop.map_or(0, |stop| stop.saturating_add(1));
-
-        Some(VariableTupleSlicePlan::Mixed {
-            fixed_prefix: Some(FixedSlice::suffix(
-                suffix_start.and_then(|start| usize::try_from(start).ok()),
-                suffix_stop,
-                step,
-            )),
-            variable: VariableSlice {
-                include_variable: true,
-                prefix_start: prefix_stop.map_or(0, |stop| stop.saturating_add(1)),
-                prefix_stop: self.prefix_len(),
-                suffix_start: 0,
-                suffix_stop: suffix_union_stop,
-            },
-            fixed_suffix: None,
-        })
-    }
-
-    fn mixed_backward_from_variable_slice_plan(
-        &self,
-        stop: Option<i32>,
-    ) -> Option<VariableTupleSlicePlan> {
-        let prefix_stop = match stop {
-            None => None,
-            Some(stop) if stop >= 0 => Some(Self::nonnegative_slice_index(Some(stop))?),
-            Some(stop) => {
-                if Self::distance_from_end(stop)
-                    .is_some_and(|distance| distance > self.len().minimum())
-                {
-                    None
-                } else {
-                    return None;
-                }
-            }
-        };
-
-        Some(VariableTupleSlicePlan::Mixed {
-            fixed_prefix: None,
-            variable: VariableSlice {
-                include_variable: true,
-                prefix_start: prefix_stop.map_or(0, |stop| stop.saturating_add(1)),
-                prefix_stop: self.prefix_len(),
-                suffix_start: 0,
-                suffix_stop: 0,
-            },
-            fixed_suffix: None,
-        })
-    }
-
-    fn backward_slice_plan(
-        &self,
-        start: Option<i32>,
-        stop: Option<i32>,
-        step: NonZeroI32,
-    ) -> VariableTupleSlicePlan {
-        self.fixed_front_slice_plan(start, stop, step)
-            .or_else(|| self.fixed_back_slice_plan(start, stop, step))
-            .or_else(|| self.backward_empty_slice_plan(start, stop))
-            .or_else(|| self.mixed_backward_slice_plan(start, stop, step))
-            .unwrap_or(VariableTupleSlicePlan::Homogeneous)
     }
 
     fn nonnegative_slice_index(index: Option<i32>) -> Option<usize> {
