@@ -1507,6 +1507,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::Union(union), _) => {
+                if let Some(supertype) = union.common_literal_supertype(db) {
+                    // Use the broader supertype only as a positive proof. If it has the requested
+                    // relation to the target, then every literal in the union does too. Otherwise,
+                    // check each literal individually.
+                    let supertype_result = self
+                        .without_context_collection(|| self.check_type_pair(db, supertype, target));
+                    if supertype_result.is_always_satisfied(db) {
+                        return supertype_result;
+                    }
+                }
+
                 union
                     .elements(db)
                     .iter()
