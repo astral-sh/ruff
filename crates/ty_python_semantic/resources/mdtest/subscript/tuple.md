@@ -302,14 +302,14 @@ def mixed_static_slices(
     reveal_type(t[:2])  # revealed: tuple[P0, P1]
     reveal_type(t[:3])  # revealed: tuple[P0, P1, V | S0]
     reveal_type(t[:5])  # revealed: tuple[P0, P1, V | S0, V | S0 | S1, V | S0 | S1 | S2]
-    reveal_type(t[:6])  # revealed: tuple[P0 | P1 | V | S0 | S1 | S2, ...]
+    reveal_type(t[:6])  # revealed: tuple[P0, P1, *tuple[V | S0 | S1 | S2, ...]]
     reveal_type(t[:-3])  # revealed: tuple[P0, P1, *tuple[V, ...]]
     reveal_type(t[:-1])  # revealed: tuple[P0, P1, *tuple[V, ...], S0, S1]
 
     reveal_type(t[0:])  # revealed: tuple[P0, P1, *tuple[V, ...], S0, S1, S2]
     reveal_type(t[1:])  # revealed: tuple[P1, *tuple[V, ...], S0, S1, S2]
     reveal_type(t[2:])  # revealed: tuple[*tuple[V, ...], S0, S1, S2]
-    reveal_type(t[3:])  # revealed: tuple[V | S0 | S1 | S2, ...]
+    reveal_type(t[3:])  # revealed: tuple[*tuple[V | S0, ...], S1, S2]
     reveal_type(t[-3:])  # revealed: tuple[S0, S1, S2]
     reveal_type(t[-1:])  # revealed: tuple[S2]
 
@@ -321,7 +321,7 @@ def mixed_static_slices(
     reveal_type(t[3:5])  # revealed: tuple[V | S0 | S1, V | S0 | S1 | S2]
     reveal_type(t[5:2])  # revealed: tuple[()]
     reveal_type(t[-3:-1])  # revealed: tuple[S0, S1]
-    reveal_type(t[-2:100])  # revealed: tuple[P0 | P1 | V | S0 | S1 | S2, ...]
+    reveal_type(t[-2:100])  # revealed: tuple[S1 | S2, ...]
     reveal_type(t[-1:1])  # revealed: tuple[()]
 
     reveal_type(t[0:2:2])  # revealed: tuple[P0]
@@ -336,7 +336,7 @@ def mixed_static_slices(
     reveal_type(t[::-1])  # revealed: tuple[S2, S1, S0, *tuple[V, ...], P1, P0]
     reveal_type(t[:0:-1])  # revealed: tuple[S2, S1, S0, *tuple[V, ...], P1]
     reveal_type(t[:1:-1])  # revealed: tuple[S2, S1, S0, *tuple[V, ...]]
-    reveal_type(t[:2:-1])  # revealed: tuple[P0 | P1 | V | S0 | S1 | S2, ...]
+    reveal_type(t[:2:-1])  # revealed: tuple[S2, S1, *tuple[V | S0, ...]]
     reveal_type(t[2147483647::-1])  # revealed: tuple[P0 | P1 | V | S0 | S1 | S2, ...]
     reveal_type(t[::-2])  # revealed: tuple[S2, S0, *tuple[V | P0 | P1, ...]]
     reveal_type(t[:0:-2])  # revealed: tuple[S2, S0, *tuple[V | P1, ...]]
@@ -353,7 +353,7 @@ def mixed_static_slices(
 def homogeneous_static_slices(t: tuple[*tuple[V, ...]]) -> None:
     reveal_type(t[:])  # revealed: tuple[V, ...]
     reveal_type(t[1:])  # revealed: tuple[V, ...]
-    reveal_type(t[-1:-1])  # revealed: tuple[V, ...]
+    reveal_type(t[-1:-1])  # revealed: tuple[()]
     reveal_type(t[::2])  # revealed: tuple[V, ...]
     reveal_type(t[::-1])  # revealed: tuple[V, ...]
 
@@ -361,11 +361,11 @@ def prefix_only_static_slices(t: tuple[P0, *tuple[V, ...]]) -> None:
     reveal_type(t[:])  # revealed: tuple[P0, *tuple[V, ...]]
     reveal_type(t[1:])  # revealed: tuple[V, ...]
     reveal_type(t[:-1])  # revealed: tuple[P0 | V, ...]
-    reveal_type(t[:2])  # revealed: tuple[P0 | V, ...]
+    reveal_type(t[:2])  # revealed: tuple[P0, *tuple[V, ...]]
     reveal_type(t[::2])  # revealed: tuple[P0, *tuple[V, ...]]
     reveal_type(t[::-1])  # revealed: tuple[*tuple[V, ...], P0]
     reveal_type(t[:0:-1])  # revealed: tuple[V, ...]
-    reveal_type(t[:1:-1])  # revealed: tuple[P0 | V, ...]
+    reveal_type(t[:1:-1])  # revealed: tuple[V, ...]
 
 def suffix_only_static_slices(t: tuple[*tuple[V, ...], S0]) -> None:
     reveal_type(t[:])  # revealed: tuple[*tuple[V, ...], S0]
@@ -375,7 +375,7 @@ def suffix_only_static_slices(t: tuple[*tuple[V, ...], S0]) -> None:
     reveal_type(t[::2])  # revealed: tuple[V | S0, ...]
     reveal_type(t[::-1])  # revealed: tuple[S0, *tuple[V, ...]]
     reveal_type(t[-1::-1])  # revealed: tuple[S0, *tuple[V, ...]]
-    reveal_type(t[:-2:-1])  # revealed: tuple[V | S0, ...]
+    reveal_type(t[:-2:-1])  # revealed: tuple[S0]
 ```
 
 ## Indexes into homogeneous and mixed tuples
