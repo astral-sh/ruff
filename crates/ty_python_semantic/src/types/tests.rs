@@ -50,7 +50,7 @@ fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
         .expect("a specialized `list` should be a generic alias")
 }
 
-fn oscillating_generic_alias_cycle_recover<'db>(
+fn oscillating_type_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
     previous: &Type<'db>,
@@ -61,7 +61,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 
 #[salsa::tracked(
     cycle_initial=|_, id| Type::divergent(id),
-    cycle_fn=oscillating_generic_alias_cycle_recover,
+    cycle_fn=oscillating_type_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
     let previous = oscillating_generic_alias(db);
@@ -74,6 +74,22 @@ fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
     };
 
     list_alias(db, argument).into()
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, id| Type::divergent(id),
+    cycle_fn=oscillating_type_cycle_recover,
+)]
+fn oscillating_protocol(db: &dyn Db) -> Type<'_> {
+    let previous = oscillating_protocol(db);
+    let int_protocol =
+        KnownClass::Iterable.to_specialized_instance(db, &[KnownClass::Int.to_instance(db)]);
+
+    if previous == int_protocol {
+        KnownClass::Iterable.to_specialized_instance(db, &[KnownClass::Str.to_instance(db)])
+    } else {
+        int_protocol
+    }
 }
 
 #[test]
@@ -99,6 +115,22 @@ fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
         int.merge_cycle_recovery(&db, list_alias(&db, unknown_generic))
             .is_none()
     );
+}
+
+#[test]
+fn protocol_cycle_recovery_widens_unrelated_specializations() {
+    let db = setup_db();
+    let int_protocol =
+        KnownClass::Iterable.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let str_protocol =
+        KnownClass::Iterable.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+    let Type::Union(result) = oscillating_protocol(&db) else {
+        panic!("cycle recovery should widen both protocol specializations");
+    };
+
+    assert_eq!(result.elements(&db).len(), 2);
+    assert!(result.elements(&db).contains(&int_protocol));
+    assert!(result.elements(&db).contains(&str_protocol));
 }
 
 #[test]

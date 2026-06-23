@@ -1354,6 +1354,7 @@ impl<'db> Type<'db> {
         div: Self,
     ) -> Option<Self> {
         let current_class = current.class(db);
+        let original = Type::instance(db, current_class);
         let alias = current_class.into_generic_alias()?;
         let original_specialization = alias.specialization(db);
         let specialization = original_specialization.apply_type_mapping(
@@ -1367,7 +1368,6 @@ impl<'db> Type<'db> {
             db,
             ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization)),
         );
-        let original = Type::NominalInstance(current);
 
         if let Type::Union(wrapped_union) = wrapped {
             normalized =
