@@ -602,10 +602,11 @@ fn class_uses_standard_flag_method(
     enum_class: EnumClassLiteral<'_>,
     name: &str,
 ) -> bool {
-    let is_copied_onto_concrete_flag = matches!(
-        name,
-        "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
-    );
+    let is_copied_onto_concrete_flag = Program::get(db).python_version(db) >= PythonVersion::PY311
+        && matches!(
+            name,
+            "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
+        );
     match enum_class.class_literal(db) {
         ClassLiteral::Static(class) if is_copied_onto_concrete_flag => {
             custom_enum_method(db, class.body_scope(db), name).is_none()

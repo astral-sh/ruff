@@ -2324,7 +2324,28 @@ class CustomOperator(Flag):
         return "custom"
 
 reveal_type(CustomOperator.A | CustomOperator.A)  # revealed: str
+```
 
+On Python 3.11 and later, `EnumMeta` replaces inherited operator overrides with the standard `Flag`
+implementations on concrete Flag classes:
+
+```py
+class ModernOperatorBase(Flag):
+    # error: [invalid-method-override]
+    def __or__(self, other: "ModernOperatorBase") -> str:
+        return "custom"
+
+class CopiedOperator(ModernOperatorBase):
+    A = 1
+    B = 2
+    AB = 3
+
+reveal_type(CopiedOperator.A | CopiedOperator.B)  # revealed: Literal[CopiedOperator.AB]
+```
+
+A custom metaclass `__call__` also controls results that the standard Flag methods construct:
+
+```py
 class CallingMeta(EnumMeta):
     def __call__(cls, *args: Any, **kwargs: Any) -> Any:
         return "custom"
@@ -2437,7 +2458,7 @@ reveal_type(LegacyIntFlag(-2))  # revealed: LegacyIntFlag
 reveal_type(~LegacyIntFlag.A)  # revealed: LegacyIntFlag
 ```
 
-## Flag members before Python 3.11
+## Flag behavior before Python 3.11
 
 Before Python 3.11, class iteration includes every non-alias `Flag` name, including zero and
 composite values. Inversion uses that member set.
@@ -2459,6 +2480,22 @@ class LegacyMembers(Flag):
 # revealed: tuple[Literal["ZERO"], Literal["A"], Literal["AB"]]
 reveal_type(enum_members(LegacyMembers))
 reveal_type(~LegacyMembers.ZERO)  # revealed: Literal[LegacyMembers.AB]
+```
+
+Before Python 3.11, inherited operators are not replaced with the standard `Flag` implementations:
+
+```py
+class OperatorBase(Flag):
+    # error: [invalid-method-override]
+    def __or__(self, other: "OperatorBase") -> str:
+        return "custom"
+
+class InheritedOperator(OperatorBase):
+    A = 1
+    B = 2
+    AB = 3
+
+reveal_type(InheritedOperator.A | InheritedOperator.B)  # revealed: str
 ```
 
 ## Function syntax
