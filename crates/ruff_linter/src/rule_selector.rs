@@ -89,17 +89,18 @@ impl Hash for UnresolvedRuleSelector {
 }
 
 impl UnresolvedRuleSelector {
-    pub fn resolve(&self, _preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
+    pub fn resolve(
+        &self,
+        setting: &'static str,
+        _preview: PreviewMode,
+    ) -> Result<RuleSelector, RuleResolutionError> {
         RuleSelector::from_str(&self.selector).map_err(|_| {
-            if self.selector == "PREVIEW" {
-                RuleResolutionError::Removed {
-                    selector: self.selector.clone(),
-                }
+            let kind = if matches!(self.selector.as_str(), "PREVIEW" | "NURSERY") {
+                RuleResolutionErrorKind::Removed
             } else {
-                RuleResolutionError::Unknown {
-                    selector: self.selector.clone(),
-                }
-            }
+                RuleResolutionErrorKind::Unknown
+            };
+            RuleResolutionError::from_selector(self, setting, kind)
         })
     }
 
@@ -180,29 +181,55 @@ impl std::fmt::Display for RuleSelectorSource {
 }
 
 #[derive(Debug)]
-pub enum RuleResolutionError {
-    Removed { selector: String },
-    Unknown { selector: String },
+enum RuleResolutionErrorKind {
+    Removed,
+    Unknown,
+}
+
+#[derive(Debug)]
+pub struct RuleResolutionError {
+    selector: String,
+    setting: &'static str,
+    source: RuleSelectorSource,
+    kind: RuleResolutionErrorKind,
 }
 
 impl RuleResolutionError {
-    pub fn log_warning(&self, setting: &str, source: &RuleSelectorSource) {
-        warn_user_once_by_message!("{} in `{setting}` from {source}", self);
+    fn from_selector(
+        unresolved: &UnresolvedRuleSelector,
+        setting: &'static str,
+        kind: RuleResolutionErrorKind,
+    ) -> Self {
+        Self {
+            selector: unresolved.selector.clone(),
+            setting,
+            source: unresolved.source.clone(),
+            kind,
+        }
+    }
+
+    pub fn log_warning(&self) {
+        warn_user_once_by_message!("{}", self);
+    }
+}
+
+impl std::fmt::Display for RuleResolutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = match self.kind {
+            RuleResolutionErrorKind::Removed => "Removed",
+            RuleResolutionErrorKind::Unknown => "Unknown rule",
+        };
+        write!(
+            f,
+            "{kind} selector `{selector}` in `{setting}` from {source}",
+            selector = self.selector,
+            setting = self.setting,
+            source = self.source,
+        )
     }
 }
 
 impl std::error::Error for RuleResolutionError {}
-
-impl std::fmt::Display for RuleResolutionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RuleResolutionError::Removed { selector } => write!(f, "Removed selector `{selector}`"),
-            RuleResolutionError::Unknown { selector } => {
-                write!(f, "Unknown rule selector `{selector}`")
-            }
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {

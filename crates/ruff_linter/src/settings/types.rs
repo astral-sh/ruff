@@ -927,17 +927,19 @@ impl CompiledPerFileIgnoreList {
             // ignore disabled rules.
             let data: RuleSet = selectors
                 .iter()
-                .filter_map(|selector| match selector.resolve(preview) {
-                    Ok(selector) => Some(selector),
-                    Err(err) => {
-                        if is_warn_on_unknown_selectors_enabled(preview) {
-                            err.log_warning("per-file-ignores", selector.source());
-                        } else {
-                            resolution_error.get_or_insert(err);
+                .filter_map(
+                    |selector| match selector.resolve("per-file-ignores", preview) {
+                        Ok(selector) => Some(selector),
+                        Err(err) => {
+                            if is_warn_on_unknown_selectors_enabled(preview) {
+                                err.log_warning();
+                            } else {
+                                resolution_error.get_or_insert(err);
+                            }
+                            None
                         }
-                        None
-                    }
-                })
+                    },
+                )
                 .flat_map(|selector| selector.all_rules())
                 .collect();
             PerFile {

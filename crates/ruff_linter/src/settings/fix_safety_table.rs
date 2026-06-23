@@ -68,11 +68,11 @@ impl FixSafetyTable {
             );
 
         for (setting, selector, safety_override) in selectors {
-            let selector = match selector.resolve(preview_options.mode) {
+            let selector = match selector.resolve(setting, preview_options.mode) {
                 Ok(selector) => selector,
                 Err(err) => {
                     if is_warn_on_unknown_selectors_enabled(preview_options.mode) {
-                        err.log_warning(setting, selector.source());
+                        err.log_warning();
                         continue;
                     }
                     return Err(err);

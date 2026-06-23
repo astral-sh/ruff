@@ -96,17 +96,17 @@ pub enum RuleSelectorKind {
 impl RuleSelection {
     fn resolve(&self, preview: PreviewMode) -> Result<ResolvedRuleSelection, RuleResolutionError> {
         fn resolve(
-            setting: &str,
+            setting: &'static str,
             selectors: &[UnresolvedRuleSelector],
             preview: PreviewMode,
         ) -> Result<Vec<RuleSelector>, RuleResolutionError> {
             selectors
                 .iter()
-                .filter_map(|selector| match selector.resolve(preview) {
+                .filter_map(|selector| match selector.resolve(setting, preview) {
                     Ok(selector) => Some(Ok(selector)),
                     Err(err) => {
                         if is_warn_on_unknown_selectors_enabled(preview) {
-                            err.log_warning(setting, selector.source());
+                            err.log_warning();
                             None
                         } else {
                             Some(Err(err))

@@ -770,7 +770,7 @@ fn unknown_rule_selectors_select_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `select` from the CLI
     ");
     Ok(())
 }
@@ -785,7 +785,7 @@ fn unknown_rule_selectors_extend_select_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `extend-select` from the CLI
     ");
     Ok(())
 }
@@ -800,7 +800,7 @@ fn unknown_rule_selectors_ignore_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `ignore` from the CLI
     ");
     Ok(())
 }
@@ -815,7 +815,7 @@ fn unknown_rule_selectors_fixable_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `fixable` from the CLI
     ");
     Ok(())
 }
@@ -830,7 +830,7 @@ fn unknown_rule_selectors_extend_fixable_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `extend-fixable` from the CLI
     ");
     Ok(())
 }
@@ -845,7 +845,7 @@ fn unknown_rule_selectors_unfixable_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `unfixable` from the CLI
     ");
     Ok(())
 }
@@ -860,7 +860,7 @@ fn unknown_rule_selectors_config_ignore_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `ignore` from the CLI
     ");
     Ok(())
 }
@@ -875,7 +875,7 @@ fn unknown_rule_selectors_config_extend_safe_fixes_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `extend-safe-fixes` from the CLI
     ");
     Ok(())
 }
@@ -890,7 +890,7 @@ fn unknown_rule_selectors_config_extend_unsafe_fixes_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `extend-unsafe-fixes` from the CLI
     ");
     Ok(())
 }
@@ -905,7 +905,7 @@ fn unknown_rule_selectors_per_file_ignores_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
     ");
     Ok(())
 }
@@ -920,7 +920,7 @@ fn unknown_rule_selectors_extend_per_file_ignores_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
     ");
     Ok(())
 }
@@ -935,7 +935,7 @@ fn unknown_rule_selectors_config_per_file_ignores_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
     ");
     Ok(())
 }
@@ -953,7 +953,7 @@ fn unknown_rule_selectors_config_extend_per_file_ignores_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481`
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
     ");
     Ok(())
 }
