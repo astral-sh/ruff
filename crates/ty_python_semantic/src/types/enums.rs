@@ -1,3 +1,4 @@
+use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -22,6 +23,14 @@ use crate::{
     },
 };
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
+
+mod flag;
+
+pub(crate) use flag::{
+    FlagAutoValueState, FlagBoundary, FlagIteration, flag_binary_result, flag_constructor_result,
+    flag_invert_result, flag_literal_iteration, flag_literal_len, flag_literal_truthiness,
+    flag_membership_result,
+};
 
 /// A resolved enum method, retaining both whether it is analyzable and who defines it.
 ///
@@ -153,6 +162,8 @@ pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 
+    pub(crate) flag: Option<flag::FlagMetadata>,
+
     /// Members whose values were defined using `auto()`.
     pub(crate) auto_members: FxHashSet<Name>,
 
@@ -198,10 +209,11 @@ pub(super) fn class_defines_property<'db>(
     false
 }
 
-/// An enum class literal with its canonical members, value types, and aliases.
+/// An enum class literal with its declared member objects, value types, and aliases.
 ///
 /// This keeps the enum-specific information used by enum literals and enum complements alongside
-/// the underlying class literal.
+/// the underlying class literal. For a `Flag`, zero-valued and multi-bit named members are retained
+/// here so attribute lookup can resolve them even though iteration excludes them.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumClassLiteral<'db> {
     pub(crate) class_literal: ClassLiteral<'db>,
@@ -209,7 +221,7 @@ pub struct EnumClassLiteral<'db> {
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
-    /// Whether the canonical members exhaust the runtime values of this enum class.
+    /// Whether the declared member objects exhaust the runtime values of this enum class.
     ///
     /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
     /// create runtime members beyond those declared in the class body, so their declared members
@@ -396,6 +408,7 @@ impl<'db> EnumMetadata<'db> {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            flag: None,
             auto_members: FxHashSet::default(),
             value_annotation: None,
             value_construction: EnumValueConstruction::default(),
@@ -487,6 +500,13 @@ impl<'db> EnumMetadata<'db> {
         if self.members.is_empty() {
             return None;
         }
+        if self.flag.is_some() {
+            return Some(UnionType::from_two_elements(
+                db,
+                KnownClass::Str.to_instance(db),
+                Type::none(db),
+            ));
+        }
         let union = self
             .members
             .keys()
@@ -494,6 +514,19 @@ impl<'db> EnumMetadata<'db> {
             .fold(UnionBuilder::new(db), UnionBuilder::add)
             .build();
         Some(union)
+    }
+
+    pub(crate) fn canonical_members_are_known(&self) -> bool {
+        self.flag
+            .as_ref()
+            .is_none_or(flag::FlagMetadata::canonical_members_are_known)
+    }
+
+    pub(crate) fn canonical_member_names(&self) -> impl Iterator<Item = &Name> {
+        match &self.flag {
+            Some(flag) => Either::Left(flag.canonical_members().iter().map(|(name, _)| name)),
+            None => Either::Right(self.members.keys()),
+        }
     }
 }
 
@@ -805,6 +838,26 @@ fn try_register_alias<'db>(
     false
 }
 
+/// Register aliases for a `Flag`, where integer values that compare equal identify the same
+/// member even if their literal types differ (for example, `True` and `1`).
+fn try_register_flag_alias(
+    value_ty: Type<'_>,
+    name: &Name,
+    flag_values: &mut FxHashMap<i64, Name>,
+    aliases: &mut FxHashMap<Name, Name>,
+) -> bool {
+    let Some(value) = value_ty.as_int_like_literal() else {
+        return false;
+    };
+    if let Some(canonical) = flag_values.get(&value) {
+        aliases.insert(name.clone(), canonical.clone());
+        true
+    } else {
+        flag_values.insert(value, name.clone());
+        false
+    }
+}
+
 /// List all members of an enum.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
@@ -834,21 +887,38 @@ pub(crate) fn enum_metadata<'db>(
             let mut members = FxIndexMap::default();
             let mut aliases = FxHashMap::default();
             let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+            let is_flag = matches!(
+                enum_lit.base_class(db),
+                KnownClass::Flag | KnownClass::IntFlag
+            );
+            let mut flag_values = FxHashMap::default();
             for (name, ty) in spec.members(db) {
-                if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
+                if (is_flag && try_register_flag_alias(*ty, name, &mut flag_values, &mut aliases))
+                    || (!is_flag && try_register_alias(*ty, name, &mut enum_values, &mut aliases))
+                {
                     continue;
                 }
                 members.insert(name.clone(), *ty);
             }
             members.shrink_to_fit();
 
-            return Some(EnumMetadata {
+            let mut metadata = EnumMetadata {
                 members,
                 aliases,
+                flag: None,
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
                 value_construction: EnumValueConstruction::default(),
-            });
+            };
+            if is_flag {
+                metadata.flag = Some(flag::FlagMetadata::from_enum_metadata(
+                    db,
+                    ClassLiteral::DynamicEnum(enum_lit),
+                    &metadata,
+                    spec.boundary(db),
+                ));
+            }
+            return Some(metadata);
         }
     };
 
@@ -865,10 +935,16 @@ pub(crate) fn enum_metadata<'db>(
     }
 
     let scope_id = class.body_scope(db);
+    let module = parsed_module(db, class.file(db)).load(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+    let is_flag = Type::ClassLiteral(ClassLiteral::Static(class))
+        .is_subtype_of(db, KnownClass::Flag.to_subclass_of(db));
+    let mut flag_values: FxHashMap<i64, Name> = FxHashMap::default();
+    let mut flag_member_values: FxHashMap<Name, i64> = FxHashMap::default();
+    let mut flag_auto_values = FlagAutoValueState::new();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
     let mut prev_value_was_non_literal_int = false;
@@ -923,10 +999,30 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
+            let flag_definition_and_expression = is_flag
+                .then(|| {
+                    let mut definitions = bindings
+                        .clone()
+                        .filter_map(|binding| binding.binding.definition());
+                    let definition = definitions.next()?;
+                    if definitions.next().is_some() {
+                        return None;
+                    }
+                    let expression = match definition.kind(db) {
+                        DefinitionKind::Assignment(assignment) => assignment.value(&module),
+                        DefinitionKind::AnnotatedAssignment(assignment) => {
+                            assignment.value(&module)?
+                        }
+                        _ => return None,
+                    };
+                    Some((definition, expression))
+                })
+                .flatten();
+
             let inferred = place_from_bindings(db, bindings).place;
             let mut explicit_member_wrapper = false;
 
-            let value_ty = match inferred {
+            let mut value_ty = match inferred {
                 Place::Undefined => {
                     return None;
                 }
@@ -953,8 +1049,10 @@ pub(crate) fn enum_metadata<'db>(
 
                             // enum.auto
                             Some(KnownClass::Auto) => {
-                                auto_counter += 1;
-                                auto_members.insert(name.clone());
+                                if !is_flag {
+                                    auto_counter += 1;
+                                    auto_members.insert(name.clone());
+                                }
 
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
                                 let auto_value_ty =
@@ -962,6 +1060,8 @@ pub(crate) fn enum_metadata<'db>(
                                         .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                     {
                                         Type::string_literal(db, &name.to_lowercase())
+                                    } else if is_flag {
+                                        flag_auto_values.next_value(db)
                                     } else {
                                         let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
                                             class
@@ -1038,10 +1138,53 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
+            if is_flag && explicit_member_wrapper && value_ty.is_instance_of(db, KnownClass::Auto) {
+                value_ty = flag_auto_values.next_value(db);
+                auto_members.insert(name.clone());
+            }
+
+            if let Some((definition, expression)) = flag_definition_and_expression {
+                let next_auto_value = value_construction
+                    .alias_detection_value(db, flag_auto_values.next_value(db), true)
+                    .and_then(Type::as_int_like_literal);
+                let (symbolic_value, is_direct_auto) = flag::flag_member_expression_value(
+                    db,
+                    definition,
+                    expression,
+                    &flag_member_values,
+                    next_auto_value,
+                );
+                if is_direct_auto {
+                    auto_members.insert(name.clone());
+                }
+                if let Some(symbolic_value) = symbolic_value {
+                    value_ty = Type::int_literal(symbolic_value);
+                }
+            }
+
             let alias_value_ty =
                 value_construction.alias_detection_value(db, value_ty, auto_members.contains(name));
+            if is_flag {
+                flag_auto_values.observe(alias_value_ty.unwrap_or_else(Type::any));
+                if let Some(value) = alias_value_ty.and_then(Type::as_int_like_literal) {
+                    flag_member_values.insert(name.clone(), value);
+                }
+            }
             if let Some(alias_value_ty) = alias_value_ty
-                && try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                && ((is_flag
+                    && try_register_flag_alias(
+                        alias_value_ty,
+                        name,
+                        &mut flag_values,
+                        &mut aliases,
+                    ))
+                    || (!is_flag
+                        && try_register_alias(
+                            alias_value_ty,
+                            name,
+                            &mut enum_values,
+                            &mut aliases,
+                        )))
             {
                 return None;
             }
@@ -1054,9 +1197,7 @@ pub(crate) fn enum_metadata<'db>(
                         !matches!(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(assignment)
-                                if assignment
-                                    .value(&parsed_module(db, declaration.file(db)).load(db))
-                                    .is_some()
+                                if assignment.value(&module).is_some()
                         )
                     })
                 })
@@ -1097,13 +1238,23 @@ pub(crate) fn enum_metadata<'db>(
 
     members.shrink_to_fit();
 
-    Some(EnumMetadata {
+    let mut metadata = EnumMetadata {
         members,
         aliases,
+        flag: None,
         auto_members,
         value_annotation,
         value_construction,
-    })
+    };
+    if is_flag {
+        metadata.flag = Some(flag::FlagMetadata::from_enum_metadata(
+            db,
+            ClassLiteral::Static(class),
+            &metadata,
+            flag::static_flag_boundary(db, class),
+        ));
+    }
+    Some(metadata)
 }
 
 /// Returns whether an enum's metaclass has a custom value-transforming method before the stdlib

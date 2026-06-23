@@ -7,7 +7,8 @@ use crate::{
         CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
         UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-        diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+        diagnostic::UNSUPPORTED_BOOL_CONVERSION, enums::flag_literal_truthiness,
+        typed_dict::TypedDictField,
     },
 };
 use ty_python_core::Truthiness;
@@ -306,9 +307,17 @@ impl<'db> Type<'db> {
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
-                LiteralValueTypeKind::Enum(enum_type) => enum_type
-                    .enum_class_instance(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)?,
+                LiteralValueTypeKind::Enum(enum_type) => {
+                    if let Some(truthiness) = flag_literal_truthiness(db, enum_type) {
+                        Truthiness::from(truthiness)
+                    } else {
+                        enum_type.enum_class_instance(db).try_bool_impl(
+                            db,
+                            allow_short_circuit,
+                            visitor,
+                        )?
+                    }
+                }
 
                 LiteralValueTypeKind::Int(num) => Truthiness::from(num.as_i64() != 0),
                 LiteralValueTypeKind::Bool(bool) => Truthiness::from(bool),

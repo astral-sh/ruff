@@ -4243,6 +4243,13 @@ impl<'db> Type<'db> {
             }
         }
 
+        if let Some(length) = self
+            .as_enum_literal()
+            .and_then(|literal| enums::flag_literal_len(db, literal))
+        {
+            return Some(Type::int_literal(length));
+        }
+
         let return_ty = match self.try_call_dunder(
             db,
             "__len__",

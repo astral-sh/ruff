@@ -7,6 +7,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
+use crate::types::enums::flag_membership_result;
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -913,6 +914,12 @@ fn infer_membership_test_comparison<'db>(
     range: TextRange,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
+    if let Some(result) = flag_membership_result(db, left, right) {
+        return Ok(Type::bool_literal(match op {
+            MembershipTestCompareOperator::In => result,
+            MembershipTestCompareOperator::NotIn => !result,
+        }));
+    }
     let compare_result_opt = match right.try_call_dunder(
         db,
         "__contains__",

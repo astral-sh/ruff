@@ -14,6 +14,7 @@ use crate::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
             TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
         },
+        enums::{FlagAutoValueState, FlagBoundary},
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
@@ -186,32 +187,18 @@ fn next_auto_value<'db>(
     base_class: KnownClass,
     name: &str,
     last_int_value: Option<i64>,
+    flag_values: &FlagAutoValueState,
 ) -> Type<'db> {
     match base_class {
         KnownClass::StrEnum => Type::string_literal(db, &name.to_lowercase()),
+        KnownClass::Flag | KnownClass::IntFlag => flag_values.next_value(db),
         _ => {
             let Some(last) = last_int_value else {
                 return KnownClass::Int.to_instance(db);
             };
-            match base_class {
-                KnownClass::Flag | KnownClass::IntFlag => {
-                    // next power of two after highest bit in the last value
-                    if last <= 0 {
-                        Type::int_literal(1)
-                    } else {
-                        let shift = i64::BITS - last.leading_zeros();
-                        1_u64
-                            .checked_shl(shift)
-                            .and_then(|value| i64::try_from(value).ok())
-                            .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(db))
-                    }
-                }
-                _ => last
-                    .checked_add(1)
-                    .map(Type::int_literal)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
-            }
+            last.checked_add(1)
+                .map(Type::int_literal)
+                .unwrap_or_else(|| KnownClass::Int.to_instance(db))
         }
     }
 }
@@ -224,14 +211,16 @@ fn enum_members_from_names(
 ) -> Vec<(Name, Type<'_>)> {
     let mut members = Vec::with_capacity(names.len());
     let mut last_int_value = None;
+    let mut flag_values = FlagAutoValueState::new();
 
     for (index, name) in names.into_iter().enumerate() {
         let value = if index == 0 {
             first_enum_auto_value(db, base_class, name.as_str(), start)
         } else {
-            next_auto_value(db, base_class, name.as_str(), last_int_value)
+            next_auto_value(db, base_class, name.as_str(), last_int_value, &flag_values)
         };
         last_int_value = value.as_int_literal();
+        flag_values.observe(value);
         members.push((name, value));
     }
 
@@ -332,6 +321,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let names_kw = call_expr.arguments.find_keyword("names");
         let start_kw = call_expr.arguments.find_keyword("start");
         let type_kw = call_expr.arguments.find_keyword("type");
+        let boundary_kw = call_expr.arguments.find_keyword("boundary");
 
         let has_positional_keyword_conflict =
             (!args.is_empty() && value_kw.is_some()) || (args.len() >= 2 && names_kw.is_some());
@@ -402,6 +392,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let (mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
             self.infer_enum_mixin_argument(&kw.value, base_class)
         });
+        let boundary = if matches!(base_class, KnownClass::Flag | KnownClass::IntFlag) {
+            boundary_kw.map_or_else(
+                || FlagBoundary::default_for_base(base_class),
+                |keyword| {
+                    let ty = self.expression_type(&keyword.value);
+                    if ty.is_none(db) {
+                        FlagBoundary::default_for_base(base_class)
+                    } else {
+                        FlagBoundary::from_type(db, ty).unwrap_or(FlagBoundary::Unknown)
+                    }
+                },
+            )
+        } else {
+            FlagBoundary::Unknown
+        };
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
@@ -443,6 +448,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             base_class,
             mixin_type,
             has_too_many_positional || has_positional_keyword_conflict || !valid_mixin_type,
+            boundary,
         );
 
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
@@ -573,6 +579,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         base_class: KnownClass,
         mixin_type: Option<Type<'db>>,
         has_invalid_arguments: bool,
+        boundary: FlagBoundary,
     ) -> EnumSpec<'db> {
         let db = self.db();
         let (members, has_known_members) = if has_invalid_arguments {
@@ -622,7 +629,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        EnumSpec::new(db, members.into_boxed_slice(), has_known_members)
+        EnumSpec::new(db, members.into_boxed_slice(), has_known_members, boundary)
     }
 
     fn create_dynamic_enum_anchor(
@@ -773,13 +780,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Explicit-value forms match static enums: `start` is ignored and a leading `auto()`
         // still begins from the default seed of `1`.
         let mut last_int_value = Some(0);
+        let mut flag_values = FlagAutoValueState::new();
         for (name, value) in explicit_members {
             let value = if value.is_instance_of(db, KnownClass::Auto) {
-                next_auto_value(db, base_class, name.as_str(), last_int_value)
+                next_auto_value(db, base_class, name.as_str(), last_int_value, &flag_values)
             } else {
                 value
             };
             last_int_value = value.as_int_like_literal();
+            flag_values.observe(value);
             members.push((name, value));
         }
         EnumMembersArgParseResult::Known(KnownEnumMembers {
@@ -801,6 +810,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let mut members = Vec::with_capacity(dict.items.len());
         let mut last_int_value = Some(0);
+        let mut flag_values = FlagAutoValueState::new();
         let mut has_opaque_keys = false;
         for item in &dict.items {
             let Some(key) = &item.key else {
@@ -819,11 +829,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let name = Name::new(string_lit.value(db));
             let raw_value = self.expression_type(&item.value);
             let value = if raw_value.is_instance_of(db, KnownClass::Auto) {
-                next_auto_value(db, base_class, name.as_str(), last_int_value)
+                next_auto_value(db, base_class, name.as_str(), last_int_value, &flag_values)
             } else {
                 raw_value
             };
             last_int_value = value.as_int_like_literal();
+            flag_values.observe(value);
             members.push((name, value));
         }
         if has_opaque_keys {

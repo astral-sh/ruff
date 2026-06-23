@@ -68,7 +68,9 @@ use crate::types::diagnostic::{
     report_too_many_positional_patterns_for_callable_class_pattern,
     report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
-use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
+use crate::types::enums::{
+    enum_ignored_names, flag_constructor_result, flag_invert_result, is_enum_class_by_inheritance,
+};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
     same_module_uncached_raw_signature,
@@ -8929,6 +8931,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let return_ty = bindings.return_type(db);
+        let return_ty = callable_type
+            .as_class_literal()
+            .and_then(|class| {
+                flag_constructor_result(
+                    db,
+                    class,
+                    arguments
+                        .args
+                        .first()
+                        .map(|argument| self.expression_type(argument)),
+                )
+            })
+            .unwrap_or(return_ty);
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
@@ -10346,6 +10361,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
+            }
+
+            (ast::UnaryOp::Invert, ty) if let Some(result) = flag_invert_result(self.db(), ty) => {
+                result
             }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {

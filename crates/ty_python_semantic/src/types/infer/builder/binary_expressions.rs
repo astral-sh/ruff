@@ -8,6 +8,7 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
+use crate::types::enums::flag_binary_result;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
@@ -547,6 +548,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => Some(todo),
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
+
+            (
+                left,
+                right,
+                op @ (ast::Operator::BitOr | ast::Operator::BitAnd | ast::Operator::BitXor),
+            ) if let Some(result) = flag_binary_result(db, left, right, op) => Some(result),
 
             (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
                 let recursively_defined = if left.recursively_defined().is_yes()

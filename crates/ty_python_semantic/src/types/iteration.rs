@@ -7,6 +7,7 @@ use crate::{
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
+        enums::{FlagIteration, flag_literal_iteration},
         todo_type,
         tuple::{TupleSpec, TupleSpecBuilder},
     },
@@ -142,6 +143,16 @@ impl<'db> Type<'db> {
                     // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                     LiteralValueTypeKind::LiteralString => {
                         Some(Cow::Owned(TupleSpec::homogeneous(ty)))
+                    }
+                    LiteralValueTypeKind::Enum(literal) => {
+                        flag_literal_iteration(db, literal).map(|iteration| {
+                            Cow::Owned(match iteration {
+                                FlagIteration::Exact(members) => {
+                                    TupleSpec::heterogeneous(members)
+                                }
+                                FlagIteration::Unknown(member) => TupleSpec::homogeneous(member),
+                            })
+                        })
                     }
                     _ => None
                 }

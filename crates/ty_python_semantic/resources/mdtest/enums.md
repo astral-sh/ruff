@@ -2095,6 +2095,228 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
+## Flags
+
+`Flag` members represent integer masks. Zero-valued and multi-bit names are valid attributes but are
+not included when the class is iterated. `auto()` assigns the next power of two, including when an
+earlier member used a larger explicit value:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from enum import CONFORM, EJECT, Flag, FlagBoundary, IntFlag, auto, member
+from typing import Any, Literal
+from ty_extensions import enum_members
+
+class Permission(Flag):
+    NONE = 0
+    READ = auto()
+    WRITE = auto()
+    EXECUTE = auto()
+    READ_WRITE = READ | WRITE
+    READ_ALIAS = READ
+
+# Zero, composites, and aliases are not canonical members.
+# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
+reveal_type(enum_members(Permission))
+
+reveal_type(Permission.EXECUTE.value)  # revealed: Literal[4]
+reveal_type(Permission.READ_WRITE.value)  # revealed: Literal[3]
+reveal_type(Permission.READ_ALIAS)  # revealed: Literal[Permission.READ]
+reveal_type(Permission(Permission.READ))  # revealed: Literal[Permission.READ]
+
+class OutOfOrder(Flag):
+    HIGH = 8
+    LOW = 1
+    NEXT = auto()
+
+reveal_type(OutOfOrder.NEXT.value)  # revealed: Literal[16]
+
+class WrappedAuto(Flag):
+    FIRST = member(auto())
+    SECOND = auto()
+
+reveal_type(WrappedAuto.SECOND.value)  # revealed: Literal[2]
+
+class BooleanValue(Flag):
+    TRUE = True
+    ONE = 1
+
+reveal_type(BooleanValue.ONE)  # revealed: Literal[BooleanValue.TRUE]
+reveal_type(enum_members(BooleanValue))  # revealed: tuple[Literal["TRUE"]]
+
+# A custom integer mixin can change member values during class creation.
+class Offset(int):
+    def __new__(cls, value: int):
+        return int.__new__(cls, value + 1)
+
+class TransformedValues(Offset, Flag):
+    A = 1
+    B = 2
+
+reveal_type(enum_members(TransformedValues))  # revealed: Unknown
+
+def unknown_values(value: int):
+    class Dynamic(Flag):
+        A = value
+        B = auto()
+
+    reveal_type(enum_members(Dynamic))  # revealed: Unknown
+    reveal_type(Dynamic.B.value)  # revealed: int
+```
+
+Bitwise operations use the member masks without enumerating every possible combination. A result is
+a literal when it has a declared name and otherwise remains the nominal Flag type:
+
+```py
+reveal_type(Permission.READ | Permission.WRITE)  # revealed: Literal[Permission.READ_WRITE]
+reveal_type(Permission.READ & Permission.WRITE)  # revealed: Literal[Permission.NONE]
+reveal_type(Permission.READ ^ Permission.WRITE)  # revealed: Literal[Permission.READ_WRITE]
+reveal_type(~Permission.READ)  # revealed: Permission
+
+reveal_type(bool(Permission.NONE))  # revealed: Literal[False]
+reveal_type(bool(Permission.READ_WRITE))  # revealed: Literal[True]
+reveal_type(len(Permission.READ_WRITE))  # revealed: Literal[2]
+
+# revealed: tuple[Literal[Permission.READ], Literal[Permission.WRITE]]
+reveal_type(tuple(Permission.READ_WRITE))
+
+reveal_type(Permission.READ in Permission.READ_WRITE)  # revealed: Literal[True]
+reveal_type(Permission.EXECUTE in Permission.READ_WRITE)  # revealed: Literal[False]
+
+def attributes(value: Permission):
+    reveal_type(value.name)  # revealed: str | None
+    reveal_type(value.value)  # revealed: int
+
+def gradual(left: Permission, right: Any):
+    if isinstance(right, Permission):
+        reveal_type(left | right)  # revealed: Permission
+```
+
+The boundary policy determines what happens to undeclared bits. `CONFORM` removes them, `EJECT`
+returns an integer, and the default `IntFlag` policy keeps them:
+
+```py
+class Strict(Flag):
+    A = 1
+    C = 4
+
+class Conforming(Flag, boundary=CONFORM):
+    NONE = 0
+    A = 1
+    C = 4
+
+class Ejecting(IntFlag, boundary=EJECT):
+    A = 1
+    C = 4
+
+class SignedEjecting(Flag, boundary=EJECT):
+    NEGATIVE = -1
+    A = 1
+    B = 2
+
+class Keeping(IntFlag):
+    A = 1
+    C = 4
+    NOT_A = 6
+
+class OtherIntFlag(IntFlag):
+    B = 2
+
+reveal_type(~Strict.A)  # revealed: Literal[Strict.C]
+reveal_type(Conforming(2))  # revealed: Literal[Conforming.NONE]
+reveal_type(Ejecting(2))  # revealed: Literal[2]
+reveal_type(Ejecting.A | 2)  # revealed: Literal[3]
+reveal_type(2 | Ejecting.A)  # revealed: Literal[3]
+reveal_type(True | Ejecting.A)  # revealed: int
+reveal_type(Ejecting.A | OtherIntFlag.B)  # revealed: Literal[3]
+reveal_type(OtherIntFlag.B | Ejecting.A)  # revealed: OtherIntFlag
+reveal_type(~Ejecting.A)  # revealed: Literal[-2]
+reveal_type(SignedEjecting(-1))  # revealed: Literal[SignedEjecting.NEGATIVE]
+reveal_type(SignedEjecting(3))  # revealed: Literal[3]
+reveal_type(Keeping.A | 8)  # revealed: Keeping
+reveal_type(~Keeping.A)  # revealed: Literal[Keeping.NOT_A]
+reveal_type(Keeping(-12))  # revealed: Literal[Keeping.C]
+Keeping.A | "invalid"  # error: [unsupported-operator]
+
+def dynamic_boundary(value: int):
+    reveal_type(Ejecting(value))  # revealed: int
+    reveal_type(Ejecting.A | value)  # revealed: int
+
+class EjectBase(Flag, boundary=EJECT):
+    pass
+
+class InheritedEject(EjectBase):
+    A = 1
+
+reveal_type(InheritedEject(2))  # revealed: Literal[2]
+
+def unknown_boundary(boundary: FlagBoundary):
+    class Configured(Flag, boundary=boundary):
+        A = 1
+
+    reveal_type(Configured(0))  # revealed: Configured
+    reveal_type(Configured(2))  # revealed: Configured | int
+```
+
+The same rules apply to classes created with the functional syntax:
+
+```py
+Functional = Flag("Functional", {"HIGH": 8, "LOW": 1, "NEXT": auto()})
+reveal_type(Functional.NEXT.value)  # revealed: Literal[16]
+
+FunctionalEject = IntFlag("FunctionalEject", {"A": 1, "C": 4}, boundary=EJECT)
+reveal_type(FunctionalEject(2))  # revealed: Literal[2]
+```
+
+User-defined operators retain their declared return types:
+
+```py
+class CustomOperator(Flag):
+    A = 1
+
+    # error: [invalid-method-override]
+    def __or__(self, other: "CustomOperator") -> str:
+        return "custom"
+
+reveal_type(CustomOperator.A | CustomOperator.A)  # revealed: str
+```
+
+Inherited behavioral methods and custom iteration hooks also take precedence over the standard Flag
+behavior:
+
+```py
+class BehaviorBase(Flag):
+    def __bool__(self) -> Literal[False]:
+        return False
+
+    def __len__(self) -> Literal[7]:
+        return 7
+
+    def __contains__(self, other: Flag) -> Literal[False]:
+        return False
+
+class CustomBehavior(BehaviorBase):
+    A = 1
+
+reveal_type(bool(CustomBehavior.A))  # revealed: Literal[False]
+reveal_type(len(CustomBehavior.A))  # revealed: Literal[7]
+reveal_type(CustomBehavior.A in CustomBehavior.A)  # revealed: Literal[False]
+
+class IterationBase(Flag):
+    @classmethod
+    def _iter_member_(cls, value: int):
+        return iter(())
+
+class CustomIteration(IterationBase):
+    A = 1
+
+reveal_type(tuple(CustomIteration.A))  # revealed: tuple[CustomIteration, ...]
+```
+
 ## Function syntax
 
 ### String names (positional)

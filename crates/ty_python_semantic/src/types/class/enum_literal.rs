@@ -10,6 +10,7 @@ use crate::types::Type;
 use crate::types::class::known::KnownClass;
 use crate::types::class::{ClassLiteral, ClassType, MemberLookupPolicy};
 use crate::types::class_base::ClassBase;
+use crate::types::enums::FlagBoundary;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
 use ty_python_core::definition::Definition;
@@ -21,6 +22,7 @@ pub struct EnumSpec<'db> {
     #[returns(deref)]
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     pub(crate) has_known_members: bool,
+    pub(crate) boundary: FlagBoundary,
 }
 
 impl<'db> EnumSpec<'db> {
@@ -40,7 +42,12 @@ impl<'db> EnumSpec<'db> {
             })
             .collect::<Option<Box<_>>>()?;
 
-        Some(Self::new(db, members, self.has_known_members(db)))
+        Some(Self::new(
+            db,
+            members,
+            self.has_known_members(db),
+            self.boundary(db),
+        ))
     }
 }
 
