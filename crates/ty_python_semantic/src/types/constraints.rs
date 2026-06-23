@@ -719,6 +719,9 @@ struct ConstraintSetStorage<'db> {
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
+    /// Only caches completed top-level results. Recursive results depend on active path
+    /// assignments and must not use this cache.
+    never_satisfied_cache: FxHashMap<NodeId, bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
@@ -1073,6 +1076,25 @@ impl<'db> ConstraintSetBuilder<'db> {
             .borrow_mut()
             .constraint_implication_cache
             .insert(key, result);
+        result
+    }
+
+    fn cached_is_never_satisfied(&self, node: NodeId, compute: impl FnOnce() -> bool) -> bool {
+        let cached = self
+            .storage
+            .borrow()
+            .never_satisfied_cache
+            .get(&node)
+            .copied();
+        if let Some(result) = cached {
+            return result;
+        }
+
+        let result = compute();
+        self.storage
+            .borrow_mut()
+            .never_satisfied_cache
+            .insert(node, result);
         result
     }
 
@@ -2153,10 +2175,10 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
-            Node::Interior(interior) => {
+            Node::Interior(interior) => builder.cached_is_never_satisfied(self, || {
                 let mut path = interior.path_assignments(builder);
                 self.is_never_satisfied_inner(db, builder, &mut path)
-            }
+            }),
         }
     }
 
@@ -6750,6 +6772,53 @@ mod tests {
             Some(&false)
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
+    }
+
+    #[test]
+    fn never_satisfied_results_are_cached() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let impossible = t_int.and(&db, &builder, || t_str);
+
+        assert!(!t_int.is_never_satisfied(&db));
+        assert!(!t_int.is_never_satisfied(&db));
+        assert!(impossible.is_never_satisfied(&db));
+        assert!(impossible.is_never_satisfied(&db));
+        assert!(ConstraintSet::never(&builder).is_never_satisfied(&db));
+        assert!(!ConstraintSet::always(&builder).is_never_satisfied(&db));
+
+        {
+            let storage = builder.storage.borrow();
+            assert_eq!(storage.never_satisfied_cache.get(&t_int.node), Some(&false));
+            assert_eq!(
+                storage.never_satisfied_cache.get(&impossible.node),
+                Some(&true)
+            );
+            assert_eq!(storage.never_satisfied_cache.len(), 2);
+        }
+
+        let _unrelated = create_constraint(&db, &builder, u, KnownClass::Bool);
+        assert!(!t_int.is_never_satisfied(&db));
+        assert!(impossible.is_never_satisfied(&db));
+        assert_eq!(builder.storage.borrow().never_satisfied_cache.len(), 2);
+
+        let owned = create_compacted_owned_set(&db);
+        owned.query(|builder, set| {
+            assert!(!set.is_never_satisfied(&db));
+            assert!(!set.is_never_satisfied(&db));
+            assert_eq!(
+                builder
+                    .storage
+                    .borrow()
+                    .never_satisfied_cache
+                    .get(&set.node),
+                Some(&false)
+            );
+        });
     }
 
     #[track_caller]
