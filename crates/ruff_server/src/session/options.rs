@@ -489,6 +489,7 @@ mod tests {
     use std::str::FromStr;
 
     use insta::assert_debug_snapshot;
+    use ruff_linter::settings::types::PreviewMode;
     use ruff_python_formatter::QuoteStyle;
     use ruff_workspace::options::{
         FormatOptions as RuffFormatOptions, LintCommonOptions, LintOptions, Options,
@@ -515,6 +516,22 @@ mod tests {
 
     fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
+    }
+
+    #[test]
+    fn client_options_rule_selectors_use_editor_source() {
+        let options: ClientOptions = deserialize_fixture(r#"{"lint": {"select": ["F481"]}}"#);
+        let settings = options.into_settings().unwrap();
+        let selector = &settings.editor_settings.select.unwrap()[0];
+
+        assert_eq!(selector.source(), &RuleSelectorSource::Editor);
+        assert_eq!(
+            selector
+                .resolve("select", PreviewMode::Disabled)
+                .unwrap_err()
+                .to_string(),
+            "Unknown rule selector `F481` in `select` from the editor configuration"
+        );
     }
 
     #[cfg(not(windows))]

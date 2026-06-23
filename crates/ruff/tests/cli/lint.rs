@@ -866,31 +866,33 @@ fn unknown_rule_selectors_config_ignore_f481() -> Result<()> {
 }
 
 #[test]
-fn unknown_rule_selectors_config_extend_safe_fixes_f481() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.extend-safe-fixes=['F481']"]), @"
+    fixture.write_file("ruff.toml", r#"lint = { extend-safe-fixes = ["F481"] }"#)?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `extend-safe-fixes` from the CLI
+      Cause: Unknown rule selector `F481` in `extend-safe-fixes` from [TMP]/ruff.toml
     ");
     Ok(())
 }
 
 #[test]
-fn unknown_rule_selectors_config_extend_unsafe_fixes_f481() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.extend-unsafe-fixes=['F481']"]), @"
+    fixture.write_file("ruff.toml", r#"lint = { extend-unsafe-fixes = ["F481"] }"#)?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `extend-unsafe-fixes` from the CLI
+      Cause: Unknown rule selector `F481` in `extend-unsafe-fixes` from [TMP]/ruff.toml
     ");
     Ok(())
 }
@@ -926,34 +928,39 @@ fn unknown_rule_selectors_extend_per_file_ignores_f481() -> Result<()> {
 }
 
 #[test]
-fn unknown_rule_selectors_config_per_file_ignores_f481() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.per-file-ignores={'test.py'=['F481']}"]), @"
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
     ");
     Ok(())
 }
 
 #[test]
-fn unknown_rule_selectors_config_extend_per_file_ignores_f481() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args([
-        "--config",
-        "lint.extend-per-file-ignores={'test.py'=['F481']}",
-    ]), @"
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { extend-per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
     ");
     Ok(())
 }
@@ -1075,13 +1082,13 @@ fn unknown_rule_selectors_config_ignore_f481_preview() -> Result<()> {
 }
 
 #[test]
-fn unknown_rule_selectors_config_extend_safe_fixes_f481_preview() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481_preview() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args([
-        "--preview",
-        "--config",
-        "lint.extend-safe-fixes=['F481']",
-    ]), @"
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, extend-safe-fixes = ["F481"] }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1090,19 +1097,19 @@ fn unknown_rule_selectors_config_extend_safe_fixes_f481_preview() -> Result<()> 
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `extend-safe-fixes` from the CLI
+    warning: Unknown rule selector `F481` in `extend-safe-fixes` from [TMP]/ruff.toml
     ");
     Ok(())
 }
 
 #[test]
-fn unknown_rule_selectors_config_extend_unsafe_fixes_f481_preview() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481_preview() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args([
-        "--preview",
-        "--config",
-        "lint.extend-unsafe-fixes=['F481']",
-    ]), @"
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, extend-unsafe-fixes = ["F481"] }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1111,7 +1118,7 @@ fn unknown_rule_selectors_config_extend_unsafe_fixes_f481_preview() -> Result<()
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from the CLI
+    warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from [TMP]/ruff.toml
     ");
     Ok(())
 }
@@ -1151,13 +1158,13 @@ fn unknown_rule_selectors_extend_per_file_ignores_f481_preview() -> Result<()> {
 }
 
 #[test]
-fn unknown_rule_selectors_config_per_file_ignores_f481_preview() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481_preview() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args([
-        "--preview",
-        "--config",
-        "lint.per-file-ignores={'test.py'=['F481']}",
-    ]), @"
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1166,19 +1173,19 @@ fn unknown_rule_selectors_config_per_file_ignores_f481_preview() -> Result<()> {
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    warning: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
     ");
     Ok(())
 }
 
 #[test]
-fn unknown_rule_selectors_config_extend_per_file_ignores_f481_preview() -> Result<()> {
+fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481_preview() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
-    assert_cmd_snapshot!(fixture.check_command().args([
-        "--preview",
-        "--config",
-        "lint.extend-per-file-ignores={'test.py'=['F481']}",
-    ]), @"
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, extend-per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1187,7 +1194,7 @@ fn unknown_rule_selectors_config_extend_per_file_ignores_f481_preview() -> Resul
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    warning: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
     ");
     Ok(())
 }
