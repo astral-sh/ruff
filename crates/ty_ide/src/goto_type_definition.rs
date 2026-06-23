@@ -1275,7 +1275,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+        "#);
     }
 
     #[test]
@@ -1303,7 +1316,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class list(MutableSequence[_T]):
+           |       ----
+           |
+        "#);
     }
 
     #[test]
@@ -1331,7 +1357,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+        "#);
     }
 
     #[test]
@@ -1371,7 +1410,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | -------
+           |
+        ");
     }
 
     #[test]

@@ -203,8 +203,8 @@ use crate::{
         CallableTypes, EnumClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
         equality_truthiness, expand_type, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -238,7 +238,7 @@ use ty_python_core::{
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_by_previous_patterns<'db>(
+pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
@@ -272,10 +272,7 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
-        .build()
+    pattern_binding_fallthrough_type(db, predicate.kind(db), subject_ty)
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -1097,7 +1094,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .as_deref()
             .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
             .unwrap_or(Truthiness::AlwaysTrue),
-        PatternPredicateKind::MatchStar => Truthiness::Ambiguous,
+        PatternPredicateKind::Star(_) => Truthiness::AlwaysTrue,
     }
 }
 
