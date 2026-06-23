@@ -101,7 +101,6 @@ impl NarrowingConstraints {
     ///
     /// The nodes must satisfy the same ordering and allocation invariants as graphs produced by
     /// [`NarrowingConstraintsBuilder`].
-    #[cfg(feature = "testing")]
     pub fn from_test_nodes(nodes: Vec<InteriorNode>) -> Self {
         Self {
             used_interiors: nodes.into_boxed_slice(),

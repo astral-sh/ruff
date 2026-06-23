@@ -48,7 +48,6 @@ anyhow = { workspace = true }
 [features]
 serde = ["dep:serde", "dep:ruff_macros"]
 schemars = ["dep:schemars", "dep:serde_json"]
-testing = []
 
 [lints]
 workspace = true
