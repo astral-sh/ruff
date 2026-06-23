@@ -109,11 +109,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         !self.diagnostics.borrow().is_empty()
     }
 
-    /// Returns a guard that prevents diagnostic construction until it is dropped.
-    pub(super) fn suppress_diagnostics(&mut self) -> DiagnosticSuppressionGuard<'_, 'db, 'ast> {
+    /// Prevents diagnostic construction for this inference context.
+    pub(super) fn suppress_diagnostics(&mut self) {
         debug_assert!(!self.diagnostics_suppressed);
         self.diagnostics_suppressed = true;
-        DiagnosticSuppressionGuard { context: self }
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
@@ -153,9 +152,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
-        if self.diagnostics_suppressed {
-            return None;
-        }
         LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
     }
 
@@ -178,9 +174,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'ctx, 'db>> {
-        if self.diagnostics_suppressed {
-            return None;
-        }
         DiagnosticGuardBuilder::new(self, id, severity)
     }
 
@@ -251,28 +244,6 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("diagnostics", &self.diagnostics)
             .field("defused", &self.bomb)
             .finish()
-    }
-}
-
-/// Prevents diagnostic construction while holding an exclusive borrow of an inference context.
-///
-/// The exclusive borrow prevents recursive expression inference from accidentally inheriting the
-/// suppression state.
-pub(super) struct DiagnosticSuppressionGuard<'ctx, 'db, 'ast> {
-    context: &'ctx mut InferContext<'db, 'ast>,
-}
-
-impl<'db, 'ast> std::ops::Deref for DiagnosticSuppressionGuard<'_, 'db, 'ast> {
-    type Target = InferContext<'db, 'ast>;
-
-    fn deref(&self) -> &Self::Target {
-        self.context
-    }
-}
-
-impl Drop for DiagnosticSuppressionGuard<'_, '_, '_> {
-    fn drop(&mut self) {
-        self.context.diagnostics_suppressed = false;
     }
 }
 
@@ -447,6 +418,10 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: LintId,
     ) -> Option<(Severity, LintSource)> {
+        if ctx.diagnostics_suppressed {
+            return None;
+        }
+
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
         // has been refactored, but this still kind of looked
@@ -567,6 +542,10 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
+        if ctx.diagnostics_suppressed {
+            return None;
+        }
+
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }

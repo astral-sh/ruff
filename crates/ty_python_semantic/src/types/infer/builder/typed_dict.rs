@@ -323,7 +323,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         dict: &ast::ExprDict,
         typed_dict: TypedDictType<'db>,
         item_types: &mut FxHashMap<NodeIndex, Type<'db>>,
-        emit_validation_diagnostics: bool,
     ) -> Option<Type<'db>> {
         let ast::ExprDict {
             range: _,
@@ -358,30 +357,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             item_types.insert(item.value.node_index().load(), value_ty);
         }
 
-        let validate = |context| {
-            validate_typed_dict_dict_literal(
-                context,
-                typed_dict,
-                dict,
-                dict.into(),
-                |expr: &ast::Expr, tcx: TypeContext<'db>| {
-                    item_types
-                        .get(&expr.node_index().load())
-                        .copied()
-                        .unwrap_or_else(|| {
-                            let _ = tcx;
-                            Type::unknown()
-                        })
-                },
-            )
-        };
-
-        if emit_validation_diagnostics {
-            validate(&self.context)
-        } else {
-            let context = self.context.suppress_diagnostics();
-            validate(&context)
-        }
+        validate_typed_dict_dict_literal(
+            &self.context,
+            typed_dict,
+            dict,
+            dict.into(),
+            |expr: &ast::Expr, tcx: TypeContext<'db>| {
+                item_types
+                    .get(&expr.node_index().load())
+                    .copied()
+                    .unwrap_or_else(|| {
+                        let _ = tcx;
+                        Type::unknown()
+                    })
+            },
+        )
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
     }

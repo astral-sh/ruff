@@ -6798,7 +6798,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly.
                 if let Some(ty) =
-                    self.infer_typed_dict_expression(dict, typed_dict, &mut item_types, true)
+                    self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                 {
                     return ty;
                 }
@@ -6826,7 +6826,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !has_dict_compatible_fallback
                 {
                     if let Some(ty) =
-                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types, true)
+                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types)
                     {
                         return ty;
                     }
@@ -6849,15 +6849,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Reuse nested expressions that receive the same field context across candidates.
                     let teardown = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
-                        // Suppress validation diagnostics for discarded candidates. A mixed union
-                        // like `TypedDict | dict[str, Any]` should remain quiet when the dict arm
-                        // accepts the literal.
-                        if let Some(inferred_ty) = self.speculate().infer_typed_dict_expression(
-                            dict,
-                            typed_dict,
-                            &mut item_types,
-                            false,
-                        ) {
+                        // Suppress diagnostics for discarded candidates. A mixed union like
+                        // `TypedDict | dict[str, Any]` should remain quiet when the dict arm accepts
+                        // the literal.
+                        if let Some(inferred_ty) = self
+                            .speculate_without_diagnostics()
+                            .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                        {
                             narrowed_tys.push(inferred_ty);
                         }
 
@@ -11178,6 +11176,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .dataclass_field_specifiers
             .clone_from(dataclass_field_specifiers);
 
+        builder
+    }
+
+    /// Returns a speculative builder that does not construct diagnostics.
+    fn speculate_without_diagnostics(&self) -> Self {
+        let mut builder = self.speculate();
+        builder.context.suppress_diagnostics();
         builder
     }
 
