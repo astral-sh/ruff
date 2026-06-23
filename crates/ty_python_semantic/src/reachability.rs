@@ -211,6 +211,7 @@ use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
@@ -834,58 +835,91 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 
     /// Projects one constraint node into the graph for this place.
-    fn project(&mut self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
+    fn project(&mut self, root: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
         type Id = ScopedNarrowingConstraint;
+        enum Action {
+            Visit(Id),
+            AnalyzeNonTerminal(Id),
+            FinishNonTerminal { id: Id, branch: Id },
+            FinishPredicate(Id),
+        }
 
+        let mut actions = SmallVec::<[Action; 8]>::new();
+        actions.push(Action::Visit(root));
+
+        while let Some(action) = actions.pop() {
+            match action {
+                Action::Visit(id) => {
+                    if id.is_terminal() || self.project_cache.contains_key(&id) {
+                        continue;
+                    }
+
+                    let node = self.constraints.get_interior_node(id);
+                    let predicate = self.predicates[node.atom];
+
+                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                        actions.push(Action::AnalyzeNonTerminal(id));
+                        actions.push(Action::Visit(node.if_uncertain));
+                    } else {
+                        actions.push(Action::FinishPredicate(id));
+                        actions.push(Action::Visit(node.if_false));
+                        actions.push(Action::Visit(node.if_uncertain));
+                        actions.push(Action::Visit(node.if_true));
+                    }
+                }
+                Action::AnalyzeNonTerminal(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    let predicate = self.predicates[node.atom];
+                    let branch = match analyze_single(self.db, &predicate) {
+                        Truthiness::AlwaysTrue => node.if_true,
+                        Truthiness::AlwaysFalse => node.if_false,
+                        Truthiness::Ambiguous => {
+                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                        }
+                    };
+
+                    actions.push(Action::FinishNonTerminal { id, branch });
+                    actions.push(Action::Visit(branch));
+                }
+                Action::FinishNonTerminal { id, branch } => {
+                    let node = self.constraints.get_interior_node(id);
+                    let branch = self.projected_node(branch);
+                    let if_uncertain = self.projected_node(node.if_uncertain);
+                    let projected = self.graph.or(branch, if_uncertain);
+                    self.project_cache.insert(id, projected);
+                }
+                Action::FinishPredicate(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    let if_true = self.projected_node(node.if_true);
+                    let if_uncertain = self.projected_node(node.if_uncertain);
+                    let if_false = self.projected_node(node.if_false);
+                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
+
+                    let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
+                        let either = self.graph.or(if_true, if_false);
+                        self.graph.or(either, if_uncertain)
+                    } else {
+                        self.graph.add_node(ProjectedNarrowingNode {
+                            atom: node.atom,
+                            if_true,
+                            if_uncertain,
+                            if_false,
+                        })
+                    };
+                    self.project_cache.insert(id, projected);
+                }
+            }
+        }
+
+        self.projected_node(root)
+    }
+
+    fn projected_node(&self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
         match id {
-            Id::ALWAYS_TRUE => return ProjectedNarrowingNodeId::ALWAYS_TRUE,
-            Id::ALWAYS_FALSE => return ProjectedNarrowingNodeId::ALWAYS_FALSE,
-            _ => {}
+            ScopedNarrowingConstraint::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            ScopedNarrowingConstraint::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            _ => self.project_cache[&id],
         }
-
-        if let Some(cached) = self.project_cache.get(&id) {
-            return *cached;
-        }
-
-        let node = self.constraints.get_interior_node(id);
-        let predicate = self.predicates[node.atom];
-
-        let projected = if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-            let if_uncertain = self.project(node.if_uncertain);
-            match analyze_single(self.db, &predicate) {
-                Truthiness::AlwaysTrue => {
-                    let if_true = self.project(node.if_true);
-                    self.graph.or(if_true, if_uncertain)
-                }
-                Truthiness::AlwaysFalse => {
-                    let if_false = self.project(node.if_false);
-                    self.graph.or(if_false, if_uncertain)
-                }
-                Truthiness::Ambiguous => {
-                    unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
-                }
-            }
-        } else {
-            let if_true = self.project(node.if_true);
-            let if_uncertain = self.project(node.if_uncertain);
-            let if_false = self.project(node.if_false);
-            let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
-
-            if pos_constraint.is_none() && neg_constraint.is_none() {
-                let either = self.graph.or(if_true, if_false);
-                self.graph.or(either, if_uncertain)
-            } else {
-                self.graph.add_node(ProjectedNarrowingNode {
-                    atom: node.atom,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                })
-            }
-        };
-
-        self.project_cache.insert(id, projected);
-        projected
     }
 }
 
