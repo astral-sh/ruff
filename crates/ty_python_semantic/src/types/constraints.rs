@@ -214,7 +214,7 @@ where
             }),
         );
         let deferred_quantification = InferableTypeVars::from_typevars(db, deferred_quantification);
-        ConstraintSet::from_node_with_metadata(builder, node, deferred_quantification)
+        ConstraintSet::from_node(builder, node, deferred_quantification)
     }
 
     fn when_all<'db, 'c>(
@@ -240,7 +240,7 @@ where
             }),
         );
         let deferred_quantification = InferableTypeVars::from_typevars(db, deferred_quantification);
-        ConstraintSet::from_node_with_metadata(builder, node, deferred_quantification)
+        ConstraintSet::from_node(builder, node, deferred_quantification)
     }
 }
 
@@ -306,11 +306,7 @@ impl<'db> OwnedConstraintSet<'db> {
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
         };
-        let set = ConstraintSet::from_node_with_metadata(
-            &builder,
-            self.node,
-            self.deferred_quantification,
-        );
+        let set = ConstraintSet::from_node(&builder, self.node, self.deferred_quantification);
         f(&builder, set)
     }
 }
@@ -378,11 +374,7 @@ pub(crate) enum SolutionProjection<'db> {
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
-    fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
-        Self::from_node_with_metadata(builder, node, InferableTypeVars::None)
-    }
-
-    fn from_node_with_metadata(
+    fn from_node(
         builder: &'c ConstraintSetBuilder<'db>,
         node: NodeId,
         deferred_quantification: InferableTypeVars<'db>,
@@ -396,11 +388,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_FALSE)
+        Self::from_node(builder, ALWAYS_FALSE, InferableTypeVars::None)
     }
 
     fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_node(builder, ALWAYS_TRUE)
+        Self::from_node(builder, ALWAYS_TRUE, InferableTypeVars::None)
     }
 
     pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, b: bool) -> Self {
@@ -430,7 +422,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> Self {
-        Self::from_node_with_metadata(
+        Self::from_node(
             builder,
             Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
             InferableTypeVars::None,
@@ -492,7 +484,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // TODO: Preserve quantifier structure through negation-like operations instead of forcing
         // deferred quantification before checking the implication.
         let self_effective = self.apply_deferred_quantification(db, builder);
-        Self::from_node_with_metadata(
+        Self::from_node(
             builder,
             self_effective
                 .node
@@ -571,7 +563,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // TODO: Preserve quantifier structure through negation instead of forcing deferred
         // quantification before negating.
         let self_effective = self.apply_deferred_quantification(db, builder);
-        Self::from_node_with_metadata(
+        Self::from_node(
             builder,
             self_effective.node.negate(builder),
             InferableTypeVars::None,
@@ -657,7 +649,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // quantification before the negation-like operation.
         let self_effective = self.apply_deferred_quantification(db, builder);
         let other_effective = other.apply_deferred_quantification(db, builder);
-        Self::from_node_with_metadata(
+        Self::from_node(
             builder,
             self_effective
                 .node
@@ -689,7 +681,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
 
-        Self::from_node_with_metadata(
+        Self::from_node(
             builder,
             self.node
                 .exists(db, builder, self.deferred_quantification.iter(db)),
@@ -1053,7 +1045,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
 
         if other.node.is_terminal() {
-            return ConstraintSet::from_node(self, other.node);
+            return ConstraintSet::from_node(self, other.node, InferableTypeVars::None);
         }
         let inner = other
             .inner
@@ -1081,7 +1073,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(self, inner, &constraints, &mut cache, other.node);
-        ConstraintSet::from_node_with_metadata(self, node, other.deferred_quantification)
+        ConstraintSet::from_node(self, node, other.deferred_quantification)
     }
 
     /// Interns a single typevar, giving it a stable order in this builder
@@ -7238,6 +7230,7 @@ mod tests {
             t_int
                 .node
                 .exists(&db, &builder, deferred_quantification.iter(&db)),
+            InferableTypeVars::None,
         );
         let deferred = t_int.with_deferred_quantification(&db, &builder, deferred_quantification);
 
@@ -7296,9 +7289,12 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, u, Type::TypeVar(t), Type::TypeVar(t));
         let set = t_int.and(&db, &builder, || u_equals_t);
 
-        let Solutions::Constrained(raw_solutions) = ConstraintSet::from_node(&builder, set.node)
-            .solutions(&db, &builder, SolutionProjection::AllTypeVars)
-        else {
+        let Solutions::Constrained(raw_solutions) = ConstraintSet::from_node(
+            &builder,
+            set.node,
+            InferableTypeVars::None,
+        )
+        .solutions(&db, &builder, SolutionProjection::AllTypeVars) else {
             panic!("expected constrained raw solutions");
         };
         assert_eq!(raw_solutions.len(), 1);
@@ -7336,7 +7332,7 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
             .with_deferred_quantification(&db, &builder, deferred_quantification);
-        let quantified_after_negation = ConstraintSet::from_node_with_metadata(
+        let quantified_after_negation = ConstraintSet::from_node(
             &builder,
             t_int.node.negate(&builder),
             deferred_quantification,
