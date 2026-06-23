@@ -11,8 +11,10 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________________________^
   |
 help: Organize imports
+  |
   - from module import Class as C
   - from module import CONSTANT
   - from module import function
   - from module import function as f
 1 + from module import CONSTANT, Class as C, function, function as f
+  |

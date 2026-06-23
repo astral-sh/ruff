@@ -63,19 +63,19 @@ use lsp_types::{
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
     DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
-    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange,
-    FoldingRangeParams, Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest,
-    InitializeResult, InitializedNotification, InitializedParams, InlayHint,
-    InlayHintClientCapabilities, InlayHintParams, InlayHintRequest, LanguageKind, Notification,
-    PartialResultParams, Position, PrepareRenameRequest, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, Request, SemanticTokens, ShutdownRequest,
-    SignatureHelp, SignatureHelpParams, SignatureHelpRequest, SignatureHelpTriggerKind,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, Uri, VersionedTextDocumentIdentifier,
-    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest, WorkspaceEdit, WorkspaceFolder,
-    WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
+    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
+    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
+    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
+    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
+    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
+    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
+    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -839,6 +839,17 @@ impl TestServer {
             content_changes: changes,
         };
         self.send_notification::<DidChangeTextDocumentNotification>(params);
+    }
+
+    /// Send a `textDocument/didSave` notification
+    pub(crate) fn save_text_document(&mut self, path: impl AsRef<SystemPath>) {
+        let params = DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier {
+                uri: self.file_uri(path),
+            },
+            text: None,
+        };
+        self.send_notification::<DidSaveTextDocumentNotification>(params);
     }
 
     /// Send a `textDocument/didClose` notification

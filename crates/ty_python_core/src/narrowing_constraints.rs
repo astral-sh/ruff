@@ -39,7 +39,7 @@ use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
 use crate::predicate::ScopedPredicateId;
-use crate::rank::RankBitBox;
+use crate::rank::{RankBitBox, RankBitBoxVec};
 use crate::scope::FileScopeId;
 
 /// The ID of a narrowing formula within one scope.
@@ -93,7 +93,7 @@ pub struct InteriorNode {
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct NarrowingConstraints {
     used_interiors: Box<[InteriorNode]>,
-    used_indices: Option<Box<RankBitBox>>,
+    used_indices: Option<RankBitBox>,
 }
 
 impl NarrowingConstraints {
@@ -119,7 +119,7 @@ impl NarrowingConstraints {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct NarrowingConstraintsBuilder {
     interiors: IndexVec<ScopedNarrowingConstraint, InteriorNode>,
-    interior_used: IndexVec<ScopedNarrowingConstraint, bool>,
+    interior_used: RankBitBoxVec,
     interior_cache: FxHashMap<InteriorNode, ScopedNarrowingConstraint>,
     and_cache: FxHashMap<
         (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
@@ -133,29 +133,29 @@ pub struct NarrowingConstraintsBuilder {
 
 impl NarrowingConstraintsBuilder {
     pub(crate) fn build(self) -> NarrowingConstraints {
-        if self.interior_used.iter().all(|used| *used) {
+        if self.interior_used.first_zero().is_none() {
             NarrowingConstraints {
                 used_interiors: self.interiors.raw.into_boxed_slice(),
                 used_indices: None,
             }
         } else {
-            let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
             let used_interiors = self
                 .interiors
                 .into_iter()
-                .zip(self.interior_used)
+                .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
+            let used_indices = RankBitBox::from_bits(self.interior_used);
             NarrowingConstraints {
                 used_interiors,
-                used_indices: Some(Box::new(used_indices)),
+                used_indices: Some(used_indices),
             }
         }
     }
 
     pub(crate) fn mark_used(&mut self, node: ScopedNarrowingConstraint) {
-        if !node.is_terminal() && !self.interior_used[node] {
-            self.interior_used[node] = true;
+        if !node.is_terminal() && !self.interior_used[node.index()] {
+            self.interior_used.set(node.index(), true);
             let node = self.interiors[node];
             self.mark_used(node.if_true);
             self.mark_used(node.if_uncertain);

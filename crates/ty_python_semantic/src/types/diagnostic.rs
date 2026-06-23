@@ -1423,29 +1423,10 @@ pub(crate) fn is_invalid_typed_dict_literal(
 fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     context: &'ctx InferContext,
     node: T,
-    target_ty: Type<'db>,
     message: std::fmt::Arguments,
 ) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
     let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
-
-    let mut diag = builder.into_diagnostic(message);
-
-    match target_ty {
-        Type::ClassLiteral(class) => {
-            diag.info(format_args!(
-                "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
-                class.name(context.db()),
-            ));
-        }
-        Type::FunctionLiteral(function) => {
-            diag.info(format_args!(
-                "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
-                function.name(context.db()),
-            ));
-        }
-        _ => {}
-    }
-    Some(diag)
+    Some(builder.into_diagnostic(message))
 }
 
 pub(super) fn note_numbers_module_not_supported<'db>(
@@ -1619,7 +1600,6 @@ pub(super) fn report_invalid_assignment<'db>(
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
-        target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
             value_ty.display_with(context.db(), settings.clone()),
@@ -1628,6 +1608,24 @@ pub(super) fn report_invalid_assignment<'db>(
     ) else {
         return;
     };
+
+    if matches!(target_node, AnyNodeRef::ExprName(_)) {
+        match target_ty {
+            Type::ClassLiteral(class) => {
+                diag.info(format_args!(
+                    "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
+                    class.name(context.db()),
+                ));
+            }
+            Type::FunctionLiteral(function) => {
+                diag.info(format_args!(
+                    "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
+                    function.name(context.db()),
+                ));
+            }
+            _ => {}
+        }
+    }
 
     if value_node.is_some() {
         match definition_kind {
@@ -1681,7 +1679,6 @@ pub(super) fn report_invalid_attribute_assignment(
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
-        target_ty,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
             source_ty.display(context.db()),
@@ -2867,7 +2864,7 @@ pub(crate) fn report_duplicate_bases(
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.focus_range(db)) else {
         return;
     };
 
@@ -2882,28 +2879,23 @@ pub(crate) fn report_duplicate_bases(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
-    let mut sub_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!(
-            "The definition of class `{}` will raise `TypeError` at runtime",
-            class.name(db)
-        ),
-    );
+    diagnostic.info(format_args!(
+        "Definition of class `{}` will raise `TypeError` at runtime",
+        class.name(db)
+    ));
+
     let first_base = bases_list[*first_index].source_node();
-    sub_diagnostic.annotate(
-        Annotation::secondary(context.span(first_base)).message(format_args!(
-            "Class `{duplicate_name}` first included in bases list here"
-        )),
-    );
+    diagnostic.annotate(context.secondary(first_base).message(format_args!(
+        "Class `{duplicate_name}` first included in bases list here"
+    )));
+
     for index in later_indices {
         let repeated_base = bases_list[*index].source_node();
-        sub_diagnostic.annotate(
+        diagnostic.annotate(
             Annotation::primary(context.span(repeated_base))
                 .message(format_args!("Class `{duplicate_name}` later repeated here")),
         );
     }
-
-    diagnostic.sub(sub_diagnostic);
 }
 
 pub(crate) fn report_invalid_or_unsupported_base(

@@ -46,7 +46,7 @@ use crate::rules::pydocstyle::settings::Settings;
 ///
 /// [Google Python style guide]: https://google.github.io/styleguide/pyguide.html#383-functions-and-methods
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.18")]
 pub(crate) struct PropertyDocstringStartsWithVerb {
     pub(crate) first_word: String,
 }

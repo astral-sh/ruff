@@ -1272,6 +1272,21 @@ impl Iterator for SuppressionParser<'_> {
     }
 }
 
+/// Returns the range of the rule identifier at `offset` within a `noqa` or Ruff suppression
+/// comment.
+pub fn rule_identifier_range_at_offset(
+    source: &str,
+    comment_range: TextRange,
+    offset: TextSize,
+) -> Option<TextRange> {
+    crate::noqa::rule_identifier_range_at_offset(source, comment_range, offset).or_else(|| {
+        SuppressionParser::new(source, comment_range)
+            .filter_map(Result::ok)
+            .flat_map(|comment| comment.codes)
+            .find(|range| range.contains(offset))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::{self, Formatter};

@@ -141,7 +141,7 @@ impl<'db> Mro<'db> {
                             )
                     ) =>
             {
-                ClassBase::try_from_type(
+                ClassBase::try_from_explicit_base(
                     db,
                     *single_base,
                     Some(ClassLiteral::Static(class_literal)),
@@ -187,7 +187,7 @@ impl<'db> Mro<'db> {
                             &original_bases[i + 1..],
                         );
                     } else {
-                        match ClassBase::try_from_type(
+                        match ClassBase::try_from_explicit_base(
                             db,
                             *base,
                             Some(ClassLiteral::Static(class_literal)),
@@ -262,7 +262,7 @@ impl<'db> Mro<'db> {
                     // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
                     // precise!).
                     for (index, base) in original_bases.iter().enumerate() {
-                        let Some(base) = ClassBase::try_from_type(
+                        let Some(base) = ClassBase::try_from_explicit_base(
                             db,
                             *base,
                             Some(ClassLiteral::Static(class_literal)),
@@ -292,7 +292,7 @@ impl<'db> Mro<'db> {
                                     later_indices: later_indices.iter().copied().collect(),
                                 });
                             }
-                            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                                 duplicate_dynamic_bases = true;
                             }
                         }
@@ -347,7 +347,7 @@ impl<'db> Mro<'db> {
         let mut invalid_bases = Vec::new();
 
         for (i, base_type) in original_bases.iter().enumerate() {
-            match ClassBase::try_from_type(db, *base_type, None) {
+            match ClassBase::try_from_explicit_base(db, *base_type, None) {
                 Some(class_base) => resolved_bases.push(class_base),
                 None => invalid_bases.push((i, *base_type)),
             }
@@ -364,7 +364,7 @@ impl<'db> Mro<'db> {
         // Check if any bases are dynamic, like `Unknown` or `Any`.
         let has_dynamic_bases = resolved_bases
             .iter()
-            .any(|base| matches!(base, ClassBase::Dynamic(_)));
+            .any(|base| matches!(base, ClassBase::Any | ClassBase::Dynamic(_)));
 
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
 
@@ -395,7 +395,7 @@ impl<'db> Mro<'db> {
         let mut duplicates = Vec::new();
         let mut has_duplicate_dynamic_bases = false;
         for base in &resolved_bases {
-            if matches!(base, ClassBase::Dynamic(_)) {
+            if matches!(base, ClassBase::Any | ClassBase::Dynamic(_)) {
                 if !seen.insert(*base) {
                     has_duplicate_dynamic_bases = true;
                 }
@@ -439,7 +439,7 @@ impl<'db> Mro<'db> {
         let original_bases = dynamic_enum.explicit_bases(db);
         let mut resolved_bases: Vec<ClassBase<'db>> = Vec::with_capacity(original_bases.len());
         for base_type in original_bases.iter().copied() {
-            if let Some(base) = ClassBase::try_from_type(db, base_type, None) {
+            if let Some(base) = ClassBase::try_from_explicit_base(db, base_type, None) {
                 resolved_bases.push(base);
             }
         }
@@ -502,8 +502,8 @@ impl<'db> Mro<'db> {
 
         for base_type in dynamic.explicit_bases(db) {
             // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base =
-                ClassBase::try_from_type(db, *base_type, None).unwrap_or_else(ClassBase::unknown);
+            let base = ClassBase::try_from_explicit_base(db, *base_type, None)
+                .unwrap_or_else(ClassBase::unknown);
 
             for item in base.mro(db, None) {
                 if seen.insert(item) {

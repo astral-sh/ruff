@@ -57,14 +57,12 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
   |           ^^^^^^^^^^^
   |
 help: Remove the type parameters from the `Protocol` base
-2 |
-3 | T = TypeVar("T")
+  |
 4 |
   - class Foo(Protocol[T], Generic[T]): ...  # error: [invalid-generic-class]
 5 + class Foo(Protocol, Generic[T]): ...  # error: [invalid-generic-class]
 6 |
-7 | # fmt: off
-8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -80,16 +78,14 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
    | |_^
    |
 help: Remove the type parameters from the `Protocol` base
-7  | # fmt: off
-8  |
+   |
 9  | # error: [invalid-generic-class]
    - class Bar(Protocol[
    -   T,
    - ], Generic[T]): ...
 10 + class Bar(Protocol, Generic[T]): ...
 11 |
-12 | class Spam(  # docs
-13 |   # error: [invalid-generic-class]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -106,8 +102,7 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
    | |_^
    |
 help: Remove the type parameters from the `Protocol` base
-13 |
-14 | class Spam(  # docs
+   |
 15 |   # error: [invalid-generic-class]
    -   Protocol[  # some comment
    -     # another comment
@@ -116,8 +111,7 @@ help: Remove the type parameters from the `Protocol` base
    - ],  # important comma!
 16 +   Protocol,  # important comma!
 17 |   # and a newline...
-18 |   Generic[  # look at this
-19 |   # wow
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -130,11 +124,11 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
    |              ^^^^^^^^^^^
    |
 help: Remove the type parameters from the `Protocol` base
-29 |
-30 | # fmt: on
+   |
 31 |
    - class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
 32 + class Foo[T](Protocol): ...  # error: [invalid-generic-class]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```

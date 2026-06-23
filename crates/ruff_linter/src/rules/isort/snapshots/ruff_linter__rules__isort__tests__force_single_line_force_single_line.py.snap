@@ -34,14 +34,13 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_________________^
    |
 help: Organize imports
+   |
    - import sys, math
    - from os import path, uname
 1  + import math
 2  + import sys
 3  | from json import detect_encoding
-4  | from json import dump
-5  | from json import dumps as json_dumps
-6  | from json import load
+--------------------------------------------------------------------------------
 7  | from json import loads as json_loads
    - from logging.handlers import StreamHandler, FileHandler
 8  + from logging.handlers import FileHandler, StreamHandler
@@ -81,3 +80,4 @@ help: Organize imports
 29 + from third_party import lib5
 30 + from third_party import lib6
 31 + from third_party import lib7
+   |

@@ -1,18 +1,23 @@
 use std::borrow::Cow;
 
+use super::super::document::preformatted::MarkdownFence;
+
+mod inline;
+
 /// Applies whole-docstring Markdown escaping and code-fence handling.
 ///
-/// This function assumes the input has had its whitespace normalized by `documentation_trim`,
-/// so leading whitespace is always a space, and newlines are always `\n`.
+/// This function assumes the input has had its whitespace normalized by
+/// `docstring::documentation_trim`, so leading whitespace is always a space,
+/// and newlines are always `\n`.
 ///
 /// The general approach here is:
 ///
-/// * Preserve the docstring verbatim by default, ensuring indent/linewraps are preserved
+/// * Encode line indentation and breaks so that the rendered output mirrors the source layout
 /// * Escape problematic things where necessary (bare `__dunder__` => `\_\_dunder\_\_`)
 /// * Introduce code fences where appropriate
 ///
-/// The first rule is significant in ensuring various docstring idioms render clearly.
-/// In particular ensuring things like this are faithfully rendered:
+/// The first rule is significant in ensuring various docstring idioms render
+/// clearly e.g.:
 ///
 /// ```text
 /// param1 -- a good parameter
@@ -20,8 +25,7 @@ use std::borrow::Cow;
 ///           with longer docs
 /// ```
 ///
-/// If we didn't go out of our way to preserve the indentation and line-breaks, markdown would
-/// constantly render inputs like that into abominations like:
+/// Without that encoding, Markdown would render inputs like that into abominations like:
 ///
 /// ```html
 /// <p>
@@ -32,7 +36,32 @@ use std::borrow::Cow;
 /// with longer docs
 /// </code>
 /// ```
-pub(super) fn render(docstring: &str) -> String {
+pub(super) fn render_into(output: &mut String, docstring: &str) {
+    render_with_indentation_mode(output, docstring, LeadingIndentation::DisplayOnly);
+}
+
+/// Renders an extracted docstring fragment with ordinary spaces for indentation.
+///
+/// Unlike [`render_into`], this emits leading indentation outside code blocks as ordinary spaces,
+/// allowing Markdown to interpret it as block syntax such as nested lists.
+pub(super) fn render_fragment_into(output: &mut String, fragment: &str) {
+    render_with_indentation_mode(output, fragment, LeadingIndentation::MarkdownSyntax);
+}
+
+/// How to emit leading indentation outside recognized code blocks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LeadingIndentation {
+    /// Emit `&nbsp;` so that indentation affects display without activating Markdown syntax.
+    DisplayOnly,
+    /// Emit ordinary spaces that Markdown can interpret as block syntax.
+    MarkdownSyntax,
+}
+
+fn render_with_indentation_mode(
+    output: &mut String,
+    docstring: &str,
+    leading_indentation: LeadingIndentation,
+) {
     // Here lies a monumemnt to robust parsing and escaping:
     // a codefence with SO MANY backticks that surely no one will ever accidentally
     // break out of it, even if they're writing python documentation about markdown
@@ -43,7 +72,6 @@ pub(super) fn render(docstring: &str) -> String {
     // While rendering this we should make note of all the `singletick` locations
     // and (possibly in a higher up piece of logic) try to resolve the names for
     // cross-linking. (Similar to `TypeDetails` in the type formatting code.)
-    let mut output = String::new();
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
@@ -109,7 +137,7 @@ pub(super) fn render(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see a markdown codefence, start one
-        if !in_any_code && let Some(fence) = super::MarkdownFence::find(trimmed_source_line) {
+        if !in_any_code && let Some(fence) = MarkdownFence::find(trimmed_source_line) {
             // Unlike other blocks we don't need to emit fences because it's already markdown
             block_indent = line_indent;
             in_any_code = true;
@@ -238,8 +266,8 @@ pub(super) fn render(docstring: &str) -> String {
         // We could subtract the block_indent here but in practice it's uglier
         // TODO: should we not do this if the `line.is_empty()`? When would it matter?
         for _ in 0..line_indent {
-            // If we're not in a codeblock use non-breaking spaces to preserve the indent
-            if !in_any_code {
+            // Outside code blocks, emit indentation according to the selected mode.
+            if !in_any_code && matches!(leading_indentation, LeadingIndentation::DisplayOnly) {
                 // TODO: would the raw unicode codepoint be handled *better* or *worse*
                 // by various IDEs? VS Code handles this approach well, at least.
                 output.push_str("&nbsp;");
@@ -249,77 +277,7 @@ pub(super) fn render(docstring: &str) -> String {
         }
 
         if !in_any_code {
-            // This line is plain text, so we need to escape things that are inert in reST
-            // but active syntax in markdown... but not if it's inside `inline code`.
-            // Inline-code syntax is shared by reST and markdown which is really convenient
-            // except we need to find and parse it anyway to do this escaping properly! :(
-            // For now we assume `inline code` does not span a line (I'm not even sure if can).
-            //
-            // Things that need to be escaped: underscores and HTML-sensitive characters.
-            //
-            // e.g. we want __init__ => \_\_init\_\_ but `__init__` => `__init__`
-            let escape = |input: &str| {
-                input
-                    .replace('&', "&amp;")
-                    .replace('<', "&lt;")
-                    .replace('>', "&gt;")
-                    .replace('_', "\\_")
-            };
-
-            let mut in_inline_code = false;
-            let mut first_chunk = true;
-            let mut opening_tick_count = 0;
-            let mut current_tick_count = 0;
-            for chunk in rendered_line.split('`') {
-                // First chunk is definitionally not in inline-code and so always plaintext
-                if first_chunk {
-                    first_chunk = false;
-                    output.push_str(&escape(chunk));
-                    continue;
-                }
-                // Not in first chunk, emit the ` between the last chunk and this one
-                output.push('`');
-                current_tick_count += 1;
-
-                // If we're in an inline block and have enough close-ticks to terminate it, do so.
-                // TODO: we parse ``hello```there` as (hello)(there) which probably isn't correct
-                // (definitely not for markdown) but it's close enough for horse grenades in this
-                // MVP impl. Notably we're verbatime emitting all the `'s so as long as reST and
-                // markdown agree we're *fine*. The accuracy of this parsing only affects the
-                // accuracy of where we apply escaping (so we need to misparse and see escapables
-                // for any of this to matter).
-                if opening_tick_count > 0 && current_tick_count >= opening_tick_count {
-                    opening_tick_count = 0;
-                    current_tick_count = 0;
-                    in_inline_code = false;
-                }
-
-                // If this chunk is completely empty we're just in a run of ticks, continue
-                if chunk.is_empty() {
-                    continue;
-                }
-
-                // Ok the chunk is non-empty, our run of ticks is complete
-                if in_inline_code {
-                    // The previous check for >= open_tick_count didn't trip, so these can't close
-                    // and these ticks will be verbatim rendered in the content
-                    current_tick_count = 0;
-                } else if current_tick_count > 0 {
-                    // Ok we're now in inline code
-                    opening_tick_count = current_tick_count;
-                    current_tick_count = 0;
-                    in_inline_code = true;
-                }
-
-                // Finally include the content either escaped or not
-                if in_inline_code {
-                    output.push_str(chunk);
-                } else {
-                    output.push_str(&escape(chunk));
-                }
-            }
-            // NOTE: explicitly not "flushing" the ticks here.
-            // We respect however the user closed their inline code.
+            inline::render_line(output, rendered_line);
         } else if rendered_line.is_empty() {
             if in_doctest {
                 // This is the end of a doctest
@@ -342,6 +300,4 @@ pub(super) fn render(docstring: &str) -> String {
             output.push_str(FENCE);
         }
     }
-
-    output
 }

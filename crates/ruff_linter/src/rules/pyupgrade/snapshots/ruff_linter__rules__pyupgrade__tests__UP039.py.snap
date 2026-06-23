@@ -10,12 +10,12 @@ UP039 [*] Unnecessary parentheses after class definition
 3 |     pass
   |
 help: Remove parentheses
+  |
 1 | # Errors
   - class A():
 2 + class A:
 3 |     pass
-4 |
-5 |
+  |
 
 UP039 [*] Unnecessary parentheses after class definition
  --> UP039.py:6:8
@@ -26,14 +26,12 @@ UP039 [*] Unnecessary parentheses after class definition
 8 |     pass
   |
 help: Remove parentheses
-3 |     pass
-4 |
+  |
 5 |
   - class A() \
 6 + class A \
 7 |     :
-8 |     pass
-9 |
+  |
 
 UP039 [*] Unnecessary parentheses after class definition
   --> UP039.py:12:9
@@ -44,14 +42,12 @@ UP039 [*] Unnecessary parentheses after class definition
 13 |     pass
    |
 help: Remove parentheses
-9  |
-10 |
+   |
 11 | class A \
    -         ():
 12 +         :
 13 |     pass
-14 |
-15 |
+   |
 
 UP039 [*] Unnecessary parentheses after class definition
   --> UP039.py:17:8
@@ -62,14 +58,12 @@ UP039 [*] Unnecessary parentheses after class definition
 18 |     pass
    |
 help: Remove parentheses
-14 |
-15 |
+   |
 16 | @decorator()
    - class A():
 17 + class A:
 18 |     pass
-19 |
-20 | @decorator
+   |
 
 UP039 [*] Unnecessary parentheses after class definition
   --> UP039.py:21:8
@@ -80,14 +74,12 @@ UP039 [*] Unnecessary parentheses after class definition
 22 |     pass
    |
 help: Remove parentheses
-18 |     pass
-19 |
+   |
 20 | @decorator
    - class A():
 21 + class A:
 22 |     pass
-23 |
-24 | # OK
+   |
 
 UP039 [*] Unnecessary parentheses after class definition
   --> UP039.py:46:10
@@ -99,11 +91,11 @@ UP039 [*] Unnecessary parentheses after class definition
    | |_^
    |
 help: Remove parentheses
-43 |     pass
-44 |
+   |
 45 |
    - class Foo(
    -     # text
    - ): ...
 46 + class Foo: ...
+   |
 note: This is an unsafe fix and may change runtime behavior

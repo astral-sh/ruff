@@ -876,7 +876,7 @@ When assigning to a union of `TypedDict` types, the type will be narrowed based 
 literal:
 
 ```py
-from typing import TypedDict
+from typing import TypeVar, TypedDict
 from typing_extensions import NotRequired
 
 class Foo(TypedDict):
@@ -908,6 +908,9 @@ reveal_type(x4)  # revealed: Bar
 x5: Foo | Bar = {"baz": 1}
 reveal_type(x5)  # revealed: Foo | Bar
 
+x5_fallback: Foo | Bar | dict[str, object] = {"baz": 1}
+reveal_type(x5_fallback)  # revealed: dict[str, object]
+
 class FooBar1(TypedDict):
     foo: int
     bar: int
@@ -929,6 +932,21 @@ reveal_type(x7)  # revealed: FooBar1 | FooBar3
 
 x8: FooBar1 | FooBar2 | FooBar3 | None = {"foo": 1, "bar": 1}
 reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3
+
+# Nested peer inference must still observe its speculative diagnostics while the outer dictionary
+# is tested against multiple TypedDicts.
+class PeerContainer(TypedDict):
+    nested: Foo
+
+PeerT = TypeVar("PeerT")
+
+def preserve_peer(value: PeerT) -> PeerT:
+    return value
+
+def _(payload: Foo | None):
+    # error: [invalid-assignment]
+    nested: PeerContainer | Bar = {"nested": preserve_peer(payload or {"unexpected": 1})}
+    reveal_type(nested)  # revealed: PeerContainer | Bar
 ```
 
 In doing so, may have to infer the same type with multiple distinct type contexts:

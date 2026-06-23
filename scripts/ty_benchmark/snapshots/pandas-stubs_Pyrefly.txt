@@ -1,2 +1,2 @@
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 0 errors (181 suppressed, 3 warnings not shown)
+ INFO 0 errors (249 suppressed, 3 warnings not shown)

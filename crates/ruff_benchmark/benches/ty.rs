@@ -1,12 +1,13 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
 use ruff_benchmark::real_world_projects::{
-    InstalledProject, RealWorldProject, copy_directory_recursive, get_project_cache_dir,
-    install_dependencies_to_cache,
+    InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, copy_directory_recursive,
+    get_project_cache_dir, install_dependencies_to_cache,
 };
 
 use std::fmt::Write;
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
@@ -225,32 +226,32 @@ fn setup_micro_case(code: &str) -> Case {
     setup_micro_case_inner(code, None)
 }
 
-fn setup_micro_case_with_dependencies(name: &str, dependencies: &[&str], code: &str) -> Case {
-    setup_micro_case_inner(code, Some((name, dependencies)))
+fn setup_micro_case_venv(name: &str, dependencies: &[&str]) -> PathBuf {
+    let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
+    std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+    let venv_path = cache_dir.join(".venv");
+    install_dependencies_to_cache(
+        name,
+        dependencies,
+        &venv_path,
+        SupportedPythonVersion::Py312,
+        TY_ECOSYSTEM_PIN,
+    )
+    .expect("Failed to install dependencies");
+
+    venv_path
 }
 
-fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> Case {
+fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
-    let python = dependencies.map(|(name, dependencies)| {
-        let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
-        std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
-
-        let venv_path = cache_dir.join(".venv");
-        install_dependencies_to_cache(
-            name,
-            dependencies,
-            &venv_path,
-            SupportedPythonVersion::Py312,
-            "2025-06-17",
-        )
-        .expect("Failed to install dependencies");
-
+    let python = venv_path.map(|venv_path| {
         // Copy the on-disk venv into the in-memory filesystem.
         // ProjectMetadata::discover walks up from /src and uses / as the project root,
         // so the venv must be at /.venv for the `python = ".venv"` option to resolve correctly.
-        copy_directory_recursive(&fs, &venv_path, SystemPath::new("/.venv"))
+        copy_directory_recursive(&fs, venv_path, SystemPath::new("/.venv"))
             .expect("Failed to copy venv to memory filesystem");
 
         RelativePathBuf::cli(SystemPath::new(".venv"))
@@ -1217,27 +1218,23 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
 
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
+    let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
+    let code = r#"
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "a": [1, 2, 3],
+            "b": [4, 5, 6],
+            "c": [7, 8, 9],
+        })
+        df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
+            df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
+        "#;
 
     // This example was reported in https://github.com/astral-sh/ty/issues/3039.
     criterion.bench_function("ty_micro[pandas_tdd]", |b| {
         b.iter_batched_ref(
-            || {
-                setup_micro_case_with_dependencies(
-                    "pandas_tdd",
-                    &["pandas-stubs"],
-                    r#"
-                    import pandas as pd
-
-                    df = pd.DataFrame({
-                        "a": [1, 2, 3],
-                        "b": [4, 5, 6],
-                        "c": [7, 8, 9],
-                    })
-                    df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
-                        df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
-                    "#,
-                )
-            },
+            || setup_micro_case_inner(code, Some(&venv_path)),
             |case| {
                 let Case { db, .. } = case;
                 let result = db.check();
@@ -1438,13 +1435,13 @@ fn hydra(criterion: &mut Criterion) {
         RealWorldProject {
             name: "hydra-zen",
             repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-            commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-            paths: &["src"],
+            commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
+            paths: &["src", "tests/annotations"],
             dependencies: &["pydantic", "beartype", "hydra-core"],
-            max_dep_date: "2025-06-17",
-            python_version: SupportedPythonVersion::Py313,
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        100,
+        510,
     );
 
     bench_project(&benchmark, criterion);
@@ -1455,13 +1452,13 @@ fn attrs(criterion: &mut Criterion) {
         RealWorldProject {
             name: "attrs",
             repository: "https://github.com/python-attrs/attrs",
-            commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-            paths: &["src"],
+            commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
+            paths: &["src/attrs", "src/attr", "typing-examples"],
             dependencies: &[],
-            max_dep_date: "2025-06-17",
-            python_version: SupportedPythonVersion::Py313,
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        120,
+        102,
     );
 
     bench_project(&benchmark, criterion);
@@ -1472,13 +1469,13 @@ fn anyio(criterion: &mut Criterion) {
         RealWorldProject {
             name: "anyio",
             repository: "https://github.com/agronholm/anyio",
-            commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
+            commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
             paths: &["src"],
-            dependencies: &[],
-            max_dep_date: "2025-06-17",
-            python_version: SupportedPythonVersion::Py313,
+            dependencies: &["exceptiongroup", "idna", "pytest"],
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        150,
+        110,
     );
 
     bench_project(&benchmark, criterion);
@@ -1489,13 +1486,13 @@ fn datetype(criterion: &mut Criterion) {
         RealWorldProject {
             name: "DateType",
             repository: "https://github.com/glyph/DateType",
-            commit: "57c9c93cf2468069f72945fc04bf27b64100dad8",
+            commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
             paths: &["src"],
             dependencies: &[],
-            max_dep_date: "2025-07-04",
-            python_version: SupportedPythonVersion::Py313,
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        10,
+        17,
     );
 
     bench_project(&benchmark, criterion);

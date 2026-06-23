@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::enums::{EnumComplement, enum_metadata};
+use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
@@ -165,7 +165,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
             continue;
         };
         let enum_class = complement.enum_class(db);
-        let metadata = enum_metadata(db, enum_class).expect("Enum complement class is an enum");
+        let enum_class_literal = complement.enum_class_literal(db);
         let mut shared_excluded_names: FxHashSet<_> =
             complement.excluded_names(db).iter().cloned().collect();
 
@@ -197,7 +197,8 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 continue;
             }
 
-            let Some(canonical_name) = metadata.resolve_member(enum_literal.name(db)) else {
+            let Some(canonical_name) = enum_class_literal.resolve_member(db, enum_literal.name(db))
+            else {
                 continue;
             };
             shared_excluded_names.remove(canonical_name);
@@ -210,14 +211,13 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
             for rest in complement.rest(db) {
                 builder = builder.add_positive(*rest);
             }
-            for name in metadata
-                .members
-                .keys()
+            for name in enum_class_literal
+                .member_names(db)
                 .filter(|name| shared_excluded_names.contains(*name))
             {
                 builder = builder.add_negative(Type::enum_literal(EnumLiteralType::new(
                     db,
-                    enum_class,
+                    complement.enum_class_literal(db),
                     name.clone(),
                 )));
             }
@@ -440,13 +440,11 @@ enum ReduceResult<'db> {
 /// resulting in faster convergence of the fixed-point iteration.
 const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
-/// so in principle we can have as many literal elements as we want,
-/// but to avoid unintended huge computational loads, we limit it to 256.
-const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
-/// However, we set a much larger limit for enum literals than for other kinds of literals.
-/// Huge enums are not uncommon (especially in generated code), and it's annoying
+/// so in principle we can have as many literal elements as we want.
+/// We set a large limit for union and enum literals.
+/// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
-const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
+const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -790,18 +788,11 @@ impl<'db> UnionBuilder<'db> {
                         }
                     }
                     LiteralValueTypeKind::Enum(enum_member_to_add) => {
-                        let enum_class = enum_member_to_add.enum_class(self.db);
+                        let enum_class_literal = enum_member_to_add.enum_class_literal(self.db);
+                        let enum_class = enum_class_literal.class_literal(self.db);
+                        let enum_member_count = enum_class_literal.member_count(self.db);
 
-                        // We generally expect that a `Type::LiteralValue(LiteralValueTypeKind::Enum)`
-                        // value is in fact in enum, i.e., that `enum_metadata` returns `Some(...)`.
-                        // However, during cycle recovery, it's possible (empirically) to end up
-                        // in an inconsistent state. The metadata is only required for simplification
-                        // and not for correctness, so we treat it as optional here.
-                        // TODO: Come up with a design, either to enum metadata or the cycle
-                        // handling more broadly, that avoids this inconsistency.
-                        let metadata = enum_metadata(self.db, enum_class);
-
-                        if metadata.is_some_and(|metadata| metadata.members.len() == 1) {
+                        if enum_member_count == 1 {
                             self.add_in_place_impl(
                                 enum_member_to_add.enum_class_instance(self.db),
                                 seen_aliases,
@@ -820,15 +811,7 @@ impl<'db> UnionBuilder<'db> {
                                     if *existing_enum_class != enum_class {
                                         continue;
                                     }
-                                    // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
-                                    // for why we avoid using the `should_widen` closure here.
-                                    let enum_literals_limit =
-                                        if self.recursively_defined.is_yes() && cycle_recovery {
-                                            MAX_RECURSIVE_UNION_LITERALS
-                                        } else {
-                                            MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                        };
-                                    if literals.len() >= enum_literals_limit {
+                                    if should_widen(literals.len(), self.recursively_defined) {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with = literal.enum_class_instance(self.db);
                                         self.add_in_place_impl(replace_with, seen_aliases);
@@ -862,9 +845,7 @@ impl<'db> UnionBuilder<'db> {
                                 ordermap::map::Entry::Vacant(entry) => {
                                     entry.insert(literal.is_promotable());
 
-                                    if metadata.is_some_and(|metadata| {
-                                        found.len() == metadata.members.len()
-                                    }) {
+                                    if found.len() == enum_member_count {
                                         self.add_in_place_impl(
                                             enum_member_to_add.enum_class_instance(self.db),
                                             seen_aliases,
@@ -1108,6 +1089,17 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
+    /// Add DNF branches, dropping those that have already collapsed to `Never` so that later
+    /// union distribution does not multiply dead branches.
+    fn extend(&mut self, other: Self) {
+        self.intersections.extend(
+            other
+                .intersections
+                .into_iter()
+                .filter(|intersection| !intersection.contains_never()),
+        );
+    }
+
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
         self.add_positive_impl(ty, &mut vec![])
     }
@@ -1144,7 +1136,7 @@ impl<'db> IntersectionBuilder<'db> {
                     .iter()
                     .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     })
             }
@@ -1232,7 +1224,7 @@ impl<'db> IntersectionBuilder<'db> {
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     },
                 )
@@ -1278,6 +1270,10 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    fn contains_never(&self) -> bool {
+        self.positive.contains(&Type::Never)
+    }
+
     /// Return `true` when an intersection excludes every member of an enum class.
     ///
     /// This recognizes enum complements that have become empty, such as
@@ -1300,8 +1296,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
 
-            let enum_class = instance.class_literal(db);
-            let Some(metadata) = enum_metadata(db, enum_class) else {
+            let Some(enum_class_literal) = instance.class_literal(db).into_enum_class(db) else {
                 continue;
             };
 
@@ -1310,12 +1305,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let Some(enum_literal) = negative.as_enum_literal() else {
                     continue;
                 };
-                if enum_literal.enum_class(db) != enum_class {
+                if enum_literal.enum_class_literal(db) != enum_class_literal {
                     continue;
                 }
 
                 let name = enum_literal.name(db);
-                let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+                let Some(canonical_name) = enum_class_literal.resolve_member(db, name) else {
+                    continue;
+                };
                 excluded_names.insert(canonical_name.clone());
             }
 
@@ -1323,9 +1320,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             }
 
-            if metadata
-                .members
-                .keys()
+            if enum_class_literal
+                .member_names(db)
                 .all(|name| excluded_names.contains(name))
             {
                 return true;
@@ -1838,6 +1834,36 @@ mod tests {
         assert_eq!(union.elements(&db), &[t0, t1]);
     }
 
+    #[test]
+    fn union_common_literal_supertype() {
+        let db = setup_db();
+
+        let str_union = UnionType::from_elements(
+            &db,
+            [
+                Type::string_literal(&db, "a"),
+                Type::string_literal(&db, "b"),
+            ],
+        )
+        .expect_union();
+        assert_eq!(
+            str_union.common_literal_supertype(&db),
+            Some(Type::literal_string())
+        );
+
+        let int_union = UnionType::from_elements(&db, [Type::int_literal(1), Type::int_literal(2)])
+            .expect_union();
+        assert_eq!(
+            int_union.common_literal_supertype(&db),
+            Some(KnownClass::Int.to_instance(&db))
+        );
+
+        let mixed_union =
+            UnionType::from_elements(&db, [Type::string_literal(&db, "a"), Type::int_literal(1)])
+                .expect_union();
+        assert_eq!(mixed_union.common_literal_supertype(&db), None);
+    }
+
     fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
         if *ty == marker { replacement } else { *ty }
     }
@@ -1900,6 +1926,23 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(&db).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn build_intersection_discards_never_dnf_branches() {
+        let db = setup_db();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+
+        let int_or_str = UnionType::from_elements(&db, [int, str]);
+        let int_or_bytes = UnionType::from_elements(&db, [int, bytes]);
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(int_or_str)
+            .add_positive(int_or_bytes);
+
+        assert_eq!(intersection.intersections.len(), 1);
+        assert_eq!(intersection.build(), int);
     }
 
     #[test]

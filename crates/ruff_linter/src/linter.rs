@@ -13,9 +13,8 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
-use ruff_source_file::SourceFile;
 
-use crate::checkers::ast::{LintContext, check_ast};
+use crate::checkers::ast::{LazySourceFile, LintContext, check_ast};
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
@@ -360,12 +359,10 @@ pub fn check_path(
         }
     }
 
-    let syntax_errors = parsed.unsupported_syntax_errors();
-
     diagnostics_to_messages(
         diagnostics,
         parsed.errors(),
-        syntax_errors,
+        parsed.unsupported_syntax_errors(),
         &semantic_syntax_errors,
         directives,
         &source_file,
@@ -515,20 +512,20 @@ fn diagnostics_to_messages(
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],
     directives: &Directives,
-    source_file: &SourceFile,
+    source_file: &LazySourceFile<'_>,
 ) -> Vec<Diagnostic> {
     parse_errors
         .iter()
         .map(|parse_error| {
-            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.get().clone(), &parse_error.error, parse_error)
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            Diagnostic::invalid_syntax(source_file.clone(), syntax_error, syntax_error)
+            Diagnostic::invalid_syntax(source_file.get().clone(), syntax_error, syntax_error)
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| Diagnostic::invalid_syntax(source_file.clone(), error, error)),
+                .map(|error| Diagnostic::invalid_syntax(source_file.get().clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             if let Some(range) = diagnostic.range() {

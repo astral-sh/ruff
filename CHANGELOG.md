@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.15.18
+
+Released on 2026-06-18.
+
+### Preview features
+
+- Handle nested `ruff:ignore` comments ([#25791](https://github.com/astral-sh/ruff/pull/25791))
+- Stop displaying severity in output ([#26050](https://github.com/astral-sh/ruff/pull/26050))
+- Use human-readable names in CLI output ([#25937](https://github.com/astral-sh/ruff/pull/25937))
+- Use human-readable names in LSP and playground diagnostics ([#26058](https://github.com/astral-sh/ruff/pull/26058))
+- \[`pydocstyle`\] Prevent property docstrings starting with verbs (`D421`) ([#23775](https://github.com/astral-sh/ruff/pull/23775))
+- \[`flake8-pyi`\] Extend `PYI033` to Python files ([#26129](https://github.com/astral-sh/ruff/pull/26129))
+
+### Bug fixes
+
+- Detect equivalent numeric mapping keys ([#26009](https://github.com/astral-sh/ruff/pull/26009))
+- Detect mapping keys equivalent to booleans ([#25982](https://github.com/astral-sh/ruff/pull/25982))
+- Detect repeated signed and complex dictionary keys ([#26007](https://github.com/astral-sh/ruff/pull/26007))
+
+### Rule changes
+
+- \[`flake8-pyi`\] Rename `PYI033` to `legacy-type-comment` ([#26131](https://github.com/astral-sh/ruff/pull/26131))
+
+### Performance
+
+- Use `ThinVec` for call keywords ([#25999](https://github.com/astral-sh/ruff/pull/25999))
+- Inline parser recovery context checks ([#26038](https://github.com/astral-sh/ruff/pull/26038))
+- Match parser keywords as bytes ([#26037](https://github.com/astral-sh/ruff/pull/26037))
+- Move value parsing out of lexing ([#25360](https://github.com/astral-sh/ruff/pull/25360))
+
+### Server
+
+- Render subdiagnostics and secondary annotations as related information ([#26011](https://github.com/astral-sh/ruff/pull/26011))
+
+### Documentation
+
+- Update fix availability for always-fixable rules ([#26091](https://github.com/astral-sh/ruff/pull/26091))
+- \[`flake8-tidy-imports`\] Add fix safety section (`TID252`) ([#17491](https://github.com/astral-sh/ruff/pull/17491))
+
+### Parser
+
+- Reject `__debug__` lambda parameters ([#26022](https://github.com/astral-sh/ruff/pull/26022))
+- Reject `_` as a match-pattern target ([#25977](https://github.com/astral-sh/ruff/pull/25977))
+- Reject multiple starred names in sequence patterns ([#25976](https://github.com/astral-sh/ruff/pull/25976))
+- Reject parenthesized star imports ([#26021](https://github.com/astral-sh/ruff/pull/26021))
+- Reject starred comprehension targets ([#26023](https://github.com/astral-sh/ruff/pull/26023))
+- Reject unparenthesized generator expressions in class bases ([#25978](https://github.com/astral-sh/ruff/pull/25978))
+- Reject `yield` expressions after commas ([#26024](https://github.com/astral-sh/ruff/pull/26024))
+- Validate function type parameter default order ([#25981](https://github.com/astral-sh/ruff/pull/25981))
+
+### Playground
+
+- Make diagnostic links clickable ([#26104](https://github.com/astral-sh/ruff/pull/26104))
+- Use diagnostic tags ([#26105](https://github.com/astral-sh/ruff/pull/26105))
+
+### Contributors
+
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@ntBre](https://github.com/ntBre)
+- [@gtkacz](https://github.com/gtkacz)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Kalmaegi](https://github.com/Kalmaegi)
+
 ## 0.15.17
 
 Released on 2026-06-11.

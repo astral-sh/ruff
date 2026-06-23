@@ -42,6 +42,65 @@ fn typing_vs_typeshed_no_default() {
     );
 }
 
+fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
+    KnownClass::List
+        .to_specialized_class_type(db, &[argument])
+        .expect("`list` should accept one type argument")
+        .into_generic_alias()
+        .expect("a specialized `list` should be a generic alias")
+}
+
+fn oscillating_generic_alias_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &Type<'db>,
+    current: Type<'db>,
+) -> Type<'db> {
+    current.cycle_normalized(db, *previous, cycle)
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, id| Type::divergent(id),
+    cycle_fn=oscillating_generic_alias_cycle_recover,
+)]
+fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
+    let previous = oscillating_generic_alias(db);
+    let argument = if let Type::GenericAlias(alias) = previous
+        && alias.specialization(db).types(db) == [Type::unknown()]
+    {
+        KnownClass::Int.to_instance(db)
+    } else {
+        Type::unknown()
+    };
+
+    list_alias(db, argument).into()
+}
+
+#[test]
+fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
+    let db = setup_db();
+    let Type::GenericAlias(alias) = oscillating_generic_alias(&db) else {
+        panic!("cycle recovery should preserve the generic alias");
+    };
+
+    assert_eq!(alias.specialization(&db).types(&db), &[Type::unknown()]);
+}
+
+#[test]
+fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
+    let db = setup_db();
+    let int = list_alias(&db, KnownClass::Int.to_instance(&db));
+    let str = list_alias(&db, KnownClass::Str.to_instance(&db));
+    assert!(str.merge_cycle_recovery(&db, int).is_none());
+
+    let generic_context = int.specialization(&db).generic_context(&db);
+    let unknown_generic = Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+    assert!(
+        int.merge_cycle_recovery(&db, list_alias(&db, unknown_generic))
+            .is_none()
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.

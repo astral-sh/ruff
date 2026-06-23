@@ -22,6 +22,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_^
    |
 help: Organize imports
+  |
   - from foo import (  # Comment on `foo`
   -     Member as Alias,  # Comment on `Alias`
   - )
@@ -41,3 +42,4 @@ help: Organize imports
 6 + from foo import (  # Comment on `foo`
 7 +     Member as Alias,  # Comment on `Alias`
 8 | )
+  |

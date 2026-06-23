@@ -8,6 +8,7 @@ UP042 [*] Class A inherits from both `str` and `enum.Enum`
   |       ^
   |
 help: Inherit from `enum.StrEnum`
+  |
   - from enum import Enum
 1 + from enum import Enum, StrEnum
 2 |
@@ -15,8 +16,7 @@ help: Inherit from `enum.StrEnum`
   - class A(str, Enum): ...
 4 + class A(StrEnum): ...
 5 |
-6 |
-7 | class B(Enum, str): ...
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 UP042 [*] Class B inherits from both `str` and `enum.Enum`
@@ -26,18 +26,16 @@ UP042 [*] Class B inherits from both `str` and `enum.Enum`
   |       ^
   |
 help: Inherit from `enum.StrEnum`
-   - from enum import Enum
-1  + from enum import Enum, StrEnum
-2  |
-3  |
-4  | class A(str, Enum): ...
-5  |
-6  |
-   - class B(Enum, str): ...
-7  + class B(StrEnum): ...
-8  |
-9  |
-10 | class D(int, str, Enum): ...
+  |
+  - from enum import Enum
+1 + from enum import Enum, StrEnum
+2 |
+--------------------------------------------------------------------------------
+6 |
+  - class B(Enum, str): ...
+7 + class B(StrEnum): ...
+8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 UP042 Class D inherits from both `str` and `enum.Enum`

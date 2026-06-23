@@ -300,16 +300,14 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
         case _:
             assert_never(value)
 
-def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:  # error: [invalid-return-type]
+def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
         case [int()]:
             return 42
         case [str()]:
             return 42
         case _:
-            # TODO: The previous cases are exhaustive, so this should simplify
-            # to `tuple[Never]`, and therefore `Never`.
-            # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
+            # revealed: Never
             reveal_type(x)
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
@@ -738,6 +736,44 @@ def cross_int_enum_members(value: First | Second) -> None:
             reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
         case _:
             reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
+
+class Warning(Enum):
+    W1 = auto()
+
+class Verdict(Enum):
+    V0 = auto()
+    V1 = auto()
+    V2 = auto()
+    V3 = auto()
+    V4 = auto()
+    V5 = auto()
+    V6 = auto()
+    V7 = auto()
+    V8 = auto()
+    V9 = auto()
+    V10 = auto()
+    V11 = auto()
+
+def many_cross_enum_cases(value: Warning | Verdict) -> None:
+    match value:
+        case Verdict.V0:
+            return
+        case Verdict.V1:
+            return
+        case Verdict.V2:
+            return
+        case Verdict.V3:
+            return
+        case Verdict.V4:
+            return
+        case Verdict.V5:
+            return
+        case Verdict.V6:
+            return
+        case Verdict.V7:
+            return
+        case _:
+            reveal_type(value)  # revealed: Warning | Literal[Verdict.V8, Verdict.V9, Verdict.V10, Verdict.V11]
 
 class Automatic(StrEnum):
     GENERATED = auto()

@@ -301,7 +301,7 @@ impl Rule {
             | Rule::TooManyBlankLines
             | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingCommaOnBareTuple
-            | Rule::TypeCommentInStub
+            | Rule::LegacyTypeComment
             | Rule::UselessSemicolon
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,

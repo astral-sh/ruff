@@ -515,7 +515,7 @@ pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
 }
@@ -685,7 +685,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value,
                 target,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                target_kind: TargetKind::from(unpack),
+                unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
             }),
@@ -1175,15 +1175,6 @@ pub enum TargetKind<'db> {
     Single,
 }
 
-impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
-    fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
-        match value {
-            Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
-            None => TargetKind::Single,
-        }
-    }
-}
-
 impl<'db> TargetKind<'db> {
     fn from_unpack(unpack: Option<Unpack<'db>>, unpack_position: UnpackPosition) -> Self {
         match unpack {
@@ -1423,14 +1414,14 @@ impl ImportFromSubmoduleDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AssignmentDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
+    unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
-    pub fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+    pub fn unpack(&self) -> Option<Unpack<'db>> {
+        self.unpack
     }
 
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {

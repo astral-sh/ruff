@@ -71,8 +71,7 @@ info: `Foo.method` is decorated with `@final`, forbidding overrides
   |             ------ `Foo.method` defined here
   |
 help: Remove all overloads for `method`
-25 |     def method2(self, x: str) -> str: ...
-26 |
+   |
 27 | class Bar(Foo):
    -     @overload
    -     def method(self, x: int) -> int: ...
@@ -81,8 +80,7 @@ help: Remove all overloads for `method`
 28 +     
 29 +       # error: [override-of-final-method]
 30 |
-31 |     # This is fine: the only overload that is marked `@final`
-32 |     # is in a statically-unreachable branch
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```

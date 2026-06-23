@@ -50,24 +50,29 @@ y: Any = "not an Any"  # error: [invalid-assignment]
 
 The spec allows you to define subclasses of `Any`.
 
-`SubclassOfAny` has an unknown superclass, which might be `int`. The assignment to `x` should not be
-allowed, even when the unknown superclass is `int`. The assignment to `y` should be allowed, since
-`Subclass` might have `int` as a superclass, and is therefore assignable to `int`.
+Instances of direct and indirect subclasses of `Any` retain their nominal type and declared members,
+but are gradually assignable to arbitrary types. This assignability is one-way: an arbitrary value
+is not assignable to either subclass.
 
 ```py
 from typing import Any
 from ty_extensions import reveal_mro
 
 class SubclassOfAny(Any): ...
+class IndirectSubclass(SubclassOfAny): ...
 
 reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
+reveal_mro(IndirectSubclass)  # revealed: (<class 'IndirectSubclass'>, <class 'SubclassOfAny'>, Any, <class 'object'>)
+reveal_type(SubclassOfAny())  # revealed: SubclassOfAny
+reveal_type(IndirectSubclass())  # revealed: IndirectSubclass
 
-x: SubclassOfAny = 1  # error: [invalid-assignment]
-y: int = SubclassOfAny()
+not_a_direct_instance: SubclassOfAny = 1  # error: [invalid-assignment]
+not_an_indirect_instance: IndirectSubclass = 1  # error: [invalid-assignment]
+direct_as_int: int = SubclassOfAny()
+indirect_as_int: int = IndirectSubclass()
 ```
 
-`SubclassOfAny` should not be assignable to a final class though, because `SubclassOfAny` could not
-possibly be a subclass of `FinalClass`:
+This includes final classes:
 
 ```py
 from typing import final
@@ -75,12 +80,113 @@ from typing import final
 @final
 class FinalClass: ...
 
-f: FinalClass = SubclassOfAny()  # error: [invalid-assignment]
+f: FinalClass = SubclassOfAny()
 
 @final
 class OtherFinalClass: ...
 
-f: FinalClass | OtherFinalClass = SubclassOfAny()  # error: [invalid-assignment]
+f: FinalClass | OtherFinalClass = SubclassOfAny()
+```
+
+This behavior is preserved through dynamically created subclasses:
+
+```py
+from typing import Any, final
+from ty_extensions import reveal_mro
+
+class A(Any): ...
+
+B = type("B", (A,), {})
+
+class C(B): ...
+
+@final
+class FinalClass: ...
+
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, Any, <class 'object'>)
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, Any, <class 'object'>)
+
+b: FinalClass = B()
+c: FinalClass = C()
+```
+
+`Annotated` metadata on a base does not change this behavior:
+
+```py
+from typing import Annotated, Any, Literal, final
+from ty_extensions import reveal_mro
+
+class A(Any): ...
+class B(Annotated[A, "metadata"]): ...
+
+@final
+class FinalClass: ...
+
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, Any, <class 'object'>)
+
+x: FinalClass = B()
+y: Literal[1] = B()
+```
+
+This behavior is also preserved when the subclass inherits from a generic alias:
+
+```py
+from typing import Any, Generic, Literal, TypeVar, final
+
+T = TypeVar("T")
+
+class GenericSubclass(Any, Generic[T]): ...
+class SubclassOfGenericAlias(GenericSubclass[int]): ...
+
+@final
+class FinalClass: ...
+
+final: FinalClass = SubclassOfGenericAlias()
+literal: Literal[1] = SubclassOfGenericAlias()
+```
+
+A base expression whose inferred type is `Any` does not count as explicitly inheriting from `Any`.
+The dynamic MRO entry makes instances assignable to non-final classes, but unlike an explicit `Any`
+base, not to final or literal types:
+
+```py
+from typing import Any, Literal, final
+
+class Arbitrary: ...
+
+@final
+class FinalClass: ...
+
+def check_dynamic_base(base: Any):
+    class DynamicBase(base): ...
+    class IndirectSubclass(DynamicBase): ...
+
+    reveal_type(DynamicBase())  # revealed: DynamicBase
+    ordinary: Arbitrary = IndirectSubclass()
+    final: FinalClass = DynamicBase()  # error: [invalid-assignment]
+    literal: Literal[1] = DynamicBase()  # error: [invalid-assignment]
+    indirect_final: FinalClass = IndirectSubclass()  # error: [invalid-assignment]
+    indirect_literal: Literal[1] = IndirectSubclass()  # error: [invalid-assignment]
+```
+
+Similarly, inheriting from a name whose inferred type is `Unknown` makes instances assignable to
+non-final classes, but not to final classes:
+
+```py
+from typing import final
+
+from somewhere import UnknownBase  # error: [unresolved-import]
+
+class Arbitrary: ...
+
+@final
+class FinalClass: ...
+
+class FromUnknownBase(UnknownBase): ...
+
+reveal_type(FromUnknownBase())  # revealed: FromUnknownBase
+ordinary_unknown: Arbitrary = FromUnknownBase()
+final_unknown: FinalClass = FromUnknownBase()  # error: [invalid-assignment]
 ```
 
 A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:
@@ -118,7 +224,40 @@ def takes_other_protocol(f: OtherProtocol): ...
 takes_other_protocol(SubclassOfAny())
 ```
 
-A subclass of `Any` cannot be assigned to literal types, since those cannot be subclassed:
+Error context from a failed structural check should be discarded when assignability succeeds due to
+an explicit `Any` base:
+
+```py
+from typing import Any, Callable
+
+class CallableSubclassOfAny(Any):
+    def __call__(self, x: int) -> str:
+        raise NotImplementedError
+
+class IncompatibleCallable:
+    def __call__(self, x: int) -> bytes:
+        raise NotImplementedError
+
+def check_callable_union(value1: CallableSubclassOfAny | IncompatibleCallable):
+    target1: Callable[[int], int] = value1  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
+   --> src/mdtest_snippet.py:141:14
+    |
+141 |     target1: Callable[[int], int] = value1  # snapshot
+    |              --------------------   ^^^^^^ Incompatible value of type `CallableSubclassOfAny | IncompatibleCallable`
+    |              |
+    |              Declared type
+    |
+info: element `IncompatibleCallable` of union `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
+info: └── type `IncompatibleCallable` has inferred callable type `(x: int) -> bytes`
+info:     └── incompatible return types: `bytes` is not assignable to `int`
+```
+
+A subclass of `Any` is also assignable to literal types through the dynamic element of its instance
+type:
 
 ```py
 from typing import Any, Literal
@@ -126,7 +265,7 @@ from typing import Any, Literal
 class MockAny(Any):
     pass
 
-x: Literal[1] = MockAny()  # error: [invalid-assignment]
+x: Literal[1] = MockAny()
 ```
 
 A use case where subclasses of `Any` come up is in mocking libraries, where the mock object should

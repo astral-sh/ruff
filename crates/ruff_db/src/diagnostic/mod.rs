@@ -562,9 +562,13 @@ impl Ord for RenderingSortKey<'_> {
             self.diagnostic.primary_span(),
             other.diagnostic.primary_span(),
         ) {
-            let order = span1.file().path(&self.db).cmp(span2.file().path(&self.db));
-            if order.is_ne() {
-                return order;
+            let file1 = span1.file();
+            let file2 = span2.file();
+            if file1 != file2 {
+                let order = file1.path(&self.db).cmp(file2.path(&self.db));
+                if order.is_ne() {
+                    return order;
+                }
             }
 
             if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
@@ -1404,10 +1408,10 @@ pub struct DisplayDiagnosticConfig {
     /// here for now as the most "sensible" place for it to live until
     /// we had more concrete use cases. ---AG
     context: usize,
-    /// The "merge window" for annotations.
+    /// The "merge window" for annotations and fix diff hunks.
     ///
-    /// If two annotations have fewer than this number of lines between them,
-    /// they will be merged into a single annotation.
+    /// Nearby annotations or fix edits are rendered in a single source frame even when their
+    /// configured context windows would not otherwise overlap.
     merge_window: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
     preview: bool,
@@ -1472,10 +1476,10 @@ impl DisplayDiagnosticConfig {
         }
     }
 
-    /// Set the "merge window" for annotations.
+    /// Set the "merge window" for annotations and fix diff hunks.
     ///
-    /// If two annotations have fewer than this number of lines between them,
-    /// they will be merged into a single annotation.
+    /// Nearby annotations or fix edits are rendered in a single source frame even when their
+    /// configured context windows would not otherwise overlap.
     pub fn merge_window(self, lines: usize) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             merge_window: lines,

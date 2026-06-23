@@ -4,6 +4,7 @@ use std::rc::Rc;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::{
     Db, TypeQualifiers,
@@ -354,12 +355,14 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
+        type SeenTypeAliases<'db> = SmallVec<[TypeAliasType<'db>; 1]>;
+
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
             db: &'db dyn Db,
             visitor: &'a TypeVarDefaultVisitor<'db>,
             seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &'a RefCell<FxHashSet<TypeAliasType<'db>>>,
+            seen_type_aliases: &'a RefCell<SeenTypeAliases<'db>>,
         }
 
         fn typevar_default_is_self_referential<'db>(
@@ -387,11 +390,38 @@ impl<'db> TypeVarInstance<'db> {
             type_alias: TypeAliasType<'db>,
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
-            if !state.seen_type_aliases.borrow_mut().insert(type_alias) {
-                return false;
+            {
+                let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
+                if seen_type_aliases.contains(&type_alias) {
+                    return false;
+                }
+                seen_type_aliases.push(type_alias);
             }
 
-            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
+            let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
+                if specialization
+                    .types(state.db)
+                    .iter()
+                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
+                {
+                    return true;
+                }
+                type_alias.value_type(state.db)
+            } else if let Some(generic_context) = type_alias.generic_context(state.db)
+                && generic_context.variables(state.db).any(|typevar| {
+                    typevar_default_is_self_referential(
+                        state,
+                        typevar.typevar(state.db),
+                        self_identity,
+                    )
+                })
+            {
+                return true;
+            } else {
+                type_alias.raw_value_type(state.db)
+            };
+
+            type_is_self_referential_impl(state, value_type, self_identity)
         }
 
         fn type_is_self_referential_impl<'db>(
@@ -419,7 +449,7 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let seen_typevars = RefCell::new(FxHashSet::default());
-        let seen_type_aliases = RefCell::new(FxHashSet::default());
+        let seen_type_aliases = RefCell::new(SeenTypeAliases::new());
 
         let state = State {
             db,
@@ -752,7 +782,7 @@ impl<'db> TypeVarNonceGenerator<'db> {
 
 pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     db: &'db dyn Db,
-    ty: Type<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
     generic_context: GenericContext<'db>,
 ) -> Option<TypeVarNonce> {
     struct MatchingFreshnessCollector<'db> {
@@ -806,7 +836,9 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     }
 
     let collector = MatchingFreshnessCollector::new(db, generic_context);
-    collector.visit_type(db, ty);
+    for ty in types {
+        collector.visit_type(db, ty);
+    }
     collector.max_freshness.get()
 }
 
@@ -1112,6 +1144,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::ReplaceType { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
@@ -1413,7 +1446,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1433,13 +1466,17 @@ fn bound_typevar_default_type<'db>(
 
 #[expect(clippy::ref_option)]
 fn bound_typevar_default_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    _previous_default: &Option<Type<'db>>,
-    _default: Option<Type<'db>>,
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    match (previous_default, default) {
+        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (_, None) => None,
+    }
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
@@ -1709,5 +1746,5 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>>;
+    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
 pub(crate) struct VisitTypeVarDefault;

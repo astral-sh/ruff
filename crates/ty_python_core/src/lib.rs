@@ -269,9 +269,12 @@ struct DefinitionsByNode<'db> {
 
 impl<'db> DefinitionsByNode<'db> {
     fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
-        let mut single = FxHashMap::default();
-        let mut non_single = FxHashMap::default();
-        single.reserve(definitions_by_node.len());
+        let single_count = definitions_by_node
+            .values()
+            .filter(|definitions| definitions.len() == 1)
+            .count();
+        let mut single = Vec::with_capacity(single_count);
+        let mut non_single = Vec::with_capacity(definitions_by_node.len() - single_count);
 
         #[expect(
             clippy::iter_over_hash_type,
@@ -279,15 +282,15 @@ impl<'db> DefinitionsByNode<'db> {
         )]
         for (key, definitions) in definitions_by_node {
             if definitions.len() == 1 {
-                single.insert(key, definitions[0]);
+                single.push((key, definitions[0]));
             } else {
-                non_single.insert(key, definitions.into_boxed_slice());
+                non_single.push((key, definitions.into_boxed_slice()));
             }
         }
 
         Self {
-            single: FrozenMap::from(single),
-            non_single: FrozenMap::from(non_single),
+            single: FrozenMap::from_entries(single),
+            non_single: FrozenMap::from_entries(non_single),
         }
     }
 
@@ -317,6 +320,9 @@ pub struct SemanticIndex<'db> {
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Map from an unpacking target to its [`unpack::Unpack`] ingredient.
+    unpacks_by_target: FrozenMap<ExpressionNodeKey, unpack::Unpack<'db>>,
+
     /// Map from a standalone statement to its [`Statement`] ingredient.
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
 
@@ -345,7 +351,7 @@ pub struct SemanticIndex<'db> {
     ast_ids: AstIds,
 
     /// The set of modules that are imported anywhere within this file.
-    imported_modules: Arc<FrozenSet<ModuleName>>,
+    imported_modules: FrozenSet<ModuleName>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -676,6 +682,11 @@ impl<'db> SemanticIndex<'db> {
         self.expressions_by_node
             .get(&expression_key.into())
             .copied()
+    }
+
+    /// Returns the [`unpack::Unpack`] ingredient for an unpacking target, if any.
+    pub fn try_unpack(&self, target: impl Into<ExpressionNodeKey>) -> Option<unpack::Unpack<'db>> {
+        self.unpacks_by_target.get(&target.into()).copied()
     }
 
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {

@@ -226,6 +226,14 @@ impl<'a> SemanticModel<'a> {
             .chain(self.typing_modules.iter().map(String::as_str))
     }
 
+    /// Reserves capacity for builtin bindings.
+    pub fn reserve_builtin_bindings(&mut self, additional: usize) {
+        // Match the capacity that repeated `push` calls would reach while avoiding the
+        // intermediate allocations.
+        self.bindings.reserve_exact(additional.next_power_of_two());
+        self.global_scope_mut().reserve_bindings(additional);
+    }
+
     /// Create a new [`Binding`] for a builtin.
     pub fn push_builtin(&mut self) -> BindingId {
         self.bindings.push(Binding {

@@ -10,11 +10,11 @@ F401 [*] `mlflow.pyfunc.loaders.chat_agent` imported but unused
 4 | import mlflow.pyfunc.loaders.code_model
   |
 help: Remove unused import: `mlflow.pyfunc.loaders.chat_agent`
+  |
 1 |
   - import mlflow.pyfunc.loaders.chat_agent
 2 | import mlflow.pyfunc.loaders.chat_model
-3 | import mlflow.pyfunc.loaders.code_model
-4 | from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
+  |
 
 F401 [*] `mlflow.pyfunc.loaders.chat_model` imported but unused
  --> f401_preview_submodule.py:3:8
@@ -26,12 +26,11 @@ F401 [*] `mlflow.pyfunc.loaders.chat_model` imported but unused
 5 | from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
   |
 help: Remove unused import: `mlflow.pyfunc.loaders.chat_model`
-1 |
+  |
 2 | import mlflow.pyfunc.loaders.chat_agent
   - import mlflow.pyfunc.loaders.chat_model
 3 | import mlflow.pyfunc.loaders.code_model
-4 | from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
-5 |
+  |
 
 F401 [*] `mlflow.pyfunc.loaders.code_model` imported but unused
  --> f401_preview_submodule.py:4:8
@@ -43,13 +42,11 @@ F401 [*] `mlflow.pyfunc.loaders.code_model` imported but unused
 5 | from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
   |
 help: Remove unused import: `mlflow.pyfunc.loaders.code_model`
-1 |
-2 | import mlflow.pyfunc.loaders.chat_agent
+  |
 3 | import mlflow.pyfunc.loaders.chat_model
   - import mlflow.pyfunc.loaders.code_model
 4 | from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
-5 |
-6 | if IS_PYDANTIC_V2_OR_NEWER:
+  |
 
 F401 [*] `mlflow.pyfunc.loaders.responses_agent` imported but unused
  --> f401_preview_submodule.py:8:12
@@ -59,8 +56,8 @@ F401 [*] `mlflow.pyfunc.loaders.responses_agent` imported but unused
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove unused import: `mlflow.pyfunc.loaders.responses_agent`
-5 | from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
-6 |
+  |
 7 | if IS_PYDANTIC_V2_OR_NEWER:
   -     import mlflow.pyfunc.loaders.responses_agent
 8 +     pass
+  |

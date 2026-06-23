@@ -1,4 +1,4 @@
-use crate::docstring::Docstring;
+use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
@@ -186,7 +186,7 @@ fn keyword_argument_hover_contents<'db>(
         .and_then(|definition| docstring_for_call_definition(db, definition))
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
     {
-        contents.push(HoverContent::Docstring(documentation));
+        contents.push(HoverContent::DocstringFragment(documentation));
     }
 
     Some(contents)
@@ -202,7 +202,7 @@ fn parameter_hover_label(label: &str, is_keyword_variadic: bool) -> String {
     format!("({kind}) {label}")
 }
 
-fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docstring> {
+fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<DocstringFragment> {
     let parameter_documentation = docstring.parameter_documentation();
     parameter_documentation
         .get(name)
@@ -210,8 +210,7 @@ fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docs
             name.strip_prefix("**")
                 .and_then(|name| parameter_documentation.get(name))
         })
-        .cloned()
-        .map(Docstring::new)
+        .map(|documentation| DocstringFragment::new(documentation))
 }
 
 pub struct Hover<'db> {
@@ -297,6 +296,7 @@ pub enum HoverContent<'db> {
         ty: Type<'db>,
     },
     Docstring(Docstring),
+    DocstringFragment(DocstringFragment),
 }
 
 impl<'db> HoverContent<'db> {
@@ -388,6 +388,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fmt(f)
             }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
+            HoverContent::DocstringFragment(fragment) => fragment.render(self.kind).fmt(f),
         }
     }
 }
@@ -562,6 +563,56 @@ mod tests {
           |     source
           |
         ");
+    }
+
+    #[test]
+    fn hover_function_rest_docstring() {
+        let test = hover_test(
+            r#"
+        def documented(value):
+            '''Return a value.
+
+            :param str value: The input value.
+            :rtype: str
+            '''
+            return value
+
+        docu<CURSOR>mented("x")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def documented(value) -> Unknown
+        ---------------------------------------------
+        Return a value.
+
+        :param str value: The input value.
+        :rtype: str
+
+        ---------------------------------------------
+        ```python
+        def documented(value) -> Unknown
+        ```
+        ---
+        Return a value.
+
+        ## Parameters
+        **value**: `str`<HB>
+        The input value.
+
+        ## Returns
+        `str`
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:1
+           |
+        10 | documented("x")
+           | ^^^^-^^^^^
+           | |   |
+           | |   Cursor offset
+           | source
+           |
+        "#);
     }
 
     #[test]
@@ -2155,6 +2206,48 @@ mod tests {
            |      ^-
            |      ||
            |      |Cursor offset
+           |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_preserves_rest_field_like_continuation() {
+        let test = hover_test(
+            r#"
+            def test(value: int):
+                """my cool test
+
+                :param value:
+                    :param fake: - Parent option.
+                        - Child option.
+                """
+                return 0
+
+            test(value<CURSOR>=123)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) value: int
+        ---------------------------------------------
+        :param fake: - Parent option.
+            - Child option.
+
+        ---------------------------------------------
+        ```python
+        (parameter) value: int
+        ```
+        ---
+        :param fake: - Parent option.<HB>
+            - Child option.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:6
+           |
+        11 | test(value=123)
+           |      ^^^^^- Cursor offset
+           |      |
            |      source
            |
         ");

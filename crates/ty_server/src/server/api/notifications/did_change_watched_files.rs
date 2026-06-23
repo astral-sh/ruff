@@ -85,8 +85,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         if client_capabilities.supports_workspace_diagnostic_refresh() {
             client.send_request::<types::DiagnosticRefreshRequest>(session, (), |_, ()| {});
         } else {
-            for key in session.text_document_handles() {
-                publish_diagnostics_if_needed(&key, session, client);
+            for document in session.file_document_handles() {
+                publish_diagnostics_if_needed(&document, session, client);
             }
         }
 

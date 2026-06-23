@@ -19,6 +19,11 @@ use crate::{Db, DisplaySettings};
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
+    /// The `Any` special form used directly as a base class.
+    ///
+    /// This is distinct from [`ClassBase::Dynamic`] because a base expression whose inferred type
+    /// is `Any` does not give the class the same gradual assignability as an explicit `Any` base.
+    Any,
     Dynamic(DynamicType<'db>),
     Divergent(DivergentType),
     Class(ClassType<'db>),
@@ -49,12 +54,13 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
+            Self::Any | Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
         }
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
+            ClassBase::Any => "Any",
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(
@@ -84,6 +90,24 @@ impl<'db> ClassBase<'db> {
 
     pub(super) const fn is_typed_dict(self) -> bool {
         matches!(self, ClassBase::TypedDict)
+    }
+
+    /// Return whether this is an explicit `Any` base.
+    pub(super) const fn is_explicit_any_base(self) -> bool {
+        matches!(self, ClassBase::Any)
+    }
+
+    /// Convert an explicit base while preserving a direct use of the `Any` special form.
+    pub(super) fn try_from_explicit_base(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        subclass: Option<ClassLiteral<'db>>,
+    ) -> Option<Self> {
+        if matches!(ty, Type::SpecialForm(SpecialFormType::Any)) {
+            Some(Self::Any)
+        } else {
+            Self::try_from_type(db, ty, subclass)
+        }
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -204,14 +228,13 @@ impl<'db> ClassBase<'db> {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
                 KnownInstanceType::Annotated(ty) => {
-                    // Unions are not supported in this position, so we only need to support
-                    // something like `class C(Annotated[Base, "metadata"]): ...`, which we
-                    // can do by turning the instance type (`Base` in this example) back into
-                    // a class.
-                    let annotated_ty = ty.inner(db);
-                    let instance_ty = annotated_ty.as_nominal_instance()?;
-
-                    Some(Self::Class(instance_ty.class(db)))
+                    match ty.inner(db) {
+                        Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+                        Type::NominalInstance(instance) => {
+                            Some(Self::Class(instance.class(db)))
+                        }
+                        _ => None,
+                    }
                 }
             },
 
@@ -238,6 +261,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
+                | SpecialFormType::Divergent
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy
                 | SpecialFormType::TypeForm => None,
@@ -290,7 +314,8 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_)
+            Self::Any
+            | Self::Dynamic(_)
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
@@ -302,6 +327,7 @@ impl<'db> ClassBase<'db> {
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Class(class) => class.metaclass(db),
+            Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
             // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
@@ -320,7 +346,8 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => {
                 Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Self::Dynamic(_)
+            Self::Any
+            | Self::Dynamic(_)
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
@@ -374,7 +401,8 @@ impl<'db> ClassBase<'db> {
                     .try_mro(db, specialization)
                     .is_err_and(StaticMroError::is_cycle)
             }
-            ClassBase::Dynamic(_)
+            ClassBase::Any
+            | ClassBase::Dynamic(_)
             | ClassBase::Divergent(_)
             | ClassBase::Generic
             | ClassBase::Protocol
@@ -390,7 +418,8 @@ impl<'db> ClassBase<'db> {
     ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
-            ClassBase::Dynamic(_)
+            ClassBase::Any
+            | ClassBase::Dynamic(_)
             | ClassBase::Divergent(_)
             | ClassBase::Generic
             | ClassBase::TypedDict => ClassBaseMroIterator::length_2(db, self),
@@ -418,6 +447,7 @@ impl<'db> ClassBase<'db> {
         impl std::fmt::Display for ClassBaseDisplay<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
+                    ClassBase::Any => f.write_str("Any"),
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
                     ClassBase::Divergent(_) => f.write_str("Divergent"),
                     ClassBase::Class(class) => Type::from(class)
@@ -447,6 +477,7 @@ impl<'db> From<ClassType<'db>> for ClassBase<'db> {
 impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
+            ClassBase::Any => Type::Dynamic(DynamicType::Any),
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Divergent(divergent) => Type::Divergent(divergent),
             ClassBase::Class(class) => class.into(),

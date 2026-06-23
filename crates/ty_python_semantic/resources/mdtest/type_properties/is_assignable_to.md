@@ -288,16 +288,21 @@ static_assert(not is_assignable_to(type[Any], None))
 
 ### Class-literal types
 
-Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
-to `type`:
+Class-literal types with a dynamically typed base are assignable to any type `T` where `T` is
+assignable to `type`:
 
 ```py
 from typing import Any
 from ty_extensions import is_assignable_to, static_assert, TypeOf
 
-def test(x: Any):
+class A: ...
+
+def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
     class Foo(x): ...
     class Bar(Any): ...
+    class Baz(cls): ...
+    class Mixed(Bar, x): ...
+    class UnionDynamic(union_base): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
     static_assert(is_assignable_to(TypeOf[Foo], type[int]))
@@ -308,15 +313,35 @@ def test(x: Any):
     static_assert(is_assignable_to(TypeOf[Bar], type[int]))
     static_assert(is_assignable_to(TypeOf[Bar], type[Any]))
 
+    static_assert(is_assignable_to(TypeOf[Baz], Any))
+    static_assert(is_assignable_to(TypeOf[Baz], type))
+    static_assert(is_assignable_to(TypeOf[Baz], type[int]))
+    static_assert(is_assignable_to(TypeOf[Baz], type[Any]))
+
+    static_assert(is_assignable_to(TypeOf[Mixed], Any))
+    static_assert(is_assignable_to(TypeOf[Mixed], type))
+    static_assert(is_assignable_to(TypeOf[Mixed], type[int]))
+    static_assert(is_assignable_to(TypeOf[Mixed], type[Any]))
+
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], Any))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type[int]))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type[Any]))
+
     static_assert(not is_assignable_to(TypeOf[Foo], int))
     static_assert(not is_assignable_to(TypeOf[Bar], int))
+    static_assert(not is_assignable_to(TypeOf[Baz], int))
+    static_assert(not is_assignable_to(TypeOf[Mixed], int))
+    static_assert(not is_assignable_to(TypeOf[UnionDynamic], int))
 ```
 
-This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+A dynamically typed base could be `int` at runtime, making the new class a subclass of `int`. The
+class object is therefore assignable to `type[int]`, but not to `int`.
 
 ### Nominal instance and subclass-of types
 
-Instances of classes that inherit `Any` are assignable to any non-final type.
+Instances of classes that inherit directly from `Any` are assignable to arbitrary types, including
+final types.
 
 ```py
 from ty_extensions import is_assignable_to, static_assert
@@ -335,7 +360,7 @@ class FinalClass:
 static_assert(is_assignable_to(InheritsAny, Arbitrary))
 static_assert(is_assignable_to(InheritsAny, Any))
 static_assert(is_assignable_to(InheritsAny, object))
-static_assert(not is_assignable_to(InheritsAny, FinalClass))
+static_assert(is_assignable_to(InheritsAny, FinalClass))
 ```
 
 Similar for subclass-of types:

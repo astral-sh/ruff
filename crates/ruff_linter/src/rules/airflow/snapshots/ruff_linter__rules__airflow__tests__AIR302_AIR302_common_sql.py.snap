@@ -11,16 +11,14 @@ AIR302 [*] `airflow.hooks.dbapi.ConnectorProtocol` is moved into `common-sql` pr
 9 | DbApiHook()
   |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `ConnectorProtocol` from `airflow.providers.common.sql.hooks.sql` instead.
-1 | from __future__ import annotations
-2 |
+  |
 3 | from airflow.hooks.dbapi import (
   -     ConnectorProtocol,
 4 |     DbApiHook,
 5 | )
 6 + from airflow.providers.common.sql.hooks.sql import ConnectorProtocol
 7 |
-8 | ConnectorProtocol()
-9 | DbApiHook()
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.dbapi.DbApiHook` is moved into `common-sql` provider in Airflow 3.0;
@@ -33,15 +31,13 @@ AIR302 [*] `airflow.hooks.dbapi.DbApiHook` is moved into `common-sql` provider i
 11 | from airflow.hooks.dbapi_hook import DbApiHook
    |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `DbApiHook` from `airflow.providers.common.sql.hooks.sql` instead.
-2 |
-3 | from airflow.hooks.dbapi import (
+  |
 4 |     ConnectorProtocol,
   -     DbApiHook,
 5 | )
 6 + from airflow.providers.common.sql.hooks.sql import DbApiHook
 7 |
-8 | ConnectorProtocol()
-9 | DbApiHook()
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.dbapi_hook.DbApiHook` is moved into `common-sql` provider in Airflow 3.0;
@@ -54,15 +50,13 @@ AIR302 [*] `airflow.hooks.dbapi_hook.DbApiHook` is moved into `common-sql` provi
 15 | SQLCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `DbApiHook` from `airflow.providers.common.sql.hooks.sql` instead.
-8  | ConnectorProtocol()
-9  | DbApiHook()
+   |
 10 |
    - from airflow.hooks.dbapi_hook import DbApiHook
 11 | from airflow.operators.check_operator import SQLCheckOperator
 12 + from airflow.providers.common.sql.hooks.sql import DbApiHook
 13 |
-14 | DbApiHook()
-15 | SQLCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -73,14 +67,12 @@ AIR302 [*] `airflow.operators.check_operator.SQLCheckOperator` is moved into `co
    | ^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-9  | DbApiHook()
-10 |
+   |
 11 | from airflow.hooks.dbapi_hook import DbApiHook
    - from airflow.operators.check_operator import SQLCheckOperator
 12 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 13 |
-14 | DbApiHook()
-15 | SQLCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -93,14 +85,12 @@ AIR302 [*] `airflow.operators.sql.SQLCheckOperator` is moved into `common-sql` p
 22 | CheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-16 |
-17 |
+   |
 18 | from airflow.operators.check_operator import CheckOperator
    - from airflow.operators.sql import SQLCheckOperator
 19 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 20 |
-21 | SQLCheckOperator()
-22 | CheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -111,13 +101,11 @@ AIR302 [*] `airflow.operators.check_operator.CheckOperator` is moved into `commo
    | ^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-17 |
-18 | from airflow.operators.check_operator import CheckOperator
+   |
 19 | from airflow.operators.sql import SQLCheckOperator
 20 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 21 |
-22 | SQLCheckOperator()
-23 | CheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.druid_check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -129,13 +117,11 @@ AIR302 [*] `airflow.operators.druid_check_operator.CheckOperator` is moved into 
    | ^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-23 |
-24 |
+   |
 25 | from airflow.operators.druid_check_operator import CheckOperator
 26 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 27 |
-28 | CheckOperator()
-29 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.presto_check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -147,13 +133,11 @@ AIR302 [*] `airflow.operators.presto_check_operator.CheckOperator` is moved into
    | ^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-28 |
-29 |
+   |
 30 | from airflow.operators.presto_check_operator import CheckOperator
 31 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 32 |
-33 | CheckOperator()
-34 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.druid_check_operator.DruidCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -167,13 +151,11 @@ AIR302 [*] `airflow.operators.druid_check_operator.DruidCheckOperator` is moved 
 44 | IntervalCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-38 | )
-39 | from airflow.operators.druid_check_operator import DruidCheckOperator
+   |
 40 | from airflow.operators.presto_check_operator import PrestoCheckOperator
 41 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 42 |
-43 | DruidCheckOperator()
-44 | PrestoCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.presto_check_operator.PrestoCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -186,13 +168,11 @@ AIR302 [*] `airflow.operators.presto_check_operator.PrestoCheckOperator` is move
 45 | SQLIntervalCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-38 | )
-39 | from airflow.operators.druid_check_operator import DruidCheckOperator
+   |
 40 | from airflow.operators.presto_check_operator import PrestoCheckOperator
 41 + from airflow.providers.common.sql.operators.sql import SQLCheckOperator
 42 |
-43 | DruidCheckOperator()
-44 | PrestoCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.IntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -205,8 +185,7 @@ AIR302 [*] `airflow.operators.check_operator.IntervalCheckOperator` is moved int
 45 | SQLIntervalCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-34 |
-35 | from airflow.operators.check_operator import (
+   |
 36 |     IntervalCheckOperator,
    -     SQLIntervalCheckOperator,
 37 | )
@@ -214,8 +193,7 @@ help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalC
 39 | from airflow.operators.presto_check_operator import PrestoCheckOperator
 40 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 41 |
-42 | DruidCheckOperator()
-43 | PrestoCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -227,8 +205,7 @@ AIR302 [*] `airflow.operators.check_operator.SQLIntervalCheckOperator` is moved 
    | ^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-34 |
-35 | from airflow.operators.check_operator import (
+   |
 36 |     IntervalCheckOperator,
    -     SQLIntervalCheckOperator,
 37 | )
@@ -236,8 +213,7 @@ help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalC
 39 | from airflow.operators.presto_check_operator import PrestoCheckOperator
 40 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 41 |
-42 | DruidCheckOperator()
-43 | PrestoCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.presto_check_operator.IntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -251,13 +227,11 @@ AIR302 [*] `airflow.operators.presto_check_operator.IntervalCheckOperator` is mo
 56 | PrestoIntervalCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-50 |     PrestoIntervalCheckOperator,
-51 | )
+   |
 52 | from airflow.operators.sql import SQLIntervalCheckOperator
 53 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 54 |
-55 | IntervalCheckOperator()
-56 | SQLIntervalCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -269,14 +243,12 @@ AIR302 [*] `airflow.operators.sql.SQLIntervalCheckOperator` is moved into `commo
 56 | PrestoIntervalCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-49 |     IntervalCheckOperator,
-50 |     PrestoIntervalCheckOperator,
+   |
 51 | )
    - from airflow.operators.sql import SQLIntervalCheckOperator
 52 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 53 |
-54 | IntervalCheckOperator()
-55 | SQLIntervalCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.presto_check_operator.PrestoIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -288,13 +260,11 @@ AIR302 [*] `airflow.operators.presto_check_operator.PrestoIntervalCheckOperator`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLIntervalCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-50 |     PrestoIntervalCheckOperator,
-51 | )
+   |
 52 | from airflow.operators.sql import SQLIntervalCheckOperator
 53 + from airflow.providers.common.sql.operators.sql import SQLIntervalCheckOperator
 54 |
-55 | IntervalCheckOperator()
-56 | SQLIntervalCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.SQLThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -307,16 +277,14 @@ AIR302 [*] `airflow.operators.check_operator.SQLThresholdCheckOperator` is moved
 65 | ThresholdCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLThresholdCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-57 |
-58 |
+   |
 59 | from airflow.operators.check_operator import (
    -     SQLThresholdCheckOperator,
 60 |     ThresholdCheckOperator,
 61 | )
 62 + from airflow.providers.common.sql.operators.sql import SQLThresholdCheckOperator
 63 |
-64 | SQLThresholdCheckOperator()
-65 | ThresholdCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.ThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -327,16 +295,14 @@ AIR302 [*] `airflow.operators.check_operator.ThresholdCheckOperator` is moved in
    | ^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLThresholdCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-57 |
-58 |
+   |
 59 | from airflow.operators.check_operator import (
    -     SQLThresholdCheckOperator,
 60 |     ThresholdCheckOperator,
 61 | )
 62 + from airflow.providers.common.sql.operators.sql import SQLThresholdCheckOperator
 63 |
-64 | SQLThresholdCheckOperator()
-65 | ThresholdCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.SQLThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -348,14 +314,12 @@ AIR302 [*] `airflow.operators.sql.SQLThresholdCheckOperator` is moved into `comm
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLThresholdCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-65 | ThresholdCheckOperator()
-66 |
+   |
 67 |
    - from airflow.operators.sql import SQLThresholdCheckOperator
 68 + from airflow.providers.common.sql.operators.sql import SQLThresholdCheckOperator
 69 |
-70 | SQLThresholdCheckOperator()
-71 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -368,16 +332,14 @@ AIR302 [*] `airflow.operators.check_operator.SQLValueCheckOperator` is moved int
 79 | ValueCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLValueCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-71 |
-72 |
+   |
 73 | from airflow.operators.check_operator import (
    -     SQLValueCheckOperator,
 74 |     ValueCheckOperator,
 75 | )
 76 + from airflow.providers.common.sql.operators.sql import SQLValueCheckOperator
 77 |
-78 | SQLValueCheckOperator()
-79 | ValueCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.check_operator.ValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -388,16 +350,14 @@ AIR302 [*] `airflow.operators.check_operator.ValueCheckOperator` is moved into `
    | ^^^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLValueCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-71 |
-72 |
+   |
 73 | from airflow.operators.check_operator import (
    -     SQLValueCheckOperator,
 74 |     ValueCheckOperator,
 75 | )
 76 + from airflow.providers.common.sql.operators.sql import SQLValueCheckOperator
 77 |
-78 | SQLValueCheckOperator()
-79 | ValueCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -411,14 +371,12 @@ AIR302 [*] `airflow.operators.sql.SQLValueCheckOperator` is moved into `common-s
 90 | PrestoValueCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLValueCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-83 |     PrestoValueCheckOperator,
-84 |     ValueCheckOperator,
+   |
 85 | )
    - from airflow.operators.sql import SQLValueCheckOperator
 86 + from airflow.providers.common.sql.operators.sql import SQLValueCheckOperator
 87 |
-88 | SQLValueCheckOperator()
-89 | ValueCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.presto_check_operator.ValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -430,13 +388,11 @@ AIR302 [*] `airflow.operators.presto_check_operator.ValueCheckOperator` is moved
 90 | PrestoValueCheckOperator()
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLValueCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-84 |     ValueCheckOperator,
-85 | )
+   |
 86 | from airflow.operators.sql import SQLValueCheckOperator
 87 + from airflow.providers.common.sql.operators.sql import SQLValueCheckOperator
 88 |
-89 | SQLValueCheckOperator()
-90 | ValueCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.presto_check_operator.PrestoValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -448,13 +404,11 @@ AIR302 [*] `airflow.operators.presto_check_operator.PrestoValueCheckOperator` is
    | ^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLValueCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-84 |     ValueCheckOperator,
-85 | )
+   |
 86 | from airflow.operators.sql import SQLValueCheckOperator
 87 + from airflow.providers.common.sql.operators.sql import SQLValueCheckOperator
 88 |
-89 | SQLValueCheckOperator()
-90 | ValueCheckOperator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.BaseSQLOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -468,20 +422,15 @@ AIR302 [*] `airflow.operators.sql.BaseSQLOperator` is moved into `common-sql` pr
 104 | SQLTableCheckOperator()
     |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `BaseSQLOperator` from `airflow.providers.common.sql.operators.sql` instead.
-91  |
-92  |
+    |
 93  | from airflow.operators.sql import (
     -     BaseSQLOperator,
 94  |     BranchSQLOperator,
-95  |     SQLColumnCheckOperator,
-96  |     SQLTableCheckOperator,
-97  |     _convert_to_float_if_possible,
-98  |     parse_boolean,
+--------------------------------------------------------------------------------
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import BaseSQLOperator
 101 |
-102 | BaseSQLOperator()
-103 | BranchSQLOperator()
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.BranchSQLOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -494,19 +443,15 @@ AIR302 [*] `airflow.operators.sql.BranchSQLOperator` is moved into `common-sql` 
 105 | SQLColumnCheckOperator()
     |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `BranchSQLOperator` from `airflow.providers.common.sql.operators.sql` instead.
-92  |
-93  | from airflow.operators.sql import (
+    |
 94  |     BaseSQLOperator,
     -     BranchSQLOperator,
 95  |     SQLColumnCheckOperator,
-96  |     SQLTableCheckOperator,
-97  |     _convert_to_float_if_possible,
-98  |     parse_boolean,
+--------------------------------------------------------------------------------
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import BranchSQLOperator
 101 |
-102 | BaseSQLOperator()
-103 | BranchSQLOperator()
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.SQLTableCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -520,8 +465,7 @@ AIR302 [*] `airflow.operators.sql.SQLTableCheckOperator` is moved into `common-s
 106 | _convert_to_float_if_possible()
     |
 help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLTableCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-94  |     BaseSQLOperator,
-95  |     BranchSQLOperator,
+    |
 96  |     SQLColumnCheckOperator,
     -     SQLTableCheckOperator,
 97  |     _convert_to_float_if_possible,
@@ -529,8 +473,7 @@ help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `SQLTableChec
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import SQLTableCheckOperator
 101 |
-102 | BaseSQLOperator()
-103 | BranchSQLOperator()
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
@@ -544,8 +487,7 @@ AIR302 [*] `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-
 107 | parse_boolean()
     |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `SQLColumnCheckOperator` from `airflow.providers.common.sql.operators.sql` instead.
-93  | from airflow.operators.sql import (
-94  |     BaseSQLOperator,
+    |
 95  |     BranchSQLOperator,
     -     SQLColumnCheckOperator,
 96  |     SQLTableCheckOperator,
@@ -554,8 +496,7 @@ help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `SQLColumnChe
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import SQLColumnCheckOperator
 101 |
-102 | BaseSQLOperator()
-103 | BranchSQLOperator()
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql._convert_to_float_if_possible` is moved into `common-sql` provider in Airflow 3.0;
@@ -568,16 +509,14 @@ AIR302 [*] `airflow.operators.sql._convert_to_float_if_possible` is moved into `
 107 | parse_boolean()
     |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `_convert_to_float_if_possible` from `airflow.providers.common.sql.operators.sql` instead.
-95  |     BranchSQLOperator,
-96  |     SQLColumnCheckOperator,
+    |
 97  |     SQLTableCheckOperator,
     -     _convert_to_float_if_possible,
 98  |     parse_boolean,
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import _convert_to_float_if_possible
 101 |
-102 | BaseSQLOperator()
-103 | BranchSQLOperator()
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.sql.parse_boolean` is moved into `common-sql` provider in Airflow 3.0;
@@ -589,15 +528,13 @@ AIR302 [*] `airflow.operators.sql.parse_boolean` is moved into `common-sql` prov
     | ^^^^^^^^^^^^^
     |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `parse_boolean` from `airflow.providers.common.sql.operators.sql` instead.
-96  |     SQLColumnCheckOperator,
-97  |     SQLTableCheckOperator,
+    |
 98  |     _convert_to_float_if_possible,
     -     parse_boolean,
 99  | )
 100 + from airflow.providers.common.sql.operators.sql import parse_boolean
 101 |
-102 | BaseSQLOperator()
-103 | BranchSQLOperator()
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.sql.SqlSensor` is moved into `common-sql` provider in Airflow 3.0;
@@ -609,14 +546,12 @@ AIR302 [*] `airflow.sensors.sql.SqlSensor` is moved into `common-sql` provider i
     | ^^^^^^^^^
     |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `SqlSensor` from `airflow.providers.common.sql.sensors.sql` instead.
-107 | parse_boolean()
-108 |
+    |
 109 |
     - from airflow.sensors.sql import SqlSensor
 110 + from airflow.providers.common.sql.sensors.sql import SqlSensor
 111 |
-112 | SqlSensor()
-113 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.sql_sensor.SqlSensor` is moved into `common-sql` provider in Airflow 3.0;
@@ -628,12 +563,10 @@ AIR302 [*] `airflow.sensors.sql_sensor.SqlSensor` is moved into `common-sql` pro
     | ^^^^^^^^^
     |
 help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `SqlSensor` from `airflow.providers.common.sql.sensors.sql` instead.
-112 | SqlSensor()
-113 |
+    |
 114 |
     - from airflow.sensors.sql_sensor import SqlSensor
 115 + from airflow.providers.common.sql.sensors.sql import SqlSensor
 116 |
-117 | SqlSensor()
-118 |
+    |
 note: This is an unsafe fix and may change runtime behavior

@@ -200,9 +200,9 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
+        CallableTypes, EnumClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, equality_truthiness, infer_narrowing_constraints,
+        equality_truthiness, expand_type, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
         singleton_pattern_type,
     },
@@ -286,15 +286,15 @@ fn type_narrowed_by_pattern<'db>(
 fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
     subject_ty: Type<'db>,
-) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
     fn add_enum_literal<'db>(
         db: &'db dyn Db,
-        enum_class: &mut Option<ClassLiteral<'db>>,
+        enum_class: &mut Option<EnumClassLiteral<'db>>,
         names: &mut FxHashSet<Name>,
         ty: Type<'db>,
     ) -> Option<()> {
         let enum_literal = ty.as_enum_literal()?;
-        let class = enum_literal.enum_class(db);
+        let class = enum_literal.enum_class_literal(db);
 
         if let Some(existing_class) = *enum_class {
             if existing_class != class {
@@ -304,9 +304,8 @@ fn enum_literal_subject_names<'db>(
             *enum_class = Some(class);
         }
 
-        let metadata = enum_metadata(db, class)?;
         let name = enum_literal.name(db);
-        let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+        let canonical_name = class.resolve_member(db, name)?;
         names.insert(canonical_name.clone());
         Some(())
     }
@@ -337,18 +336,17 @@ fn enum_literal_subject_names<'db>(
 /// canonical member names before returning.
 fn enum_member_pattern_name<'db>(
     db: &'db dyn Db,
-    enum_class: ClassLiteral<'db>,
+    enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
     let value_ty = definite_match_pattern_type(db, kind);
     let enum_literal = value_ty.as_enum_literal()?;
-    if enum_literal.enum_class(db) != enum_class {
+    if enum_literal.enum_class_literal(db) != enum_class {
         return None;
     }
 
-    let metadata = enum_metadata(db, enum_class)?;
     let name = enum_literal.name(db);
-    let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+    let canonical_name = enum_class.resolve_member(db, name)?;
     Some(canonical_name.clone())
 }
 
@@ -367,7 +365,7 @@ struct EnumMemberPatternCoverage {
 /// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
 fn enum_member_pattern_coverage<'db>(
     db: &'db dyn Db,
-    enum_class: ClassLiteral<'db>,
+    enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> EnumMemberPatternCoverage {
     let mut coverage = EnumMemberPatternCoverage {
@@ -475,7 +473,11 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
+    let coverage_subject_ty = expand_type(db, subject_ty)
+        .map(|types| UnionType::from_elements(db, types))
+        .unwrap_or(subject_ty);
+    let narrowed_subject_ty =
+        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -561,6 +563,12 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     base_ty: Type<'db>,
     place: ScopedPlaceId,
 ) -> Type<'db> {
+    match id {
+        ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
+        ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
+        _ => {}
+    }
+
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
@@ -832,50 +840,50 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn project(&mut self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
         type Id = ScopedNarrowingConstraint;
 
+        match id {
+            Id::ALWAYS_TRUE => return ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            Id::ALWAYS_FALSE => return ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            _ => {}
+        }
+
         if let Some(cached) = self.project_cache.get(&id) {
             return *cached;
         }
 
-        let projected = match id {
-            Id::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
-            Id::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
-            _ => {
-                let node = self.constraints.get_interior_node(id);
-                let predicate = self.predicates[node.atom];
+        let node = self.constraints.get_interior_node(id);
+        let predicate = self.predicates[node.atom];
 
-                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    let if_uncertain = self.project(node.if_uncertain);
-                    match analyze_single(self.db, &predicate) {
-                        Truthiness::AlwaysTrue => {
-                            let if_true = self.project(node.if_true);
-                            self.graph.or(if_true, if_uncertain)
-                        }
-                        Truthiness::AlwaysFalse => {
-                            let if_false = self.project(node.if_false);
-                            self.graph.or(if_false, if_uncertain)
-                        }
-                        Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
-                        }
-                    }
-                } else {
+        let projected = if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+            let if_uncertain = self.project(node.if_uncertain);
+            match analyze_single(self.db, &predicate) {
+                Truthiness::AlwaysTrue => {
                     let if_true = self.project(node.if_true);
-                    let if_uncertain = self.project(node.if_uncertain);
-                    let if_false = self.project(node.if_false);
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
-
-                    if pos_constraint.is_none() && neg_constraint.is_none() {
-                        let either = self.graph.or(if_true, if_false);
-                        self.graph.or(either, if_uncertain)
-                    } else {
-                        self.graph.add_node(ProjectedNarrowingNode {
-                            atom: node.atom,
-                            if_true,
-                            if_uncertain,
-                            if_false,
-                        })
-                    }
+                    self.graph.or(if_true, if_uncertain)
                 }
+                Truthiness::AlwaysFalse => {
+                    let if_false = self.project(node.if_false);
+                    self.graph.or(if_false, if_uncertain)
+                }
+                Truthiness::Ambiguous => {
+                    unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                }
+            }
+        } else {
+            let if_true = self.project(node.if_true);
+            let if_uncertain = self.project(node.if_uncertain);
+            let if_false = self.project(node.if_false);
+            let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
+
+            if pos_constraint.is_none() && neg_constraint.is_none() {
+                let either = self.graph.or(if_true, if_false);
+                self.graph.or(either, if_uncertain)
+            } else {
+                self.graph.add_node(ProjectedNarrowingNode {
+                    atom: node.atom,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                })
             }
         };
 

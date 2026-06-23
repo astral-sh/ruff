@@ -128,16 +128,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent) | ((positional=...) -> Divergent)
+        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 
@@ -228,6 +228,31 @@ X = NewType("X", C)
 Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
 min(Y)
 T = f()
+```
+
+## Type replacement with a lazy function signature
+
+Type replacement while recovering the first `function` definition must not evaluate its lazy
+signature. The definition's reachability depends on the enclosing loop header through the match
+pattern. Evaluating the signature during `infer_definition_types` cycle recovery would therefore
+introduce a new `loop_header_reachability` dependency, which Salsa rejects.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+lambda: function
+for factory in (lambda: (function for _ in factory),):  # error: [not-iterable]
+    match 0:
+        case missing():  # error: [unresolved-reference]
+            def function(): ...
+
+        case factory():  # error: [invalid-match-pattern]
+            ...
+        case 0:
+            def function(): ...
 ```
 
 ## Lazy cached property behind `hasattr`
