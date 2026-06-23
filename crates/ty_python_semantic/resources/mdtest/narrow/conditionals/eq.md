@@ -126,7 +126,7 @@ Comparisons between values of the same enum preserve existing narrowing. They ca
 members shared by both operands, or determine that groups with no members in common are unequal:
 
 ```py
-from enum import IntEnum, StrEnum
+from enum import Enum, IntEnum, StrEnum
 from typing import Literal
 
 class Choice(StrEnum):
@@ -189,6 +189,13 @@ class RuntimeIntAlias(IntEnum):
     SECOND = 1
 
 reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: bool
+
+class CoercingAlias(str, Enum):
+    FIRST = 1
+    SECOND = "1"
+
+# `str.__new__` normalizes both declared values to the same runtime string.
+reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: bool
 ```
 
 Equality narrowing must not copy unrelated parts of one operand's type to the other:
