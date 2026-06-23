@@ -2186,6 +2186,13 @@ reveal_type(len(Permission.READ_WRITE))  # revealed: Literal[2]
 # revealed: tuple[Literal[Permission.READ], Literal[Permission.WRITE]]
 reveal_type(tuple(Permission.READ_WRITE))
 
+class MissingSingleBit(Flag):
+    A = 1
+    AB = 3
+
+# CPython yields `None` for the unnamed single-bit value `2`.
+reveal_type(tuple(MissingSingleBit.AB))  # revealed: tuple[MissingSingleBit | None, ...]
+
 reveal_type(Permission.READ in Permission.READ_WRITE)  # revealed: Literal[True]
 reveal_type(Permission.EXECUTE in Permission.READ_WRITE)  # revealed: Literal[False]
 

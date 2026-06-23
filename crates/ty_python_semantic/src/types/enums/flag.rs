@@ -269,6 +269,10 @@ impl<'db> FlagMetadata<'db> {
         self.canonical_members_are_in_value_order
     }
 
+    fn value_has_missing_single_bit_member(&self, value: i64) -> Option<bool> {
+        Some(value & (self.flag_mask? & !self.singles_mask?) != 0)
+    }
+
     fn member_value(&self, name: &Name) -> Option<i64> {
         self.member_values.get(name).copied()
     }
@@ -1024,6 +1028,16 @@ pub(crate) fn flag_literal_iteration<'db>(
     };
     if value < 0 {
         return Some(FlagIteration::Unknown(nominal));
+    }
+    if flag
+        .value_has_missing_single_bit_member(value)
+        .unwrap_or(true)
+    {
+        return Some(FlagIteration::Unknown(UnionType::from_two_elements(
+            db,
+            nominal,
+            Type::none(db),
+        )));
     }
     Some(FlagIteration::Exact(
         flag.canonical_members()
