@@ -41,16 +41,16 @@ AlwaysTruthy: _SpecialForm
 `AlwaysTruthy` represents the set of all objects that always evaluate to `True` in a boolean
 context.
 
-Most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since their boolean
-evaluation may be uncertain or depend on runtime state. For example, although an instance of
-*exactly* `object` is always truthy, a variable annotated as having type `object` could
-also be an instance of an arbitrary subclass of `object` that is always falsy. This means that
-the boolean evaluation of a variable inferred as `object` is uncertain, so `object` is not a
-subtype of `AlwaysTruthy`.
+`AlwaysTruthy` is inhabited by singleton objects such as `True` and `...`, as well as truthy
+literal strings, integers and bytestrings. It can also be inhabited by instances of classes
+with `__bool__` methods returning `Literal[True]`.
 
-In practice, `AlwaysTruthy` is mostly inhabited by truthy literal strings, integers and
-bytestrings, as well as singleton objects such as `True` and `...`. However, it can also be
-inhabited by instances of classes with `__bool__` methods returning `Literal[True]`.
+In practice, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since
+their boolean evaluation may be uncertain or depend on runtime state. For example, although
+an instance of *exactly* `object` is always truthy, a variable annotated as having type
+`object` could also be an instance of an arbitrary subclass of `object` that is always falsy.
+This means that the boolean evaluation of a variable inferred as `object` is uncertain, so
+`object` is not a subtype of `AlwaysTruthy`.
 """
 
 AlwaysFalsy: _SpecialForm
@@ -58,15 +58,12 @@ AlwaysFalsy: _SpecialForm
 `AlwaysFalsy` represents the set of all objects that always evaluate to `False` in a boolean
 context.
 
-Most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since their boolean
-evaluation may be uncertain or depend on runtime state. For example, although an empty list
-is falsy while it is empty, it will no longer be falsy after an item has been appended to the
-list. This means that the boolean evaluation of a variable inferred as `list[int]` is uncertain,
-so `list[int]` is not a subtype of `AlwaysFalsy`.
+`AlwaysFalsy` is inhabited by singleton objects such as `False` and `None`, as well as the
+literals `""`, `b""` and `0`. It can also be inhabited by instances of classes with `__bool__`
+methods returning `Literal[False]`.
 
-In practice, `AlwaysFalsy` is mostly inhabited by the literals `""`, `b""` and `0`, as well as
-singleton objects such as `False` and `None`. However, it can also be inhabited by instances of
-classes with `__bool__` methods returning `Literal[False]`.
+In practice, however, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`,
+since their boolean evaluation may be uncertain or depend on runtime state.
 """
 
 # -------------
@@ -79,10 +76,14 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 """
 `Intersection[T1, T2, ..., Tn]` represents an intersection type: the set of all objects that inhabit
-all of the types `T1`, `T2`, ..., `Tn`. An intersection type is a subtype of each of the types in the intersection.
+all of the types `T1`, `T2`, ..., `Tn`.
 
-For example, although neither `P` nor `Q` is a subtype of the other, an instance of `S` inhabits
-`Intersection[P, Q]` because `S` inherits from both `P` and `Q`:
+For any two fully static types `T1` and `T2`, `Intersection[T1, T2]` is a subtype of both `T1` and
+`T2`. For any type `T3` that is a subtype of both `T1` and `T2`, `Intersection[T1, T2]` is a
+supertype of `T3`.
+
+In the following example, although neither `P` nor `Q` is a subtype of the other, an instance of `S`
+inhabits `Intersection[P, Q]` because `S` inherits from both `P` and `Q`:
 
 ```python
 class P: ...
@@ -98,8 +99,10 @@ TypeOf: _SpecialForm
 `TypeOf[expression]` is the inferred type of `expression`.
 
 Unlike a regular [type expression], the argument to `TypeOf` is interpreted as a
-["value expression"][value expression]: an ordinary Python expression whose type ty infers. For
-example, `TypeOf[str]` is the literal class type of `str`, whereas `str` is the instance type.
+["value expression"][value expression]: an ordinary Python expression whose type ty infers. Whereas
+`str` in a type annotation means "any instance of the class `str`", `TypeOf[str]` in a type annotation
+signifies "the type inhabited by the `str` class object itself at runtime". `Literal[3]` is therefore
+the same type as `TypeOf[3]`, since ty infers the object `3` as having type `Literal[3]`.
 
 [type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 [value expression]: https://docs.python.org/3/reference/expressions.html
