@@ -12,15 +12,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 9 | def foo():
   |
 help: Remove unnecessary assignment
-3 | ###
-4 |
+  |
 5 | def foo():
   -     x = 1
   -     yield x  # RUF070
 6 +     yield 1
 7 |
-8 | def foo():
-9 |     x = [1, 2, 3]
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
@@ -34,15 +32,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
 13 | def foo():
    |
 help: Remove unnecessary assignment
-7  |     yield x  # RUF070
-8  |
+   |
 9  | def foo():
    -     x = [1, 2, 3]
    -     yield from x  # RUF070
 10 +     yield from [1, 2, 3]
 11 |
-12 | def foo():
-13 |     for i in range(10):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -56,15 +52,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 18 | def foo():
    |
 help: Remove unnecessary assignment
-12 |
-13 | def foo():
+   |
 14 |     for i in range(10):
    -         x = i * 2
    -         yield x  # RUF070
 15 +         yield i * 2
 16 |
-17 | def foo():
-18 |     if True:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -78,15 +72,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 23 | def foo():
    |
 help: Remove unnecessary assignment
-17 |
-18 | def foo():
+   |
 19 |     if True:
    -         x = 1
    -         yield x  # RUF070
 20 +         yield 1
 21 |
-22 | def foo():
-23 |     with open("foo.txt") as f:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -100,15 +92,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 28 | def foo():
    |
 help: Remove unnecessary assignment
-22 |
-23 | def foo():
+   |
 24 |     with open("foo.txt") as f:
    -         x = f.read()
    -         yield x  # RUF070
 25 +         yield f.read()
 26 |
-27 | def foo():
-28 |     try:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -122,15 +112,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 33 |         pass
    |
 help: Remove unnecessary assignment
-27 |
-28 | def foo():
+   |
 29 |     try:
    -         x = something()
    -         yield x  # RUF070
 30 +         yield something()
 31 |     except Exception:
-32 |         pass
-33 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -144,15 +132,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 39 | def foo():
    |
 help: Remove unnecessary assignment
-33 |         pass
-34 |
+   |
 35 | def foo():
    -     x = some_function()
    -     yield x  # RUF070
 36 +     yield some_function()
 37 |
-38 | def foo():
-39 |     x = some_generator()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
@@ -166,15 +152,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
 43 | def foo():
    |
 help: Remove unnecessary assignment
-37 |     yield x  # RUF070
-38 |
+   |
 39 | def foo():
    -     x = some_generator()
    -     yield from x  # RUF070
 40 +     yield from some_generator()
 41 |
-42 | def foo():
-43 |     x = lambda: 1
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -188,15 +172,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 47 | def foo():
    |
 help: Remove unnecessary assignment
-41 |     yield from x  # RUF070
-42 |
+   |
 43 | def foo():
    -     x = lambda: 1
    -     yield x  # RUF070
 44 +     yield lambda: 1
 45 |
-46 | def foo():
-47 |     x = (y := 1)
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -210,15 +192,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 51 | def foo():
    |
 help: Remove unnecessary assignment
-45 |     yield x  # RUF070
-46 |
+   |
 47 | def foo():
    -     x = (y := 1)
    -     yield x  # RUF070
 48 +     yield (y := 1)
 49 |
-50 | def foo():
-51 |     x =1
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -232,15 +212,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 55 | def foo():
    |
 help: Remove unnecessary assignment
-49 |     yield x  # RUF070
-50 |
+   |
 51 | def foo():
    -     x =1
    -     yield x  # RUF070 (no space after `=`)
 52 +     yield 1
 53 |
-54 | def foo():
-55 |     x = yield 1
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -254,15 +232,13 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 59 | # Assignment inside `with`, yield outside
    |
 help: Remove unnecessary assignment
-53 |     yield x  # RUF070 (no space after `=`)
-54 |
+   |
 55 | def foo():
    -     x = yield 1
    -     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
 56 +     yield (yield 1)
 57 |
-58 | # Assignment inside `with`, yield outside
-59 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF070 [*] Unnecessary assignment to `x` before `yield` statement
@@ -274,13 +250,11 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |           ^
    |
 help: Remove unnecessary assignment
-59 | # Assignment inside `with`, yield outside
-60 | def foo():
+   |
 61 |     with open("foo.txt") as f:
    -         x = f.read()
    -     yield x  # RUF070
 62 +         yield f.read()
 63 |
-64 |
-65 | ###
+   |
 note: This is an unsafe fix and may change runtime behavior

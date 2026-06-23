@@ -7,8 +7,8 @@ fn only_warnings() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
@@ -20,6 +20,47 @@ fn only_warnings() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn only_warnings_and_exit_zero_on_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+
+    let output = case
+        .command()
+        .arg("--exit-zero-on-warning")
+        .arg("--warn")
+        .arg("unresolved-reference")
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "`--exit-zero-on-warning` failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn error_on_warning_conflicts_with_exit_zero_on_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "")?
+        .with_filter(r"Usage: ty(?:\.exe)? check", "Usage: ty check");
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--exit-zero-on-warning"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument '--error-on-warning' cannot be used with '--exit-zero-on-warning'
+
+    Usage: ty check --error-on-warning [PATH]...
+
+    For more information, try '--help'.
     ");
 
     Ok(())
@@ -64,7 +105,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("test.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -84,8 +125,17 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 }
 
 #[test]
-fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
-    let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+fn only_warnings_and_error_on_warning_overrides_configuration() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "ty.toml",
+            r#"
+            [terminal]
+            error-on-warning = false
+        "#,
+        ),
+    ])?;
 
     assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @"
     success: false
@@ -107,21 +157,21 @@ fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
 }
 
 #[test]
-fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Result<()> {
+fn only_warnings_and_error_on_warning_is_disabled_in_configuration() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("test.py", r"print(x)  # [unresolved-reference]"),
         (
             "ty.toml",
             r#"
             [terminal]
-            error-on-warning = true
+            error-on-warning = false
         "#,
         ),
     ])?;
 
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
@@ -175,7 +225,7 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
 }
 
 #[test]
-fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()> {
+fn both_warnings_and_errors_and_exit_zero_on_warning() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",
         r###"
@@ -184,7 +234,7 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--exit-zero-on-warning"), @"
     success: false
     exit_code: 1
     ----- stdout -----

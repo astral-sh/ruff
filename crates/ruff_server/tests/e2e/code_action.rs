@@ -1,6 +1,9 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
-use lsp_types::{CodeAction, CodeActionKind, CodeActionResolveRequest};
+use lsp_types::{
+    Code, CodeAction, CodeActionKind, CodeActionResolveRequest, CodeActionResponse,
+    DocumentDiagnosticReport,
+};
 
 use crate::TestServerBuilder;
 
@@ -74,6 +77,51 @@ fn code_actions_for_python() -> Result<()> {
     ]
     "#
     );
+
+    Ok(())
+}
+
+#[test]
+fn human_readable_rule_names() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "pyproject.toml",
+            r#"
+[tool.ruff]
+preview = true
+"#,
+        )?
+        .build();
+
+    server.open_text_document("test.py", "import os\n", 1);
+
+    let diagnostics = match server.document_diagnostic_request("test.py", None) {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => {
+            report.full_document_diagnostic_report.items
+        }
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("Expected a full diagnostic report");
+        }
+    };
+    assert_eq!(
+        diagnostics[0].code,
+        Some(Code::String("unused-import".to_string()))
+    );
+
+    let actions = server
+        .code_action_request("test.py", diagnostics)
+        .expect("Expected code actions");
+    let titles: Vec<_> = actions
+        .iter()
+        .filter_map(|action| match action {
+            CodeActionResponse::CodeAction(action) => Some(action.title.as_str()),
+            CodeActionResponse::Command(_) => None,
+        })
+        .collect();
+
+    assert!(titles.contains(&"Ruff (unused-import): Remove unused import: `os`"));
+    assert!(titles.contains(&"Ruff (unused-import): Disable for this line"));
 
     Ok(())
 }

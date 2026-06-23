@@ -11,6 +11,11 @@ use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
+// Selected using performance and memory profiling across the 162-project ecosystem corpus.
+// Member-expression equality is relatively expensive, and raising the cutoff to 16 regressed
+// performance for comparatively little additional memory savings.
+const LINEAR_SEARCH_THRESHOLD: usize = 8;
+
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct Member {
@@ -419,15 +424,48 @@ impl Hash for MemberExprRef<'_> {
 #[derive(Ord, PartialOrd, get_size2::GetSize, salsa::Update)]
 pub struct ScopedMemberId;
 
+/// Map from member path to its ID.
+///
+/// Uses a hash table to avoid storing the path twice.
+#[derive(Debug, Default, get_size2::GetSize)]
+struct MemberReverseTable(hashbrown::HashTable<ScopedMemberId>);
+
+impl MemberReverseTable {
+    fn member_id(
+        &self,
+        members: &IndexVec<ScopedMemberId, Member>,
+        member: &MemberExprRef<'_>,
+    ) -> Option<ScopedMemberId> {
+        self.0
+            .find(hash_single(member), |id| members[*id].expression == *member)
+            .copied()
+    }
+
+    fn entry<'a>(
+        &'a mut self,
+        members: &IndexVec<ScopedMemberId, Member>,
+        member: &Member,
+    ) -> Entry<'a, ScopedMemberId> {
+        let member = member.expression.as_ref();
+        self.0.entry(
+            hash_single(&member),
+            |id| members[*id].expression.as_ref() == member,
+            |id| hash_single(&members[*id].expression.as_ref()),
+        )
+    }
+
+    fn shrink_to_fit(&mut self, members: &IndexVec<ScopedMemberId, Member>) {
+        self.0
+            .shrink_to_fit(|id| hash_single(&members[*id].expression.as_ref()));
+    }
+}
+
 /// The members of a scope. Allows lookup by member path and [`ScopedMemberId`].
 #[derive(Default, get_size2::GetSize)]
 pub(super) struct MemberTable {
     members: IndexVec<ScopedMemberId, Member>,
-
-    /// Map from member path to its ID.
-    ///
-    /// Uses a hash table to avoid storing the path twice.
-    map: hashbrown::HashTable<ScopedMemberId>,
+    /// Reverse lookup retained only when linear search would be expensive.
+    reverse: Option<Box<MemberReverseTable>>,
 }
 
 impl MemberTable {
@@ -454,20 +492,20 @@ impl MemberTable {
         self.members.iter()
     }
 
-    fn hash_member_expression_ref(member: &MemberExprRef) -> u64 {
-        hash_single(member)
-    }
-
     /// Returns the ID of the member with the given expression, if it exists.
     pub(crate) fn member_id<'a>(
         &self,
         member: impl Into<MemberExprRef<'a>>,
     ) -> Option<ScopedMemberId> {
         let member = member.into();
-        let hash = Self::hash_member_expression_ref(&member);
-        self.map
-            .find(hash, |id| self.members[*id].expression == member)
-            .copied()
+
+        if let Some(reverse) = self.reverse.as_deref() {
+            return reverse.member_id(&self.members, &member);
+        }
+
+        self.members
+            .iter_enumerated()
+            .find_map(|(id, candidate)| (candidate.expression == member).then_some(id))
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
@@ -499,23 +537,23 @@ impl std::fmt::Debug for MemberTable {
 #[derive(Debug, Default)]
 pub(super) struct MemberTableBuilder {
     table: MemberTable,
+    reverse: MemberReverseTable,
 }
 
 impl MemberTableBuilder {
+    pub(super) fn member_id<'a>(
+        &self,
+        member: impl Into<MemberExprRef<'a>>,
+    ) -> Option<ScopedMemberId> {
+        let member = member.into();
+        self.reverse.member_id(&self.table.members, &member)
+    }
+
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
-        let member_ref = member.expression.as_ref();
-        let hash = MemberTable::hash_member_expression_ref(&member_ref);
-        let entry = self.table.map.entry(
-            hash,
-            |id| self.table.members[*id].expression.as_ref() == member.expression.as_ref(),
-            |id| {
-                let ref_expr = self.table.members[*id].expression.as_ref();
-                MemberTable::hash_member_expression_ref(&ref_expr)
-            },
-        );
+        let entry = self.reverse.entry(&self.table.members, &member);
 
         match entry {
             Entry::Occupied(entry) => {
@@ -538,12 +576,17 @@ impl MemberTableBuilder {
     }
 
     pub(super) fn build(self) -> MemberTable {
-        let mut table = self.table;
+        let Self {
+            mut table,
+            mut reverse,
+        } = self;
         table.members.shrink_to_fit();
-        table.map.shrink_to_fit(|id| {
-            let ref_expr = table.members[*id].expression.as_ref();
-            MemberTable::hash_member_expression_ref(&ref_expr)
-        });
+
+        if table.members.len() > LINEAR_SEARCH_THRESHOLD {
+            reverse.shrink_to_fit(&table.members);
+            table.reverse = Some(Box::new(reverse));
+        }
+
         table
     }
 }

@@ -208,13 +208,14 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
     };
 
     // Sends a notification to the client with the diagnostics for the document.
-    let publish_diagnostics_notification = |uri: Uri, diagnostics: Vec<Diagnostic>| {
-        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
-            uri,
-            diagnostics,
-            version: Some(document.version()),
-        });
-    };
+    let publish_diagnostics_notification =
+        |uri: Uri, version: Option<i32>, diagnostics: Vec<Diagnostic>| {
+            client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
+                uri,
+                diagnostics,
+                version,
+            });
+        };
 
     match diagnostics.to_lsp_diagnostics(
         db,
@@ -222,7 +223,11 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         session.global_settings(),
     ) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(document.uri().clone(), diagnostics);
+            publish_diagnostics_notification(
+                document.uri().clone(),
+                Some(document.version()),
+                diagnostics,
+            );
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
             #[expect(
@@ -230,7 +235,11 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
                 reason = "diagnostic notifications for distinct cell URIs are independent"
             )]
             for (cell_uri, diagnostics) in cell_diagnostics {
-                publish_diagnostics_notification(cell_uri, diagnostics);
+                let version = session
+                    .document_handle(&cell_uri)
+                    .map(|document| document.version())
+                    .ok();
+                publish_diagnostics_notification(cell_uri, version, diagnostics);
             }
         }
     }

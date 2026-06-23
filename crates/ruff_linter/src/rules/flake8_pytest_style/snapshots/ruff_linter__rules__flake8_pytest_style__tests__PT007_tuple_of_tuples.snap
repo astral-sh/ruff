@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-assertion_line: 358
 ---
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
   --> PT007.py:23:9
@@ -13,14 +12,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 25 |     ),
    |
 help: Use `tuple` of `tuple` for parameter values
-20 | @pytest.mark.parametrize(
-21 |     ("param1", "param2"),
+   |
 22 |     (
    -         [1, 2],
 23 +         (1, 2),
 24 |         [3, 4],
-25 |     ),
-26 | )
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -34,14 +31,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 26 | )
    |
 help: Use `tuple` of `tuple` for parameter values
-21 |     ("param1", "param2"),
-22 |     (
+   |
 23 |         [1, 2],
    -         [3, 4],
 24 +         (3, 4),
 25 |     ),
-26 | )
-27 | def test_tuple_of_lists(param1, param2):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
@@ -53,14 +48,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
 33 |     ...
    |
 help: Use `tuple` for parameter values
-28 |     ...
-29 |
+   |
 30 |
    - @pytest.mark.parametrize("param", [1, 2])
 31 + @pytest.mark.parametrize("param", (1, 2))
 32 | def test_list(param):
-33 |     ...
-34 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -77,8 +70,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 43 |   def test_list_of_tuples(param1, param2):
    |
 help: Use `tuple` of `tuple` for parameter values
-35 |
-36 | @pytest.mark.parametrize(
+   |
 37 |     ("param1", "param2"),
    -     [
 38 +     (
@@ -87,8 +79,7 @@ help: Use `tuple` of `tuple` for parameter values
    -     ],
 41 +     ),
 42 | )
-43 | def test_list_of_tuples(param1, param2):
-44 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -105,8 +96,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 54 |   def test_list_of_lists(param1, param2):
    |
 help: Use `tuple` of `tuple` for parameter values
-46 |
-47 | @pytest.mark.parametrize(
+   |
 48 |     ("param1", "param2"),
    -     [
 49 +     (
@@ -115,8 +105,7 @@ help: Use `tuple` of `tuple` for parameter values
    -     ],
 52 +     ),
 53 | )
-54 | def test_list_of_lists(param1, param2):
-55 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -130,14 +119,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 52 |     ],
    |
 help: Use `tuple` of `tuple` for parameter values
-47 | @pytest.mark.parametrize(
-48 |     ("param1", "param2"),
+   |
 49 |     [
    -         [1, 2],
 50 +         (1, 2),
 51 |         [3, 4],
-52 |     ],
-53 | )
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -151,14 +138,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 53 | )
    |
 help: Use `tuple` of `tuple` for parameter values
-48 |     ("param1", "param2"),
-49 |     [
+   |
 50 |         [1, 2],
    -         [3, 4],
 51 +         (3, 4),
 52 |     ],
-53 | )
-54 | def test_list_of_lists(param1, param2):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -175,8 +160,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 65 |   def test_csv_name_list_of_lists(param1, param2):
    |
 help: Use `tuple` of `tuple` for parameter values
-57 |
-58 | @pytest.mark.parametrize(
+   |
 59 |     "param1,param2",
    -     [
 60 +     (
@@ -185,8 +169,7 @@ help: Use `tuple` of `tuple` for parameter values
    -     ],
 63 +     ),
 64 | )
-65 | def test_csv_name_list_of_lists(param1, param2):
-66 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -200,14 +183,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 63 |     ],
    |
 help: Use `tuple` of `tuple` for parameter values
-58 | @pytest.mark.parametrize(
-59 |     "param1,param2",
+   |
 60 |     [
    -         [1, 2],
 61 +         (1, 2),
 62 |         [3, 4],
-63 |     ],
-64 | )
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
@@ -221,14 +202,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tu
 64 | )
    |
 help: Use `tuple` of `tuple` for parameter values
-59 |     "param1,param2",
-60 |     [
+   |
 61 |         [1, 2],
    -         [3, 4],
 62 +         (3, 4),
 63 |     ],
-64 | )
-65 | def test_csv_name_list_of_lists(param1, param2):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
@@ -245,8 +224,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
 76 |   def test_single_list_of_lists(param):
    |
 help: Use `tuple` for parameter values
-68 |
-69 | @pytest.mark.parametrize(
+   |
 70 |     "param",
    -     [
 71 +     (
@@ -255,8 +233,7 @@ help: Use `tuple` for parameter values
    -     ],
 74 +     ),
 75 | )
-76 | def test_single_list_of_lists(param):
-77 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
@@ -268,14 +245,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
 82 | @pytest.mark.parametrize("d", [3,])
    |
 help: Use `tuple` for parameter values
-77 |     ...
-78 |
+   |
 79 |
    - @pytest.mark.parametrize("a", [1, 2])
 80 + @pytest.mark.parametrize("a", (1, 2))
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
-82 | @pytest.mark.parametrize("d", [3,])
-83 | @pytest.mark.parametrize(
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
@@ -289,14 +264,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
 84 |     "d",
    |
 help: Use `tuple` for parameter values
-79 |
-80 | @pytest.mark.parametrize("a", [1, 2])
+   |
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    - @pytest.mark.parametrize("d", [3,])
 82 + @pytest.mark.parametrize("d", (3,))
 83 | @pytest.mark.parametrize(
-84 |     "d",
-85 |     [("3", "4")],
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
@@ -310,14 +283,12 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
 87 | @pytest.mark.parametrize(
    |
 help: Use `tuple` for parameter values
-82 | @pytest.mark.parametrize("d", [3,])
-83 | @pytest.mark.parametrize(
+   |
 84 |     "d",
    -     [("3", "4")],
 85 +     (("3", "4"),),
 86 | )
-87 | @pytest.mark.parametrize(
-88 |     "e",
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
@@ -331,12 +302,10 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple`
 91 | def test_multiple_decorators(a, b, c, d, e):
    |
 help: Use `tuple` for parameter values
-86 | )
-87 | @pytest.mark.parametrize(
+   |
 88 |     "e",
    -     [("3", "4"),],
 89 +     (("3", "4"),),
 90 | )
-91 | def test_multiple_decorators(a, b, c, d, e):
-92 |     pass
+   |
 note: This is an unsafe fix and may change runtime behavior

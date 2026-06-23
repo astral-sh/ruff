@@ -276,17 +276,60 @@ mod indexed {
         Wide,
     }
 
+    #[derive(Default)]
+    struct IndexedNodesBuilder<'ast> {
+        chunks: Vec<IndexChunk>,
+        words: Vec<u64>,
+        pending: Vec<AnyRootNodeRef<'ast>>,
+        #[cfg(test)]
+        all_nodes: Vec<AnyRootNodeRef<'ast>>,
+    }
+
+    impl<'ast> IndexedNodesBuilder<'ast> {
+        fn new() -> Self {
+            Self {
+                pending: Vec::with_capacity(IndexedNodes::CHUNK_LEN),
+                ..Self::default()
+            }
+        }
+
+        fn push(&mut self, node: AnyRootNodeRef<'ast>) {
+            #[cfg(test)]
+            self.all_nodes.push(node);
+
+            self.pending.push(node);
+
+            if self.pending.len() == IndexedNodes::CHUNK_LEN {
+                self.flush();
+            }
+        }
+
+        fn finish(mut self) -> IndexedNodes {
+            self.flush();
+
+            IndexedNodes {
+                chunks: self.chunks.into_boxed_slice(),
+                words: self.words.into_boxed_slice(),
+            }
+        }
+
+        fn flush(&mut self) {
+            IndexedNodes::extend_from_nodes(&mut self.chunks, &mut self.words, &self.pending);
+            self.pending.clear();
+        }
+    }
+
     impl IndexedNodes {
         const ALIGNMENT: usize = std::mem::align_of::<AtomicNodeIndex>();
         const CHUNK_LEN: usize = 64;
         const KIND_BITS: u8 = 5;
         const KIND_MASK: u64 = (1 << Self::KIND_BITS) - 1;
 
-        fn from_collected(nodes: CollectedNodes<'_>) -> Self {
-            let CollectedNodes { nodes } = nodes;
-            let mut chunks = Vec::with_capacity(nodes.len().div_ceil(Self::CHUNK_LEN));
-            let mut words = Vec::new();
-
+        fn extend_from_nodes(
+            chunks: &mut Vec<IndexChunk>,
+            words: &mut Vec<u64>,
+            nodes: &[AnyRootNodeRef<'_>],
+        ) {
             for node_chunk in nodes.chunks(Self::CHUNK_LEN) {
                 let (base, max, aligned) =
                     node_chunk
@@ -324,7 +367,7 @@ mod indexed {
                         let offset = u64::try_from(offset)
                             .expect("relative address offset was checked to fit in 64 bits");
                         Self::write_bits(
-                            &mut words,
+                            words,
                             word_start as usize * 64 + entry * usize::from(relative_bits),
                             (offset << Self::KIND_BITS) | u64::from(kind as u8),
                             relative_bits,
@@ -349,7 +392,7 @@ mod indexed {
                     for (entry, node) in node_chunk.iter().enumerate() {
                         let (kind, _) = node.into_raw_parts();
                         Self::write_bits(
-                            &mut words,
+                            words,
                             (word_start as usize + node_chunk.len()) * 64
                                 + entry * usize::from(Self::KIND_BITS),
                             u64::from(kind as u8),
@@ -357,11 +400,6 @@ mod indexed {
                         );
                     }
                 }
-            }
-
-            Self {
-                chunks: chunks.into_boxed_slice(),
-                words: words.into_boxed_slice(),
             }
         }
 
@@ -471,7 +509,7 @@ mod indexed {
         /// Create a new [`IndexedModule`] from the given AST.
         pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
             let mut visitor = Visitor {
-                nodes: Some(CollectedNodes::default()),
+                nodes: Some(IndexedNodesBuilder::new()),
                 index: 0,
                 max_index: MAX_REAL_INDEX,
                 overflowed: false,
@@ -484,10 +522,10 @@ mod indexed {
 
             AnyNodeRef::from(inner.parsed.syntax()).visit_source_order(&mut visitor);
 
-            let nodes = visitor
+            let index = visitor
                 .nodes
-                .expect("top-level AST visitor should collect indexed nodes");
-            let index = IndexedNodes::from_collected(nodes);
+                .expect("top-level AST visitor should collect indexed nodes")
+                .finish();
             Arc::get_mut(&mut inner)
                 .expect("newly created indexed module should have a unique Arc")
                 .index = index;
@@ -519,16 +557,11 @@ mod indexed {
         }
     }
 
-    #[derive(Default)]
-    struct CollectedNodes<'ast> {
-        nodes: Vec<AnyRootNodeRef<'ast>>,
-    }
-
-    /// A visitor that collects nodes in source order.
+    /// A visitor that indexes nodes in source order.
     struct Visitor<'ast> {
         index: u32,
         max_index: u32,
-        nodes: Option<CollectedNodes<'ast>>,
+        nodes: Option<IndexedNodesBuilder<'ast>>,
         overflowed: bool,
     }
 
@@ -546,7 +579,7 @@ mod indexed {
             }
 
             if let Some(nodes) = &mut self.nodes {
-                nodes.nodes.push(AnyRootNodeRef::from(node));
+                nodes.push(AnyRootNodeRef::from(node));
             }
             self.index += 1;
         }
@@ -747,15 +780,16 @@ class C[T](Base, metaclass=Meta):
             .expect("test source should parse");
             let indexed = IndexedModule::new(parsed);
             let mut visitor = Visitor {
-                nodes: Some(CollectedNodes::default()),
+                nodes: Some(IndexedNodesBuilder::new()),
                 index: 0,
                 max_index: MAX_REAL_INDEX,
                 overflowed: false,
             };
             AnyNodeRef::from(indexed.parsed.syntax()).visit_source_order(&mut visitor);
-            let CollectedNodes { nodes } = visitor
+            let nodes = visitor
                 .nodes
-                .expect("test visitor should collect indexed nodes");
+                .expect("test visitor should collect indexed nodes")
+                .all_nodes;
 
             assert_eq!(indexed.index.len(), nodes.len());
             let mut seen_kinds = [false; 1 << IndexedNodes::KIND_BITS];

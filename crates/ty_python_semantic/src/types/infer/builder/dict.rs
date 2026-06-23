@@ -39,7 +39,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // committed with the fast path or left for ordinary `dict(...)` inference when we fall
             // back.
             let supports_typed_dict_context = {
-                let mut speculative_builder = self.speculate();
+                let mut speculative_builder = self.speculate_without_diagnostics();
                 infer_unpacked_keyword_types(arguments, |expr, tcx| {
                     speculative_builder.infer_expression(expr, tcx)
                 })

@@ -3370,6 +3370,7 @@ name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
  "aho-corasick",
+ "arrayvec",
  "bitflags 2.13.0",
  "compact_str",
  "get-size2",
@@ -3572,6 +3573,7 @@ dependencies = [
  "jod-thread",
  "libc",
  "lsp-server",
+ "memchr",
  "regex",
  "ruff_db",
  "ruff_diagnostics",

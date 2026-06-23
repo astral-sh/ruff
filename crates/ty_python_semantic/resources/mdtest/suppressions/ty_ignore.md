@@ -30,10 +30,11 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression comment
-1 | test = 10
+  |
 2 | # snapshot
   - a = test + 3  # ty: ignore[possibly-unresolved-reference]
 3 + a = test + 3
+  |
 ```
 
 ## Unused suppression if the error codes don't match
@@ -53,11 +54,12 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression comment
-1 | # snapshot: unused-ignore-comment
+  |
 2 | # error: [unresolved-reference]
   - a = test + 3  # ty: ignore[possibly-unresolved-reference]
 3 + a = test + 3
 4 | print(a)
+  |
 ```
 
 ## Suppressed unused comment
@@ -86,9 +88,11 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unused-ignore-co
   |                                            ^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression code
+  |
 1 | # snapshot
   - a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
 2 + a = 10 / 0  # ty: ignore[division-by-zero]
+  |
 ```
 
 ## Multiple unused comments
@@ -108,12 +112,12 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression comment
+  |
 1 | # snapshot
   - a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
 2 + a = 10 / 2
 3 | # snapshot
-4 | # snapshot
-5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+  |
 ```
 
 ```py
@@ -130,13 +134,12 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignme
   |                          ^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression code
-2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
-3 | # snapshot
+  |
 4 | # snapshot
   - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
 5 + a = 10 / 0  # ty: ignore[division-by-zero, unresolved-reference]
 6 | # snapshot
-7 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+  |
 
 
 warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
@@ -146,13 +149,12 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-refer
   |                                                                ^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression code
-2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
-3 | # snapshot
+  |
 4 | # snapshot
   - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
 5 + a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero]
 6 | # snapshot
-7 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+  |
 ```
 
 ```py
@@ -168,11 +170,11 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignme
   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove the unused suppression codes
-4 | # snapshot
-5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+  |
 6 | # snapshot
   - a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
 7 + a = 10 / 0  # ty: ignore[division-by-zero]
+  |
 ```
 
 ## Multiple suppressions

@@ -579,25 +579,30 @@ impl<'db> Bindings<'db> {
     where
         I: IntoIterator<Item = Bindings<'db>>,
     {
-        let mut implicit_dunder_new_is_possibly_unbound = false;
-        let mut implicit_dunder_init_is_possibly_unbound = false;
-        let mut elements_acc = SmallVec::new();
+        let mut bindings_iter = bindings_iter.into_iter();
+        // Use the first binding as the accumulator to reuse its elements buffer.
+        let Self {
+            callable_type: _,
+            mut implicit_dunder_new_is_possibly_unbound,
+            mut implicit_dunder_init_is_possibly_unbound,
+            mut elements,
+            enclosing_binding_contexts: _,
+        } = bindings_iter.next().expect("bindings must not be empty");
 
-        // Preserve each input's existing union/intersection structure.
-        for set in bindings_iter {
-            implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
+        for bindings in bindings_iter {
+            implicit_dunder_new_is_possibly_unbound |=
+                bindings.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
-                set.implicit_dunder_init_is_possibly_unbound;
-            elements_acc.extend(set.elements);
+                bindings.implicit_dunder_init_is_possibly_unbound;
+            elements.extend(bindings.elements);
         }
 
-        let elements = elements_acc;
         assert!(!elements.is_empty());
         Self {
             callable_type,
-            elements,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
+            elements,
             enclosing_binding_contexts: None,
         }
     }

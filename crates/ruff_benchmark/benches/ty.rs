@@ -7,6 +7,7 @@ use ruff_benchmark::real_world_projects::{
 
 use std::fmt::Write;
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
@@ -225,32 +226,32 @@ fn setup_micro_case(code: &str) -> Case {
     setup_micro_case_inner(code, None)
 }
 
-fn setup_micro_case_with_dependencies(name: &str, dependencies: &[&str], code: &str) -> Case {
-    setup_micro_case_inner(code, Some((name, dependencies)))
+fn setup_micro_case_venv(name: &str, dependencies: &[&str]) -> PathBuf {
+    let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
+    std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+    let venv_path = cache_dir.join(".venv");
+    install_dependencies_to_cache(
+        name,
+        dependencies,
+        &venv_path,
+        SupportedPythonVersion::Py312,
+        TY_ECOSYSTEM_PIN,
+    )
+    .expect("Failed to install dependencies");
+
+    venv_path
 }
 
-fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> Case {
+fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
-    let python = dependencies.map(|(name, dependencies)| {
-        let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
-        std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
-
-        let venv_path = cache_dir.join(".venv");
-        install_dependencies_to_cache(
-            name,
-            dependencies,
-            &venv_path,
-            SupportedPythonVersion::Py312,
-            TY_ECOSYSTEM_PIN,
-        )
-        .expect("Failed to install dependencies");
-
+    let python = venv_path.map(|venv_path| {
         // Copy the on-disk venv into the in-memory filesystem.
         // ProjectMetadata::discover walks up from /src and uses / as the project root,
         // so the venv must be at /.venv for the `python = ".venv"` option to resolve correctly.
-        copy_directory_recursive(&fs, &venv_path, SystemPath::new("/.venv"))
+        copy_directory_recursive(&fs, venv_path, SystemPath::new("/.venv"))
             .expect("Failed to copy venv to memory filesystem");
 
         RelativePathBuf::cli(SystemPath::new(".venv"))
@@ -1217,27 +1218,23 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
 
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
+    let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
+    let code = r#"
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "a": [1, 2, 3],
+            "b": [4, 5, 6],
+            "c": [7, 8, 9],
+        })
+        df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
+            df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
+        "#;
 
     // This example was reported in https://github.com/astral-sh/ty/issues/3039.
     criterion.bench_function("ty_micro[pandas_tdd]", |b| {
         b.iter_batched_ref(
-            || {
-                setup_micro_case_with_dependencies(
-                    "pandas_tdd",
-                    &["pandas-stubs"],
-                    r#"
-                    import pandas as pd
-
-                    df = pd.DataFrame({
-                        "a": [1, 2, 3],
-                        "b": [4, 5, 6],
-                        "c": [7, 8, 9],
-                    })
-                    df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
-                        df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
-                    "#,
-                )
-            },
+            || setup_micro_case_inner(code, Some(&venv_path)),
             |case| {
                 let Case { db, .. } = case;
                 let result = db.check();

@@ -22,7 +22,7 @@ enum BinaryExpressionOperandTypes<'db> {
 }
 
 type BinaryExpressionVisitor<'db> =
-    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>>;
+    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -182,7 +182,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let db = self.db();
 
-        let update_ty = self.speculate().infer_expression(
+        let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
             TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
         );

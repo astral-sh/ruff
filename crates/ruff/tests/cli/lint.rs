@@ -3833,7 +3833,9 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |        ^^^^
       |
     help: Remove unused import: `math`
+      |
       - import math
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -3897,8 +3899,10 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
+      |
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
+      |
 
     stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1

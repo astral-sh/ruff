@@ -10,7 +10,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_______________________^
   |
 help: Organize imports
+  |
 1 | from .logging import config_logging
 2 + from .settings import *
 3 | from .settings import ENV
   - from .settings import *
+  |

@@ -65,6 +65,22 @@ mod named_tuple;
 mod static_literal;
 mod typed_dict;
 
+bitflags::bitflags! {
+    /// Properties that affect the representation of instances of a class.
+    ///
+    /// This combines properties derived from the MRO into the existing class-classification
+    /// query, avoiding a separate cached query for each property.
+    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash, salsa::Update)]
+    pub(super) struct ClassInstanceFlags: u8 {
+        /// The class is, or inherits from, a `TypedDict` specification.
+        const TYPED_DICT = 1 << 0;
+        /// The class directly or indirectly inherits from an explicit `Any` base.
+        const INHERITS_FROM_EXPLICIT_ANY = 1 << 1;
+    }
+}
+
+impl get_size2::GetSize for ClassInstanceFlags {}
+
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
@@ -154,7 +170,9 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn code_generator_of_dynamic_class<'db>(
             db: &'db dyn Db,
             class: DynamicClassLiteral<'db>,
@@ -214,6 +232,24 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
+    /// Merge two cycle iterations that specialize the same class origin.
+    ///
+    /// A semantic union of these class objects is not a valid class base. Keep the shared class
+    /// identity and merge the approximations inside its specialization instead.
+    pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        let origin = self.origin(db);
+        if origin != previous.origin(db) {
+            return None;
+        }
+
+        Some(Self::new(
+            db,
+            origin,
+            self.specialization(db)
+                .merge_cycle_recovery(db, previous.specialization(db))?,
+        ))
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -336,6 +372,7 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+#[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -393,6 +430,34 @@ impl<'db> ClassLiteral<'db> {
     /// Returns an iterator over the MRO.
     pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         MroIterator::new(db, self, None)
+    }
+
+    /// Return the properties that affect how instances of this class are represented.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+        match self {
+            Self::Static(literal) => literal.instance_flags(db),
+            Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
+            Self::DynamicNamedTuple(_) => ClassInstanceFlags::empty(),
+            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => {
+                ClassInstanceFlags::empty()
+            }
+            Self::DynamicEnum(literal) if literal.explicit_bases(db).is_empty() => {
+                ClassInstanceFlags::empty()
+            }
+            Self::Dynamic(_) | Self::DynamicEnum(_) => {
+                if self.iter_mro(db).any(ClassBase::is_explicit_any_base) {
+                    ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
+                } else {
+                    ClassInstanceFlags::empty()
+                }
+            }
+        }
+    }
+
+    /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
+    pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        self.instance_flags(db)
+            .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }
 
     /// Returns the metaclass of this class.
@@ -2171,6 +2236,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
+                ClassBase::Any => ConstraintSet::from_bool(
+                    self.constraints,
+                    self.relation.is_assignability() || target.is_object(db),
+                ),
                 ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
@@ -2390,8 +2459,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) if policy.require_concrete() => {}
-                ClassBase::Dynamic(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) if policy.require_concrete() => {}
+                ClassBase::Any | ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
@@ -2466,7 +2535,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     // We already return the dynamic type for class member lookup, so we can
                     // just return unbound here (to avoid having to build a union of the
                     // dynamic type with itself).

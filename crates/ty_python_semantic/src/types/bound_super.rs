@@ -375,11 +375,11 @@ impl<'db> BoundSuperType<'db> {
         pivot_class: ClassBase<'db>,
     ) -> bool {
         match pivot_class {
-            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
             ClassBase::Class(pivot_class) => {
                 let pivot_class = pivot_class.class_literal(db);
                 class.iter_mro(db).any(|superclass| match superclass {
-                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
                     ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
                     ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
                 })
@@ -988,8 +988,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, l == r)
             }
             (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
-            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => self.always(),
-            (ClassBase::Dynamic(_), _) => self.never(),
+            (ClassBase::Any | ClassBase::Dynamic(_), ClassBase::Any | ClassBase::Dynamic(_)) => {
+                self.always()
+            }
+            (ClassBase::Any | ClassBase::Dynamic(_), _) => self.never(),
 
             (ClassBase::Generic, ClassBase::Generic) => self.always(),
             (ClassBase::Generic, _) => self.never(),

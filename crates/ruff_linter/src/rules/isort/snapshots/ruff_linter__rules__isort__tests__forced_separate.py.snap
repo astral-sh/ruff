@@ -15,7 +15,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________________________________________________________^
   |
 help: Organize imports
-1  | # office_helper and tests are both first-party,
+   |
 2  | # but we want tests and experiments to be separated, in that order
 3  + from office_helper.assistants import entity_registry as er
 4  | from office_helper.core import CoreState
@@ -26,3 +26,4 @@ help: Organize imports
 9  | from experiments.starry import *
 10 | from experiments.weird import varieties
    - from office_helper.assistants import entity_registry as er
+   |

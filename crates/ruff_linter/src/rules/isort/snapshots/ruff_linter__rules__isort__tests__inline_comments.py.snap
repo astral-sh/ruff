@@ -18,8 +18,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |______________________________________________________________________________________^
    |
 help: Organize imports
-1  | from a.prometheus.metrics import (  # type:ignore[attr-defined]
-2  |     TERMINAL_CURRENTLY_RUNNING_TOTAL,
+   |
 3  | )
    -
 4  | from b.prometheus.metrics import (
@@ -36,3 +35,4 @@ help: Organize imports
 11 +     OTHER_RUNNING_TOTAL,
 12 +     TERMINAL_CURRENTLY_RUNNING_TOTAL,
 13 + )
+   |

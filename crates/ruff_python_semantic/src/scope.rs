@@ -84,6 +84,11 @@ impl<'a> Scope<'a> {
         }
     }
 
+    /// Reserves capacity for at least `additional` more bindings.
+    pub(crate) fn reserve_bindings(&mut self, additional: usize) {
+        self.bindings.reserve(additional);
+    }
+
     /// Returns `true` if this scope has a binding with the given name.
     pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
