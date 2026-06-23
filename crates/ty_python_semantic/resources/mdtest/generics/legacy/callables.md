@@ -26,6 +26,13 @@ def identity2(c: Callable[P, T]) -> Callable[P, T]:
 reveal_type(generic_context(identity2))
 # revealed: [T](t: T) -> T
 reveal_type(identity2(identity))
+
+class CallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+# revealed: (value: int, /) -> str
+reveal_type(identity2(CallableInstance()))
 ```
 
 Generic classes are another example, since you invoke the class to instantiate it:

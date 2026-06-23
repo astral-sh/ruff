@@ -2880,7 +2880,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal, Type::NominalInstance(actual_nominal)) => {
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::NominalInstance(actual_nominal),
+            ) => {
                 // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
                     formal.tuple_instance_spec(self.db),
