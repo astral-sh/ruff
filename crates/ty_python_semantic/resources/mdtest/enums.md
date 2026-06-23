@@ -2127,6 +2127,7 @@ reveal_type(Permission.EXECUTE.value)  # revealed: Literal[4]
 reveal_type(Permission.READ_WRITE.value)  # revealed: Literal[3]
 reveal_type(Permission.READ_ALIAS)  # revealed: Literal[Permission.READ]
 reveal_type(Permission(Permission.READ))  # revealed: Literal[Permission.READ]
+reveal_type(Permission(value=1))  # revealed: Literal[Permission.READ]
 
 class OutOfOrder(Flag):
     HIGH = 8
@@ -2241,6 +2242,7 @@ class OtherIntFlag(IntFlag):
 reveal_type(~Strict.A)  # revealed: Literal[Strict.C]
 reveal_type(Conforming(2))  # revealed: Literal[Conforming.NONE]
 reveal_type(Ejecting(2))  # revealed: Literal[2]
+reveal_type(Ejecting(value=2))  # revealed: Literal[2]
 reveal_type(Ejecting.A | 2)  # revealed: Literal[3]
 reveal_type(2 | Ejecting.A)  # revealed: Literal[3]
 reveal_type(True | Ejecting.A)  # revealed: int

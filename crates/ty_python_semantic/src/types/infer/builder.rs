@@ -8938,8 +8938,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     class,
                     arguments
-                        .args
-                        .first()
+                        .find_argument_value("value", 0)
                         .map(|argument| self.expression_type(argument)),
                 )
             })
