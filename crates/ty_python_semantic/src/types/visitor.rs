@@ -300,11 +300,36 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db>(RefCell<TypeCollectorState<'db>>);
+
+#[derive(Default, Debug)]
+enum TypeCollectorState<'db> {
+    #[default]
+    Empty,
+    One(Type<'db>),
+    Many(FxHashSet<Type<'db>>),
+}
 
 impl<'db> TypeCollector<'db> {
     pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+        let mut state = self.0.borrow_mut();
+        match &mut *state {
+            TypeCollectorState::Empty => {
+                *state = TypeCollectorState::One(ty);
+                false
+            }
+            TypeCollectorState::One(first) if *first == ty => true,
+            TypeCollectorState::One(first) => {
+                let first = *first;
+                let mut seen = FxHashSet::default();
+                let inserted_first = seen.insert(first);
+                let inserted_ty = seen.insert(ty);
+                debug_assert!(inserted_first && inserted_ty);
+                *state = TypeCollectorState::Many(seen);
+                false
+            }
+            TypeCollectorState::Many(seen) => !seen.insert(ty),
+        }
     }
 }
 
