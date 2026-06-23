@@ -2135,10 +2135,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // without checking return types or individual parameter types. The full parameter
         // comparison below reaches the same result, but only after doing work that is expensive for
         // large overload sets.
-        if target_typevartuple.is_none()
-            && source.parameters.is_standard()
+        if source.parameters.is_standard()
             && target.parameters.is_standard()
             && source.parameters.variadic().is_none()
+            && target_typevartuple.is_none()
         {
             let source_positional = source.parameters.positional().count();
             let target_positional = target.parameters.positional().count();
@@ -2168,27 +2168,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        // An unpacked TypeVarTuple is inferred from the positional parameters below. Defer the
-        // return check until then so that each use of the TypeVarTuple is replaced by the same
-        // packed tuple instead of being related as individual tuple elements.
-        let return_type_checks = if target_typevartuple.is_some() {
-            true
-        } else {
-            let return_type_constraints =
-                self.check_type_pair(db, source.return_ty, target.return_ty);
-            let return_type_checks = !result
-                .intersect(db, self.constraints, return_type_constraints)
-                .is_never_satisfied(db);
-            if let Some(context) = self.report_context()
-                && !return_type_checks
-            {
-                context.push(ErrorContext::IncompatibleReturnTypes {
-                    source: source.return_ty,
-                    target: target.return_ty,
-                });
-            }
-            return_type_checks
-        };
+        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_checks = !result
+            .intersect(db, self.constraints, return_type_constraints)
+            .is_never_satisfied(db);
+        if let Some(context) = self.report_context()
+            && !return_type_checks
+        {
+            context.push(ErrorContext::IncompatibleReturnTypes {
+                source: source.return_ty,
+                target: target.return_ty,
+            });
+        }
 
         let check_types = |result: &mut ConstraintSet<'db, 'c>,
                            target_ty: Type<'db>,
@@ -3119,39 +3110,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 parameters.next_target();
                 target_index += 1;
 
-                let typevartuple_matches = ConstraintSet::constrain_typevar_upper_bound(
-                    db,
-                    self.constraints,
-                    typevartuple,
-                    inferred_tuple,
-                );
+                let typevartuple_matches =
+                    self.check_type_pair(db, Type::TypeVar(typevartuple), inferred_tuple);
                 if result
                     .intersect(db, self.constraints, typevartuple_matches)
                     .is_never_satisfied(db)
                 {
-                    return result;
-                }
-
-                let type_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                    typevartuple,
-                    inferred_tuple,
-                ));
-                let rewritten_target_return = target.return_ty.apply_type_mapping_impl(
-                    db,
-                    &type_mapping,
-                    TypeContext::default(),
-                    &ApplyTypeMappingVisitor::default(),
-                );
-                let return_type_constraints =
-                    self.check_type_pair(db, source.return_ty, rewritten_target_return);
-                if result
-                    .intersect(db, self.constraints, return_type_constraints)
-                    .is_never_satisfied(db)
-                {
-                    self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
-                        source: source.return_ty,
-                        target: rewritten_target_return,
-                    });
                     return result;
                 }
 
