@@ -1028,6 +1028,18 @@ struct VariableSlice {
     suffix_stop: usize,
 }
 
+/// A private operand accepted by `VariableLengthTuple::slice`.
+trait VariableTupleSlice<'db> {
+    fn apply_to<'a>(
+        self,
+        db: &'db dyn Db,
+        tuple: &'a VariableLengthTuple<Type<'db>>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        Self: 'a,
+        'db: 'a;
+}
+
 /// How to approximate a static slice into a variable-length tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum VariableTupleSlicePlan {
@@ -1065,14 +1077,19 @@ impl FixedSlice {
             step,
         }
     }
+}
 
-    fn elements<'db>(self, tuple: &VariableLengthTuple<Type<'db>>) -> Vec<Type<'db>> {
-        let elements = match self.segment {
-            FixedSegment::Prefix => tuple.prefix_elements(),
-            FixedSegment::Suffix => tuple.suffix_elements(),
-        };
-
-        py_slice_with_step(elements, self.start, self.stop, self.step).collect()
+impl<'db> VariableTupleSlice<'db> for FixedSlice {
+    fn apply_to<'a>(
+        self,
+        db: &'db dyn Db,
+        tuple: &'a VariableLengthTuple<Type<'db>>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        Self: 'a,
+        'db: 'a,
+    {
+        tuple.slice_fixed(db, self)
     }
 }
 
@@ -1100,120 +1117,19 @@ impl FixedPositionSlice {
             step,
         }
     }
+}
 
-    fn elements<'db>(
+impl<'db> VariableTupleSlice<'db> for FixedPositionSlice {
+    fn apply_to<'a>(
         self,
         db: &'db dyn Db,
-        tuple: &VariableLengthTuple<Type<'db>>,
-    ) -> Vec<Type<'db>> {
-        match self {
-            FixedPositionSlice::FrontForward {
-                start,
-                exclusive_stop,
-                step,
-            } => Self::front_forward_elements(db, tuple, start, exclusive_stop, step),
-            FixedPositionSlice::FrontBackward {
-                start,
-                exclusive_stop,
-                step,
-            } => Self::front_backward_elements(db, tuple, start, exclusive_stop, step),
-            FixedPositionSlice::Back {
-                start,
-                exclusive_stop,
-                step,
-            } => Self::back_elements(db, tuple, start, exclusive_stop, step),
-        }
-    }
-
-    fn front_forward_elements<'db>(
-        db: &'db dyn Db,
-        tuple: &VariableLengthTuple<Type<'db>>,
-        start: usize,
-        exclusive_stop: usize,
-        step: NonZeroUsize,
-    ) -> Vec<Type<'db>> {
-        (start..exclusive_stop)
-            .step_by(step.get())
-            .map(|index| {
-                tuple.type_at_nonnegative_index(db, index).unwrap_or_else(|| {
-                    unreachable!(
-                        "front-origin fixed slice positions are validated during plan construction"
-                    )
-                })
-            })
-            .collect()
-    }
-
-    fn front_backward_elements<'db>(
-        db: &'db dyn Db,
-        tuple: &VariableLengthTuple<Type<'db>>,
-        start: usize,
-        exclusive_stop: Option<usize>,
-        step: NonZeroUsize,
-    ) -> Vec<Type<'db>> {
-        let mut index = start;
-        let mut elements = Vec::new();
-        loop {
-            if exclusive_stop.is_some_and(|stop| index <= stop) {
-                break;
-            }
-
-            elements.push(tuple.type_at_nonnegative_index(db, index).unwrap_or_else(|| {
-                unreachable!(
-                    "front-origin fixed slice positions are validated during plan construction"
-                )
-            }));
-
-            let Some(next_index) = index.checked_sub(step.get()) else {
-                break;
-            };
-            index = next_index;
-        }
-
-        elements
-    }
-
-    fn back_elements<'db>(
-        db: &'db dyn Db,
-        tuple: &VariableLengthTuple<Type<'db>>,
-        start: usize,
-        exclusive_stop: usize,
-        step: NonZeroI32,
-    ) -> Vec<Type<'db>> {
-        let step = step.get();
-        let step_abs = step.unsigned_abs() as usize;
-        let mut distance = start;
-        let mut elements = Vec::new();
-
-        if step > 0 {
-            while distance > exclusive_stop {
-                elements.push(tuple.type_at_negative_distance(db, distance).unwrap_or_else(|| {
-                    unreachable!(
-                        "back-origin fixed slice positions are validated during plan construction"
-                    )
-                }));
-
-                if distance.saturating_sub(exclusive_stop) <= step_abs {
-                    break;
-                }
-                distance -= step_abs;
-            }
-        } else {
-            while distance < exclusive_stop {
-                elements.push(tuple.type_at_negative_distance(db, distance).unwrap_or_else(|| {
-                    unreachable!(
-                        "back-origin fixed slice positions are validated during plan construction"
-                    )
-                }));
-
-                if exclusive_stop - distance <= step_abs {
-                    break;
-                }
-                distance += step_abs;
-            }
-        }
-
-        elements
+        tuple: &'a VariableLengthTuple<Type<'db>>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        Self: 'a,
+        'db: 'a,
+    {
+        tuple.slice_fixed_position(db, self)
     }
 }
 
@@ -1274,7 +1190,7 @@ impl VariableTupleSlicePlan {
             }
 
             VariableTupleSlicePlan::Fixed(fixed) => {
-                Type::heterogeneous_tuple(db, fixed.elements(db, tuple))
+                Type::heterogeneous_tuple(db, tuple.slice(db, fixed))
             }
 
             VariableTupleSlicePlan::Mixed {
@@ -1283,13 +1199,9 @@ impl VariableTupleSlicePlan {
                 fixed_suffix,
             } => Type::tuple(TupleType::mixed(
                 db,
-                fixed_prefix
-                    .map(|fixed_prefix| fixed_prefix.elements(tuple))
-                    .unwrap_or_default(),
+                tuple.optional_slice(db, fixed_prefix),
                 variable.ty(db, tuple),
-                fixed_suffix
-                    .map(|fixed_suffix| fixed_suffix.elements(tuple))
-                    .unwrap_or_default(),
+                tuple.optional_slice(db, fixed_suffix),
             )),
 
             VariableTupleSlicePlan::Homogeneous => tuple.homogeneous_type(db),
@@ -1298,6 +1210,175 @@ impl VariableTupleSlicePlan {
 }
 
 impl<'db> VariableLengthTuple<Type<'db>> {
+    fn slice<'a, S>(&'a self, db: &'db dyn Db, slice: S) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        S: VariableTupleSlice<'db> + 'a,
+        'db: 'a,
+    {
+        slice.apply_to(db, self)
+    }
+
+    fn optional_slice<'a, S>(
+        &'a self,
+        db: &'db dyn Db,
+        slice: Option<S>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        S: VariableTupleSlice<'db> + 'a,
+        'db: 'a,
+    {
+        match slice {
+            Some(slice) => Either::Left(self.slice(db, slice)),
+            None => Either::Right(std::iter::empty()),
+        }
+    }
+
+    fn slice_fixed(
+        &self,
+        _db: &'db dyn Db,
+        slice: FixedSlice,
+    ) -> impl Iterator<Item = Type<'db>> + '_ {
+        let elements = match slice.segment {
+            FixedSegment::Prefix => self.prefix_elements(),
+            FixedSegment::Suffix => self.suffix_elements(),
+        };
+
+        py_slice_with_step(elements, slice.start, slice.stop, slice.step)
+    }
+
+    fn slice_fixed_position<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        slice: FixedPositionSlice,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        'db: 'a,
+    {
+        match slice {
+            FixedPositionSlice::FrontForward {
+                start,
+                exclusive_stop,
+                step,
+            } => Either::Left(self.slice_front_forward(db, start, exclusive_stop, step)),
+            FixedPositionSlice::FrontBackward {
+                start,
+                exclusive_stop,
+                step,
+            } => Either::Right(Either::Left(self.slice_front_backward(
+                db,
+                start,
+                exclusive_stop,
+                step,
+            ))),
+            FixedPositionSlice::Back {
+                start,
+                exclusive_stop,
+                step,
+            } => Either::Right(Either::Right(self.slice_back(
+                db,
+                start,
+                exclusive_stop,
+                step,
+            ))),
+        }
+    }
+
+    fn slice_front_forward<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        start: usize,
+        exclusive_stop: usize,
+        step: NonZeroUsize,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        'db: 'a,
+    {
+        (start..exclusive_stop)
+            .step_by(step.get())
+            .map(move |index| {
+                self.type_at_nonnegative_index(db, index).unwrap_or_else(|| {
+                    unreachable!(
+                        "front-origin fixed slice positions are validated during plan construction"
+                    )
+                })
+            })
+    }
+
+    fn slice_front_backward<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        start: usize,
+        exclusive_stop: Option<usize>,
+        step: NonZeroUsize,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        'db: 'a,
+    {
+        let mut next_index = Some(start);
+        std::iter::from_fn(move || {
+            let index = next_index?;
+            if exclusive_stop.is_some_and(|stop| index <= stop) {
+                next_index = None;
+                return None;
+            }
+
+            let element = self
+                .type_at_nonnegative_index(db, index)
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "front-origin fixed slice positions are validated during plan construction"
+                    )
+                });
+
+            next_index = index.checked_sub(step.get());
+            Some(element)
+        })
+    }
+
+    fn slice_back<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        start: usize,
+        exclusive_stop: usize,
+        step: NonZeroI32,
+    ) -> impl Iterator<Item = Type<'db>> + 'a
+    where
+        'db: 'a,
+    {
+        let step = step.get();
+        let step_abs = step.unsigned_abs() as usize;
+        let mut distance = start;
+
+        std::iter::from_fn(move || {
+            if (step > 0 && distance <= exclusive_stop) || (step < 0 && distance >= exclusive_stop)
+            {
+                return None;
+            }
+
+            let element = self
+                .type_at_negative_distance(db, distance)
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "back-origin fixed slice positions are validated during plan construction"
+                    )
+                });
+
+            if step > 0 {
+                if distance.saturating_sub(exclusive_stop) <= step_abs {
+                    distance = exclusive_stop;
+                } else {
+                    distance -= step_abs;
+                }
+            } else if exclusive_stop - distance <= step_abs {
+                distance = exclusive_stop;
+            } else {
+                distance += step_abs;
+            }
+
+            Some(element)
+        })
+    }
+
     /// Returns a sound static slice result for a mixed tuple.
     ///
     /// We preserve fixed-length results exactly, unioning each output position when it can come
