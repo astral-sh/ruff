@@ -145,13 +145,13 @@ error[type-assertion-failure]: Argument does not have asserted type `Baz`
 info: `Baz` and `Foo & Bar` are not equivalent types
 ```
 
-Compact enum complements that are equivalent to a literal union are still spellable.
+When narrowing leaves only one enum member, the inferred type is the corresponding literal.
 
 ```py
-from enum import Flag
+from enum import Enum
 from typing_extensions import assert_type
 
-class F(Flag):
+class F(Enum):
     A = 1
     B = 2
     C = 4
