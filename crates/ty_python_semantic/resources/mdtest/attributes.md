@@ -3597,6 +3597,27 @@ class ProjectionCustomMethodCall:
 
         reveal_type(self.x)  # revealed: MethodBox[int]
 
+class ProjectionMethodCallArgumentDebug:
+    description: str
+
+class ProjectionMethodCallArgumentLayer:
+    def maybe_debug(self, dependency: object) -> ProjectionMethodCallArgumentDebug | None:
+        return ProjectionMethodCallArgumentDebug()
+
+class ProjectionMethodCallArgumentNode:
+    layer: ProjectionMethodCallArgumentLayer
+    private: "ProjectionMethodCallArgumentNode | None"
+
+def projection_method_call_argument(node: ProjectionMethodCallArgumentNode, dependency: object) -> None:
+    while True:
+        debug = node.layer.maybe_debug(dependency)
+        node = node.private or node
+        if debug is None:
+            return
+
+        reveal_type(debug)  # revealed: ProjectionMethodCallArgumentDebug
+        debug.description
+
 class MethodPair(Generic[ProjectionT, ProjectionU]):
     def __init__(self, left: ProjectionT, right: ProjectionU) -> None:
         self.left_value = left

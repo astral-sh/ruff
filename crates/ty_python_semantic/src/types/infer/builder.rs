@@ -8457,7 +8457,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
-        callable_type: Type<'db>,
+        mut callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
@@ -8496,6 +8496,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             func,
             arguments,
         } = call_expression;
+
+        if let ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
+            callable_type = callable_type.member_projection_callee_fallback(self.db(), &attr.id);
+        }
 
         if callable_type
             .as_class_literal()

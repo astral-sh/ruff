@@ -190,6 +190,35 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inference-time API: restores unresolved member projections in method-call callee position.
+    ///
+    /// A method call first infers the attribute access used as its callee. If that intermediate
+    /// callee contains an unresolved `Member` projection, fall back to the pre-projection behavior
+    /// where `Divergent.foo(...)` remains `Divergent`, instead of allowing the intermediate bound
+    /// method object to affect the return type.
+    pub(crate) fn member_projection_callee_fallback(
+        self,
+        db: &'db dyn Db,
+        method_name: &Name,
+    ) -> Self {
+        match self {
+            Type::Projection(projection)
+                if projection.path(db).ops().last().is_some_and(|op| {
+                    matches!(
+                        op,
+                        ProjectionOp::Member(member) if member.name(db) == method_name
+                    )
+                }) =>
+            {
+                Type::Divergent(projection.root(db))
+            }
+            Type::Union(union) => union.map(db, |element| {
+                element.member_projection_callee_fallback(db, method_name)
+            }),
+            _ => self,
+        }
+    }
+
     /// Inference-time API: projects a context-manager enter operation without replay evidence.
     pub(crate) fn try_context_enter_projection(
         self,
