@@ -297,6 +297,9 @@ def simple[*Ts](callback: Callable[[*Ts], tuple[*Ts]]) -> tuple[*Ts]:
 def positional_only(x: int, y: str, /) -> tuple[int, str]:
     raise NotImplementedError
 
+def no_parameters() -> tuple[()]:
+    raise NotImplementedError
+
 def standard(x: int, y: str) -> tuple[int, str]:
     raise NotImplementedError
 
@@ -318,6 +321,7 @@ def keyword_only(*, x: int) -> tuple[int]:
 def gradual(callback: Callable[..., tuple[int, ...]]) -> None:
     reveal_type(simple(callback))  # revealed: tuple[int, ...]
 
+reveal_type(simple(no_parameters))  # revealed: tuple[()]
 reveal_type(simple(positional_only))  # revealed: tuple[int, str]
 reveal_type(simple(standard))  # revealed: tuple[int, str]
 reveal_type(simple(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
@@ -421,9 +425,11 @@ def infer_with_suffix[*Ts](callback: Callable[[int, *Ts, bytes], None]) -> tuple
     raise NotImplementedError
 
 def fixed_suffix(prefix: int, middle: str, suffix: bytes, /) -> None: ...
+def empty_middle(prefix: int, suffix: bytes, /) -> None: ...
 def unpacked_suffix(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
 
 reveal_type(infer_with_suffix(fixed_suffix))  # revealed: tuple[str]
+reveal_type(infer_with_suffix(empty_middle))  # revealed: tuple[()]
 reveal_type(infer_with_suffix(unpacked_suffix))  # revealed: tuple[str, ...]
 ```
 

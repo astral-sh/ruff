@@ -32,7 +32,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
@@ -2079,6 +2079,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
 
+            /// Move to the next target parameter while reusing the current source parameter.
+            fn next_reusing_source(
+                &mut self,
+            ) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+                match (self.current_source, self.next_target()) {
+                    (Some(source_param), Some(target_param)) => {
+                        Some(EitherOrBoth::Both(source_param, target_param))
+                    }
+                    (Some(source_param), None) => Some(EitherOrBoth::Left(source_param)),
+                    (None, Some(target_param)) => Some(EitherOrBoth::Right(target_param)),
+                    (None, None) => None,
+                }
+            }
+
             /// Move to the next parameter in the `source` parameter iterator, [`None`] if the
             /// iterator is exhausted.
             fn next_source(&mut self) -> Option<&'a Parameter<'db>> {
@@ -3032,105 +3046,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // parameter which means that the keyword variant is still unmatched.
         let mut target_keywords = Vec::new();
         let mut target_index = 0usize;
+        let mut reuse_current_source = false;
 
         loop {
-            // A TypeVarTuple can consume zero or more parameters, so inspect the target before
-            // advancing the source iterator. The ordinary zip below always advances both sides.
-            if let Some(typevartuple) = target_typevartuple
-                && let Some(target_parameter) = parameters.peek_target()
-                && target_parameter.is_variadic()
-                && target_parameter.has_starred_annotation()
-                && target_parameter.annotated_type() == Type::TypeVar(typevartuple)
-            {
-                let reused_source_variadic = parameters
-                    .current_source
-                    .filter(|parameter| parameter.is_variadic());
-                let source_positional: Vec<_> = reused_source_variadic
-                    .into_iter()
-                    .chain(parameters.source_iter.clone())
-                    .take_while(|parameter| parameter.is_positional() || parameter.is_variadic())
-                    .collect();
-                let target_suffix_len = parameters
-                    .target_iter
-                    .clone()
-                    .skip(1)
-                    .take_while(|parameter| parameter.is_positional())
-                    .count();
-
-                let (inferred_tuple, consumed_source_len) = if let Some(source_variadic_index) =
-                    source_positional
-                        .iter()
-                        .position(|parameter| parameter.is_variadic())
-                {
-                    let source_prefix = &source_positional[..source_variadic_index];
-                    let source_variadic = source_positional[source_variadic_index];
-                    let source_suffix = &source_positional[source_variadic_index + 1..];
-                    if source_suffix.len() < target_suffix_len {
-                        return self.never();
-                    }
-
-                    let inferred_suffix_len = source_suffix.len() - target_suffix_len;
-                    let inferred_spec = TupleSpecBuilder::Variable {
-                        prefix: source_prefix
-                            .iter()
-                            .map(|parameter| parameter.annotated_type())
-                            .collect(),
-                        variable: source_variadic.annotated_type(),
-                        suffix: source_suffix[..inferred_suffix_len]
-                            .iter()
-                            .map(|parameter| parameter.annotated_type())
-                            .collect(),
-                    }
-                    .build();
-                    (
-                        Type::tuple(TupleType::new(db, &inferred_spec)),
-                        source_variadic_index + 1 + inferred_suffix_len,
-                    )
-                } else {
-                    let Some(middle_end) = source_positional.len().checked_sub(target_suffix_len)
-                    else {
-                        return self.never();
-                    };
-                    (
-                        Type::heterogeneous_tuple(
-                            db,
-                            source_positional[..middle_end]
-                                .iter()
-                                .map(|parameter| parameter.annotated_type()),
-                        ),
-                        middle_end,
-                    )
-                };
-
-                let consumed_from_source_iter = consumed_source_len
-                    .saturating_sub(usize::from(reused_source_variadic.is_some()));
-                for _ in 0..consumed_from_source_iter {
-                    parameters.next_source();
-                }
-                parameters.next_target();
-                target_index += 1;
-
-                let typevartuple_matches =
-                    self.check_type_pair(db, Type::TypeVar(typevartuple), inferred_tuple);
-                if result
-                    .intersect(db, self.constraints, typevartuple_matches)
-                    .is_never_satisfied(db)
-                {
-                    return result;
-                }
-
-                if source.parameters.is_gradual() {
-                    return match self.relation {
-                        TypeRelation::Assignability => result,
-                        TypeRelation::Subtyping
-                        | TypeRelation::SubtypingAssuming
-                        | TypeRelation::Redundancy { .. } => self.never(),
-                    };
-                }
-                continue;
-            }
-
-            let Some(next_parameter) = parameters.next() else {
+            let next_parameter = if std::mem::take(&mut reuse_current_source) {
+                parameters.next_reusing_source()
+            } else {
+                parameters.next()
+            };
+            let Some(next_parameter) = next_parameter else {
                 if target_keywords.is_empty() {
                     // All parameters have been checked or both the parameter lists were empty.
                     // In either case, `source` is a subtype of `target`.
@@ -3143,45 +3067,184 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
 
             match next_parameter {
-                EitherOrBoth::Left(source_parameter) => match source_parameter.kind() {
-                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
-                        if !target_keywords.is_empty() =>
+                EitherOrBoth::Left(source_parameter) => {
+                    if source_parameter.is_variadic()
+                        && source_parameter.has_starred_annotation()
+                        && let Type::TypeVar(typevartuple) = source_parameter.annotated_type()
+                        && typevartuple.is_typevartuple(db)
                     {
-                        // If there are any unmatched keyword parameters in `other`, they need to
-                        // be checked against the keyword-only / keyword-variadic parameters that
-                        // will be done after this loop.
-                        break;
+                        return self.never();
                     }
-                    ParameterKind::PositionalOnly { default_type, .. }
-                    | ParameterKind::PositionalOrKeyword { default_type, .. }
-                    | ParameterKind::KeywordOnly { default_type, .. } => {
-                        // For `source <: target` to be valid, if there are no more parameters in
-                        // `target`, then the non-variadic parameters in `source` must have a default
-                        // value.
-                        if default_type.is_none() {
-                            if let Some(context) = self.report_context() {
-                                let parameter = ParameterDescription::new(
-                                    target_index,
-                                    source_parameter.name(),
-                                );
-                                context.push(ErrorContext::ExtraRequiredParameter { parameter });
+                    match source_parameter.kind() {
+                        ParameterKind::KeywordOnly { .. }
+                        | ParameterKind::KeywordVariadic { .. }
+                            if !target_keywords.is_empty() =>
+                        {
+                            // If there are any unmatched keyword parameters in `other`, they need
+                            // to be checked against the keyword-only / keyword-variadic parameters
+                            // that will be done after this loop.
+                            break;
+                        }
+                        ParameterKind::PositionalOnly { default_type, .. }
+                        | ParameterKind::PositionalOrKeyword { default_type, .. }
+                        | ParameterKind::KeywordOnly { default_type, .. } => {
+                            // For `source <: target` to be valid, if there are no more parameters
+                            // in `target`, then the non-variadic parameters in `source` must have a
+                            // default value.
+                            if default_type.is_none() {
+                                if let Some(context) = self.report_context() {
+                                    let parameter = ParameterDescription::new(
+                                        target_index,
+                                        source_parameter.name(),
+                                    );
+                                    context.push(ErrorContext::ExtraRequiredParameter {
+                                        parameter,
+                                    });
+                                }
+                                return self.never();
                             }
-                            return self.never();
+                        }
+                        ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                            // Variadic parameters don't have any restrictions in this context, so
+                            // we'll just continue to the next parameter set.
                         }
                     }
-                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
-                        // Variadic parameters don't have any restrictions in this context, so
-                        // we'll just continue to the next parameter set.
-                    }
-                },
+                }
 
-                EitherOrBoth::Right(_) => {
+                EitherOrBoth::Right(target_parameter) => {
+                    if let Some(typevartuple) = target_typevartuple
+                        && target_parameter.is_variadic()
+                        && target_parameter.has_starred_annotation()
+                        && target_parameter.annotated_type() == Type::TypeVar(typevartuple)
+                    {
+                        let typevartuple_matches = self.check_type_pair(
+                            db,
+                            Type::TypeVar(typevartuple),
+                            Type::empty_tuple(db),
+                        );
+                        if result
+                            .intersect(db, self.constraints, typevartuple_matches)
+                            .is_never_satisfied(db)
+                        {
+                            return result;
+                        }
+                        target_index += 1;
+                        continue;
+                    }
+
                     // If there are more parameters in `target` than in `source`, then `source` is
                     // not a subtype of `target`.
                     return self.never();
                 }
 
                 EitherOrBoth::Both(source_param, target_param) => {
+                    if let Some(typevartuple) = target_typevartuple
+                        && target_param.is_variadic()
+                        && target_param.has_starred_annotation()
+                        && target_param.annotated_type() == Type::TypeVar(typevartuple)
+                    {
+                        let current_source_is_positional =
+                            source_param.is_positional() || source_param.is_variadic();
+                        let source_tail = parameters.source_iter.as_slice();
+                        let source_tail_positional_len = if current_source_is_positional {
+                            source_tail
+                                .iter()
+                                .take_while(|parameter| {
+                                    parameter.is_positional() || parameter.is_variadic()
+                                })
+                                .count()
+                        } else {
+                            0
+                        };
+                        let current_source_len = usize::from(current_source_is_positional);
+                        let source_positional_len = current_source_len + source_tail_positional_len;
+                        let source_positional = || {
+                            std::iter::once(source_param)
+                                .take(current_source_len)
+                                .chain(source_tail[..source_tail_positional_len].iter())
+                        };
+                        let target_suffix_len = parameters
+                            .target_iter
+                            .clone()
+                            .take_while(|parameter| parameter.is_positional())
+                            .count();
+
+                        let source_variadic_index =
+                            source_positional().position(Parameter::is_variadic);
+                        let (inferred_tuple, consumed_source_len) =
+                            if let Some(source_variadic_index) = source_variadic_index {
+                                let source_suffix_len =
+                                    source_positional_len - source_variadic_index - 1;
+                                if source_suffix_len < target_suffix_len {
+                                    return self.never();
+                                }
+
+                                let inferred_suffix_len = source_suffix_len - target_suffix_len;
+                                let Some(source_variadic) =
+                                    source_positional().nth(source_variadic_index)
+                                else {
+                                    return self.never();
+                                };
+                                (
+                                    Type::tuple(TupleType::mixed(
+                                        db,
+                                        source_positional()
+                                            .take(source_variadic_index)
+                                            .map(Parameter::annotated_type),
+                                        source_variadic.annotated_type(),
+                                        source_positional()
+                                            .skip(source_variadic_index + 1)
+                                            .take(inferred_suffix_len)
+                                            .map(Parameter::annotated_type),
+                                    )),
+                                    source_variadic_index + 1 + inferred_suffix_len,
+                                )
+                            } else {
+                                let Some(middle_end) =
+                                    source_positional_len.checked_sub(target_suffix_len)
+                                else {
+                                    return self.never();
+                                };
+                                (
+                                    Type::heterogeneous_tuple(
+                                        db,
+                                        source_positional()
+                                            .take(middle_end)
+                                            .map(Parameter::annotated_type),
+                                    ),
+                                    middle_end,
+                                )
+                            };
+
+                        if consumed_source_len == 0 {
+                            reuse_current_source = true;
+                        } else {
+                            for _ in 1..consumed_source_len {
+                                parameters.next_source();
+                            }
+                        }
+                        target_index += 1;
+
+                        let typevartuple_matches =
+                            self.check_type_pair(db, Type::TypeVar(typevartuple), inferred_tuple);
+                        if result
+                            .intersect(db, self.constraints, typevartuple_matches)
+                            .is_never_satisfied(db)
+                        {
+                            return result;
+                        }
+
+                        if source.parameters.is_gradual() {
+                            return match self.relation {
+                                TypeRelation::Assignability => result,
+                                TypeRelation::Subtyping
+                                | TypeRelation::SubtypingAssuming
+                                | TypeRelation::Redundancy { .. } => self.never(),
+                            };
+                        }
+                        continue;
+                    }
+
                     match (source_param.kind(), target_param.kind()) {
                         (
                             ParameterKind::PositionalOnly {
