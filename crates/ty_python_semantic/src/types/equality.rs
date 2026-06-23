@@ -10,8 +10,9 @@ use rustc_hash::FxHashSet;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueTypeKind,
-    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints,
+    UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -734,7 +735,10 @@ fn enum_literal_constraint<'db>(
     operator: ComparisonOperator,
     condition_expects_equality: bool,
 ) -> Option<Type<'db>> {
-    let LiteralValueTypeKind::Enum(right) = right.as_literal_value_kind()? else {
+    let Type::LiteralValue(right_literal) = right.resolve_type_alias(db) else {
+        return None;
+    };
+    let LiteralValueTypeKind::Enum(right) = right_literal.kind() else {
         return None;
     };
     if !is_same_enum_domain(db, left, right)
@@ -748,7 +752,10 @@ fn enum_literal_constraint<'db>(
     let name = enum_class_literal
         .resolve_member(db, right.name(db))?
         .clone();
-    let equal_to_right = Type::enum_literal(EnumLiteralType::new(db, enum_class_literal, name));
+    let equal_to_right = Type::from(LiteralValueType::new(
+        EnumLiteralType::new(db, enum_class_literal, name),
+        right_literal.is_promotable(),
+    ));
     Some(equal_to_right.negate_if(db, !condition_expects_equality))
 }
 
