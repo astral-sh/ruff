@@ -1465,3 +1465,76 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::tests::setup_db;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::narrowing_constraints::InteriorNode;
+    use ty_python_core::predicate::Predicates;
+    use ty_python_core::semantic_index;
+
+    #[test]
+    fn deep_constraint_projection_does_not_overflow() -> anyhow::Result<()> {
+        const DEPTH: usize = 100_000;
+
+        let handle = std::thread::Builder::new()
+            .name("deep-narrowing-projection".into())
+            .stack_size(ruff_db::STACK_SIZE)
+            .spawn(|| -> anyhow::Result<()> {
+                let mut db = setup_db();
+                db.write_dedented(
+                    "/src/test.py",
+                    r#"
+                    def f(x: int, flag: bool) -> None:
+                        if flag:
+                            y = x
+                    "#,
+                )?;
+
+                let file = system_path_to_file(&db, "/src/test.py").unwrap();
+                let index = semantic_index(&db, file);
+                let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+                let use_def = index.use_def_map(function_scope);
+                let predicate = use_def
+                    .predicates()
+                    .iter()
+                    .find(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
+                    .unwrap();
+                let predicates: Predicates = std::iter::repeat_n(*predicate, DEPTH).collect();
+
+                // Build `p99_999 or ... or p0`. Each predicate concerns `flag`, so projecting the
+                // graph for `x` removes every interior node and leaves `ALWAYS_TRUE`.
+                let nodes = (0..DEPTH)
+                    .map(|index| InteriorNode {
+                        atom: ScopedPredicateId::new(index),
+                        if_true: ScopedNarrowingConstraint::ALWAYS_TRUE,
+                        if_uncertain: if index == 0 {
+                            ScopedNarrowingConstraint::ALWAYS_FALSE
+                        } else {
+                            ScopedNarrowingConstraint::new(index - 1)
+                        },
+                        if_false: ScopedNarrowingConstraint::ALWAYS_FALSE,
+                    })
+                    .collect();
+                let constraints = NarrowingConstraints::from_test_nodes(nodes);
+                let x = index.place_table(function_scope).symbol_id("x").unwrap();
+                let mut projector = NarrowingProjector::new(
+                    &db,
+                    &constraints,
+                    &predicates,
+                    ScopedPlaceId::Symbol(x),
+                );
+
+                assert_eq!(
+                    projector.project(ScopedNarrowingConstraint::new(DEPTH - 1)),
+                    ProjectedNarrowingNodeId::ALWAYS_TRUE
+                );
+                Ok(())
+            })?;
+
+        handle.join().expect("projection thread panicked")
+    }
+}
