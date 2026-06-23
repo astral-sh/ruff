@@ -113,7 +113,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<ProjectionResult<'db>> {
-        if !self.needs_projection_operation(db, true) {
+        if !self.needs_projection_operation(db) {
             return None;
         }
 
@@ -136,7 +136,7 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Option<Result<Self, SubscriptError<'db>>> {
-        if !self.needs_projection_operation(db, true) {
+        if !self.needs_projection_operation(db) {
             return None;
         }
 
@@ -162,7 +162,7 @@ impl<'db> Type<'db> {
         name: &Name,
         policy: MemberLookupPolicy,
     ) -> Option<ProjectionResult<'db>> {
-        if !self.needs_projection_operation(db, true) {
+        if !self.needs_projection_operation(db) {
             return None;
         }
 
@@ -179,7 +179,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         method_name: &Name,
     ) -> Option<ProjectionResult<'db>> {
-        if !self.needs_projection_operation(db, true) {
+        if !self.needs_projection_operation(db) {
             return None;
         }
 

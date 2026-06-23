@@ -58,9 +58,8 @@ impl<'db> Type<'db> {
     }
 
     /// Returns whether applying a projection operation can observe a cycle artifact.
-    fn needs_projection_operation(self, db: &'db dyn Db, include_nested_divergent: bool) -> bool {
-        self.has_top_level_cycle_artifact(db)
-            || self.contains_nested_cycle_artifact(db, include_nested_divergent)
+    fn needs_projection_operation(self, db: &'db dyn Db) -> bool {
+        self.contains_nested_cycle_artifact(db, true)
     }
 
     /// Returns `true` if both types originate from the same cycle root, regardless
