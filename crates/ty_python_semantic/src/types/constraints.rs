@@ -96,7 +96,6 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
-use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -7107,7 +7106,7 @@ impl PathAssignments {
             target: "ty_python_semantic::types::constraints::PathAssignment",
             before = %format_args!(
                 "[{}]",
-                self.assignments[..start].iter().map(|(assignment, _)| {
+                self.assignments[..start].iter().map(|assignment| {
                     assignment.display(db, builder)
                 }).format(", "),
             ),
@@ -7125,7 +7124,7 @@ impl PathAssignments {
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 new = %format_args!(
                     "[{}]",
-                    self.assignments[start..].iter().map(|(assignment, _)| {
+                    self.assignments[start..].iter().map(|assignment| {
                         assignment.display(db, builder)
                     }).format(", "),
                 ),
@@ -7149,7 +7148,7 @@ impl PathAssignments {
         result
     }
 
-    pub(crate) fn positive_constraints(&self) -> impl Iterator<Item = (ConstraintId, usize)> + '_ {
+    pub(crate) fn positive_constraints(&self) -> impl Iterator<Item = ConstraintId> + '_ {
         self.assignments
             .iter()
             .filter_map(|(assignment, (source_order, _))| match assignment {
@@ -7159,7 +7158,7 @@ impl PathAssignments {
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
-        self.assignments.contains_key(&assignment)
+        self.assignments.contains(&assignment)
     }
 
     fn contains_constraint(&self, constraint: ConstraintId) -> bool {
@@ -7255,7 +7254,7 @@ impl PathAssignments {
                 assignment = %assignment.display(db, builder),
                 facts = %format_args!(
                     "[{}]",
-                    self.assignments.iter().map(|(assignment, _)| {
+                    self.assignments.iter().map(|assignment| {
                         assignment.display(db, builder)
                     }).format(", "),
                 ),
@@ -7316,13 +7315,7 @@ impl PathAssignments {
             }
         }
 
-        // Then use our sequents to add additional facts that we know to be true. We currently
-        // reuse the `source_order` of the "real" constraint passed into `walk_edge` when we add
-        // these derived facts.
-        //
-        // TODO: This might not be stable enough, if we add more than one derived fact for this
-        // constraint. If we still see inconsistent test output, we might need a more complex
-        // way of tracking source order for derived facts.
+        // Then use our sequents to add additional facts that we know to be true.
         //
         // TODO: This is very naive at the moment, partly for expediency, and partly because we
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
