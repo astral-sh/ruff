@@ -2226,6 +2226,13 @@ class Ejecting(IntFlag, boundary=EJECT):
     A = 1
     C = 4
 
+class CustomMissing(IntFlag, boundary=EJECT):
+    A = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> Any:
+        return 42
+
 class SignedEjecting(Flag, boundary=EJECT):
     NEGATIVE = -1
     A = 1
@@ -2258,7 +2265,10 @@ reveal_type(~Strict.A)  # revealed: Literal[Strict.C]
 reveal_type(Conforming(2))  # revealed: Literal[Conforming.NONE]
 reveal_type(Ejecting(2))  # revealed: Literal[2]
 reveal_type(Ejecting(value=2))  # revealed: Literal[2]
+reveal_type(CustomMissing(2))  # revealed: int
+reveal_type(CustomMissing(CustomMissing.A))  # revealed: Literal[CustomMissing.A]
 reveal_type(Ejecting.A | 2)  # revealed: Literal[3]
+reveal_type(CustomMissing.A | 2)  # revealed: int
 reveal_type(2 | Ejecting.A)  # revealed: Literal[3]
 reveal_type(True | Ejecting.A)  # revealed: int
 reveal_type(Ejecting.A | OtherIntFlag.B)  # revealed: OtherIntFlag
@@ -2321,8 +2331,12 @@ class CallingMeta(EnumMeta):
 
 class CustomCall(Flag, metaclass=CallingMeta):
     A = 1
+    B = 2
+    AB = 3
 
 reveal_type(CustomCall(1))  # revealed: Any
+reveal_type(CustomCall.A | CustomCall.B)  # revealed: Any
+reveal_type(~CustomCall.A)  # revealed: Any
 ```
 
 Inherited behavioral methods and custom iteration hooks also take precedence over the standard Flag
