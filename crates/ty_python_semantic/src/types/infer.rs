@@ -1530,6 +1530,9 @@ struct ExpressionInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
+    /// Functions called while inferring this expression.
+    called_functions: Box<[FunctionType<'db>]>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 }

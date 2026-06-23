@@ -904,6 +904,27 @@ def nested_pair[T](pair: tuple[T, list[T]]) -> T:
 
 nested_result = nested_pair(("value", lst(None)))
 reveal_type(nested_result)  # revealed: str | None
+
+# Diagnostics emitted while inferring a context-independent argument are replayed into the final
+# fixpoint round exactly once. Suppressed diagnostics also replay their used-suppression state.
+def diagnostic_pair[T](value: T, values: list[T]) -> T:
+    return value
+
+# error: [unresolved-reference]
+diagnostic_pair(missing_name, [1])
+diagnostic_pair(suppressed_missing, [1])  # ty: ignore[unresolved-reference]
+
+# Ordinary string literals and non-generic calls are independent of the changing generic context.
+string_result = diagnostic_pair("one", ["two"])
+reveal_type(string_result)  # revealed: str
+
+def non_generic(value: int) -> int:
+    return value
+
+# Diagnostics from an independently cached non-generic call are replayed exactly once.
+# error: [unresolved-reference]
+diagnostic_pair(non_generic(missing_argument), [1])
+diagnostic_pair(non_generic(suppressed_argument), [1])  # ty: ignore[unresolved-reference]
 ```
 
 Long reverse dependency chains can require more than two speculative iterations:
