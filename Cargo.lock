@@ -2087,36 +2087,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8863b587001c1b9a8a4e36008cebc6b3612cb1226fe2de94858e06092687b608"
 
 [[package]]
-name = "mdtest"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "camino",
- "colored 3.1.1",
- "indexmap",
- "insta",
- "memchr",
- "path-slash",
- "regex",
- "ruff_db",
- "ruff_diagnostics",
- "ruff_index",
- "ruff_python_ast",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash",
- "rustc-stable-hash",
- "salsa",
- "serde",
- "similar 3.1.1",
- "smallvec",
- "thiserror 2.0.18",
- "toml 1.1.2+spec-1.1.0",
- "tracing",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3291,6 +3261,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_linter_mdtest"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "datatest-stable",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_mdtest",
+ "ruff_python_ast",
+ "ruff_workspace",
+ "salsa",
+]
+
+[[package]]
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
@@ -3324,13 +3309,28 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
- "datatest-stable",
- "mdtest",
+ "colored 3.1.1",
+ "indexmap",
+ "insta",
+ "memchr",
+ "path-slash",
+ "regex",
  "ruff_db",
- "ruff_linter",
+ "ruff_diagnostics",
+ "ruff_index",
  "ruff_python_ast",
- "ruff_workspace",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash",
+ "rustc-stable-hash",
  "salsa",
+ "serde",
+ "similar 3.1.1",
+ "smallvec",
+ "thiserror 2.0.18",
+ "toml 1.1.2+spec-1.1.0",
+ "tracing",
 ]
 
 [[package]]
@@ -4861,9 +4861,9 @@ dependencies = [
  "anyhow",
  "camino",
  "dunce",
- "mdtest",
  "ruff_db",
  "ruff_diagnostics",
+ "ruff_mdtest",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",
