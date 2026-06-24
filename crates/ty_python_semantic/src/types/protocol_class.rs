@@ -23,7 +23,7 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
-        ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericContext,
         InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
         TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
@@ -499,12 +499,20 @@ impl<'db> ProtocolMemberType<'db> {
     fn resolve(self, db: &'db dyn Db) -> Option<Self> {
         match self.kind {
             ProtocolMemberTypeKind::Value => Some(self),
-            ProtocolMemberTypeKind::PropertyGetter => property_get_member_type(db, self.ty),
+            ProtocolMemberTypeKind::PropertyGetter => property_get_member_type(db, self.ty, None),
             ProtocolMemberTypeKind::PropertySetter => property_set_member_type(db, self.ty),
         }
     }
 
     fn bind_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
+        match self.kind {
+            ProtocolMemberTypeKind::PropertyGetter => {
+                return property_get_member_type(db, self.ty, Some(self_type))
+                    .map(|member| member.ty);
+            }
+            ProtocolMemberTypeKind::Value | ProtocolMemberTypeKind::PropertySetter => {}
+        }
+
         let resolved = self.resolve(db)?;
         if !resolved.ty.contains_self(db) {
             return Some(resolved.ty);
@@ -949,12 +957,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 fn property_get_member_type<'db>(
     db: &'db dyn Db,
     getter: Type<'db>,
+    self_type: Option<Type<'db>>,
 ) -> Option<ProtocolMemberType<'db>> {
     let mut get_types = Vec::new();
     let mut definition = None;
     for callable in &getter.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
-            get_types.push(signature.return_ty);
+            let return_ty = if let Some(self_type) = self_type
+                && let Some(self_typevar) = signature
+                    .parameters()
+                    .get_positional(0)
+                    .and_then(|parameter| parameter.annotated_type().as_typevar())
+            {
+                let specialization = GenericContext::from_typevar_instances(db, [self_typevar])
+                    .specialize(db, vec![self_type]);
+                signature.return_ty.apply_specialization(db, specialization)
+            } else {
+                signature.return_ty
+            };
+            get_types.push(return_ty);
             definition = definition.or(signature.definition());
         }
     }
@@ -1242,9 +1263,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required_ty: ProtocolMemberType<'db>,
         instance_access: bool,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(required_ty) = required_ty.resolve(db) else {
-            return self.never();
-        };
         let fallback_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
         let Some(attribute_type) =
             protocol_member_read_type(db, ty, receiver_ty, member, instance_access)
@@ -1253,6 +1271,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         if member.is_method() && instance_access {
+            let Some(required_ty) = required_ty.resolve(db) else {
+                return self.never();
+            };
             let Type::Callable(required_callable) = required_ty.ty else {
                 return self.never();
             };
@@ -1266,6 +1287,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     )
                 })
         } else if member.is_method() {
+            let Some(required_ty) = required_ty.resolve(db) else {
+                return self.never();
+            };
             let Type::Callable(required_callable) = required_ty.ty else {
                 return self.never();
             };
