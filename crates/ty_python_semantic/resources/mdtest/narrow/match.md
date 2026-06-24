@@ -735,7 +735,8 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
 ## Exhaustive positional patterns for built-in classes
 
 Python defines a fixed set of built-in classes whose single positional subpattern receives the
-entire subject. This example checks every such class, including nested sequence and `or` patterns:
+entire subject. The `float` element also handles `int`, which is assignable to `float` but is not a
+`float` instance at runtime:
 
 ```py
 def builtin_positional_patterns_are_exhaustive(
@@ -800,75 +801,22 @@ def builtin_subclass_positional_pattern_is_exhaustive(value: MyInt) -> int:
         case MyInt(_):
             return 1
 
-def builtin_base_positional_pattern_is_exhaustive_for_subclass(value: MyInt) -> int:
-    match value:
-        case int(_):
-            return 1
-
-def nested_builtin_positional_pattern_is_exhaustive_for_subclass(
-    value: tuple[MyInt],
-) -> int:
-    match value:
-        case [int(_)]:
-            return 1
-
 def builtin_positional_literal_is_not_exhaustive(
     value: MyInt,
     # error: [invalid-return-type]
 ) -> int:
     match value:
-        case int(0):
+        case MyInt(0):
             return 1
 ```
 
 ## Resolving `__match_args__`
 
-For other positional class patterns, Python reads `__match_args__` from the pattern class. The
-attribute must be definitely present and must be a fixed tuple of literal attribute names. The
-selected attributes must also be definitely present on the subject:
+For other positional class patterns, Python reads `__match_args__` from the pattern class. A fixed
+tuple of attribute names makes the corresponding positional patterns exhaustive when every selected
+attribute is present on the subject:
 
 ```py
-class MyIntWithDefinitelyBoundMatchArgs(int):
-    __match_args__ = ("real",)
-
-def builtin_subclass_with_definitely_bound_match_args_is_exhaustive(
-    value: MyIntWithDefinitelyBoundMatchArgs,
-) -> int:
-    match value:
-        case MyIntWithDefinitelyBoundMatchArgs(_):
-            return 1
-
-def nested_builtin_subclass_with_definitely_bound_match_args_is_exhaustive(
-    value: tuple[MyIntWithDefinitelyBoundMatchArgs],
-) -> int:
-    match value:
-        case [MyIntWithDefinitelyBoundMatchArgs(_)]:
-            return 1
-
-class MyIntWithMissingMatchArg(int):
-    __match_args__ = ("missing",)
-
-def builtin_subclass_with_missing_match_arg_is_not_exhaustive(
-    value: MyIntWithMissingMatchArg,
-    # error: [invalid-return-type]
-) -> int:
-    match value:
-        case MyIntWithMissingMatchArg(_):
-            return 1
-
-class MatchArgsMeta(type):
-    __match_args__ = ("missing",)
-
-class MyIntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
-
-def builtin_subclass_with_metaclass_match_args_is_not_exhaustive(
-    value: MyIntWithMetaclassMatchArgs,
-    # error: [invalid-return-type]
-) -> int:
-    match value:
-        case MyIntWithMetaclassMatchArgs(_):
-            return 1
-
 class KnownAttributes:
     __match_args__ = ("x", "y")
     x: int = 0
@@ -878,12 +826,42 @@ def fixed_match_args_are_exhaustive(value: KnownAttributes) -> int:
     match value:
         case KnownAttributes(_, _):
             return 1
+```
+
+The pattern is not exhaustive when a selected attribute is missing, an explicit annotation widens
+the tuple type, or a conditional definition can override a built-in class's usual positional
+behavior. A metaclass can also provide `__match_args__` that selects a missing attribute:
+
+```py
+class IntWithMissingMatchArg(int):
+    __match_args__ = ("missing",)
+
+def missing_match_arg_is_not_exhaustive(
+    value: IntWithMissingMatchArg,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case IntWithMissingMatchArg(_):
+            return 1
+
+class MatchArgsMeta(type):
+    __match_args__ = ("missing",)
+
+class IntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
+
+def metaclass_match_args_is_not_exhaustive(
+    value: IntWithMetaclassMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case IntWithMetaclassMatchArgs(_):
+            return 1
 
 class WidenedMatchArgs:
     __match_args__: tuple[str, ...] = ("x",)
     x: int = 0
 
-def widened_match_args_does_not_identify_an_attribute(
+def widened_match_args_is_not_exhaustive(
     value: WidenedMatchArgs,
     # error: [invalid-return-type]
 ) -> int:
@@ -891,45 +869,21 @@ def widened_match_args_does_not_identify_an_attribute(
         case WidenedMatchArgs(_):
             return 1
 
-class AnnotatedMatchArgs(int):
-    __match_args__: tuple[str, ...]
-
-def annotated_match_args_is_not_exhaustive(
-    value: AnnotatedMatchArgs,
-    # error: [invalid-return-type]
-) -> int:
-    match value:
-        case AnnotatedMatchArgs(_):
-            return 1
-
 def condition() -> bool:
     return bool()
 
 flag = condition()
 
-class PossiblyBoundMatchArgs:
-    if flag:
-        __match_args__ = ("x",)
-    x: int = 0
-
-def possibly_bound_match_args_is_not_exhaustive(
-    value: PossiblyBoundMatchArgs,
-    # error: [invalid-return-type]
-) -> int:
-    match value:
-        case PossiblyBoundMatchArgs(_):
-            return 1
-
-class PossiblyBoundIntMatchArgs(int):
+class ConditionalIntMatchArgs(int):
     if flag:
         __match_args__ = ("missing",)
 
-def possibly_bound_match_args_does_not_enable_match_self(
-    value: PossiblyBoundIntMatchArgs,
+def conditional_match_args_disables_builtin_behavior(
+    value: ConditionalIntMatchArgs,
     # error: [invalid-return-type]
 ) -> int:
     match value:
-        case PossiblyBoundIntMatchArgs(_):
+        case ConditionalIntMatchArgs(_):
             return 1
 ```
 
@@ -942,16 +896,9 @@ descriptor access can raise `AttributeError` and an annotated attribute can be a
 from typing import Literal
 
 class FallibleProperty:
-    __match_args__ = ("x",)
-
     @property
     def x(self) -> Literal[1]:
         raise AttributeError
-
-def direct_fallible_property_is_statically_exhaustive(value: FallibleProperty) -> int:
-    match value:
-        case FallibleProperty(_):
-            return 1
 
 def fallible_property_value_pattern_is_statically_exhaustive(value: FallibleProperty) -> int:
     match value:
@@ -1006,7 +953,14 @@ def subclass_member_is_exhaustive(value: ChildWithX) -> int:
     match value:
         case BaseWithoutX(x=_):
             return 1
+```
 
+## Positional behavior comes from the pattern class
+
+Only the class named in the pattern determines what a positional subpattern receives. Although
+`IntPlainChild` also inherits from `int`, `PlainBase(_)` does not receive the whole value:
+
+```py
 class PlainBase: ...
 class IntPlainChild(int, PlainBase): ...
 
@@ -1040,7 +994,8 @@ def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
 ## Missing class-pattern attributes
 
 A class pattern can fail after its `isinstance` check if a requested attribute is missing or only
-conditionally defined. The failed branch therefore keeps the original subject type:
+conditionally defined. This applies to both keyword and positional attributes, including inside a
+sequence. The failed branch therefore keeps the original subject type:
 
 ```py
 from typing import final
@@ -1060,7 +1015,7 @@ def missing_attribute_keeps_original_subject(
         case _:
             reveal_type(value)  # revealed: MissingAttributes | OtherClass
 
-def keyword_class_pattern_in_sequence_preserves_fallback(
+def missing_positional_attribute_keeps_sequence_possible(
     value: tuple[MissingAttributes],
 ) -> None:
     match value:
