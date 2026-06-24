@@ -1685,6 +1685,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
+    /// Report an undeclared protocol attribute written through a method receiver.
+    ///
+    /// The instance or class receiver may be referenced directly, from an eager nested scope, or
+    /// through a capture in a nested function.
+    fn report_undeclared_protocol_attribute(&self, target: &ast::ExprAttribute) {
+        let db = self.db();
+        let Some(receiver) = target.value.as_name_expr() else {
+            return;
+        };
+        let Some(method_scope_id) = self.receiver_method_scope(receiver) else {
+            return;
+        };
+        let Some(protocol) = self
+            .index
+            .class_definition_of_method(method_scope_id)
+            .and_then(|definition| original_class_type(db, definition))
+            .map(|class| class.default_specialization(db))
+            .and_then(|class| class.into_protocol_class(db))
+        else {
+            return;
+        };
+        if protocol.interface(db).includes_member(db, target.attr.id())
+            || protocol.has_member_declaration(db, target.attr.id())
+        {
+            return;
+        }
+
+        diagnostic::report_undeclared_protocol_attribute(&self.context, target, protocol);
+    }
+
     /// Returns the implicit `__class__` cell in the current direct method body or
     /// lazy scope defined directly in a class body.
     fn dunder_class_cell_type(&self) -> Option<ClassLiteral<'db>> {
@@ -3707,6 +3737,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
             ) => {
                 let object_ty = self.infer_expression(object, TypeContext::default());
+                self.report_undeclared_protocol_attribute(attr_expr);
 
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
@@ -4486,6 +4517,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
+            if let ast::Expr::Attribute(target) = target.as_ref() {
+                self.report_undeclared_protocol_attribute(target);
+            }
 
             // For annotated assignments like `self.x: Final[int] = 1`, the `Final` qualifier
             // comes from the annotation itself, so we can check it directly rather than
@@ -4949,6 +4983,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
+                self.report_undeclared_protocol_attribute(attr_expr);
                 self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
             }
         }

@@ -1003,7 +1003,11 @@ the class body are disallowed. This is mandated by [the spec][spec_protocol_memb
 > allowed. The rationale for this is that the protocol class implementation is often not shared by
 > subtypes, so the interface should not depend on the default implementation.
 
+Ordinary, annotated, and annotation-only assignments are treated the same:
+
 ```py
+from typing import Any, ClassVar
+
 class Foo(Protocol):
     x: int
     y: str
@@ -1011,22 +1015,62 @@ class Foo(Protocol):
     def __init__(self) -> None:
         self.x = 42  # fine
 
-        self.a = 56  # TODO: should emit diagnostic
-        self.b: int = 128  # TODO: should emit diagnostic
+        self.a = 56  # error: [ambiguous-protocol-member]
+        self.b: int = 128  # error: [ambiguous-protocol-member]
+        self.c: int  # error: [ambiguous-protocol-member]
 
     def non_init_method(self) -> None:
-        self.x = 64  # fine
+        self.x: int = 64  # fine
         self.y = "bar"  # fine
 
-        self.c = 72  # TODO: should emit diagnostic
+        self.d = 72  # error: [ambiguous-protocol-member]
 
-# Note: the list of members does not include `a`, `b` or `c`,
+# Note: the list of members does not include `a`, `b`, `c` or `d`,
 # as none of these attributes is declared in the class body.
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
 ```
 
-If a member is declared in a superclass of a protocol class, it is fine for it to be assigned to in
-the sub-protocol class without a redeclaration:
+An explicit `Any` annotation on `self` does not change the object that Python passes to the method:
+
+```py
+class AnySelf(Protocol):
+    def method(self: Any) -> None:
+        self.attribute = 1  # error: [ambiguous-protocol-member]
+```
+
+Assignments in a comprehension and augmented assignments are also writes to the instance.
+`__getattr__` provides the read side of `+=` below, so that case tests only the write:
+
+```py
+class AssignmentForms(Protocol):
+    def __getattr__(self, name: str) -> int:
+        return 0
+
+    def comprehension(self) -> None:
+        [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
+
+    def augmented_assignment(self) -> None:
+        self.augmented += 1  # snapshot: ambiguous-protocol-member
+```
+
+```snapshot
+warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
+   --> src/mdtest_snippet.py:321:9
+    |
+321 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+    |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
+    |
+info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
+   --> src/mdtest_snippet.py:313:7
+    |
+313 | class AssignmentForms(Protocol):
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
+    |
+info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
+```
+
+If a member is declared in a superclass of a protocol class, the subclass can assign to it in the
+class body or in a method without redeclaring it:
 
 ```py
 class Super(Protocol):
@@ -1035,8 +1079,87 @@ class Super(Protocol):
 class Sub(Super, Protocol):
     x = 42  # no error here, since it's declared in the superclass
 
+    def __init__(self) -> None:
+        self.x = 43  # no error here either
+
 reveal_type(get_protocol_members(Super))  # revealed: frozenset[Literal["x"]]
 reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["x"]]
+```
+
+Assignments through an instance method's `self` parameter or a classmethod's `cls` parameter can
+trigger this diagnostic. Static methods have no implicit receiver, while other parameters and
+methods on concrete subclasses do not affect a protocol's declared interface:
+
+```py
+class Holder:
+    extra: int
+
+class WithStaticMethod(Protocol):
+    @staticmethod
+    def method(value: Holder) -> None:
+        value.extra = 1  # no error
+
+class WithClassMethod(Protocol):
+    @classmethod
+    def method(cls: Any) -> None:
+        cls.extra = 1  # error: [ambiguous-protocol-member]
+
+class WithDeclaredClassVariable(Protocol):
+    extra: ClassVar[int]
+
+    @classmethod
+    def method(cls: Any) -> None:
+        cls.extra = 1  # no error
+
+class WithOtherParameter(Protocol):
+    def method(self, value: Holder) -> None:
+        value.extra = 1  # no error
+
+class ConcreteSubclass(Foo):
+    def method(self) -> None:
+        self.extra = 1  # no error
+```
+
+Assignments can also occur in scopes nested inside a method. A nested class body or function that
+uses the method's `self` still writes to the protocol instance, and a nested function can similarly
+capture a classmethod's `cls`. An inner parameter named `self` refers to another object and is not
+reported:
+
+```py
+class NestedScopes(Protocol):
+    def class_body(self) -> None:
+        class Nested:
+            self.extra = 1  # error: [ambiguous-protocol-member]
+
+    def function(self: Any) -> None:
+        def inner() -> None:
+            self.extra = 1  # error: [ambiguous-protocol-member]
+
+        inner()
+
+    def shadowed(self) -> None:
+        def inner(self: Holder) -> None:
+            self.extra = 1  # no error
+
+        inner(Holder())
+
+    @classmethod
+    def class_method(cls: Any) -> None:
+        def inner() -> None:
+            cls.extra = 1  # error: [ambiguous-protocol-member]
+
+        inner()
+```
+
+The runtime list of protocol members omits some names, including `__doc__`. An explicit declaration
+still permits assignment to the attribute:
+
+```py
+class WithExcludedMember(Protocol):
+    __doc__: str
+
+    def method(self) -> None:
+        self.__doc__ = "Protocol documentation"  # no error
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
