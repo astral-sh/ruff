@@ -24,7 +24,7 @@ impl UnresolvedRuleSelector {
         RuleSelector::from_str(self.0.as_str()).or_else(|_| {
             let kind = if let Ok(rule) = Rule::from_name(self.0.as_str()) {
                 if is_human_readable_names_enabled(preview) {
-                    return Ok(RuleSelector::from_str(&rule.noqa_code().to_string()).unwrap());
+                    return Ok(RuleSelector::from(rule));
                 }
                 RuleResolutionErrorKind::PreviewName
             } else if matches!(self.0.as_str(), "PREVIEW" | "NURSERY") {
