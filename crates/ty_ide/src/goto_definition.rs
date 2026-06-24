@@ -33,7 +33,7 @@ pub fn goto_definition(
 #[cfg(test)]
 pub(super) mod test {
 
-    use crate::tests::{CursorTest, IntoDiagnostic};
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use crate::{NavigationTargets, RangedValue, goto_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -1114,6 +1114,229 @@ def ab(a: int, *, c: int): ...
           |
         2 | def ab(a, *, b = None, c = None):
           |     --
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_function_call_selects_implementation() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            @overload
+            def f(value: int) -> int: ...
+            @overload
+            def f(value: str) -> str: ...
+            def f(value: Any) -> Any:
+                return value
+
+            f<CURSOR>(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:11:1
+           |
+        11 | f(1)
+           | ^ Clicking here
+           |
+        info: Found 1 definition
+         --> main.py:8:5
+          |
+        8 | def f(value: Any) -> Any:
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_function_with_decorated_implementation() {
+        let test = cursor_test(
+            r#"
+            from collections.abc import Callable
+            from typing import Any, ParamSpec, TypeVar, overload
+
+            P = ParamSpec("P")
+            R = TypeVar("R")
+
+            def decorate(function: Callable[P, R]) -> Callable[P, R]:
+                return function
+
+            @overload
+            def f(value: int) -> int: ...
+            @overload
+            def f(value: str) -> str: ...
+            @decorate
+            def f(value: Any) -> Any:
+                return value
+
+            f<CURSOR>(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:19:1
+           |
+        19 | f(1)
+           | ^ Clicking here
+           |
+        info: Found 1 definition
+          --> main.py:16:5
+           |
+        16 | def f(value: Any) -> Any:
+           |     -
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_function_with_conditional_declarations() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            def flag() -> bool: ...
+
+            @overload
+            def f() -> None: ...
+
+            if flag():
+                @overload
+                def f(value: str) -> str: ...
+            else:
+                @overload
+                def f(value: int) -> int: ...
+
+            def f(value: Any = None) -> Any:
+                return value
+
+            f<CURSOR>("value")
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+          --> main.py:19:1
+           |
+        19 | f("value")
+           | ^ Clicking here
+           |
+        info: Found 1 definition
+          --> main.py:16:5
+           |
+        16 | def f(value: Any = None) -> Any:
+           |     -
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overloads_with_conditional_implementation_remain_ambiguous() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            def flag() -> bool: ...
+
+            if flag():
+                @overload
+                def f(value: int) -> int: ...
+                @overload
+                def f(value: str) -> str: ...
+            else:
+                def f(value: object) -> object:
+                    return value
+
+            f<CURSOR>(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:15:1
+           |
+        15 | f(1)
+           | ^ Clicking here
+           |
+        info: Found 3 definitions
+          --> main.py:8:9
+           |
+         8 |     def f(value: int) -> int: ...
+           |         -
+         9 |     @overload
+        10 |     def f(value: str) -> str: ...
+           |         -
+        11 | else:
+        12 |     def f(value: object) -> object:
+           |         -
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_method_call_selects_implementation() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            class C:
+                @overload
+                def f(self, value: int) -> int: ...
+                @overload
+                def f(self, value: str) -> str: ...
+                def f(self, value: Any) -> Any:
+                    return value
+
+            C().f<CURSOR>(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:12:5
+           |
+        12 | C().f(1)
+           |     ^ Clicking here
+           |
+        info: Found 1 definition
+         --> main.py:9:9
+          |
+        9 |     def f(self, value: Any) -> Any:
+          |         -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_declaration_selects_implementation() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            @overload
+            def f(value: int) -> int: ...
+            @overload
+            def f<CURSOR>(value: str) -> str: ...
+            def f(value: Any) -> Any:
+                return value
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:7:5
+          |
+        7 | def f(value: str) -> str: ...
+          |     ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:8:5
+          |
+        8 | def f(value: Any) -> Any:
+          |     -
           |
         ");
     }
