@@ -1091,6 +1091,12 @@ class WithEagerNestedClass(Protocol):
         class Nested:
             self.extra = 1  # error: [ambiguous-protocol-member]
 
+class WithExcludedMember(Protocol):
+    __doc__: str
+
+    def method(self) -> None:
+        self.__doc__ = "Protocol documentation"  # no error
+
 class WithStaticMethod(Protocol):
     @staticmethod
     def method(value: Holder) -> None:

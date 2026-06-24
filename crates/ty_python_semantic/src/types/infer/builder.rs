@@ -1710,7 +1710,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return;
         };
-        if protocol.interface(db).includes_member(db, target.attr.id()) {
+        if protocol.interface(db).includes_member(db, target.attr.id())
+            || protocol.has_member_declaration(db, target.attr.id())
+        {
             return;
         }
 
