@@ -6455,8 +6455,10 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly) |
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
+                TypeMapping::Promote(
+                    PromotionMode::On,
+                    PromotionKind::ClassLiteralsOnly | PromotionKind::SingletonsOnly,
+                ) => self,
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
             }
 
