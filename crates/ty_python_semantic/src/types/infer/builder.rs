@@ -42,8 +42,7 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, assignment_attribute_members,
-    attribute_write_requirement, instance_attribute_write_member_requirement,
-    property_setter_returns_never,
+    attribute_write_requirement, property_setter_returns_never,
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -10876,8 +10875,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     false
                 }
             }
-            AttributeWriteRequirement::Instance(object_ty) => {
-                self.evaluate_instance(*object_ty, emit_diagnostics)
+            AttributeWriteRequirement::Instance { object_ty, member } => {
+                self.evaluate_instance(*object_ty, member, emit_diagnostics)
             }
             AttributeWriteRequirement::Class { object_ty, member } => {
                 self.evaluate_class(*object_ty, member, emit_diagnostics)
@@ -10934,7 +10933,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
-    fn evaluate_instance(&mut self, object_ty: Type<'db>, emit_diagnostics: bool) -> bool {
+    fn evaluate_instance(
+        &mut self,
+        object_ty: Type<'db>,
+        member: &InstanceAttributeWriteMember<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
         let db = self.builder.db();
         let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
 
@@ -10972,8 +10976,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             return false;
         }
 
-        let member = instance_attribute_write_member_requirement(db, object_ty, self.attribute);
-        match &member {
+        match member {
             InstanceAttributeWriteMember::ClassVar => {
                 if emit_diagnostics {
                     self.report(AssignmentAttributeWriteDiagnostic::CannotAssignToClassVar);
