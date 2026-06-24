@@ -325,7 +325,7 @@ fn divergent_type() {
     assert_eq!(union.display(&db).to_string(), "Divergent | int");
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
         let when = source.when_constraint_set_assignable_to_owned(&db, target);
-        assert!(when.query(|_builder, when| when.is_never_satisfied(&db)));
+        assert!(when.query(|_builder, when| when.is_always_satisfied(&db)));
     }
     let normalized = union
         .recursive_type_normalized_impl(&db, div, false)

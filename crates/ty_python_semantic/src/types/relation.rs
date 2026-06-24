@@ -436,16 +436,17 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        // A top-level `Divergent` must be handled by lazy constraint-set assignability.
-        if self.is_divergent() || target.is_divergent() {
-            return false;
-        }
-
         match (self, target) {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
-            (_, Type::Union(union)) => union.elements(db).contains(&self),
-            (Type::Intersection(intersection), _) => intersection.positive(db).contains(&target),
+            (_, Type::Union(union)) => {
+                self.materialized_divergent_fallback().is_none()
+                    && union.elements(db).contains(&self)
+            }
+            (Type::Intersection(intersection), _) => {
+                target.materialized_divergent_fallback().is_none()
+                    && intersection.positive(db).contains(&target)
+            }
             _ => false,
         }
     }
@@ -1126,7 +1127,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
