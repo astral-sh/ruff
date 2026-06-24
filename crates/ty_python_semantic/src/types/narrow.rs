@@ -34,8 +34,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
-use super::enums::{enum_member_literals, enum_metadata};
-use super::equality::{evaluate_type_equality, evaluate_type_inequality};
+use super::enums::enum_member_literals;
+use super::equality::{
+    enum_membership_constraint, evaluate_type_equality, evaluate_type_inequality,
+};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -113,15 +115,8 @@ fn finite_single_valued_union_alternatives<'db>(
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
         }
-        Type::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db)).is_some()
-                && !ty.overrides_equality(db) =>
-        {
-            Some(
-                enum_member_literals(db, instance.class_literal(db), None)
-                    .expect("Calling `enum_member_literals` on an enum class")
-                    .collect(),
-            )
+        Type::NominalInstance(instance) if !ty.overrides_equality(db) => {
+            enum_member_literals(db, instance.class_literal(db), None).map(Iterator::collect)
         }
         _ => None,
     }
@@ -140,12 +135,8 @@ fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'d
             .enum_complement(db)
             .is_some_and(|complement| complement.has_finite_single_valued_alternatives(db)),
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => true,
-        Type::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db))
-                .is_some_and(|metadata| !metadata.members.is_empty())
-                && !ty.overrides_equality(db) =>
-        {
-            true
+        Type::NominalInstance(instance) if !ty.overrides_equality(db) => {
+            enum_member_literals(db, instance.class_literal(db), None).is_some()
         }
         _ => false,
     }
@@ -2204,6 +2195,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
+        if let Ok(iterable) = rhs_ty.try_iterate(self.db)
+            && let Some(constraint) = enum_membership_constraint(
+                self.db,
+                lhs_ty,
+                iterable.homogeneous_element_type(self.db),
+                true,
+            )
+        {
+            return Some(constraint);
+        }
+
         if is_union_of_single_valued(self.db, lhs_ty) {
             rhs_ty
                 .try_iterate(self.db)
@@ -2242,6 +2244,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_values = self.exact_fixed_length_membership_values(rhs_ty)?;
+
+        if let Some(constraint) = enum_membership_constraint(self.db, lhs_ty, rhs_values, false) {
+            return Some(constraint);
+        }
 
         if is_union_of_single_valued(self.db, lhs_ty) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.

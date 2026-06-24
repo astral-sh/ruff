@@ -209,6 +209,12 @@ pub struct EnumClassLiteral<'db> {
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
+    /// Whether the canonical members exhaust the runtime values of this enum class.
+    ///
+    /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
+    /// create runtime members beyond those declared in the class body, so their declared members
+    /// are not a closed value set.
+    pub(crate) members_are_exhaustive: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -237,13 +243,31 @@ fn enum_class_literal<'db>(
         .map(|(alias, member)| (alias.clone(), member.clone()))
         .collect();
     aliases.sort_unstable();
+    let members_are_exhaustive = !metadata.value_construction.metaclass_may_transform_values
+        && !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Flag.to_subclass_of(db))
+        && !enum_has_custom_missing(db, class);
 
     Some(EnumClassLiteral::new(
         db,
         class,
         members,
         aliases.into_boxed_slice(),
+        members_are_exhaustive,
     ))
+}
+
+/// Return whether enum construction may create pseudo-members through a custom `_missing_` method.
+fn enum_has_custom_missing<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    let ClassLiteral::Static(class) = class else {
+        return false;
+    };
+
+    class
+        .iter_mro(db, None)
+        .filter_map(ClassBase::into_class)
+        .take_while(|base| base.known(db) != Some(KnownClass::Enum))
+        .filter_map(|base| base.class_literal(db).as_static())
+        .any(|base| custom_enum_method(db, base.body_scope(db), "_missing_").is_some())
 }
 
 impl<'db> EnumClassLiteral<'db> {
@@ -535,6 +559,9 @@ impl<'db> EnumComplementType<'db> {
         }
 
         let enum_class_literal = enum_class?;
+        if !enum_class_literal.members_are_exhaustive(db) {
+            return None;
+        }
         let mut excluded_names = FxHashSet::default();
         for negative in negative {
             let enum_literal = negative.as_enum_literal()?;
@@ -1229,12 +1256,16 @@ fn resolve_enum_method<'db>(
     }
 }
 
+/// Return the enum's canonical member literals when they exhaust its runtime domain.
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     exclude_member: Option<&'a Name>,
 ) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
     let enum_class_literal = class.into_enum_class(db)?;
+    if !enum_class_literal.members_are_exhaustive(db) {
+        return None;
+    }
     Some(
         enum_class_literal
             .member_names(db)
@@ -1245,8 +1276,11 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     )
 }
 
+/// Return whether the enum has exactly one possible runtime value.
 pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    enum_metadata(db, class).is_some_and(|metadata| metadata.members.len() == 1)
+    class.into_enum_class(db).is_some_and(|enum_class| {
+        enum_class.members_are_exhaustive(db) && enum_class.member_count(db) == 1
+    })
 }
 
 pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {

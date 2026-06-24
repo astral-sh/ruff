@@ -848,8 +848,10 @@ impl<'db> UnionBuilder<'db> {
                         let enum_class_literal = enum_member_to_add.enum_class_literal(self.db);
                         let enum_class = enum_class_literal.class_literal(self.db);
                         let enum_member_count = enum_class_literal.member_count(self.db);
+                        let members_are_exhaustive =
+                            enum_class_literal.members_are_exhaustive(self.db);
 
-                        if enum_member_count == 1 {
+                        if members_are_exhaustive && enum_member_count == 1 {
                             self.add_in_place_impl(
                                 enum_member_to_add.enum_class_instance(self.db),
                                 seen_aliases,
@@ -902,7 +904,7 @@ impl<'db> UnionBuilder<'db> {
                                 ordermap::map::Entry::Vacant(entry) => {
                                     entry.insert(literal.is_promotable());
 
-                                    if found.len() == enum_member_count {
+                                    if members_are_exhaustive && found.len() == enum_member_count {
                                         self.add_in_place_impl(
                                             enum_member_to_add.enum_class_instance(self.db),
                                             seen_aliases,
@@ -1356,6 +1358,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             let Some(enum_class_literal) = instance.class_literal(db).into_enum_class(db) else {
                 continue;
             };
+            if !enum_class_literal.members_are_exhaustive(db) {
+                continue;
+            }
 
             let mut excluded_names = FxHashSet::default();
             for negative in &self.negative {
