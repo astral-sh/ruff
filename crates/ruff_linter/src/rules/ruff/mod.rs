@@ -259,7 +259,7 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test for https://github.com/astral-sh/ruff/issues/20803.
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/20803>.
     ///
     /// When both RUF027 (`missing-fstring-syntax`) and F401 (`unused-import`) fire
     /// on the same module — RUF027 promoting a string literal to an f-string that

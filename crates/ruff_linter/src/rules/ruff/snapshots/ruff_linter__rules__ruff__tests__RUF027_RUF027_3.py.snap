@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF027 [*] Possible f-string without an `f` prefix
+ --> RUF027_3.py:3:7
+  |
+1 | from sys import byteorder
+2 |
+3 | print("Byte order: {byteorder}-endian")
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Add `f` prefix
+  |
+2 |
+  - print("Byte order: {byteorder}-endian")
+3 + print(f"Byte order: {byteorder}-endian")
+  |
+note: This is an unsafe fix and may change runtime behavior
