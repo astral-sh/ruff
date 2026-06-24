@@ -1693,7 +1693,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         inside_generic_method_body: bool,
     ) -> Option<Type<'db>> {
         let cell_is_visible = match inner {
-            NodeWithScopeKind::Function(_) | NodeWithScopeKind::Lambda(_) => true,
+            NodeWithScopeKind::Function(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::GeneratorExpression(_) => true,
             NodeWithScopeKind::FunctionTypeParameters(_) => {
                 inside_generic_method_body || self.is_deferred()
             }
@@ -1707,6 +1709,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class = outer.as_class()?;
         let definition = self.index.expect_single_definition(class);
         original_class_type(self.db(), definition).map(Type::ClassLiteral)
+    }
+
+    /// Returns the implicit `__class__` cell used to evaluate a deferred method annotation.
+    fn deferred_method_annotation_class_type(&self) -> Option<Type<'db>> {
+        if !self.is_deferred()
+            || !self.inference_flags().intersects(
+                InferenceFlags::IN_PARAMETER_ANNOTATION | InferenceFlags::IN_RETURN_TYPE,
+            )
+        {
+            return None;
+        }
+
+        let InferenceRegion::Deferred(definition) = self.region else {
+            return None;
+        };
+        let DefinitionKind::Function(function) = definition.kind(self.db()) else {
+            return None;
+        };
+        let function_scope = self
+            .index
+            .node_scope(NodeWithScopeRef::Function(function.node(self.module())));
+        let class_definition = self.index.class_definition_of_method(function_scope)?;
+        original_class_type(self.db(), class_definition).map(Type::ClassLiteral)
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -9571,6 +9596,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Place::Undefined.into();
             }
 
+            let is_dunder_class = place_expr
+                .as_symbol()
+                .is_some_and(|symbol| symbol.name() == "__class__");
+            if is_dunder_class && let Some(ty) = self.deferred_method_annotation_class_type() {
+                return Place::bound(ty).into();
+            }
+
             for parent_id in place_table.parents(place_expr) {
                 let parent_expr = place_table.place(parent_id);
                 let mut expr_ref = expr_ref;
@@ -9635,6 +9667,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // treatment would reveal `Literal[42, 99] | None` even immediately after `x = 99`,
             // which is too frustrating for users in practice.
             let mut inside_generic_method_body = false;
+            let mut dunder_class_shadowed_by_local = false;
             for ((_, inner_scope), (enclosing_scope_file_id, enclosing_scope)) in
                 self.index.ancestor_scopes(file_scope_id).tuple_windows()
             {
@@ -9653,16 +9686,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inside_generic_method_body = true;
                 }
 
-                let dunder_class_cell_type = place_expr
-                    .as_symbol()
-                    .filter(|symbol| symbol.name() == "__class__")
-                    .and_then(|_| {
+                if is_dunder_class
+                    && enclosing_scope.kind().is_function_like()
+                    && let Some(symbol) = self
+                        .index
+                        .place_table(enclosing_scope_file_id)
+                        .symbol_by_name("__class__")
+                    && symbol.is_local()
+                {
+                    dunder_class_shadowed_by_local = true;
+                }
+
+                let dunder_class_cell_type = is_dunder_class
+                    .then(|| {
                         self.dunder_class_cell_type(
                             inner_scope.node(),
                             enclosing_scope.node(),
                             inside_generic_method_body,
                         )
-                    });
+                    })
+                    .flatten();
+                let resolve_dunder_class_cell = |ty| -> PlaceAndQualifiers<'db> {
+                    if dunder_class_shadowed_by_local {
+                        Place::Undefined.into()
+                    } else {
+                        Place::bound(ty).into()
+                    }
+                };
 
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
@@ -9678,7 +9728,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // the class namespace itself, so their explicit class bindings take precedence
                 // over the cell.
                 if !is_immediately_enclosing_scope && let Some(ty) = dunder_class_cell_type {
-                    return Place::bound(ty).into();
+                    return resolve_dunder_class_cell(ty);
                 }
 
                 let has_root_place_been_reassigned = || {
@@ -9743,7 +9793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 return Place::Undefined.into();
                             }
                             if let Some(ty) = dunder_class_cell_type {
-                                return Place::bound(ty).into();
+                                return resolve_dunder_class_cell(ty);
                             }
                             continue;
                         }
@@ -9762,7 +9812,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
                 let Some(enclosing_place_id) = enclosing_place_table.place_id(place_expr) else {
                     if let Some(ty) = dunder_class_cell_type {
-                        return Place::bound(ty).into();
+                        return resolve_dunder_class_cell(ty);
                     }
                     continue;
                 };
@@ -9788,7 +9838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Note that this check includes members like `x.y` and `x[0]`, which aren't
                     // symbols and can't be explicitly `nonlocal`.
                     if let Some(ty) = dunder_class_cell_type {
-                        return Place::bound(ty).into();
+                        return resolve_dunder_class_cell(ty);
                     }
                     continue;
                 }

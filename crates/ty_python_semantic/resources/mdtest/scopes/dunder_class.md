@@ -54,6 +54,19 @@ class Outer:
                 reveal_type(__class__)  # revealed: <class 'Inner'>
 ```
 
+## Generator expressions
+
+Generator expressions are evaluated lazily and capture the cell when they are defined directly in a
+class body.
+
+```py
+class C:
+    values = (
+        reveal_type(__class__)  # revealed: <class 'C'>
+        for _ in range(1)
+    )
+```
+
 ## Shadowing
 
 The implicit cell takes precedence over a global with the same name. Local bindings and explicit
@@ -96,6 +109,19 @@ class D:
 
         def nested() -> None:
             reveal_type(__class__)  # revealed: <class 'int'>
+```
+
+An unbound method-local `__class__` shadows the implicit cell, including from an eager nested scope.
+
+```py
+class C:
+    def method(self) -> None:
+        class Inner:
+            # error: [unresolved-reference]
+            # revealed: Unknown
+            reveal_type(__class__)
+
+        __class__ = int
 ```
 
 ## Type alias annotation scopes
@@ -168,7 +194,7 @@ class C:
     ) -> None: ...
 ```
 
-## Deferred generic method annotations
+## Deferred method annotations
 
 Python 3.14 defers annotation evaluation, making the cell available to ordinary annotations as well
 as type-parameter bounds.
@@ -182,4 +208,10 @@ python-version = "3.14"
 class C:
     def method[T](self, value: __class__) -> __class__:
         raise NotImplementedError
+
+class Outer:
+    def method(self) -> None:
+        class Inner:
+            def annotated(self, value: __class__) -> None:
+                reveal_type(value)  # revealed: Inner
 ```
