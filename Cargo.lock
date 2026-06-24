@@ -544,7 +544,7 @@ dependencies = [
  "terminfo",
  "thiserror 2.0.18",
  "which",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -673,7 +673,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1027,7 +1027,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1107,7 +1107,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1800,6 +1800,15 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -2988,7 +2997,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "jiff",
  "log",
  "mimalloc",
@@ -3075,7 +3084,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "regex",
  "ruff_macros",
  "seahash",
@@ -3138,7 +3147,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "libcst",
  "markdown",
  "pretty_assertions",
@@ -3246,7 +3255,7 @@ dependencies = [
  "imperative",
  "insta",
  "is-macro",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "jiff",
  "libcst",
  "log",
@@ -3296,7 +3305,7 @@ name = "ruff_macros"
 version = "0.0.2"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -3346,7 +3355,7 @@ name = "ruff_notebook"
 version = "0.0.2"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "rand 0.10.1",
  "ruff_diagnostics",
  "ruff_source_file",
@@ -3423,7 +3432,7 @@ dependencies = [
  "countme",
  "datatest-stable",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "memchr",
  "regex",
  "ruff_cache",
@@ -3479,7 +3488,7 @@ version = "0.0.2"
 dependencies = [
  "bitflags 2.13.0",
  "icu_properties",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "ruff_python_ast",
 ]
 
@@ -3494,7 +3503,7 @@ dependencies = [
  "datatest-stable",
  "get-size2",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "memchr",
  "ruff_annotate_snippets",
  "ruff_python_ast",
@@ -3545,7 +3554,7 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.2"
 dependencies = [
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "ruff_source_file",
  "ruff_text_size",
  "unicode-ident",
@@ -3664,7 +3673,7 @@ dependencies = [
  "ignore",
  "indexmap",
  "is-macro",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "matchit",
  "path-absolutize",
@@ -3725,7 +3734,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -4138,10 +4147,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -4603,7 +4612,7 @@ dependencies = [
  "get-size2",
  "indexmap",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "memchr",
  "rayon",
  "regex",
@@ -4712,7 +4721,7 @@ dependencies = [
  "bitvec",
  "get-size2",
  "hashbrown 0.17.1",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "ruff_db",
  "ruff_index",
  "ruff_macros",
@@ -4751,7 +4760,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "memchr",
  "ordermap",
  "pretty_assertions",
@@ -5355,7 +5364,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]

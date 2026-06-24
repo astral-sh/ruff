@@ -10582,10 +10582,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 let (ty, range) = infer_ty(self, item, peer_ty);
 
-                let is_last = matches!(
-                    position,
-                    itertools::Position::Last | itertools::Position::Only
-                );
+                let is_last = position.is_last();
 
                 if is_last {
                     if done { Type::Never } else { ty }

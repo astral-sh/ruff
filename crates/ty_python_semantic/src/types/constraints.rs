@@ -4155,7 +4155,8 @@ impl InteriorNode {
                     .or_insert(source_order);
             });
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
-            .tuple_combinations()
+            .array_combinations()
+            .map(|[left, right]| (left, right))
             .collect();
 
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
