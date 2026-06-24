@@ -291,7 +291,7 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
         self.members(db)
-            .filter(|member| !member.is_method() && !member.has_todo_type(db))
+            .filter(|member| !member.is_method() && !member.has_todo_type())
             .collect()
     }
 
@@ -916,11 +916,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.definition
     }
 
-    fn has_todo_type(&self, db: &'db dyn Db) -> bool {
+    fn has_todo_type(&self) -> bool {
         self.instance
             .member_types()
             .chain(self.class.member_types())
-            .any(|ty| ty.resolve(db).is_some_and(|ty| ty.ty.is_todo()))
+            .any(|ty| ty.kind == ProtocolMemberTypeKind::Value && ty.ty.is_todo())
     }
 }
 
