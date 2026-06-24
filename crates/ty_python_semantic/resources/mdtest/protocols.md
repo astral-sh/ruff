@@ -2599,6 +2599,27 @@ def g(x: int) -> None:
 reveal_type(x2(1))  # revealed: int
 ```
 
+The class-side check for a method member only establishes that the member is present. Its signature
+is checked through the instance, so the class-side check must not add the same generic constraints a
+second time. This matters when checking a covariant protocol that also has non-method members:
+
+```py
+from collections.abc import Iterator
+from typing import Any, Protocol, TypeVar
+from ty_extensions import is_assignable_to, static_assert
+
+T_co = TypeVar("T_co", covariant=True)
+
+class CovariantList(Protocol[T_co]):
+    @property
+    def __class__(self) -> type[list[Any]]: ...
+    @__class__.setter
+    def __class__(self, value: type[list[Any]], /) -> None: ...
+    def __iter__(self) -> Iterator[T_co]: ...
+
+static_assert(is_assignable_to(list[int], CovariantList[float]))
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
