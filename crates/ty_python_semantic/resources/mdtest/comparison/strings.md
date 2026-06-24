@@ -35,4 +35,5 @@ def _(value: LiteralString):
     reveal_type(value == 1)  # revealed: Literal[False]
     reveal_type(b"" != value)  # revealed: Literal[True]
     reveal_type(value == "")  # revealed: bool
+    reveal_type(value != "")  # revealed: bool
 ```
