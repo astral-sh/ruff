@@ -673,6 +673,45 @@ def _(value: Foo | Shifted):
         reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
 ```
 
+An explicit `_value_` annotation can make `.value` precise, but it does not describe the scalar
+payload used by inherited comparison methods. We therefore cannot compare members transformed by a
+custom constructor using their annotated values:
+
+```py
+from enum import IntEnum
+from typing import Literal
+
+class AnnotatedShifted(IntEnum):
+    _value_: Literal[1]
+
+    def __new__(cls, value: int) -> "AnnotatedShifted":
+        member = int.__new__(cls, value + 1)
+        member._value_ = 1
+        return member
+
+    MEMBER = 1
+
+class Other(IntEnum):
+    MEMBER = 1
+
+reveal_type(AnnotatedShifted.MEMBER.value)  # revealed: Literal[1]
+reveal_type(AnnotatedShifted.MEMBER == Other.MEMBER)  # revealed: bool
+
+if AnnotatedShifted.MEMBER != Other.MEMBER:
+    reveal_type(AnnotatedShifted.MEMBER)  # revealed: AnnotatedShifted
+
+class AnnotatedInitialized(IntEnum):
+    _value_: Literal[2]
+
+    def __init__(self, value: int) -> None:
+        self._value_ = 2
+
+    MEMBER = 1
+
+reveal_type(AnnotatedInitialized.MEMBER.value)  # revealed: Literal[2]
+reveal_type(AnnotatedInitialized.MEMBER == Other.MEMBER)  # revealed: bool
+```
+
 The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
 member. Here, the inherited `int.__new__` converts the generated string `"1"` to the integer `1`.
 Because the generated value's exact conversion is not modeled, we cannot use it to decide whether

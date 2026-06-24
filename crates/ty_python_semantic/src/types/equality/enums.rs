@@ -11,7 +11,10 @@ use crate::types::{
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
-use super::{ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics};
+use super::{
+    ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics,
+    enum_literal_value,
+};
 
 /// Compare two enum value domains without comparing every pair of members.
 ///
@@ -794,10 +797,13 @@ fn enum_class_key_profile<'db>(
     let members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]> = enum_class
         .members(db)
         .iter()
-        .map(|(name, value)| {
+        .map(|(name, _)| {
             (
                 name.clone(),
-                semantics.and_then(|semantics| enum_comparison_key(semantics, *value)),
+                semantics.and_then(|semantics| {
+                    enum_literal_value(db, EnumLiteralType::new(db, enum_class, name.clone()))
+                        .and_then(|value| enum_comparison_key(semantics, value))
+                }),
             )
         })
         .collect();
