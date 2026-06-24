@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
@@ -43,10 +41,7 @@ impl<'db> Type<'db> {
         Type::Callable(CallableType::paramspec_value(db, parameters))
     }
 
-    pub(crate) fn try_upcast_to_callable(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<Cow<'db, CallableTypes<'db>>> {
+    pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy(db, UpcastPolicy::default())
     }
 
@@ -54,7 +49,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         recursive_definition: Option<Definition<'db>>,
-    ) -> Option<Cow<'db, CallableTypes<'db>>> {
+    ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy_and_context(
             db,
             UpcastPolicy::default(),
@@ -68,7 +63,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         policy: UpcastPolicy,
-    ) -> Option<Cow<'db, CallableTypes<'db>>> {
+    ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy_and_context(
             db,
             policy,
@@ -81,38 +76,39 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         policy: UpcastPolicy,
         context: CallableUpcastContext<'db>,
-    ) -> Option<Cow<'db, CallableTypes<'db>>> {
+    ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
         }
 
         match self {
-            Type::Callable(callable) => Some(Cow::Owned(CallableTypes::one(callable))),
+            Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
-            Type::Dynamic(_) => Some(Cow::Owned(CallableTypes::one(CallableType::function_like(
+            Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
-            )))),
-            Type::Divergent(_) => Some(Cow::Owned(CallableTypes::one(
-                CallableType::function_like(db, Signature::dynamic(self)),
+            ))),
+            Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
+                db,
+                Signature::dynamic(self),
             ))),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
             {
-                Some(Cow::Owned(CallableTypes::one(CallableType::bottom(db))))
+                Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::FunctionLiteral(function_literal) => Some(Cow::Owned(CallableTypes::one(
-                function_literal.into_callable_type(db),
-            ))),
+            Type::FunctionLiteral(function_literal) => {
+                Some(CallableTypes::one(function_literal.into_callable_type(db)))
+            }
             Type::BoundMethod(bound_method)
                 if context.is_recursive_reference(db, bound_method.function(db)) =>
             {
-                Some(Cow::Owned(CallableTypes::one(CallableType::bottom(db))))
+                Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => Some(Cow::Owned(CallableTypes::one(
-                bound_method.into_callable_type(db),
-            ))),
+            Type::BoundMethod(bound_method) => {
+                Some(CallableTypes::one(bound_method.into_callable_type(db)))
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -131,41 +127,37 @@ impl<'db> Type<'db> {
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
-                        .map(|callables| {
-                            Cow::Owned(callables.map(|callable| callable.into_regular(db)))
-                        })
+                        .map(|callables| callables.map(|callable| callable.into_regular(db)))
                 } else {
                     None
                 }
             }
-            Type::ClassLiteral(class_literal) => Some(Cow::Borrowed(
-                class_literal.identity_specialization(db).into_callable(db),
-            )),
-
-            Type::GenericAlias(alias) => {
-                Some(Cow::Borrowed(ClassType::Generic(alias).into_callable(db)))
+            Type::ClassLiteral(class_literal) => {
+                Some(class_literal.identity_specialization(db).into_callable(db))
             }
+
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
 
             Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
-                Some(Cow::Owned(CallableTypes::one(CallableType::function_like(
+                Some(CallableTypes::one(CallableType::function_like(
                     db,
                     Signature::new(Parameters::top(), subclass_of_ty.to_instance(db)),
-                ))))
+                )))
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(Cow::Borrowed(class.into_callable(db))),
+                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound
                             .to_meta_type(db)
                             .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
-                        Some(Cow::Owned(upcast_callables.map(|callable| {
+                        Some(upcast_callables.map(|callable| {
                             let signatures = callable
                                 .signatures(db)
                                 .into_iter()
@@ -176,7 +168,7 @@ impl<'db> Type<'db> {
                                 callable.kind(db),
                                 callable.provenance(db),
                             )
-                        })))
+                        }))
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         let mut callables = SmallVec::new();
@@ -186,7 +178,7 @@ impl<'db> Type<'db> {
                                 .try_upcast_to_callable_with_policy_and_context(
                                     db, policy, context,
                                 )?;
-                            for &callable in element_upcast.iter() {
+                            for callable in element_upcast.into_inner() {
                                 let signatures = callable
                                     .signatures(db)
                                     .into_iter()
@@ -199,19 +191,17 @@ impl<'db> Type<'db> {
                                 ));
                             }
                         }
-                        Some(Cow::Owned(CallableTypes::new(callables)))
+                        Some(CallableTypes::new(callables))
                     }
-                    None => Some(Cow::Owned(CallableTypes::one(CallableType::single(
+                    None => Some(CallableTypes::one(CallableType::single(
                         db,
                         Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
-                    )))),
+                    ))),
                 },
-                SubclassOfInner::Dynamic(_) => {
-                    Some(Cow::Owned(CallableTypes::one(CallableType::single(
-                        db,
-                        Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
-                    ))))
-                }
+                SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
+                ))),
             },
 
             Type::Union(union) => {
@@ -219,9 +209,9 @@ impl<'db> Type<'db> {
                 for element in union.elements(db) {
                     let element_callable = element
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
-                    callables.extend(element_callable.iter().copied());
+                    callables.extend(element_callable.into_inner());
                 }
-                Some(Cow::Owned(CallableTypes::new(callables)))
+                Some(CallableTypes::new(callables))
             }
 
             Type::LiteralValue(literal) => match literal.kind() {
@@ -238,29 +228,27 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>
             {
-                Some(Cow::Owned(CallableTypes::one(CallableType::bottom(db))))
+                Some(CallableTypes::one(CallableType::bottom(db)))
             }
 
-            Type::KnownBoundMethod(method) => {
-                Some(Cow::Owned(CallableTypes::one(CallableType::new(
-                    db,
-                    CallableSignature::from_overloads(method.signatures(db)),
-                    CallableTypeKind::Regular,
-                    CallableFunctionProvenance::None,
-                ))))
-            }
+            Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
+                db,
+                CallableSignature::from_overloads(method.signatures(db)),
+                CallableTypeKind::Regular,
+                CallableFunctionProvenance::None,
+            ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
-                Some(Cow::Owned(CallableTypes::one(CallableType::new(
+                Some(CallableTypes::one(CallableType::new(
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
-                ))))
+                )))
             }
 
             Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
-                Some(Cow::Owned(CallableTypes::one(CallableType::single(
+                Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
                         Parameters::new(
@@ -270,7 +258,7 @@ impl<'db> Type<'db> {
                         ),
                         Type::NewTypeInstance(newtype),
                     ),
-                ))))
+                )))
             }
 
             Type::Never
@@ -283,7 +271,7 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                Some(Cow::Owned(CallableTypes::one(partial.partial(db))))
+                Some(CallableTypes::one(partial.partial(db)))
             }
 
             Type::Intersection(intersection) => {
@@ -659,7 +647,7 @@ impl<'db> CallableTypes<'db> {
         CallableTypes(callables)
     }
 
-    pub(crate) fn exactly_one(&self) -> Option<CallableType<'db>> {
+    pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
         match self.0.as_slice() {
             [single] => Some(*single),
             _ => None,
@@ -670,13 +658,12 @@ impl<'db> CallableTypes<'db> {
         &self.0
     }
 
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, CallableType<'db>> {
-        self.0.iter()
+    pub(super) fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+        self.0
     }
 
-    pub(crate) fn to_type(&self, db: &'db dyn Db) -> Type<'db> {
-        assert!(!self.0.is_empty(), "CallableTypes should not be empty");
-        UnionType::from_elements(db, self.0.iter().copied().map(Type::Callable))
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, CallableType<'db>> {
+        self.0.iter()
     }
 
     pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -684,7 +671,7 @@ impl<'db> CallableTypes<'db> {
         UnionType::from_elements(db, self.0.into_iter().map(Type::Callable))
     }
 
-    pub(crate) fn map(&self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
+    pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
 

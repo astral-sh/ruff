@@ -2021,18 +2021,16 @@ impl<'db> Bindings<'db> {
                             let [Some(ty)] = overload.parameter_types() else {
                                 continue;
                             };
-                            let Some(callables) = ty.try_upcast_to_callable(db) else {
+                            let Some(callables) = ty.try_upcast_to_callable(db).map(|callables| {
+                                if into_callable == KnownFunction::IntoRegularCallable {
+                                    callables.map(|callable| callable.into_regular(db))
+                                } else {
+                                    callables
+                                }
+                            }) else {
                                 continue;
                             };
-                            let callable_type =
-                                if into_callable == KnownFunction::IntoRegularCallable {
-                                    callables
-                                        .map(|callable| callable.into_regular(db))
-                                        .into_type(db)
-                                } else {
-                                    callables.to_type(db)
-                                };
-                            overload.set_return_type(callable_type);
+                            overload.set_return_type(callables.into_type(db));
                         }
 
                         Some(KnownFunction::DunderAllNames) => {

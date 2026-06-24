@@ -99,13 +99,13 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::unpacker::UnpackResult;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, ClassType, DynamicType,
-    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
-    UnionBuilder, UnionType, any_over_type, binding_type,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
+    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -5471,7 +5471,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             let Some(decorator_callable) = decorator_ty
                 .try_upcast_to_callable(db)
-                .and_then(|callables| callables.exactly_one())
+                .and_then(CallableTypes::exactly_one)
             else {
                 return false;
             };
@@ -5510,7 +5510,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )),
             _ => decorated_ty
                 .try_upcast_to_callable(self.db())
-                .and_then(|callables| callables.exactly_one())
+                .and_then(CallableTypes::exactly_one)
                 .and_then(|callable| match callable.kind(self.db()) {
                     kind @ (CallableTypeKind::FunctionLike
                     | CallableTypeKind::StaticMethodLike
@@ -5538,7 +5538,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && is_transparent_callable_decorator(self.db(), decorator_ty, decorated_ty)
             && let Some(callable) = decorated_ty
                 .try_upcast_to_callable(self.db())
-                .and_then(|callables| callables.exactly_one())
+                .and_then(CallableTypes::exactly_one)
         {
             return Type::Callable(callable);
         }

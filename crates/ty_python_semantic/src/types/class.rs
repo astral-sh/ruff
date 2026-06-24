@@ -1946,7 +1946,7 @@ impl<'db> ClassType<'db> {
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     #[salsa::tracked(
-        returns(ref),
+        returns(clone),
         cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]

@@ -2203,7 +2203,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .map(|callable| callable.into_regular(db))
                                 .into_type(db)
                         } else {
-                            callables.to_type(db)
+                            callables.into_type(db)
                         }
                     })
                 else {

@@ -562,7 +562,7 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            let superclass_type_as_type = superclass_type_as_callable.to_type(db);
+            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
             if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
                 continue;
