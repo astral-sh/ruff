@@ -524,8 +524,8 @@ impl<'db> DynamicClassLiteral<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
-            self.anchor(db).clone(),
+            self.name(db),
+            self.anchor(db),
             self.members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
@@ -560,7 +560,7 @@ impl<'db> DynamicClassLiteral<'db> {
 
         Some(Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             anchor,
             members,
             self.has_dynamic_namespace(db),

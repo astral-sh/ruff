@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::Cursor;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange, TextSlice};
 
 /// A shebang directive (e.g., `#!/usr/bin/env python3`).
 #[derive(Debug, PartialEq, Eq)]
@@ -30,6 +33,21 @@ impl Deref for ShebangDirective<'_> {
     fn deref(&self) -> &Self::Target {
         self.0
     }
+}
+
+/// Return the range of a shebang at the start of a file, including its line ending.
+pub(crate) fn leading_shebang_range(source: &str, tokens: &Tokens) -> Option<TextRange> {
+    let first_token = tokens.first()?;
+    if first_token.kind() != TokenKind::Comment
+        || ShebangDirective::try_extract(source.slice(first_token)).is_none()
+    {
+        return None;
+    }
+
+    Some(TextRange::new(
+        first_token.start(),
+        source.full_line_end(first_token.end()),
+    ))
 }
 
 #[cfg(test)]

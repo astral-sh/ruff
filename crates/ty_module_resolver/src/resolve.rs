@@ -427,7 +427,7 @@ fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -
 /// valid desperate search-paths, but don't worry about that.)
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
 fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Box<[SearchPath]>> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
@@ -1044,14 +1044,14 @@ fn desperately_resolve_name(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
-    let search_paths = absolute_desperate_search_paths(db, importing_file);
+    let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
     resolve_name_impl(
         db,
         name,
         mode,
-        search_paths.iter().flatten(),
+        search_paths.iter(),
         &if mode.stubs_allowed() {
-            StubPackageSearchPaths::from_search_paths(db, search_paths.iter().flatten())
+            StubPackageSearchPaths::from_search_paths(db, search_paths.iter())
         } else {
             StubPackageSearchPaths::empty()
         },

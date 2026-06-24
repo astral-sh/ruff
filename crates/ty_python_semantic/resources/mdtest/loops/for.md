@@ -1951,6 +1951,20 @@ def projection_for_loop_recursive_orbit_transversal(degree, generators, alpha):
     return tr, slp_dict
 ```
 
+### Nested collection cycles do not panic
+
+Regression test for [#3836](https://github.com/astral-sh/ty/issues/3836).
+
+```py
+def distance() -> None:
+    previous = [0]
+    for _ in [0]:
+        row = []
+        for _ in [0]:
+            row.append(previous[0])
+        previous = row
+```
+
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the

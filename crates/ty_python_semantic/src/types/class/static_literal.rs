@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::Span,
@@ -159,7 +160,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.body_scope(db),
             self.known(db),
             self.deprecated(db),
@@ -2074,7 +2075,7 @@ impl<'db> StaticClassLiteral<'db> {
                     default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
-                    alias = field.alias(db);
+                    alias.clone_from(field.alias(db));
                     converter = field.converter(db);
                 }
 
@@ -2201,26 +2202,26 @@ impl<'db> StaticClassLiteral<'db> {
 
         Self::implicit_attribute_inner(
             db,
-            class_body_scope,
-            name.to_string(),
-            target_method_decorator,
+            ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
         )
         .member
     }
 
     #[salsa::tracked(
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _, _, _| {
+        cycle_initial=|_, id, _| {
             ImplicitAttributeMember::new(Member::new(Place::bound(Type::divergent(id)).into()))
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn implicit_attribute_inner(
         db: &'db dyn Db,
-        class_body_scope: ScopeId<'db>,
-        name: String,
-        target_method_decorator: MethodDecorator,
+        attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttributeMember<'db> {
+        let class_body_scope = attribute.class_body_scope(db);
+        let name = attribute.name(db);
+        let target_method_decorator = attribute.target_method_decorator(db);
+
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
         // attribute, then apply public-type promotion to the final union.
@@ -2280,7 +2281,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, &name)
+            attribute_declarations(db, class_body_scope, name)
         {
             let method_scope = index.scope(method_scope_id);
             if !is_valid_scope(method_scope) {
@@ -2355,7 +2356,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
-            attribute_assignments(db, class_body_scope, &name)
+            attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
             if !is_valid_scope(binding_scope) {
@@ -3268,6 +3269,17 @@ fn explicit_bases_cycle_fn<'db>(
     }
 }
 
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ImplicitAttributeName<'db> {
+    class_body_scope: ScopeId<'db>,
+    #[returns(deref)]
+    name: CompactString,
+    target_method_decorator: MethodDecorator,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ImplicitAttributeName<'_> {}
+
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.file(db));
@@ -3317,9 +3329,7 @@ fn implicit_attribute_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous_member: &ImplicitAttributeMember<'db>,
     member: ImplicitAttributeMember<'db>,
-    _class_body_scope: ScopeId<'db>,
-    _name: String,
-    _target_method_decorator: MethodDecorator,
+    _attribute: ImplicitAttributeName<'db>,
 ) -> ImplicitAttributeMember<'db> {
     let projection_evidence = ProjectionEvidenceSet::merged(
         db,

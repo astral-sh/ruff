@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::TypeTransformer;
+pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -35,9 +35,9 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    callable_pattern_type, definite_match_pattern_type, definite_sequence_pattern_type,
-    exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    callable_pattern_type, definite_match_pattern_type, exact_sequence_pattern_type,
+    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_fallthrough_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub use self::projection::ProjectionType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
@@ -67,7 +67,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-pub(crate) use crate::types::enums::{EnumComplementType, enum_metadata};
+pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::equality_truthiness;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
@@ -1282,14 +1282,22 @@ impl<'db> Type<'db> {
                     .collect::<Option<smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]>>>()
                 && replacements.len() > 1
             {
-                return Some(current.map_leave_aliases(db, |element| {
+                let normalized = current.map_leave_aliases(db, |element| {
                     replacements
                         .iter()
                         .find_map(|(original, normalized)| {
                             (*original == *element).then_some(*normalized)
                         })
                         .unwrap_or(*element)
-                }));
+                });
+
+                // Multi-arm matching cannot prove a one-to-one correspondence between previous
+                // and growing current arms. Union with the entire previous result to keep recovery
+                // monotonic when a stable arm shares a nominal class with a wrapper.
+                return Some(UnionType::from_elements_cycle_recovery(
+                    db,
+                    [Type::Union(previous), normalized],
+                ));
             }
 
             // Only align unions when each iteration has exactly one changed arm. With multiple
@@ -1350,16 +1358,28 @@ impl<'db> Type<'db> {
         wrapped: Self,
         div: Self,
     ) -> Option<Self> {
+        // A variadic tuple can flatten the previous cycle result before the result appears again
+        // as a fixed element, as in `x = (*x, x)`. If the fixed prefix or suffix grows between
+        // iterations, replacing only that nested occurrence would leave the flattened prefix
+        // growing by one element on every iteration. Variadic tuples with stable fixed elements
+        // still need nominal growth recovery for recursive `TypeOf` references.
+        if let Some(current_tuple) = current.own_tuple_spec(db)
+            && current_tuple.is_variadic()
+            && let Some(previous_tuple) = wrapped.exact_tuple_instance_spec(db)
+            && current_tuple.fixed_elements().count() > previous_tuple.fixed_elements().count()
+        {
+            return None;
+        }
+
+        let type_mapping = TypeMapping::ReplaceType {
+            from: wrapped,
+            to: div,
+        };
+
         let current_class = current.class(db);
         let alias = current_class.into_generic_alias()?;
         let original_specialization = alias.specialization(db);
-        let specialization = original_specialization.apply_type_mapping(
-            db,
-            &TypeMapping::ReplaceType {
-                from: wrapped,
-                to: div,
-            },
-        );
+        let specialization = original_specialization.apply_type_mapping(db, &type_mapping);
         if specialization == original_specialization {
             return None;
         }
@@ -4066,24 +4086,23 @@ impl<'db> Type<'db> {
                         }) =>
                 {
                     let enum_literal = literal.as_enum().unwrap();
-                    let enum_class = enum_literal.enum_class(db);
-                    let is_enum_subclass = Type::ClassLiteral(enum_class)
+                    let enum_class = enum_literal.enum_class_literal(db);
+                    let is_enum_subclass = Type::ClassLiteral(enum_class.class_literal(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-                    enum_metadata(db, enum_class)
-                        .and_then(|metadata| match name_str {
-                            "name" if is_enum_subclass => {
-                                metadata.name_type(db, enum_literal.name(db))
-                            }
-                            "_name_" => metadata.name_type(db, enum_literal.name(db)),
-                            "value" if is_enum_subclass => {
-                                metadata.value_type(db, enum_literal.name(db))
-                            }
-                            "_value_" => metadata.value_type(db, enum_literal.name(db)),
-                            _ => None,
-                        })
-                        .map_or_else(|| Place::Undefined, Place::bound)
-                        .into()
+                    (match name_str {
+                        "name" if is_enum_subclass => {
+                            enum_class.name_type(db, enum_literal.name(db))
+                        }
+                        "_name_" => enum_class.name_type(db, enum_literal.name(db)),
+                        "value" if is_enum_subclass => {
+                            enum_class.value_type(db, enum_literal.name(db))
+                        }
+                        "_value_" => enum_class.value_type(db, enum_literal.name(db)),
+                        _ => None,
+                    })
+                    .map_or_else(|| Place::Undefined, Place::bound)
+                    .into()
                 }
 
                 Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
@@ -4178,15 +4197,20 @@ impl<'db> Type<'db> {
 
                     // Enum members can be accessed through enum instances and other enum members,
                     // e.g. `answer.YES` or `Answer.YES.NO`.
-                    if let Some(enum_class) =
-                        this.nominal_class(db).map(|class| class.class_literal(db))
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                    if let Some(enum_class) = match this {
+                        Type::LiteralValue(literal) => literal
+                            .as_enum()
+                            .map(|enum_literal| enum_literal.enum_class_literal(db)),
+                        _ => this
+                            .nominal_class(db)
+                            .map(|class| class.class_literal(db))
+                            .and_then(|class| class.into_enum_class(db)),
+                    } && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
                             enum_class,
-                            resolved_name.clone(),
+                            resolved_name,
                         )))
                         .into();
                     }
@@ -4215,16 +4239,15 @@ impl<'db> Type<'db> {
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     let enum_class = match this {
-                        Type::ClassLiteral(literal) => Some(literal),
+                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
                             .into_class(db)
-                            .map(|class| class.class_literal(db)),
+                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                        && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
@@ -7130,18 +7153,19 @@ impl<'db> Type<'db> {
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db),
+            Self::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple,
+            ) => Type::SpecialForm(SpecialFormType::Todo).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
             Self::Projection(_)
             | Self::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple
-                | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::UnspecializedTypeVar,
+                DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
             | Self::TypeIs(_)

@@ -528,6 +528,21 @@ impl PlaceState {
         }
     }
 
+    /// Add the given constraint to live bindings selected by definition ID.
+    pub(super) fn record_narrowing_constraint_for_bindings(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+        bindings: &[ScopedDefinitionId],
+    ) {
+        for binding in &mut self.bindings.live_bindings {
+            if bindings.contains(&binding.binding()) {
+                binding.narrowing_constraint = narrowing_constraints
+                    .add_and_constraint(binding.narrowing_constraint, constraint);
+            }
+        }
+    }
+
     /// Add given reachability constraint to all live bindings.
     pub(super) fn record_reachability_constraint(
         &mut self,

@@ -10,27 +10,117 @@ from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
 
+# -----
 # Types
+# -----
+
 Unknown: _SpecialForm
+"""
+`Unknown` is a dynamic type inferred due to missing type information or an inference error.
+
+ty infers `Unknown` for unannotated values with insufficient type information. It also uses it as a
+fallback after certain type errors. This contrasts with `Any`, which represents an *explicitly*
+annotated dynamic type. Like `Any`, however, it is a dynamic type, so ty allows any operation on it.
+"""
+
+Todo: _SpecialForm
+"""
+`@Todo` is a dynamic type inferred due to a known missing feature or incomplete implementation in
+ty.
+
+Like `Any` and `Unknown`, `@Todo` is a dynamic type, so ty allows any operation on it. Unlike `Any`,
+it is not explicitly provided in an annotation; unlike `Unknown`, it specifically indicates a
+limitation in ty.
+
+It is an internal type used by ty and cannot be used in annotations. These types should disappear
+as ty implements the missing functionality.
+"""
+
 Divergent: _SpecialForm
 """
-`Divergent` represents type-level recursion that does not converge.
+`Divergent` is a dynamic type inferred due to type-level recursion that does not converge.
 
 Type inference can be recursive. ty analyzes inference cycles repeatedly, looking for a
 stable result. If each iteration produces a new type, ty replaces the non-convergent part
 with `Divergent`.
 
-Like `Any` and `Unknown`, `Divergent` is a gradual type, so ty allows any operation on it.
+Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operation on it.
 Unlike `Unknown`, it does not represent missing type information. It is an internal type
 used by ty and cannot be used in annotations.
 """
-AlwaysTruthy: _SpecialForm
-AlwaysFalsy: _SpecialForm
 
+AlwaysTruthy: _SpecialForm
+"""
+`AlwaysTruthy` represents the set of all objects that always evaluate to `True` in a boolean
+context.
+
+`AlwaysTruthy` is inhabited by singleton objects such as `True` and `...`, as well as truthy
+literal strings, integers and bytestrings. It can also be inhabited by instances of classes
+with `__bool__` methods returning `Literal[True]`.
+
+In practice, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since
+their boolean evaluation may be uncertain or depend on runtime state. For example, although
+an instance of *exactly* `object` is always truthy, a variable annotated as having type
+`object` could also be an instance of an arbitrary subclass of `object` that is always falsy.
+This means that the boolean evaluation of a variable inferred as `object` is uncertain, so
+`object` is not a subtype of `AlwaysTruthy`.
+"""
+
+AlwaysFalsy: _SpecialForm
+"""
+`AlwaysFalsy` represents the set of all objects that always evaluate to `False` in a boolean
+context.
+
+`AlwaysFalsy` is inhabited by singleton objects such as `False` and `None`, as well as the
+literals `""`, `b""` and `0`. It can also be inhabited by instances of classes with `__bool__`
+methods returning `Literal[False]`.
+
+In practice, however, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`,
+since their boolean evaluation may be uncertain or depend on runtime state.
+"""
+
+# -------------
 # Special forms
+# -------------
+
 Not: _SpecialForm
+"""`Not[T]` represents the set of all objects that do not inhabit the type `T`."""
+
 Intersection: _SpecialForm
+"""
+`Intersection[T1, T2, ..., Tn]` represents an intersection type: the set of all objects that inhabit
+all of the types `T1`, `T2`, ..., `Tn`.
+
+For any two fully static types `T1` and `T2`, `Intersection[T1, T2]` is a subtype of both `T1` and
+`T2`. For any type `T3` that is a subtype of both `T1` and `T2`, `Intersection[T1, T2]` is a
+supertype of `T3`.
+
+In the following example, although neither `P` nor `Q` is a subtype of the other, an instance of `S`
+inhabits `Intersection[P, Q]` because `S` inherits from both `P` and `Q`:
+
+```python
+class P: ...
+class Q: ...
+class S(P, Q): ...
+
+s: Intersection[P, Q] = S()
+```
+"""
+
 TypeOf: _SpecialForm
+"""
+`TypeOf[expression]` is the inferred type of `expression`.
+
+Unlike a regular [type expression], the argument to `TypeOf` is interpreted as a
+["value expression"][value expression]: an ordinary Python expression whose type ty infers. Whereas
+`str` in a type annotation means "any instance of the class `str`", `TypeOf[str]` in a type annotation
+signifies "the type inhabited by the `str` class object itself at runtime". `Literal[3]` is therefore
+the same type as `TypeOf[3]`, since ty infers the object `3` as having type `Literal[3]`.
+
+[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+[value expression]: https://docs.python.org/3/reference/expressions.html
+"""
+
 CallableTypeOf: _SpecialForm
 """
 `CallableTypeOf[T]` extracts the callable type of `T` while preserving any function-like
@@ -130,18 +220,18 @@ class ConstraintSet:
         lower_bound: TypeForm[object],
         typevar: TypeForm[object],
         upper_bound: TypeForm[object],
-    ) -> Self:
+    ) -> ConstraintSet:
         """
         Returns a constraint set that requires `typevar` to specialize to a type
         that is a supertype of `lower_bound` and a subtype of `upper_bound`.
         """
 
     @staticmethod
-    def always() -> Self:
+    def always() -> ConstraintSet:
         """Returns a constraint set that is always satisfied"""
 
     @staticmethod
-    def never() -> Self:
+    def never() -> ConstraintSet:
         """Returns a constraint set that is never satisfied"""
 
     def implies_subtype_of(self, ty: TypeForm[object], of: TypeForm[object]) -> Self:

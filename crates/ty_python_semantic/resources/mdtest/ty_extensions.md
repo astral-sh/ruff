@@ -516,6 +516,14 @@ nested: list[tuple[TypeOf[nested]]]
 nested = [(1,)]
 reveal_type(nested)  # revealed: list[Divergent]
 
+variadic_tuple: tuple[TypeOf[variadic_tuple], ...]
+variadic_tuple = (1,)
+reveal_type(variadic_tuple)  # revealed: tuple[Literal[1]]
+
+mixed_variadic_tuple: tuple[TypeOf[mixed_variadic_tuple], *tuple[int, ...]]
+mixed_variadic_tuple = (1,)
+reveal_type(mixed_variadic_tuple)  # revealed: tuple[Literal[1]]
+
 optional: list[TypeOf[optional]] | None
 optional = [1]
 reveal_type(optional)  # revealed: list[Divergent]
@@ -526,6 +534,7 @@ y: Container[TypeOf[y]]
 y = 1  # error: [invalid-assignment]
 reveal_type(y)  # revealed: Container[Divergent]
 
+# Regression test for https://github.com/astral-sh/ty/issues/3837.
 union: list[TypeOf[union]] | Container[TypeOf[union]]
 union = [1]
 reveal_type(union)  # revealed: list[Divergent]
@@ -775,6 +784,41 @@ def _(
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
     reveal_type(c8)  # revealed: (x: int) -> str
+```
+
+A callable instance upcast to a callable type is still a regular callable when stored as a class
+attribute, even if its `__call__` method is function-like. Explicit descriptor behavior is still
+respected:
+
+```py
+from functools import partial
+from typing import Callable
+from ty_extensions import into_callable
+
+class CallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+instance = CallableInstance()
+
+class Owner:
+    callback = into_callable(instance)
+
+Owner().callback(1)
+Owner().callback()  # error: [missing-argument]
+
+class DescriptorCallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+    def __get__(self, owner, instance) -> Callable[[], str]:
+        return partial(self, 42)
+
+class DescriptorOwner:
+    callback = DescriptorCallableInstance()
+
+DescriptorOwner().callback(1)  # error: [too-many-positional-arguments]
+DescriptorOwner().callback()
 ```
 
 Narrowed callable enum values can still be used with callable type extraction:

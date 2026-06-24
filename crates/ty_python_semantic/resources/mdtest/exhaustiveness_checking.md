@@ -247,6 +247,32 @@ def match_non_exhaustive(x: Color):
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
+Matching every named member is not exhaustive for enums that can also have unnamed members.
+
+```py
+from enum import Enum, Flag
+
+class Permission(Flag):
+    READ = 1
+
+class OpenEnum(Enum):
+    ONLY = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> "OpenEnum":
+        return object.__new__(cls)
+
+def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
+    match value:
+        case Permission.READ:
+            return 1
+
+def match_open_enum(value: OpenEnum) -> int:  # error: [invalid-return-type]
+    match value:
+        case OpenEnum.ONLY:
+            return 1
+```
+
 ## Checks on enum literal subsets
 
 ```py
@@ -404,7 +430,7 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
         case GenericClass(x=x):
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: Unknown
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
 ```

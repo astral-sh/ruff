@@ -914,7 +914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
             TypeVarKind::LegacyParamSpec,
         );
@@ -1252,7 +1252,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
             TypeVarKind::LegacyTypeVar,
         );

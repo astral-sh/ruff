@@ -719,6 +719,9 @@ struct ConstraintSetStorage<'db> {
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
+    /// Only caches completed top-level results. Recursive results depend on active path
+    /// assignments and must not use this cache.
+    never_satisfied_cache: FxHashMap<NodeId, bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
@@ -2154,8 +2157,18 @@ impl NodeId {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
+                if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&self) {
+                    return *result;
+                }
+
                 let mut path = interior.path_assignments(builder);
-                self.is_never_satisfied_inner(db, builder, &mut path)
+                let result = self.is_never_satisfied_inner(db, builder, &mut path);
+                builder
+                    .storage
+                    .borrow_mut()
+                    .never_satisfied_cache
+                    .insert(self, result);
+                result
             }
         }
     }
@@ -4142,7 +4155,8 @@ impl InteriorNode {
                     .or_insert(source_order);
             });
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
-            .tuple_combinations()
+            .array_combinations()
+            .map(|[left, right]| (left, right))
             .collect();
 
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
@@ -6750,6 +6764,47 @@ mod tests {
             Some(&false)
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
+    }
+
+    #[test]
+    fn never_satisfied_results_are_cached() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let impossible = t_int.and(&db, &builder, || t_str);
+
+        assert!(!t_int.is_never_satisfied(&db));
+        assert!(!t_int.is_never_satisfied(&db));
+        assert!(impossible.is_never_satisfied(&db));
+        assert!(impossible.is_never_satisfied(&db));
+        assert!(ConstraintSet::never(&builder).is_never_satisfied(&db));
+        assert!(!ConstraintSet::always(&builder).is_never_satisfied(&db));
+
+        {
+            let storage = builder.storage.borrow();
+            assert_eq!(storage.never_satisfied_cache.get(&t_int.node), Some(&false));
+            assert_eq!(
+                storage.never_satisfied_cache.get(&impossible.node),
+                Some(&true)
+            );
+            assert_eq!(storage.never_satisfied_cache.len(), 2);
+        }
+
+        let owned = create_compacted_owned_set(&db);
+        owned.query(|builder, set| {
+            assert!(!set.is_never_satisfied(&db));
+            assert!(!set.is_never_satisfied(&db));
+            assert_eq!(
+                builder
+                    .storage
+                    .borrow()
+                    .never_satisfied_cache
+                    .get(&set.node),
+                Some(&false)
+            );
+        });
     }
 
     #[track_caller]
