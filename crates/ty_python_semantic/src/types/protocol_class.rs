@@ -1391,21 +1391,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required: ProtocolMemberAccess<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        if access == ProtocolMemberAccessMode::Class
-            && member.is_method()
-            && (member.name == "__call__"
-                || matches!(
-                    ty.class_member(db, member.name.into())
-                        .place
-                        .ignore_possibly_undefined(),
-                    Some(Type::FunctionLiteral(function))
-                        if function.is_classmethod(db) || function.is_staticmethod(db)
-                ))
-        {
-            // The instance-side check is authoritative for the signature of a classmethod or
-            // staticmethod implementation. Class access only establishes that the member is
-            // present. Callable types and several callable literal forms do not expose a useful
-            // `__call__` member through their meta-type.
+        if access == ProtocolMemberAccessMode::Class && member.is_method() {
+            // The instance-side check is authoritative for the signature of a method
+            // implementation. Class access only establishes that the member is present. Callable
+            // types and several callable literal forms do not expose a useful `__call__` member
+            // through their meta-type.
             return ConstraintSet::from_bool(
                 self.constraints,
                 member.name == "__call__"
