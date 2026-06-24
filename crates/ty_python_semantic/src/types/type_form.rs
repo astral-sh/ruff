@@ -22,7 +22,8 @@ pub(super) fn walk_typeform_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for TypeFormType<'_> {}
 
 impl<'db> TypeFormType<'db> {
-    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    /// Creates the runtime type-form type for a type expression that denotes `ty`.
+    pub fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         Type::TypeForm(Self::new(db, ty))
     }
 }

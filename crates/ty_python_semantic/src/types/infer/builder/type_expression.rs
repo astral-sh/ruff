@@ -75,6 +75,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             previously_in_type_expression,
         );
         self.store_expression_type(expression, ty);
+        self.store_type_expression_flags(expression, TypeExpressionFlags::TYPE_EXPRESSION);
         ty
     }
 

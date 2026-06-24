@@ -82,6 +82,8 @@ bitflags::bitflags! {
     pub(crate) struct TypeExpressionFlags: u8 {
         /// The expression is syntactically an `Unpack[...]` type expression.
         const UNPACK = 1 << 0;
+        /// The expression is evaluated as a type expression.
+        const TYPE_EXPRESSION = 1 << 1;
     }
 }
 
@@ -896,6 +898,11 @@ impl<'db> ScopeInference<'db> {
             .as_ref()
             .and_then(|extra| extra.type_expression_flags.get(&expression.into()).copied())
             .unwrap_or_default()
+    }
+
+    pub(crate) fn is_type_expression(&self, expression: impl Into<ExpressionNodeKey>) -> bool {
+        self.type_expression_flags(expression)
+            .contains(TypeExpressionFlags::TYPE_EXPRESSION)
     }
 }
 
