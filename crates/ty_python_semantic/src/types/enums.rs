@@ -873,7 +873,8 @@ pub(crate) fn enum_metadata<'db>(
         inherited_known_enum_method(db, class, "__init__")
     });
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
-        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"));
+        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"))
+        .or_else(|| inherited_user_defined_mixin_new(db, class));
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
@@ -1213,6 +1214,24 @@ fn inherited_user_defined_enum_method<'db>(
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
+}
+
+/// Looks up a user-defined `__new__` on a data-type mixin before the first parent enum.
+///
+/// When no enum class provides a member constructor, `EnumType` uses this method to construct the
+/// scalar payload stored by the enum member.
+fn inherited_user_defined_mixin_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<EnumMethodBinding<'db>> {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.class_literal(db).as_static())
+        .take_while(|base| !is_enum_class_by_inheritance(db, *base))
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
 }
 
 /// Looks up a resolvable method inherited from a known enum class.

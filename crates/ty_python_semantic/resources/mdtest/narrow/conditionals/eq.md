@@ -702,6 +702,28 @@ reveal_type(AnnotatedInitialized.MEMBER.value)  # revealed: Literal[2]
 reveal_type(AnnotatedInitialized.MEMBER == Other.MEMBER)  # revealed: bool
 ```
 
+A scalar data-type mixin can also transform a declared value before it becomes the enum member's
+comparison payload. Such a value is not a safe comparison key:
+
+```py
+from enum import Enum, IntEnum
+
+class ShiftedInt(int):
+    def __new__(cls, value: int) -> "ShiftedInt":
+        return int.__new__(cls, value + 1)
+
+class Shifted(ShiftedInt, Enum):
+    MEMBER = 1
+
+class Normal(IntEnum):
+    MEMBER = 2
+
+reveal_type(Shifted.MEMBER == Normal.MEMBER)  # revealed: bool
+
+if Shifted.MEMBER == Normal.MEMBER:
+    reveal_type(Shifted.MEMBER)  # revealed: Shifted
+```
+
 The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
 member. Here, the inherited `int.__new__` converts the generated string `"1"` to the integer `1`.
 Because the generated value's exact conversion is not modeled, we cannot use it to decide whether
