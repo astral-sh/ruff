@@ -194,8 +194,9 @@ class RuntimeIntAlias(IntEnum):
 reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Literal[True]
 ```
 
-Scalar mixins can also coerce different class-body values to the same runtime value. Here, both
-declarations become aliases at runtime, so the comparison cannot be assumed false:
+A scalar mixin can normalize member values before `Enum` checks for aliases. Here, `str` converts
+`1` to `"1"`, so the two members are aliases at runtime. Since ty does not model this constructor
+call, the comparison remains `bool`:
 
 ```py
 class CoercingAlias(str, Enum):
@@ -205,12 +206,12 @@ class CoercingAlias(str, Enum):
 reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: bool
 ```
 
-Equality narrowing must not transfer `Any` or an unrelated `NewType` constraint from one operand to
-the other:
+Equality can transfer restrictions on enum members, but other intersection elements must stay on the
+operand where they originated:
 
 ```py
 from enum import StrEnum
-from typing import Any, NewType
+from typing import Any, Literal, NewType
 from ty_extensions import Intersection
 
 class Response(StrEnum):
@@ -219,14 +220,14 @@ class Response(StrEnum):
 
 Tag = NewType("Tag", str)
 
-def compare_narrowed_any(left: Response, right: Any):
-    if isinstance(right, Response):
-        if right == Response.ACCEPT:
-            return
-        if left != right:
-            return
-        reveal_type(left)  # revealed: Literal[Response.REJECT]
-        reveal_type(right)  # revealed: Response & Any & ~Literal[Response.ACCEPT]
+def compare_any(
+    left: Response,
+    right: Intersection[Literal[Response.REJECT], Any],
+):
+    if left != right:
+        return
+    reveal_type(left)  # revealed: Literal[Response.REJECT]
+    reveal_type(right)  # revealed: Literal[Response.REJECT] & Any
 
 def compare_newtype(left: Response, right: Intersection[Response, Tag]):
     if left != right:
