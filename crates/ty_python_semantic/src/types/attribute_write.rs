@@ -49,9 +49,11 @@ pub(super) enum AttributeWriteRequirement<'db> {
         write_ty: Option<Type<'db>>,
         qualifiers: TypeQualifiers,
     },
-    /// An instance write that still requires descriptor, instance-member, and `__setattr__`
-    /// resolution.
-    Instance(Type<'db>),
+    /// A write through an instance, resolved against its class and instance attributes.
+    Instance {
+        object_ty: Type<'db>,
+        member: InstanceAttributeWriteMember<'db>,
+    },
     /// A write through a class object, resolved against its metaclass and class attributes.
     Class {
         object_ty: Type<'db>,
@@ -181,8 +183,8 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::ProtocolInstance(protocol) => protocol
             .interface(db)
             .instance_write_requirement(db, attribute)
-            .map_or(
-                AttributeWriteRequirement::Instance(object_ty),
+            .map_or_else(
+                || instance_attribute_write_requirement(db, object_ty, attribute),
                 |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
                     write_ty,
                     qualifiers,
@@ -208,7 +210,9 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::TypeGuard(_)
         | Type::TypeForm(_)
         | Type::TypedDict(_)
-        | Type::NewTypeInstance(_) => AttributeWriteRequirement::Instance(object_ty),
+        | Type::NewTypeInstance(_) => {
+            instance_attribute_write_requirement(db, object_ty, attribute)
+        }
 
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
             class_attribute_write_requirement(db, object_ty, attribute)
@@ -232,12 +236,23 @@ pub(super) fn attribute_write_requirement<'db>(
     }
 }
 
+fn instance_attribute_write_requirement<'db>(
+    db: &'db dyn Db,
+    object_ty: Type<'db>,
+    attribute: &str,
+) -> AttributeWriteRequirement<'db> {
+    AttributeWriteRequirement::Instance {
+        object_ty,
+        member: instance_attribute_write_member_requirement(db, object_ty, attribute),
+    }
+}
+
 /// Resolve the declared member that governs an instance attribute write.
 ///
 /// The returned requirement preserves a possibly-defined class member and its instance fallback,
 /// because both runtime paths must accept the write. If neither exists, the caller must evaluate
 /// `__setattr__`.
-pub(super) fn instance_attribute_write_member_requirement<'db>(
+fn instance_attribute_write_member_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
     attribute: &str,
