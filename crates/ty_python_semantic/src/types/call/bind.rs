@@ -56,7 +56,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
@@ -5315,91 +5315,34 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let parameters = self.signature.parameters();
-        let starred_typevartuple_declared_type = |parameter: &Parameter<'db>| {
-            if !parameter.has_starred_annotation() {
-                return None;
-            }
-            if let Type::TypeVar(typevar) = parameter.annotated_type()
-                && typevar.is_typevartuple(self.db)
-            {
-                return Some(Type::tuple(TupleType::new(
-                    self.db,
-                    &TupleSpecBuilder::with_capacity(0)
-                        .concat_variadic_typevar(self.db, typevar)
-                        .build(),
-                )));
-            }
-            let tuple = parameter
-                .annotated_type()
-                .exact_tuple_instance_spec(self.db)?;
-            let TupleSpec::Variable(variable) = tuple.as_ref() else {
-                return None;
-            };
-            if matches!(
-                variable.variable(),
-                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
-            ) {
-                Some(parameter.annotated_type())
-            } else {
-                None
-            }
-        };
-
-        let starred_typevartuple_declared_types = parameters
-            .iter()
-            .map(starred_typevartuple_declared_type)
-            .collect::<Vec<_>>();
-        let mut starred_typevartuple_arguments = starred_typevartuple_declared_types
-            .iter()
-            .map(|declared_type| declared_type.map(|_| Vec::new()))
-            .collect::<Vec<_>>();
-        if starred_typevartuple_arguments.iter().any(Option::is_some) {
-            for (argument_index, _, _, argument_types) in self.enumerate_argument_types() {
-                for matched_parameter in self.argument_matches[argument_index].iter() {
-                    let parameter_index = matched_parameter.index;
-                    if let Some(typevartuple_arguments) =
-                        &mut starred_typevartuple_arguments[parameter_index]
-                    {
-                        typevartuple_arguments
-                            .push(argument_types.get_default().unwrap_or(Type::unknown()));
-                    }
-                }
-            }
-        }
-
-        for (declared_type, argument_types) in starred_typevartuple_declared_types
-            .iter()
-            .zip(&starred_typevartuple_arguments)
-        {
-            let Some((declared_type, argument_types)) =
-                declared_type.as_ref().zip(argument_types.as_ref())
-            else {
-                continue;
-            };
-            let argument_type = Type::heterogeneous_tuple(self.db, argument_types.iter().copied());
-            let specialization_result = builder.infer(*declared_type, argument_type);
-
-            if let Err(error) = specialization_result {
-                specialization_errors.push(BindingError::SpecializationError {
-                    error,
-                    argument_index: None,
-                });
-            }
-        }
-
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
-                if starred_typevartuple_arguments[parameter_index].is_some() {
+                let parameter = &parameters[parameter_index];
+                let declared_type = parameter.annotated_type();
+                // A `TypeVarTuple` needs to be inferred from all matched positional arguments as a
+                // single tuple. Skip per-argument inference until call binding supports that.
+                if parameter.has_starred_annotation()
+                    && (matches!(
+                        declared_type,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                    ) || matches!(
+                        declared_type.exact_tuple_instance_spec(self.db).as_deref(),
+                        Some(TupleSpec::Variable(variable))
+                            if matches!(
+                                variable.variable(),
+                                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                            )
+                    ))
+                {
                     continue;
                 }
                 if self.is_gradual_variadic_parameter(parameter_index) {
                     continue;
                 }
 
-                let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
                 let specialization_result = builder.infer(
                     declared_type,

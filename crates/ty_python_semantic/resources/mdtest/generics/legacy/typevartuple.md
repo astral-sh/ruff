@@ -338,12 +338,13 @@ class Variadic(Generic[*Ts]):
 reveal_type(Positional(()))  # revealed: Positional[()]
 reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
 
-reveal_type(Variadic())  # revealed: Variadic[()]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
+reveal_type(Variadic())  # revealed: Variadic[*tuple[Unknown, ...]]
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[*tuple[Unknown, ...]]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
-    reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
+    reveal_type(Variadic(i, s))  # revealed: Variadic[*tuple[Unknown, ...]]
 ```
 
 ### Unspecified type arguments

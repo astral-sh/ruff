@@ -40,8 +40,9 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-reveal_type(collect())  # revealed: tuple[()]
-reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
+reveal_type(collect())  # revealed: tuple[Unknown, ...]
+reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
 ```
 
 ## Callable parameters
@@ -65,7 +66,8 @@ def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
-# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> str`, found `def format_value(value: int, label: str, /) -> str`"
+# TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
+# from the callback.
 reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
