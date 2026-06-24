@@ -1686,7 +1686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Returns the type of the implicit `__class__` cell in the current direct method body or
-    /// class-body lambda.
+    /// lazy scope defined directly in a class body.
     fn dunder_class_cell_type(&self) -> Option<Type<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let class_definition =
@@ -1694,7 +1694,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 definition
             } else {
                 let current_scope = self.index.scope(current_scope_id);
-                if !matches!(current_scope.node(), NodeWithScopeKind::Lambda(_)) {
+                if !matches!(
+                    current_scope.node(),
+                    NodeWithScopeKind::Lambda(_) | NodeWithScopeKind::GeneratorExpression(_)
+                ) {
                     return None;
                 }
                 let class = self

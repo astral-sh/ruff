@@ -30,6 +30,32 @@ class C:
     shadowed = lambda __class__: reveal_type(__class__)  # revealed: Unknown
 ```
 
+## Generator expression scopes
+
+The body of a generator expression defined directly in a class captures the cell because it is
+evaluated lazily. The first iterable is evaluated eagerly in the class body, where the cell is not
+yet available. Eager comprehension bodies likewise cannot access the cell.
+
+```py
+class C:
+    values = (
+        reveal_type(__class__)  # revealed: <class 'C'>
+        for _ in range(1)
+    )
+
+    first_iterable = (
+        value
+        for value in (
+            __class__,  # error: [unresolved-reference]
+        )
+    )
+
+    eager_comprehension = [
+        __class__  # error: [unresolved-reference]
+        for _ in range(1)
+    ]
+```
+
 ## Class bodies and method defaults
 
 The cell is not available directly in the class body or while evaluating a method's default
@@ -68,9 +94,9 @@ class D:
 
 ## Known limitations
 
-The implicit cell is currently only modeled in direct method bodies and lambdas defined directly in
-a class body. The following valid uses are left unresolved until the cell can be represented at the
-correct lexical scope boundary.
+The implicit cell is currently only modeled in direct method bodies and lazy scopes defined directly
+in a class body. The following valid uses are left unresolved until the cell can be represented at
+the correct lexical scope boundary.
 
 ### Nested function scopes
 
@@ -82,21 +108,6 @@ class C:
             # error: [unresolved-reference]
             # revealed: Unknown
             reveal_type(__class__)
-```
-
-### Generator expressions
-
-Generator expressions created in a class body capture the cell because they are evaluated lazily.
-
-```py
-class C:
-    values = (
-        # TODO: This should reveal `<class 'C'>` without an error.
-        # error: [unresolved-reference]
-        # revealed: Unknown
-        reveal_type(__class__)
-        for _ in range(1)
-    )
 ```
 
 ### Type alias annotation scopes
