@@ -1335,16 +1335,28 @@ impl<'db> Type<'db> {
         wrapped: Self,
         div: Self,
     ) -> Option<Self> {
+        // A variadic tuple can flatten the previous cycle result before the result appears again
+        // as a fixed element, as in `x = (*x, x)`. If the fixed prefix or suffix grows between
+        // iterations, replacing only that nested occurrence would leave the flattened prefix
+        // growing by one element on every iteration. Variadic tuples with stable fixed elements
+        // still need nominal growth recovery for recursive `TypeOf` references.
+        if let Some(current_tuple) = current.own_tuple_spec(db)
+            && current_tuple.is_variadic()
+            && let Some(previous_tuple) = wrapped.exact_tuple_instance_spec(db)
+            && current_tuple.fixed_elements().count() > previous_tuple.fixed_elements().count()
+        {
+            return None;
+        }
+
+        let type_mapping = TypeMapping::ReplaceType {
+            from: wrapped,
+            to: div,
+        };
+
         let current_class = current.class(db);
         let alias = current_class.into_generic_alias()?;
         let original_specialization = alias.specialization(db);
-        let specialization = original_specialization.apply_type_mapping(
-            db,
-            &TypeMapping::ReplaceType {
-                from: wrapped,
-                to: div,
-            },
-        );
+        let specialization = original_specialization.apply_type_mapping(db, &type_mapping);
         if specialization == original_specialization {
             return None;
         }
