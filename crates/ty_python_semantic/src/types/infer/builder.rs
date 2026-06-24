@@ -1685,27 +1685,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
-    /// Returns the type of the implicit `__class__` closure cell visible from the current scope.
-    fn dunder_class_cell_type(&self) -> Option<Type<'db>> {
-        self.index
-            .ancestor_scopes(self.scope().file_scope_id(self.db()))
-            .tuple_windows()
-            .find_map(|((_, inner), (_, outer))| {
-                if !outer.kind().is_class()
-                    || !matches!(
-                        inner.node(),
-                        NodeWithScopeKind::Function(_)
-                            | NodeWithScopeKind::FunctionTypeParameters(_)
-                            | NodeWithScopeKind::Lambda(_)
-                    )
-                {
-                    return None;
-                }
+    /// Returns the type of the implicit `__class__` cell at a method/class scope boundary.
+    fn dunder_class_cell_type(
+        &self,
+        inner: &NodeWithScopeKind,
+        outer: &NodeWithScopeKind,
+        inside_generic_method_body: bool,
+    ) -> Option<Type<'db>> {
+        let cell_is_visible = match inner {
+            NodeWithScopeKind::Function(_) | NodeWithScopeKind::Lambda(_) => true,
+            NodeWithScopeKind::FunctionTypeParameters(_) => {
+                inside_generic_method_body || self.is_deferred()
+            }
+            NodeWithScopeKind::TypeAlias(_) | NodeWithScopeKind::TypeAliasTypeParameters(_) => true,
+            _ => false,
+        };
+        if !cell_is_visible {
+            return None;
+        }
 
-                let class = outer.node().as_class()?;
-                let definition = self.index.expect_single_definition(class);
-                original_class_type(self.db(), definition).map(Type::ClassLiteral)
-            })
+        let class = outer.as_class()?;
+        let definition = self.index.expect_single_definition(class);
+        original_class_type(self.db(), definition).map(Type::ClassLiteral)
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -9633,25 +9634,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // cases we're being too deferential to local bindings. Unfortunately the fully sound
             // treatment would reveal `Literal[42, 99] | None` even immediately after `x = 99`,
             // which is too frustrating for users in practice.
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+            let mut inside_generic_method_body = false;
+            for ((_, inner_scope), (enclosing_scope_file_id, enclosing_scope)) in
+                self.index.ancestor_scopes(file_scope_id).tuple_windows()
+            {
                 // If the current enclosing scope is global, no place lookup is performed here,
                 // instead falling back to the module's explicit global lookup below.
                 if enclosing_scope_file_id.is_global() {
                     break;
                 }
 
+                if matches!(inner_scope.node(), NodeWithScopeKind::Function(_))
+                    && matches!(
+                        enclosing_scope.node(),
+                        NodeWithScopeKind::FunctionTypeParameters(_)
+                    )
+                {
+                    inside_generic_method_body = true;
+                }
+
+                let dunder_class_cell_type = place_expr
+                    .as_symbol()
+                    .filter(|symbol| symbol.name() == "__class__")
+                    .and_then(|_| {
+                        self.dunder_class_cell_type(
+                            inner_scope.node(),
+                            enclosing_scope.node(),
+                            inside_generic_method_body,
+                        )
+                    });
+
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
                 // There is one exception to this rule: annotation scopes can see
                 // names defined in an immediately-enclosing class scope.
-                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
+                let is_immediately_enclosing_scope = inner_scope.kind().is_annotation()
+                    && !inside_generic_method_body
+                    && enclosing_scope.kind().is_class();
 
-                let is_immediately_enclosing_scope = scope.is_annotation(db)
-                    && scope
-                        .scope(db)
-                        .parent()
-                        .is_some_and(|parent| parent == enclosing_scope_file_id);
+                // For methods, the cell sits inside the class namespace and therefore takes
+                // precedence over class and outer-scope bindings. Annotation scopes can access
+                // the class namespace itself, so their explicit class bindings take precedence
+                // over the cell.
+                if !is_immediately_enclosing_scope && let Some(ty) = dunder_class_cell_type {
+                    return Place::bound(ty).into();
+                }
 
                 let has_root_place_been_reassigned = || {
                     let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
@@ -9714,6 +9742,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if has_root_place_been_reassigned() {
                                 return Place::Undefined.into();
                             }
+                            if let Some(ty) = dunder_class_cell_type {
+                                return Place::bound(ty).into();
+                            }
                             continue;
                         }
                         EnclosingSnapshotResult::NoLongerInEagerContext => {
@@ -9730,6 +9761,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
                 let Some(enclosing_place_id) = enclosing_place_table.place_id(place_expr) else {
+                    if let Some(ty) = dunder_class_cell_type {
+                        return Place::bound(ty).into();
+                    }
                     continue;
                 };
 
@@ -9753,6 +9787,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !(enclosing_place.is_bound() || enclosing_place.is_declared()) {
                     // Note that this check includes members like `x.y` and `x[0]`, which aren't
                     // symbols and can't be explicitly `nonlocal`.
+                    if let Some(ty) = dunder_class_cell_type {
+                        return Place::bound(ty).into();
+                    }
                     continue;
                 }
 
@@ -9794,18 +9831,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 )
                             });
                         }
-                    }
-                    Place::Undefined.into()
-                })
-                // Methods receive an implicit `__class__` closure cell. The cell is also visible
-                // from nested scopes and takes precedence over a global with the same name.
-                .or_fall_back_to(db, || {
-                    if place_expr
-                        .as_symbol()
-                        .is_some_and(|symbol| symbol.name() == "__class__")
-                        && let Some(ty) = self.dunder_class_cell_type()
-                    {
-                        return Place::bound(ty).into();
                     }
                     Place::Undefined.into()
                 })
