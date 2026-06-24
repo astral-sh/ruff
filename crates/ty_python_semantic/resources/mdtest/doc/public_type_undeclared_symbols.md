@@ -35,14 +35,17 @@ class HtmlResponse(Response): ...
 
 class TestResponse:
     response_class = Response
+    response_classes = (Response,)
 
     def check(self) -> None:
         reveal_type(self.response_class)  # revealed: type[Response]
+        reveal_type(self.response_classes)  # revealed: tuple[type[Response]]
 
 class TestHtmlResponse(TestResponse):
     response_class = HtmlResponse
 
 reveal_type(TestResponse.response_class)  # revealed: <class 'Response'>
+reveal_type(TestResponse.response_classes)  # revealed: tuple[<class 'Response'>]
 
 def check_type(response: type[TestResponse]) -> None:
     reveal_type(response.response_class)  # revealed: type[Response]

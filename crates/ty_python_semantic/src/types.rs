@@ -2088,19 +2088,17 @@ impl<'db> Type<'db> {
         self.promote_singletons_impl(db)
     }
 
-    /// Promote top-level class literals to the class objects represented by `type[...]`.
+    /// Promote class literals to the class objects represented by `type[...]`.
     ///
     /// This is intentionally separate from regular promotion. Applying it during collection
     /// inference would lose useful precision for local and module-level collections of class
     /// objects.
     pub(crate) fn promote_class_literals(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Type::ClassLiteral(class) => SubclassOfType::from(db, class.default_specialization(db)),
-            Type::Union(union) => {
-                union.map_leave_aliases(db, |element| element.promote_class_literals(db))
-            }
-            _ => self,
-        }
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly),
+            TypeContext::default(),
+        )
     }
 
     /// Recursively promote singleton types (like `None`, `EllipsisType`) to
@@ -6203,6 +6201,15 @@ impl<'db> Type<'db> {
             return self;
         }
 
+        if let Type::ClassLiteral(class) = self
+            && matches!(
+                type_mapping,
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly)
+            )
+        {
+            return SubclassOfType::from(db, class.default_specialization(db));
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -6211,7 +6218,7 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
-                    TypeMapping::Promote(PromotionMode::On, _) => {
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
                             type_mapping,
@@ -6328,9 +6335,12 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-                // Promotion should remove negative contributions from intersections,
-                // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
+                // Regular promotion should remove negative contributions from intersections,
+                // so we don't preserve them here when regular promotion is enabled.
+                if !matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                ) {
                     for negative in intersection.negative(db) {
                         builder = builder.add_negative(
                             negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
@@ -6445,6 +6455,7 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly) |
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
             }
@@ -7382,6 +7393,8 @@ impl PromotionMode {
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
+    /// Promote class literals recursively without promoting other literal types.
+    ClassLiteralsOnly,
     /// Singleton-only promotion recursively descends through nominal instances
     /// without recursing into unions or non-nominal types.
     SingletonsOnly,
