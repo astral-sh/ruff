@@ -1080,15 +1080,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             AttributeWriteRequirement::Unconstrained => self.always(),
             AttributeWriteRequirement::CannotAssign => self.never(),
-            AttributeWriteRequirement::Module(Some(write_ty)) => {
-                self.check_type_pair(db, value_ty, *write_ty)
-            }
-            AttributeWriteRequirement::Module(None) => self.never(),
-            AttributeWriteRequirement::ProtocolMember {
+            AttributeWriteRequirement::Module(Some(write_ty))
+            | AttributeWriteRequirement::ProtocolMember {
                 write_ty: Some(write_ty),
                 ..
             } => self.check_type_pair(db, value_ty, *write_ty),
-            AttributeWriteRequirement::ProtocolMember { write_ty: None, .. } => self.never(),
+            AttributeWriteRequirement::Module(None)
+            | AttributeWriteRequirement::ProtocolMember { write_ty: None, .. } => self.never(),
             AttributeWriteRequirement::Instance(object_ty) => {
                 self.check_instance_property_write(db, *object_ty, member_name, value_ty)
             }
