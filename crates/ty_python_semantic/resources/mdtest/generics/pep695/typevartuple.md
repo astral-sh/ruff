@@ -433,6 +433,25 @@ reveal_type(infer_with_suffix(empty_middle))  # revealed: tuple[()]
 reveal_type(infer_with_suffix(unpacked_suffix))  # revealed: tuple[str, ...]
 ```
 
+### Nested unpacked callable parameters
+
+Nested unpacked tuple parameters are equivalent to their flattened form.
+
+```py
+from typing import Callable
+
+def expect_nested(
+    callback: Callable[[int, *tuple[*tuple[str, ...], bytes], str], None],
+) -> None: ...
+def pass_flattened(
+    callback: Callable[[int, *tuple[str, ...], bytes, str], None],
+) -> None:
+    # TODO: This should be assignable because the nested unpacking is equivalent to the flattened
+    # form.
+    # error: [invalid-argument-type]
+    expect_nested(callback)
+```
+
 ### Callable inference with additional keyword parameters
 
 Additional keyword-only or variadic keyword parameters do not contribute to a `TypeVarTuple`
