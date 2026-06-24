@@ -91,7 +91,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.15.19
     hooks:
       - id: ruff-format
         exclude: crates/ty_python_semantic/resources/corpus/
@@ -118,7 +118,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.15.19
     hooks:
       - id: ruff-format
         name: mdtest format
