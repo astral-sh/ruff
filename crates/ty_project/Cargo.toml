@@ -70,6 +70,7 @@ schemars = [
     "dep:schemars",
     "ruff_db/schemars",
     "ruff_python_ast/schemars",
+    "ruff_ranged_value/schemars",
     "ty_python_semantic/schemars",
     "ty_python_core/schemars",
 ]
