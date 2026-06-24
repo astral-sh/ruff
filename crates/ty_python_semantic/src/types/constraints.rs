@@ -1266,7 +1266,6 @@ pub(crate) struct UpperBound<'db> {
     clauses: FxOrderSet<Type<'db>>,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 impl<'db> UpperBound<'db> {
     pub(crate) fn none() -> Self {
         Self::default()
@@ -1282,6 +1281,7 @@ impl<'db> UpperBound<'db> {
         Self { clauses }
     }
 
+    #[cfg(test)]
     pub(crate) fn from_clauses(
         db: &'db dyn Db,
         clauses: impl IntoIterator<Item = Type<'db>>,
@@ -1351,18 +1351,6 @@ impl<'db> UpperBound<'db> {
     /// ty's ordinary DNF representation by distributing intersections over unions.
     pub(crate) fn materialize_exact(&self, db: &'db dyn Db) -> Type<'db> {
         IntersectionType::from_elements(db, self.clauses.iter().copied())
-    }
-
-    /// Exact conversion to an ordinary [`Type`] only when no stored clause is a visible top-level
-    /// union.
-    ///
-    /// This deliberately does not resolve aliases, so alias-expanded hidden unions can still
-    /// distribute during exact materialization.
-    pub(crate) fn materialize_exact_if_no_visible_unions(
-        &self,
-        db: &'db dyn Db,
-    ) -> Option<Type<'db>> {
-        (!self.has_visible_union_clause()).then(|| self.materialize_exact(db))
     }
 
     fn has_visible_union_clause(&self) -> bool {
@@ -6858,26 +6846,6 @@ mod tests {
 
         upper.add_clause(&db, int);
         assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
-    }
-
-    #[test]
-    fn upper_bound_exact_materialization_guards_visible_unions() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-
-        let upper = UpperBound::from_clause(int);
-        assert!(!upper.has_visible_union_clause());
-        assert_eq!(upper.materialize_exact(&db), int);
-        assert_eq!(upper.materialize_exact_if_no_visible_unions(&db), Some(int));
-
-        let union_upper = UpperBound::from_clause(int_or_str);
-        assert!(union_upper.has_visible_union_clause());
-        assert_eq!(
-            union_upper.materialize_exact_if_no_visible_unions(&db),
-            None
-        );
     }
 
     #[test]
