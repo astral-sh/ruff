@@ -539,16 +539,32 @@ std::thread_local! {
 #[derive(Default)]
 struct ActiveNonTerminalCalls {
     calls: RefCell<Vec<(salsa::Id, ScopedPredicateId)>>,
+    sessions: RefCell<Vec<(salsa::Id, FxHashSet<ScopedPredicateId>)>>,
 }
 
 impl ActiveNonTerminalCalls {
-    fn visit<R>(&self, scope: salsa::Id, predicate: ScopedPredicateId, f: impl FnOnce() -> R) -> R {
-        self.calls.borrow_mut().push((scope, predicate));
-        let _guard = ActiveNonTerminalCallGuard {
-            calls: &self.calls,
-            expected: (scope, predicate),
+    fn visit_scope<R>(&self, scope: salsa::Id, f: impl FnOnce() -> R) -> R {
+        self.sessions
+            .borrow_mut()
+            .push((scope, FxHashSet::default()));
+        let _guard = ActiveNonTerminalCallSessionGuard {
+            sessions: &self.sessions,
+            expected_scope: scope,
         };
         f()
+    }
+
+    fn visit<R>(&self, scope: salsa::Id, predicate: ScopedPredicateId, f: impl FnOnce() -> R) -> R {
+        self.calls.borrow_mut().push((scope, predicate));
+        let result = {
+            let _guard = ActiveNonTerminalCallGuard {
+                calls: &self.calls,
+                expected: (scope, predicate),
+            };
+            f()
+        };
+        self.mark_prepared(scope, predicate);
+        result
     }
 
     fn frontier(&self, scope: salsa::Id) -> Option<ScopedPredicateId> {
@@ -557,6 +573,41 @@ impl ActiveNonTerminalCalls {
             .iter()
             .rev()
             .find_map(|(active_scope, predicate)| (*active_scope == scope).then_some(*predicate))
+    }
+
+    fn is_prepared(&self, scope: salsa::Id, predicate: ScopedPredicateId) -> bool {
+        self.sessions
+            .borrow()
+            .iter()
+            .rev()
+            .find_map(|(active_scope, prepared)| {
+                (*active_scope == scope).then(|| prepared.contains(&predicate))
+            })
+            .unwrap_or(false)
+    }
+
+    fn mark_prepared(&self, scope: salsa::Id, predicate: ScopedPredicateId) {
+        let mut sessions = self.sessions.borrow_mut();
+        let session = sessions
+            .iter_mut()
+            .rev()
+            .find(|(active_scope, _)| *active_scope == scope);
+        debug_assert!(session.is_some(), "an active call needs a worklist session");
+        if let Some((_, prepared)) = session {
+            prepared.insert(predicate);
+        }
+    }
+}
+
+struct ActiveNonTerminalCallSessionGuard<'a> {
+    sessions: &'a RefCell<Vec<(salsa::Id, FxHashSet<ScopedPredicateId>)>>,
+    expected_scope: salsa::Id,
+}
+
+impl Drop for ActiveNonTerminalCallSessionGuard<'_> {
+    fn drop(&mut self) {
+        let scope = self.sessions.borrow_mut().pop().map(|(scope, _)| scope);
+        debug_assert_eq!(scope, Some(self.expected_scope));
     }
 }
 
@@ -594,11 +645,15 @@ fn should_recover_non_terminal_call(
 /// predicates in reverse to reduce their size. Walking the requested graph and inferring its calls
 /// in source order turns a deeply recursive query chain into cache lookups without analyzing calls
 /// from unrelated control-flow paths.
+///
+/// During reentry, calls at or beyond the active frontier cannot be prepared without recreating
+/// the cycle. Calls before it are safe to prepare unless the active scope session already did so.
 fn analyze_non_terminal_call_worklist<'db>(
     db: &'db dyn Db,
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root: ScopedReachabilityConstraintId,
+    recovery_frontier: Option<ScopedPredicateId>,
 ) {
     let mut pending = vec![root];
     let mut visited = FxHashSet::default();
@@ -623,10 +678,16 @@ fn analyze_non_terminal_call_worklist<'db>(
     calls.sort_unstable_by_key(|predicate| predicate.index());
     calls.dedup();
     for predicate in calls {
+        if recovery_frontier.is_some_and(|frontier| predicate.index() >= frontier.index()) {
+            continue;
+        }
+
         let predicate_data = &predicates[predicate];
         let scope = predicate_scope(db, predicate_data).as_id();
         ACTIVE_NON_TERMINAL_CALLS.with(|active| {
-            active.visit(scope, predicate, || analyze_single(db, predicate_data));
+            if !active.is_prepared(scope, predicate) {
+                active.visit(scope, predicate, || analyze_single(db, predicate_data));
+            }
         });
     }
 }
@@ -698,20 +759,20 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             active.visit(
                 &scope,
                 || {
-                    // The outer evaluation is already inferring calls in source order. Reentering
-                    // that work through a later implicit-attribute binding would otherwise
-                    // recreate the reverse query chain that the worklist is meant to avoid.
-                    evaluate_reachability_constraint(
-                        db,
-                        self,
-                        predicates,
-                        id,
-                        non_terminal_call_recovery_frontier(db, predicate),
-                    )
+                    let recovery_frontier = non_terminal_call_recovery_frontier(db, predicate);
+                    // This graph can contain earlier calls from a control-flow path that is absent
+                    // from the outer graph. Prepare those calls in source order before evaluating
+                    // the graph, while leaving the active and future calls to cycle recovery.
+                    analyze_non_terminal_call_worklist(db, self, predicates, id, recovery_frontier);
+                    evaluate_reachability_constraint(db, self, predicates, id, recovery_frontier)
                 },
                 || {
-                    analyze_non_terminal_call_worklist(db, self, predicates, id);
-                    evaluate_reachability_constraint(db, self, predicates, id, None)
+                    ACTIVE_NON_TERMINAL_CALLS.with(|calls| {
+                        calls.visit_scope(scope, || {
+                            analyze_non_terminal_call_worklist(db, self, predicates, id, None);
+                            evaluate_reachability_constraint(db, self, predicates, id, None)
+                        })
+                    })
                 },
             )
         })
@@ -1762,22 +1823,26 @@ class Form(Ui):
         let scope = method_scope.to_scope_id(&db, ui_file).as_id();
         let consumer_file = system_path_to_file(&db, "/src/package/consumer.py").unwrap();
 
-        ACTIVE_REACHABILITY_EVALUATIONS.with(|active| {
-            active.visit(
-                &scope,
-                || panic!("test unexpectedly reentered its synthetic outer evaluation"),
-                || {
-                    let diagnostics = check_types(&db, consumer_file);
-                    assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
-                    assert_eq!(diagnostics[0].id(), DiagnosticId::RevealedType);
-                    assert_eq!(
-                        diagnostics[0]
-                            .primary_annotation()
-                            .and_then(|annotation| annotation.get_message()),
-                        Some("`int`")
+        ACTIVE_NON_TERMINAL_CALLS.with(|calls| {
+            calls.visit_scope(scope, || {
+                ACTIVE_REACHABILITY_EVALUATIONS.with(|active| {
+                    active.visit(
+                        &scope,
+                        || panic!("test unexpectedly reentered its synthetic outer evaluation"),
+                        || {
+                            let diagnostics = check_types(&db, consumer_file);
+                            assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+                            assert_eq!(diagnostics[0].id(), DiagnosticId::RevealedType);
+                            assert_eq!(
+                                diagnostics[0]
+                                    .primary_annotation()
+                                    .and_then(|annotation| annotation.get_message()),
+                                Some("`int`")
+                            );
+                        },
                     );
-                },
-            );
+                });
+            });
         });
 
         Ok(())

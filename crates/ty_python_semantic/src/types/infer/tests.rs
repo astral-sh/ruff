@@ -346,6 +346,7 @@ fn unbound_symbol_no_reachability_constraint_check() {
 }
 
 const MANY_WIDGETS: usize = 400;
+const MANY_BRANCH_NON_TERMINAL_CALLS: usize = 5_000;
 const MANY_NON_TERMINAL_CALLS: usize = 1_100;
 const FEW_NON_TERMINAL_CALLS: usize = 80;
 
@@ -530,6 +531,67 @@ class Form(Ui):
             ])?;
 
             assert_revealed_type(&db, "/src/consumer.py", "Widget");
+
+            Ok(())
+        })?;
+
+    handle.join().expect("regression test thread panicked")
+}
+
+#[test]
+fn branch_local_calls_reentered_by_implicit_attribute_do_not_overflow_stack() -> anyhow::Result<()>
+{
+    let handle = std::thread::Builder::new()
+        .name("branch-local-call-stack-test".into())
+        .stack_size(ruff_db::STACK_SIZE)
+        .spawn(|| {
+            let mut db = setup_db();
+            let mut ui = String::from(
+                r#"from helpers import noop
+from widgets import Widget
+
+class Ui:
+    def setup(self, flag: bool):
+        if flag:
+"#,
+            );
+            for _ in 0..MANY_BRANCH_NON_TERMINAL_CALLS {
+                ui.push_str("            noop()\n");
+            }
+            ui.push_str(
+                r#"            self.target = Widget()
+            return
+        self.target.configure()
+"#,
+            );
+
+            db.write_files([
+                ("/src/helpers.py", "def noop() -> None: ...\n"),
+                (
+                    "/src/widgets.py",
+                    r#"class Widget:
+    def configure(self) -> None: ...
+"#,
+                ),
+                ("/src/ui.py", &ui),
+            ])?;
+
+            let file = system_path_to_file(&db, "/src/ui.py").unwrap();
+            let index = semantic_index(&db, file);
+            let class_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+            let function_scope = index.child_scopes(class_scope).next().unwrap().0;
+            let use_def = index.use_def_map(function_scope);
+            // The fallthrough graph only contains the call on the non-returning branch. Inferring
+            // its receiver reenters the assignment graph on the returning branch, whose calls
+            // therefore have not been prepared by the outer worklist.
+            assert_eq!(
+                use_def.reachability_constraints().evaluate(
+                    &db,
+                    use_def.predicates(),
+                    use_def.end_of_scope_reachability(),
+                ),
+                Truthiness::Ambiguous,
+            );
 
             Ok(())
         })?;
