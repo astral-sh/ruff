@@ -817,8 +817,8 @@ static_assert(not is_assignable_to(A, HasX))
 class B:
     x: Final = 42
 
-static_assert(not is_subtype_of(A, HasX))
-static_assert(not is_assignable_to(A, HasX))
+static_assert(not is_subtype_of(B, HasX))
+static_assert(not is_assignable_to(B, HasX))
 
 class IntSub(int): ...
 
@@ -2409,7 +2409,7 @@ static_assert(is_subtype_of(HasGetAttr, HasXProperty))
 static_assert(is_assignable_to(HasGetAttr, HasXProperty))
 
 static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
+static_assert(not is_assignable_to(HasGetAttr, HasMutableXAttr))
 
 class HasGetAttrWithUnsuitableReturn:
     def __getattr__(self, attr: str) -> tuple[int, int]:
@@ -3225,6 +3225,7 @@ of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent t
 
 ```py
 from typing import Protocol
+from typing_extensions import Self
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
 
@@ -3263,23 +3264,35 @@ class NStaticMethodBad:
     def x(cls, val: int) -> str:
         return "foo"
 
+class PFactory(Protocol):
+    @classmethod
+    def create(cls) -> Self: ...
+
+class Factory:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class BadFactory:
+    @classmethod
+    def create(cls) -> int:
+        return 42
+
 # `PClassMethod.x` and `PStaticMethod.x` evaluate to callable types with equivalent signatures
 # whether you access them on the protocol class or instances of the protocol.
 # That means that they are equivalent protocols!
 static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
 
-# TODO: these should all pass
-static_assert(not is_assignable_to(NNotCallable, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NNotCallable, PStaticMethod))  # error: [static-assert-error]
-static_assert(is_disjoint_from(NNotCallable, PClassMethod))  # error: [static-assert-error]
-static_assert(is_disjoint_from(NNotCallable, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NNotCallable, PClassMethod))
+static_assert(not is_assignable_to(NNotCallable, PStaticMethod))
+static_assert(is_disjoint_from(NNotCallable, PClassMethod))
+static_assert(is_disjoint_from(NNotCallable, PStaticMethod))
 
 # `NInstanceMethod.x` has the correct type when accessed on an instance of
 # `NInstanceMethod`, but not when accessed on the class object itself
 #
-# TODO: these should pass
-static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))
+static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))
 
 # A nominal type with a `@staticmethod` can satisfy a protocol with a `@classmethod`
 # if the staticmethod duck-types the same as the classmethod member
@@ -3288,26 +3301,27 @@ static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [s
 # with a `@staticmethod` member
 static_assert(is_assignable_to(NClassMethodGood, PClassMethod))
 static_assert(is_assignable_to(NClassMethodGood, PStaticMethod))
-# TODO: these should all pass:
-static_assert(is_subtype_of(NClassMethodGood, PClassMethod))  # error: [static-assert-error]
-static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NClassMethodGood, PClassMethod))
+static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))
 
 static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
 static_assert(is_assignable_to(NStaticMethodGood, PStaticMethod))
-# TODO: these should all pass:
-static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))  # error: [static-assert-error]
-static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))
+static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))
+
+# `Self` in the classmethod signature is bound to the implementation type.
+static_assert(is_subtype_of(Factory, PFactory))
+static_assert(not is_assignable_to(BadFactory, PFactory))
 ```
 
-Until classmethod protocol members are fully supported, their placeholder representation should not
-incorrectly require a mutable instance attribute. In particular, a frozen dataclass can satisfy a
-protocol bound through a classmethod:
+A classmethod protocol member does not require a mutable instance attribute. In particular, a frozen
+dataclass can satisfy a protocol bound through a classmethod:
 
 ```py
 from dataclasses import dataclass
