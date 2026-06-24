@@ -333,10 +333,6 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                     if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
                         return subject_ty;
                     }
-                    let class_ty = Type::instance(db, class.top_materialization(db));
-                    if kind.is_argumentless() && subject_ty.is_subtype_of(db, class_ty) {
-                        return Type::Never;
-                    }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_argumentless()
