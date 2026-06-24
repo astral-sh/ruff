@@ -542,6 +542,12 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// chain. Inferring the expressions in source order turns that chain into cache lookups while
 /// preserving normal reachability and narrowing during every inference.
 ///
+/// Because the prefix is based on predicate indices rather than graph reachability, branch-heavy
+/// code can warm calls from earlier source branches that this evaluation would not otherwise visit.
+/// A demand-driven graph walk could avoid that work, but would require a more complex work list. We
+/// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
+/// typically exercise most of its predicates eventually.
+///
 /// Reentrant analysis of the same predicate graph skips the prefix pass: because the outer pass is
 /// proceeding in source order, any preceding call needed by the current expression has already
 /// been inferred. A different predicate graph performs its own pass, which is necessary when
