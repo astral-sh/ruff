@@ -24,6 +24,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::path::Path;
 
+use crate::external::ExternalLintRuntimeHandle;
 use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -250,6 +251,7 @@ pub(crate) struct Checker<'a> {
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
     context: &'a LintContext<'a>,
+    external_runtime: Option<ExternalLintRuntimeHandle>,
 }
 
 impl<'a> Checker<'a> {
@@ -271,6 +273,7 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
         context: &'a LintContext<'a>,
+        external_runtime: Option<ExternalLintRuntimeHandle>,
     ) -> Self {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -300,8 +303,16 @@ impl<'a> Checker<'a> {
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
             context,
+            external_runtime,
         }
     }
+}
+
+fn external_runtime_from_settings(settings: &LinterSettings) -> Option<ExternalLintRuntimeHandle> {
+    settings
+        .external_ast
+        .as_ref()
+        .map(|registry| ExternalLintRuntimeHandle::new(registry.clone()))
 }
 
 impl<'a> Checker<'a> {
@@ -486,6 +497,11 @@ impl<'a> Checker<'a> {
     /// the tokens for the current file, even when within a parsed type annotation.
     pub(crate) fn source_tokens(&self) -> &'a Tokens {
         self.parsed.tokens()
+    }
+
+    #[cfg_attr(not(feature = "ext-lint"), allow(dead_code))]
+    pub(crate) fn owned_source_file(&self) -> SourceFile {
+        self.context.owned_source_file()
     }
 
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
@@ -1647,6 +1663,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 4: Analysis
         analyze::statement(stmt, self);
+        if let Some(runtime) = &self.external_runtime {
+            runtime.run_on_stmt(self, stmt);
+        }
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
@@ -2267,6 +2286,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         self.semantic.flags = flags_snapshot;
         analyze::expression(expr, self);
+        if let Some(runtime) = &self.external_runtime {
+            runtime.run_on_expr(self, expr);
+        }
         self.semantic.pop_node();
     }
 
@@ -3376,6 +3398,11 @@ pub(crate) fn check_ast(
     };
 
     let allocator = typed_arena::Arena::new();
+    let external_runtime = if context.is_rule_enabled(Rule::ExternalLinter) {
+        external_runtime_from_settings(settings)
+    } else {
+        None
+    };
     let mut checker = Checker::new(
         parsed,
         &allocator,
@@ -3393,10 +3420,24 @@ pub(crate) fn check_ast(
         notebook_index,
         target_version,
         context,
+        external_runtime,
     );
     checker.bind_builtins();
+    let external_runtime = checker.external_runtime.clone();
+    if let Some(runtime) = external_runtime {
+        runtime.run_in_session(|| run_checker(&mut checker, parsed));
+    } else {
+        run_checker(&mut checker, parsed);
+    }
 
-    // Iterate over the AST.
+    let Checker {
+        semantic_errors, ..
+    } = checker;
+
+    semantic_errors.into_inner()
+}
+
+fn run_checker<'a>(checker: &mut Checker<'a>, parsed: &'a Parsed<ModModule>) {
     checker.visit_module(parsed.suite());
     checker.visit_body(parsed.suite());
 
@@ -3407,24 +3448,18 @@ pub(crate) fn check_ast(
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.
-    analyze::deferred_lambdas(&mut checker);
-    analyze::deferred_for_loops(&mut checker);
-    analyze::deferred_comprehensions(&mut checker);
-    analyze::definitions(&mut checker);
-    analyze::bindings(&checker);
-    analyze::unresolved_references(&checker);
-    analyze::deferred_with_statements(&mut checker);
+    analyze::deferred_lambdas(checker);
+    analyze::deferred_for_loops(checker);
+    analyze::deferred_comprehensions(checker);
+    analyze::definitions(checker);
+    analyze::bindings(checker);
+    analyze::unresolved_references(checker);
+    analyze::deferred_with_statements(checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
     checker.analyze.scopes.push(ScopeId::global());
-    analyze::deferred_scopes(&checker);
-
-    let Checker {
-        semantic_errors, ..
-    } = checker;
-
-    semantic_errors.into_inner()
+    analyze::deferred_scopes(checker);
 }
 
 /// A type for collecting diagnostics in a given file.
@@ -3563,6 +3598,10 @@ impl<'a> LintContext<'a> {
     #[inline]
     pub(crate) fn into_parts(self) -> (Vec<Diagnostic>, LazySourceFile<'a>) {
         (self.diagnostics.into_inner(), self.source_file)
+    }
+
+    pub(crate) fn owned_source_file(&self) -> SourceFile {
+        self.source_file().clone()
     }
 
     #[inline]
