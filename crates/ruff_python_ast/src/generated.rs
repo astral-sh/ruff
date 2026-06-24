@@ -4032,12 +4032,6 @@ impl ruff_text_size::Ranged for crate::Comprehension {
     }
 }
 
-impl ruff_text_size::Ranged for crate::Arguments {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
 impl ruff_text_size::Ranged for crate::Parameters {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -4051,12 +4045,6 @@ impl ruff_text_size::Ranged for crate::Parameter {
 }
 
 impl ruff_text_size::Ranged for crate::ParameterWithDefault {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::Keyword {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -4123,6 +4111,18 @@ impl ruff_text_size::Ranged for crate::BytesLiteral {
 }
 
 impl ruff_text_size::Ranged for crate::Identifier {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::Arguments {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::Keyword {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -4596,12 +4596,6 @@ impl crate::HasNodeIndex for crate::Comprehension {
     }
 }
 
-impl crate::HasNodeIndex for crate::Arguments {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
-    }
-}
-
 impl crate::HasNodeIndex for crate::Parameters {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
@@ -4615,12 +4609,6 @@ impl crate::HasNodeIndex for crate::Parameter {
 }
 
 impl crate::HasNodeIndex for crate::ParameterWithDefault {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
-    }
-}
-
-impl crate::HasNodeIndex for crate::Keyword {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
@@ -4687,6 +4675,18 @@ impl crate::HasNodeIndex for crate::BytesLiteral {
 }
 
 impl crate::HasNodeIndex for crate::Identifier {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
+        &self.node_index
+    }
+}
+
+impl crate::HasNodeIndex for crate::Arguments {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
+        &self.node_index
+    }
+}
+
+impl crate::HasNodeIndex for crate::Keyword {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
@@ -5913,11 +5913,9 @@ pub enum AnyNodeRef<'a> {
     PatternArguments(&'a crate::PatternArguments),
     PatternKeyword(&'a crate::PatternKeyword),
     Comprehension(&'a crate::Comprehension),
-    Arguments(&'a crate::Arguments),
     Parameters(&'a crate::Parameters),
     Parameter(&'a crate::Parameter),
     ParameterWithDefault(&'a crate::ParameterWithDefault),
-    Keyword(&'a crate::Keyword),
     Alias(&'a crate::Alias),
     WithItem(&'a crate::WithItem),
     MatchCase(&'a crate::MatchCase),
@@ -5929,6 +5927,8 @@ pub enum AnyNodeRef<'a> {
     StringLiteral(&'a crate::StringLiteral),
     BytesLiteral(&'a crate::BytesLiteral),
     Identifier(&'a crate::Identifier),
+    Arguments(&'a crate::Arguments),
+    Keyword(&'a crate::Keyword),
 }
 
 impl<'a> From<&'a Mod> for AnyNodeRef<'a> {
@@ -6792,12 +6792,6 @@ impl<'a> From<&'a crate::Comprehension> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::Arguments> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::Arguments) -> AnyNodeRef<'a> {
-        AnyNodeRef::Arguments(node)
-    }
-}
-
 impl<'a> From<&'a crate::Parameters> for AnyNodeRef<'a> {
     fn from(node: &'a crate::Parameters) -> AnyNodeRef<'a> {
         AnyNodeRef::Parameters(node)
@@ -6813,12 +6807,6 @@ impl<'a> From<&'a crate::Parameter> for AnyNodeRef<'a> {
 impl<'a> From<&'a crate::ParameterWithDefault> for AnyNodeRef<'a> {
     fn from(node: &'a crate::ParameterWithDefault) -> AnyNodeRef<'a> {
         AnyNodeRef::ParameterWithDefault(node)
-    }
-}
-
-impl<'a> From<&'a crate::Keyword> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::Keyword) -> AnyNodeRef<'a> {
-        AnyNodeRef::Keyword(node)
     }
 }
 
@@ -6885,6 +6873,18 @@ impl<'a> From<&'a crate::BytesLiteral> for AnyNodeRef<'a> {
 impl<'a> From<&'a crate::Identifier> for AnyNodeRef<'a> {
     fn from(node: &'a crate::Identifier) -> AnyNodeRef<'a> {
         AnyNodeRef::Identifier(node)
+    }
+}
+
+impl<'a> From<&'a crate::Arguments> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Arguments) -> AnyNodeRef<'a> {
+        AnyNodeRef::Arguments(node)
+    }
+}
+
+impl<'a> From<&'a crate::Keyword> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Keyword) -> AnyNodeRef<'a> {
+        AnyNodeRef::Keyword(node)
     }
 }
 
@@ -6969,11 +6969,9 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternArguments(node) => node.range(),
             AnyNodeRef::PatternKeyword(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
-            AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Parameters(node) => node.range(),
             AnyNodeRef::Parameter(node) => node.range(),
             AnyNodeRef::ParameterWithDefault(node) => node.range(),
-            AnyNodeRef::Keyword(node) => node.range(),
             AnyNodeRef::Alias(node) => node.range(),
             AnyNodeRef::WithItem(node) => node.range(),
             AnyNodeRef::MatchCase(node) => node.range(),
@@ -6985,6 +6983,8 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StringLiteral(node) => node.range(),
             AnyNodeRef::BytesLiteral(node) => node.range(),
             AnyNodeRef::Identifier(node) => node.range(),
+            AnyNodeRef::Arguments(node) => node.range(),
+            AnyNodeRef::Keyword(node) => node.range(),
         }
     }
 }
@@ -7070,11 +7070,9 @@ impl crate::HasNodeIndex for AnyNodeRef<'_> {
             AnyNodeRef::PatternArguments(node) => node.node_index(),
             AnyNodeRef::PatternKeyword(node) => node.node_index(),
             AnyNodeRef::Comprehension(node) => node.node_index(),
-            AnyNodeRef::Arguments(node) => node.node_index(),
             AnyNodeRef::Parameters(node) => node.node_index(),
             AnyNodeRef::Parameter(node) => node.node_index(),
             AnyNodeRef::ParameterWithDefault(node) => node.node_index(),
-            AnyNodeRef::Keyword(node) => node.node_index(),
             AnyNodeRef::Alias(node) => node.node_index(),
             AnyNodeRef::WithItem(node) => node.node_index(),
             AnyNodeRef::MatchCase(node) => node.node_index(),
@@ -7086,6 +7084,8 @@ impl crate::HasNodeIndex for AnyNodeRef<'_> {
             AnyNodeRef::StringLiteral(node) => node.node_index(),
             AnyNodeRef::BytesLiteral(node) => node.node_index(),
             AnyNodeRef::Identifier(node) => node.node_index(),
+            AnyNodeRef::Arguments(node) => node.node_index(),
+            AnyNodeRef::Keyword(node) => node.node_index(),
         }
     }
 }
@@ -7173,11 +7173,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternArguments(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternKeyword(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::Arguments(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Parameters(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Parameter(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ParameterWithDefault(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::Keyword(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Alias(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::WithItem(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => std::ptr::NonNull::from(*node).cast(),
@@ -7189,6 +7187,8 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StringLiteral(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::BytesLiteral(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Identifier(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::Arguments(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::Keyword(node) => std::ptr::NonNull::from(*node).cast(),
         }
     }
 }
@@ -7278,11 +7278,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
             AnyNodeRef::Comprehension(node) => node.visit_source_order(visitor),
-            AnyNodeRef::Arguments(node) => node.visit_source_order(visitor),
             AnyNodeRef::Parameters(node) => node.visit_source_order(visitor),
             AnyNodeRef::Parameter(node) => node.visit_source_order(visitor),
             AnyNodeRef::ParameterWithDefault(node) => node.visit_source_order(visitor),
-            AnyNodeRef::Keyword(node) => node.visit_source_order(visitor),
             AnyNodeRef::Alias(node) => node.visit_source_order(visitor),
             AnyNodeRef::WithItem(node) => node.visit_source_order(visitor),
             AnyNodeRef::MatchCase(node) => node.visit_source_order(visitor),
@@ -7294,6 +7292,8 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(node) => node.visit_source_order(visitor),
             AnyNodeRef::BytesLiteral(node) => node.visit_source_order(visitor),
             AnyNodeRef::Identifier(node) => node.visit_source_order(visitor),
+            AnyNodeRef::Arguments(node) => node.visit_source_order(visitor),
+            AnyNodeRef::Keyword(node) => node.visit_source_order(visitor),
         }
     }
 }
@@ -7446,11 +7446,9 @@ pub enum AnyRootNodeRef<'a> {
     PatternArguments(&'a crate::PatternArguments),
     PatternKeyword(&'a crate::PatternKeyword),
     Comprehension(&'a crate::Comprehension),
-    Arguments(&'a crate::Arguments),
     Parameters(&'a crate::Parameters),
     Parameter(&'a crate::Parameter),
     ParameterWithDefault(&'a crate::ParameterWithDefault),
-    Keyword(&'a crate::Keyword),
     Alias(&'a crate::Alias),
     WithItem(&'a crate::WithItem),
     MatchCase(&'a crate::MatchCase),
@@ -7462,6 +7460,8 @@ pub enum AnyRootNodeRef<'a> {
     StringLiteral(&'a crate::StringLiteral),
     BytesLiteral(&'a crate::BytesLiteral),
     Identifier(&'a crate::Identifier),
+    Arguments(&'a crate::Arguments),
+    Keyword(&'a crate::Keyword),
 }
 
 /// The unflattened enum or struct type stored by an [`AnyRootNodeRef`].
@@ -7483,11 +7483,9 @@ pub enum RootNodeKind {
     PatternArguments,
     PatternKeyword,
     Comprehension,
-    Arguments,
     Parameters,
     Parameter,
     ParameterWithDefault,
-    Keyword,
     Alias,
     WithItem,
     MatchCase,
@@ -7499,6 +7497,8 @@ pub enum RootNodeKind {
     StringLiteral,
     BytesLiteral,
     Identifier,
+    Arguments,
+    Keyword,
 }
 
 impl RootNodeKind {
@@ -7515,11 +7515,9 @@ impl RootNodeKind {
         Self::PatternArguments,
         Self::PatternKeyword,
         Self::Comprehension,
-        Self::Arguments,
         Self::Parameters,
         Self::Parameter,
         Self::ParameterWithDefault,
-        Self::Keyword,
         Self::Alias,
         Self::WithItem,
         Self::MatchCase,
@@ -7531,6 +7529,8 @@ impl RootNodeKind {
         Self::StringLiteral,
         Self::BytesLiteral,
         Self::Identifier,
+        Self::Arguments,
+        Self::Keyword,
     ];
 
     /// Returns the root node kind with the given discriminant.
@@ -7548,22 +7548,22 @@ impl RootNodeKind {
             8 => Some(Self::PatternArguments),
             9 => Some(Self::PatternKeyword),
             10 => Some(Self::Comprehension),
-            11 => Some(Self::Arguments),
-            12 => Some(Self::Parameters),
-            13 => Some(Self::Parameter),
-            14 => Some(Self::ParameterWithDefault),
-            15 => Some(Self::Keyword),
-            16 => Some(Self::Alias),
-            17 => Some(Self::WithItem),
-            18 => Some(Self::MatchCase),
-            19 => Some(Self::Decorator),
-            20 => Some(Self::ElifElseClause),
-            21 => Some(Self::TypeParams),
-            22 => Some(Self::FString),
-            23 => Some(Self::TString),
-            24 => Some(Self::StringLiteral),
-            25 => Some(Self::BytesLiteral),
-            26 => Some(Self::Identifier),
+            11 => Some(Self::Parameters),
+            12 => Some(Self::Parameter),
+            13 => Some(Self::ParameterWithDefault),
+            14 => Some(Self::Alias),
+            15 => Some(Self::WithItem),
+            16 => Some(Self::MatchCase),
+            17 => Some(Self::Decorator),
+            18 => Some(Self::ElifElseClause),
+            19 => Some(Self::TypeParams),
+            20 => Some(Self::FString),
+            21 => Some(Self::TString),
+            22 => Some(Self::StringLiteral),
+            23 => Some(Self::BytesLiteral),
+            24 => Some(Self::Identifier),
+            25 => Some(Self::Arguments),
+            26 => Some(Self::Keyword),
 
             _ => None,
         }
@@ -8503,23 +8503,6 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Comprehension {
     }
 }
 
-impl<'a> From<&'a crate::Arguments> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Arguments) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Arguments(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Arguments {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Arguments, ()> {
-        match node {
-            AnyRootNodeRef::Arguments(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
 impl<'a> From<&'a crate::Parameters> for AnyRootNodeRef<'a> {
     #[inline]
     fn from(node: &'a crate::Parameters) -> AnyRootNodeRef<'a> {
@@ -8566,23 +8549,6 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ParameterWithDefault {
     fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ParameterWithDefault, ()> {
         match node {
             AnyRootNodeRef::ParameterWithDefault(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Keyword> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Keyword) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Keyword(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Keyword {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Keyword, ()> {
-        match node {
-            AnyRootNodeRef::Keyword(node) => Ok(node),
             _ => Err(()),
         }
     }
@@ -8775,6 +8741,40 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Identifier {
     }
 }
 
+impl<'a> From<&'a crate::Arguments> for AnyRootNodeRef<'a> {
+    #[inline]
+    fn from(node: &'a crate::Arguments) -> AnyRootNodeRef<'a> {
+        AnyRootNodeRef::Arguments(node)
+    }
+}
+
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Arguments {
+    type Error = ();
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Arguments, ()> {
+        match node {
+            AnyRootNodeRef::Arguments(node) => Ok(node),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::Keyword> for AnyRootNodeRef<'a> {
+    #[inline]
+    fn from(node: &'a crate::Keyword) -> AnyRootNodeRef<'a> {
+        AnyRootNodeRef::Keyword(node)
+    }
+}
+
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Keyword {
+    type Error = ();
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Keyword, ()> {
+        match node {
+            AnyRootNodeRef::Keyword(node) => Ok(node),
+            _ => Err(()),
+        }
+    }
+}
+
 impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
@@ -8789,11 +8789,9 @@ impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
             AnyRootNodeRef::PatternArguments(node) => node.range(),
             AnyRootNodeRef::PatternKeyword(node) => node.range(),
             AnyRootNodeRef::Comprehension(node) => node.range(),
-            AnyRootNodeRef::Arguments(node) => node.range(),
             AnyRootNodeRef::Parameters(node) => node.range(),
             AnyRootNodeRef::Parameter(node) => node.range(),
             AnyRootNodeRef::ParameterWithDefault(node) => node.range(),
-            AnyRootNodeRef::Keyword(node) => node.range(),
             AnyRootNodeRef::Alias(node) => node.range(),
             AnyRootNodeRef::WithItem(node) => node.range(),
             AnyRootNodeRef::MatchCase(node) => node.range(),
@@ -8805,6 +8803,8 @@ impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
             AnyRootNodeRef::StringLiteral(node) => node.range(),
             AnyRootNodeRef::BytesLiteral(node) => node.range(),
             AnyRootNodeRef::Identifier(node) => node.range(),
+            AnyRootNodeRef::Arguments(node) => node.range(),
+            AnyRootNodeRef::Keyword(node) => node.range(),
         }
     }
 }
@@ -8823,11 +8823,9 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
             AnyRootNodeRef::PatternArguments(node) => node.node_index(),
             AnyRootNodeRef::PatternKeyword(node) => node.node_index(),
             AnyRootNodeRef::Comprehension(node) => node.node_index(),
-            AnyRootNodeRef::Arguments(node) => node.node_index(),
             AnyRootNodeRef::Parameters(node) => node.node_index(),
             AnyRootNodeRef::Parameter(node) => node.node_index(),
             AnyRootNodeRef::ParameterWithDefault(node) => node.node_index(),
-            AnyRootNodeRef::Keyword(node) => node.node_index(),
             AnyRootNodeRef::Alias(node) => node.node_index(),
             AnyRootNodeRef::WithItem(node) => node.node_index(),
             AnyRootNodeRef::MatchCase(node) => node.node_index(),
@@ -8839,6 +8837,8 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
             AnyRootNodeRef::StringLiteral(node) => node.node_index(),
             AnyRootNodeRef::BytesLiteral(node) => node.node_index(),
             AnyRootNodeRef::Identifier(node) => node.node_index(),
+            AnyRootNodeRef::Arguments(node) => node.node_index(),
+            AnyRootNodeRef::Keyword(node) => node.node_index(),
         }
     }
 }
@@ -8886,10 +8886,6 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::Comprehension,
                 std::ptr::NonNull::from(node).cast(),
             ),
-            AnyRootNodeRef::Arguments(node) => (
-                RootNodeKind::Arguments,
-                std::ptr::NonNull::from(node).cast(),
-            ),
             AnyRootNodeRef::Parameters(node) => (
                 RootNodeKind::Parameters,
                 std::ptr::NonNull::from(node).cast(),
@@ -8902,9 +8898,6 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::ParameterWithDefault,
                 std::ptr::NonNull::from(node).cast(),
             ),
-            AnyRootNodeRef::Keyword(node) => {
-                (RootNodeKind::Keyword, std::ptr::NonNull::from(node).cast())
-            }
             AnyRootNodeRef::Alias(node) => {
                 (RootNodeKind::Alias, std::ptr::NonNull::from(node).cast())
             }
@@ -8945,6 +8938,13 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::Identifier,
                 std::ptr::NonNull::from(node).cast(),
             ),
+            AnyRootNodeRef::Arguments(node) => (
+                RootNodeKind::Arguments,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Keyword(node) => {
+                (RootNodeKind::Keyword, std::ptr::NonNull::from(node).cast())
+            }
         }
     }
 
@@ -8992,9 +8992,6 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::Comprehension => {
                     AnyRootNodeRef::Comprehension(&*pointer.cast::<crate::Comprehension>())
                 }
-                RootNodeKind::Arguments => {
-                    AnyRootNodeRef::Arguments(&*pointer.cast::<crate::Arguments>())
-                }
                 RootNodeKind::Parameters => {
                     AnyRootNodeRef::Parameters(&*pointer.cast::<crate::Parameters>())
                 }
@@ -9004,9 +9001,6 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::ParameterWithDefault => AnyRootNodeRef::ParameterWithDefault(
                     &*pointer.cast::<crate::ParameterWithDefault>(),
                 ),
-                RootNodeKind::Keyword => {
-                    AnyRootNodeRef::Keyword(&*pointer.cast::<crate::Keyword>())
-                }
                 RootNodeKind::Alias => AnyRootNodeRef::Alias(&*pointer.cast::<crate::Alias>()),
                 RootNodeKind::WithItem => {
                     AnyRootNodeRef::WithItem(&*pointer.cast::<crate::WithItem>())
@@ -9038,6 +9032,12 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::Identifier => {
                     AnyRootNodeRef::Identifier(&*pointer.cast::<crate::Identifier>())
                 }
+                RootNodeKind::Arguments => {
+                    AnyRootNodeRef::Arguments(&*pointer.cast::<crate::Arguments>())
+                }
+                RootNodeKind::Keyword => {
+                    AnyRootNodeRef::Keyword(&*pointer.cast::<crate::Keyword>())
+                }
             }
         }
     }
@@ -9059,11 +9059,9 @@ impl<'a> AnyRootNodeRef<'a> {
             AnyRootNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Comprehension(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Arguments(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Parameters(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Parameter(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::ParameterWithDefault(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Keyword(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Alias(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::WithItem(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::MatchCase(node) => node.visit_source_order(visitor),
@@ -9075,6 +9073,8 @@ impl<'a> AnyRootNodeRef<'a> {
             AnyRootNodeRef::StringLiteral(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::BytesLiteral(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Identifier(node) => node.visit_source_order(visitor),
+            AnyRootNodeRef::Arguments(node) => node.visit_source_order(visitor),
+            AnyRootNodeRef::Keyword(node) => node.visit_source_order(visitor),
         }
     }
 }
@@ -9159,11 +9159,9 @@ pub enum NodeKind {
     PatternArguments,
     PatternKeyword,
     Comprehension,
-    Arguments,
     Parameters,
     Parameter,
     ParameterWithDefault,
-    Keyword,
     Alias,
     WithItem,
     MatchCase,
@@ -9175,6 +9173,8 @@ pub enum NodeKind {
     StringLiteral,
     BytesLiteral,
     Identifier,
+    Arguments,
+    Keyword,
 }
 
 impl AnyNodeRef<'_> {
@@ -9260,11 +9260,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
             AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
-            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
             AnyNodeRef::Parameter(_) => NodeKind::Parameter,
             AnyNodeRef::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
-            AnyNodeRef::Keyword(_) => NodeKind::Keyword,
             AnyNodeRef::Alias(_) => NodeKind::Alias,
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
@@ -9276,6 +9274,8 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StringLiteral(_) => NodeKind::StringLiteral,
             AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
             AnyNodeRef::Identifier(_) => NodeKind::Identifier,
+            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
+            AnyNodeRef::Keyword(_) => NodeKind::Keyword,
         }
     }
 }
