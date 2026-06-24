@@ -11,16 +11,47 @@ as per the editor.
 
 ### `configuration`
 
-Path to a `ruff.toml` or `pyproject.toml` file to use for configuration.
+The `configuration` setting allows you to configure editor-specific Ruff behavior. This can be done
+in one of the following ways:
 
-By default, Ruff will discover configuration for each project from the filesystem, mirroring the
-behavior of the Ruff CLI.
+1. **Configuration file path:** Specify the path to a `ruff.toml` or `pyproject.toml` file that
+    contains the configuration. User home directory and environment variables will be expanded.
+1. **Inline JSON configuration:** Directly provide the configuration as a JSON object.
+
+!!! note "Added in Ruff `0.9.8`"
+
+    The **Inline JSON configuration** option was introduced in Ruff `0.9.8`.
+
+The default behavior, if `configuration` is unset, is to load the settings from the project's
+configuration (a `ruff.toml` or `pyproject.toml` in the project's directory), consistent with when
+running Ruff on the command-line.
+
+The [`configurationPreference`](#configurationpreference) setting controls the precedence if both an
+editor-provided configuration (`configuration`) and a project level configuration file are present.
+
+#### Resolution order {: #configuration_resolution_order }
+
+In an editor, Ruff supports three sources of configuration, prioritized as follows (from highest to
+lowest):
+
+1. **Specific settings:** Individual settings like [`lineLength`](#linelength) or
+    [`lint.select`](#select) defined in the editor
+1. [**`ruff.configuration`**](#configuration): Settings provided via the
+    [`configuration`](#configuration) field (either a path to a configuration file or an inline
+    configuration object)
+1. **Configuration file:** Settings defined in a `ruff.toml` or `pyproject.toml` file in the
+    project's directory (if present)
+
+For example, if the line length is specified in all three sources, Ruff will use the value from the
+[`lineLength`](#linelength) setting.
 
 **Default value**: `null`
 
 **Type**: `string`
 
 **Example usage**:
+
+_Using configuration file path:_
 
 === "VS Code"
 
@@ -33,13 +64,13 @@ behavior of the Ruff CLI.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           configuration = "~/path/to/ruff.toml"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -51,6 +82,89 @@ behavior of the Ruff CLI.
           "initialization_options": {
             "settings": {
               "configuration": "~/path/to/ruff.toml"
+            }
+          }
+        }
+      }
+    }
+    ```
+
+_Using inline configuration:_
+
+=== "VS Code"
+
+    ```json
+    {
+        "ruff.configuration": {
+            "lint": {
+                "unfixable": ["F401"],
+                "extend-select": ["TID251"],
+                "flake8-tidy-imports": {
+                    "banned-api": {
+                        "typing.TypedDict": {
+                            "msg": "Use `typing_extensions.TypedDict` instead",
+                        }
+                    }
+                }
+            },
+            "format": {
+                "quote-style": "single"
+            }
+        }
+    }
+    ```
+
+=== "Neovim"
+
+    ```lua
+    vim.lsp.config('ruff', {
+      init_options = {
+        settings = {
+          configuration = {
+            lint = {
+              unfixable = {"F401"},
+              ["extend-select"] = {"TID251"},
+              ["flake8-tidy-imports"] = {
+                ["banned-api"] = {
+                  ["typing.TypedDict"] = {
+                    msg = "Use `typing_extensions.TypedDict` instead"
+                  }
+                }
+              }
+            },
+            format = {
+              ["quote-style"] = "single"
+            }
+          }
+        }
+      }
+    })
+    ```
+
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "configuration": {
+                "lint": {
+                  "unfixable": ["F401"],
+                  "extend-select": ["TID251"],
+                  "flake8-tidy-imports": {
+                    "banned-api": {
+                      "typing.TypedDict": {
+                        "msg": "Use `typing_extensions.TypedDict` instead"
+                      }
+                    }
+                  }
+                },
+                "format": {
+                  "quote-style": "single"
+                }
+              }
             }
           }
         }
@@ -85,13 +199,13 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           configurationPreference = "filesystemFirst"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -132,13 +246,13 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           exclude = ["**/tests/**"]
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -178,13 +292,13 @@ The line length to use for the linter and formatter.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lineLength = 100
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -224,13 +338,13 @@ Whether to register the server as capable of handling `source.fixAll` code actio
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           fixAll = false
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -270,13 +384,13 @@ Whether to register the server as capable of handling `source.organizeImports` c
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           organizeImports = false
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -318,13 +432,13 @@ Whether to show syntax error diagnostics.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           showSyntaxErrors = false
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -364,13 +478,13 @@ The log level to use for the server.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           logLevel = "debug"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -412,13 +526,13 @@ If not set, logs will be written to stderr.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           logFile = "~/path/to/ruff.log"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -462,7 +576,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           codeAction = {
@@ -472,7 +586,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -516,7 +630,7 @@ Whether to display Quick Fix actions to autofix violations.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           codeAction = {
@@ -526,7 +640,7 @@ Whether to display Quick Fix actions to autofix violations.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -538,7 +652,7 @@ Whether to display Quick Fix actions to autofix violations.
           "initialization_options": {
             "settings": {
               "codeAction": {
-                "fixViolation": = {
+                "fixViolation": {
                   "enable": false
                 }
               }
@@ -574,7 +688,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -582,7 +696,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -594,9 +708,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
           "initialization_options": {
             "settings": {
               "lint": {
-                "enable" = {
-                  "enable": false
-                }
+                "enable": false
               }
             }
           }
@@ -626,7 +738,7 @@ Whether to enable Ruff's preview mode when linting.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -634,7 +746,7 @@ Whether to enable Ruff's preview mode when linting.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -676,7 +788,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -684,7 +796,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -726,7 +838,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -734,7 +846,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -776,7 +888,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -784,7 +896,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -830,7 +942,7 @@ Whether to enable Ruff's preview mode when formatting.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           format = {
@@ -838,7 +950,7 @@ Whether to enable Ruff's preview mode when formatting.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -851,6 +963,62 @@ Whether to enable Ruff's preview mode when formatting.
             "settings": {
               "format": {
                 "preview": true
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
+### `backend` {: #format_backend }
+
+The backend to use for formatting files. Following options are available:
+
+- `"internal"`: Use the built-in Ruff formatter
+- `"uv"`: Use uv for formatting (requires uv >= 0.8.13)
+
+For `internal`, the formatter version will match the selected Ruff version while for `uv`, the
+formatter version may differ.
+
+**Default value**: `"internal"`
+
+**Type**: `"internal" | "uv"`
+
+**Example usage**:
+
+=== "VS Code"
+
+    ```json
+    {
+        "ruff.format.backend": "uv"
+    }
+    ```
+
+=== "Neovim"
+
+    ```lua
+    vim.lsp.config('ruff', {
+      init_options = {
+        settings = {
+          format = {
+            backend = "uv"
+          }
+        }
+      }
+    })
+    ```
+
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "format": {
+                "backend": "uv"
               }
             }
           }

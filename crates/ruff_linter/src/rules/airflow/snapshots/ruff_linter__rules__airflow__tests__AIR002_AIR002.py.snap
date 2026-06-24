@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR002 `DAG` or `@dag` should have an explicit `schedule` argument
+ --> AIR002.py:4:1
+  |
+2 | from airflow.timetables.simple import NullTimetable
+3 |
+4 | DAG(dag_id="class_default_schedule")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 |
+6 | DAG(dag_id="class_schedule", schedule="@hourly")
+  |
+
+AIR002 `DAG` or `@dag` should have an explicit `schedule` argument
+  --> AIR002.py:13:2
+   |
+13 | @dag()
+   |  ^^^^^
+14 | def decorator_default_schedule():
+15 |     pass
+   |

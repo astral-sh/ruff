@@ -188,7 +188,7 @@ IndexError: list index out of range
 ```
 
 ```console
-$ python -c 'next(iter(range(0)))[0]'
+$ python -c 'next(iter(range(0)))'
 Traceback (most recent call last):
   File "<string>", line 1, in <module>
 StopIteration
@@ -279,10 +279,22 @@ Conversely, the following configuration would only enable fixes for `F401`:
 Ruff supports several mechanisms for suppressing lint errors, be they false positives or
 permissible violations.
 
-To omit a lint rule entirely, add it to the "ignore" list via the [`lint.ignore`](settings.md#lint_ignore)
+### Configuration
+
+To omit a lint rule everywhere, add it to the "ignore" list via the [`lint.ignore`](settings.md#lint_ignore)
 setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 
-To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
+To omit a lint rule within specific files based on file path prefixes or patterns,
+see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting.
+
+### Comments
+
+Ruff supports multiple forms of suppression comments, including inline and file-level `noqa`
+comments, and range suppressions.
+
+#### Line-level
+
+Ruff supports a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
@@ -314,6 +326,146 @@ import os  # noqa: I001
 import abc
 ```
 
+The full inline comment specification is as follows:
+
+- An inline blanket `noqa` comment is given by a case-insensitive match for
+  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
+  end of the comment, the beginning of a new comment (`#`), or whitespace
+  followed by any character other than `:`.
+- An inline `noqa` suppression is given by first finding a case-insensitive match
+  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
+  after `noqa`, and followed by the symbol `:`. After this we are expected to
+  have a list of rule codes which is given by sequences of uppercase ASCII
+  characters followed by ASCII digits, separated by whitespace or commas. The
+  list ends at the last valid code. We will attempt to interpret rules with a
+  missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
+  case.
+
+*The following is currently only available in [preview mode](`preview.md`).*
+
+To cover an entire "logical" line (a multi-line statement or suite header),
+an "ignore" comment may be placed above the first line:
+
+```python
+# ruff: ignore[unused-function-argument]  # Covers the entire function signature
+def foo(
+    arg1,
+    arg2,
+):
+    pass
+
+# ruff: ignore[line-too-long]  # Covers the entire list literal
+things = [
+    "really long string literal ...",
+    "really long string literal ...",
+]
+```
+
+Alternately, placing the "ignore" comment inside of a multi-line statement, or
+at the end of a line, will cover only a single "physical" line, leaving the rest
+of the multi-line statement or header uncovered:
+
+```python
+def foo(
+    arg1,
+    # ruff: ignore[unused-function-argument]  # Only covers `arg2`
+    arg2,
+):
+    pass
+
+things = [
+    "really long string literal ...",  # ruff: ignore[line-too-long]  # Only covers this line
+    "really long string literal ...",
+]
+```
+
+Ignore comments can also be "stacked" with other comments or pragmas, and will
+still cover the next logical line:
+
+```python
+# ruff: ignore[ambiguous-variable-name]
+# ruff: ignore[unused-variable]
+# I definitely know what I'm doing.
+i = 1
+```
+
+The full line-level suppression comment specification is as follows:
+
+- An own-line or trailing comment starting with case sensitive `#ruff:`, with
+  optional whitespace after the `#` symbol and `:` symbol, followed by `ignore[`,
+  any rules to be suppressed, and ending with `]`.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
+
+
+#### Block-level
+
+To ignore one or more violations within a range or block of code, a "disable" comment
+followed by a matching "enable" comment can be used, like so:
+
+```python
+# ruff: disable[E501]
+VALUE_1 = "Lorem ipsum dolor sit amet ..."
+VALUE_2 = "Lorem ipsum dolor sit amet ..."
+VALUE_3 = "Lorem ipsum dolor sit amet ..."
+# ruff: enable[E501]
+```
+
+To define a range, both the "disable" and "enable" comments must have matching codes,
+in the same order, as well as matching indentation levels within a logical block of code:
+
+```python
+def foo():
+    # ruff: disable[E741, F841]
+    i = 1
+    # ruff: enable[E741, F841]
+```
+
+If no matching "enable" comment is found, Ruff will also treat this as an "implicit" range.
+The implicit range is defined from the starting "disable" comment, until reaching
+a logical scope indented less than the starting comment:
+
+```python
+def foo():
+    # ruff: disable[E741, F841]
+    i = 1
+    if True:
+        O = 1
+    l = 1
+
+# implicit end of range
+foo()
+```
+
+It is strongly suggested to use explicit range suppressions, in order to prevent
+accidental suppressions of violations, especially at global module scope.
+For this reason, a `RUF104` diagnostic will also be produced for any implicit range.
+If implicit range suppressions are desired, the `RUF104` rule can be disabled,
+or an inline `noqa` suppression can be added to the end of the "disable" comment.
+
+Range suppressions cannot be used to enable or select rules that aren't already
+selected by the project configuration or runtime flags. An "enable" comment can only
+be used to terminate a preceding "disable" comment with identical codes.
+
+Unlike `noqa` suppressions, range suppressions do not support "blanket" suppression
+of all violations. At least one violation code must be listed.
+
+In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in these comments
+instead of rule codes (e.g. `F401`).
+
+The full range suppression comment specification is as follows:
+
+- An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
+  after the `#` symbol and `:` symbol, followed by either `disable` or `enable`
+  to start or end a range respectively, immediately followed by `[`, any codes to
+  be suppressed, and ending with `]`.
+- Codes to be suppressed must be separated by commas, with optional whitespace
+  before or after each code, and may be followed by an optional trailing comma
+  after the last code.
+
+#### File-level
+
 To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
 preferably towards the top, like so:
 
@@ -328,32 +480,65 @@ file, preferably towards the top, like so:
 # ruff: noqa: F841
 ```
 
-Or see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting, which enables the same
-functionality from within your `pyproject.toml` or `ruff.toml` file.
-
 Global `noqa` comments must be on their own line to disambiguate from comments which ignore
 violations on a single line.
 
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.
 
-### Detecting unused suppression comments
+The file-level suppression comment specification is as follows:
+
+- A file-level exemption comment is given by a case-sensitive match for `#ruff:`
+  or `#flake8:`, with optional whitespace after `#` and before `:`, followed by
+  optional whitespace and a case-insensitive match for `noqa`. After this, the
+  specification is as in the inline `noqa` suppressions above.
+
+In [`preview`](preview.md) mode, one or more rules can be ignored across an
+entire file with a `file-ignore` comment on its own line, at global module scope,
+and preferably near the top of the file:
+
+```python
+# ruff: file-ignore[unused-import, unused-function-argument]
+```
+
+The full-level suppression comment specification is as follows:
+
+- An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
+  after the `#` symbol and `:` symbol, followed by `file-ignore[`, any rules to
+  be suppressed, and ending with `]`.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
+
+### Detecting unused suppressions
 
 Ruff implements a special rule, [`unused-noqa`](https://docs.astral.sh/ruff/rules/unused-noqa/),
-under the `RUF100` code, to enforce that your `noqa` directives are "valid", in that the violations
-they _say_ they ignore are actually being triggered on that line (and thus suppressed). To flag
-unused `noqa` directives, run: `ruff check /path/to/file.py --extend-select RUF100`.
+under the `RUF100` code, to enforce that your suppressions are "valid", in that the violations
+they _say_ they ignore are actually being triggered and suppressed. To flag
+unused suppression comments, run Ruff with `--extend-select RUF100`, like so:
 
-Ruff can also _remove_ any unused `noqa` directives via its fix functionality. To remove any
-unused `noqa` directives, run: `ruff check /path/to/file.py --extend-select RUF100 --fix`.
+```shell-session
+$ ruff check /path/to/file.py --extend-select RUF100
+```
+
+Ruff can also _remove_ any unused suppression comments via its fix functionality.
+To remove any unused suppressions, run Ruff with `--fix`, like so:
+
+```shell-session
+$ ruff check /path/to/file.py --extend-select RUF100 --fix
+```
 
 ### Inserting necessary suppression comments
 
 Ruff can _automatically add_ `noqa` directives to all lines that contain violations, which is
 useful when migrating a new codebase to Ruff. To automatically add `noqa` directives to all
-relevant lines (with the appropriate rule codes), run: `ruff check /path/to/file.py --add-noqa`.
+relevant lines (with the appropriate rule codes), run Ruff with `--add-noqa`, like so:
 
-### Action comments
+```shell-session
+$ ruff check /path/to/file.py --add-noqa
+```
+
+### isort action comments
 
 Ruff respects isort's [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 (`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which

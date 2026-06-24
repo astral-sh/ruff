@@ -1,0 +1,111 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_type_alias.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..95,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 0..26,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 5..14,
+                            id: Name("__debug__"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Subscript(
+                        ExprSubscript {
+                            node_index: NodeIndex(None),
+                            range: 17..26,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 17..21,
+                                    id: Name("list"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 22..25,
+                                    id: Name("int"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 67..94,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 72..77,
+                            id: Name("Debug"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 77..88,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 78..87,
+                                        name: Identifier {
+                                            id: Name("__debug__"),
+                                            range: 78..87,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 91..94,
+                            id: Name("str"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | type __debug__ = list[int]  # visited as an Expr but still flagged
+  |      ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+2 | type Debug[__debug__] = str
+  |
+
+
+  |
+1 | type __debug__ = list[int]  # visited as an Expr but still flagged
+2 | type Debug[__debug__] = str
+  |            ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

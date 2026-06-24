@@ -2,10 +2,10 @@ use std::collections::VecDeque;
 
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Operator};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.255")]
 pub(crate) struct ExceptWithNonExceptionClasses {
     is_star: bool,
 }
@@ -69,10 +70,7 @@ pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handle
                 .current_statement()
                 .as_try_stmt()
                 .is_some_and(|try_stmt| try_stmt.is_star);
-            checker.report_diagnostic(Diagnostic::new(
-                ExceptWithNonExceptionClasses { is_star },
-                expr.range(),
-            ));
+            checker.report_diagnostic(ExceptWithNonExceptionClasses { is_star }, expr.range());
         }
     }
 }

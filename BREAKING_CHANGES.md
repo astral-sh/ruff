@@ -1,5 +1,184 @@
 # Breaking Changes
 
+## 0.15.0
+
+- **2026 formatter style guide**
+
+    Ruff now formats your code according to the 2026 style guide. See the
+    formatter section in the changelog or blog post for a detailed list of
+    changes.
+
+- **Block suppression comments in the linter**
+
+    The linter now supports block suppression comments. For example, to suppress
+    `N803` for all parameters in this function:
+
+    ```python
+    # ruff: disable[N803]
+    def foo(
+        legacyArg1,
+        legacyArg2,
+        legacyArg3,
+        legacyArg4,
+    ): ...
+    # ruff: enable[N803]
+    ```
+
+- **Alpine Docker image**
+
+    The `ruff:alpine` Docker image is now based on Alpine 3.23 (up from 3.21).
+
+- **Debian Docker image**
+
+    The `ruff:debian` and `ruff:debian-slim` Docker images are now based on Debian 13 "Trixie" instead of Debian 12 "Bookworm."
+
+- **`ppc64` binaries**
+
+    Binaries for the `ppc64` (64-bit big-endian PowerPC) architecture are no longer included in our releases. It should still be possible to build Ruff manually for this platform, if needed.
+
+- **Default Python version and `extend`**
+
+    Ruff now resolves all `extend`ed configuration files before falling back on a default Python version.
+
+## 0.14.0
+
+- **Default to Python 3.10**
+
+    Ruff now defaults to Python 3.10 instead of 3.9 if no explicit Python
+    version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version)
+    or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires)
+    ([#20725](https://github.com/astral-sh/ruff/pull/20725))
+
+- **Default to Python 3.14 for syntax errors**
+
+    Ruff will default to the _latest_ supported Python version (3.14) when
+    checking for syntax errors without a Python version configured. The default
+    in all other cases, like applying lint rules, remains at the minimum
+    supported Python version (3.10).
+
+## 0.13.0
+
+- **Several rules can now add `from __future__ import annotations` automatically**
+
+    `TC001`, `TC002`, `TC003`, `RUF013`, and `UP037` now add `from __future__ import annotations` as part of their fixes when the
+    `lint.future-annotations` setting is enabled. This allows the rules to move
+    more imports into `TYPE_CHECKING` blocks (`TC001`, `TC002`, and `TC003`),
+    use PEP 604 union syntax on Python versions before 3.10 (`RUF013`), and
+    unquote more annotations (`UP037`).
+
+- **Full module paths are now used to verify first-party modules**
+
+    Ruff now checks that the full path to a module exists on disk before
+    categorizing it as a first-party import. This change makes first-party
+    import detection more accurate, helping to avoid false positives on local
+    directories with the same name as a third-party dependency, for example. See
+    the [FAQ
+    section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) on import categorization for more details.
+
+- **Deprecated rules must now be selected by exact rule code**
+
+    Ruff will no longer activate deprecated rules selected by their group name
+    or prefix. As noted below, the two remaining deprecated rules were also
+    removed in this release, so this won't affect any current rules, but it will
+    still affect any deprecations in the future.
+
+- **The deprecated macOS configuration directory fallback has been removed**
+
+    Ruff will no longer look for a user-level configuration file at
+    `~/Library/Application Support/ruff/ruff.toml` on macOS. This feature was
+    deprecated in v0.5 in favor of using the [XDG
+    specification](https://specifications.freedesktop.org/basedir-spec/latest/)
+    (usually resolving to `~/.config/ruff/ruff.toml`), like on Linux. The
+    fallback and accompanying deprecation warning have now been removed.
+
+- **[`pandas-df-variable-name`](https://docs.astral.sh/ruff/rules/pandas-df-variable-name) (`PD901`) has been removed**
+
+- **[`non-pep604-isinstance`](https://docs.astral.sh/ruff/rules/non-pep604-isinstance) (`UP038`) has been removed**
+
+## 0.12.0
+
+- **Detection of more syntax errors**
+
+    Ruff now detects version-related syntax errors, such as the use of the `match`
+    statement on Python versions before 3.10, and syntax errors emitted by
+    CPython's compiler, such as irrefutable `match` patterns before the final
+    `case` arm.
+
+- **New default Python version handling for syntax errors**
+
+    Ruff will default to the _latest_ supported Python version (3.13) when
+    checking for the version-related syntax errors mentioned above to prevent
+    false positives in projects without a Python version configured. The default
+    in all other cases, like applying lint rules, is unchanged and remains at the
+    minimum supported Python version (3.9).
+
+- **Updated f-string formatting**
+
+    Ruff now formats multi-line f-strings with format specifiers to avoid adding a
+    line break after the format specifier. This addresses a change to the Python
+    grammar in version 3.13.4 that made such a line break a syntax error.
+
+- **`rust-toolchain.toml` is no longer included in source distributions**
+
+    The `rust-toolchain.toml` is used to specify a higher Rust version than Ruff's
+    minimum supported Rust version (MSRV) for development and building release
+    artifacts. However, when present in source distributions, it would also cause
+    downstream package maintainers to pull in the same Rust toolchain, even if
+    their available toolchain was MSRV-compatible.
+
+- **[`suspicious-xmle-tree-usage`](https://docs.astral.sh/ruff/rules/suspicious-xmle-tree-usage/)
+    (`S320`) has been removed**
+
+## 0.11.0
+
+This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.
+
+- **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
+
+    In previous versions of Ruff, you could specify your Python version with:
+
+    - The `target-version` option in a `ruff.toml` file or the `[tool.ruff]` section of a pyproject.toml file.
+    - The `project.requires-python` field in a `pyproject.toml` file with a `[tool.ruff]` section.
+
+    These options worked well in most cases, and are still recommended for fine control of the Python version. However, because of the way Ruff discovers config files, `pyproject.toml` files without a `[tool.ruff]` section would be ignored, including the `requires-python` setting. Ruff would then use the default Python version (3.9 as of this writing) instead, which is surprising when you've attempted to request another version.
+
+    In v0.10, config discovery has been updated to address this issue:
+
+    - If Ruff finds a `ruff.toml` file without a `target-version`, it will check
+        for a `pyproject.toml` file in the same directory and respect its
+        `requires-python` version, even if it does not contain a `[tool.ruff]`
+        section.
+    - If Ruff finds a user-level configuration, the `requires-python` field of the closest `pyproject.toml` in a parent directory will take precedence.
+    - If there is no config file (`ruff.toml`or `pyproject.toml` with a
+        `[tool.ruff]` section) in the directory of the file being checked, Ruff will
+        search for the closest `pyproject.toml` in the parent directories and use its
+        `requires-python` setting.
+
+## 0.10.0
+
+- **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
+
+    Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
+    You can find a description of this change in the 0.11.0 section.
+
+- **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
+
+    Previously, Ruff only recognized typechecking blocks that tested the `typing.TYPE_CHECKING` symbol. Now, Ruff recognizes any local variable named `TYPE_CHECKING`. This release also removes support for the legacy `if 0:` and `if False:` typechecking checks. Use a local `TYPE_CHECKING` variable instead.
+
+- **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
+
+    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [_Error suppression_](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
+
+- **Avoid unnecessary parentheses around with statements with a single context manager and a trailing comment** ([#14005](https://github.com/astral-sh/ruff/pull/14005))
+
+    This change fixes a bug in the formatter where it introduced unnecessary parentheses around with statements with a single context manager and a trailing comment. This change may result in a change in formatting for some users.
+
+- **Bump alpine default tag to 3.21 for derived Docker images** ([#16456](https://github.com/astral-sh/ruff/pull/16456))
+
+    Alpine 3.21 was released in Dec 2024 and is used in the official Alpine-based Python images. Now the ruff:alpine image will use 3.21 instead of 3.20 and ruff:alpine3.20 will no longer be updated.
+
+- **\[`unsafe-markup-use`\]: `RUF035` has been recoded to `S704`** ([#15957](https://github.com/astral-sh/ruff/pull/15957))
+
 ## 0.9.0
 
 Ruff now formats your code according to the 2025 style guide. As a result, your code might now get formatted differently. See the [changelog](./CHANGELOG.md#090) for a detailed list of changes.
@@ -209,8 +388,8 @@ This change only affects those using Ruff under its default rule set. Users that
 
 ### Remove support for emoji identifiers ([#7212](https://github.com/astral-sh/ruff/pull/7212))
 
-Previously, Ruff supported the non-standard compliant emoji identifiers e.g. `📦 = 1`.
-We decided to remove this non-standard language extension, and Ruff now reports syntax errors for emoji identifiers in your code, the same as CPython.
+Previously, Ruff supported non-standards-compliant emoji identifiers such as `📦 = 1`.
+We decided to remove this non-standard language extension. Ruff now reports syntax errors for invalid emoji identifiers in your code, the same as CPython.
 
 ### Improved GitLab fingerprints ([#7203](https://github.com/astral-sh/ruff/pull/7203))
 

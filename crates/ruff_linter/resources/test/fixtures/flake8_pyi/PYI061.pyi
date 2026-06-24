@@ -53,4 +53,3 @@ b: None | Literal[None] | None
 c: (None | Literal[None]) | None
 d: None | (Literal[None] | None)
 e: None | ((None | Literal[None]) | None) | None
-f: Literal[None] | Literal[None]

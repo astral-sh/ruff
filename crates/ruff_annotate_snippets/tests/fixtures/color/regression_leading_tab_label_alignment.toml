@@ -1,0 +1,45 @@
+
+# [crates/ruff_db/src/diagnostic/render.rs:123:47] diag.to_annotate() = Message {
+    # level: Error,
+    # id: Some(
+        # "call-non-callable",
+    # ),
+    # title: "Object of type `bool` is not callable",
+    # snippets: [
+        # Snippet {
+            # origin: Some(
+                # "main.py",
+            # ),
+            # line_start: 1,
+            # source: "def f():\n\treturn (1 == '2')()  # Tab indented\n",
+            # annotations: [
+                # Annotation {
+                    # range: 17..29,
+                    # label: None,
+                    # level: Error,
+                # },
+            # ],
+            # fold: false,
+        # },
+    # ],
+    # footer: [],
+# }
+
+[message]
+level = "Error"
+id = "E0308"
+title = "call-non-callable"
+
+[[message.snippets]]
+source = "def f():\n\treturn (1 == '2')()  # Tab indented\n"
+line_start = 4
+origin = "$DIR/main.py"
+
+[[message.snippets.annotations]]
+label = ""
+level = "Error"
+range = [17, 29]
+
+[renderer]
+# anonymized_line_numbers = true
+color = true

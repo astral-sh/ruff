@@ -1,0 +1,401 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/incomplete_attribute_before_for_in_delimiter.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..142,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 0..22,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 0..22,
+                            elt: Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 1..6,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 1..5,
+                                            id: Name("item"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 6..6,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 7..21,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 11..15,
+                                            id: Name("item"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 19..21,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 23..51,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 23..51,
+                            elt: Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 24..29,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 24..28,
+                                            id: Name("item"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 29..29,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 30..50,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 40..44,
+                                            id: Name("item"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 48..50,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: true,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 52..74,
+                    value: SetComp(
+                        ExprSetComp {
+                            node_index: NodeIndex(None),
+                            range: 52..74,
+                            elt: Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 53..58,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 53..57,
+                                            id: Name("item"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 58..58,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 59..73,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 63..67,
+                                            id: Name("item"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 71..73,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 75..97,
+                    value: Generator(
+                        ExprGenerator {
+                            node_index: NodeIndex(None),
+                            range: 75..97,
+                            elt: Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 76..81,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 76..80,
+                                            id: Name("item"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 81..81,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 82..96,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 86..90,
+                                            id: Name("item"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 94..96,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 98..120,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 98..120,
+                            elt: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 99..103,
+                                    id: Name("item"),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 104..119,
+                                    node_index: NodeIndex(None),
+                                    target: Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 108..113,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 108..112,
+                                                    id: Name("item"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name(""),
+                                                range: 113..113,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 117..119,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            For(
+                StmtFor {
+                    node_index: NodeIndex(None),
+                    range: 121..141,
+                    is_async: false,
+                    target: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 125..130,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 125..129,
+                                    id: Name("item"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name(""),
+                                range: 130..130,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 134..136,
+                            id: Name("xs"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 138..141,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 138..141,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | [item. for item in xs]
+  |        ^^^ Syntax Error: Expected an identifier
+2 | [item. async for item in xs]
+3 | {item. for item in xs}
+  |
+
+
+  |
+1 | [item. for item in xs]
+2 | [item. async for item in xs]
+  |        ^^^^^ Syntax Error: Expected an identifier
+3 | {item. for item in xs}
+4 | (item. for item in xs)
+  |
+
+
+  |
+1 | [item. for item in xs]
+2 | [item. async for item in xs]
+3 | {item. for item in xs}
+  |        ^^^ Syntax Error: Expected an identifier
+4 | (item. for item in xs)
+5 | [item for item. in xs]
+  |
+
+
+  |
+2 | [item. async for item in xs]
+3 | {item. for item in xs}
+4 | (item. for item in xs)
+  |        ^^^ Syntax Error: Expected an identifier
+5 | [item for item. in xs]
+6 | for item. in xs: ...
+  |
+
+
+  |
+3 | {item. for item in xs}
+4 | (item. for item in xs)
+5 | [item for item. in xs]
+  |                 ^^ Syntax Error: Expected an identifier
+6 | for item. in xs: ...
+  |
+
+
+  |
+4 | (item. for item in xs)
+5 | [item for item. in xs]
+6 | for item. in xs: ...
+  |           ^^ Syntax Error: Expected an identifier
+  |

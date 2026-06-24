@@ -431,3 +431,16 @@ f"hellooooooooooooooooooooooo \
         worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
 aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
         worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+
+# This t-string should be flattened
+xxxxxxxxxxxxxxxx = t"aaaaaaaaaaaaaaaaaaaaa {
+    expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (
+    yyyyyyyyyyyyyy + zzzzzzzzzzz
+)
+
+# This is not a multiline t-string, but the expression is too long so it should be
+# wrapped in parentheses.
+t"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+aaaaaaaaaaa = t"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)

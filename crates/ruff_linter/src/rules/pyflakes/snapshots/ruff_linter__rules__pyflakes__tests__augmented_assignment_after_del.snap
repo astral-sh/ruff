@@ -1,20 +1,21 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-<filename>:10:5: F821 Undefined name `x`
+F821 Undefined name `x`
+  --> <filename>:10:5
    |
  8 |     # entirely after the `del` statement. However, it should be an F821
  9 |     # error, because the name is defined in the scope, but unbound.
 10 |     x += 1
-   |     ^ F821
+   |     ^
    |
 
-<filename>:10:5: F841 Local variable `x` is assigned to but never used
+F841 Local variable `x` is assigned to but never used
+  --> <filename>:10:5
    |
  8 |     # entirely after the `del` statement. However, it should be an F821
  9 |     # error, because the name is defined in the scope, but unbound.
 10 |     x += 1
-   |     ^ F841
+   |     ^
    |
-   = help: Remove assignment to unused variable `x`
+help: Remove assignment to unused variable `x`

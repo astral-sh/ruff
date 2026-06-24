@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+---
+C418 Unnecessary dict comprehension passed to `dict()` (remove the outer call to `dict()`)
+ --> C418_py315.py:3:1
+  |
+1 | dicts = [{"a": 1}, {"b": 2}]
+2 |
+3 | dict({**d for d in dicts})
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove outer `dict()` call

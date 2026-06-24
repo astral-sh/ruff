@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{Arguments, Expr, Stmt, StmtClassDef};
-use ruff_python_semantic::{analyze::class::is_enumeration, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_slots::rules::helpers::has_slots;
+use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does
 /// Checks for subclasses of `str` that lack a `__slots__` definition.
@@ -39,6 +39,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct NoSlotsInStrSubclass;
 
 impl Violation for NoSlotsInStrSubclass {
@@ -73,7 +74,7 @@ pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &S
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
+    checker.report_diagnostic(NoSlotsInStrSubclass, stmt.identifier());
 }
 
 /// Return `true` if the class is a subclass of `str`.

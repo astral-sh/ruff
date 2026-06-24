@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/attribute.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -159,6 +158,73 @@ result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
     + 1
 ).bit_length()
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/16151
+result = (
+   (await query_the_thing(mypy_doesnt_understand))  # type: ignore[x]
+   .foo()
+   .bar()
+)
+
+(
+    (
+        a # trailing end-of-line
+        # trailing own-line
+    ) # trailing closing parentheses
+    # dangling before dot
+    .b # trailing end-of-line
+)
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19350
+variable = (
+    (something)  # a comment
+    .first_method("some string")
+)
+
+variable = (
+    something # a commentdddddddddddddddddddddddddddddd
+    .first_method("some string")
+)
+
+if (
+    (something)  # a commentdddddddddddddddddddddddddddddd
+    .first_method("some string")
+): pass
+
+variable = (
+    (something # a comment
+    ).first_method("some string")
+)
+
+if (
+    (something # a comment
+    ).first_method("some string") # second comment
+): pass
+
+variable = ( # 1
+    # 2
+    (something)  # 3
+    # 4
+    .first_method("some string") # 5
+    # 6
+) # 7
+
+
+if (
+    (something
+    # trailing own line on value
+    )
+    .first_method("some string")
+): ...
+
+variable = (
+    (something
+    # 1
+    )  # 2
+    .first_method("some string")
+)
+
 ```
 
 ## Output
@@ -295,4 +361,71 @@ result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
     + 1
 ).bit_length()
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/16151
+result = (
+    (await query_the_thing(mypy_doesnt_understand))  # type: ignore[x]
+    .foo()
+    .bar()
+)
+
+(
+    (
+        a  # trailing end-of-line
+        # trailing own-line
+    )  # trailing closing parentheses
+    # dangling before dot
+    .b  # trailing end-of-line
+)
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19350
+variable = (
+    (something)  # a comment
+    .first_method("some string")
+)
+
+variable = something.first_method(  # a commentdddddddddddddddddddddddddddddd
+    "some string"
+)
+
+if (
+    (something)  # a commentdddddddddddddddddddddddddddddd
+    .first_method("some string")
+):
+    pass
+
+variable = (
+    something  # a comment
+).first_method("some string")
+
+if (
+    (
+        something  # a comment
+    ).first_method("some string")  # second comment
+):
+    pass
+
+variable = (  # 1
+    # 2
+    (something)  # 3
+    # 4
+    .first_method("some string")  # 5
+    # 6
+)  # 7
+
+
+if (
+    something
+    # trailing own line on value
+).first_method("some string"):
+    ...
+
+variable = (
+    (
+        something
+        # 1
+    )  # 2
+    .first_method("some string")
+)
 ```

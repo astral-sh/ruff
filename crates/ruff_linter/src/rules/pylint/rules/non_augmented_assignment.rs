@@ -1,13 +1,13 @@
 use ast::Expr;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{ExprBinOp, ExprRef, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for assignments that can be replaced with augmented assignment
@@ -69,6 +69,7 @@ use crate::checkers::ast::Checker;
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.7")]
 pub(crate) struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }
@@ -101,7 +102,8 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
 
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
-        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        let mut diagnostic =
+            checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,
@@ -110,7 +112,7 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
             value,
             assign.range,
         )));
-        checker.report_diagnostic(diagnostic);
+
         return;
     }
 
@@ -120,7 +122,8 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
-        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        let mut diagnostic =
+            checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,
@@ -129,7 +132,6 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
             value,
             assign.range,
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -148,12 +150,10 @@ fn augmented_assignment(
 
     let right_operand_ref = ExprRef::from(right_operand);
     let parent = original_expr.into();
-    let comment_ranges = checker.comment_ranges();
-    let source = checker.source();
+    let tokens = checker.tokens();
 
     let right_operand_range =
-        parenthesized_range(right_operand_ref, parent, comment_ranges, source)
-            .unwrap_or(right_operand.range());
+        parenthesized_range(right_operand_ref, parent, tokens).unwrap_or(right_operand.range());
     let right_operand_expr = locator.slice(right_operand_range);
 
     let target_expr = locator.slice(target);

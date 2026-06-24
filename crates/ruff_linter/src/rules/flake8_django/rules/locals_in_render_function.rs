@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 ///     return render(request, "app/index.html", context)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct DjangoLocalsInRenderFunction;
 
 impl Violation for DjangoLocalsInRenderFunction {
@@ -61,10 +62,7 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall)
 
     if let Some(argument) = call.arguments.find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
-                DjangoLocalsInRenderFunction,
-                argument.range(),
-            ));
+            checker.report_diagnostic(DjangoLocalsInRenderFunction, argument.range());
         }
     }
 }

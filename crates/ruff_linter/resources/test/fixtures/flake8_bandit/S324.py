@@ -45,3 +45,10 @@ crypt.crypt("test", salt=crypt.METHOD_SHA512)
 crypt.mksalt()
 crypt.mksalt(crypt.METHOD_SHA256)
 crypt.mksalt(crypt.METHOD_SHA512)
+
+# From issue: https://github.com/astral-sh/ruff/issues/16525#issuecomment-2706188584
+# Errors
+hashlib.new("Md5")
+
+# OK
+hashlib.new('Sha256')

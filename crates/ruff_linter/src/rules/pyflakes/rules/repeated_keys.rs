@@ -1,16 +1,16 @@
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::Rule;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for dictionary literals that associate multiple values with the
@@ -40,9 +40,16 @@ use crate::registry::Rule;
 /// foo["baz"]  # 2
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
+///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.30")]
 pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
     existing: SourceCodeSnippet,
@@ -106,9 +113,16 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// foo[baz]  # 2
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
+///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.30")]
 pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }
@@ -136,6 +150,10 @@ impl Violation for MultiValueRepeatedKeyVariable {
 
 /// F601, F602
 pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
+    if dict.len() < 2 {
+        return;
+    }
+
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<HashableExpr, (&Expr, FxHashSet<ComparableExpr>)> =
         FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
@@ -156,82 +174,116 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
             Entry::Occupied(mut entry) => {
                 let (seen_key, seen_values) = entry.get_mut();
                 match key {
-                    Expr::StringLiteral(_)
-                    | Expr::BytesLiteral(_)
-                    | Expr::NumberLiteral(_)
-                    | Expr::BooleanLiteral(_)
-                    | Expr::NoneLiteral(_)
-                    | Expr::EllipsisLiteral(_)
-                    | Expr::Tuple(_)
-                    | Expr::FString(_) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                            let mut diagnostic = Diagnostic::new(
-                                MultiValueRepeatedKeyLiteral {
-                                    name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                                    existing: SourceCodeSnippet::from_str(
-                                        checker.locator().slice(*seen_key),
-                                    ),
-                                },
-                                key.range(),
-                            );
-                            if !seen_values.insert(comparable_value) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                                    parenthesized_range(
-                                        dict.value(i - 1).into(),
-                                        dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i - 1).range())
-                                    .end(),
-                                    parenthesized_range(
-                                        dict.value(i).into(),
-                                        dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i).range())
-                                    .end(),
-                                )));
-                            }
-                            checker.report_diagnostic(diagnostic);
+                    key if is_literal_key(key)
+                        && checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
+                    {
+                        let mut diagnostic = checker.report_diagnostic(
+                            MultiValueRepeatedKeyLiteral {
+                                name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                                existing: SourceCodeSnippet::from_str(
+                                    checker.locator().slice(*seen_key),
+                                ),
+                            },
+                            key.range(),
+                        );
+                        if !seen_values.insert(comparable_value) {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                                parenthesized_range(
+                                    dict.value(i - 1).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i - 1).range())
+                                .end(),
+                                parenthesized_range(
+                                    dict.value(i).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i).range())
+                                .end(),
+                            )));
                         }
                     }
-                    Expr::Name(_) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                            let mut diagnostic = Diagnostic::new(
-                                MultiValueRepeatedKeyVariable {
-                                    name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                                },
-                                key.range(),
-                            );
-                            let comparable_value: ComparableExpr = dict.value(i).into();
-                            if !seen_values.insert(comparable_value) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                                    parenthesized_range(
-                                        dict.value(i - 1).into(),
-                                        dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i - 1).range())
-                                    .end(),
-                                    parenthesized_range(
-                                        dict.value(i).into(),
-                                        dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i).range())
-                                    .end(),
-                                )));
-                            }
-                            checker.report_diagnostic(diagnostic);
+                    Expr::Name(_)
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) =>
+                    {
+                        let mut diagnostic = checker.report_diagnostic(
+                            MultiValueRepeatedKeyVariable {
+                                name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                            },
+                            key.range(),
+                        );
+                        let comparable_value: ComparableExpr = dict.value(i).into();
+                        if !seen_values.insert(comparable_value) {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                                parenthesized_range(
+                                    dict.value(i - 1).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i - 1).range())
+                                .end(),
+                                parenthesized_range(
+                                    dict.value(i).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i).range())
+                                .end(),
+                            )));
                         }
                     }
                     _ => {}
                 }
             }
         }
+    }
+}
+
+fn is_literal_key(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::Tuple(_)
+        | Expr::FString(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => signed_number_literal(operand).is_some(),
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: ast::Operator::Add | ast::Operator::Sub,
+            right,
+            ..
+        }) => {
+            signed_number_literal(left).is_some_and(|number| {
+                matches!(number.value, ast::Number::Int(_) | ast::Number::Float(_))
+            }) && matches!(
+                right.as_ref(),
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Complex { .. },
+                    ..
+                })
+            )
+        }
+        _ => false,
+    }
+}
+
+fn signed_number_literal(expr: &Expr) -> Option<&ast::ExprNumberLiteral> {
+    match expr {
+        Expr::NumberLiteral(number) => Some(number),
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => signed_number_literal(operand),
+        _ => None,
     }
 }

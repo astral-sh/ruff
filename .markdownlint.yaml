@@ -29,3 +29,7 @@ MD024:
 #
 # Ref: https://github.com/astral-sh/ruff/pull/15011#issuecomment-2544790854
 MD046: false
+
+# Link text should be descriptive
+# Disallows link text like *here* which is annoying.
+MD059: false

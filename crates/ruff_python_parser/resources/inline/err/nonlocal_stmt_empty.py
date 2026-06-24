@@ -1,1 +1,2 @@
-nonlocal
+def _():
+    nonlocal

@@ -1,9 +1,10 @@
+use ruff_python_ast::token::{Token, TokenFlags, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
-use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
-use crate::Mode;
+use crate::string::InterpolatedStringKind;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -19,18 +20,17 @@ pub(crate) struct TokenSource<'src> {
 
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
-    pub(crate) fn new(lexer: Lexer<'src>) -> Self {
-        // TODO(dhruvmanila): Use `allocate_tokens_vec`
+    pub(crate) fn new(lexer: Lexer<'src>, source: &str, start_offset: TextSize) -> Self {
         TokenSource {
             lexer,
-            tokens: vec![],
+            tokens: allocate_tokens_vec(&source[start_offset.to_usize()..]),
         }
     }
 
     /// Create a new token source from the given source code which starts at the given offset.
     pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
         let lexer = Lexer::new(source, mode, start_offset);
-        let mut source = TokenSource::new(lexer);
+        let mut source = TokenSource::new(lexer, source, start_offset);
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();
@@ -38,26 +38,24 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Returns the kind of the current token.
-    pub(crate) fn current_kind(&self) -> TokenKind {
+    pub(crate) const fn current_kind(&self) -> TokenKind {
         self.lexer.current_kind()
     }
 
     /// Returns the range of the current token.
-    pub(crate) fn current_range(&self) -> TextRange {
+    pub(crate) const fn current_range(&self) -> TextRange {
         self.lexer.current_range()
     }
 
-    /// Returns the flags for the current token.
-    pub(crate) fn current_flags(&self) -> TokenFlags {
-        self.lexer.current_flags()
+    /// Returns the current parenthesis, bracket, and brace nesting level.
+    #[inline]
+    pub(crate) const fn nesting(&self) -> u32 {
+        self.lexer.nesting()
     }
 
-    /// Calls the underlying [`take_value`] method on the lexer. Refer to its documentation
-    /// for more info.
-    ///
-    /// [`take_value`]: Lexer::take_value
-    pub(crate) fn take_value(&mut self) -> TokenValue {
-        self.lexer.take_value()
+    /// Returns the flags for the current token.
+    pub(crate) const fn current_flags(&self) -> TokenFlags {
+        self.lexer.current_flags()
     }
 
     /// Calls the underlying [`re_lex_logical_token`] method on the lexer with the new lexer
@@ -65,27 +63,72 @@ impl<'src> TokenSource<'src> {
     ///
     /// [`re_lex_logical_token`]: Lexer::re_lex_logical_token
     pub(crate) fn re_lex_logical_token(&mut self) {
-        let mut non_logical_newline_start = None;
-        for token in self.tokens.iter().rev() {
+        let mut non_logical_newline = None;
+
+        #[cfg(debug_assertions)]
+        let last_non_trivia_end_before = {
+            self.tokens
+                .iter()
+                .rev()
+                .find(|tok| !tok.kind().is_trivia())
+                .map(ruff_text_size::Ranged::end)
+        };
+
+        for (index, token) in self.tokens.iter().enumerate().rev() {
             match token.kind() {
                 TokenKind::NonLogicalNewline => {
-                    non_logical_newline_start = Some(token.start());
+                    non_logical_newline = Some((index, token.start()));
                 }
                 TokenKind::Comment => continue,
                 _ => break,
             }
         }
 
-        if self.lexer.re_lex_logical_token(non_logical_newline_start) {
-            let current_start = self.current_range().start();
-            while self
-                .tokens
-                .last()
-                .is_some_and(|last| last.start() >= current_start)
-            {
-                self.tokens.pop();
-            }
+        if !self
+            .lexer
+            .re_lex_logical_token(non_logical_newline.map(|(_, start)| start))
+        {
+            return;
         }
+
+        let non_logical_line_index = non_logical_newline
+            .expect(
+                "`re_lex_logical_token` should only return `true` if `non_logical_line` is `Some`",
+            )
+            .0;
+
+        // Trim the already bumped logical line token (and comments coming after it) as it might now have become a logical line token
+        self.tokens.truncate(non_logical_line_index);
+
+        #[cfg(debug_assertions)]
+        {
+            let last_non_trivia_end_now = {
+                self.tokens
+                    .iter()
+                    .rev()
+                    .find(|tok| !tok.kind().is_trivia())
+                    .map(ruff_text_size::Ranged::end)
+            };
+
+            assert_eq!(last_non_trivia_end_before, last_non_trivia_end_now);
+        }
+
+        // Ensure `current` is positioned at a non-trivia token.
+        if self.current_kind().is_trivia() {
+            self.bump(self.current_kind());
+        }
+    }
+
+    pub(crate) fn re_lex_string_token_in_interpolation_element(
+        &mut self,
+        kind: InterpolatedStringKind,
+    ) {
+        self.lexer
+            .re_lex_string_token_in_interpolation_element(kind);
+    }
+
+    pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
+        self.lexer.re_lex_raw_string_in_format_spec();
     }
 
     /// Returns the next non-trivia token without consuming it.
@@ -166,6 +209,21 @@ impl<'src> TokenSource<'src> {
         self.tokens.truncate(tokens_position);
     }
 
+    /// Returns a slice of [`Token`] that are within the given `range`.
+    pub(crate) fn in_range(&self, range: TextRange) -> &[Token] {
+        let start = self
+            .tokens
+            .iter()
+            .rposition(|tok| tok.start() == range.start());
+        let end = self.tokens.iter().rposition(|tok| tok.end() == range.end());
+
+        let (Some(start), Some(end)) = (start, end) else {
+            return &self.tokens;
+        };
+
+        &self.tokens[start..=end]
+    }
+
     /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
     /// encountered during lexing. The token collection includes both the trivia and non-trivia
     /// tokens.
@@ -182,6 +240,8 @@ impl<'src> TokenSource<'src> {
             assert_eq!(last.kind(), TokenKind::EndOfFile);
         }
 
+        self.tokens.shrink_to_fit();
+
         (self.tokens, self.lexer.finish())
     }
 }
@@ -191,12 +251,20 @@ pub(crate) struct TokenSourceCheckpoint {
     tokens_position: usize,
 }
 
-/// Allocates a [`Vec`] with an approximated capacity to fit all tokens
-/// of `contents`.
-///
-/// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
-#[allow(dead_code)]
+/// Allocates a token buffer with a capacity intended to skip early grows.
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
-    let lower_bound = contents.len().saturating_mul(15) / 100;
-    Vec::with_capacity(lower_bound)
+    // In sampled ruff-ecosystem projects, about three quarters of Python files contain at least
+    // one token per eight source bytes. Intentionally underestimate the final token count to avoid
+    // over-reserving for token-sparse files.
+    const BYTES_PER_PREALLOCATED_TOKEN: usize = 8;
+    const MIN_INITIAL_CAPACITY: usize = 128;
+
+    let capacity_hint = contents.len() / BYTES_PER_PREALLOCATED_TOKEN;
+    if capacity_hint < MIN_INITIAL_CAPACITY {
+        return Vec::new();
+    }
+
+    // Stay on a power-of-two bucket so that later geometric growth does not preserve an
+    // arbitrary capacity offset.
+    Vec::with_capacity(1 << capacity_hint.ilog2())
 }

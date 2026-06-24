@@ -5,13 +5,13 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::display_settings;
-use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
+use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::CacheKey;
 use ruff_python_semantic::{Alias, MemberNameImport, ModuleNameImport, NameImport};
 
@@ -20,19 +20,15 @@ use super::categorize::ImportSection;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
     ClosestToFurthest,
     /// Place "further" imports (more `.` characters, least local) imports
     /// before "closer" imports (fewer `.` characters, most local).
+    #[default]
     FurthestToClosest,
-}
-
-impl Default for RelativeImportsOrder {
-    fn default() -> Self {
-        Self::FurthestToClosest
-    }
 }
 
 impl Display for RelativeImportsOrder {
@@ -45,7 +41,7 @@ impl Display for RelativeImportsOrder {
 }
 
 #[derive(Debug, Clone, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub required_imports: BTreeSet<NameImport>,
     pub combine_as_imports: bool,
@@ -64,6 +60,7 @@ pub struct Settings {
     pub constants: FxHashSet<String>,
     pub variables: FxHashSet<String>,
     pub no_lines_before: FxHashSet<ImportSection>,
+    pub import_headings: FxHashMap<ImportSection, String>,
     pub lines_after_imports: isize,
     pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
@@ -118,6 +115,7 @@ impl Default for Settings {
             constants: FxHashSet::default(),
             variables: FxHashSet::default(),
             no_lines_before: FxHashSet::default(),
+            import_headings: FxHashMap::default(),
             lines_after_imports: -1,
             lines_between_types: 0,
             forced_separate: Vec::new(),
@@ -154,6 +152,7 @@ impl Display for Settings {
                 self.constants | set,
                 self.variables | set,
                 self.no_lines_before | set,
+                self.import_headings | map,
                 self.lines_after_imports,
                 self.lines_between_types,
                 self.forced_separate | array,

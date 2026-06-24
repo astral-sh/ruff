@@ -22,19 +22,9 @@ for a, b, c, in iter:
 for (a, b) in iter:
     pass
 
-for target in *x.attr:
-    pass
-
 for target in [1, 2]:
     pass
 
-for *target in a, b, c,:
-    pass
-else:
-    pass
-
-for target in *x | y: ...
-for target in *await x: ...
 for target in await x: ...
 for target in lambda x: x: ...
 for target in x if True else y: ...

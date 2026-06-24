@@ -27,8 +27,9 @@ with contextlib.ExitStack() as stack:
     close_files = stack.pop_all().close
 
 # OK
-with contextlib.AsyncExitStack() as exit_stack:
-    f = await exit_stack.enter_async_context(open("filename"))
+async def foo():
+    with contextlib.AsyncExitStack() as exit_stack:
+        f = await exit_stack.enter_async_context(open("filename"))
 
 # OK (false negative)
 with contextlib.ExitStack():
@@ -264,3 +265,23 @@ def func(filepath, encoding):
 # OK
 def func(filepath, encoding):
     return f(open(filepath, mode="rt", encoding=encoding))
+
+
+from unittest import IsolatedAsyncioTestCase, TestCase
+
+# OK
+class ExampleClassTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.enterClassContext(open("filename"))
+
+# OK
+async def foo():
+    class ExampleAsyncTests(IsolatedAsyncioTestCase):
+        async def test_something(self):
+            await self.enterAsyncContext(open("filename"))
+
+# OK
+class ExampleTests(TestCase):
+    def setUp(self):
+        self.enterContext(open("filename"))

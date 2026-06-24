@@ -1,13 +1,13 @@
+use super::AnnotatedImport;
 use super::settings::Settings;
 use super::types::{AliasData, ImportBlock, ImportFromData, TrailingComma};
-use super::AnnotatedImport;
 
 pub(crate) fn normalize_imports<'a>(
     imports: Vec<AnnotatedImport<'a>>,
     settings: &Settings,
 ) -> ImportBlock<'a> {
     let mut block = ImportBlock::default();
-    for import in imports {
+    for (index, import) in imports.into_iter().enumerate() {
         match import {
             AnnotatedImport::Import {
                 names,
@@ -21,8 +21,10 @@ pub(crate) fn normalize_imports<'a>(
                         .entry(AliasData {
                             name: name.name,
                             asname: name.asname,
+                            is_lazy: name.is_lazy,
                         })
                         .or_default();
+                    comment_set.first_index.get_or_insert(index);
                     for comment in atop {
                         comment_set.atop.push(comment.value);
                     }
@@ -38,14 +40,18 @@ pub(crate) fn normalize_imports<'a>(
                         .entry(AliasData {
                             name: name.name,
                             asname: name.asname,
+                            is_lazy: name.is_lazy,
                         })
-                        .or_default();
+                        .or_default()
+                        .first_index
+                        .get_or_insert(index);
                 }
             }
             AnnotatedImport::ImportFrom {
                 module,
                 names,
                 level,
+                is_lazy,
                 atop,
                 inline,
                 trailing,
@@ -53,10 +59,9 @@ pub(crate) fn normalize_imports<'a>(
             } => {
                 // Whether to track each member of the import as a separate entry.
                 let isolate_aliases = settings.force_single_line
-                    && module.map_or(true, |module| {
-                        !settings.single_line_exclusions.contains(module)
-                    })
-                    && !names.first().is_some_and(|alias| alias.name == "*");
+                    && module
+                        .is_none_or(|module| !settings.single_line_exclusions.contains(module))
+                    && names.first().is_none_or(|alias| alias.name != "*");
 
                 // Insert comments on the statement itself.
                 if isolate_aliases {
@@ -65,13 +70,19 @@ pub(crate) fn normalize_imports<'a>(
                         let import_from = block
                             .import_from_as
                             .entry((
-                                ImportFromData { module, level },
+                                ImportFromData {
+                                    module,
+                                    level,
+                                    is_lazy,
+                                },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
+                                    is_lazy: false,
                                 },
                             ))
                             .or_default();
+                        import_from.first_index.get_or_insert(index);
 
                         // Associate the comments above the import statement with the first alias
                         // (best effort).
@@ -94,25 +105,39 @@ pub(crate) fn normalize_imports<'a>(
                         let import_from = if alias.name == "*" {
                             block
                                 .import_from_star
-                                .entry(ImportFromData { module, level })
+                                .entry(ImportFromData {
+                                    module,
+                                    level,
+                                    is_lazy,
+                                })
                                 .or_default()
                         } else if alias.asname.is_none() || settings.combine_as_imports {
                             block
                                 .import_from
-                                .entry(ImportFromData { module, level })
+                                .entry(ImportFromData {
+                                    module,
+                                    level,
+                                    is_lazy,
+                                })
                                 .or_default()
                         } else {
                             block
                                 .import_from_as
                                 .entry((
-                                    ImportFromData { module, level },
+                                    ImportFromData {
+                                        module,
+                                        level,
+                                        is_lazy,
+                                    },
                                     AliasData {
                                         name: alias.name,
                                         asname: alias.asname,
+                                        is_lazy: false,
                                     },
                                 ))
                                 .or_default()
                         };
+                        import_from.first_index.get_or_insert(index);
 
                         for comment in atop {
                             import_from.comments.atop.push(comment.value);
@@ -131,33 +156,48 @@ pub(crate) fn normalize_imports<'a>(
                     let import_from = if alias.name == "*" {
                         block
                             .import_from_star
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData {
+                                module,
+                                level,
+                                is_lazy,
+                            })
                             .or_default()
                     } else if !isolate_aliases
                         && (alias.asname.is_none() || settings.combine_as_imports)
                     {
                         block
                             .import_from
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData {
+                                module,
+                                level,
+                                is_lazy,
+                            })
                             .or_default()
                     } else {
                         block
                             .import_from_as
                             .entry((
-                                ImportFromData { module, level },
+                                ImportFromData {
+                                    module,
+                                    level,
+                                    is_lazy,
+                                },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
+                                    is_lazy: false,
                                 },
                             ))
                             .or_default()
                     };
+                    import_from.first_index.get_or_insert(index);
 
                     let comment_set = import_from
                         .aliases
                         .entry(AliasData {
                             name: alias.name,
                             asname: alias.asname,
+                            is_lazy: false,
                         })
                         .or_default();
 

@@ -1,0 +1,68 @@
+class Simple:
+    # Range comprises skip range
+    x=1
+    <RANGE_START>x=2 <RANGE_END># fmt: skip
+    x=3
+
+class Semicolon:
+    # Range is part of skip range
+    x=1
+    x=2;<RANGE_START>x=3<RANGE_END> # fmt: skip
+    x=4
+
+class FormatFirst:
+    x=1
+    <RANGE_START>x=2<RANGE_END>;x=3 # fmt: skip
+    x=4
+
+class FormatMiddle:
+    x=1
+    x=2;<RANGE_START>x=3<RANGE_END>;x=4 # fmt: skip
+    x=5
+
+class SemicolonNewLogicalLine:
+    # Range overlaps on right side
+    <RANGE_START>x=1;
+    x=2<RANGE_END>;x=3 # fmt: skip
+    x=4
+
+class SemicolonNewLogicalLine:
+    # Range overlaps on left side
+    x=1;
+    x=2;<RANGE_START>x=3 # fmt: skip
+    x=4<RANGE_END>
+
+class ManySemicolonOneLine:
+    x=1
+    x=2;x=3;x=4 # fmt: skip
+    x=5
+
+class CompoundInSuite:
+    x=1
+    <RANGE_START>def foo(): y=1 <RANGE_END># fmt: skip
+    x=2
+
+class CompoundInSuiteNewline:
+    x=1
+    def foo():
+        y=1 # fmt: skip
+    x=2
+
+class MultiLineSkip:
+    # Range inside statement
+    x=1
+    x = <RANGE_START>[
+        '1',
+        '2',<RANGE_END>
+    ] # fmt: skip
+
+
+class LotsOfComments:
+    # 1
+    x=[ # 2
+        '1', # 3<RANGE_START>
+        '2',
+        '3'
+    ]    ;x=2;x=3 # 4<RANGE_END> # fmt: skip # 5
+    # 6
+

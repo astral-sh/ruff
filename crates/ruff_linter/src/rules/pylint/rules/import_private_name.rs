@@ -2,12 +2,13 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::name::QualifiedName;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::package::PackageRoot;
 
@@ -50,6 +51,7 @@ use crate::package::PackageRoot;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 /// [PEP 420]: https://peps.python.org/pep-0420/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.14")]
 pub(crate) struct ImportPrivateName {
     name: String,
     module: Option<String>,
@@ -95,7 +97,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         // We can also ignore dunder names.
         // Ex) `from __future__ import annotations`
         // Ex) `from foo import __version__`
-        if root_module.starts_with("__") || import_info.member_name.starts_with("__") {
+        if is_dunder(root_module) || is_dunder(&import_info.member_name) {
             continue;
         }
 
@@ -115,7 +117,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
             .qualified_name
             .segments()
             .iter()
-            .find_position(|name| name.starts_with('_'))
+            .find_position(|name| name.starts_with('_') && !is_dunder(name))
         else {
             continue;
         };
@@ -136,22 +138,38 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         } else {
             None
         };
-        checker.report_diagnostic(Diagnostic::new(
-            ImportPrivateName { name, module },
-            binding.range(),
-        ));
+        let range = match binding.source.map(|id| checker.semantic().statement(id)) {
+            Some(ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. })) => {
+                if index < import_info.module_name.len() {
+                    module.as_ref().map_or(binding.range(), |module| {
+                        SimpleTokenizer::starts_at(module.start(), checker.locator().contents())
+                            .skip_trivia()
+                            .find(|token| {
+                                token.kind == SimpleTokenKind::Name
+                                    && checker.locator().slice(token.range()) == *private_name
+                            })
+                            .map_or(binding.range(), |token| token.range())
+                    })
+                } else {
+                    names
+                        .iter()
+                        .find(|alias| alias.name.as_str() == import_info.member_name)
+                        .map_or(binding.range(), |alias| alias.name.range())
+                }
+            }
+            _ => binding.range(),
+        };
+
+        checker.report_diagnostic(ImportPrivateName { name, module }, range);
     }
 }
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing context.
 fn is_typing(reference: &ResolvedReference) -> bool {
-    reference.in_type_checking_block()
-        || reference.in_typing_only_annotation()
-        || reference.in_string_type_definition()
-        || reference.in_runtime_evaluated_annotation()
+    reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
 }
 
-#[allow(clippy::struct_field_names)]
+#[expect(clippy::struct_field_names)]
 struct ImportInfo<'a> {
     module_name: &'a [&'a str],
     member_name: Cow<'a, str>,

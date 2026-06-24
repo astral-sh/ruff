@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::{class, function_type};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -58,11 +58,20 @@ use crate::checkers::ast::Checker;
 ///         return square(self.value)
 /// ```
 ///
+/// ## Options
+///
+/// This rule only applies to regular methods, not static or class methods. You can customize how
+/// Ruff categorizes methods with the following options:
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// ## References
 /// - [Python documentation: `functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 /// - [don't lru_cache methods!](https://www.youtube.com/watch?v=sVjtp6tGo0g)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.114")]
 pub(crate) struct CachedInstanceMethod;
 
 impl Violation for CachedInstanceMethod {
@@ -88,8 +97,8 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
         &function_def.decorator_list,
         scope,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(type_, function_type::FunctionType::Method) {
         return;
@@ -102,7 +111,7 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
                 return;
             }
 
-            checker.report_diagnostic(Diagnostic::new(CachedInstanceMethod, decorator.range()));
+            checker.report_diagnostic(CachedInstanceMethod, decorator.range());
         }
     }
 }

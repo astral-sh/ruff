@@ -1,7 +1,7 @@
 <svg width="869px" height="236px" xmlns="http://www.w3.org/2000/svg">
   <style>
     .fg { fill: #AAAAAA }
-    .bg { background: #000000 }
+    .bg { fill: #000000 }
     .fg-bright-blue { fill: #5555FF }
     .fg-bright-red { fill: #FF5555 }
     .fg-yellow { fill: #AA5500 }

@@ -1,0 +1,160 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: typed_dict.md - `TypedDict` - Class header validation
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict
+ 2 | 
+ 3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
+ 4 | 
+ 5 | # This even fails at runtime!
+ 6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+ 7 | class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+ 8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+ 9 | def f(is_total: bool):
+10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+11 | class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
+12 | from abc import ABCMeta
+13 | 
+14 | class Spam(TypedDict, metaclass=ABCMeta): ...  # error: [invalid-typed-dict-header]
+15 | 
+16 | # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
+17 | # so there doesn't seem to be any reason why you'd want to do this
+18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
+19 | def f(kwargs: dict[str, object]):
+20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+21 | class Qux(TypedDict, total=1 == 1): ...  # error: [invalid-argument-type]
+22 | class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-typed-dict-header]: TypedDict class `Foo` can only inherit from TypedDict classes
+   --> src/mdtest_snippet.py:3:22
+    |
+  3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
+    |                      ^^^ `int` is not a `TypedDict` class
+    |
+   ::: stdlib/builtins.pyi:349:7
+    |
+349 | class int:
+    |       --- `int` defined here
+    |
+
+```
+
+```
+error[invalid-typed-dict-header]: TypedDict class `Foo2` can only inherit from TypedDict classes
+   --> src/mdtest_snippet.py:6:23
+    |
+  6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+    |                       ^^^^^^ `object` is not a `TypedDict` class
+    |
+   ::: stdlib/builtins.pyi:113:7
+    |
+113 | class object:
+    |       ------ `object` defined here
+    |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDict` definition
+ --> src/mdtest_snippet.py:7:22
+  |
+7 | class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+  |                      ^^^^^^^^ Expected either `True` or `False`, got object of type `Literal[42]`
+  |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `closed` in `TypedDict` definition
+ --> src/mdtest_snippet.py:8:22
+  |
+8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+  |                      ^^^^^^^^^^^ Expected either `True` or `False`, got object of type `None`
+  |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDict` definition
+  --> src/mdtest_snippet.py:10:34
+   |
+10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+   |                                  ^^^^^^^^^^^^^^ Expected either `True` or `False`, got object of type `bool`
+   |
+
+```
+
+```
+error[unknown-argument]: Unknown keyword argument `weird` in `TypedDict` definition
+  --> src/mdtest_snippet.py:11:25
+   |
+11 | class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
+   |                         ^^^^^^^^
+   |
+
+```
+
+```
+error[invalid-typed-dict-header]: Custom metaclasses are not supported in `TypedDict` definitions
+  --> src/mdtest_snippet.py:14:23
+   |
+14 | class Spam(TypedDict, metaclass=ABCMeta): ...  # error: [invalid-typed-dict-header]
+   |                       ^^^^^^^^^^^^^^^^^
+   |
+
+```
+
+```
+error[invalid-typed-dict-header]: Custom metaclasses are not supported in `TypedDict` definitions
+  --> src/mdtest_snippet.py:18:22
+   |
+18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
+   |                      ^^^^^^^^^^^^^^
+   |
+
+```
+
+```
+error[invalid-typed-dict-header]: Keyword-variadic arguments are not supported in `TypedDict` definitions
+  --> src/mdtest_snippet.py:20:27
+   |
+20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+   |                           ^^^^^^^^
+   |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDict` definition
+  --> src/mdtest_snippet.py:21:22
+   |
+21 | class Qux(TypedDict, total=1 == 1): ...  # error: [invalid-argument-type]
+   |                      ^^^^^^^^^^^^ Expected either `True` or `False`, got object of type `Literal[True]`
+   |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `closed` in `TypedDict` definition
+  --> src/mdtest_snippet.py:22:23
+   |
+22 | class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
+   |                       ^^^^^^^^^^^^^ Expected either `True` or `False`, got object of type `Literal[True]`
+   |
+
+```

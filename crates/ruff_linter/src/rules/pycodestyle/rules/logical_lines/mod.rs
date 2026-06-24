@@ -9,7 +9,7 @@ pub(crate) use missing_whitespace::*;
 pub(crate) use missing_whitespace_after_keyword::*;
 pub(crate) use missing_whitespace_around_operator::*;
 pub(crate) use redundant_backslash::*;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub(crate) use space_around_operator::*;
@@ -18,8 +18,8 @@ pub(crate) use whitespace_around_named_parameter_equals::*;
 pub(crate) use whitespace_before_comment::*;
 pub(crate) use whitespace_before_parameters::*;
 
-use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::Locator;
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
 
 mod extraneous_whitespace;
 mod indentation;
@@ -392,7 +392,6 @@ impl LogicalLinesBuilder {
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    #[allow(clippy::cast_possible_truncation)]
     fn push_token(&mut self, kind: TokenKind, range: TextRange) {
         let line = &mut self.current_line;
 
@@ -428,7 +427,7 @@ impl LogicalLinesBuilder {
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;
         if self.current_line.tokens_start < end {

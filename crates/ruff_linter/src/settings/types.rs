@@ -5,57 +5,74 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
-use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifier, VersionSpecifiers};
+use pep440_rs::{VersionSpecifier, VersionSpecifiers};
+use ruff_db::diagnostic::DiagnosticFormat;
 use rustc_hash::FxHashMap;
-use serde::{de, Deserialize, Deserializer, Serialize};
-use strum::IntoEnumIterator;
+use serde::{Deserialize, Deserializer, Serialize, de};
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{self as ast, PySourceType, SourceType};
 
+use crate::Applicability;
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 use crate::{display_settings, fs};
 
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    PartialOrd,
-    Ord,
-    PartialEq,
-    Eq,
-    Default,
-    Serialize,
-    Deserialize,
-    CacheKey,
-    EnumIter,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
     Py38,
-    // Make sure to also change the default for `ruff_python_formatter::PythonVersion`
-    // when changing the default here.
-    #[default]
     Py39,
     Py310,
     Py311,
     Py312,
     Py313,
-    // Remember to update the `latest()` function
-    // when adding new versions here!
+    Py314,
+    Py315,
 }
 
-impl From<PythonVersion> for Pep440Version {
+impl Default for PythonVersion {
+    fn default() -> Self {
+        // SAFETY: the unit test `default_python_version_works()` checks that this doesn't panic
+        Self::try_from(ast::PythonVersion::default()).unwrap()
+    }
+}
+
+impl TryFrom<ast::PythonVersion> for PythonVersion {
+    type Error = String;
+
+    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
+        match value {
+            ast::PythonVersion::PY37 => Ok(Self::Py37),
+            ast::PythonVersion::PY38 => Ok(Self::Py38),
+            ast::PythonVersion::PY39 => Ok(Self::Py39),
+            ast::PythonVersion::PY310 => Ok(Self::Py310),
+            ast::PythonVersion::PY311 => Ok(Self::Py311),
+            ast::PythonVersion::PY312 => Ok(Self::Py312),
+            ast::PythonVersion::PY313 => Ok(Self::Py313),
+            ast::PythonVersion::PY314 => Ok(Self::Py314),
+            ast::PythonVersion::PY315 => Ok(Self::Py315),
+            _ => Err(format!("unrecognized python version {value}")),
+        }
+    }
+}
+
+impl From<PythonVersion> for ast::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        let (major, minor) = value.as_tuple();
+        Self { major, minor }
+    }
+}
+
+impl From<PythonVersion> for pep440_rs::Version {
     fn from(version: PythonVersion) -> Self {
         let (major, minor) = version.as_tuple();
         Self::new([u64::from(major), u64::from(minor)])
@@ -63,15 +80,6 @@ impl From<PythonVersion> for Pep440Version {
 }
 
 impl PythonVersion {
-    /// Return the latest supported Python version.
-    pub const fn latest() -> Self {
-        Self::Py313
-    }
-
-    pub const fn minimal_supported() -> Self {
-        Self::Py37
-    }
-
     pub const fn as_tuple(&self) -> (u8, u8) {
         match self {
             Self::Py37 => (3, 7),
@@ -81,54 +89,9 @@ impl PythonVersion {
             Self::Py311 => (3, 11),
             Self::Py312 => (3, 12),
             Self::Py313 => (3, 13),
+            Self::Py314 => (3, 14),
+            Self::Py315 => (3, 15),
         }
-    }
-
-    pub const fn major(&self) -> u8 {
-        self.as_tuple().0
-    }
-
-    pub const fn minor(&self) -> u8 {
-        self.as_tuple().1
-    }
-
-    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
-        /// Truncate a version to its major and minor components.
-        fn major_minor(version: &Version) -> Option<Version> {
-            let major = version.release().first()?;
-            let minor = version.release().get(1)?;
-            Some(Version::new([major, minor]))
-        }
-
-        // Extract the minimum supported version from the specifiers.
-        let minimum_version = requires_version
-            .iter()
-            .filter(|specifier| {
-                matches!(
-                    specifier.operator(),
-                    Operator::Equal
-                        | Operator::EqualStar
-                        | Operator::ExactEqual
-                        | Operator::TildeEqual
-                        | Operator::GreaterThan
-                        | Operator::GreaterThanEqual
-                )
-            })
-            .filter_map(|specifier| major_minor(specifier.version()))
-            .min()?;
-
-        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
-
-        // Find the Python version that matches the minimum supported version.
-        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
-    }
-
-    /// Return `true` if the current version supports [PEP 701].
-    ///
-    /// [PEP 701]: https://peps.python.org/pep-0701/
-    pub fn supports_pep701(self) -> bool {
-        self >= Self::Py312
     }
 }
 
@@ -203,10 +166,42 @@ impl UnsafeFixes {
     }
 }
 
+/// Represents a path to be passed to [`Glob::new`].
+#[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
+pub struct GlobPath {
+    path: PathBuf,
+}
+
+impl GlobPath {
+    /// Constructs a [`GlobPath`] by escaping any glob metacharacters in `root` and normalizing
+    /// `path` to the escaped `root`.
+    ///
+    /// See [`fs::normalize_path_to`] for details of the normalization.
+    pub fn normalize(path: impl AsRef<Path>, root: impl AsRef<Path>) -> Self {
+        let root = root.as_ref().to_string_lossy();
+        let escaped = globset::escape(&root);
+        let absolute = fs::normalize_path_to(path, escaped);
+        Self { path: absolute }
+    }
+
+    pub fn into_inner(self) -> PathBuf {
+        self.path
+    }
+}
+
+impl Deref for GlobPath {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.path
+    }
+}
+
 #[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
-    User(String, PathBuf),
+    Config(String),
+    User(String, GlobPath),
 }
 
 impl FilePattern {
@@ -214,6 +209,9 @@ impl FilePattern {
         match self {
             FilePattern::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);
+            }
+            FilePattern::Config(pattern) => {
+                builder.add(Glob::new(&pattern)?);
             }
             FilePattern::User(pattern, absolute) => {
                 // Add the absolute path.
@@ -236,7 +234,7 @@ impl Display for FilePattern {
             "{:?}",
             match self {
                 Self::Builtin(pattern) => pattern,
-                Self::User(pattern, _) => pattern.as_str(),
+                Self::User(pattern, _) | Self::Config(pattern) => pattern.as_str(),
             }
         )
     }
@@ -246,9 +244,10 @@ impl FromStr for FilePattern {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let pattern = s.to_string();
-        let absolute = fs::normalize_path(&pattern);
-        Ok(Self::User(pattern, absolute))
+        Ok(Self::User(
+            s.to_string(),
+            GlobPath::normalize(s, fs::get_cwd()),
+        ))
     }
 }
 
@@ -258,12 +257,12 @@ pub struct FilePatternSet {
     cache_key: u64,
     // This field is only for displaying the internals
     // of `set`.
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     _set_internals: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,
@@ -319,38 +318,53 @@ impl CacheKey for FilePatternSet {
     }
 }
 
+/// A glob pattern and associated data for matching file paths.
 #[derive(Debug, Clone)]
-pub struct PerFileIgnore {
-    pub(crate) basename: String,
-    pub(crate) absolute: PathBuf,
-    pub(crate) negated: bool,
-    pub(crate) rules: RuleSet,
+pub struct PerFile<T> {
+    /// The glob pattern used to construct the [`PerFile`].
+    basename: String,
+    /// The same pattern as `basename` but normalized to the project root directory.
+    absolute: GlobPath,
+    /// Whether the glob pattern should be negated (e.g. `!*.ipynb`)
+    negated: bool,
+    /// The per-file data associated with these glob patterns.
+    data: T,
 }
 
-impl PerFileIgnore {
-    pub fn new(
-        mut pattern: String,
-        prefixes: &[RuleSelector],
-        project_root: Option<&Path>,
-    ) -> Self {
-        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
-        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+impl<T> PerFile<T> {
+    /// Construct a new [`PerFile`] from the given glob `pattern` and containing `data`.
+    ///
+    /// If provided, `project_root` is used to construct a second glob pattern normalized to the
+    /// project root directory. See [`fs::normalize_path_to`] for more details.
+    fn new(mut pattern: String, project_root: Option<&Path>, data: T) -> Self {
         let negated = pattern.starts_with('!');
         if negated {
             pattern.drain(..1);
         }
-        let path = Path::new(&pattern);
-        let absolute = match project_root {
-            Some(project_root) => fs::normalize_path_to(path, project_root),
-            None => fs::normalize_path(path),
-        };
+
+        let project_root = project_root.unwrap_or(fs::get_cwd());
 
         Self {
+            absolute: GlobPath::normalize(&pattern, project_root),
             basename: pattern,
-            absolute,
             negated,
-            rules,
+            data,
         }
+    }
+}
+
+/// Per-file ignored linting rules.
+///
+/// See [`PerFile`] for details of the representation.
+#[derive(Debug, Clone)]
+pub struct PerFileIgnore(PerFile<RuleSet>);
+
+impl PerFileIgnore {
+    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore
+        // disabled rules
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        Self(PerFile::new(pattern, project_root, rules))
     }
 }
 
@@ -418,6 +432,7 @@ pub enum Language {
     Python,
     Pyi,
     Ipynb,
+    Markdown,
 }
 
 impl FromStr for Language {
@@ -428,6 +443,7 @@ impl FromStr for Language {
             "python" => Ok(Self::Python),
             "pyi" => Ok(Self::Pyi),
             "ipynb" => Ok(Self::Ipynb),
+            "md" => Ok(Self::Markdown),
             _ => {
                 bail!("Unrecognized language: `{s}`. Expected one of `python`, `pyi`, or `ipynb`.")
             }
@@ -435,12 +451,13 @@ impl FromStr for Language {
     }
 }
 
-impl From<Language> for PySourceType {
+impl From<Language> for SourceType {
     fn from(value: Language) -> Self {
         match value {
-            Language::Python => Self::Python,
-            Language::Ipynb => Self::Ipynb,
-            Language::Pyi => Self::Stub,
+            Language::Python => Self::Python(PySourceType::Python),
+            Language::Ipynb => Self::Python(PySourceType::Ipynb),
+            Language::Pyi => Self::Python(PySourceType::Stub),
+            Language::Markdown => Self::Markdown,
         }
     }
 }
@@ -485,10 +502,36 @@ impl From<ExtensionPair> for (String, Language) {
 pub struct ExtensionMapping(FxHashMap<String, Language>);
 
 impl ExtensionMapping {
+    /// Return the file extensions in the mapping.
+    pub fn extensions(&self) -> impl Iterator<Item = &String> {
+        self.0.keys()
+    }
+
     /// Return the [`Language`] for the given file.
     pub fn get(&self, path: &Path) -> Option<Language> {
         let ext = path.extension()?.to_str()?;
         self.0.get(ext).copied()
+    }
+
+    /// Return the [`Language`] for a given file extension.
+    pub fn get_extension(&self, ext: &str) -> Option<Language> {
+        self.0.get(ext).copied()
+    }
+
+    /// Return a mapped [`SourceType`] for a given path.
+    pub fn get_source_type(&self, path: &Path) -> SourceType {
+        match self.get(path) {
+            None => SourceType::from(path),
+            Some(language) => SourceType::from(language),
+        }
+    }
+
+    /// Return a mapped [`SourceType`] for a given file extension.
+    pub fn get_source_type_by_extension(&self, ext: &str) -> SourceType {
+        match self.get_extension(ext) {
+            None => SourceType::from_extension(ext),
+            Some(language) => SourceType::from(language),
+        }
     }
 }
 
@@ -528,6 +571,20 @@ pub enum OutputFormat {
     Sarif,
 }
 
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(
+            self,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        )
+    }
+}
+
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -547,6 +604,33 @@ impl Display for OutputFormat {
     }
 }
 
+/// The subset of output formats only implemented in Ruff, not in `ruff_db` via `DisplayDiagnostics`.
+pub enum RuffOutputFormat {
+    Grouped,
+    Sarif,
+}
+
+impl TryFrom<OutputFormat> for DiagnosticFormat {
+    type Error = RuffOutputFormat;
+
+    fn try_from(format: OutputFormat) -> std::result::Result<Self, Self::Error> {
+        match format {
+            OutputFormat::Concise => Ok(DiagnosticFormat::Concise),
+            OutputFormat::Full => Ok(DiagnosticFormat::Full),
+            OutputFormat::Json => Ok(DiagnosticFormat::Json),
+            OutputFormat::JsonLines => Ok(DiagnosticFormat::JsonLines),
+            OutputFormat::Junit => Ok(DiagnosticFormat::Junit),
+            OutputFormat::Gitlab => Ok(DiagnosticFormat::Gitlab),
+            OutputFormat::Pylint => Ok(DiagnosticFormat::Pylint),
+            OutputFormat::Rdjson => Ok(DiagnosticFormat::Rdjson),
+            OutputFormat::Azure => Ok(DiagnosticFormat::Azure),
+            OutputFormat::Github => Ok(DiagnosticFormat::Github),
+            OutputFormat::Grouped => Err(RuffOutputFormat::Grouped),
+            OutputFormat::Sarif => Err(RuffOutputFormat::Sarif),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
 pub struct RequiredVersion(VersionSpecifiers);
@@ -555,25 +639,33 @@ impl TryFrom<String> for RequiredVersion {
     type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl FromStr for RequiredVersion {
+    type Err = pep440_rs::VersionSpecifiersParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
-        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+        if let Ok(version) = pep440_rs::Version::from_str(value) {
             Ok(Self(VersionSpecifiers::from(
                 VersionSpecifier::equals_version(version),
             )))
         } else {
-            Ok(Self(VersionSpecifiers::from_str(&value)?))
+            Ok(Self(VersionSpecifiers::from_str(value)?))
         }
     }
 }
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for RequiredVersion {
-    fn schema_name() -> String {
-        "RequiredVersion".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("RequiredVersion")
     }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        gen.subschema_for::<String>()
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <String as schemars::JsonSchema>::json_schema(generator)
     }
 }
 
@@ -601,17 +693,95 @@ impl Display for RequiredVersion {
 /// For reference pep8-naming uses
 /// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
-pub type IdentifierPattern = glob::Pattern;
+///
+/// Literal patterns without glob metacharacters fall back on string
+/// comparison to avoid the overhead of constructing a [`glob::Pattern`].
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, CacheKey)]
+pub enum IdentifierPattern {
+    Literal(String),
+    Glob(Box<glob::Pattern>),
+}
 
-#[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFileIgnore {
+impl IdentifierPattern {
+    pub fn new(pattern: &str) -> Result<Self, glob::PatternError> {
+        // `]` is only special inside `[...]`, which necessarily includes `[`.
+        if pattern.contains(['?', '*', '[']) {
+            Ok(Self::Glob(Box::new(glob::Pattern::new(pattern)?)))
+        } else {
+            Ok(Self::Literal(pattern.to_string()))
+        }
+    }
+
+    pub fn matches(&self, candidate: &str) -> bool {
+        match self {
+            Self::Literal(literal) => literal == candidate,
+            Self::Glob(pattern) => pattern.matches(candidate),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Literal(literal) => literal,
+            Self::Glob(pattern) => pattern.as_str(),
+        }
+    }
+}
+
+impl Display for IdentifierPattern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for IdentifierPattern {
+    type Err = glob::PatternError;
+
+    fn from_str(pattern: &str) -> Result<Self, Self::Err> {
+        Self::new(pattern)
+    }
+}
+
+/// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
+#[derive(Debug, Clone)]
+pub struct CompiledPerFile<T> {
     pub absolute_matcher: GlobMatcher,
     pub basename_matcher: GlobMatcher,
     pub negated: bool,
-    pub rules: RuleSet,
+    pub data: T,
 }
 
-impl Display for CompiledPerFileIgnore {
+impl<T> CompiledPerFile<T> {
+    fn new(
+        absolute_matcher: GlobMatcher,
+        basename_matcher: GlobMatcher,
+        negated: bool,
+        data: T,
+    ) -> Self {
+        Self {
+            absolute_matcher,
+            basename_matcher,
+            negated,
+            data,
+        }
+    }
+}
+
+impl<T> CacheKey for CompiledPerFile<T>
+where
+    T: CacheKey,
+{
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.absolute_matcher.cache_key(state);
+        self.basename_matcher.cache_key(state);
+        self.negated.cache_key(state);
+        self.data.cache_key(state);
+    }
+}
+
+impl<T> Display for CompiledPerFile<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
@@ -619,52 +789,130 @@ impl Display for CompiledPerFileIgnore {
                 self.absolute_matcher | globmatcher,
                 self.basename_matcher | globmatcher,
                 self.negated,
-                self.rules,
+                self.data,
             ]
         }
         Ok(())
     }
 }
 
-#[derive(Debug, Clone, CacheKey, Default)]
-pub struct CompiledPerFileIgnoreList {
-    // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<CompiledPerFileIgnore>,
+/// A sequence of [`CompiledPerFile<T>`].
+#[derive(Debug, Clone, Default)]
+pub struct CompiledPerFileList<T> {
+    inner: Vec<CompiledPerFile<T>>,
 }
 
-impl CompiledPerFileIgnoreList {
-    /// Given a list of patterns, create a `GlobSet`.
-    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
-        let ignores: Result<Vec<_>> = per_file_ignores
-            .into_iter()
-            .map(|per_file_ignore| {
-                // Construct absolute path matcher.
-                let absolute_matcher =
-                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
-
-                // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
-
-                Ok(CompiledPerFileIgnore {
-                    absolute_matcher,
-                    basename_matcher,
-                    negated: per_file_ignore.negated,
-                    rules: per_file_ignore.rules,
-                })
-            })
-            .collect();
-        Ok(Self { ignores: ignores? })
+impl<T> CacheKey for CompiledPerFileList<T>
+where
+    T: CacheKey,
+{
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.inner.cache_key(state);
     }
 }
 
-impl Display for CompiledPerFileIgnoreList {
+impl<T> CompiledPerFileList<T> {
+    /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    fn resolve(per_file_items: impl IntoIterator<Item = PerFile<T>>) -> Result<Self> {
+        let inner: Result<Vec<_>> = per_file_items
+            .into_iter()
+            .map(|per_file_ignore| {
+                // Construct absolute path matcher.
+                let absolute_matcher = Glob::new(&per_file_ignore.absolute.to_string_lossy())
+                    .with_context(|| format!("invalid glob {:?}", per_file_ignore.absolute))?
+                    .compile_matcher();
+
+                // Construct basename matcher.
+                let basename_matcher = Glob::new(&per_file_ignore.basename)
+                    .with_context(|| format!("invalid glob {:?}", per_file_ignore.basename))?
+                    .compile_matcher();
+
+                Ok(CompiledPerFile::new(
+                    absolute_matcher,
+                    basename_matcher,
+                    per_file_ignore.negated,
+                    per_file_ignore.data,
+                ))
+            })
+            .collect();
+        Ok(Self { inner: inner? })
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
+impl<T: std::fmt::Debug> CompiledPerFileList<T> {
+    /// Return an iterator over the entries in `self` that match the input `path`.
+    ///
+    /// `debug_label` is used for [`debug!`] messages explaining why certain patterns were matched.
+    pub(crate) fn iter_matches<'a, 'p>(
+        &'a self,
+        path: &'p Path,
+        debug_label: &'static str,
+    ) -> impl Iterator<Item = &'p T>
+    where
+        'a: 'p,
+    {
+        let file_name = path.file_name().expect("Unable to parse filename");
+        self.inner.iter().filter_map(move |entry| {
+            if entry.basename_matcher.is_match(file_name) {
+                if entry.negated {
+                    None
+                } else {
+                    debug!(
+                        "{} for {:?} due to basename match on {:?}: {:?}",
+                        debug_label,
+                        path,
+                        entry.basename_matcher.glob().regex(),
+                        entry.data
+                    );
+                    Some(&entry.data)
+                }
+            } else if entry.absolute_matcher.is_match(path) {
+                if entry.negated {
+                    None
+                } else {
+                    debug!(
+                        "{} for {:?} due to absolute match on {:?}: {:?}",
+                        debug_label,
+                        path,
+                        entry.absolute_matcher.glob().regex(),
+                        entry.data
+                    );
+                    Some(&entry.data)
+                }
+            } else if entry.negated {
+                debug!(
+                    "{} for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
+                    debug_label,
+                    path,
+                    entry.basename_matcher.glob().regex(),
+                    entry.absolute_matcher.glob().regex(),
+                    entry.data
+                );
+                Some(&entry.data)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl<T> Display for CompiledPerFileList<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.ignores.is_empty() {
+        if self.inner.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for ignore in &self.ignores {
-                writeln!(f, "\t{ignore}")?;
+            for value in &self.inner {
+                writeln!(f, "\t{value}")?;
             }
             write!(f, "}}")?;
         }
@@ -672,10 +920,101 @@ impl Display for CompiledPerFileIgnoreList {
     }
 }
 
+#[derive(Debug, Clone, CacheKey, Default)]
+pub struct CompiledPerFileIgnoreList(CompiledPerFileList<RuleSet>);
+
+impl CompiledPerFileIgnoreList {
+    /// Given a list of [`PerFileIgnore`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+        Ok(Self(CompiledPerFileList::resolve(
+            per_file_ignores.into_iter().map(|ignore| ignore.0),
+        )?))
+    }
+}
+
 impl Deref for CompiledPerFileIgnoreList {
-    type Target = Vec<CompiledPerFileIgnore>;
+    type Target = CompiledPerFileList<RuleSet>;
 
     fn deref(&self) -> &Self::Target {
-        &self.ignores
+        &self.0
+    }
+}
+
+impl Display for CompiledPerFileIgnoreList {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Contains the target Python version for a given glob pattern.
+///
+/// See [`PerFile`] for details of the representation.
+#[derive(Debug, Clone)]
+pub struct PerFileTargetVersion(PerFile<ast::PythonVersion>);
+
+impl PerFileTargetVersion {
+    pub fn new(pattern: String, version: ast::PythonVersion, project_root: Option<&Path>) -> Self {
+        Self(PerFile::new(pattern, project_root, version))
+    }
+}
+
+#[derive(CacheKey, Clone, Debug, Default)]
+pub struct CompiledPerFileTargetVersionList(CompiledPerFileList<ast::PythonVersion>);
+
+impl CompiledPerFileTargetVersionList {
+    /// Given a list of [`PerFileTargetVersion`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    pub fn resolve(per_file_versions: Vec<PerFileTargetVersion>) -> Result<Self> {
+        Ok(Self(CompiledPerFileList::resolve(
+            per_file_versions.into_iter().map(|version| version.0),
+        )?))
+    }
+
+    pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
+        self.0
+            .iter_matches(path, "Setting Python version")
+            .next()
+            .copied()
+    }
+}
+
+impl Display for CompiledPerFileTargetVersionList {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IdentifierPattern;
+
+    #[test]
+    fn default_python_version_works() {
+        super::PythonVersion::default();
+    }
+
+    #[test]
+    fn identifier_pattern_matches_literals_exactly() {
+        let pattern = IdentifierPattern::new("package.module").unwrap();
+
+        assert!(pattern.matches("package.module"));
+        assert!(!pattern.matches("package"));
+        assert!(!pattern.matches("package.module.extra"));
+    }
+
+    #[test]
+    fn identifier_pattern_preserves_glob_matching() {
+        let pattern = IdentifierPattern::new("package.*").unwrap();
+
+        assert!(pattern.matches("package.module"));
+        assert!(!pattern.matches("other.module"));
+    }
+
+    #[test]
+    fn identifier_pattern_rejects_invalid_globs() {
+        assert!(IdentifierPattern::new("package[").is_err());
     }
 }

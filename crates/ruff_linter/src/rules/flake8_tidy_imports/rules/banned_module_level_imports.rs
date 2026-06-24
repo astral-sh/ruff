@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_ast::{Alias, AnyNodeRef, Stmt, StmtImport, StmtImportFrom};
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, NameMatchPolicy};
 
@@ -43,6 +43,7 @@ use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, 
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-module-level-imports`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct BannedModuleLevelImports {
     name: String,
 }
@@ -64,16 +65,16 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
     for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
         if let Some(banned_module) = policy.find(
             checker
-                .settings
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 BannedModuleLevelImports {
                     name: banned_module,
                 },
                 node.range(),
-            ));
+            );
         }
     }
 }

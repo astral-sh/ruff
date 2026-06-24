@@ -76,3 +76,20 @@ def aliased_parentheses_with_params():
 )
 def aliased_parentheses_no_params_multiline():
     return 42
+
+# https://github.com/astral-sh/ruff/issues/18770
+@pytest.fixture(
+    # TODO: use module scope
+    # scope="module"
+)
+def my_fixture(): ...
+
+
+@(pytest.fixture())
+def outer_paren_fixture_no_params():
+    return 42
+
+
+@(fixture())
+def outer_paren_imported_fixture_no_params():
+    return 42

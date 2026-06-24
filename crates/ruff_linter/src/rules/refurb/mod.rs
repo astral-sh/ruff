@@ -8,14 +8,16 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
-    #[test_case(Rule::ReadWholeFile, Path::new("FURB101.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_0.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_1.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_2.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
@@ -35,7 +37,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryFromFloat, Path::new("FURB164.py"))]
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
-    #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
+    #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171_0.py"))]
+    #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171_1.py"))]
     #[test_case(Rule::BitCount, Path::new("FURB161.py"))]
     #[test_case(Rule::IntOnSlicedStr, Path::new("FURB166.py"))]
     #[test_case(Rule::RegexFlagAlias, Path::new("FURB167.py"))]
@@ -45,47 +48,55 @@ mod tests {
     #[test_case(Rule::MetaClassABCMeta, Path::new("FURB180.py"))]
     #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
-    #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_0.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_1.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_2.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
     #[test_case(Rule::SubclassBuiltin, Path::new("FURB189.py"))]
+    #[test_case(Rule::FromisoformatReplaceZ, Path::new("FURB162.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("refurb").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
-    #[test_case(Rule::TypeNoneComparison, Path::new("FURB169.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
+    #[test]
+    fn read_whole_file_newline_python_version_diff() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("refurb/FURB101_3.py"),
+            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+                .with_target_version(PythonVersion::PY313),
+            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+                .with_target_version(PythonVersion::PY312),
         );
-        let diagnostics = test_path(
-            Path::new("refurb").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test]
     fn write_whole_file_python_39() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("refurb/FURB103.py"),
+            Path::new("refurb/FURB103_0.py"),
             &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
-                .with_target_version(PythonVersion::Py39),
+                .with_target_version(PythonVersion::PY39),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_number_format_python_311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("refurb/FURB116.py"),
+            &settings::LinterSettings::for_rule(Rule::FStringNumberFormat)
+                .with_target_version(PythonVersion::PY311),
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

@@ -1,13 +1,19 @@
 [package]
 name = "ruff_text_size"
-version = "0.0.0"
-publish = false
-edition = "2021"
-rust-version = "1.67.1"
+version = "0.0.2"
+description = "This is an internal component crate of Ruff"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-serde = { workspace = true, optional = true }
+get-size2 = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_test = { workspace = true }
@@ -15,6 +21,7 @@ static_assertions = { workspace = true }
 
 [features]
 serde = ["dep:serde"]
+get-size = ["dep:get-size2"]
 
 [lints]
 workspace = true
@@ -23,3 +30,6 @@ workspace = true
 name = "serde"
 path = "tests/serde.rs"
 required-features = ["serde"]
+
+[lib]
+test = false

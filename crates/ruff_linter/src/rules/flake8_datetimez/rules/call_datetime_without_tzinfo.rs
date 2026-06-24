@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{self, DatetimeModuleAntipattern};
+use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
 /// Checks for `datetime` instantiations that do not specify a timezone.
@@ -41,7 +41,11 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 /// ```
+///
+/// ## References
+/// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeWithoutTzinfo {
@@ -63,6 +67,7 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
+/// DTZ001
 pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
@@ -86,8 +91,5 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCa
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
-        CallDatetimeWithoutTzinfo(antipattern),
-        call.range,
-    ));
+    checker.report_diagnostic(CallDatetimeWithoutTzinfo(antipattern), call.range);
 }

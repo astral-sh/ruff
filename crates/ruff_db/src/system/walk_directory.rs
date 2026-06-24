@@ -35,7 +35,7 @@ impl WalkDirectoryBuilder {
     /// Each additional path is traversed recursively.
     /// This should be preferred over building multiple
     /// walkers since it enables reusing resources.
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn add(mut self, path: impl AsRef<SystemPath>) -> Self {
         self.paths.push(path.as_ref().to_path_buf());
         self
@@ -212,7 +212,7 @@ impl Display for Error {
                 path: Some(path),
                 err,
             } => {
-                write!(f, "IO error for operation on {}: {}", path, err)
+                write!(f, "IO error for operation on {path}: {err}")
             }
             ErrorKind::Io { path: None, err } => err.fmt(f),
             ErrorKind::NonUtf8Path { path } => {

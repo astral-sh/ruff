@@ -4,17 +4,17 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use crate::all::DunderAllName;
-use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::ScopeId;
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::nodes::NodeId;
 use crate::reference::ResolvedReferenceId;
-use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -230,7 +230,6 @@ impl<'a> Binding<'a> {
             // Deletions, annotations, `__future__` imports, and builtins are never considered
             // redefinitions.
             BindingKind::Deletion
-            | BindingKind::ConditionalDeletion(_)
             | BindingKind::Annotation
             | BindingKind::FutureImport
             | BindingKind::Builtin => {
@@ -446,7 +445,7 @@ impl Ranged for Binding<'_> {
 /// ID uniquely identifying a [Binding] in a program.
 ///
 /// Using a `u32` to identify [Binding]s should be sufficient because Ruff only supports documents with a
-/// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
+/// size smaller than or equal to `u32::MAX`. A document with the size of `u32::MAX` must have fewer than `u32::MAX`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
@@ -458,6 +457,11 @@ pub struct BindingId;
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
+    /// Reserves capacity for at least `additional` more bindings.
+    pub(crate) fn reserve_exact(&mut self, additional: usize) {
+        self.0.raw.reserve_exact(additional);
+    }
+
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
@@ -642,13 +646,6 @@ pub enum BindingKind<'a> {
     /// ```
     Deletion,
 
-    /// A binding for a deletion, like `x` in:
-    /// ```python
-    /// if x > 0:
-    ///     del x
-    /// ```
-    ConditionalDeletion(BindingId),
-
     /// A binding to bind an exception to a local variable, like `x` in:
     /// ```python
     /// try:
@@ -672,6 +669,24 @@ pub enum BindingKind<'a> {
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.
     UnboundException(Option<BindingId>),
+
+    /// A binding to `__class__` in the implicit closure created around every method in a class
+    /// body, if any method refers to either `__class__` or `super`.
+    ///
+    /// ```python
+    /// class C:
+    ///     __class__  # NameError: name '__class__' is not defined
+    ///
+    ///     def f():
+    ///         print(__class__)  # allowed
+    ///
+    ///     def g():
+    ///         nonlocal __class__  # also allowed because the scope is *not* the function scope
+    /// ```
+    ///
+    /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object> for more
+    /// details.
+    DunderClassCell,
 }
 
 bitflags! {
@@ -714,6 +729,15 @@ pub trait Imported<'a> {
     /// Returns the member name of the imported symbol. For a straight import, this is equivalent
     /// to the qualified name; for a `from` import, this is the name of the imported symbol.
     fn member_name(&self) -> Cow<'a, str>;
+
+    /// Returns the source module of the imported symbol.
+    ///
+    /// For example:
+    ///
+    /// - `import foo` returns `["foo"]`
+    /// - `import foo.bar` returns `["foo","bar"]`
+    /// - `from foo import bar` returns `["foo"]`
+    fn source_name(&self) -> &[&'a str];
 }
 
 impl<'a> Imported<'a> for Import<'a> {
@@ -730,6 +754,10 @@ impl<'a> Imported<'a> for Import<'a> {
     /// For example, given `import foo`, returns `"foo"`.
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Owned(self.qualified_name().to_string())
+    }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.qualified_name.segments()
     }
 }
 
@@ -748,6 +776,10 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Owned(self.qualified_name().to_string())
     }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.qualified_name.segments()
+    }
 }
 
 impl<'a> Imported<'a> for FromImport<'a> {
@@ -764,6 +796,10 @@ impl<'a> Imported<'a> for FromImport<'a> {
     /// For example, given `from foo import bar`, returns `"bar"`.
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Borrowed(self.qualified_name.segments()[self.qualified_name.segments().len() - 1])
+    }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.module_name()
     }
 }
 
@@ -797,6 +833,14 @@ impl<'ast> Imported<'ast> for AnyImport<'_, 'ast> {
             Self::Import(import) => import.member_name(),
             Self::SubmoduleImport(import) => import.member_name(),
             Self::FromImport(import) => import.member_name(),
+        }
+    }
+
+    fn source_name(&self) -> &[&'ast str] {
+        match self {
+            Self::Import(import) => import.source_name(),
+            Self::SubmoduleImport(import) => import.source_name(),
+            Self::FromImport(import) => import.source_name(),
         }
     }
 }

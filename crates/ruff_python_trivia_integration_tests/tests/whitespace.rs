@@ -1,4 +1,4 @@
-use ruff_python_parser::{parse_module, ParseError};
+use ruff_python_parser::{ParseError, parse_module};
 use ruff_python_trivia::has_trailing_content;
 use ruff_text_size::Ranged;
 

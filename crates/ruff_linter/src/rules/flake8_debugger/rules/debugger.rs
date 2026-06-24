@@ -1,10 +1,10 @@
 use ruff_python_ast::{Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
@@ -31,6 +31,7 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 /// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.141")]
 pub(crate) struct Debugger {
     using_type: DebuggerUsingType,
 }
@@ -46,6 +47,7 @@ impl Violation for Debugger {
     }
 }
 
+/// T100
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     if let Some(using_type) =
@@ -60,36 +62,36 @@ pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
                 }
             })
     {
-        checker.report_diagnostic(Diagnostic::new(Debugger { using_type }, expr.range()));
+        checker.report_diagnostic(Debugger { using_type }, expr.range());
     }
 }
 
+/// T100
 /// Checks for the presence of a debugger import.
-pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
+pub(crate) fn debugger_import(checker: &Checker, stmt: &Stmt, module: Option<&str>, name: &str) {
     if let Some(module) = module {
         let qualified_name = QualifiedName::user_defined(module).append_member(name);
 
         if is_debugger_call(&qualified_name) {
-            return Some(Diagnostic::new(
+            checker.report_diagnostic(
                 Debugger {
                     using_type: DebuggerUsingType::Import(qualified_name.to_string()),
                 },
                 stmt.range(),
-            ));
+            );
         }
     } else {
         let qualified_name = QualifiedName::user_defined(name);
 
         if is_debugger_import(&qualified_name) {
-            return Some(Diagnostic::new(
+            checker.report_diagnostic(
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
                 stmt.range(),
-            ));
+            );
         }
     }
-    None
 }
 
 fn is_debugger_call(qualified_name: &QualifiedName) -> bool {
@@ -109,14 +111,15 @@ fn is_debugger_call(qualified_name: &QualifiedName) -> bool {
             | ["builtins" | "", "breakpoint"]
             | ["debugpy", "breakpoint" | "listen" | "wait_for_client"]
             | ["ptvsd", "break_into_debugger" | "wait_for_attach"]
+            | ["sys", "breakpointhook" | "__breakpointhook__"]
     )
 }
 
 fn is_debugger_import(qualified_name: &QualifiedName) -> bool {
     // Constructed by taking every pattern in `is_debugger_call`, removing the last element in
     // each pattern, and de-duplicating the values.
-    // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general
-    // than (e.g.) `import celery.contrib.rdb`.
+    // As special-cases, we omit `builtins` and `sys` to allow `import builtins` and `import sys`
+    // which are far more general than (e.g.) `import celery.contrib.rdb`.
     matches!(
         qualified_name.segments(),
         ["pdb" | "pudb" | "ipdb" | "debugpy" | "ptvsd"]

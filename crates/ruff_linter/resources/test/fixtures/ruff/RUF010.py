@@ -23,11 +23,11 @@ f"{bla!s} {[]!r} {'bar'!a}"  # OK
 "Not an f-string {str(bla)}, {repr(bla)}, {ascii(bla)}"  # OK
 
 
-def ascii(arg):
-    pass
+def ascii_shadowing():
+    def ascii(arg):
+        pass
 
-
-f"{ascii(bla)}"  # OK
+    f"{ascii(bla)}"  # OK
 
 (
     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
@@ -36,5 +36,87 @@ f"{ascii(bla)}"  # OK
 )
 
 
-# OK
+# https://github.com/astral-sh/ruff/issues/16325
 f"{str({})}"
+
+f"{str({} | {})}"
+
+import builtins
+
+f"{builtins.repr(1)}"
+
+f"{repr(1)=}"
+
+f"{repr(lambda: 1)}"
+
+f"{repr(x := 2)}"
+
+f"{str(object=3)}"
+
+f"{str(x for x in [])}"
+
+f"{str((x for x in []))}"
+
+# Debug text cases - should not trigger RUF010
+f"{str(1)=}"
+f"{ascii(1)=}"
+f"{repr(1)=}"
+f"{str('hello')=}"
+f"{ascii('hello')=}"
+f"{repr('hello')=}"
+
+# Fix should be unsafe when it deletes a comment (https://github.com/astral-sh/ruff/issues/19745)
+f"{ascii(
+    # comment
+    1
+)}"
+
+f"{repr(
+    # comment
+    1
+)}"
+
+f"{str(
+    # comment
+    1
+)}"
+
+# Fix should be unsafe when it deletes comments after the argument
+f"{ascii(1  # comment
+)}"
+
+f"{repr((
+    1
+)  # comment
+)}"
+
+f"{str((
+    1
+)
+    # comment
+)}"
+
+# Fix should be safe when the comment is preserved inside extra parentheses
+f"{ascii((
+    # comment
+    1
+))}"
+
+f"{repr((
+    1  # comment
+))}"
+
+f"{repr((
+    1
+    # comment
+))}"
+
+f"{repr((
+    # comment
+    1
+))}"
+
+f"{str((
+    # comment
+    1
+))}"

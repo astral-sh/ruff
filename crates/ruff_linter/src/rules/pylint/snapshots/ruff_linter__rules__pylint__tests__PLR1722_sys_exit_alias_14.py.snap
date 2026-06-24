@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLR1722 Use `sys.exit()` instead of `exit`
+ --> sys_exit_alias_14.py:2:1
+  |
+1 | code = {"code": 2}
+2 | exit(**code)
+  | ^^^^
+  |
+help: Replace `exit` with `sys.exit()`

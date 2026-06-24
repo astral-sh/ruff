@@ -1,0 +1,52 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/walrus_py37.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..54,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 45..53,
+                    value: Named(
+                        ExprNamed {
+                            node_index: NodeIndex(None),
+                            range: 46..52,
+                            target: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 46..47,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 51..52,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.7" }
+2 | (x := 1)
+  |  ^^^^^^ Syntax Error: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+  |

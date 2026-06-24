@@ -12,7 +12,11 @@ use crate::SemanticModel;
 /// ```
 pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     match stmt {
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => match value.as_ref() {
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => match value.as_ref() {
             Expr::Call(ast::ExprCall { func, .. }) => semantic
                 .resolve_qualified_name(func.as_ref())
                 .is_some_and(|qualified_name| {
@@ -96,7 +100,12 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
 /// matplotlib.use("Agg")
 /// ```
 pub fn is_matplotlib_activation(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
@@ -126,4 +135,24 @@ pub fn is_pytest_importorskip(stmt: &Stmt, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "importorskip"])
         })
+}
+
+/// Returns `true` if a [`Stmt`] is a dynamic modification of the Python
+/// module search path, e.g.,
+/// ```python
+/// import site
+///
+/// site.addsitedir(...)
+/// ```
+pub fn is_site_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt {
+        if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+            return semantic
+                .resolve_qualified_name(func.as_ref())
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["site", "addsitedir"])
+                });
+        }
+    }
+    false
 }

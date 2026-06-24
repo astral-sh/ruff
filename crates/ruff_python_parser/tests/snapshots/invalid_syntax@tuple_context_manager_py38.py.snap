@@ -1,0 +1,191 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/tuple_context_manager_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..289,
+        body: [
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 216..236,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 222..225,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 222..225,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 227..230,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 227..230,
+                                    id: Name("bar"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 233..236,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 233..236,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 237..271,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 246..249,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 246..249,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 253..256,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 253..256,
+                                    id: Name("bar"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 260..263,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 260..263,
+                                    id: Name("baz"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 268..271,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 268..271,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 272..288,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 278..281,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 278..281,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 285..288,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 285..288,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+3 | # is parsed as a tuple, but this will always cause a runtime error, so we flag it
+4 | # anyway
+5 | with (foo, bar): ...
+  |      ^ Syntax Error: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+6 | with (
+7 |   foo,
+  |
+
+
+  |
+4 | # anyway
+5 | with (foo, bar): ...
+6 | with (
+  |      ^ Syntax Error: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+7 |   foo,
+8 |   bar,
+  |
+
+
+   |
+ 9 |   baz,
+10 | ): ...
+11 | with (foo,): ...
+   |      ^ Syntax Error: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+   |

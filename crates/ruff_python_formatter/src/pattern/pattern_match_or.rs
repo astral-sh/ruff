@@ -4,8 +4,8 @@ use ruff_python_ast::PatternMatchOr;
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
-    OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
+    in_parentheses_only_soft_line_break_or_space,
 };
 use crate::prelude::*;
 
@@ -14,7 +14,11 @@ pub struct FormatPatternMatchOr;
 
 impl FormatNodeRule<PatternMatchOr> for FormatPatternMatchOr {
     fn fmt_fields(&self, item: &PatternMatchOr, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchOr { range: _, patterns } = item;
+        let PatternMatchOr {
+            range: _,
+            node_index: _,
+            patterns,
+        } = item;
         let inner = format_with(|f: &mut PyFormatter| {
             let mut patterns = patterns.iter();
             let comments = f.context().comments().clone();

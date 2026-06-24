@@ -1,12 +1,13 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation};
+use crate::preview::is_mutable_default_in_dataclass_field_enabled;
+use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_dataclass_field};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -22,7 +23,11 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
-/// ## Examples
+/// In [preview](https://docs.astral.sh/ruff/preview/) this rule also detects mutable defaults passed via the `default` keyword
+/// argument in `field()` (for stdlib dataclasses), `attrs.field()`, `attr.ib()`,
+/// and `attr.attrib()` calls.
+///
+/// ## Example
 /// ```python
 /// from dataclasses import dataclass
 ///
@@ -55,6 +60,7 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 ///     mutable_default: ClassVar[list[int]] = []
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct MutableDataclassDefault;
 
 impl Violation for MutableDataclassDefault {
@@ -68,7 +74,7 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    if dataclass_kind(class_def, semantic).is_none() {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
@@ -82,13 +88,26 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             continue;
         };
 
+        let value = match &**value {
+            Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
+                && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
+            {
+                arguments.find_argument_value("default", 0)
+            }
+            value => Some(value),
+        };
+
+        let Some(value) = value else {
+            continue;
+        };
+
         if is_mutable_expr(value, checker.semantic())
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
-
-            checker.report_diagnostic(diagnostic);
+            checker.report_diagnostic(MutableDataclassDefault, value.range());
         }
     }
 }

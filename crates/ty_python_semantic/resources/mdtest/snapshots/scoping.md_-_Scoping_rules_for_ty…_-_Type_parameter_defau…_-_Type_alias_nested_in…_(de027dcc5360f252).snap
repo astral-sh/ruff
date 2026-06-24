@@ -1,0 +1,37 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: scoping.md - Scoping rules for type variables - Type parameter defaults cannot reference outer-scope type parameters - Type alias nested in class
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C[T]:
+2 |     # error: [invalid-type-variable-default]
+3 |     type Alias[U = T] = list[U]
+4 | 
+5 |     type Ok[U = int] = list[U]  # OK
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: Invalid default for type parameter `U`
+ --> src/mdtest_snippet.py:1:9
+  |
+1 | class C[T]:
+  |         - `T` defined here
+2 |     # error: [invalid-type-variable-default]
+3 |     type Alias[U = T] = list[U]
+  |                    ^ `T` is a type parameter bound in an outer scope
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
+
+```

@@ -128,3 +128,16 @@ def write_models(directory, Models):
         pass; \
             \
             #
+
+# Regression tests for: https://github.com/astral-sh/ruff/issues/18209
+try:
+    1 / 0
+except ():
+    pass
+
+
+BaseException = ValueError
+try:
+    int("a")
+except BaseException:
+    pass

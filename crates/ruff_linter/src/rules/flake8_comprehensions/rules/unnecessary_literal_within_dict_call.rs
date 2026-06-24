@@ -2,13 +2,13 @@ use std::fmt;
 
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `dict()` calls that take unnecessary dict literals or dict
@@ -19,7 +19,7 @@ use super::helpers;
 /// call, since the literal or comprehension syntax already returns a
 /// dictionary.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict({})
 /// dict({"a": 1})
@@ -35,19 +35,22 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct UnnecessaryLiteralWithinDictCall {
     kind: DictKind,
 }
 
-impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
+impl Violation for UnnecessaryLiteralWithinDictCall {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralWithinDictCall { kind } = self;
         format!("Unnecessary dict {kind} passed to `dict()` (remove the outer call to `dict()`)")
     }
 
-    fn fix_title(&self) -> String {
-        "Remove outer `dict()` call".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove outer `dict()` call".to_string())
     }
 }
 
@@ -71,12 +74,20 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },
         call.range(),
     );
+
+    if matches!(
+        argument,
+        Expr::DictComp(ast::ExprDictComp { key: None, .. })
+    ) {
+        // The LibCST-based fixer does not yet support PEP 798 unpacking comprehensions.
+        return;
+    }
 
     // Convert `dict({"a": 1})` to `{"a": 1}`
     diagnostic.set_fix({
@@ -88,8 +99,6 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
 
         Fix::unsafe_edits(call_start, [call_end])
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

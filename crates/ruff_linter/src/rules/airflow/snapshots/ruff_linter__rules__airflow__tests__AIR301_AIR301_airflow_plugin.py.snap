@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301 `operators` is removed in Airflow 3.0
+ --> AIR301_airflow_plugin.py:7:5
+  |
+5 |     name = "test_plugin"
+6 |     # --- Invalid extensions start
+7 |     operators = [PluginOperator]
+  |     ^^^^^^^^^
+8 |     sensors = [PluginSensorOperator]
+9 |     hooks = [PluginHook]
+  |
+help: This extension should just be imported as a regular python module.
+
+AIR301 `sensors` is removed in Airflow 3.0
+  --> AIR301_airflow_plugin.py:8:5
+   |
+ 6 |     # --- Invalid extensions start
+ 7 |     operators = [PluginOperator]
+ 8 |     sensors = [PluginSensorOperator]
+   |     ^^^^^^^
+ 9 |     hooks = [PluginHook]
+10 |     executors = [PluginExecutor]
+   |
+help: This extension should just be imported as a regular python module.
+
+AIR301 `hooks` is removed in Airflow 3.0
+  --> AIR301_airflow_plugin.py:9:5
+   |
+ 7 |     operators = [PluginOperator]
+ 8 |     sensors = [PluginSensorOperator]
+ 9 |     hooks = [PluginHook]
+   |     ^^^^^
+10 |     executors = [PluginExecutor]
+11 |     # --- Invalid extensions end
+   |
+help: This extension should just be imported as a regular python module.
+
+AIR301 `executors` is removed in Airflow 3.0
+  --> AIR301_airflow_plugin.py:10:5
+   |
+ 8 |     sensors = [PluginSensorOperator]
+ 9 |     hooks = [PluginHook]
+10 |     executors = [PluginExecutor]
+   |     ^^^^^^^^^
+11 |     # --- Invalid extensions end
+12 |     macros = [plugin_macro]
+   |
+help: This extension should just be imported as a regular python module.

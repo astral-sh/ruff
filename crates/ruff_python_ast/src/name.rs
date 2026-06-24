@@ -3,12 +3,21 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use crate::{nodes, Expr};
+use arrayvec::ArrayVec;
+
+use crate::Expr;
+use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 #[cfg_attr(feature = "salsa", derive(salsa::Update))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(
+    feature = "schemars",
+    derive(schemars::JsonSchema),
+    schemars(with = "String")
+)]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
@@ -27,14 +36,29 @@ impl Name {
         Self(compact_str::CompactString::const_new(name))
     }
 
+    pub fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+
+    pub fn push_str(&mut self, s: &str) {
+        self.0.push_str(s);
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
+    }
+}
+
+impl std::fmt::Write for Name {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.0.push_str(s);
+        Ok(())
     }
 }
 
@@ -110,6 +134,13 @@ impl From<Name> for compact_str::CompactString {
     }
 }
 
+impl From<Name> for String {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.as_str().into()
+    }
+}
+
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
@@ -177,35 +208,6 @@ impl PartialEq<Name> for &String {
     }
 }
 
-#[cfg(feature = "schemars")]
-impl schemars::JsonSchema for Name {
-    fn is_referenceable() -> bool {
-        String::is_referenceable()
-    }
-
-    fn schema_name() -> String {
-        String::schema_name()
-    }
-
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        String::schema_id()
-    }
-
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        String::json_schema(gen)
-    }
-
-    fn _schemars_private_non_optional_json_schema(
-        gen: &mut schemars::gen::SchemaGenerator,
-    ) -> schemars::schema::Schema {
-        String::_schemars_private_non_optional_json_schema(gen)
-    }
-
-    fn _schemars_private_is_option() -> bool {
-        String::_schemars_private_is_option()
-    }
-}
-
 /// A representation of a qualified name, like `typing.List`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QualifiedName<'a>(SegmentsVec<'a>);
@@ -241,7 +243,7 @@ impl<'a> QualifiedName<'a> {
     #[inline]
     pub fn builtin(name: &'a str) -> Self {
         debug_assert!(!name.contains('.'));
-        Self(SegmentsVec::Stack(SegmentsStack::from_slice(&["", name])))
+        Self(SegmentsVec::from_slice(&["", name]))
     }
 
     #[inline]
@@ -387,17 +389,15 @@ impl<'a> UnqualifiedName<'a> {
         let attr1 = match expr {
             Expr::Attribute(attr1) => attr1,
             // Ex) `foo`
-            Expr::Name(nodes::ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str()]))
-            }
+            Expr::Name(ExprName { id, .. }) => return Some(Self::from_slice(&[id.as_str()])),
             _ => return None,
         };
 
         let attr2 = match attr1.value.as_ref() {
             Expr::Attribute(attr2) => attr2,
             // Ex) `foo.bar`
-            Expr::Name(nodes::ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]))
+            Expr::Name(ExprName { id, .. }) => {
+                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]));
             }
             _ => return None,
         };
@@ -405,7 +405,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr3 = match attr2.value.as_ref() {
             Expr::Attribute(attr3) => attr3,
             // Ex) `foo.bar.baz`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr2.attr.as_str(),
@@ -418,7 +418,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr4 = match attr3.value.as_ref() {
             Expr::Attribute(attr4) => attr4,
             // Ex) `foo.bar.baz.bop`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr3.attr.as_str(),
@@ -432,7 +432,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr5 = match attr4.value.as_ref() {
             Expr::Attribute(attr5) => attr5,
             // Ex) `foo.bar.baz.bop.bap`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr4.attr.as_str(),
@@ -447,7 +447,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr6 = match attr5.value.as_ref() {
             Expr::Attribute(attr6) => attr6,
             // Ex) `foo.bar.baz.bop.bap.bab`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr5.attr.as_str(),
@@ -463,7 +463,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr7 = match attr6.value.as_ref() {
             Expr::Attribute(attr7) => attr7,
             // Ex) `foo.bar.baz.bop.bap.bab.bob`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr6.attr.as_str(),
@@ -480,7 +480,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr8 = match attr7.value.as_ref() {
             Expr::Attribute(attr8) => attr8,
             // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self(SegmentsVec::from([
                     id.as_str(),
                     attr7.attr.as_str(),
@@ -505,7 +505,7 @@ impl<'a> UnqualifiedName<'a> {
                     segments.push(attr.attr.as_str());
                     &*attr.value
                 }
-                Expr::Name(nodes::ExprName { id, .. }) => {
+                Expr::Name(ExprName { id, .. }) => {
                     segments.push(id.as_str());
                     break;
                 }
@@ -570,9 +570,9 @@ impl<'a> FromIterator<&'a str> for UnqualifiedName<'a> {
 /// Stores up to 8 segments inline, and falls back to a heap-allocated vector for names with more segments.
 ///
 /// ## Note
-/// The implementation doesn't use `SmallVec` v1 because its type definition has a variance problem.
-/// The incorrect variance leads the lifetime inference in the `SemanticModel` astray, causing
-/// all sort of "strange" lifetime errors. We can switch back to `SmallVec` when v2 is released.
+/// The inline variant uses `ArrayVec` rather than `SmallVec` v1 because `SmallVec`'s type
+/// definition has a variance problem. The incorrect variance leads lifetime inference in the
+/// `SemanticModel` astray, causing all sorts of "strange" lifetime errors.
 #[derive(Clone)]
 enum SegmentsVec<'a> {
     Stack(SegmentsStack<'a>),
@@ -602,10 +602,9 @@ impl<'a> SegmentsVec<'a> {
     /// Initializes the segments from a slice.
     #[inline]
     fn from_slice(slice: &[&'a str]) -> Self {
-        if slice.len() <= SMALL_LEN {
-            SegmentsVec::Stack(SegmentsStack::from_slice(slice))
-        } else {
-            SegmentsVec::Heap(slice.to_vec())
+        match SegmentsStack::try_from(slice) {
+            Ok(stack) => SegmentsVec::Stack(stack),
+            Err(_) => SegmentsVec::Heap(slice.to_vec()),
         }
     }
 
@@ -625,7 +624,10 @@ impl<'a> SegmentsVec<'a> {
     fn push(&mut self, name: &'a str) {
         match self {
             SegmentsVec::Stack(stack) => {
-                if let Err(segments) = stack.push(name) {
+                if let Err(error) = stack.try_push(name) {
+                    let mut segments = Vec::with_capacity(stack.len() * 2);
+                    segments.extend(stack.iter().copied());
+                    segments.push(error.element());
                     *self = SegmentsVec::Heap(segments);
                 }
             }
@@ -650,7 +652,10 @@ impl<'a> SegmentsVec<'a> {
     fn extend_from_slice(&mut self, slice: &[&'a str]) {
         match self {
             SegmentsVec::Stack(stack) => {
-                if let Err(segments) = stack.extend_from_slice(slice) {
+                if stack.try_extend_from_slice(slice).is_err() {
+                    let mut segments = Vec::with_capacity(stack.len() + slice.len());
+                    segments.extend(stack.iter().copied());
+                    segments.extend_from_slice(slice);
                     *self = SegmentsVec::Heap(segments);
                 }
             }
@@ -704,10 +709,7 @@ impl<'a> FromIterator<&'a str> for SegmentsVec<'a> {
 impl<'a> From<[&'a str; 8]> for SegmentsVec<'a> {
     #[inline]
     fn from(segments: [&'a str; 8]) -> Self {
-        SegmentsVec::Stack(SegmentsStack {
-            segments,
-            len: segments.len(),
-        })
+        SegmentsVec::Stack(SegmentsStack::from(segments))
     }
 }
 
@@ -723,8 +725,26 @@ impl<'a> Extend<&'a str> for SegmentsVec<'a> {
     fn extend<T: IntoIterator<Item = &'a str>>(&mut self, iter: T) {
         match self {
             SegmentsVec::Stack(stack) => {
-                if let Err(segments) = stack.extend(iter) {
+                let mut iter = iter.into_iter();
+                let (lower, _) = iter.size_hint();
+
+                if lower > stack.remaining_capacity() {
+                    let mut segments = Vec::with_capacity(stack.len() + lower);
+                    segments.extend(stack.iter().copied());
+                    segments.extend(iter);
                     *self = SegmentsVec::Heap(segments);
+                    return;
+                }
+
+                while let Some(name) = iter.next() {
+                    if let Err(error) = stack.try_push(name) {
+                        let mut segments = Vec::with_capacity(stack.len() * 2);
+                        segments.extend(stack.iter().copied());
+                        segments.push(error.element());
+                        segments.extend(iter);
+                        *self = SegmentsVec::Heap(segments);
+                        return;
+                    }
                 }
             }
             SegmentsVec::Heap(heap) => {
@@ -735,129 +755,7 @@ impl<'a> Extend<&'a str> for SegmentsVec<'a> {
 }
 
 const SMALL_LEN: usize = 8;
-
-#[derive(Debug, Clone, Default)]
-struct SegmentsStack<'a> {
-    segments: [&'a str; SMALL_LEN],
-    len: usize,
-}
-
-impl<'a> SegmentsStack<'a> {
-    #[inline]
-    fn from_slice(slice: &[&'a str]) -> Self {
-        assert!(slice.len() <= SMALL_LEN);
-
-        let mut segments: [&'a str; SMALL_LEN] = Default::default();
-        segments[..slice.len()].copy_from_slice(slice);
-        SegmentsStack {
-            segments,
-            len: slice.len(),
-        }
-    }
-
-    const fn capacity(&self) -> usize {
-        SMALL_LEN - self.len
-    }
-
-    #[inline]
-    fn as_slice(&self) -> &[&'a str] {
-        &self.segments[..self.len]
-    }
-
-    /// Pushes `name` to the end of the segments.
-    ///
-    /// Returns `Err` with a `Vec` containing all items (including `name`) if there's not enough capacity to push the name.
-    #[inline]
-    fn push(&mut self, name: &'a str) -> Result<(), Vec<&'a str>> {
-        if self.len < self.segments.len() {
-            self.segments[self.len] = name;
-            self.len += 1;
-            Ok(())
-        } else {
-            let mut segments = Vec::with_capacity(self.len * 2);
-            segments.extend_from_slice(&self.segments);
-            segments.push(name);
-            Err(segments)
-        }
-    }
-
-    /// Reserves spaces for `additional` segments.
-    ///
-    /// Returns `Err` with a `Vec` containing all segments and a capacity to store `additional` segments if
-    /// the stack needs to spill over to the heap to store `additional` segments.
-    #[inline]
-    fn reserve(&mut self, additional: usize) -> Result<(), Vec<&'a str>> {
-        if self.capacity() >= additional {
-            Ok(())
-        } else {
-            let mut segments = Vec::with_capacity(self.len + additional);
-            segments.extend_from_slice(self.as_slice());
-            Err(segments)
-        }
-    }
-
-    #[inline]
-    fn pop(&mut self) -> Option<&'a str> {
-        if self.len > 0 {
-            self.len -= 1;
-            Some(self.segments[self.len])
-        } else {
-            None
-        }
-    }
-
-    /// Extends the segments by appending `slice` to the end.
-    ///
-    /// Returns `Err` with a `Vec` containing all segments and the segments in `slice` if there's not enough capacity to append the names.
-    #[inline]
-    fn extend_from_slice(&mut self, slice: &[&'a str]) -> Result<(), Vec<&'a str>> {
-        let new_len = self.len + slice.len();
-        if slice.len() <= self.capacity() {
-            self.segments[self.len..new_len].copy_from_slice(slice);
-            self.len = new_len;
-            Ok(())
-        } else {
-            let mut segments = Vec::with_capacity(new_len);
-            segments.extend_from_slice(self.as_slice());
-            segments.extend_from_slice(slice);
-            Err(segments)
-        }
-    }
-
-    #[inline]
-    fn extend<I>(&mut self, iter: I) -> Result<(), Vec<&'a str>>
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        let mut iter = iter.into_iter();
-        let (lower, _) = iter.size_hint();
-
-        // There's not enough space to store the lower bound of items. Spill to the heap.
-        if let Err(mut segments) = self.reserve(lower) {
-            segments.extend(iter);
-            return Err(segments);
-        }
-
-        // Copy over up to capacity items
-        for name in iter.by_ref().take(self.capacity()) {
-            self.segments[self.len] = name;
-            self.len += 1;
-        }
-
-        let Some(item) = iter.next() else {
-            // There are no more items to copy over and they all fit into capacity.
-            return Ok(());
-        };
-
-        // There are more items and there's not enough capacity to store them on the stack.
-        // Spill over to the heap and append the remaining items.
-        let mut segments = Vec::with_capacity(self.len * 2);
-        segments.extend_from_slice(self.as_slice());
-        segments.push(item);
-        segments.extend(iter);
-        Err(segments)
-    }
-}
+type SegmentsStack<'a> = ArrayVec<&'a str, SMALL_LEN>;
 
 #[cfg(test)]
 mod tests {

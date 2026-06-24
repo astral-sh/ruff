@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -23,6 +24,7 @@ use crate::Locator;
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.254")]
 pub(crate) struct TabIndentation;
 
 impl Violation for TabIndentation {
@@ -33,11 +35,7 @@ impl Violation for TabIndentation {
 }
 
 /// W191
-pub(crate) fn tab_indentation(
-    diagnostics: &mut Vec<Diagnostic>,
-    locator: &Locator,
-    indexer: &Indexer,
-) {
+pub(crate) fn tab_indentation(context: &LintContext, locator: &Locator, indexer: &Indexer) {
     let contents = locator.contents().as_bytes();
     let mut offset = 0;
     while let Some(index) = memchr::memchr(b'\t', &contents[offset..]) {
@@ -46,7 +44,7 @@ pub(crate) fn tab_indentation(
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            diagnostics.push(Diagnostic::new(TabIndentation, indent));
+            context.report_diagnostic_if_enabled(TabIndentation, indent);
         }
 
         // Advance to the next line.

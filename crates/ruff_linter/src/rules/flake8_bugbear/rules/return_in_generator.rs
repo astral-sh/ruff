@@ -1,12 +1,11 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::statement_visitor;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 
 /// ## What it does
 /// Checks for `return {value}` statements in functions that also contain `yield`
@@ -80,6 +79,7 @@ use crate::checkers::ast::Checker;
 ///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.4.8")]
 pub(crate) struct ReturnInGenerator;
 
 impl Violation for ReturnInGenerator {
@@ -96,12 +96,25 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
         return;
     }
 
+    // Async functions are flagged by the `ReturnInGenerator` semantic syntax error.
+    if function_def.is_async {
+        return;
+    }
+
+    if function_def
+        .decorator_list
+        .iter()
+        .any(|decorator| is_pytest_hookimpl_wrapper(decorator, checker.semantic()))
+    {
+        return;
+    }
+
     let mut visitor = ReturnInGeneratorVisitor::default();
     visitor.visit_body(&function_def.body);
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
-            checker.report_diagnostic(Diagnostic::new(ReturnInGenerator, return_));
+            checker.report_diagnostic(ReturnInGenerator, return_);
         }
     }
 }
@@ -112,25 +125,31 @@ struct ReturnInGeneratorVisitor {
     has_yield: bool,
 }
 
-impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
+impl Visitor<'_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.has_yield = true;
-                }
-                _ => {}
-            },
             Stmt::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
             Stmt::Return(ast::StmtReturn {
                 value: Some(_),
                 range,
+                node_index: _,
             }) => {
                 self.return_ = Some(*range);
+                walk_stmt(self, stmt);
             }
-            _ => statement_visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Lambda(_) => {}
+            Expr::Yield(_) | Expr::YieldFrom(_) => {
+                self.has_yield = true;
+            }
+            _ => walk_expr(self, expr),
         }
     }
 }

@@ -1,0 +1,71 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: return_type.md - Function return type - Invalid implicit return type
+mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f() -> None:
+ 2 |     if False:
+ 3 |         return 1
+ 4 | 
+ 5 | # error: [invalid-return-type]
+ 6 | def f(cond: bool) -> int:
+ 7 |     if cond:
+ 8 |         return 1
+ 9 | 
+10 | # error: [invalid-return-type]
+11 | def f(cond: bool) -> int:
+12 |     if cond:
+13 |         raise ValueError()
+14 | 
+15 | # error: [invalid-return-type]
+16 | def f(cond: bool) -> int:
+17 |     if cond:
+18 |         cond = False
+19 |     else:
+20 |         return 1
+21 |     if cond:
+22 |         return 2
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+ --> src/mdtest_snippet.py:6:22
+  |
+6 | def f(cond: bool) -> int:
+  |                      ^^^
+  |
+
+```
+
+```
+error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
+  --> src/mdtest_snippet.py:11:22
+   |
+11 | def f(cond: bool) -> int:
+   |                      ^^^
+   |
+info: Consider changing the return annotation to `-> None` or adding a `return` statement
+
+```
+
+```
+error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+  --> src/mdtest_snippet.py:16:22
+   |
+16 | def f(cond: bool) -> int:
+   |                      ^^^
+   |
+
+```

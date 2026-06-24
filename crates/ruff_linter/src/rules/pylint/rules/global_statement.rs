@@ -1,6 +1,6 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -31,14 +31,16 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// def foo():
+///     var = 10
 ///     print(var)
-///     return 10
+///     return var
 ///
 ///
 /// var = foo()
 /// print(var)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct GlobalStatement {
     name: String,
 }
@@ -54,13 +56,13 @@ impl Violation for GlobalStatement {
 /// PLW0603
 pub(crate) fn global_statement(checker: &Checker, name: &str) {
     if let Some(range) = checker.semantic().global(name) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             GlobalStatement {
                 name: name.to_string(),
             },
             // Match Pylint's behavior by reporting on the `global` statement`, rather
             // than the variable usage.
             range,
-        ));
+        );
     }
 }

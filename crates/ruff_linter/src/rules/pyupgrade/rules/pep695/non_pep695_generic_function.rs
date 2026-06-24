@@ -1,13 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::visitor::Visitor;
+use rustc_hash::FxHashSet;
+
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::PythonVersion;
 
-use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
+use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested_context};
 
 /// ## What it does
 ///
@@ -25,7 +27,7 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// in Python 3.13.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
-/// cause type checking to fail.
+/// cause type checking to [fail].
 ///
 /// ## Fix safety
 ///
@@ -71,12 +73,18 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// This rule only applies to generic functions and does not include generic classes. See
 /// [`non-pep695-generic-class`][UP046] for the class version.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
+/// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
 }
@@ -98,7 +106,7 @@ impl Violation for NonPEP695GenericFunction {
 /// UP047
 pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &StmtFunctionDef) {
     // PEP-695 syntax is only available on Python 3.12+
-    if checker.settings.target_version < PythonVersion::Py312 {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
@@ -153,7 +161,11 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         }
     }
 
-    let Some(type_vars) = check_type_vars(type_vars) else {
+    // Deduplicate type vars that appear in multiple parameter annotations
+    let mut seen = FxHashSet::default();
+    type_vars.retain(|tv| seen.insert(tv.name));
+
+    let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;
     };
 
@@ -163,16 +175,15 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         source: checker.source(),
     };
 
-    checker.report_diagnostic(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             NonPEP695GenericFunction {
                 name: name.to_string(),
             },
             TextRange::new(name.start(), parameters.end()),
         )
-        .with_fix(Fix::unsafe_edit(Edit::insertion(
+        .set_fix(Fix::unsafe_edit(Edit::insertion(
             type_params.to_string(),
             name.end(),
-        ))),
-    );
+        )));
 }

@@ -18,40 +18,39 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
 
+permissions: {}
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: release-playground
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: playground/package-lock.json
-      - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: jetli/wasm-bindgen-action@v0.2.0
-      - name: "Run wasm-pack"
-        run: wasm-pack build --target web --out-dir ../../playground/src/pkg crates/ruff_wasm
+          node-version: 24
+          package-manager-cache: false
+      - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Install Node dependencies"
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: playground
       - name: "Run TypeScript checks"
         run: npm run check
         working-directory: playground
-      - name: "Build JavaScript bundle"
-        run: npm run build
+      - name: "Build Ruff playground"
+        run: npm run build --workspace ruff-playground
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@v3.13.1
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
-          command: pages deploy playground/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
+          command: pages deploy playground/ruff/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}

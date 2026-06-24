@@ -1,0 +1,130 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:38:5
+   |
+36 |     yield 1
+37 |     yield 2
+38 |     raise StopIteration  # Should trigger
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:44:5
+   |
+42 |     yield 1
+43 |     yield 2
+44 |     raise StopIteration("finished")  # Should trigger
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:50:5
+   |
+48 |     yield 1
+49 |     yield 2
+50 |     raise StopIteration(1 + 2)  # Should trigger
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:56:5
+   |
+54 |     yield 1
+55 |     yield 2
+56 |     raise StopIteration("async")  # Should trigger
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:62:9
+   |
+60 |     def inner_gen():
+61 |         yield 1
+62 |         raise StopIteration("inner")  # Should trigger
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+63 |
+64 |     yield from inner_gen()
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:71:13
+   |
+69 |         def generator_method(self):
+70 |             yield 1
+71 |             raise StopIteration("method")  # Should trigger
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+72 |
+73 |     return MyClass
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:81:9
+   |
+79 |         yield 1
+80 |         yield 2
+81 |         raise StopIteration("complex")  # Should trigger
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+82 |     except ValueError:
+83 |         yield 3
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:91:9
+   |
+89 |     yield 1
+90 |     if condition:
+91 |         raise StopIteration("conditional")  # Should trigger
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+92 |     yield 2
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+  --> stop_iteration_return.py:98:5
+   |
+96 | def generator_with_bare_stop_iteration():
+97 |     yield 1
+98 |     raise StopIteration  # Should trigger (no arguments)
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+   --> stop_iteration_return.py:105:13
+    |
+103 |         yield i
+104 |         if i == 3:
+105 |             raise StopIteration("loop")  # Should trigger
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+   --> stop_iteration_return.py:149:9
+    |
+147 |     yield 1
+148 |     class C:
+149 |         raise StopIteration  # Should trigger
+    |         ^^^^^^^^^^^^^^^^^^^
+150 |     yield C
+    |
+help: Use `return` instead
+
+PLR1708 Explicit `raise StopIteration` in generator
+   --> stop_iteration_return.py:154:5
+    |
+152 | # https://github.com/astral-sh/ruff/pull/21177#discussion_r2539702728
+153 | def foo():
+154 |     raise StopIteration((yield 1))  # Should trigger
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use `return` instead

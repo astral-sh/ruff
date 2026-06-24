@@ -1,16 +1,16 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
-use ruff_python_ast::{visitor, ExprLambda};
+use ruff_python_ast::{ExprLambda, visitor};
 use ruff_python_semantic::SemanticModel;
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary `map()` calls with lambda functions.
@@ -30,7 +30,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
 ///   `{v: v ** 2 for v in values}`.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// map(lambda x: x + 1, iterable)
 /// ```
@@ -44,6 +44,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.74")]
 pub(crate) struct UnnecessaryMap {
     object_type: ObjectType,
 }
@@ -122,10 +123,17 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         }
     };
 
+    // If the lambda body contains a `yield` or `yield from`, rewriting `map(lambda ...)` to a
+    // generator expression or any comprehension is invalid Python syntax
+    // (e.g., `yield` is not allowed inside generator or comprehension expressions). In such cases, skip.
+    if lambda_contains_yield(&lambda.body) {
+        return;
+    }
+
     for iterable in iterables {
         // For example, (x+1 for x in (c:=a)) is invalid syntax
         // so we can't suggest it.
-        if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
+        if any_over_expr(iterable, ruff_python_ast::Expr::is_named_expr) {
             return;
         }
 
@@ -138,7 +146,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, call.range);
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryMap { object_type }, call.range);
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_map(
             call,
@@ -149,7 +157,6 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         )
         .map(Fix::unsafe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
@@ -184,6 +191,13 @@ fn map_lambda_and_iterables<'a>(
     Some((lambda, iterables))
 }
 
+/// Returns true if the expression tree contains a `yield` or `yield from` expression.
+fn lambda_contains_yield(expr: &Expr) -> bool {
+    any_over_expr(expr, |expr| {
+        matches!(expr, Expr::Yield(_) | Expr::YieldFrom(_))
+    })
+}
+
 /// A lambda as the first argument to `map()` has the "expected" arity when:
 ///
 /// * It has exactly one parameter
@@ -194,6 +208,10 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
         return false;
     };
 
+    if parameters.len() != 1 {
+        return false;
+    }
+
     let [parameter] = &*parameters.args else {
         return false;
     };
@@ -201,11 +219,6 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
     if parameter.default.is_some() {
         return false;
     }
-
-    if parameters.vararg.is_some() || parameters.kwarg.is_some() {
-        return false;
-    }
-
     if late_binding(parameters, &lambda.body) {
         return false;
     }

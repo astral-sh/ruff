@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks the following constructs, all of which can be replaced by
@@ -48,12 +48,13 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///    element. As such, any side effects that occur during iteration will be
 ///    delayed.
 /// 2. Second, accessing members of a collection via square bracket notation
-///    `[0]` of the `pop()` function will raise `IndexError` if the collection
+///    `[0]` or the `pop()` function will raise `IndexError` if the collection
 ///    is empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## References
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }
@@ -115,7 +116,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         Cow::Owned(format!("iter({iterable})"))
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
@@ -126,8 +127,6 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         format!("next({iterable})"),
         expr.range(),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
@@ -263,9 +262,11 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
 /// Returns the [`Expr`] target for a comprehension, if the comprehension is "simple"
 /// (e.g., `x` for `[i for i in x]`).
 fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Option<TextRange> {
-    let [generator @ Comprehension {
-        is_async: false, ..
-    }] = generators
+    let [
+        generator @ Comprehension {
+            is_async: false, ..
+        },
+    ] = generators
     else {
         return None;
     };

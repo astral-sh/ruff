@@ -1,0 +1,85 @@
+# This workflow is a cron job that generates a report describing
+# all diagnostics ty emits across the whole ecosystem. The report
+# is uploaded to https://ty-ecosystem-ext.pages.dev/ on a weekly basis.
+
+name: ty ecosystem-report
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every Wednesday at 5:00 UTC:
+    - cron: 0 5 * * 3
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: e2c5b76149b147fae104a7d8fa0997a9eb7f7754
+
+jobs:
+  ty-ecosystem-report:
+    name: Create ecosystem report
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          version: "0.11.24"
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          lookup-only: false
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
+      - name: Create report
+        shell: bash
+        run: |
+          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+          git fetch --no-tags --filter=blob:none --unshallow origin
+
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
+
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
+
+          ecosystem-analyzer \
+            --verbose \
+            --repository . \
+            --flaky-runs 20 \
+            analyze \
+            --profile=profiling \
+            --output ecosystem-diagnostics.json
+
+          mkdir dist
+
+          ecosystem-analyzer \
+            generate-report \
+            --max-diagnostics-per-project=1000 \
+            ecosystem-diagnostics.json \
+            --output dist/index.html
+
+      # NOTE: astral-sh-bot uses this artifact to publish the ecosystem report.
+      # Make sure to update the bot if you rename the artifact.
+      - name: "Upload ecosystem report"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: full-report
+          path: dist/

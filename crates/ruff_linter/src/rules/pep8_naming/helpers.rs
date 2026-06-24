@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
 
 pub(super) fn is_camelcase(name: &str) -> bool {
@@ -91,7 +91,7 @@ pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &Sema
         return false;
     }
 
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         semantic.match_typing_qualified_name(&qualified_name, "TypedDict")
     })
 }

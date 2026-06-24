@@ -5,10 +5,14 @@ mod execute_command;
 mod format;
 mod format_range;
 mod hover;
+mod shutdown;
 
 use super::{
-    define_document_url,
-    traits::{BackgroundDocumentRequestHandler, RequestHandler, SyncRequestHandler},
+    define_document_uri,
+    traits::{
+        BackgroundDocumentRequestHandler, BackgroundRequestHandler, RequestHandler,
+        SyncRequestHandler,
+    },
 };
 pub(super) use code_action::CodeActions;
 pub(super) use code_action_resolve::CodeActionResolve;
@@ -17,5 +21,6 @@ pub(super) use execute_command::ExecuteCommand;
 pub(super) use format::Format;
 pub(super) use format_range::FormatRange;
 pub(super) use hover::Hover;
+pub(super) use shutdown::ShutdownHandler;
 
 type FormatResponse = Option<Vec<lsp_types::TextEdit>>;

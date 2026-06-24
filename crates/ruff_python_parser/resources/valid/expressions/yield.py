@@ -10,7 +10,5 @@ yield x, y
 yield (x, y)
 yield x == y
 yield (x := 1)
-yield *y
 yield x, *y
 yield *x,
-yield *x | y

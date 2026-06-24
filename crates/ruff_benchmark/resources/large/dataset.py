@@ -197,7 +197,7 @@ def test_index_with_attribute():
     ds["Foo"] = ds.Foo + 2.0
     assert (
         ds["Foo"] is ds.Foo
-    )  # This is now modfied, but both methods points to the same object
+    )  # This is now modified, but both methods points to the same object
 
 
 def test_getitem_time(ds3):

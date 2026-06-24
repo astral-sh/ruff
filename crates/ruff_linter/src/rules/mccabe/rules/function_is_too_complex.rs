@@ -1,8 +1,10 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::identifier::Identifier;
+use crate::Violation;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
@@ -18,34 +20,43 @@ use ruff_python_ast::identifier::Identifier;
 ///
 /// ## Example
 /// ```python
-/// def foo(a, b, c):
-///     if a:
-///         if b:
-///             if c:
-///                 return 1
-///             else:
-///                 return 2
-///         else:
-///             return 3
-///     else:
-///         return 4
+/// def normalize_status(status):
+///     if status == "new":
+///         return "queued"
+///     if status == "queued":
+///         return "running"
+///     if status == "running":
+///         return "done"
+///     if status == "failed":
+///         return "retry"
+///     if status == "cancelled":
+///         return "closed"
+///     return "unknown"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(a, b, c):
-///     if not a:
-///         return 4
-///     if not b:
-///         return 3
-///     if not c:
-///         return 2
-///     return 1
+/// STATUS_TRANSITIONS = {
+///     "new": "queued",
+///     "queued": "running",
+///     "running": "done",
+///     "failed": "retry",
+///     "cancelled": "closed",
+/// }
+///
+///
+/// def normalize_status(status):
+///     return STATUS_TRANSITIONS.get(status, "unknown")
 /// ```
+///
+/// Note that this example assumes a `lint.mccabe.max-complexity` of 5 or less to trigger a
+/// diagnostic because the initial code only has a complexity of 6.
 ///
 /// ## Options
 /// - `lint.mccabe.max-complexity`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct ComplexStructure {
     name: String,
     complexity: usize,
@@ -152,24 +163,24 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     complexity
 }
 
+/// C901
 pub(crate) fn function_is_too_complex(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
-) -> Option<Diagnostic> {
+) {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
-        Some(Diagnostic::new(
+        checker.report_diagnostic(
             ComplexStructure {
                 name: name.to_string(),
                 complexity,
                 max_complexity,
             },
             stmt.identifier(),
-        ))
-    } else {
-        None
+        );
     }
 }
 
@@ -500,7 +511,7 @@ def f():
     }
 
     #[test]
-    fn match_case_catch_all_with_seuqnece() -> Result<()> {
+    fn match_case_catch_all_with_sequence() -> Result<()> {
         let source = r"
 def f():
     match subject:

@@ -1,0 +1,12 @@
+"""Fix bound method attributes (method.im_? -> method.__?__)."""
+
+from typing import ClassVar, Final, Literal
+
+from .. import fixer_base
+
+MAP: Final[dict[str, str]]
+
+class FixMethodattrs(fixer_base.BaseFix):
+    BM_compatible: ClassVar[Literal[True]]
+    PATTERN: ClassVar[str]
+    def transform(self, node, results) -> None: ...

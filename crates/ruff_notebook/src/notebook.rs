@@ -1,24 +1,24 @@
 use itertools::Itertools;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
+use std::io;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::OnceLock;
-use std::{io, iter};
 use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
-use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
-use ruff_text_size::TextSize;
+use ruff_source_file::{OneIndexed, UniversalNewlineIterator};
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{schema, CellMetadata, RawNotebookMetadata};
+use crate::{CellMetadata, CellStart, RawNotebookMetadata, SYNTHETIC_CELL_SEPARATOR, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -30,7 +30,11 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
         )
     })?;
     let code = notebook.source_code().to_string();
-    notebook.update_cell_content(&code);
+    let needs_rebuild = notebook.update_cell_content(&code);
+    debug_assert!(
+        !needs_rebuild,
+        "round-tripping unchanged source cannot remove a synthetic cell separator"
+    );
     let mut writer = Vec::new();
     notebook.write(&mut writer)?;
     Ok(String::from_utf8(writer)?)
@@ -43,7 +47,9 @@ pub enum NotebookError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Json(serde_json::Error),
-    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}")]
+    #[error(
+        "Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}"
+    )]
     InvalidJson(serde_json::Error),
     #[error("This file does not match the schema expected of Jupyter Notebooks: {0}")]
     InvalidSchema(serde_json::Error),
@@ -134,21 +140,6 @@ impl Notebook {
             .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
-        let mut contents = Vec::with_capacity(valid_code_cells.len());
-        let mut current_offset = TextSize::from(0);
-        let mut cell_offsets = CellOffsets::with_capacity(valid_code_cells.len());
-        cell_offsets.push(TextSize::from(0));
-
-        for &idx in &valid_code_cells {
-            let cell_contents = match &raw_notebook.cells[idx as usize].source() {
-                SourceValue::String(string) => string.clone(),
-                SourceValue::StringArray(string_array) => string_array.join(""),
-            };
-            current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
-            contents.push(cell_contents);
-            cell_offsets.push(current_offset);
-        }
-
         // Add cell ids to 4.5+ notebooks if they are missing
         // https://github.com/astral-sh/ruff/issues/6834
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
@@ -191,13 +182,13 @@ impl Notebook {
             }
         }
 
+        let (source_code, cell_offsets) =
+            Self::source_code_and_cell_offsets(&raw_notebook, &valid_code_cells);
+
         Ok(Self {
             raw: raw_notebook,
             index: OnceLock::new(),
-            // The additional newline at the end is to maintain consistency for
-            // all cells. These newlines will be removed before updating the
-            // source code with the transformed content. Refer `update_cell_content`.
-            source_code: contents.join("\n") + "\n",
+            source_code,
             cell_offsets,
             valid_code_cells,
             trailing_newline,
@@ -224,6 +215,39 @@ impl Notebook {
         .unwrap()
     }
 
+    /// Build the concatenated source code and cell offsets from the raw notebook.
+    fn source_code_and_cell_offsets(
+        raw_notebook: &RawNotebook,
+        valid_code_cells: &[u32],
+    ) -> (String, CellOffsets) {
+        let mut source_code = String::new();
+        let mut cell_offsets = CellOffsets::with_capacity(valid_code_cells.len() + 1);
+        cell_offsets.push(TextSize::from(0));
+
+        for &idx in valid_code_cells {
+            match raw_notebook.cells[idx as usize].source() {
+                SourceValue::String(string) => source_code.push_str(string),
+                SourceValue::StringArray(string_array) => {
+                    for string in string_array {
+                        source_code.push_str(string);
+                    }
+                }
+            }
+            source_code.push(SYNTHETIC_CELL_SEPARATOR);
+            cell_offsets.push(TextSize::of(&source_code));
+        }
+
+        // The additional newline maintains a consistent source representation
+        // for notebooks without any valid Python code cells. Synthetic newlines
+        // are removed before updating the raw cell content. Refer
+        // `update_cell_content`.
+        if valid_code_cells.is_empty() {
+            source_code.push(SYNTHETIC_CELL_SEPARATOR);
+        }
+
+        (source_code, cell_offsets)
+    }
+
     /// Update the cell offsets as per the given [`SourceMap`].
     fn update_cell_offsets(&mut self, source_map: &SourceMap) {
         // When there are multiple cells without any edits, the offsets of those
@@ -233,19 +257,25 @@ impl Notebook {
         let mut last_marker: Option<&SourceMarker> = None;
 
         // The first offset is always going to be at 0, so skip it.
-        for offset in self.cell_offsets.iter_mut().skip(1).rev() {
+        for (index, offset) in self.cell_offsets.iter_mut().skip(1).rev().enumerate() {
             let closest_marker = match last_marker {
-                Some(marker) if marker.source() <= *offset => marker,
+                Some(marker) if marker.source() < *offset => marker,
                 _ => {
-                    let Some(marker) = source_map
-                        .markers()
-                        .iter()
-                        .rev()
-                        .find(|marker| marker.source() <= *offset)
-                    else {
+                    let mut markers = source_map.markers().iter().rev();
+                    let Some(marker) = markers.find(|marker| marker.source() <= *offset) else {
                         // There are no markers above the current offset, so we can
                         // stop here.
                         break;
+                    };
+                    // An internal offset is also the start of the following cell, so prefer the
+                    // first marker at that offset. The final offset is only a cell end.
+                    let marker = if index > 0 && marker.source() == *offset {
+                        markers
+                            .take_while(|marker| marker.source() == *offset)
+                            .last()
+                            .unwrap_or(marker)
+                    } else {
+                        marker
                     };
                     last_marker = Some(marker);
                     marker
@@ -262,12 +292,17 @@ impl Notebook {
 
     /// Update the cell contents with the transformed content.
     ///
+    /// Returns `true` if a cell separator was removed and the source code and
+    /// cell offsets need to be rebuilt.
+    ///
     /// ## Panics
     ///
     /// Panics if the transformed content is out of bounds for any cell. This
     /// can happen only if the cell offsets were not updated before calling
     /// this method or the offsets were updated incorrectly.
-    fn update_cell_content(&mut self, transformed: &str) {
+    fn update_cell_content(&mut self, transformed: &str) -> bool {
+        let mut missing_separator = false;
+
         for (&idx, (start, end)) in self
             .valid_code_cells
             .iter()
@@ -280,6 +315,7 @@ impl Notebook {
                         "Transformed content out of bounds ({start:?}..{end:?}) for cell at {idx:?}"
                     );
                 });
+            missing_separator |= !cell_content.ends_with(SYNTHETIC_CELL_SEPARATOR);
             self.raw.cells[idx as usize].set_source(SourceValue::StringArray(
                 UniversalNewlineIterator::from(
                     // We only need to strip the trailing newline which we added
@@ -290,66 +326,45 @@ impl Notebook {
                 .collect::<Vec<_>>(),
             ));
         }
+
+        missing_separator
     }
 
-    /// Build and return the [`JupyterIndex`].
+    /// Build and return the [`NotebookIndex`].
     ///
     /// ## Notes
     ///
-    /// Empty cells don't have any newlines, but there's a single visible line
-    /// in the UI. That single line needs to be accounted for.
+    /// Each cell range includes its synthetic newline separator. Counting the
+    /// lines in the concatenated source accounts for empty cells and for cells
+    /// that already end in a newline.
     ///
-    /// In case of [`SourceValue::StringArray`], newlines are part of the strings.
-    /// So, to get the actual count of lines, we need to check for any trailing
-    /// newline for the last line.
-    ///
-    /// For example, consider the following cell:
-    /// ```python
-    /// [
-    ///    "import os\n",
-    ///    "import sys\n",
-    /// ]
+    /// For example, the source array:
+    /// ```text
+    /// ["import os\n", "import sys\n"]
     /// ```
-    ///
-    /// Here, the array suggests that there are two lines, but the actual number
-    /// of lines visible in the UI is three. The same goes for [`SourceValue::String`]
-    /// where we need to check for the trailing newline.
-    ///
-    /// The index building is expensive as it needs to go through the content of
-    /// every valid code cell.
+    /// is joined with the synthetic separator to form `"import os\nimport sys\n\n"`,
+    /// which occupies three rows. Array entries aren't necessarily lines, though:
+    /// `["p", "a", "s", "s"]` is joined with the separator to form `"pass\n"` and
+    /// occupies one row.
     fn build_index(&self) -> NotebookIndex {
-        let mut row_to_cell = Vec::new();
-        let mut row_to_row_in_cell = Vec::new();
+        let mut cell_starts = Vec::with_capacity(self.valid_code_cells.len());
 
-        for &cell_index in &self.valid_code_cells {
-            let line_count = match &self.raw.cells[cell_index as usize].source() {
-                SourceValue::String(string) => {
-                    if string.is_empty() {
-                        1
-                    } else {
-                        NewlineWithTrailingNewline::from(string).count()
-                    }
-                }
-                SourceValue::StringArray(string_array) => {
-                    if string_array.is_empty() {
-                        1
-                    } else {
-                        let trailing_newline =
-                            usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
-                        string_array.len() + trailing_newline
-                    }
-                }
-            };
-            row_to_cell.extend(
-                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
-            );
-            row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
+        let mut current_row = OneIndexed::MIN;
+
+        for (&cell_index, range) in self.valid_code_cells.iter().zip(self.cell_offsets.ranges()) {
+            let raw_cell_index = cell_index as usize;
+            // Record the starting row of this cell
+            cell_starts.push(CellStart {
+                start_row: current_row,
+                raw_cell_index: OneIndexed::from_zero_indexed(raw_cell_index),
+            });
+
+            let line_count = UniversalNewlineIterator::from(&self.source_code[range]).count();
+
+            current_row = current_row.saturating_add(line_count);
         }
 
-        NotebookIndex {
-            row_to_cell,
-            row_to_row_in_cell,
-        }
+        NotebookIndex { cell_starts }
     }
 
     /// Return the notebook content.
@@ -383,6 +398,21 @@ impl Notebook {
         &self.cell_offsets
     }
 
+    /// Returns the start offset of the cell at index `cell` in the concatenated
+    /// text document.
+    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
+        self.cell_offsets.get(cell.to_zero_indexed()).copied()
+    }
+
+    /// Returns the text range in the concatenated document of the cell
+    /// with index `cell`.
+    pub fn cell_range(&self, cell: OneIndexed) -> Option<TextRange> {
+        let start = self.cell_offsets.get(cell.to_zero_indexed()).copied()?;
+        let end = self.cell_offsets.get(cell.to_zero_indexed() + 1).copied()?;
+
+        Some(TextRange::new(start, end))
+    }
+
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.
     pub fn trailing_newline(&self) -> bool {
         self.trailing_newline
@@ -394,8 +424,19 @@ impl Notebook {
         // it depends on the offsets to extract the cell content.
         self.index.take();
         self.update_cell_offsets(source_map);
-        self.update_cell_content(&transformed);
-        self.source_code = transformed;
+
+        let needs_rebuild = self.update_cell_content(&transformed);
+
+        if needs_rebuild {
+            // A fix that empties a cell can also remove its synthetic newline
+            // separator. For example, deleting `"import os\n"` from the first
+            // cell changes offsets `[0, 10, 16]` to `[0, 0, 6]`. Rebuild the
+            // source and offsets to restore the separator as `[0, 1, 7]`.
+            (self.source_code, self.cell_offsets) =
+                Self::source_code_and_cell_offsets(&self.raw, &self.valid_code_cells);
+        } else {
+            self.source_code = transformed;
+        }
     }
 
     /// Return a slice of [`Cell`] in the Jupyter notebook.
@@ -451,9 +492,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use ruff_diagnostics::SourceMap;
     use ruff_source_file::OneIndexed;
+    use ruff_text_size::TextSize;
 
-    use crate::{Cell, Notebook, NotebookError, NotebookIndex};
+    use crate::{Cell, CellStart, Notebook, NotebookError, NotebookIndex};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -545,39 +588,27 @@ print("after empty cells")
         assert_eq!(
             notebook.index(),
             &NotebookIndex {
-                row_to_cell: vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(4),
-                    OneIndexed::from_zero_indexed(6),
-                    OneIndexed::from_zero_indexed(6),
-                    OneIndexed::from_zero_indexed(7)
-                ],
-                row_to_row_in_cell: vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                    OneIndexed::from_zero_indexed(4),
-                    OneIndexed::from_zero_indexed(5),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                    OneIndexed::from_zero_indexed(4),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(0)
+                cell_starts: vec![
+                    CellStart {
+                        start_row: OneIndexed::MIN,
+                        raw_cell_index: OneIndexed::MIN
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(6),
+                        raw_cell_index: OneIndexed::from_zero_indexed(2)
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(11),
+                        raw_cell_index: OneIndexed::from_zero_indexed(4)
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(12),
+                        raw_cell_index: OneIndexed::from_zero_indexed(6)
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(14),
+                        raw_cell_index: OneIndexed::from_zero_indexed(7)
+                    }
                 ],
             }
         );
@@ -593,6 +624,212 @@ print("after empty cells")
             ]
         );
         Ok(())
+    }
+
+    #[test]
+    fn index_fragmented_source_array() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_source_code(
+            r##"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["p", "a", "s", "s", " ", " ", " "]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["# snapshot\n", "x = 1"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}"##,
+        )?;
+
+        assert_eq!(notebook.source_code(), "pass   \n# snapshot\nx = 1\n");
+        assert_eq!(
+            notebook.index(),
+            &NotebookIndex {
+                cell_starts: vec![
+                    CellStart {
+                        start_row: OneIndexed::MIN,
+                        raw_cell_index: OneIndexed::MIN,
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(1),
+                        raw_cell_index: OneIndexed::from_zero_indexed(1),
+                    },
+                ],
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_restores_separators_for_empty_cells() -> Result<(), NotebookError> {
+        let mut notebook = Notebook::from_source_code(
+            r##"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["import os"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["import sys"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["x = 1"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}"##,
+        )?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(0.into(), 0.into());
+        source_map.push_marker(10.into(), 0.into());
+        source_map.push_marker(21.into(), 0.into());
+        notebook.update(&source_map, "x = 1\n".to_string());
+
+        assert_eq!(notebook.source_code(), "\n\nx = 1\n");
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 1.into(), 2.into(), 8.into()]
+        );
+        assert_eq!(
+            notebook.index(),
+            &NotebookIndex {
+                cell_starts: vec![
+                    CellStart {
+                        start_row: OneIndexed::MIN,
+                        raw_cell_index: OneIndexed::MIN,
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(1),
+                        raw_cell_index: OneIndexed::from_zero_indexed(1),
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(2),
+                        raw_cell_index: OneIndexed::from_zero_indexed(2),
+                    },
+                ],
+            }
+        );
+
+        Ok(())
+    }
+
+    fn two_cell_notebook() -> Result<Notebook, NotebookError> {
+        Notebook::from_source_code(
+            r##"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["x = 1"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["x.method(inplace=True)"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}"##,
+        )
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_cell_start_in_that_cell() -> Result<(), NotebookError> {
+        let mut notebook = two_cell_notebook()?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(6.into(), 6.into());
+        source_map.push_marker(6.into(), 10.into());
+        notebook.update(
+            &source_map,
+            "x = 1\nx = x.method(inplace=True)\n".to_string(),
+        );
+
+        assert_eq!(
+            notebook.source_code(),
+            "x = 1\nx = x.method(inplace=True)\n"
+        );
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 6.into(), 33.into()]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_end_in_non_final_cell() -> Result<(), NotebookError> {
+        let mut notebook = two_cell_notebook()?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(5.into(), 5.into());
+        source_map.push_marker(5.into(), 16.into());
+        notebook.update(
+            &source_map,
+            "x = 1  # comment\nx.method(inplace=True)\n".to_string(),
+        );
+
+        assert_eq!(
+            notebook.source_code(),
+            "x = 1  # comment\nx.method(inplace=True)\n"
+        );
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 17.into(), 40.into()]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_keeps_insertion_at_end_in_last_cell() {
+        let mut notebook = Notebook::empty();
+        let end = TextSize::of(notebook.source_code());
+        let insertion = "# comment\n";
+        let transformed = format!("{}{insertion}", notebook.source_code());
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(end, end);
+        source_map.push_marker(end, end + TextSize::of(insertion));
+        notebook.update(&source_map, transformed.clone());
+
+        assert_eq!(
+            notebook.cell_offsets().last().copied(),
+            Some(TextSize::of(&transformed))
+        );
+        assert_eq!(notebook.cells()[0].source().to_string(), "\n# comment");
     }
 
     #[test_case("vscode_language_id.ipynb")]

@@ -2,13 +2,13 @@ use std::fmt;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
-use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
@@ -36,7 +36,14 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// x: Literal[b"B"] | str
 /// ```
+///
+/// ## Known issues
+/// This rule is opinionated and may not be appropriate for projects that keep
+/// literal members for editor suggestions, generated documentation, or another
+/// non-type-checking purpose. In those cases, disabling this rule for the
+/// affected annotations may be reasonable.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,
@@ -90,7 +97,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),
@@ -98,7 +105,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                     builtin_type: literal_type,
                 },
                 typing_literal_expr.range(),
-            ));
+            );
         }
     }
 }

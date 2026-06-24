@@ -1,14 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::map_subscript;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
-use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in
@@ -59,6 +57,7 @@ use crate::fix;
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct UnnecessaryPlaceholder {
     kind: Placeholder,
 }
@@ -100,7 +99,7 @@ pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
                 // Ellipses are significant in protocol methods and abstract methods.
                 // Specifically, Pyright uses the presence of an ellipsis to indicate that
                 // a method is a stub, rather than a default implementation.
-                if in_protocol_or_abstract_method(checker.semantic()) {
+                if checker.semantic().in_protocol_or_abstract_method() {
                     return;
                 }
                 Placeholder::Ellipsis
@@ -138,14 +137,14 @@ fn add_diagnostic(
     let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
     let fix = Fix::applicable_edit(edit, applicability).isolate(isolation_level);
 
-    let diagnostic = Diagnostic::new(
-        UnnecessaryPlaceholder {
-            kind: placeholder_kind,
-        },
-        stmt.range(),
-    );
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(
+            UnnecessaryPlaceholder {
+                kind: placeholder_kind,
+            },
+            stmt.range(),
+        )
+        .set_fix(fix);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -161,22 +160,4 @@ impl std::fmt::Display for Placeholder {
             Self::Ellipsis => fmt.write_str("..."),
         }
     }
-}
-
-/// Return `true` if the [`SemanticModel`] is in a `typing.Protocol` subclass or an abstract
-/// method.
-fn in_protocol_or_abstract_method(semantic: &SemanticModel) -> bool {
-    semantic.current_scopes().any(|scope| match scope.kind {
-        ScopeKind::Class(class_def) => class_def
-            .bases()
-            .iter()
-            .any(|base| semantic.match_typing_expr(map_subscript(base), "Protocol")),
-        ScopeKind::Function(function_def) => {
-            ruff_python_semantic::analyze::visibility::is_abstract(
-                &function_def.decorator_list,
-                semantic,
-            )
-        }
-        _ => false,
-    })
 }

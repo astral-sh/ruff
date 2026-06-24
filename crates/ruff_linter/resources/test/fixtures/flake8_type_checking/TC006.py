@@ -89,3 +89,11 @@ def f():
         int  # TC006
         , 6.0
     )
+
+
+def f():
+    # Keyword arguments
+    from typing import cast
+
+    cast(typ=int, val=3.0)  # TC006
+    cast(val=3.0, typ=int)  # TC006

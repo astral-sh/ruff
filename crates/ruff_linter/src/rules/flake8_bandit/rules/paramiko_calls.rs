@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -26,6 +26,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 /// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.270")]
 pub(crate) struct ParamikoCall;
 
 impl Violation for ParamikoCall {
@@ -45,6 +46,6 @@ pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
             matches!(qualified_name.segments(), ["paramiko", "exec_command"])
         })
     {
-        checker.report_diagnostic(Diagnostic::new(ParamikoCall, func.range()));
+        checker.report_diagnostic(ParamikoCall, func.range());
     }
 }

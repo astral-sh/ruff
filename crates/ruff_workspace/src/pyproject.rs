@@ -4,12 +4,14 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use log::debug;
-use pep440_rs::VersionSpecifiers;
+use pep440_rs::{Operator, Version, VersionSpecifiers};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
-use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
 
-use crate::options::Options;
+use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
@@ -39,20 +41,38 @@ impl Pyproject {
     }
 }
 
+fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
+    let path = path.as_ref();
+    let contents = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+
+    // Parse the TOML document once into a spanned representation so we can:
+    // - Inspect `required-version` without triggering strict deserialization errors.
+    // - Deserialize with precise spans (line/column and excerpt) on errors.
+    let root = toml::de::DeTable::parse(&contents)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    check_required_version(root.get_ref(), table_path)?;
+
+    let deserializer = toml::de::Deserializer::from(root);
+    T::deserialize(deserializer)
+        .map_err(|mut err| {
+            // `Deserializer::from` doesn't have access to the original input, but we do.
+            // Attach it so TOML errors include line/column and a source excerpt.
+            err.set_input(Some(&contents));
+            err
+        })
+        .with_context(|| format!("Failed to parse {}", path.display()))
+}
+
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
-    toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
+    parse_toml(path, &[])
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
-    toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
+    parse_toml(path, &["tool", "ruff"])
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -64,20 +84,21 @@ pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
 /// Return the path to the `pyproject.toml` or `ruff.toml` file in a given
 /// directory.
 pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    let path = path.as_ref();
     // Check for `.ruff.toml`.
-    let ruff_toml = path.as_ref().join(".ruff.toml");
+    let ruff_toml = path.join(".ruff.toml");
     if ruff_toml.is_file() {
         return Ok(Some(ruff_toml));
     }
 
     // Check for `ruff.toml`.
-    let ruff_toml = path.as_ref().join("ruff.toml");
+    let ruff_toml = path.join("ruff.toml");
     if ruff_toml.is_file() {
         return Ok(Some(ruff_toml));
     }
 
     // Check for `pyproject.toml`.
-    let pyproject_toml = path.as_ref().join("pyproject.toml");
+    let pyproject_toml = path.join("pyproject.toml");
     if pyproject_toml.is_file() && ruff_enabled(&pyproject_toml)? {
         return Ok(Some(pyproject_toml));
     }
@@ -96,12 +117,49 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
+fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
+    let mut current = value;
+    for key in table_path {
+        let Some(next) = current.get(*key) else {
+            return Ok(());
+        };
+        let toml::de::DeValue::Table(next) = next.get_ref() else {
+            return Ok(());
+        };
+        current = next;
+    }
+
+    let required_version = current
+        .get("required-version")
+        .and_then(|value| value.get_ref().as_str());
+
+    let Some(required_version) = required_version else {
+        return Ok(());
+    };
+
+    // If it doesn't parse, we just fall through to normal parsing; it will give a nicer error message.
+    if let Ok(required_version) = required_version.parse::<RequiredVersion>() {
+        validate_required_version(&required_version)?;
+    }
+    Ok(())
+}
+
+/// Derive target version from `required-version` in `pyproject.toml`, if
+/// such a file exists in an ancestor directory.
+pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVersion> {
+    for directory in path.as_ref().ancestors() {
+        if let Some(fallback) = get_fallback_target_version(directory) {
+            return Some(fallback);
+        }
+    }
+    None
+}
+
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn find_user_settings_toml() -> Option<PathBuf> {
     use etcetera::BaseStrategy;
-    use ruff_linter::warn_user_once;
 
     let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
     let config_dir = strategy.config_dir().join("ruff");
@@ -111,23 +169,6 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
         let path = config_dir.join(filename);
         if path.is_file() {
             return Some(path);
-        }
-    }
-
-    // On macOS, we used to support reading from `/Users/Alice/Library/Application Support`.
-    if cfg!(target_os = "macos") {
-        let strategy = etcetera::base_strategy::Apple::new().ok()?;
-        let deprecated_config_dir = strategy.data_dir().join("ruff");
-
-        for file in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
-            let path = deprecated_config_dir.join(file);
-            if path.is_file() {
-                warn_user_once!(
-                    "Reading configuration from `~/Library/Application Support` is deprecated. Please move your configuration to `{}/{file}`.",
-                    config_dir.display(),
-                );
-                return Some(path);
-            }
         }
     }
 
@@ -141,8 +182,9 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
 pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
-    if path.as_ref().ends_with("pyproject.toml") {
-        let pyproject = parse_pyproject_toml(&path)?;
+    let path = path.as_ref();
+    if path.ends_with("pyproject.toml") {
+        let pyproject = parse_pyproject_toml(path)?;
         let mut ruff = pyproject
             .tool
             .and_then(|tool| tool.ruff)
@@ -150,21 +192,79 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         if ruff.target_version.is_none() {
             if let Some(project) = pyproject.project {
                 if let Some(requires_python) = project.requires_python {
-                    ruff.target_version =
-                        PythonVersion::get_minimum_supported_version(&requires_python);
+                    ruff.target_version = get_minimum_supported_version(&requires_python);
                 }
             }
         }
         Ok(ruff)
     } else {
         let ruff = parse_ruff_toml(path);
-        if let Ok(ruff) = &ruff {
+        if let Ok(ruff) = ruff {
             if ruff.target_version.is_none() {
-                debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
+                debug!("No `target-version` found in `{}`", path.display());
             }
+            Ok(ruff)
+        } else {
+            ruff
         }
-        ruff
     }
+}
+
+/// Extract `target-version` from `pyproject.toml` in the given directory
+/// if the file exists and has `requires-python`.
+fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
+    let pyproject_path = dir.join("pyproject.toml");
+    if !pyproject_path.exists() {
+        return None;
+    }
+    let parsed_pyproject = parse_pyproject_toml(&pyproject_path);
+
+    let pyproject = match parsed_pyproject {
+        Ok(pyproject) => pyproject,
+        Err(err) => {
+            debug!("Failed to find fallback `target-version` due to: {err}");
+            return None;
+        }
+    };
+
+    if let Some(project) = pyproject.project {
+        if let Some(requires_python) = project.requires_python {
+            return get_minimum_supported_version(&requires_python);
+        }
+    }
+    None
+}
+
+/// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
+fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+    /// Truncate a version to its major and minor components.
+    fn major_minor(version: &Version) -> Option<Version> {
+        let major = version.release().first()?;
+        let minor = version.release().get(1)?;
+        Some(Version::new([major, minor]))
+    }
+
+    // Extract the minimum supported version from the specifiers.
+    let minimum_version = requires_version
+        .iter()
+        .filter(|specifier| {
+            matches!(
+                specifier.operator(),
+                Operator::Equal
+                    | Operator::EqualStar
+                    | Operator::ExactEqual
+                    | Operator::TildeEqual
+                    | Operator::GreaterThan
+                    | Operator::GreaterThanEqual
+            )
+        })
+        .filter_map(|specifier| major_minor(specifier.version()))
+        .min()?;
+
+    debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+    // Find the Python version that matches the minimum supported version.
+    PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
 }
 
 #[cfg(test)]
@@ -180,11 +280,10 @@ mod tests {
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::{LintCommonOptions, LintOptions, Options};
-    use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
+    use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
+    use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
-
     fn deserialize() -> Result<()> {
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
@@ -291,33 +390,130 @@ ignore = ["E501"]
             })
         );
 
-        assert!(toml::from_str::<Pyproject>(
-            r"
+        let pyproject: Pyproject = toml::from_str(
+            r#"
+[tool.ruff.lint.flake8-builtins]
+builtins-allowed-modules = ["asyncio"]
+builtins-ignorelist = ["argparse", 'typing']
+builtins-strict-checking = true
+allowed-modules = ['sys']
+ignorelist = ["os", 'io']
+strict-checking = false
+"#,
+        )?;
+
+        #[expect(deprecated)]
+        let expected = Flake8BuiltinsOptions {
+            builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
+            allowed_modules: Some(vec!["sys".to_string()]),
+
+            builtins_ignorelist: Some(vec!["argparse".to_string(), "typing".to_string()]),
+            ignorelist: Some(vec!["os".to_string(), "io".to_string()]),
+
+            builtins_strict_checking: Some(true),
+            strict_checking: Some(false),
+        };
+
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                ruff: Some(Options {
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            flake8_builtins: Some(expected.clone()),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
+                    ..Options::default()
+                })
+            })
+        );
+
+        let settings = expected.into_settings();
+
+        assert_eq!(settings.allowed_modules, vec!["sys".to_string()]);
+        assert_eq!(
+            settings.ignorelist,
+            vec!["os".to_string(), "io".to_string()]
+        );
+        assert!(!settings.strict_checking);
+
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
 [tool.black]
 [tool.ruff]
 line_length = 79
 ",
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
-        assert!(toml::from_str::<Pyproject>(
-            r#"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r#"
 [tool.black]
 [tool.ruff.lint]
 select = ["E123"]
 "#,
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
-        assert!(toml::from_str::<Pyproject>(
-            r"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
 [tool.black]
 [tool.ruff]
 line-length = 79
 other-attribute = 1
 ",
+            )
+            .is_err()
+        );
+
+        // Test value exceeding u16::MAX (65536) - should show clear error
+        let invalid_line_length_65536 = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 65536
+",
         )
-        .is_err());
+        .expect_err("Deserialization should have failed for line-length exceeding u16::MAX");
+
+        assert_eq!(
+            invalid_line_length_65536.message(),
+            "line-length must be between 1 and 65535 (got 65536)"
+        );
+
+        // Test value far exceeding u16::MAX (99_999) - should show clear error
+        let invalid_line_length_99999 = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 99_999
+",
+        )
+        .expect_err("Deserialization should have failed for line-length far exceeding u16::MAX");
+
+        assert_eq!(
+            invalid_line_length_99999.message(),
+            "line-length must be between 1 and 65535 (got 99999)"
+        );
+
+        // Test negative value - should show clear error
+        let invalid_line_length_negative = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = -5
+",
+        )
+        .expect_err("Deserialization should have failed for negative line-length");
+
+        assert_eq!(
+            invalid_line_length_negative.message(),
+            "line-length must be between 1 and 65535 (got -5)"
+        );
 
         Ok(())
     }

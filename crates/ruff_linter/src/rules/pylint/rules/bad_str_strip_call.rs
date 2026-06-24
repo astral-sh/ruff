@@ -3,14 +3,14 @@ use std::fmt;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::analyze::typing;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks duplicate characters in `str.strip` calls.
@@ -48,6 +48,7 @@ use crate::settings::types::PythonVersion;
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct BadStrStripCall {
     strip: StripKind,
     removal: Option<RemovalKind>,
@@ -187,12 +188,6 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
 
     let value = &**value;
 
-    if checker.settings.preview.is_disabled()
-        && !matches!(value, Expr::StringLiteral(_) | Expr::BytesLiteral(_))
-    {
-        return;
-    }
-
     let Some(value_kind) = ValueKind::from(value, checker.semantic()) else {
         return;
     };
@@ -211,13 +206,11 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let removal = if checker.settings.target_version >= PythonVersion::Py39 {
+    let removal = if checker.target_version() >= PythonVersion::PY39 {
         RemovalKind::for_strip(strip)
     } else {
         None
     };
 
-    let diagnostic = Diagnostic::new(BadStrStripCall { strip, removal }, arg.range());
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(BadStrStripCall { strip, removal }, arg.range());
 }

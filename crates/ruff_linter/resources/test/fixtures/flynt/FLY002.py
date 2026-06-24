@@ -16,8 +16,16 @@ nok4 = "a".join([a, a, *a])  # Not OK (not a static length)
 nok5 = "a".join([choice("flarp")])  # Not OK (not a simple call)
 nok6 = "a".join(x for x in "feefoofum")  # Not OK (generator)
 nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
-
+# https://github.com/astral-sh/ruff/issues/19887
+nok8 = '\n'.join([r'line1','line2'])
+nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7197
 def create_file_public_url(url, filename):
     return''.join([url, filename])
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/19837
+nok10 = "".join((foo, '"'))
+nok11 = ''.join((foo, "'"))
+nok12 = ''.join([foo, "'", '"'])
+nok13 = "".join([foo, "'", '"'])

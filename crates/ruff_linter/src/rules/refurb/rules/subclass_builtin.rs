@@ -1,29 +1,45 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{helpers::map_subscript, Arguments, StmtClassDef};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Arguments, StmtClassDef, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
+use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
 /// Checks for subclasses of `dict`, `list` or `str`.
 ///
 /// ## Why is this bad?
-/// Subclassing `dict`, `list`, or `str` objects can be error prone, use the
-/// `UserDict`, `UserList`, and `UserString` objects from the `collections` module
+/// Built-in types don't consistently use their own dunder methods. For example,
+/// `dict.__init__` and `dict.update()` bypass `__setitem__`, making inheritance unreliable.
+///
+/// Use the `UserDict`, `UserList`, and `UserString` objects from the `collections` module
 /// instead.
 ///
 /// ## Example
+///
 /// ```python
-/// class CaseInsensitiveDict(dict): ...
+/// class UppercaseDict(dict):
+///     def __setitem__(self, key, value):
+///         super().__setitem__(key.upper(), value)
+///
+///
+/// d = UppercaseDict({"a": 1, "b": 2})  # Bypasses __setitem__
+/// print(d)  # {'a': 1, 'b': 2}
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from collections import UserDict
 ///
 ///
-/// class CaseInsensitiveDict(UserDict): ...
+/// class UppercaseDict(UserDict):
+///     def __setitem__(self, key, value):
+///         super().__setitem__(key.upper(), value)
+///
+///
+/// d = UppercaseDict({"a": 1, "b": 2})  # Uses __setitem__
+/// print(d)  # {'A': 1, 'B': 2}
 /// ```
 ///
 /// ## Fix safety
@@ -41,6 +57,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// - [Python documentation: `collections`](https://docs.python.org/3/library/collections.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.3")]
 pub(crate) struct SubclassBuiltin {
     subclass: String,
     replacement: String,
@@ -89,7 +106,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
 
     let user_symbol = supported_builtin.user_symbol();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SubclassBuiltin {
             subclass: symbol.to_string(),
             replacement: user_symbol.to_string(),
@@ -105,7 +122,6 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
         let other_edit = Edit::range_replacement(binding, base_expr.range());
         Ok(Fix::unsafe_edits(import_edit, [other_edit]))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

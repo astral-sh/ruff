@@ -1,25 +1,25 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for usage of `datetime.date.fromtimestamp()`.
 ///
 /// ## Why is this bad?
-/// Python datetime objects can be naive or timezone-aware. While an aware
+/// Python date objects are naive, that is, not timezone-aware. While an aware
 /// object represents a specific moment in time, a naive object does not
 /// contain enough information to unambiguously locate itself relative to other
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.date.fromtimestamp(ts)` returns a naive datetime object.
-/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=...)` to create a
-/// timezone-aware object.
+/// `datetime.date.fromtimestamp(ts)` returns a naive date object.
+/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=...).date()` to
+/// create a timezone-aware datetime object and retrieve its date component.
 ///
 /// ## Example
 /// ```python
@@ -32,19 +32,20 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc)
+/// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc).date()
 /// ```
 ///
 /// Or, for Python 3.11 and later:
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.fromtimestamp(946684800, tz=datetime.UTC)
+/// datetime.datetime.fromtimestamp(946684800, tz=datetime.UTC).date()
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDateFromtimestamp;
 
 impl Violation for CallDateFromtimestamp {
@@ -58,6 +59,7 @@ impl Violation for CallDateFromtimestamp {
     }
 }
 
+/// DTZ012
 pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
@@ -73,6 +75,6 @@ pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: 
             )
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CallDateFromtimestamp, location));
+        checker.report_diagnostic(CallDateFromtimestamp, location);
     }
 }

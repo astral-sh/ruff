@@ -1,0 +1,182 @@
+import ruffSchema from "../../../../ruff.schema.json";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Header, useTheme, setupMonaco, downloadZip } from "shared";
+import {
+  copyAsMarkdown,
+  copyAsMarkdownLink,
+  persist,
+  persistLocal,
+  restore,
+  stringify,
+} from "./settings";
+import { default as Editor, Source } from "./Editor";
+import { loader } from "@monaco-editor/react";
+import { DEFAULT_PYTHON_SOURCE } from "../constants";
+import { default as initRuff, LogLevel, Workspace } from "ruff_wasm";
+
+export default function Chrome() {
+  const initPromise = useRef<null | Promise<void>>(null);
+  const [pythonSource, setPythonSource] = useState<null | string>(null);
+  const [settings, setSettings] = useState<null | string>(null);
+  const [revision, setRevision] = useState(0);
+  const [ruffVersion, setRuffVersion] = useState<string | null>(null);
+
+  const [theme, setTheme] = useTheme();
+
+  const handleShare = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await persist(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleCopyMarkdownLink = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await copyAsMarkdownLink(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleCopyMarkdown = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await copyAsMarkdown(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleDownload = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+
+    const toml = await import("smol-toml");
+
+    const files: { [name: string]: string } = { "main.py": pythonSource };
+
+    try {
+      files["ruff.toml"] = toml.stringify(JSON.parse(settings));
+    } catch {
+      files["ruff.json"] = settings;
+    }
+
+    await downloadZip(files, "ruff-playground");
+  }, [pythonSource, settings]);
+
+  if (initPromise.current == null) {
+    initPromise.current = startPlayground()
+      .then(({ sourceCode, settings, ruffVersion }) => {
+        setPythonSource(sourceCode);
+        setSettings(settings);
+        setRuffVersion(ruffVersion);
+        setRevision(1);
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error("Failed to initialize playground.", error);
+      });
+  }
+
+  const handleSourceChanged = useCallback(
+    (source: string) => {
+      setPythonSource(source);
+      setRevision((revision) => revision + 1);
+
+      if (settings != null) {
+        persistLocal({ pythonSource: source, settingsSource: settings });
+      }
+    },
+    [settings],
+  );
+
+  const handleSettingsChanged = useCallback(
+    (settings: string) => {
+      setSettings(settings);
+      setRevision((revision) => revision + 1);
+
+      if (pythonSource != null) {
+        persistLocal({ pythonSource: pythonSource, settingsSource: settings });
+      }
+    },
+    [pythonSource],
+  );
+
+  const handleResetClicked = useCallback(() => {
+    const pythonSource = DEFAULT_PYTHON_SOURCE;
+    const settings = stringify(Workspace.defaultSettings());
+
+    persistLocal({ pythonSource, settingsSource: settings });
+    setPythonSource(pythonSource);
+    setSettings(settings);
+  }, []);
+
+  const source: Source | null = useMemo(() => {
+    if (pythonSource == null || settings == null) {
+      return null;
+    }
+
+    return { pythonSource, settingsSource: settings };
+  }, [settings, pythonSource]);
+
+  return (
+    <main className="flex flex-col h-full bg-white dark:bg-ayu-background-dark">
+      <Header
+        theme={theme}
+        tool="ruff"
+        version={`v${ruffVersion}`}
+        onChangeTheme={setTheme}
+        edit={revision}
+        onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
+        onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
+        onReset={handleResetClicked}
+      />
+
+      <div className="flex grow">
+        {source != null && (
+          <Editor
+            theme={theme}
+            source={source}
+            onSettingsChanged={handleSettingsChanged}
+            onSourceChanged={handleSourceChanged}
+          />
+        )}
+      </div>
+    </main>
+  );
+}
+
+// Run once during startup. Initializes monaco, loads the wasm file, and restores the previous editor state.
+async function startPlayground(): Promise<{
+  sourceCode: string;
+  settings: string;
+  ruffVersion: string;
+}> {
+  const ruff = await initRuff();
+
+  if (import.meta.env.DEV) {
+    ruff.initLogging(LogLevel.Debug);
+  } else {
+    ruff.initLogging(LogLevel.Info);
+  }
+
+  const monaco = await loader.init();
+
+  setupMonaco(monaco, {
+    uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
+    fileMatch: ["ruff.json"],
+    schema: ruffSchema,
+  });
+
+  const response = await restore();
+  const [settingsSource, pythonSource] = response ?? [
+    stringify(Workspace.defaultSettings()),
+    DEFAULT_PYTHON_SOURCE,
+  ];
+
+  return {
+    sourceCode: pythonSource,
+    settings: settingsSource,
+    ruffVersion: Workspace.version(),
+  };
+}

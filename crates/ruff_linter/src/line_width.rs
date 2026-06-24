@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::hash::Hasher;
-use std::num::{NonZeroU16, NonZeroU8, ParseIntError};
+use std::num::{NonZeroU8, NonZeroU16, ParseIntError};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -13,16 +13,14 @@ use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
 ///
-/// The allowed range of values is 1..=320
-#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The allowed range of values is 1..=65535
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(
-    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
-);
+pub struct LineLength(NonZeroU16);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
-    pub const MAX: u16 = 320;
+    pub const MAX: u16 = u16::MAX;
 
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
@@ -43,6 +41,25 @@ impl Default for LineLength {
 impl fmt::Display for LineLength {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LineLength {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = i64::deserialize(deserializer)?;
+
+        u16::try_from(value)
+            .ok()
+            .and_then(|u16_value| Self::try_from(u16_value).ok())
+            .ok_or_else(|| {
+                serde::de::Error::custom(format!(
+                    "line-length must be between 1 and {} (got {value})",
+                    Self::MAX,
+                ))
+            })
     }
 }
 
@@ -96,8 +113,8 @@ impl TryFrom<u16> for LineLength {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match NonZeroU16::try_from(value) {
-            Ok(value) if value.get() <= Self::MAX => Ok(LineLength(value)),
-            Ok(_) | Err(_) => Err(LineLengthFromIntError(value)),
+            Ok(value) => Ok(LineLength(value)),
+            Err(_) => Err(LineLengthFromIntError(value)),
         }
     }
 }

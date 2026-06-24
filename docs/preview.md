@@ -177,7 +177,7 @@ setting in your configuration file:
     ```
 
 In our previous example, `--select` with `ALL` `HYP`, `HYP0`, or `HYP00` would not enable `HYP001`. Each preview
-rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
+rule will need to be selected with its exact code: for example, `--select ALL,HYP001`.
 
 If preview mode is not enabled, this setting has no effect.
 

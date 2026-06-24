@@ -1,12 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::rules::pylint::helpers::is_known_dunder_method;
-use crate::settings::types::PythonVersion;
+use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for explicit use of dunder methods, like `__str__` and `__add__`.
@@ -14,6 +15,34 @@ use crate::settings::types::PythonVersion;
 /// ## Why is this bad?
 /// Dunder names are not meant to be called explicitly and, in most cases, can
 /// be replaced with builtins or operators.
+///
+/// ## Fix safety
+/// This fix is always unsafe. When replacing dunder method calls with operators
+/// or builtins, the behavior can change in the following ways:
+///
+/// 1. Types may implement only a subset of related dunder methods. Calling a
+///    missing dunder method directly returns `NotImplemented`, but using the
+///    equivalent operator raises a `TypeError`.
+///    ```python
+///    class C: pass
+///    c = C()
+///    c.__gt__(1)  # before fix: NotImplemented
+///    c > 1        # after fix: raises TypeError
+///    ```
+/// 2. Instance-assigned dunder methods are ignored by operators and builtins.
+///    ```python
+///    class C: pass
+///    c = C()
+///    c.__bool__ = lambda: False
+///    c.__bool__() # before fix: False
+///    bool(c)      # after fix: True
+///    ```
+///
+/// 3. Even with built-in types, behavior can differ.
+///    ```python
+///    (1).__gt__(1.0)  # before fix: NotImplemented
+///    1 > 1.0          # after fix: False
+///    ```
 ///
 /// ## Example
 /// ```python
@@ -34,8 +63,8 @@ use crate::settings::types::PythonVersion;
 /// def is_greater_than_two(x: int) -> bool:
 ///     return x > 2
 /// ```
-///
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.12")]
 pub(crate) struct UnnecessaryDunderCall {
     method: String,
     replacement: Option<String>,
@@ -76,7 +105,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // If this is an allowed dunder method, abort.
-    if allowed_dunder_constants(attr, checker.settings.target_version) {
+    if allowed_dunder_constants(attr, checker.target_version()) {
         return;
     }
 
@@ -174,7 +203,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDunderCall {
             method: attr.to_string(),
             replacement: title,
@@ -205,12 +234,10 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            fixed,
+            edits::pad(fixed, call.range(), checker.locator()),
             call.range(),
         )));
-    };
-
-    checker.report_diagnostic(diagnostic);
+    }
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.
@@ -248,7 +275,7 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
         return true;
     }
 
-    if target_version < PythonVersion::Py310 && matches!(dunder_method, "__aiter__" | "__anext__") {
+    if target_version < PythonVersion::PY310 && matches!(dunder_method, "__aiter__" | "__anext__") {
         return true;
     }
 
@@ -325,6 +352,11 @@ impl DunderReplacement {
                 "Use `<<=` operator",
                 OperatorPrecedence::Assign,
             )),
+            "__imatmul__" => Some(Self::Operator(
+                "@=",
+                "Use `@=` operator",
+                OperatorPrecedence::Assign,
+            )),
             "__imod__" => Some(Self::Operator(
                 "%=",
                 "Use `%=` operator",
@@ -390,6 +422,11 @@ impl DunderReplacement {
                 "Use `*` operator",
                 OperatorPrecedence::MulDivRemain,
             )),
+            "__matmul__" => Some(Self::Operator(
+                "@",
+                "Use `@` operator",
+                OperatorPrecedence::MulDivRemain,
+            )),
             "__ne__" => Some(Self::Operator(
                 "!=",
                 "Use `!=` operator",
@@ -398,7 +435,7 @@ impl DunderReplacement {
             "__or__" => Some(Self::Operator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rshift__" => Some(Self::Operator(
                 ">>",
@@ -418,7 +455,7 @@ impl DunderReplacement {
             "__xor__" => Some(Self::Operator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__radd__" => Some(Self::ROperator(
@@ -441,6 +478,11 @@ impl DunderReplacement {
                 "Use `<<` operator",
                 OperatorPrecedence::LeftRightShift,
             )),
+            "__rmatmul__" => Some(Self::ROperator(
+                "@",
+                "Use `@` operator",
+                OperatorPrecedence::MulDivRemain,
+            )),
             "__rmod__" => Some(Self::ROperator(
                 "%",
                 "Use `%` operator",
@@ -454,7 +496,7 @@ impl DunderReplacement {
             "__ror__" => Some(Self::ROperator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rrshift__" => Some(Self::ROperator(
                 ">>",
@@ -474,7 +516,7 @@ impl DunderReplacement {
             "__rxor__" => Some(Self::ROperator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__aiter__" => Some(Self::Builtin("aiter", "Use `aiter()` builtin")),
@@ -504,6 +546,7 @@ impl DunderReplacement {
             "__delattr__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
+            "__floor__" => Some(Self::MessageOnly("Use `math.floor()` function")),
             "__format__" => Some(Self::MessageOnly(
                 "Use `format` builtin, format string method, or f-string",
             )),
@@ -518,6 +561,7 @@ impl DunderReplacement {
             "__init__" => Some(Self::MessageOnly("Instantiate class directly")),
             "__instancecheck__" => Some(Self::MessageOnly("Use `isinstance()` builtin")),
             "__invert__" => Some(Self::MessageOnly("Use `~` operator")),
+            "__length_hint__" => Some(Self::MessageOnly("Use `operator.length_hint()` function")),
             "__neg__" => Some(Self::MessageOnly("Multiply by -1 instead")),
             "__pos__" => Some(Self::MessageOnly("Multiply by +1 instead")),
             "__pow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
@@ -527,7 +571,7 @@ impl DunderReplacement {
                 "Mutate attribute directly or use setattr built-in function",
             )),
             "__setitem__" => Some(Self::MessageOnly("Use subscript assignment")),
-            "__truncate__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
+            "__trunc__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
 
             _ => None,
         }

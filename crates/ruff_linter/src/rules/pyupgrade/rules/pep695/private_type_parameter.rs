@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
+use crate::{Applicability, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker,
     renamer::{Renamer, ShadowedKind},
@@ -66,6 +66,7 @@ use crate::{
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
 }
@@ -101,43 +102,45 @@ impl Violation for PrivateTypeParameter {
 }
 
 /// UP049
-pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) {
     let semantic = checker.semantic();
-    let stmt = binding.statement(semantic)?;
+    let Some(stmt) = binding.statement(semantic) else {
+        return;
+    };
     if !binding.kind.is_type_param() {
-        return None;
+        return;
     }
 
     let kind = match stmt {
         Stmt::FunctionDef(_) => ParamKind::Function,
         Stmt::ClassDef(_) => ParamKind::Class,
-        _ => return None,
+        _ => return,
     };
 
     let old_name = binding.name(checker.source());
 
     if !old_name.starts_with('_') {
-        return None;
+        return;
     }
 
     // Sunder `_T_`, dunder `__T__`, and all all-under `_` or `__` cases should all be skipped, as
     // these are not "private" names
     if old_name.ends_with('_') {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
+    let mut diagnostic = checker.report_diagnostic(PrivateTypeParameter { kind }, binding.range);
 
     let new_name = old_name.trim_start_matches('_');
 
     // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
     // a suggested fix
     if ShadowedKind::new(binding, new_name, checker).shadows_any() {
-        return Some(diagnostic);
+        return;
     }
 
     if !is_identifier(new_name) {
-        return Some(diagnostic);
+        return;
     }
 
     let source = checker.source();
@@ -163,6 +166,4 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         let fix_isolation = Checker::isolation(binding.source);
         Ok(Fix::applicable_edits(first, rest, applicability).isolate(fix_isolation))
     });
-
-    Some(diagnostic)
 }

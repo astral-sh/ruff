@@ -1,17 +1,17 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `typing.ByteString` or `collections.abc.ByteString`.
 ///
 /// ## Why is this bad?
 /// `ByteString` has been deprecated since Python 3.9 and will be removed in
-/// Python 3.14. The Python documentation recommends using either
+/// Python 3.17. The Python documentation recommends using either
 /// `collections.abc.Buffer` (or the `typing_extensions` backport
 /// on Python <3.12) or a union like `bytes | bytearray | memoryview` instead.
 ///
@@ -28,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct ByteStringUsage {
     origin: ByteStringOrigin,
 }
@@ -74,10 +75,8 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
         ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,
         _ => return,
     };
-    checker.report_diagnostic(Diagnostic::new(
-        ByteStringUsage { origin },
-        attribute.range(),
-    ));
+    let mut diagnostic = checker.report_diagnostic(ByteStringUsage { origin }, attribute.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 }
 
 /// PYI057
@@ -97,7 +96,9 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImport
 
     for name in names {
         if name.name.as_str() == "ByteString" {
-            checker.report_diagnostic(Diagnostic::new(ByteStringUsage { origin }, name.range()));
+            let mut diagnostic =
+                checker.report_diagnostic(ByteStringUsage { origin }, name.range());
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         }
     }
 }

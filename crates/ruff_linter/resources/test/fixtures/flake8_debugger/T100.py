@@ -23,3 +23,21 @@ debugpy.listen(1234)
 enable_attach()
 break_into_debugger()
 wait_for_attach()
+
+
+# also flag `breakpointhook` from `sys` but obviously not `sys` itself. see
+# https://github.com/astral-sh/ruff/issues/16189
+import sys # ok
+
+def scope():
+    from sys import breakpointhook # error
+
+    breakpointhook() # error
+
+def scope():
+    from sys import __breakpointhook__ # error
+
+    __breakpointhook__() # error
+
+sys.breakpointhook() # error
+sys.__breakpointhook__() # error

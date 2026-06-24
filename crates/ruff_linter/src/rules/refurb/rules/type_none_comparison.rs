@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 
@@ -12,9 +12,6 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// ## Why is this bad?
 /// There is only ever one instance of `None`, so it is more efficient and
 /// readable to use the `is` operator to check if an object is `None`.
-///
-/// Only name expressions (e.g., `type(foo) == type(None)`) are reported.
-/// In [preview], the rule will also report other kinds of expressions.
 ///
 /// ## Example
 /// ```python
@@ -34,9 +31,8 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct TypeNoneComparison {
     replacement: IdentityCheck,
 }
@@ -80,18 +76,12 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         _ => return,
     };
 
-    if checker.settings.preview.is_disabled()
-        && !matches!(other_arg, Expr::Name(_) | Expr::NoneLiteral(_))
-    {
-        return;
-    }
-
-    let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range);
-
     let negate = replacement == IdentityCheck::IsNot;
     let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(TypeNoneComparison { replacement }, compare.range)
+        .set_fix(fix);
 }
 
 /// Returns the object passed to the function, if the expression is a call to

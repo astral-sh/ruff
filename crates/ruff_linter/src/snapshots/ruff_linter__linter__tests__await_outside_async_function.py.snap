@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+PLE1142 `await` should be used within an async function
+ --> resources/test/fixtures/syntax_errors/await_outside_async_function.py:2:5
+  |
+1 | def func():
+2 |     await 1
+  |     ^^^^^^^
+3 |
+4 | # Top-level await
+  |
+
+PLE1142 `await` should be used within an async function
+ --> resources/test/fixtures/syntax_errors/await_outside_async_function.py:5:1
+  |
+4 | # Top-level await
+5 | await 1
+  | ^^^^^^^
+6 |
+7 | ([await c for c in cor] async for cor in func())  # ok
+  |

@@ -1,0 +1,418 @@
+# Stub packages
+
+Stub packages are packages named `<package>-stubs` that provide typing stubs for `<package>`. See
+[specification](https://typing.python.org/en/latest/spec/distributing.html#stub-only-packages).
+
+## Simple stub
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs/__init__.pyi`:
+
+```pyi
+class Foo:
+    name: str
+    age: int
+```
+
+`/packages/foo/__init__.py`:
+
+```py
+class Foo: ...
+```
+
+`main.py`:
+
+```py
+from foo import Foo
+
+reveal_type(Foo().name)  # revealed: str
+```
+
+## Stubs only
+
+The regular package isn't required for type checking.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs/__init__.pyi`:
+
+```pyi
+class Foo:
+    name: str
+    age: int
+```
+
+`main.py`:
+
+```py
+from foo import Foo
+
+reveal_type(Foo().name)  # revealed: str
+```
+
+## `-stubs` named module
+
+A module named `<module>-stubs` isn't a stub package.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs.pyi`:
+
+```pyi
+class Foo:
+    name: str
+    age: int
+```
+
+`main.py`:
+
+```py
+from foo import Foo  # error: [unresolved-import]
+
+reveal_type(Foo().name)  # revealed: Unknown
+```
+
+## Namespace package in different search paths
+
+A namespace package with multiple stub packages spread over multiple search paths.
+
+```toml
+[environment]
+extra-paths = ["/stubs1", "/stubs2", "/packages"]
+```
+
+`/stubs1/shapes-stubs/polygons/pentagon.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
+    area: float
+```
+
+`/stubs2/shapes-stubs/polygons/hexagon.pyi`:
+
+```pyi
+class Hexagon:
+    sides: int
+    area: float
+```
+
+`/packages/shapes/polygons/pentagon.py`:
+
+```py
+class Pentagon: ...
+```
+
+`/packages/shapes/polygons/hexagon.py`:
+
+```py
+class Hexagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes.polygons.hexagon import Hexagon
+from shapes.polygons.pentagon import Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+reveal_type(Hexagon().area)  # revealed: int | float
+```
+
+## Inconsistent stub packages
+
+Stub packages where one is a namespace package and the other is a regular package. Module resolution
+should stop after the first non-namespace stub package. This matches Pyright's behavior.
+
+```toml
+[environment]
+extra-paths = ["/stubs1", "/stubs2", "/packages"]
+```
+
+`/stubs1/shapes-stubs/__init__.pyi`:
+
+```pyi
+```
+
+`/stubs1/shapes-stubs/polygons/__init__.pyi`:
+
+```pyi
+```
+
+`/stubs1/shapes-stubs/polygons/pentagon.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
+    area: float
+```
+
+`/stubs2/shapes-stubs/polygons/hexagon.pyi`:
+
+```pyi
+class Hexagon:
+    sides: int
+    area: float
+```
+
+`/packages/shapes/polygons/pentagon.py`:
+
+```py
+class Pentagon: ...
+```
+
+`/packages/shapes/polygons/hexagon.py`:
+
+```py
+class Hexagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes.polygons.pentagon import Pentagon
+from shapes.polygons.hexagon import Hexagon  # error: [unresolved-import]
+
+reveal_type(Pentagon().sides)  # revealed: int
+reveal_type(Hexagon().area)  # revealed: Unknown
+```
+
+## Namespace stubs for non-namespace package
+
+The runtime package is a regular package but the stubs are namespace packages. Pyright skips the
+stub package if the "regular" package isn't a namespace package. I'm not aware that the behavior
+here is specified, but we currently agree with pyright here.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/shapes-stubs/polygons/pentagon.pyi`:
+
+```pyi
+class Pentagon: ...
+```
+
+`/packages/shapes-stubs/polygons/hexagon.pyi`:
+
+```pyi
+class Hexagon: ...
+```
+
+`/packages/shapes/__init__.py`:
+
+```py
+```
+
+`/packages/shapes/polygons/__init__.py`:
+
+```py
+```
+
+`/packages/shapes/polygons/pentagon.py`:
+
+```py
+class Pentagon:
+    sides: int
+    area: float
+```
+
+`/packages/shapes/polygons/hexagon.py`:
+
+```py
+class Hexagon:
+    sides: int
+    area: float
+```
+
+`main.py`:
+
+```py
+from shapes.polygons.pentagon import Pentagon
+from shapes.polygons.hexagon import Hexagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+reveal_type(Hexagon().area)  # revealed: int | float
+```
+
+## Stub package using `__init__.py` over `.pyi`
+
+It's recommended that stub packages use `__init__.pyi` files over `__init__.py` but it doesn't seem
+to be an enforced convention. At least, Pyright is fine with the following.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/shapes-stubs/__init__.py`:
+
+```py
+class Pentagon:
+    sides: int
+    area: float
+
+class Hexagon:
+    sides: int
+    area: float
+```
+
+`/packages/shapes/__init__.py`:
+
+```py
+class Pentagon: ...
+class Hexagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes import Hexagon, Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+reveal_type(Hexagon().area)  # revealed: int | float
+```
+
+## Relative import in stub package
+
+Regression test for <https://github.com/astral-sh/ty/issues/408>
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/yaml-stubs/__init__.pyi`:
+
+```pyi
+from .loader import *
+```
+
+`/packages/yaml-stubs/loader.pyi`:
+
+```pyi
+class YamlLoader: ...
+```
+
+`main.py`:
+
+```py
+import yaml
+
+reveal_type(yaml.YamlLoader)  # revealed: <class 'YamlLoader'>
+```
+
+## Priority across search paths
+
+Arguably [import resolution ordering], while vague, implies that a `foo-stubs` stub package should
+have priority over a `foo` package regardless of search path ordering.
+
+Regression test for <https://github.com/astral-sh/ty/issues/1967>
+
+### Stub package comes first on the search path
+
+```toml
+[environment]
+extra-paths = ["/path-one", "/path-two"]
+```
+
+`/path-one/shapes-stubs/__init__.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
+```
+
+`/path-two/shapes/__init__.py`:
+
+```py
+class Pentagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes import Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+```
+
+### Stub package comes last on the search path
+
+```toml
+[environment]
+extra-paths = ["/path-two", "/path-one"]
+```
+
+`/path-one/shapes-stubs/__init__.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
+```
+
+`/path-two/shapes/__init__.py`:
+
+```py
+class Pentagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes import Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+```
+
+### Partial stub packages
+
+Because `shapes/bar.pyi` is a stub file, it must take priority over `shapes/foo.py` in the first
+search path even though `shapes/bar.pyi` appears in the second search path. But because
+`shapes/bar.pyi` is a `partial = true` namespace package, when we fail to find the `foo` submodule
+in `/path-two/shapes`, we must fallback to `shapes/foo.py` when resolving the module.
+
+This test exists at the intersection of namespace packages and partial stub packages.
+
+```toml
+[environment]
+extra-paths = ["/path-one", "/path-two"]
+```
+
+`/path-one/shapes/foo.py`:
+
+```py
+X = 42
+```
+
+`/path-two/shapes/bar.pyi`:
+
+```pyi
+```
+
+`/path-two/shapes/py.typed`:
+
+```text
+partial = true
+```
+
+`main.py`:
+
+```py
+from shapes.foo import X
+
+reveal_type(X)  # revealed: Literal[42]
+```
+
+[import resolution ordering]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering

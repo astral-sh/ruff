@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for needless exception names in `raise` statements.
@@ -36,6 +36,7 @@ use crate::checkers::ast::Checker;
 /// This rule's fix is marked as unsafe, as it doesn't properly handle bound
 /// exceptions that are shadowed between the `except` and `raise` statements.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct VerboseRaise;
 
 impl AlwaysFixableViolation for VerboseRaise {
@@ -72,12 +73,12 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
                     // ...and the raised object is bound to the same name...
                     if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
-                            let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
+                            let mut diagnostic =
+                                checker.report_diagnostic(VerboseRaise, exc.range());
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 "raise".to_string(),
                                 raise.range(),
                             )));
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }

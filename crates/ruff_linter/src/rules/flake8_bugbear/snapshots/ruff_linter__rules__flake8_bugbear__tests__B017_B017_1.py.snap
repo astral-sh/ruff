@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B017 Do not assert blind exception: `Exception`
+  --> B017_1.py:20:9
+   |
+18 | class Foobar(unittest.TestCase):
+19 |     def call_form_raises(self) -> None:
+20 |         self.assertRaises(Exception, something_else)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |         self.assertRaises(BaseException, something_else)
+   |
+
+B017 Do not assert blind exception: `BaseException`
+  --> B017_1.py:21:9
+   |
+19 |     def call_form_raises(self) -> None:
+20 |         self.assertRaises(Exception, something_else)
+21 |         self.assertRaises(BaseException, something_else)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B017 Do not assert blind exception: `Exception`
+  --> B017_1.py:25:5
+   |
+24 | def test_pytest_call_form() -> None:
+25 |     pytest.raises(Exception, something_else)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 |     pytest.raises(BaseException, something_else)
+   |
+
+B017 Do not assert blind exception: `BaseException`
+  --> B017_1.py:26:5
+   |
+24 | def test_pytest_call_form() -> None:
+25 |     pytest.raises(Exception, something_else)
+26 |     pytest.raises(BaseException, something_else)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 |
+28 |     pytest.raises(Exception, something_else, match="hello")
+   |

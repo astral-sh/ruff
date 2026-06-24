@@ -1,0 +1,674 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/duplicate_type_parameter_names.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..261,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 0..22,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 5..10,
+                            id: Name("Alias"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 10..16,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 11..12,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 11..12,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 14..15,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 14..15,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            node_index: NodeIndex(None),
+                            range: 19..22,
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 23..45,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 27..28,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 28..34,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 29..30,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 29..30,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 32..33,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 32..33,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 34..40,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 35..39,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 35..39,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("t"),
+                                        range: 35..36,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 38..39,
+                                                id: Name("T"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 42..45,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 42..45,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 46..64,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 52..53,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 53..59,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 54..55,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 54..55,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 57..58,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 57..58,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 61..64,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 61..64,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 65..132,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 70..75,
+                            id: Name("Alias"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 75..126,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 76..77,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 76..77,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 79..85,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 79..80,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 82..85,
+                                                    id: Name("str"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 87..102,
+                                        name: Identifier {
+                                            id: Name("V"),
+                                            range: 87..88,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    node_index: NodeIndex(None),
+                                                    range: 90..102,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 91..94,
+                                                                id: Name("str"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 96..101,
+                                                                id: Name("bytes"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 104..107,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 105..107,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
+                                        range: 109..112,
+                                        name: Identifier {
+                                            id: Name("P"),
+                                            range: 111..112,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 114..125,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 114..115,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 118..125,
+                                                    id: Name("default"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            node_index: NodeIndex(None),
+                            range: 129..132,
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 133..154,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 137..138,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 138..147,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 139..140,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 139..140,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 142..143,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 142..143,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 145..146,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 145..146,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 147..149,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 151..154,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 151..154,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 169..188,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 173..174,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 174..181,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 175..176,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 175..176,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 178..180,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 179..180,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 181..183,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 185..188,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 185..188,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 218..238,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 222..223,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 223..231,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 224..225,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 224..225,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
+                                        range: 227..230,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 229..230,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 231..233,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 235..238,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 235..238,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | type Alias[T, T] = ...
+  |               ^ Syntax Error: duplicate type parameter
+2 | def f[T, T](t: T): ...
+3 | class C[T, T]: ...
+  |
+
+
+  |
+1 | type Alias[T, T] = ...
+2 | def f[T, T](t: T): ...
+  |          ^ Syntax Error: duplicate type parameter
+3 | class C[T, T]: ...
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+  |
+
+
+  |
+1 | type Alias[T, T] = ...
+2 | def f[T, T](t: T): ...
+3 | class C[T, T]: ...
+  |            ^ Syntax Error: duplicate type parameter
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+  |
+
+
+  |
+2 | def f[T, T](t: T): ...
+3 | class C[T, T]: ...
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+  |                                                  ^^^^^^^^^^^ Syntax Error: duplicate type parameter
+5 | def f[T, T, T](): ...  # two errors
+6 | def f[T, *T](): ...    # star is still duplicate
+  |
+
+
+  |
+3 | class C[T, T]: ...
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+  |          ^ Syntax Error: duplicate type parameter
+6 | def f[T, *T](): ...    # star is still duplicate
+7 | def f[T, **T](): ...   # as is double star
+  |
+
+
+  |
+3 | class C[T, T]: ...
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+  |             ^ Syntax Error: duplicate type parameter
+6 | def f[T, *T](): ...    # star is still duplicate
+7 | def f[T, **T](): ...   # as is double star
+  |
+
+
+  |
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+6 | def f[T, *T](): ...    # star is still duplicate
+  |          ^^ Syntax Error: duplicate type parameter
+7 | def f[T, **T](): ...   # as is double star
+  |
+
+
+  |
+5 | def f[T, T, T](): ...  # two errors
+6 | def f[T, *T](): ...    # star is still duplicate
+7 | def f[T, **T](): ...   # as is double star
+  |          ^^^ Syntax Error: duplicate type parameter
+  |

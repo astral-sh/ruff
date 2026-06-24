@@ -1,12 +1,11 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::renamer::Renamer;
+use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `from collections.abc import Set` imports that do not alias
@@ -41,6 +40,7 @@ use crate::renamer::Renamer;
 /// `import foo as foo` alias, or are imported via a `*` import. As such, the
 /// fix is marked as safe in more cases for `.pyi` files.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {
@@ -57,26 +57,24 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
 }
 
 /// PYI025
-pub(crate) fn unaliased_collections_abc_set_import(
-    checker: &Checker,
-    binding: &Binding,
-) -> Option<Diagnostic> {
+pub(crate) fn unaliased_collections_abc_set_import(checker: &Checker, binding: &Binding) {
     let BindingKind::FromImport(import) = &binding.kind else {
-        return None;
+        return;
     };
     if !matches!(
         import.qualified_name().segments(),
         ["collections", "abc", "Set"]
     ) {
-        return None;
+        return;
     }
 
     let name = binding.name(checker.source());
     if name == "AbstractSet" {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
+    let mut diagnostic =
+        checker.report_diagnostic(UnaliasedCollectionsAbcSetImport, binding.range());
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
             let semantic = checker.semantic();
@@ -87,7 +85,6 @@ pub(crate) fn unaliased_collections_abc_set_import(
             Ok(Fix::applicable_edits(edit, rest, applicability))
         });
     }
-    Some(diagnostic)
 }
 
 fn determine_applicability(binding: &Binding, scope: &Scope, checker: &Checker) -> Applicability {

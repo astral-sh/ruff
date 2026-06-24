@@ -1,9 +1,11 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{parenthesize::parenthesized_range, Expr, ExprCall};
-use ruff_python_parser::TokenKind;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{Expr, ExprCall, token::parenthesized_range};
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `itertools.starmap` calls where the second argument is a `zip` call.
@@ -39,6 +41,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// This rule will emit a diagnostic but not suggest a fix if `map` has been shadowed from its
 /// builtin binding.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct StarmapZip;
 
 impl Violation for StarmapZip {
@@ -66,9 +69,24 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if !iterable_call.arguments.keywords.is_empty() {
-        // TODO: Pass `strict=` to `map` too when 3.14 is supported.
-        return;
+    let keywords = &iterable_call.arguments.keywords;
+
+    match checker.target_version().cmp(&PythonVersion::PY314) {
+        // Keyword arguments not supported for `map` before Python 3.14
+        std::cmp::Ordering::Less => {
+            if !keywords.is_empty() {
+                return;
+            }
+        }
+        // Only supported keyword argument is `strict` starting in 3.14
+        std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
+            if keywords.len() > 1 {
+                return;
+            }
+            if keywords.len() == 1 && iterable_call.arguments.find_keyword("strict").is_none() {
+                return;
+            }
+        }
     }
 
     let positionals = &iterable_call.arguments.args;
@@ -89,13 +107,11 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StarmapZip, call.range);
+    let mut diagnostic = checker.report_diagnostic(StarmapZip, call.range);
 
     if let Some(fix) = replace_with_map(call, iterable_call, checker) {
         diagnostic.set_fix(fix);
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Replace the `starmap` call with a call to the `map` builtin, if `map` has not been shadowed.
@@ -108,13 +124,8 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
 
     let mut remove_zip = vec![];
 
-    let full_zip_range = parenthesized_range(
-        zip.into(),
-        starmap.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(zip.range());
+    let full_zip_range =
+        parenthesized_range(zip.into(), starmap.into(), checker.tokens()).unwrap_or(zip.range());
 
     // Delete any parentheses around the `zip` call to prevent that the argument turns into a tuple.
     remove_zip.push(Edit::range_deletion(TextRange::new(
@@ -122,13 +133,8 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
         zip.start(),
     )));
 
-    let full_zip_func_range = parenthesized_range(
-        (&zip.func).into(),
-        zip.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(zip.func.range());
+    let full_zip_func_range = parenthesized_range((&zip.func).into(), zip.into(), checker.tokens())
+        .unwrap_or(zip.func.range());
 
     // Delete the `zip` callee
     remove_zip.push(Edit::range_deletion(full_zip_func_range));

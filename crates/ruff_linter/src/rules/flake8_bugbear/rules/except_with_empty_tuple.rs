@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{ExceptHandler, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.250")]
 pub(crate) struct ExceptWithEmptyTuple {
     is_star: bool,
 }
@@ -66,9 +67,6 @@ pub(crate) fn except_with_empty_tuple(checker: &Checker, except_handler: &Except
             .current_statement()
             .as_try_stmt()
             .is_some_and(|try_stmt| try_stmt.is_star);
-        checker.report_diagnostic(Diagnostic::new(
-            ExceptWithEmptyTuple { is_star },
-            except_handler.range(),
-        ));
+        checker.report_diagnostic(ExceptWithEmptyTuple { is_star }, except_handler.range());
     }
 }

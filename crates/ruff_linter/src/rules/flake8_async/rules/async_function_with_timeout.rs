@@ -1,14 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::visibility;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
-#[allow(clippy::doc_link_with_quotes)]
+#[expect(clippy::doc_link_with_quotes)]
 /// ## What it does
 /// Checks for `async` function definitions with `timeout` parameters.
 ///
@@ -37,6 +38,15 @@ use crate::settings::types::PythonVersion;
 /// `anyio.move_on_after`, false positives from this rule can be avoided
 /// by using a different parameter name.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method may cause type checkers to
+/// complain about a violation of the Liskov Substitution Principle if it
+/// means that the method now incompatibly overrides a method defined on a
+/// superclass. Explicitly decorating an overriding method with `@override`
+/// signals to Ruff that the method is intended to override a superclass
+/// method and that a type checker will enforce that it does so; Ruff
+/// therefore knows that it should not enforce this rule on such methods.
+///
 /// ## Example
 ///
 /// ```python
@@ -64,7 +74,9 @@ use crate::settings::types::PythonVersion;
 /// - [`trio` timeouts](https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts)
 ///
 /// ["structured concurrency"]: https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#timeouts-and-cancellation
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct AsyncFunctionWithTimeout {
     module: AsyncModule,
 }
@@ -98,6 +110,12 @@ pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast:
         return;
     };
 
+    // Ignore methods decorated with `@typing.override`, since changing the signature
+    // would make the override invalid.
+    if visibility::is_override(&function_def.decorator_list, checker.semantic()) {
+        return;
+    }
+
     // Get preferred module.
     let module = if checker.semantic().seen_module(Modules::ANYIO) {
         AsyncModule::AnyIo
@@ -108,12 +126,9 @@ pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast:
     };
 
     // asyncio.timeout feature was first introduced in Python 3.11
-    if module == AsyncModule::AsyncIo && checker.settings.target_version < PythonVersion::Py311 {
+    if module == AsyncModule::AsyncIo && checker.target_version() < PythonVersion::PY311 {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        AsyncFunctionWithTimeout { module },
-        timeout.range(),
-    ));
+    checker.report_diagnostic(AsyncFunctionWithTimeout { module }, timeout.range());
 }

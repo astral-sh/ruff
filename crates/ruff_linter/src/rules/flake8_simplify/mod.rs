@@ -6,13 +6,14 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"))]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"))]
@@ -48,18 +49,18 @@ mod tests {
     #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"))]
     #[test_case(Rule::SplitStaticString, Path::new("SIM905.py"))]
     #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"))]
+    #[test_case(Rule::ZipDictKeysAndValues, Path::new("SIM911.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
-    #[test_case(Rule::NeedlessBool, Path::new("SIM103.py"))]
-    #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
+    #[test_case(Rule::EnumerateForLoop, Path::new("SIM113.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -73,7 +74,21 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_5.py"))]
+    fn version_specific_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("diff_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_simplify").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY311),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY312)
+        );
         Ok(())
     }
 }

@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use ruff_benchmark::criterion::{
-    criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
+    BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
 
 use ruff_benchmark::{
-    TestCase, LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
-use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
-use ruff_python_parser::{parse, Mode};
+use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_ast};
+use ruff_python_parser::{Mode, ParseOptions, parse};
 use ruff_python_trivia::CommentRanges;
 
 #[cfg(target_os = "windows")]
@@ -21,7 +21,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[global_allocator]
@@ -48,8 +49,8 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 // Parse the source.
-                let parsed =
-                    parse(case.code(), Mode::Module).expect("Input should be a valid Python code");
+                let parsed = parse(case.code(), ParseOptions::from(Mode::Module))
+                    .expect("Input should be a valid Python code");
 
                 let comment_ranges = CommentRanges::from(parsed.tokens());
 

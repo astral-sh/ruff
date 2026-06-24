@@ -1,0 +1,78 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D420 Section "Args" appears after section "Returns" but should be before it
+  --> D420_google.py:36:5
+   |
+34 |         int
+35 |
+36 |     Args:
+   |     ^^^^
+37 |         x: Description.
+38 |     """
+   |
+
+D420 Section "Returns" appears after section "Raises" but should be before it
+  --> D420_google.py:47:5
+   |
+45 |         ValueError
+46 |
+47 |     Returns:
+   |     ^^^^^^^
+48 |         int
+49 |     """
+   |
+
+D420 Section "Args" appears after section "Raises" but should be before it
+  --> D420_google.py:58:5
+   |
+56 |         ValueError
+57 |
+58 |     Args:
+   |     ^^^^
+59 |         x: Description.
+   |
+
+D420 Section "Returns" appears after section "Raises" but should be before it
+  --> D420_google.py:61:5
+   |
+59 |         x: Description.
+60 |
+61 |     Returns:
+   |     ^^^^^^^
+62 |         int
+63 |     """
+   |
+
+D420 Section "Arguments" appears after section "Returns" but should be before it
+   --> D420_google.py:106:5
+    |
+104 |         int
+105 |
+106 |     Arguments:
+    |     ^^^^^^^^^
+107 |         x: Description.
+108 |     """
+    |
+
+D420 Section "Args" appears after section "Returns" but should be before it
+   --> D420_google.py:155:5
+    |
+153 |         Some notes.
+154 |
+155 |     Args:
+    |     ^^^^
+156 |         x: Description.
+157 |     """
+    |
+
+D420 Section "Args" appears after section "Returns" but should be before it
+   --> D420_google.py:189:5
+    |
+187 |         int
+188 |
+189 |     Args:
+    |     ^^^^
+190 |         x: Description.
+191 |     """
+    |

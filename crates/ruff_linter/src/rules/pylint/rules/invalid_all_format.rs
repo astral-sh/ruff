@@ -1,7 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
+
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for invalid assignments to `__all__`.
@@ -26,6 +27,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: The `import` statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.237")]
 pub(crate) struct InvalidAllFormat;
 
 impl Violation for InvalidAllFormat {
@@ -36,10 +38,8 @@ impl Violation for InvalidAllFormat {
 }
 
 /// PLE0605
-pub(crate) fn invalid_all_format(binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn invalid_all_format(checker: &Checker, binding: &Binding) {
     if binding.is_invalid_all_format() {
-        Some(Diagnostic::new(InvalidAllFormat, binding.range()))
-    } else {
-        None
+        checker.report_diagnostic(InvalidAllFormat, binding.range());
     }
 }

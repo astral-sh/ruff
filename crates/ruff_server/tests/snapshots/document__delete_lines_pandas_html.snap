@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_server/tests/document.rs
 expression: document.contents()
-snapshot_kind: text
 ---
 # +------------------------------------------------------------+
 # | Code adopted from:                                         |

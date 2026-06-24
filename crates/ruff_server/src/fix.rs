@@ -1,48 +1,54 @@
 use std::borrow::Cow;
 
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 
 use crate::{
+    PositionEncoding,
     edit::{Replacement, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding,
 };
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{
-    linter::{FixerResult, LinterResult},
+    linter::FixerResult,
     packaging::detect_package_root,
-    settings::{flags, LinterSettings},
+    settings::{LinterSettings, flags},
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
 
 /// A simultaneous fix made across a single text document or among an arbitrary
 /// number of notebook cells.
-pub(crate) type Fixes = FxHashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
+pub(crate) type Fixes = FxHashMap<lsp_types::Uri, Vec<lsp_types::TextEdit>>;
 
 pub(crate) fn fix_all(
     query: &DocumentQuery,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let source_kind = query.make_source_kind();
     let settings = query.settings();
-    let document_path = query.file_path();
+    let document_path = query.virtual_file_path();
+
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
+        return Ok(Fixes::default());
+    };
+    let source_kind = query.make_python_source_kind(source_type);
 
     // If the document is excluded, return an empty list of fixes.
-    let package = if let Some(document_path) = document_path.as_ref() {
-        if is_document_excluded_for_linting(
-            document_path,
-            &settings.file_resolver,
-            linter_settings,
-            query.text_document_language_id(),
-        ) {
-            return Ok(Fixes::default());
-        }
+    if is_document_excluded_for_linting(
+        &document_path,
+        &settings.file_resolver,
+        linter_settings,
+        query.text_document_language_id(),
+    ) {
+        return Ok(Fixes::default());
+    }
 
+    let file_path = query.file_path();
+    let package = if let Some(file_path) = &file_path {
         detect_package_root(
-            document_path
+            file_path
                 .parent()
                 .expect("a path to a document should have a parent path"),
             &linter_settings.namespace_packages,
@@ -52,8 +58,6 @@ pub(crate) fn fix_all(
         None
     };
 
-    let source_type = query.source_type();
-
     // We need to iteratively apply all safe fixes onto a single file and then
     // create a diff between the modified file and the original source to use as a single workspace
     // edit.
@@ -62,12 +66,10 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult {
-            has_syntax_error, ..
-        },
+        result,
         ..
     } = ruff_linter::linter::lint_fix(
-        &query.virtual_file_path(),
+        &document_path,
         package,
         flags::Noqa::Enabled,
         settings.unsafe_fixes,
@@ -76,7 +78,7 @@ pub(crate) fn fix_all(
         source_type,
     )?;
 
-    if has_syntax_error {
+    if result.has_invalid_syntax() {
         // If there's a syntax error, then there won't be any fixes to apply.
         return Ok(Fixes::default());
     }
@@ -100,12 +102,12 @@ pub(crate) fn fix_all(
             anyhow::bail!("Notebook document expected from notebook source kind");
         };
         let mut fixes = Fixes::default();
-        for ((source, modified), url) in source_notebook
+        for ((source, modified), uri) in source_notebook
             .cells()
             .iter()
             .map(cell_source)
             .zip(modified_notebook.cells().iter().map(cell_source))
-            .zip(notebook.urls())
+            .zip(notebook.uris())
         {
             let source_index = LineIndex::from_source_text(&source);
             let modified_index = LineIndex::from_source_text(&modified);
@@ -121,7 +123,7 @@ pub(crate) fn fix_all(
             );
 
             fixes.insert(
-                url.clone(),
+                uri.clone(),
                 vec![lsp_types::TextEdit {
                     range: source_range.to_range(&source, &source_index, encoding),
                     new_text: modified[modified_range].to_owned(),
@@ -145,7 +147,7 @@ pub(crate) fn fix_all(
             modified_index.line_starts(),
         );
         Ok([(
-            query.make_key().into_url(),
+            query.make_key().into_uri(),
             vec![lsp_types::TextEdit {
                 range: source_range.to_range(source_kind.source_code(), &source_index, encoding),
                 new_text: modified[modified_range].to_owned(),

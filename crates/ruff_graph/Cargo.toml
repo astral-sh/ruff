@@ -1,6 +1,7 @@
 [package]
 name = "ruff_graph"
-version = "0.1.0"
+version = "0.0.2"
+description = "This is an internal component crate of Ruff"
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -9,17 +10,23 @@ repository.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [dependencies]
-red_knot_python_semantic = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["os", "serde"] }
+ruff_db = { workspace = true, features = ["serde"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
+ty_module_resolver = { workspace = true }
+ty_site_packages = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
+memchr = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -28,6 +35,6 @@ zip = { workspace = true, features = [] }
 [lints]
 workspace = true
 
-[package.metadata.cargo-shear]
-# Used via `CacheKey` macro expansion.
-ignored = ["ruff_cache"]
+[lib]
+test = false
+doctest = false

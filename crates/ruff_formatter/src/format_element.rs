@@ -197,7 +197,7 @@ pub const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARAT
 
 /// Replace the line terminators matching the provided list with "\n"
 /// since its the only line break type supported by the printer
-pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<str> {
+pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<'_, str> {
     let mut result = String::new();
     let mut last_end = 0;
 
@@ -487,7 +487,7 @@ pub trait FormatElements {
 /// Represents the width by adding 1 to the actual width so that the width can be represented by a [`NonZeroU32`],
 /// allowing [`TextWidth`] or [`Option<Width>`] fit in 4 bytes rather than 8.
 ///
-/// This means that 2^32 can not be precisely represented and instead has the same value as 2^32-1.
+/// This means that 2^32 cannot be precisely represented and instead has the same value as 2^32-1.
 /// This imprecision shouldn't matter in practice because either text are longer than any configured line width
 /// and thus, the text should break.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -513,13 +513,31 @@ pub enum TextWidth {
 
 impl TextWidth {
     pub fn from_text(text: &str, indent_width: IndentWidth) -> TextWidth {
+        const fn is_printable_ascii(byte: u8) -> bool {
+            matches!(byte, b' '..=b'~')
+        }
+
         let mut width = 0u32;
 
+        for (index, byte) in text.bytes().enumerate() {
+            match byte {
+                b'\t' => width += indent_width.value(),
+                b'\n' => return TextWidth::Multiline,
+                byte if is_printable_ascii(byte) => width += 1,
+                _ => return Self::from_text_slow(&text[index..], indent_width, width),
+            }
+        }
+
+        Self::Width(Width::new(width))
+    }
+
+    #[cold]
+    fn from_text_slow(text: &str, indent_width: IndentWidth, mut width: u32) -> TextWidth {
         for c in text.chars() {
             let char_width = match c {
                 '\t' => indent_width.value(),
                 '\n' => return TextWidth::Multiline,
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 c => c.width().unwrap_or(0) as u32,
             };
             width += char_width;
@@ -543,7 +561,22 @@ impl TextWidth {
 #[cfg(test)]
 mod tests {
 
-    use crate::format_element::{normalize_newlines, LINE_TERMINATORS};
+    use crate::IndentWidth;
+    use crate::format_element::{LINE_TERMINATORS, TextWidth, normalize_newlines};
+
+    #[test]
+    fn text_width() {
+        let indent_width = IndentWidth::try_from(4).unwrap();
+        let width = |text| {
+            TextWidth::from_text(text, indent_width)
+                .width()
+                .map(super::Width::value)
+        };
+
+        assert_eq!(width("hello"), Some(5));
+        assert_eq!(width("a寿司b"), Some(6));
+        assert_eq!(width("a\0b"), Some(2));
+    }
 
     #[test]
     fn test_normalize_newlines() {

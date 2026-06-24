@@ -1,11 +1,16 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::{is_dunder, is_sunder};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{BindingKind, ScopeKind};
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::analyze::typing::TypeChecker;
+use ruff_python_semantic::{BindingKind, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::is_dunder_operator_method;
 
 /// ## What it does
 /// Checks for accesses on "private" class members.
@@ -51,6 +56,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.240")]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }
@@ -69,32 +75,19 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         return;
     };
 
-    if checker.semantic().in_annotation() {
+    let semantic = checker.semantic();
+    let current_scope = semantic.current_scope();
+
+    if semantic.in_annotation() {
         return;
     }
 
-    // Ignore non-private accesses.
-    if !attr.starts_with('_') {
-        return;
-    }
-
-    // Ignore dunder accesses.
-    let is_dunder = attr.starts_with("__") && attr.ends_with("__");
-    if is_dunder {
-        return;
-    }
-
-    // Ignore sunder accesses.
-    let is_sunder = attr.starts_with('_')
-        && attr.ends_with('_')
-        && !attr.starts_with("__")
-        && !attr.ends_with("__");
-    if is_sunder {
+    if !attr.starts_with('_') || is_dunder(attr) || is_sunder(attr) {
         return;
     }
 
     if checker
-        .settings
+        .settings()
         .flake8_self
         .ignore_names
         .contains(attr.id())
@@ -103,65 +96,14 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
     }
 
     // Ignore accesses on instances within special methods (e.g., `__eq__`).
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-        checker.semantic().current_scope().kind
-    {
-        if matches!(
-            name.as_str(),
-            "__lt__"
-                | "__le__"
-                | "__eq__"
-                | "__ne__"
-                | "__gt__"
-                | "__ge__"
-                | "__add__"
-                | "__sub__"
-                | "__mul__"
-                | "__matmul__"
-                | "__truediv__"
-                | "__floordiv__"
-                | "__mod__"
-                | "__divmod__"
-                | "__pow__"
-                | "__lshift__"
-                | "__rshift__"
-                | "__and__"
-                | "__xor__"
-                | "__or__"
-                | "__radd__"
-                | "__rsub__"
-                | "__rmul__"
-                | "__rmatmul__"
-                | "__rtruediv__"
-                | "__rfloordiv__"
-                | "__rmod__"
-                | "__rdivmod__"
-                | "__rpow__"
-                | "__rlshift__"
-                | "__rrshift__"
-                | "__rand__"
-                | "__rxor__"
-                | "__ror__"
-                | "__iadd__"
-                | "__isub__"
-                | "__imul__"
-                | "__imatmul__"
-                | "__itruediv__"
-                | "__ifloordiv__"
-                | "__imod__"
-                | "__ipow__"
-                | "__ilshift__"
-                | "__irshift__"
-                | "__iand__"
-                | "__ixor__"
-                | "__ior__"
-        ) {
+    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) = current_scope.kind {
+        if is_dunder_operator_method(name) {
             return;
         }
     }
 
-    // Allow some documented private methods, like `os._exit()`.
-    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
+    // Allow some public functions whose names start with an underscore, like `os._exit()`.
+    if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
         if matches!(qualified_name.segments(), ["os", "_exit"]) {
             return;
         }
@@ -185,31 +127,226 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 
     if let Expr::Name(name) = value.as_ref() {
         // Ignore accesses on class members from _within_ the class.
-        if checker
-            .semantic()
+        if semantic
             .resolve_name(name)
             .and_then(|id| {
-                if let BindingKind::ClassDefinition(scope) = checker.semantic().binding(id).kind {
+                if let BindingKind::ClassDefinition(scope) = semantic.binding(id).kind {
                     Some(scope)
                 } else {
                     None
                 }
             })
-            .is_some_and(|scope| {
-                checker
-                    .semantic()
-                    .current_scope_ids()
-                    .any(|parent| scope == parent)
-            })
+            .is_some_and(|scope| semantic.current_scope_ids().any(|parent| scope == parent))
         {
+            return;
+        }
+
+        if is_same_class_instance(
+            name,
+            semantic,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
+        ) {
             return;
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         PrivateMemberAccess {
             access: attr.to_string(),
         },
         expr.range(),
-    ));
+    );
+}
+
+/// Check for the following cases:
+///
+/// * Parameter annotation:
+///
+///     ```python
+///     class C[T]:
+///         def f(self, other: C): ...
+///         def f(self, other: C[...]): ...
+///         def f(self, other: Annotated[C, ...]): ...
+///     ```
+///
+/// * `super().__new__`/`cls` call:
+///
+///     ```python
+///     class C:
+///         def __new__(cls): ...
+///             instance = super().__new__(cls)
+///         @classmethod
+///         def m(cls):
+///             instance = cls()
+///     ```
+///
+/// This function is intentionally naive and does not handle more complex cases.
+/// It is expected to be expanded overtime, possibly when type-aware APIs are available.
+fn is_same_class_instance(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    classmethod_decorators: &[String],
+    staticmethod_decorators: &[String],
+) -> bool {
+    if is_method_receiver(
+        name,
+        semantic,
+        classmethod_decorators,
+        staticmethod_decorators,
+    ) {
+        return true;
+    }
+
+    let Some(binding_id) = semantic.resolve_name(name) else {
+        return false;
+    };
+
+    let binding = semantic.binding(binding_id);
+    typing::check_type::<SameClassInstanceChecker>(binding, semantic)
+}
+
+/// Return `true` if `name` resolves to the first parameter of a syntactic
+/// method receiver, including class methods and `__new__`.
+fn is_method_receiver(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    classmethod_decorators: &[String],
+    staticmethod_decorators: &[String],
+) -> bool {
+    let Some(binding_id) = semantic.resolve_name(name) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+
+    if !matches!(binding.kind, BindingKind::Argument) {
+        return false;
+    }
+
+    let Some(ast::Stmt::FunctionDef(function)) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Some(first_parameter) = function
+        .parameters
+        .posonlyargs
+        .first()
+        .or_else(|| function.parameters.args.first())
+    else {
+        return false;
+    };
+
+    if binding.range != first_parameter.parameter.name.range() {
+        return false;
+    }
+
+    let scope = &semantic.scopes[binding.scope];
+    let Some(parent_scope) = semantic.first_non_type_parent_scope(scope) else {
+        return false;
+    };
+
+    matches!(
+        function_type::classify(
+            &function.name,
+            &function.decorator_list,
+            parent_scope,
+            semantic,
+            classmethod_decorators,
+            staticmethod_decorators,
+        ),
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
+    )
+}
+
+struct SameClassInstanceChecker;
+
+impl SameClassInstanceChecker {
+    /// Whether `name` resolves to a class which the semantic model is traversing.
+    fn is_current_class_name(name: &ast::ExprName, semantic: &SemanticModel) -> bool {
+        semantic.current_scopes().any(|scope| {
+            let ScopeKind::Class(class) = scope.kind else {
+                return false;
+            };
+
+            class.name.id == name.id
+        })
+    }
+}
+
+impl TypeChecker for SameClassInstanceChecker {
+    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`, `Self`, `Annotated[Self, ...]`
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        let inner = unwrap_annotated(annotation, semantic);
+
+        if semantic.match_typing_expr(inner, "Self") {
+            return true;
+        }
+
+        let Expr::Name(class_name) = inner else {
+            return false;
+        };
+
+        Self::is_current_class_name(class_name, semantic)
+    }
+
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `self`
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        // `this = self` — a direct assignment from `self`, but only when
+        // `self` is actually a function parameter (not a local rebinding).
+        if let Expr::Name(name) = initializer
+            && name.id == "self"
+            && semantic
+                .resolve_name(name)
+                .is_some_and(|id| matches!(semantic.binding(id).kind, BindingKind::Argument))
+        {
+            return true;
+        }
+
+        let Expr::Call(call) = initializer else {
+            return false;
+        };
+
+        match &*call.func {
+            Expr::Subscript(_) => Self::match_annotation(&call.func, semantic),
+
+            Expr::Name(name) => {
+                matches!(&*name.id, "cls" | "mcs") || Self::is_current_class_name(name, semantic)
+            }
+
+            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
+                    return false;
+                };
+
+                let Expr::Name(ast::ExprName { id: func, .. }) = &**func else {
+                    return false;
+                };
+
+                func == "super" && attr == "__new__"
+            }
+
+            _ => false,
+        }
+    }
+}
+
+/// Unwrap `Annotated[X, ...]` and `C[T]` to the innermost type expression.
+fn unwrap_annotated<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
+    match expr {
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            if semantic.match_typing_expr(value, "Annotated")
+                && let Some(tuple) = slice.as_tuple_expr()
+                && let [inner, ..] = &tuple.elts[..]
+            {
+                return unwrap_annotated(inner, semantic);
+            }
+            if semantic.match_typing_expr(value, "Annotated") {
+                return expr;
+            }
+            unwrap_annotated(value, semantic)
+        }
+        _ => expr,
+    }
 }

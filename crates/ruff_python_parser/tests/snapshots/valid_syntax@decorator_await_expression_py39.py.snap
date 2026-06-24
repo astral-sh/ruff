@@ -1,0 +1,99 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_await_expression_py39.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..96,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 45..95,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 55..58,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 58..60,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                node_index: NodeIndex(None),
+                                range: 66..95,
+                                is_async: false,
+                                decorator_list: [
+                                    Decorator {
+                                        range: 66..76,
+                                        node_index: NodeIndex(None),
+                                        expression: Await(
+                                            ExprAwait {
+                                                node_index: NodeIndex(None),
+                                                range: 67..76,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 73..76,
+                                                        id: Name("bar"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                                name: Identifier {
+                                    id: Name("baz"),
+                                    range: 85..88,
+                                    node_index: NodeIndex(None),
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 88..90,
+                                    node_index: NodeIndex(None),
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 92..95,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 92..95,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

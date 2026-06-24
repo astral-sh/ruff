@@ -244,13 +244,12 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns `true` if `key` has any *leading*, *dangling*, or *trailing* parts.
-    #[allow(unused)]
     pub(super) fn has(&self, key: &K) -> bool {
         self.index.contains_key(key)
     }
 
     /// Returns the *leading*, *dangling*, and *trailing* parts of `key`.
-    pub(super) fn leading_dangling_trailing(&self, key: &K) -> LeadingDanglingTrailing<V> {
+    pub(super) fn leading_dangling_trailing(&self, key: &K) -> LeadingDanglingTrailing<'_, V> {
         match self.index.get(key) {
             None => LeadingDanglingTrailing {
                 leading: &[],
@@ -293,6 +292,10 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut builder = f.debug_map();
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "Debug output intentionally reflects the map's unspecified order"
+        )]
         for (key, entry) in &self.index {
             builder.entry(&key, &LeadingDanglingTrailing::from_entry(entry, self));
         }
@@ -505,7 +508,7 @@ impl InOrderEntry {
 
 #[derive(Clone, Debug)]
 struct OutOfOrderEntry {
-    /// Index into the [`MultiMap::out_of_order`] vector at which offset the leaading vec is stored.
+    /// Index into the [`MultiMap::out_of_order_parts`] vector at which offset the leading vec is stored.
     leading_index: usize,
     _count: Count<OutOfOrderEntry>,
 }
@@ -542,7 +545,7 @@ impl PartIndex {
         // OK because:
         // * The `value < u32::MAX` guarantees that the add doesn't overflow.
         // * The `+ 1` guarantees that the index is not zero
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         Self(std::num::NonZeroU32::new((value as u32) + 1).expect("valid value"))
     }
 

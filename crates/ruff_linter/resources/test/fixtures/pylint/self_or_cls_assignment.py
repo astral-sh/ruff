@@ -41,3 +41,10 @@ class Fruit:
 def list_fruits(self, cls) -> None:
     self = "apple"  # Ok
     cls = "banana"  # Ok
+
+# `__new__` is implicitly a static method
+# but for the purposes of this check we treat
+# it as a class method.
+class Foo:
+    def __new__(cls):
+        cls = "apple" # PLW0642

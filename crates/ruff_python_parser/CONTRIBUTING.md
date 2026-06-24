@@ -62,7 +62,7 @@ To run the fuzzer, execute the following command
 (requires [`uv`](https://github.com/astral-sh/uv) to be installed):
 
 ```sh
-uvx --from ./python/py-fuzzer fuzz
+uv run --project=./python/py-fuzzer fuzz
 ```
 
 Refer to the [py-fuzzer](https://github.com/astral-sh/ruff/blob/main/python/py-fuzzer/fuzz.py)
@@ -71,7 +71,7 @@ script for more information or use the `--help` flag to see the available option
 #### CI
 
 The fuzzer is run as part of the CI pipeline. The purpose of running the fuzzer in the CI is to
-catch any regresssions introduced by any new changes to the parser. This is why the fuzzer is run on
+catch any regressions introduced by any new changes to the parser. This is why the fuzzer is run on
 the same set of seeds on every run.
 
 ## Benchmarks

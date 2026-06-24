@@ -1,7 +1,7 @@
 [package]
 name = "ruff_notebook"
-version = "0.0.0"
-publish = false
+version = "0.0.2"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -10,9 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-doctest = false
-
 [dependencies]
 ruff_diagnostics = { workspace = true }
 ruff_source_file = { workspace = true, features = ["serde"] }
@@ -20,12 +17,12 @@ ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 itertools = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true, default-features = false, features = ["macros"] }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-rand = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }

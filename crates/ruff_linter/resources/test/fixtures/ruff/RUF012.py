@@ -81,28 +81,42 @@ class H(BaseModel):
         final_variable: Final[list[int]] = []
 
 
+from pydantic.v1 import BaseModel as V1BaseModel
+
+
+class I(V1BaseModel):
+    mutable_default: list[int] = []
+
+
+from pydantic.v1.generics import GenericModel
+
+
+class J(GenericModel):
+    mutable_default: list[int] = []
+
+
 def sqlmodel_import_checker():
     from sqlmodel.main import SQLModel
 
-    class I(SQLModel):
+    class K(SQLModel):
         id: int
         mutable_default: list[int] = []
 
 from sqlmodel import SQLModel
 
-class J(SQLModel):
+class L(SQLModel):
     id: int
     name: str
 
 
-class K(SQLModel):
+class M(SQLModel):
     id: int
     i_s: list[J] = []
 
 
-class L(SQLModel):
+class N(SQLModel):
     id: int
-    i_j: list[K] = list()
+    i_j: list[L] = list()
 
 # Lint should account for deferred annotations
 # See https://github.com/astral-sh/ruff/issues/15857
@@ -118,3 +132,21 @@ class AWithQuotes:
     final_variable: 'Final[list[int]]' = []
     class_variable_without_subscript: 'ClassVar' = []
     final_variable_without_subscript: 'Final' = []
+
+
+# Reassignment of a ClassVar should not trigger RUF012
+class P:
+    class_variable: ClassVar[list] = [10, 20, 30, 40, 50]
+    class_variable = [*class_variable[0::1], *class_variable[2::3]]
+
+
+import ctypes
+# Lint should trigger RUF012 only  for the `test` field and not the `_fields_`
+class S(ctypes.Structure):
+    test = [""]
+    _fields_ = [
+        ("attr_set", ctypes.c_uint64),
+        ("attr_clr", ctypes.c_uint64),
+        ("propagation", ctypes.c_uint64),
+        ("userns_fd", ctypes.c_uint64),
+    ]

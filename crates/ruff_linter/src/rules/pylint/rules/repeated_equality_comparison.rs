@@ -2,21 +2,25 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::Locator;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for repeated equality comparisons that can rewritten as a membership
+/// Checks for repeated equality comparisons that can be rewritten as a membership
 /// test.
+///
+/// This rule will try to determine if the values are hashable
+/// and the fix will use a `set` if they are. If unable to determine, the fix
+/// will use a `tuple` and suggest the use of a `set`.
 ///
 /// ## Why is this bad?
 /// To check if a variable is equal to one of many values, it is common to
@@ -28,9 +32,11 @@ use crate::Locator;
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
 ///
-/// In [preview], this rule will try to determine if the values are hashable
-/// and the fix will use a `set` if they are. If unable to determine, the fix
-/// will use a `tuple` and continue to suggest the use of a `set`.
+/// ## Fix safety
+/// This rule is always unsafe since literal sets and tuples
+/// evaluate their members eagerly whereas `or` comparisons
+/// are short-circuited. It is therefore possible that a fix
+/// will change behavior in the presence of side-effects.
 ///
 /// ## Example
 /// ```python
@@ -46,9 +52,8 @@ use crate::Locator;
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
@@ -59,7 +64,9 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
     fn message(&self) -> String {
         match (self.expression.full_display(), self.all_hashable) {
             (Some(expression), false) => {
-                format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
+                format!(
+                    "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+                )
             }
             (Some(expression), true) => {
                 format!("Consider merging multiple comparisons: `{expression}`.")
@@ -133,14 +140,25 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 continue;
             }
 
+            if let Some((&first, rest)) = comparators.split_first() {
+                let first_comparable = ComparableExpr::from(first);
+
+                if rest
+                    .iter()
+                    .all(|&c| ComparableExpr::from(c) == first_comparable)
+                {
+                    // Do not flag if all members are identical
+                    continue;
+                }
+            }
+
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
-            let all_hashable = checker.settings.preview.is_enabled()
-                && comparators
-                    .iter()
-                    .all(|comparator| comparator.is_literal_expr());
+            let all_hashable = comparators
+                .iter()
+                .all(|comparator| comparator.is_literal_expr());
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         expr,
@@ -165,11 +183,13 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 Expr::Set(ast::ExprSet {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: true,
                 })
@@ -187,15 +207,15 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                             },
                             comparators: Box::from([comparator]),
                             range: bool_op.range(),
+                            node_index: AtomicNodeIndex::NONE,
                         })))
                         .chain(after)
                         .collect(),
                     range: bool_op.range(),
+                    node_index: AtomicNodeIndex::NONE,
                 })),
                 bool_op.range(),
             )));
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -244,7 +264,7 @@ fn to_allowed_value<'a>(
 
     // Ignore `sys.version_info` and `sys.platform` comparisons, which are only
     // respected by type checkers when enforced via equality.
-    if any_over_expr(value, &|expr| {
+    if any_over_expr(value, |expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {
@@ -280,8 +300,8 @@ fn merged_membership_test(
         .join(", ");
 
     if all_hashable {
-        return format!("{left} {op} {{{members}}}",);
+        return format!("{left} {op} {{{members}}}");
     }
 
-    format!("{left} {op} ({members})",)
+    format!("{left} {op} ({members})")
 }

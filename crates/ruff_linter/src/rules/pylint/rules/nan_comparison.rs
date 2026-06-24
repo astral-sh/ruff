@@ -1,10 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::linter::float::as_nan_float_string_literal;
 
 /// ## What it does
 /// Checks for comparisons against NaN values.
@@ -30,8 +32,8 @@ use crate::checkers::ast::Checker;
 /// if math.isnan(x):
 ///     pass
 /// ```
-///
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NanComparison {
     nan: Nan,
 }
@@ -48,30 +50,35 @@ impl Violation for NanComparison {
 
 /// PLW0177
 pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    for expr in std::iter::once(left).chain(comparators) {
+    nan_comparison_impl(checker, std::iter::once(left).chain(comparators));
+}
+
+/// PLW0177
+pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) {
+    nan_comparison_impl(
+        checker,
+        cases
+            .iter()
+            .filter_map(|case| case.pattern.as_match_value().map(|pattern| &*pattern.value)),
+    );
+}
+
+fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = &'a Expr>) {
+    for expr in comparators {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
                 ["numpy", "nan" | "NAN" | "NaN"] => {
-                    checker.report_diagnostic(Diagnostic::new(
-                        NanComparison { nan: Nan::NumPy },
-                        expr.range(),
-                    ));
+                    checker.report_diagnostic(NanComparison { nan: Nan::NumPy }, expr.range());
                 }
                 ["math", "nan"] => {
-                    checker.report_diagnostic(Diagnostic::new(
-                        NanComparison { nan: Nan::Math },
-                        expr.range(),
-                    ));
+                    checker.report_diagnostic(NanComparison { nan: Nan::Math }, expr.range());
                 }
                 _ => continue,
             }
         }
 
         if is_nan_float(expr, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
-                NanComparison { nan: Nan::Math },
-                expr.range(),
-            ));
+            checker.report_diagnostic(NanComparison { nan: Nan::Math }, expr.range());
         }
     }
 }
@@ -108,14 +115,10 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     }
 
-    let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = &**args else {
+    let [expr] = &**args else {
         return false;
     };
-
-    if !matches!(
-        value.to_str(),
-        "nan" | "NaN" | "NAN" | "Nan" | "nAn" | "naN" | "nAN" | "NAn"
-    ) {
+    if as_nan_float_string_literal(expr).is_none() {
         return false;
     }
 

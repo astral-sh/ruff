@@ -3,10 +3,10 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Parameter;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::textwrap::dedent;
@@ -14,12 +14,14 @@ use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::helpers::find_underline;
 use crate::rules::pydocstyle::settings::Convention;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for over-indented sections in docstrings.
@@ -89,6 +91,7 @@ use crate::rules::pydocstyle::settings::Convention;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct OverindentedSection {
     name: String,
 }
@@ -192,6 +195,7 @@ impl AlwaysFixableViolation for OverindentedSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct OverindentedSectionUnderline {
     name: String,
 }
@@ -275,6 +279,7 @@ impl AlwaysFixableViolation for OverindentedSectionUnderline {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct NonCapitalizedSectionName {
     name: String,
 }
@@ -373,6 +378,7 @@ impl AlwaysFixableViolation for NonCapitalizedSectionName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingNewLineAfterSectionName {
     name: String,
 }
@@ -476,6 +482,7 @@ impl AlwaysFixableViolation for MissingNewLineAfterSectionName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingDashedUnderlineAfterSection {
     name: String,
 }
@@ -582,6 +589,7 @@ impl AlwaysFixableViolation for MissingDashedUnderlineAfterSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingSectionUnderlineAfterName {
     name: String,
 }
@@ -686,6 +694,7 @@ impl AlwaysFixableViolation for MissingSectionUnderlineAfterName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MismatchedSectionUnderlineLength {
     name: String,
 }
@@ -783,6 +792,7 @@ impl AlwaysFixableViolation for MismatchedSectionUnderlineLength {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct NoBlankLineAfterSection {
     name: String,
 }
@@ -876,6 +886,7 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct NoBlankLineBeforeSection {
     name: String,
 }
@@ -971,6 +982,7 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingBlankLineAfterLastSection {
     name: String,
 }
@@ -1054,12 +1066,17 @@ impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct EmptyDocstringSection {
     name: String,
 }
@@ -1137,6 +1154,7 @@ impl Violation for EmptyDocstringSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.74")]
 pub(crate) struct MissingSectionNameColon {
     name: String,
 }
@@ -1167,9 +1185,13 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body. Function docstrings often include a section for
 /// function arguments; this rule is concerned with that section only.
+/// Note that this rule only checks docstrings with an arguments (e.g. `Args`) section.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
+///
+/// Parameters annotated with `typing.Unpack` are exempt from this rule.
+/// This follows the Python typing specification for unpacking keyword arguments.
 ///
 /// ## Example
 /// ```python
@@ -1220,7 +1242,9 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+/// - [Python - Unpack for keyword arguments](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UndocumentedParam {
     /// The name of the function being documented.
     definition: String,
@@ -1297,12 +1321,17 @@ impl Violation for UndocumentedParam {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct BlankLinesBetweenHeaderAndContent {
     name: String,
 }
@@ -1319,8 +1348,102 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
     }
 }
 
+/// ## What it does
+/// Checks for docstring sections that appear out of order.
+///
+/// ## Why is this bad?
+/// Docstring sections should follow the canonical ordering specified by the
+/// docstring convention (NumPy or Google). Consistent ordering makes
+/// docstrings easier to read and navigate.
+///
+/// For the NumPy convention, all sections have a prescribed order per the
+/// numpydoc style guide. For the Google convention, only the relative ordering
+/// of `Args`, `Returns`/`Yields`, and `Raises` is enforced; all other sections
+/// are unordered.
+///
+/// ## Example
+///
+/// Given `lint.pydocstyle.convention = "numpy"`:
+///
+/// ```python
+/// def func() -> int:
+///     """Summary.
+///
+///     Notes
+///     -----
+///     Some notes.
+///
+///     Returns
+///     -------
+///     int
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def func() -> int:
+///     """Summary.
+///
+///     Returns
+///     -------
+///     int
+///
+///     Notes
+///     -----
+///     Some notes.
+///     """
+/// ```
+///
+/// Given `lint.pydocstyle.convention = "google"`:
+///
+/// ```python
+/// def func(x: int) -> int:
+///     """Summary.
+///
+///     Returns:
+///         int
+///
+///     Args:
+///         x: Description.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def func(x: int) -> int:
+///     """Summary.
+///
+///     Args:
+///         x: Description.
+///
+///     Returns:
+///         int
+///     """
+/// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [NumPy docstring standard](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.15.3")]
+pub(crate) struct IncorrectSectionOrder {
+    current: String,
+    previous: String,
+}
+
+impl Violation for IncorrectSectionOrder {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IncorrectSectionOrder { current, previous } = self;
+        format!(r#"Section "{current}" appears after section "{previous}" but should be before it"#)
+    }
+}
+
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
-/// D414, D416, D417
+/// D414, D416, D417, D420
 pub(crate) fn sections(
     checker: &Checker,
     docstring: &Docstring,
@@ -1328,11 +1451,23 @@ pub(crate) fn sections(
     convention: Option<Convention>,
 ) {
     match convention {
-        Some(Convention::Google) => parse_google_sections(checker, docstring, section_contexts),
-        Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, section_contexts),
+        Some(Convention::Google) => {
+            check_section_order(checker, section_contexts, google_section_order);
+            parse_google_sections(checker, docstring, section_contexts);
+        }
+        Some(Convention::Numpy) => {
+            check_section_order(checker, section_contexts, numpy_section_order);
+            parse_numpy_sections(checker, docstring, section_contexts);
+        }
         Some(Convention::Pep257) | None => match section_contexts.style() {
-            SectionStyle::Google => parse_google_sections(checker, docstring, section_contexts),
-            SectionStyle::Numpy => parse_numpy_sections(checker, docstring, section_contexts),
+            SectionStyle::Google => {
+                check_section_order(checker, section_contexts, google_section_order);
+                parse_google_sections(checker, docstring, section_contexts);
+            }
+            SectionStyle::Numpy => {
+                check_section_order(checker, section_contexts, numpy_section_order);
+                parse_numpy_sections(checker, docstring, section_contexts);
+            }
         },
     }
 }
@@ -1360,8 +1495,8 @@ fn blanks_and_section_underline(
     if let Some(non_blank_line) = following_lines.next() {
         if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
             if num_blank_lines_after_header > 0 {
-                if checker.enabled(Rule::MissingSectionUnderlineAfterName) {
-                    let mut diagnostic = Diagnostic::new(
+                if checker.is_rule_enabled(Rule::MissingSectionUnderlineAfterName) {
+                    let mut diagnostic = checker.report_diagnostic(
                         MissingSectionUnderlineAfterName {
                             name: context.section_name().to_string(),
                         },
@@ -1373,14 +1508,12 @@ fn blanks_and_section_underline(
                         context.following_range().start(),
                         blank_lines_end,
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
             if dashed_line.len().to_usize() != context.section_name().len() {
-                if checker.enabled(Rule::MismatchedSectionUnderlineLength) {
-                    let mut diagnostic = Diagnostic::new(
+                if checker.is_rule_enabled(Rule::MismatchedSectionUnderlineLength) {
+                    let mut diagnostic = checker.report_diagnostic(
                         MismatchedSectionUnderlineLength {
                             name: context.section_name().to_string(),
                         },
@@ -1392,15 +1525,14 @@ fn blanks_and_section_underline(
                         "-".repeat(context.section_name().len()),
                         dashed_line,
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
-            if checker.enabled(Rule::OverindentedSectionUnderline) {
+            if checker.is_rule_enabled(Rule::OverindentedSectionUnderline) {
                 let leading_space = leading_space(&non_blank_line);
-                if leading_space.len() > docstring.indentation.len() {
-                    let mut diagnostic = Diagnostic::new(
+                let docstring_indentation = docstring.compute_indentation();
+                if leading_space.len() > docstring_indentation.len() {
+                    let mut diagnostic = checker.report_diagnostic(
                         OverindentedSectionUnderline {
                             name: context.section_name().to_string(),
                         },
@@ -1412,14 +1544,12 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                         leading_space.text_len() + TextSize::from(1),
                     );
-                    let contents = clean_space(docstring.indentation);
+                    let contents = clean_space(docstring_indentation);
                     diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
                         Edit::range_deletion(range)
                     } else {
                         Edit::range_replacement(contents, range)
                     }));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1438,15 +1568,13 @@ fn blanks_and_section_underline(
                     }
 
                     if following_lines.peek().is_none() {
-                        if checker.enabled(Rule::EmptyDocstringSection) {
-                            checker.report_diagnostic(Diagnostic::new(
-                                EmptyDocstringSection {
-                                    name: context.section_name().to_string(),
-                                },
-                                context.section_name_range(),
-                            ));
-                        }
-                    } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                        checker.report_diagnostic_if_enabled(
+                            EmptyDocstringSection {
+                                name: context.section_name().to_string(),
+                            },
+                            context.section_name_range(),
+                        );
+                    } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
                         // reStructuredText directive, the blank lines should be preserved, as in:
                         //
@@ -1470,7 +1598,7 @@ fn blanks_and_section_underline(
 
                         if is_sphinx {
                             if num_blank_lines_dashes_end > 1 {
-                                let mut diagnostic = Diagnostic::new(
+                                let mut diagnostic = checker.report_diagnostic(
                                     BlankLinesBetweenHeaderAndContent {
                                         name: context.section_name().to_string(),
                                     },
@@ -1482,10 +1610,9 @@ fn blanks_and_section_underline(
                                     line_after_dashes.start(),
                                     blank_lines_after_dashes_end,
                                 )));
-                                checker.report_diagnostic(diagnostic);
                             }
                         } else {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 BlankLinesBetweenHeaderAndContent {
                                     name: context.section_name().to_string(),
                                 },
@@ -1496,24 +1623,22 @@ fn blanks_and_section_underline(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
                             )));
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }
             } else {
-                if checker.enabled(Rule::EmptyDocstringSection) {
-                    checker.report_diagnostic(Diagnostic::new(
-                        EmptyDocstringSection {
-                            name: context.section_name().to_string(),
-                        },
-                        context.section_name_range(),
-                    ));
-                }
+                checker.report_diagnostic_if_enabled(
+                    EmptyDocstringSection {
+                        name: context.section_name().to_string(),
+                    },
+                    context.section_name_range(),
+                );
             }
         } else {
-            if style.is_numpy() && checker.enabled(Rule::MissingDashedUnderlineAfterSection) {
+            if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection)
+            {
                 if let Some(equal_line) = find_underline(&non_blank_line, '=') {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         MissingDashedUnderlineAfterSection {
                             name: context.section_name().to_string(),
                         },
@@ -1526,10 +1651,8 @@ fn blanks_and_section_underline(
                         "-".repeat(context.section_name().len()),
                         equal_line,
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 } else {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         MissingDashedUnderlineAfterSection {
                             name: context.section_name().to_string(),
                         },
@@ -1540,19 +1663,17 @@ fn blanks_and_section_underline(
                     let content = format!(
                         "{}{}{}",
                         checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation),
+                        clean_space(docstring.compute_indentation()),
                         "-".repeat(context.section_name().len()),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                         content,
                         context.summary_range().end(),
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
             if num_blank_lines_after_header > 0 {
-                if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                     // If the section is followed by exactly one line, and then a
                     // reStructuredText directive, the blank lines should be preserved, as in:
                     //
@@ -1575,7 +1696,7 @@ fn blanks_and_section_underline(
 
                     if is_sphinx {
                         if num_blank_lines_after_header > 1 {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 BlankLinesBetweenHeaderAndContent {
                                     name: context.section_name().to_string(),
                                 },
@@ -1588,10 +1709,9 @@ fn blanks_and_section_underline(
                                 context.following_range().start(),
                                 blank_lines_end,
                             )));
-                            checker.report_diagnostic(diagnostic);
                         }
                     } else {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             BlankLinesBetweenHeaderAndContent {
                                 name: context.section_name().to_string(),
                             },
@@ -1602,15 +1722,14 @@ fn blanks_and_section_underline(
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
         }
     } else {
         // Nothing but blank lines after the section header.
-        if style.is_numpy() && checker.enabled(Rule::MissingDashedUnderlineAfterSection) {
-            let mut diagnostic = Diagnostic::new(
+        if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection) {
+            let mut diagnostic = checker.report_diagnostic(
                 MissingDashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
                 },
@@ -1621,24 +1740,20 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                clean_space(docstring.indentation),
+                clean_space(docstring.compute_indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 content,
                 context.summary_range().end(),
             )));
-
-            checker.report_diagnostic(diagnostic);
         }
-        if checker.enabled(Rule::EmptyDocstringSection) {
-            checker.report_diagnostic(Diagnostic::new(
-                EmptyDocstringSection {
-                    name: context.section_name().to_string(),
-                },
-                context.section_name_range(),
-            ));
-        }
+        checker.report_diagnostic_if_enabled(
+            EmptyDocstringSection {
+                name: context.section_name().to_string(),
+            },
+            context.section_name_range(),
+        );
     }
 }
 
@@ -1649,11 +1764,11 @@ fn common_section(
     next: Option<&SectionContext>,
     style: SectionStyle,
 ) {
-    if checker.enabled(Rule::NonCapitalizedSectionName) {
+    if checker.is_rule_enabled(Rule::NonCapitalizedSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 NonCapitalizedSectionName {
                     name: context.section_name().to_string(),
                 },
@@ -1665,15 +1780,15 @@ fn common_section(
                 capitalized_section_name.to_string(),
                 section_range,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
-    if checker.enabled(Rule::OverindentedSection) {
+    if checker.is_rule_enabled(Rule::OverindentedSection) {
         let leading_space = leading_space(context.summary_line());
-        if leading_space.len() > docstring.indentation.len() {
+        let docstring_indentation = docstring.compute_indentation();
+        if leading_space.len() > docstring_indentation.len() {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 OverindentedSection {
                     name: context.section_name().to_string(),
                 },
@@ -1681,21 +1796,20 @@ fn common_section(
             );
 
             // Replace the existing indentation with whitespace of the appropriate length.
-            let content = clean_space(docstring.indentation);
+            let content = clean_space(docstring_indentation);
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
             } else {
                 Edit::range_replacement(content, fix_range)
             }));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
     let line_end = checker.stylist().line_ending().as_str();
 
     if let Some(next) = next {
-        if checker.enabled(Rule::NoBlankLineAfterSection) {
+        if checker.is_rule_enabled(Rule::NoBlankLineAfterSection) {
             let num_blank_lines = context
                 .following_lines()
                 .rev()
@@ -1703,7 +1817,7 @@ fn common_section(
                 .count();
             if num_blank_lines < 2 {
                 let section_range = context.section_name_range();
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
                     },
@@ -1714,13 +1828,12 @@ fn common_section(
                     line_end.to_string(),
                     next.start(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
     } else {
         // The first blank line is the line containing the closing triple quotes, so we need at
         // least two.
-        if checker.enabled(Rule::MissingBlankLineAfterLastSection) {
+        if checker.is_rule_enabled(Rule::MissingBlankLineAfterLastSection) {
             let num_blank_lines = context
                 .following_lines()
                 .rev()
@@ -1738,32 +1851,31 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
+                        leading_space(docstring.compute_indentation())
                     ),
                     context.end() - del_len,
                     context.end(),
                 );
 
                 let section_range = context.section_name_range();
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     MissingBlankLineAfterLastSection {
                         name: context.section_name().to_string(),
                     },
                     section_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
 
-    if checker.enabled(Rule::NoBlankLineBeforeSection) {
+    if checker.is_rule_enabled(Rule::NoBlankLineBeforeSection) {
         if !context
             .previous_line()
             .is_some_and(|line| line.trim().is_empty())
         {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
                 },
@@ -1774,7 +1886,6 @@ fn common_section(
                 line_end.to_string(),
                 context.start(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1806,7 +1917,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if !checker.settings.pydocstyle.ignore_var_parameters() {
+    if !checker.settings().pydocstyle.ignore_var_parameters() {
         if let Some(arg) = function.parameters.vararg.as_ref() {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");
@@ -1817,7 +1928,9 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg.as_ref() {
+        if let Some(arg) = function.parameters.kwarg.as_ref()
+            && !has_unpack_annotation(checker, arg)
+        {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("**{arg_name}");
             if !arg_name.starts_with('_')
@@ -1832,15 +1945,24 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     if !missing_arg_names.is_empty() {
         if let Some(definition) = docstring.definition.name() {
             let names = missing_arg_names.into_iter().sorted().collect();
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 UndocumentedParam {
                     definition: definition.to_string(),
                     names,
                 },
                 function.identifier(),
-            ));
+            );
         }
     }
+}
+
+/// Returns `true` if the parameter is annotated with `typing.Unpack`
+fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
+    parameter.annotation.as_ref().is_some_and(|annotation| {
+        checker
+            .semantic()
+            .match_typing_expr(map_subscript(annotation), "Unpack")
+    })
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
@@ -1869,7 +1991,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
     for line in args_content.trim().lines() {
-        if line.chars().next().map_or(true, char::is_whitespace) {
+        if line.chars().next().is_none_or(char::is_whitespace) {
             // This is a continuation of the documentation for the previous parameter,
             // because it starts with whitespace.
             if let Some(last) = args_sections.last_mut() {
@@ -1948,11 +2070,11 @@ fn numpy_section(
 ) {
     common_section(checker, docstring, context, next, SectionStyle::Numpy);
 
-    if checker.enabled(Rule::MissingNewLineAfterSectionName) {
+    if checker.is_rule_enabled(Rule::MissingNewLineAfterSectionName) {
         let suffix = context.summary_after_section_name();
 
         if !suffix.is_empty() {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 MissingNewLineAfterSectionName {
                     name: context.section_name().to_string(),
                 },
@@ -1963,12 +2085,10 @@ fn numpy_section(
                 section_range.end(),
                 suffix.text_len(),
             ))));
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 
-    if checker.enabled(Rule::UndocumentedParam) {
+    if checker.is_rule_enabled(Rule::UndocumentedParam) {
         if matches!(context.kind(), SectionKind::Parameters) {
             parameters_section(checker, docstring, context);
         }
@@ -1983,10 +2103,10 @@ fn google_section(
 ) {
     common_section(checker, docstring, context, next, SectionStyle::Google);
 
-    if checker.enabled(Rule::MissingSectionNameColon) {
+    if checker.is_rule_enabled(Rule::MissingSectionNameColon) {
         let suffix = context.summary_after_section_name();
         if suffix != ":" {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 MissingSectionNameColon {
                     name: context.section_name().to_string(),
                 },
@@ -1998,7 +2118,6 @@ fn google_section(
                 ":".to_string(),
                 TextRange::at(section_name_range.end(), suffix.text_len()),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -2024,7 +2143,7 @@ fn parse_google_sections(
         google_section(checker, docstring, &context, iterator.peek());
     }
 
-    if checker.enabled(Rule::UndocumentedParam) {
+    if checker.is_rule_enabled(Rule::UndocumentedParam) {
         let mut has_args = false;
         let mut documented_args: FxHashSet<String> = FxHashSet::default();
         for section_context in section_contexts {
@@ -2047,5 +2166,118 @@ fn parse_google_sections(
         if has_args {
             missing_args(checker, docstring, &documented_args);
         }
+    }
+}
+
+/// Canonical ordering of NumPy-style docstring sections.
+///
+/// Variant order matches the [numpydoc style guide](https://numpydoc.readthedocs.io/en/latest/format.html).
+#[derive(PartialEq, Eq, PartialOrd)]
+enum NumpySectionOrder {
+    ShortSummary,
+    ExtendedSummary,
+    Parameters,
+    Attributes,
+    Methods,
+    Returns,
+    Yields,
+    Receives,
+    OtherParameters,
+    Raises,
+    Warns,
+    Warnings,
+    SeeAlso,
+    Notes,
+    References,
+    Examples,
+}
+
+fn numpy_section_order(kind: SectionKind) -> Option<NumpySectionOrder> {
+    match kind {
+        SectionKind::ShortSummary => Some(NumpySectionOrder::ShortSummary),
+        SectionKind::ExtendedSummary => Some(NumpySectionOrder::ExtendedSummary),
+        SectionKind::Parameters => Some(NumpySectionOrder::Parameters),
+        SectionKind::Attributes => Some(NumpySectionOrder::Attributes),
+        SectionKind::Methods => Some(NumpySectionOrder::Methods),
+        SectionKind::Returns => Some(NumpySectionOrder::Returns),
+        SectionKind::Yields => Some(NumpySectionOrder::Yields),
+        SectionKind::Receives => Some(NumpySectionOrder::Receives),
+        SectionKind::OtherParams | SectionKind::OtherParameters => {
+            Some(NumpySectionOrder::OtherParameters)
+        }
+        SectionKind::Raises => Some(NumpySectionOrder::Raises),
+        SectionKind::Warns => Some(NumpySectionOrder::Warns),
+        SectionKind::Warnings => Some(NumpySectionOrder::Warnings),
+        SectionKind::SeeAlso => Some(NumpySectionOrder::SeeAlso),
+        SectionKind::Notes => Some(NumpySectionOrder::Notes),
+        SectionKind::References => Some(NumpySectionOrder::References),
+        SectionKind::Examples => Some(NumpySectionOrder::Examples),
+        _ => None,
+    }
+}
+
+/// Canonical ordering of Google-style docstring sections.
+///
+/// Only enforces the ordering explicitly documented in the
+/// [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods):
+/// Args before Returns/Yields, Raises after those. All other sections are
+/// unordered and return `None`.
+#[derive(PartialEq, Eq, PartialOrd)]
+enum GoogleSectionOrder {
+    Args,
+    Returns,
+    Yields,
+    Raises,
+}
+
+fn google_section_order(kind: SectionKind) -> Option<GoogleSectionOrder> {
+    match kind {
+        SectionKind::Args
+        | SectionKind::Arguments
+        | SectionKind::KeywordArgs
+        | SectionKind::KeywordArguments
+        | SectionKind::OtherArgs
+        | SectionKind::OtherArguments => Some(GoogleSectionOrder::Args),
+        SectionKind::Returns | SectionKind::Return => Some(GoogleSectionOrder::Returns),
+        SectionKind::Yields | SectionKind::Yield => Some(GoogleSectionOrder::Yields),
+        SectionKind::Raises => Some(GoogleSectionOrder::Raises),
+        _ => None,
+    }
+}
+
+/// D420
+fn check_section_order<P: PartialOrd>(
+    checker: &Checker,
+    section_contexts: &SectionContexts,
+    order_fn: fn(SectionKind) -> Option<P>,
+) {
+    if !checker.is_rule_enabled(Rule::IncorrectSectionOrder) {
+        return;
+    }
+
+    let mut max_order: Option<(P, &str)> = None;
+
+    for context in section_contexts {
+        let Some(position) = order_fn(context.kind()) else {
+            continue;
+        };
+
+        if let Some((ref prev_pos, prev_name)) = max_order
+            && position < *prev_pos
+        {
+            checker.report_diagnostic(
+                IncorrectSectionOrder {
+                    current: context.section_name().to_string(),
+                    previous: prev_name.to_string(),
+                },
+                context.section_name_range(),
+            );
+            // Don't update max_order: keep tracking against the highest-seen
+            // position so that subsequent sections are compared against the
+            // same out-of-place section.
+            continue;
+        }
+
+        max_order = Some((position, context.section_name()));
     }
 }

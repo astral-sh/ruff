@@ -1,15 +1,15 @@
 //! Code modification struct to support symbol renaming within a scope.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use itertools::Itertools;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
 use ruff_python_stdlib::{builtins::is_python_builtin, keyword::is_keyword};
 use ruff_text_size::Ranged;
 
+use crate::Edit;
 use crate::checkers::ast::Checker;
 
 pub(crate) struct Renamer;
@@ -298,11 +298,15 @@ impl Renamer {
         let name_argument = match qualified_name.segments() {
             ["collections", "namedtuple"] => arguments.find_argument_value("typename", 0),
 
-            ["typing" | "typing_extensions", "TypeVar" | "ParamSpec" | "TypeVarTuple" | "NewType" | "TypeAliasType"] => {
-                arguments.find_argument_value("name", 0)
-            }
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "ParamSpec" | "TypeVarTuple" | "NewType" | "TypeAliasType",
+            ] => arguments.find_argument_value("name", 0),
 
-            ["enum", "Enum" | "IntEnum" | "StrEnum" | "ReprEnum" | "Flag" | "IntFlag"]
+            [
+                "enum",
+                "Enum" | "IntEnum" | "StrEnum" | "ReprEnum" | "Flag" | "IntFlag",
+            ]
             | ["typing" | "typing_extensions", "NamedTuple" | "TypedDict"] => {
                 arguments.find_positional(0)
             }
@@ -350,7 +354,10 @@ impl Renamer {
                 ))
             }
             // Avoid renaming builtins and other "special" bindings.
-            BindingKind::FutureImport | BindingKind::Builtin | BindingKind::Export(_) => None,
+            BindingKind::FutureImport
+            | BindingKind::Builtin
+            | BindingKind::Export(_)
+            | BindingKind::DunderClassCell => None,
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument
@@ -365,7 +372,6 @@ impl Renamer {
             | BindingKind::ClassDefinition(_)
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
-            | BindingKind::ConditionalDeletion(_)
             | BindingKind::UnboundException(_) => {
                 Some(Edit::range_replacement(target.to_string(), binding.range()))
             }
@@ -399,7 +405,7 @@ impl ShadowedKind {
 
         if is_python_builtin(
             new_name,
-            checker.settings.target_version.minor(),
+            checker.target_version().minor,
             checker.source_type.is_ipynb(),
         ) {
             return ShadowedKind::BuiltIn;

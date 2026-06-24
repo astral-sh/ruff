@@ -1,10 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters};
 use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for mocked calls that use a dummy `lambda` function instead of
@@ -40,6 +42,7 @@ use ruff_text_size::Ranged;
 /// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
 /// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestPatchWithLambda;
 
 impl Violation for PytestPatchWithLambda {
@@ -73,19 +76,23 @@ impl<'a> Visitor<'a> for LambdaBodyVisitor<'a> {
     }
 }
 
-fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
+fn check_patch_call(checker: &Checker, call: &ast::ExprCall, index: usize) {
     if call.arguments.find_keyword("return_value").is_some() {
-        return None;
+        return;
     }
 
-    let ast::ExprLambda {
+    let Some(ast::ExprLambda {
         parameters,
         body,
         range: _,
-    } = call
+        node_index: _,
+    }) = call
         .arguments
-        .find_argument_value("new", index)?
-        .as_lambda_expr()?;
+        .find_argument_value("new", index)
+        .and_then(|expr| expr.as_lambda_expr())
+    else {
+        return;
+    };
 
     // Walk the lambda body. If the lambda uses the arguments, then it's valid.
     if let Some(parameters) = parameters {
@@ -95,16 +102,18 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
         };
         visitor.visit_expr(body);
         if visitor.uses_args {
-            return None;
+            return;
         }
     }
 
-    Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
+    checker.report_diagnostic(PytestPatchWithLambda, call.func.range());
 }
 
 /// PT008
-pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
-    let name = UnqualifiedName::from_expr(&call.func)?;
+pub(crate) fn patch_with_lambda(checker: &Checker, call: &ast::ExprCall) {
+    let Some(name) = UnqualifiedName::from_expr(&call.func) else {
+        return;
+    };
 
     if matches!(
         name.segments(),
@@ -118,7 +127,7 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
             "patch"
         ] | ["unittest", "mock", "patch"]
     ) {
-        check_patch_call(call, 1)
+        check_patch_call(checker, call, 1);
     } else if matches!(
         name.segments(),
         [
@@ -132,8 +141,6 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
             "object"
         ] | ["unittest", "mock", "patch", "object"]
     ) {
-        check_patch_call(call, 2)
-    } else {
-        None
+        check_patch_call(checker, call, 2);
     }
 }

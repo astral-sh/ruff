@@ -1,0 +1,31 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: unresolved_reference.md - Diagnostics for unresolved references - New builtin used on old Python version
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_reference.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | PythonFinalizationError  # error: [unresolved-reference]
+```
+
+# Diagnostics
+
+```
+error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | PythonFinalizationError  # error: [unresolved-reference]
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: `PythonFinalizationError` was added as a builtin in Python 3.13
+info: Python 3.12 was assumed when resolving types because it was specified on the command line
+
+```

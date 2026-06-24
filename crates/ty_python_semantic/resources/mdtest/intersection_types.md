@@ -1,0 +1,1418 @@
+# Intersection types
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+## Introduction
+
+This test suite covers certain properties of intersection types and makes sure that we can apply
+various simplification strategies. We use `&` and `~` to construct intersection types (note that we
+display negative contributions at the end; the order does not matter):
+
+```py
+class P: ...
+class Q: ...
+
+def _(
+    i1: P & Q,
+    i2: P & ~Q,
+    i3: ~P & Q,
+    i4: ~P & ~Q,
+) -> None:
+    reveal_type(i1)  # revealed: P & Q
+    reveal_type(i2)  # revealed: P & ~Q
+    reveal_type(i3)  # revealed: Q & ~P
+    reveal_type(i4)  # revealed: ~P & ~Q
+```
+
+## Notation
+
+Throughout this document, we use the following types as representatives for certain equivalence
+classes.
+
+### Non-disjoint types
+
+We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
+
+```py
+from ty_extensions import static_assert, is_disjoint_from
+
+class P: ...
+class Q: ...
+class R: ...
+
+static_assert(not is_disjoint_from(P, Q))
+static_assert(not is_disjoint_from(P, R))
+static_assert(not is_disjoint_from(Q, R))
+```
+
+Although `P` is not a subtype of `Q` and `Q` is not a subtype of `P`, the two types are not disjoint
+because it would be possible to create a class `S` that inherits from both `P` and `Q` using
+multiple inheritance. An instance of `S` would be a member of the `P` type _and_ the `Q` type.
+
+### Disjoint types
+
+We use `Literal[1]`, `Literal[2]`, … as examples of pairwise-disjoint types, and `int` as a joint
+supertype of these:
+
+```py
+from ty_extensions import static_assert, is_disjoint_from, is_subtype_of
+from typing import Literal
+
+static_assert(is_disjoint_from(Literal[1], Literal[2]))
+static_assert(is_disjoint_from(Literal[1], Literal[3]))
+static_assert(is_disjoint_from(Literal[2], Literal[3]))
+
+static_assert(is_subtype_of(Literal[1], int))
+static_assert(is_subtype_of(Literal[2], int))
+static_assert(is_subtype_of(Literal[3], int))
+```
+
+### Subtypes
+
+Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes:
+
+```py
+from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+
+class A: ...
+class B(A): ...
+class C(B): ...
+
+static_assert(is_subtype_of(B, A))
+static_assert(is_subtype_of(C, B))
+static_assert(is_subtype_of(C, A))
+
+static_assert(not is_subtype_of(A, B))
+static_assert(not is_subtype_of(B, C))
+static_assert(not is_subtype_of(A, C))
+
+class B1(A): ...
+class B2(A): ...
+
+static_assert(is_subtype_of(B1, A))
+static_assert(is_subtype_of(B2, A))
+
+static_assert(not is_subtype_of(A, B1))
+static_assert(not is_subtype_of(A, B2))
+
+static_assert(not is_subtype_of(B1, B2))
+static_assert(not is_subtype_of(B2, B1))
+```
+
+## Structural properties
+
+This section covers structural properties of intersection types and documents some decisions on how
+to represent mixtures of intersections and unions.
+
+### Single-element intersections
+
+If we have an intersection with a single element, we can simplify to that element. Similarly, we
+show an intersection with a single negative contribution as just the negation of that element.
+
+```py
+from ty_extensions import Intersection
+
+class P: ...
+
+def _(
+    i1: Intersection[P],
+    i2: Intersection[~P],
+) -> None:
+    reveal_type(i1)  # revealed: P
+    reveal_type(i2)  # revealed: ~P
+```
+
+### Flattening of nested intersections
+
+We eagerly flatten nested intersections types.
+
+```py
+class P: ...
+class Q: ...
+class R: ...
+class S: ...
+
+def positive_contributions(
+    i1: P & (Q & R),
+    i2: (P & Q) & R,
+) -> None:
+    reveal_type(i1)  # revealed: P & Q & R
+    reveal_type(i2)  # revealed: P & Q & R
+
+def negative_contributions(
+    i1: ~P & (~Q & ~R),
+    i2: (~P & ~Q) & ~R,
+) -> None:
+    reveal_type(i1)  # revealed: ~P & ~Q & ~R
+    reveal_type(i2)  # revealed: ~P & ~Q & ~R
+
+def mixed(
+    i1: P & (~Q & R),
+    i2: (P & ~Q) & R,
+    i3: ~P & (Q & ~R),
+    i4: (Q & ~R) & ~P,
+) -> None:
+    reveal_type(i1)  # revealed: P & R & ~Q
+    reveal_type(i2)  # revealed: P & R & ~Q
+    reveal_type(i3)  # revealed: Q & ~P & ~R
+    reveal_type(i4)  # revealed: Q & ~R & ~P
+
+def multiple(
+    i1: (P & Q) & (R & S),
+):
+    reveal_type(i1)  # revealed: P & Q & R & S
+
+def nested(
+    i1: ((P & Q) & R) & S,
+    i2: P & (Q & (R & S)),
+):
+    reveal_type(i1)  # revealed: P & Q & R & S
+    reveal_type(i2)  # revealed: P & Q & R & S
+```
+
+### Union of intersections
+
+We always normalize our representation to a _union of intersections_, so when we add a _union to an
+intersection_, we distribute the union over the respective elements:
+
+```py
+class P: ...
+class Q: ...
+class R: ...
+class S: ...
+
+def _(
+    i1: P & (Q | R | S),
+    i2: (P | Q | R) & S,
+    i3: (P | Q) & (R | S),
+) -> None:
+    reveal_type(i1)  # revealed: (P & Q) | (P & R) | (P & S)
+    reveal_type(i2)  # revealed: (P & S) | (Q & S) | (R & S)
+    reveal_type(i3)  # revealed: (P & R) | (Q & R) | (P & S) | (Q & S)
+
+def simplifications_for_same_elements(
+    i1: P & (Q | P),
+    i2: Q & (P | Q),
+    i3: (P | Q) & (Q | R),
+    i4: (P | Q) & (P | Q),
+    i5: (P | Q) & (Q | P),
+) -> None:
+    #   P & (Q | P)
+    # = P & Q | P & P
+    # = P & Q | P
+    # = P
+    # (because P is a supertype of P & Q)
+    reveal_type(i1)  # revealed: P
+    # similar here:
+    reveal_type(i2)  # revealed: Q
+
+    #   (P | Q) & (Q | R)
+    # = P & Q | P & R | Q & Q | Q & R
+    # = P & Q | P & R | Q | Q & R
+    # = Q | P & R
+    # (again, because Q is a supertype of P & Q and of Q & R)
+    reveal_type(i3)  # revealed: Q | (P & R)
+
+    #   (P | Q) & (P | Q)
+    # = P & P | P & Q | Q & P | Q & Q
+    # = P | P & Q | Q
+    # = P | Q
+    reveal_type(i4)  # revealed: P | Q
+```
+
+### Negation distributes over union
+
+Distribution also applies to a negation operation. This is a manifestation of one of
+[De Morgan's laws], namely `~(P | Q) = ~P & ~Q`:
+
+```py
+from typing import Literal
+
+class P: ...
+class Q: ...
+class R: ...
+
+def _(i1: ~(P | Q), i2: ~(P | Q | R)) -> None:
+    reveal_type(i1)  # revealed: ~P & ~Q
+    reveal_type(i2)  # revealed: ~P & ~Q & ~R
+
+def example_literals(i: ~Literal[1, 2]) -> None:
+    reveal_type(i)  # revealed: ~Literal[1] & ~Literal[2]
+```
+
+### Negation of intersections
+
+The other of [De Morgan's laws], `~(P & Q) = ~P | ~Q`, also holds:
+
+```py
+class P: ...
+class Q: ...
+class R: ...
+
+def _(
+    i1: ~(P & Q),
+    i2: ~(P & Q & R),
+) -> None:
+    reveal_type(i1)  # revealed: ~P | ~Q
+    reveal_type(i2)  # revealed: ~P | ~Q | ~R
+```
+
+### `Never` is dual to `object`
+
+`Never` represents the empty set of values, while `object` represents the set of all values, so
+`~Never` is equivalent to `object`, and `~object` is equivalent to `Never`. This is a manifestation
+of the [complement laws] of set theory.
+
+```py
+from typing_extensions import Never
+
+def _(
+    not_never: ~Never,
+    not_object: ~object,
+) -> None:
+    reveal_type(not_never)  # revealed: object
+    reveal_type(not_object)  # revealed: Never
+```
+
+### `object & ~T` is equivalent to `~T`
+
+A second consequence of the fact that `object` is the top type is that `object` is always redundant
+in intersections, and can be eagerly simplified out. `object & P` is equivalent to `P`;
+`object & ~P` is equivalent to `~P` for any type `P`.
+
+```pyi
+from ty_extensions import is_equivalent_to, static_assert
+
+class P: ...
+
+static_assert(is_equivalent_to(object & P, P))
+static_assert(is_equivalent_to(object & ~P, ~P))
+```
+
+### Intersection of a type and its negation
+
+Continuing with more [complement laws], if we see both `P` and `~P` in an intersection, we can
+simplify to `Never`, even in the presence of other types:
+
+```py
+from typing import Any, Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class P: ...
+class Q: ...
+class R(Generic[T_co]): ...
+
+def _(i: P & ~P) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: ~P & P) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: P & Q & ~P) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: ~P & Q & P) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: P & Any & ~P) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: ~P & Any & P) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: R[P] & ~R[P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: R[P] & ~R[Q]) -> None:
+    reveal_type(i)  # revealed: R[P] & ~R[Q]
+```
+
+### Union of a type and its negation
+
+Similarly, if we have both `P` and `~P` in a _union_, we can simplify that to `object`.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class P: ...
+class Q: ...
+class R(Generic[T_co]): ...
+
+def _(
+    i1: P | ~P,
+    i2: ~P | P,
+    i3: P | Q | ~P,
+    i4: ~P | Q | P,
+    i5: R[P] | ~R[P],
+    i6: R[P] | ~R[Q],
+) -> None:
+    reveal_type(i1)  # revealed: object
+    reveal_type(i2)  # revealed: object
+    reveal_type(i3)  # revealed: object
+    reveal_type(i4)  # revealed: object
+    reveal_type(i5)  # revealed: object
+    reveal_type(i6)  # revealed: R[P] | ~R[Q]
+```
+
+### Negation is an involution
+
+The final of the [complement laws] states that negating twice is equivalent to not negating at all:
+
+```py
+class P: ...
+
+def _(
+    i1: ~P,
+    i2: ~~P,
+    i3: ~~~P,
+    i4: ~~~~P,
+) -> None:
+    reveal_type(i1)  # revealed: ~P
+    reveal_type(i2)  # revealed: P
+    reveal_type(i3)  # revealed: ~P
+    reveal_type(i4)  # revealed: P
+```
+
+## Simplification strategies
+
+In this section, we present various simplification strategies that go beyond the structure of the
+representation.
+
+### `Never` in intersections
+
+If we intersect with `Never`, we can simplify the whole intersection to `Never`, even if there are
+dynamic types involved:
+
+```py
+from typing_extensions import Never, Any
+
+class P: ...
+class Q: ...
+
+def _(
+    i1: P & Never,
+    i2: Never & P,
+    i3: Any & Never,
+    i4: Never & ~Any,
+) -> None:
+    reveal_type(i1)  # revealed: Never
+    reveal_type(i2)  # revealed: Never
+    reveal_type(i3)  # revealed: Never
+    reveal_type(i4)  # revealed: Never
+```
+
+### Simplifications using disjointness
+
+#### Positive contributions
+
+If we intersect disjoint types, we can simplify to `Never`, even in the presence of other types:
+
+```py
+from typing import Literal, Any
+
+class P: ...
+
+def _(
+    i01: Literal[1] & Literal[2],
+    i02: Literal[2] & Literal[1],
+    i03: Literal[1] & Literal[2] & P,
+    i04: Literal[1] & P & Literal[2],
+    i05: P & Literal[1] & Literal[2],
+    i06: Literal[1] & Literal[2] & Any,
+    i07: Literal[1] & Any & Literal[2],
+    i08: Any & Literal[1] & Literal[2],
+) -> None:
+    reveal_type(i01)  # revealed: Never
+    reveal_type(i02)  # revealed: Never
+    reveal_type(i03)  # revealed: Never
+    reveal_type(i04)  # revealed: Never
+    reveal_type(i05)  # revealed: Never
+    reveal_type(i06)  # revealed: Never
+    reveal_type(i07)  # revealed: Never
+    reveal_type(i08)  # revealed: Never
+
+# `bool` is final and cannot be subclassed, so `type[bool]` is equivalent to `Literal[bool]`, which
+# is disjoint from `type[str]`:
+def example_type_bool_type_str(
+    i: type[bool] & type[str],
+) -> None:
+    reveal_type(i)  # revealed: Never
+```
+
+#### Positive and negative contributions
+
+If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can remove the negative
+contribution `~Y`, as `~Y` must fully contain the positive contribution `X` as a subtype:
+
+```py
+from typing import Literal
+
+def _(
+    i1: Literal[1] & ~Literal[2],
+    i2: ~Literal[2] & Literal[1],
+    i3: Literal[1] & ~Literal[2] & int,
+    i4: Literal[1] & int & ~Literal[2],
+    i5: int & Literal[1] & ~Literal[2],
+) -> None:
+    reveal_type(i1)  # revealed: Literal[1]
+    reveal_type(i2)  # revealed: Literal[1]
+    reveal_type(i3)  # revealed: Literal[1]
+    reveal_type(i4)  # revealed: Literal[1]
+    reveal_type(i5)  # revealed: Literal[1]
+
+# None is disjoint from int, so this simplification applies here
+def example_none(
+    i1: int & ~None,
+    i2: ~None & int,
+) -> None:
+    reveal_type(i1)  # revealed: int
+    reveal_type(i2)  # revealed: int
+```
+
+### Simplifications using subtype relationships
+
+#### Positive type and positive subtype
+
+Subtypes are contained within their supertypes, so we can simplify intersections by removing
+superfluous supertypes:
+
+```py
+from typing import Any
+
+class A: ...
+class B(A): ...
+class C(B): ...
+class Unrelated: ...
+
+def _(
+    i01: A & B,
+    i02: B & A,
+    i03: A & C,
+    i04: C & A,
+    i05: B & C,
+    i06: C & B,
+    i07: A & B & C,
+    i08: C & B & A,
+    i09: B & C & A,
+    i10: A & B & Unrelated,
+    i11: B & A & Unrelated,
+    i12: B & Unrelated & A,
+    i13: A & Unrelated & B,
+    i14: Unrelated & A & B,
+    i15: Unrelated & B & A,
+    i16: A & B & Any,
+    i17: B & A & Any,
+    i18: B & Any & A,
+    i19: A & Any & B,
+    i20: Any & A & B,
+    i21: Any & B & A,
+) -> None:
+    reveal_type(i01)  # revealed: B
+    reveal_type(i02)  # revealed: B
+    reveal_type(i03)  # revealed: C
+    reveal_type(i04)  # revealed: C
+    reveal_type(i05)  # revealed: C
+    reveal_type(i06)  # revealed: C
+    reveal_type(i07)  # revealed: C
+    reveal_type(i08)  # revealed: C
+    reveal_type(i09)  # revealed: C
+    reveal_type(i10)  # revealed: B & Unrelated
+    reveal_type(i11)  # revealed: B & Unrelated
+    reveal_type(i12)  # revealed: B & Unrelated
+    reveal_type(i13)  # revealed: Unrelated & B
+    reveal_type(i14)  # revealed: Unrelated & B
+    reveal_type(i15)  # revealed: Unrelated & B
+    reveal_type(i16)  # revealed: B & Any
+    reveal_type(i17)  # revealed: B & Any
+    reveal_type(i18)  # revealed: B & Any
+    reveal_type(i19)  # revealed: Any & B
+    reveal_type(i20)  # revealed: Any & B
+    reveal_type(i21)  # revealed: Any & B
+```
+
+#### Negative type and negative subtype
+
+For negative contributions, this property is reversed. Here we can remove superfluous _subtypes_:
+
+```py
+from typing import Any
+
+class A: ...
+class B(A): ...
+class C(B): ...
+class Unrelated: ...
+
+def _(
+    i01: ~B & ~A,
+    i02: ~A & ~B,
+    i03: ~A & ~C,
+    i04: ~C & ~A,
+    i05: ~B & ~C,
+    i06: ~C & ~B,
+    i07: ~A & ~B & ~C,
+    i08: ~C & ~B & ~A,
+    i09: ~B & ~C & ~A,
+    i10: ~B & ~A & Unrelated,
+    i11: ~A & ~B & Unrelated,
+    i12: ~A & Unrelated & ~B,
+    i13: ~B & Unrelated & ~A,
+    i14: Unrelated & ~A & ~B,
+    i15: Unrelated & ~B & ~A,
+    i16: ~B & ~A & Any,
+    i17: ~A & ~B & Any,
+    i18: ~A & Any & ~B,
+    i19: ~B & Any & ~A,
+    i20: Any & ~A & ~B,
+    i21: Any & ~B & ~A,
+) -> None:
+    reveal_type(i01)  # revealed: ~A
+    reveal_type(i02)  # revealed: ~A
+    reveal_type(i03)  # revealed: ~A
+    reveal_type(i04)  # revealed: ~A
+    reveal_type(i05)  # revealed: ~B
+    reveal_type(i06)  # revealed: ~B
+    reveal_type(i07)  # revealed: ~A
+    reveal_type(i08)  # revealed: ~A
+    reveal_type(i09)  # revealed: ~A
+    reveal_type(i10)  # revealed: Unrelated & ~A
+    reveal_type(i11)  # revealed: Unrelated & ~A
+    reveal_type(i12)  # revealed: Unrelated & ~A
+    reveal_type(i13)  # revealed: Unrelated & ~A
+    reveal_type(i14)  # revealed: Unrelated & ~A
+    reveal_type(i15)  # revealed: Unrelated & ~A
+    reveal_type(i16)  # revealed: Any & ~A
+    reveal_type(i17)  # revealed: Any & ~A
+    reveal_type(i18)  # revealed: Any & ~A
+    reveal_type(i19)  # revealed: Any & ~A
+    reveal_type(i20)  # revealed: Any & ~A
+    reveal_type(i21)  # revealed: Any & ~A
+```
+
+#### Negative type and multiple negative subtypes
+
+If there are multiple negative subtypes, all of them can be removed:
+
+```py
+class A: ...
+class B1(A): ...
+class B2(A): ...
+
+def _(
+    i1: ~A & ~B1 & ~B2,
+    i2: ~A & ~B2 & ~B1,
+    i3: ~B1 & ~A & ~B2,
+    i4: ~B1 & ~B2 & ~A,
+    i5: ~B2 & ~A & ~B1,
+    i6: ~B2 & ~B1 & ~A,
+) -> None:
+    reveal_type(i1)  # revealed: ~A
+    reveal_type(i2)  # revealed: ~A
+    reveal_type(i3)  # revealed: ~A
+    reveal_type(i4)  # revealed: ~A
+    reveal_type(i5)  # revealed: ~A
+    reveal_type(i6)  # revealed: ~A
+```
+
+#### Negative type and positive subtype
+
+When `A` is a supertype of `B`, its negation `~A` is disjoint from `B`, so we can simplify the
+intersection to `Never`:
+
+```py
+from typing import Any
+
+class A: ...
+class B(A): ...
+class C(B): ...
+class Unrelated: ...
+
+def _(
+    i1: ~A & B,
+    i2: B & ~A,
+    i3: ~A & C,
+    i4: C & ~A,
+    i5: Unrelated & ~A & B,
+    i6: B & ~A & ~Unrelated,
+    i7: Any & ~A & B,
+    i8: B & ~A & ~Any,
+) -> None:
+    reveal_type(i1)  # revealed: Never
+    reveal_type(i2)  # revealed: Never
+    reveal_type(i3)  # revealed: Never
+    reveal_type(i4)  # revealed: Never
+    reveal_type(i5)  # revealed: Never
+    reveal_type(i6)  # revealed: Never
+    reveal_type(i7)  # revealed: Never
+    reveal_type(i8)  # revealed: Never
+```
+
+### Simplifications of `bool`, `AlwaysTruthy` and `AlwaysFalsy`
+
+In general, intersections with `AlwaysTruthy` and `AlwaysFalsy` cannot be simplified. Naively, you
+might think that `int & AlwaysFalsy` could simplify to `Literal[0]`, but this is not the case: for
+example, the `False` constant inhabits the type `int & AlwaysFalsy` (due to the fact that
+`False.__class__` is `bool` at runtime, and `bool` subclasses `int`), but `False` does not inhabit
+the type `Literal[0]`.
+
+Nonetheless, intersections of `AlwaysFalsy` or `AlwaysTruthy` with `bool` _can_ be simplified, due
+to the fact that `bool` is a `@final` class at runtime that cannot be subclassed.
+
+```py
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from typing_extensions import Literal
+
+class P: ...
+
+def f(
+    a: bool & AlwaysTruthy,
+    b: bool & AlwaysFalsy,
+    c: bool & ~AlwaysTruthy,
+    d: bool & ~AlwaysFalsy,
+    e: bool & AlwaysTruthy & P,
+    f: bool & AlwaysFalsy & P,
+    g: bool & ~AlwaysTruthy & P,
+    h: bool & ~AlwaysFalsy & P,
+):
+    reveal_type(a)  # revealed: Literal[True]
+    reveal_type(b)  # revealed: Literal[False]
+    reveal_type(c)  # revealed: Literal[False]
+    reveal_type(d)  # revealed: Literal[True]
+
+    # `bool & AlwaysTruthy & P` -> `Literal[True] & P` -> `Never`
+    reveal_type(e)  # revealed: Never
+    reveal_type(f)  # revealed: Never
+    reveal_type(g)  # revealed: Never
+    reveal_type(h)  # revealed: Never
+
+def never(
+    a: (AlwaysFalsy & ~Literal[False]) & bool,
+    b: (AlwaysTruthy & ~Literal[True]) & bool,
+    c: (Literal[True] & ~AlwaysTruthy) & bool,
+    d: (Literal[False] & ~AlwaysFalsy) & bool,
+):
+    # TODO: This should be `Never`
+    reveal_type(a)  # revealed: Literal[True]
+    # TODO: This should be `Never`
+    reveal_type(b)  # revealed: Literal[False]
+    reveal_type(c)  # revealed: Never
+    reveal_type(d)  # revealed: Never
+```
+
+Regression tests for complex nested simplifications:
+
+```py
+from typing_extensions import Any, assert_type
+
+def _(x: bool & ~(Any & ~AlwaysTruthy & ~AlwaysFalsy)):
+    assert_type(x, bool)
+
+def _(x: bool & Any | Literal[True] | Literal[False]):
+    assert_type(x, bool)
+```
+
+## Simplification of `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy`
+
+Similarly, intersections between `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy` can be
+simplified, due to the fact that a `LiteralString` inhabitant is known to have `__class__` set to
+exactly `str` (and not a subclass of `str`):
+
+```py
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, Unknown
+from typing_extensions import LiteralString
+
+def f(
+    a: LiteralString & AlwaysTruthy,
+    b: LiteralString & AlwaysFalsy,
+    c: LiteralString & ~AlwaysTruthy,
+    d: LiteralString & ~AlwaysFalsy,
+    e: AlwaysFalsy & LiteralString,
+    f: ~AlwaysTruthy & LiteralString,
+    g: AlwaysTruthy & LiteralString,
+    h: ~AlwaysFalsy & LiteralString,
+    i: Unknown & LiteralString & AlwaysFalsy,
+    j: ~AlwaysTruthy & Unknown & LiteralString,
+):
+    reveal_type(a)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(b)  # revealed: Literal[""]
+    reveal_type(c)  # revealed: Literal[""]
+    reveal_type(d)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(e)  # revealed: Literal[""]
+    reveal_type(f)  # revealed: Literal[""]
+    reveal_type(g)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(h)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(i)  # revealed: Unknown & Literal[""]
+    reveal_type(j)  # revealed: Unknown & Literal[""]
+```
+
+## Simplifications involving enums and enum literals
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Literal
+from enum import Enum
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+type Red = Literal[Color.RED]
+type Green = Literal[Color.GREEN]
+type Blue = Literal[Color.BLUE]
+
+def _(a: Color & Red) -> None:
+    reveal_type(a)  # revealed: Literal[Color.RED]
+
+def _(b: Color & ~Red) -> None:
+    reveal_type(b)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(c: Color & ~(Red | Green)) -> None:
+    reveal_type(c)  # revealed: Literal[Color.BLUE]
+
+def _(d: Color & ~(Red | Green | Blue)) -> None:
+    reveal_type(d)  # revealed: Never
+
+def _(e: Red & ~Color) -> None:
+    reveal_type(e)  # revealed: Never
+
+def _(f: (Red | Green) & ~Color) -> None:
+    reveal_type(f)  # revealed: Never
+
+def _(g: ~Red & Color) -> None:
+    reveal_type(g)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(h: Red & Green) -> None:
+    reveal_type(h)  # revealed: Never
+
+def _(i: (Red | Green) & (Green | Blue)) -> None:
+    reveal_type(i)  # revealed: Literal[Color.GREEN]
+
+class Single(Enum):
+    VALUE = 0
+
+def _(a: Single & Literal[Single.VALUE]) -> None:
+    reveal_type(a)  # revealed: Single
+
+def _(b: Single & ~Literal[Single.VALUE]) -> None:
+    reveal_type(b)  # revealed: Never
+
+def _(c: ~Literal[Single.VALUE] & Single) -> None:
+    reveal_type(c)  # revealed: Never
+
+def _(d: Single & ~Single) -> None:
+    reveal_type(d)  # revealed: Never
+
+def _(e: (Single | int) & ~Single) -> None:
+    reveal_type(e)  # revealed: int
+```
+
+## Addition of a type to an intersection with many non-disjoint types
+
+This slightly strange-looking test is a regression test for a mistake that was nearly made in a PR:
+<https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
+
+```py
+from ty_extensions import AlwaysFalsy, Unknown
+from typing_extensions import Literal
+
+def _(x: str & Unknown & AlwaysFalsy & Literal[""]):
+    reveal_type(x)  # revealed: Unknown & Literal[""]
+```
+
+## Non fully-static types
+
+### Negation of dynamic types
+
+`Any` represents the dynamic type, an unknown set of runtime values. The negation of that, `~Any`,
+is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We therefore eagerly
+simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
+
+```py
+from ty_extensions import Unknown
+from typing_extensions import Any, Never
+
+class P: ...
+
+def any(
+    i1: ~Any,
+    i2: P & ~Any,
+    i3: Never & ~Any,
+) -> None:
+    reveal_type(i1)  # revealed: Any
+    reveal_type(i2)  # revealed: P & Any
+    reveal_type(i3)  # revealed: Never
+
+def unknown(
+    i1: ~Unknown,
+    i2: P & ~Unknown,
+    i3: Never & ~Unknown,
+) -> None:
+    reveal_type(i1)  # revealed: Unknown
+    reveal_type(i2)  # revealed: P & Unknown
+    reveal_type(i3)  # revealed: Never
+```
+
+### Collapsing of multiple `Any`/`Unknown` contributions
+
+The intersection of an unknown set of runtime values with (another) unknown set of runtime values is
+still an unknown set of runtime values:
+
+```py
+from ty_extensions import Unknown
+from typing_extensions import Any
+
+class P: ...
+
+def any(
+    i1: Any & Any,
+    i2: P & Any & Any,
+    i3: Any & P & Any,
+    i4: Any & Any & P,
+) -> None:
+    reveal_type(i1)  # revealed: Any
+    reveal_type(i2)  # revealed: P & Any
+    reveal_type(i3)  # revealed: Any & P
+    reveal_type(i4)  # revealed: Any & P
+
+def unknown(
+    i1: Unknown & Unknown,
+    i2: P & Unknown & Unknown,
+    i3: Unknown & P & Unknown,
+    i4: Unknown & Unknown & P,
+) -> None:
+    reveal_type(i1)  # revealed: Unknown
+    reveal_type(i2)  # revealed: P & Unknown
+    reveal_type(i3)  # revealed: Unknown & P
+    reveal_type(i4)  # revealed: Unknown & P
+```
+
+### No self-cancellation
+
+Dynamic types do not cancel each other out. Intersecting an unknown set of values with the negation
+of another unknown set of values is not necessarily empty, so we keep the positive contribution:
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+def any(
+    i1: Any & ~Any,
+    i2: ~Any & Any,
+) -> None:
+    reveal_type(i1)  # revealed: Any
+    reveal_type(i2)  # revealed: Any
+
+def unknown(
+    i1: Unknown & ~Unknown,
+    i2: ~Unknown & Unknown,
+) -> None:
+    reveal_type(i1)  # revealed: Unknown
+    reveal_type(i2)  # revealed: Unknown
+```
+
+### Mixed dynamic types
+
+Gradually-equivalent types can be simplified out of intersections:
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+def mixed(
+    i1: Any & Unknown,
+    i2: Any & ~Unknown,
+    i3: ~Any & Unknown,
+    i4: ~Any & ~Unknown,
+) -> None:
+    reveal_type(i1)  # revealed: Any
+    reveal_type(i2)  # revealed: Any
+    reveal_type(i3)  # revealed: Any
+    reveal_type(i4)  # revealed: Any
+```
+
+## Calling intersection types
+
+### Basic intersection calls
+
+When calling an intersection type, we try to call each positive element with the given arguments.
+Elements where the call fails (wrong arguments, not callable, etc.) are discarded. The return type
+is the intersection of return types from the elements where the call succeeded.
+
+```py
+from typing import Callable
+
+class Foo: ...
+
+def _(
+    x: type[Foo] & Callable[[], str],
+) -> None:
+    # Both `type[Foo]` and `Callable[[], str]` are callable with no arguments.
+    # `x()` returns `Foo` if `x` has type `type[Foo]`,
+    # and `str` if `x` has type `Callable[[], str]()`.
+    # The return type is the intersection of `Foo` and `str`.
+    reveal_type(x())  # revealed: Foo & str
+```
+
+### Partial success in intersection calls
+
+If one element accepts the call but another rejects it (e.g., due to incompatible arguments), the
+call still succeeds using only the element that accepts:
+
+```py
+from typing import Callable
+
+class Bar: ...
+
+def _(
+    x: type[Bar] & Callable[[int], str],
+) -> None:
+    # `type[Bar]` accepts no arguments and returns `Bar`.
+    # `Callable[[int], str]` requires an int argument, so it fails for this call.
+    # We discard the failing element and use only `type[Bar]`.
+    reveal_type(x())  # revealed: Bar
+```
+
+### All intersection elements reject the call
+
+If all elements are callable but all reject the specific call (e.g., incompatible arguments), we
+show errors for each failing element:
+
+```py
+from typing import Callable
+
+def _(
+    x: Callable[[int], str] & Callable[[str], int],
+) -> None:
+    # Both callables reject a `float` argument:
+    # - `Callable[[int], str]` expects `int`
+    # - `Callable[[str], int]` expects `str`
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    x(1.0)
+```
+
+### Error priority: binding error over top-callable
+
+When intersection elements fail with different error types, we use a priority hierarchy to determine
+which errors to show. More specific errors (like `invalid-argument-type`) take precedence over less
+specific ones (like `call-top-callable` or `call-non-callable`).
+
+A specific argument error takes priority over a top-callable error:
+
+```py
+from ty_extensions import Top
+from typing import Callable
+
+def _(
+    x: Callable[[int], str] & Top[Callable[..., object]],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `Top[Callable[..., object]]` would fail with call-top-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+### Error priority: binding error over not-callable
+
+A specific argument error takes priority over a not-callable error:
+
+```py
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Callable[[int], str] & NotCallable,
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `NotCallable` would fail with call-non-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+### Error priority: top-callable over not-callable
+
+A top-callable error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Top
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Top[Callable[..., object]] & NotCallable,
+) -> None:
+    # `Top[Callable[..., object]]` fails with call-top-callable
+    # `NotCallable` would fail with call-non-callable
+    # We only show the call-top-callable error (it's more specific)
+    # error: [call-top-callable]
+    reveal_type(x())  # revealed: object
+```
+
+### Keyword arguments
+
+```py
+class RetA: ...
+class RetB: ...
+
+class Foo:
+    def __call__(self, *, name: str) -> RetA:
+        return RetA()
+
+class Bar:
+    def __call__(self, *, name: str) -> RetB:
+        return RetB()
+
+def _(x: Foo & Bar) -> None:
+    reveal_type(x(name="hello"))  # revealed: RetA & RetB
+```
+
+### Three or more elements with partial success
+
+When an intersection has three or more callable elements, some of which accept the call and some of
+which reject it, the failing elements are discarded:
+
+```py
+class RetA: ...
+class RetB: ...
+
+class A:
+    def __call__(self) -> RetA:
+        return RetA()
+
+class B:
+    def __call__(self) -> RetB:
+        return RetB()
+
+class C:
+    def __call__(self, x: int) -> int:
+        return 1
+
+def _(x: A & B & C) -> None:
+    # A() succeeds, B() succeeds, C() fails (needs int arg) -> discarded
+    reveal_type(x())  # revealed: RetA & RetB
+```
+
+### Class constructors
+
+```py
+class A: ...
+class B: ...
+
+def _(x: type[A] & type[B]) -> None:
+    reveal_type(x())  # revealed: A & B
+```
+
+### Intersection with `Any`
+
+When one intersection element is `Any`, both elements are called. `Any` is callable and returns
+`Any`:
+
+```py
+from typing import Any
+
+class Foo: ...
+
+def _(x: type[Foo] & Any) -> None:
+    reveal_type(x())  # revealed: Foo & Any
+```
+
+### Element returning `Never`
+
+When one element returns `Never`, the intersection of return types simplifies to `Never`:
+
+```py
+from typing import Callable, NoReturn
+
+def _(x: Callable[[bool], NoReturn] & Callable[[int], str]) -> None:
+    reveal_type(x)  # revealed: ((bool, /) -> Never) & ((int, /) -> str)
+    reveal_type(x(True))  # revealed: Never
+```
+
+### Variadic arguments
+
+When one intersection element accepts variadic arguments, it can succeed alongside more specific
+elements:
+
+```py
+class RetA: ...
+class RetB: ...
+
+class AcceptsAnything:
+    def __call__(self, *args: object, **kwargs: object) -> RetA:
+        return RetA()
+
+class SpecificArgs:
+    def __call__(self, x: int) -> RetB:
+        return RetB()
+
+def _(x: AcceptsAnything & SpecificArgs) -> None:
+    reveal_type(x(42))  # revealed: RetA & RetB
+    reveal_type(x("foo"))  # revealed: RetA
+```
+
+### No callable elements
+
+If no positive element is callable, the intersection is not callable:
+
+```py
+class A: ...
+class B: ...
+
+def _(x: A & B) -> None:
+    # error: [call-non-callable] "Object of type `A & B` is not callable"
+    reveal_type(x())  # revealed: Unknown
+```
+
+## Unions containing intersections
+
+### Intersection element fails, union element succeeds
+
+When a union contains intersection elements, we properly handle each union element. If an
+intersection element succeeds, it contributes to the result. If all elements within an intersection
+fail, the priority hierarchy is used for diagnostics:
+
+```py
+from ty_extensions import Top
+from typing import Callable
+
+class A: ...
+class B: ...
+
+def _(
+    f: Callable[[int], A] & Top[Callable[..., B]] | Callable[[str], int],
+) -> None:
+    reveal_type(f)  # revealed: (((int, /) -> A) & Top[(...) -> B]) | ((str, /) -> int)
+
+    # When called with a string argument:
+    # - The intersection element: Callable[[int], A] fails (wrong type),
+    #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
+    #   only the invalid-argument-type error is shown for the intersection.
+    # - The Callable[[str], int] element succeeds.
+    # The return type includes both elements' return types:
+    # error: [invalid-argument-type]
+    reveal_type(f("hello"))  # revealed: (A & B) | int
+```
+
+### All union elements succeed
+
+When all union elements succeed, the return type is the union of each element's return type. For
+intersection elements, the return type is itself an intersection of the successful bindings:
+
+```py
+from typing import Callable
+
+class A: ...
+class B: ...
+
+class ReturnsA:
+    def __call__(self, x: int) -> A:
+        return A()
+
+class ReturnsB:
+    def __call__(self, x: int) -> B:
+        return B()
+
+def _(
+    f: ReturnsA & ReturnsB | Callable[[int], str],
+) -> None:
+    reveal_type(f)  # revealed: (ReturnsA & ReturnsB) | ((int, /) -> str)
+    reveal_type(f(42))  # revealed: (A & B) | str
+```
+
+### All union elements fail
+
+When all union elements fail (including intersection elements), errors are reported for each:
+
+```py
+from ty_extensions import Top
+from typing import Callable
+
+class A: ...
+class B: ...
+
+def _(
+    f: Callable[[int], A] & Top[Callable[..., B]] | Callable[[str], int],
+) -> None:
+    reveal_type(f)  # revealed: (((int, /) -> A) & Top[(...) -> B]) | ((str, /) -> int)
+
+    # When called with no arguments:
+    # - The intersection element: Callable[[int], A] fails (missing argument),
+    #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
+    #   only the missing-argument error is shown.
+    # - The Callable[[str], int] also fails (missing argument).
+    # error: [missing-argument]
+    # error: [missing-argument]
+    f()
+```
+
+## Invalid
+
+```py
+from ty_extensions import Intersection, Not
+
+# error: [invalid-type-form] "`ty_extensions.Intersection` requires at least one argument when used in a parameter annotation"
+def f(x: Intersection) -> None:
+    reveal_type(x)  # revealed: Unknown
+
+# error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a parameter annotation"
+def f(x: Not) -> None:
+    reveal_type(x)  # revealed: Unknown
+```
+
+## Attribute access on pure negation types
+
+When an attribute has a pure negation type (an intersection with only negative contributions, like
+`~AlwaysFalsy`), accessing it should preserve the negation information rather than falling back to
+`object`.
+
+```py
+from ty_extensions import AlwaysFalsy
+
+class C:
+    x: ~AlwaysFalsy
+
+def f(c: C):
+    reveal_type(c.x)  # revealed: ~AlwaysFalsy
+```
+
+## Methods on intersections
+
+### The same method from a common base
+
+```py
+class Base:
+    def f(self) -> int:
+        return 0
+
+class X(Base):
+    pass
+
+class Y(Base):
+    pass
+
+def test(x: X & Y) -> None:
+    reveal_type(x.f)  # revealed: bound method (X & Y).f() -> int
+    reveal_type(x.f())  # revealed: int
+
+# Example subclass that inhabits that intersection:
+class Z(X, Y):
+    pass
+
+test(Z())
+```
+
+### A method that could be compatible with a protocol (without violating Liskov)
+
+```py
+from typing import Protocol
+
+class Proto(Protocol):
+    def method(self) -> int: ...
+
+class X:
+    # This `method` isn't compatible with `Proto`, but a subclass could refine it...
+    def method(self) -> int | str:
+        return "hello"
+
+def test(x: X & Proto) -> None:
+    reveal_type(x.method())  # revealed: int
+
+# ...like this. This subclass inhabits the intersection above.
+class Y(X):
+    def method(self) -> int:
+        return 42
+
+test(Y())
+```
+
+## Intersections of invariant generics
+
+For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+class P: ...
+class Q: ...
+
+class Invariant[T]:
+    value: T
+
+type InvariantAny = Invariant[Any]
+
+def _(
+    i1: Invariant[Any] & Invariant[P],
+    i2: Invariant[P] & Invariant[Any],
+    i3: InvariantAny & Invariant[P],
+    i4: Invariant[Unknown] & Invariant[P],
+    i5: Invariant[Any] & Q & Invariant[P],
+    i6: Invariant[P] & Q & Invariant[Any],
+) -> None:
+    reveal_type(i1)  # revealed: Invariant[P]
+    reveal_type(i2)  # revealed: Invariant[P]
+    reveal_type(i3)  # revealed: Invariant[P]
+    reveal_type(i4)  # revealed: Invariant[P]
+    reveal_type(i5)  # revealed: Q & Invariant[P]
+    reveal_type(i6)  # revealed: Invariant[P] & Q
+
+def _(
+    i1: list[Any] & list[int],
+    i2: dict[str, int] & dict[str, Any],
+    i3: dict[Any, str] & dict[int, str],
+    i4: dict[str, int] & dict[Any, Any],
+) -> None:
+    reveal_type(i1)  # revealed: list[int]
+    reveal_type(i2)  # revealed: dict[str, int]
+    reveal_type(i3)  # revealed: dict[int, str]
+    reveal_type(i4)  # revealed: dict[str, int]
+
+def _(
+    i1: list[Any] & list[Any | int],
+    i2: list[Any] & list[Any],
+) -> None:
+    reveal_type(i1)  # revealed: list[Any | int]
+    reveal_type(i2)  # revealed: list[Any]
+```
+
+Intersections with typevars and NewTypes are not affected by this:
+
+```py
+from typing import Any, NewType, TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T", bound=list[Any])
+ListId = NewType("ListId", list[Any])
+
+def is_int_list(value: object) -> TypeIs[list[int]]:
+    return isinstance(value, list) and all(isinstance(item, int) for item in value)
+
+def preserve_id(value: ListId) -> ListId:
+    if is_int_list(value):
+        reveal_type(value)  # revealed: ListId & list[int]
+        return value
+    return value
+
+def preserve_type(value: T) -> T:
+    if is_int_list(value):
+        reveal_type(value)  # revealed: T@preserve_type & list[int]
+        return value
+    return value
+```
+
+[complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)
+[de morgan's laws]: https://en.wikipedia.org/wiki/De_Morgan%27s_laws

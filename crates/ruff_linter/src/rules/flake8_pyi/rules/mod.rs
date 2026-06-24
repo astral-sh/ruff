@@ -1,5 +1,14 @@
 use std::fmt;
 
+use anyhow::Result;
+
+use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
+use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::TypingImporter;
+use crate::{Applicability, Edit, Fix};
+
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;
 pub(crate) use bad_version_info_comparison::*;
@@ -16,6 +25,7 @@ pub(crate) use exit_annotations::*;
 pub(crate) use future_annotations_in_stub::*;
 pub(crate) use generic_not_last_base_class::*;
 pub(crate) use iter_method_return_iterable::*;
+pub(crate) use legacy_type_comment::*;
 pub(crate) use no_return_argument_annotation::*;
 pub(crate) use non_empty_stub_body::*;
 pub(crate) use non_self_return_type::*;
@@ -34,7 +44,6 @@ pub(crate) use str_or_repr_defined_in_stub::*;
 pub(crate) use string_or_bytes_too_long::*;
 pub(crate) use stub_body_multiple_statements::*;
 pub(crate) use type_alias_naming::*;
-pub(crate) use type_comment_in_stub::*;
 pub(crate) use unaliased_collections_abc_set_import::*;
 pub(crate) use unnecessary_literal_union::*;
 pub(crate) use unnecessary_type_union::*;
@@ -59,6 +68,7 @@ mod exit_annotations;
 mod future_annotations_in_stub;
 mod generic_not_last_base_class;
 mod iter_method_return_iterable;
+mod legacy_type_comment;
 mod no_return_argument_annotation;
 mod non_empty_stub_body;
 mod non_self_return_type;
@@ -77,7 +87,6 @@ mod str_or_repr_defined_in_stub;
 mod string_or_bytes_too_long;
 mod stub_body_multiple_statements;
 mod type_alias_naming;
-mod type_comment_in_stub;
 mod unaliased_collections_abc_set_import;
 mod unnecessary_literal_union;
 mod unnecessary_type_union;
@@ -107,4 +116,43 @@ impl fmt::Display for TypingModule {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.write_str(self.as_str())
     }
+}
+
+/// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
+fn generate_union_fix(
+    generator: Generator,
+    importer: &TypingImporter,
+    nodes: Vec<&Expr>,
+    annotation: &Expr,
+    applicability: Applicability,
+) -> Result<Fix> {
+    debug_assert!(nodes.len() >= 2, "At least two nodes required");
+
+    let (import_edit, binding) = importer.import(annotation.start())?;
+
+    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
+    let new_expr = Expr::Subscript(ExprSubscript {
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        value: Box::new(Expr::Name(ExprName {
+            id: Name::new(binding),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        })),
+        slice: Box::new(Expr::Tuple(ExprTuple {
+            elts: nodes.into_iter().cloned().collect(),
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
+        ctx: ExprContext::Load,
+    });
+
+    Ok(Fix::applicable_edits(
+        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
+        [import_edit],
+        applicability,
+    ))
 }

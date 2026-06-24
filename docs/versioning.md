@@ -2,6 +2,21 @@
 
 Ruff uses a custom versioning scheme that uses the **minor** version number for breaking changes and the **patch** version number for bug fixes. Ruff does not yet have a stable API; once Ruff's API is stable, the **major** version number and semantic versioning will be used.
 
+## Crate versioning
+
+Ruff's crates are published to [crates.io](https://crates.io). The following crates follow Ruff's
+normal versioning policy:
+
+- `ruff`
+- `ruff_linter`
+- `ruff_wasm`
+
+The Rust interfaces of these crates do not follow semantic versioning.
+
+The remaining crates published as part of Ruff releases provide **no stability guarantees**. Their
+Rust interfaces are considered internal and unstable. Consequently, they are versioned as `0.0.x`.
+The patch version is incremented on every Ruff release, regardless of changes to the crate.
+
 ## Version changes
 
 **Minor** version increases will occur when:
@@ -20,6 +35,7 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
     - Stable rules are added to the default set
     - Stable rules are removed from the default set
     - A safe fix for a rule is promoted to stable
+    - A rule is deprecated
 - Formatter:
      - The stable style changed
 - Language server:
@@ -48,6 +64,15 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
     - A new server setting is added
     - A server setting is deprecated
 
+## Minimum supported Rust version
+
+The minimum supported Rust version required to compile Ruff is listed in the `rust-version` key of
+the `[workspace.package]` section in `Cargo.toml`. It may change in any release (minor or patch). It
+will never be newer than N-2 Rust versions, where N is the latest stable version. For example, if
+the latest stable Rust version is 1.85, Ruff's minimum supported Rust version will be at most 1.83.
+
+This is only relevant to users who build Ruff from source. Installing Ruff from the Python package
+index usually installs a pre-built binary and does not require Rust compilation.
 
 ## Preview mode
 

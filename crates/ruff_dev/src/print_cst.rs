@@ -1,10 +1,9 @@
 //! Print the `LibCST` CST for a given Python file.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {

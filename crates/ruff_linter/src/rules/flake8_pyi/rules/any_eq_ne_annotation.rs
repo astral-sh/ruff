@@ -1,10 +1,10 @@
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `__eq__` and `__ne__` implementations that use `typing.Any` as
@@ -28,8 +28,10 @@ use crate::checkers::ast::Checker;
 /// ## Example
 ///
 /// ```pyi
+/// from typing import Any
+///
 /// class Foo:
-///     def __eq__(self, obj: typing.Any) -> bool: ...
+///     def __eq__(self, obj: Any) -> bool: ...
 /// ```
 ///
 /// Use instead:
@@ -42,6 +44,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct AnyEqNeAnnotation {
     method_name: String,
 }
@@ -84,7 +87,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &P
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         AnyEqNeAnnotation {
             method_name: name.to_string(),
         },
@@ -100,5 +103,4 @@ pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &P
         let binding_edit = Edit::range_replacement(binding, annotation.range());
         Ok(Fix::safe_edits(binding_edit, import_edit))
     });
-    checker.report_diagnostic(diagnostic);
 }

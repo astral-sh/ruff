@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
+};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -10,16 +10,27 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
 ///
 /// ## Why is this bad?
-/// `TypedDict` subclasses can be defined either through a functional syntax
+/// `TypedDict` types can be defined either through a functional syntax
 /// (`Foo = TypedDict(...)`) or a class syntax (`class Foo(TypedDict): ...`).
 ///
 /// The class syntax is more readable and generally preferred over the
 /// functional syntax.
+///
+/// Nonetheless, there are some situations in which it is impossible to use
+/// the class-based syntax. This rule will not apply to those cases. Namely,
+/// it is impossible to use the class-based syntax if any `TypedDict` fields are:
+/// - Not valid [python identifiers] (for example, `@x`)
+/// - [Python keywords] such as `in`
+/// - [Private names] such as `__id` that would undergo [name mangling] at runtime
+///   if the class-based syntax was used
+/// - [Dunder names] such as `__int__` that can confuse type checkers if they're used
+///   with the class-based syntax.
 ///
 /// ## Example
 /// ```python
@@ -45,7 +56,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.TypedDict`](https://docs.python.org/3/library/typing.html#typing.TypedDict)
+///
+/// [Private names]: https://docs.python.org/3/tutorial/classes.html#private-variables
+/// [name mangling]: https://docs.python.org/3/reference/expressions.html#private-name-mangling
+/// [python identifiers]: https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+/// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
+/// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
 }
@@ -82,7 +100,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
         },
@@ -100,7 +118,6 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
@@ -117,6 +134,7 @@ fn match_typed_dict_assign<'a>(
         func,
         arguments,
         range: _,
+        node_index: _,
     }) = value
     else {
         return None;
@@ -135,6 +153,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
                 id: field.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -142,6 +161,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
         value: None,
         simple: true,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
@@ -149,7 +169,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
 /// Generate a `StmtKind:ClassDef` statement based on the provided body, keywords, and base class.
 fn create_class_def_stmt(
     class_name: &str,
-    body: Vec<Stmt>,
+    body: Suite,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
 ) -> Stmt {
@@ -158,25 +178,28 @@ fn create_class_def_stmt(
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
-                Some(keyword) => Box::from([keyword.clone()]),
-                None => Box::from([]),
+                Some(keyword) => std::iter::once(keyword.clone()).collect(),
+                None => std::iter::empty().collect(),
             },
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         body,
         type_params: None,
-        decorator_list: vec![],
+        decorator_list: ast::DecoratorList::new(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
 
-fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
+fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
     if items.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(vec![node])
+        Some(Suite::from([node]))
     } else {
         items
             .iter()
@@ -185,7 +208,10 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
                     if !is_identifier(field.to_str()) {
                         return None;
                     }
-                    if is_dunder(field.to_str()) {
+                    // Converting TypedDict to class-based syntax is not safe if fields contain
+                    // private or dunder names, because private names will be mangled and dunder
+                    // names can confuse type checkers.
+                    if field.to_str().starts_with("__") {
                         return None;
                     }
                     Some(create_field_assignment_stmt(field.to_str(), value))
@@ -196,7 +222,7 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
     }
 }
 
-fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>> {
+fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Suite> {
     let ast::ExprName { id, .. } = func.as_name_expr()?;
     if id != "dict" {
         return None;
@@ -205,20 +231,22 @@ fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>>
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(vec![node])
+        Some(Suite::from([node]))
     } else {
         fields_from_keywords(keywords)
     }
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
-fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
+fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        return Some(vec![node]);
+        return Some(Suite::from([node]));
     }
 
     keywords
@@ -233,19 +261,22 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
 }
 
 /// Match the fields and `total` keyword from a `TypedDict` call.
-fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&Keyword>)> {
+fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keyword>)> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
         ([_typename, fields], [..]) => {
             let total = arguments.find_keyword("total");
             match fields {
-                Expr::Dict(ast::ExprDict { items, range: _ }) => {
-                    Some((fields_from_dict_literal(items)?, total))
-                }
+                Expr::Dict(ast::ExprDict {
+                    items,
+                    range: _,
+                    node_index: _,
+                }) => Some((fields_from_dict_literal(items)?, total)),
                 Expr::Call(ast::ExprCall {
                     func,
                     arguments: Arguments { keywords, .. },
                     range: _,
+                    node_index: _,
                 }) => Some((fields_from_dict_call(func, keywords)?, total)),
                 _ => None,
             }
@@ -254,8 +285,9 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
         ([_typename], []) => {
             let node = Stmt::Pass(ast::StmtPass {
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
-            Some((vec![node], None))
+            Some((Suite::from([node]), None))
         }
         // Ex) `TypedDict("MyType", a=int, b=str)`
         ([_typename], fields) => Some((fields_from_keywords(fields)?, None)),
@@ -268,7 +300,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
 fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
-    body: Vec<Stmt>,
+    body: Suite,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
     generator: Generator,

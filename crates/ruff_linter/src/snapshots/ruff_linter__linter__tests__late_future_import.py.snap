@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+F404 `from __future__` imports must occur at the beginning of the file
+ --> resources/test/fixtures/syntax_errors/late_future_import.py:2:1
+  |
+1 | import random
+2 | from __future__ import annotations  # Error; not at top of file
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |

@@ -4,7 +4,14 @@ from pathlib import Path
 
 from stdlibs import stdlib_module_names
 
-PATH = Path("crates") / "ruff_python_stdlib" / "src" / "sys" / "known_stdlib.rs"
+PATH = (
+    Path(__file__).parents[1]
+    / "crates"
+    / "ruff_python_stdlib"
+    / "src"
+    / "sys"
+    / "known_stdlib.rs"
+)
 VERSIONS: list[tuple[int, int]] = [
     (3, 7),
     (3, 8),
@@ -13,6 +20,8 @@ VERSIONS: list[tuple[int, int]] = [
     (3, 11),
     (3, 12),
     (3, 13),
+    (3, 14),
+    (3, 15),
 ]
 
 with PATH.open("w") as f:

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
@@ -6,10 +6,10 @@ use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
-use ruff_python_parser::{ParseError, ParseErrorType};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 
-use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
 
 use crate::fs;
 use crate::source_kind::SourceKind;
@@ -85,8 +85,8 @@ macro_rules! notify_user {
     ($($arg:tt)*) => {
         println!(
             "[{}] {}",
-            chrono::Local::now()
-                .format("%H:%M:%S %p")
+            jiff::Zoned::now()
+                .strftime("%H:%M:%S %p")
                 .to_string()
                 .dimmed(),
             format_args!($($arg)*)
@@ -109,7 +109,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     const fn level_filter(&self) -> log::LevelFilter {
         match self {
             LogLevel::Default => log::LevelFilter::Info,
@@ -142,7 +142,7 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
             Level::Info | Level::Debug | Level::Trace => {
                 out.finish(format_args!(
                     "{}[{}][{}] {}",
-                    chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                    jiff::Zoned::now().strftime("[%Y-%m-%d][%H:%M:%S]"),
                     record.target(),
                     record.level(),
                     message
@@ -151,7 +151,7 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
         })
         .level(level.level_filter())
         .level_for("globset", log::LevelFilter::Warn)
-        .level_for("red_knot_python_semantic", log::LevelFilter::Warn)
+        .level_for("ty_python_semantic", log::LevelFilter::Warn)
         .level_for("salsa", log::LevelFilter::Warn)
         .chain(std::io::stderr())
         .apply()?;
@@ -195,21 +195,21 @@ impl DisplayParseError {
         // Translate the byte offset to a location in the originating source.
         let location =
             if let Some(jupyter_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-                let source_location = source_code.source_location(error.location.start());
+                let source_location = source_code.line_column(error.location.start());
 
                 ErrorLocation::Cell(
                     jupyter_index
-                        .cell(source_location.row)
+                        .cell(source_location.line)
                         .unwrap_or(OneIndexed::MIN),
-                    SourceLocation {
-                        row: jupyter_index
-                            .cell_row(source_location.row)
+                    LineColumn {
+                        line: jupyter_index
+                            .cell_row(source_location.line)
                             .unwrap_or(OneIndexed::MIN),
                         column: source_location.column,
                     },
                 )
             } else {
-                ErrorLocation::File(source_code.source_location(error.location.start()))
+                ErrorLocation::File(source_code.line_column(error.location.start()))
             };
 
         Self {
@@ -222,6 +222,11 @@ impl DisplayParseError {
     /// Return the path of the file in which the error occurred.
     pub fn path(&self) -> Option<&Path> {
         self.path.as_deref()
+    }
+
+    /// Return the underlying [`ParseError`].
+    pub fn error(&self) -> &ParseError {
+        &self.error
     }
 }
 
@@ -245,10 +250,10 @@ impl Display for DisplayParseError {
                 write!(
                     f,
                     "{row}{colon}{column}{colon} {inner}",
-                    row = location.row,
+                    row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
-                    inner = &DisplayParseErrorType(&self.error.error)
+                    inner = self.error.error
                 )
             }
             ErrorLocation::Cell(cell, location) => {
@@ -256,74 +261,22 @@ impl Display for DisplayParseError {
                     f,
                     "{cell}{colon}{row}{colon}{column}{colon} {inner}",
                     cell = cell,
-                    row = location.row,
+                    row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
-                    inner = &DisplayParseErrorType(&self.error.error)
+                    inner = self.error.error
                 )
             }
         }
     }
 }
 
-pub(crate) struct DisplayParseErrorType<'a>(&'a ParseErrorType);
-
-impl<'a> DisplayParseErrorType<'a> {
-    pub(crate) fn new(error: &'a ParseErrorType) -> Self {
-        Self(error)
-    }
-}
-
-impl Display for DisplayParseErrorType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", TruncateAtNewline(&self.0))
-    }
-}
-
 #[derive(Debug)]
 enum ErrorLocation {
     /// The error occurred in a Python file.
-    File(SourceLocation),
+    File(LineColumn),
     /// The error occurred in a Jupyter cell.
-    Cell(OneIndexed, SourceLocation),
-}
-
-/// Truncates the display text before the first newline character to avoid line breaks.
-struct TruncateAtNewline<'a>(&'a dyn Display);
-
-impl Display for TruncateAtNewline<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        struct TruncateAdapter<'a> {
-            inner: &'a mut dyn Write,
-            after_new_line: bool,
-        }
-
-        impl Write for TruncateAdapter<'_> {
-            fn write_str(&mut self, s: &str) -> std::fmt::Result {
-                if self.after_new_line {
-                    Ok(())
-                } else {
-                    if let Some(end) = s.find(['\n', '\r']) {
-                        self.inner.write_str(&s[..end])?;
-                        self.inner.write_str("\u{23ce}...")?;
-                        self.after_new_line = true;
-                        Ok(())
-                    } else {
-                        self.inner.write_str(s)
-                    }
-                }
-            }
-        }
-
-        write!(
-            TruncateAdapter {
-                inner: f,
-                after_new_line: false,
-            },
-            "{}",
-            self.0
-        )
-    }
+    Cell(OneIndexed, LineColumn),
 }
 
 #[cfg(test)]

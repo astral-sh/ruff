@@ -1,27 +1,30 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/function_def_valid_return_expr.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..125,
+        node_index: NodeIndex(None),
+        range: 0..97,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: NodeIndex(None),
                     range: 0..27,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..9,
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,9 +34,11 @@ Module(
                     returns: Some(
                         BinOp(
                             ExprBinOp {
+                                node_index: NodeIndex(None),
                                 range: 13..22,
                                 left: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 13..16,
                                         id: Name("int"),
                                         ctx: Load,
@@ -42,6 +47,7 @@ Module(
                                 op: BitOr,
                                 right: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 19..22,
                                         id: Name("str"),
                                         ctx: Load,
@@ -53,9 +59,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: NodeIndex(None),
                                 range: 24..27,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 24..27,
                                     },
                                 ),
@@ -66,16 +74,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: NodeIndex(None),
                     range: 28..57,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 32..35,
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 35..37,
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -85,19 +96,24 @@ Module(
                     returns: Some(
                         Lambda(
                             ExprLambda {
+                                node_index: NodeIndex(None),
                                 range: 41..52,
                                 parameters: Some(
                                     Parameters {
                                         range: 48..49,
+                                        node_index: NodeIndex(None),
                                         posonlyargs: [],
                                         args: [
                                             ParameterWithDefault {
                                                 range: 48..49,
+                                                node_index: NodeIndex(None),
                                                 parameter: Parameter {
                                                     range: 48..49,
+                                                    node_index: NodeIndex(None),
                                                     name: Identifier {
                                                         id: Name("x"),
                                                         range: 48..49,
+                                                        node_index: NodeIndex(None),
                                                     },
                                                     annotation: None,
                                                 },
@@ -111,6 +127,7 @@ Module(
                                 ),
                                 body: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 51..52,
                                         id: Name("x"),
                                         ctx: Load,
@@ -122,9 +139,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: NodeIndex(None),
                                 range: 54..57,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 54..57,
                                     },
                                 ),
@@ -135,64 +154,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 58..85,
+                    node_index: NodeIndex(None),
+                    range: 58..96,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 62..65,
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 65..67,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: Some(
-                        Yield(
-                            ExprYield {
-                                range: 72..79,
-                                value: Some(
-                                    Name(
-                                        ExprName {
-                                            range: 78..79,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                            },
-                        ),
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 82..85,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 82..85,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 86..124,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 90..93,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 93..95,
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -202,23 +176,27 @@ Module(
                     returns: Some(
                         If(
                             ExprIf {
-                                range: 99..119,
+                                node_index: NodeIndex(None),
+                                range: 71..91,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        range: 106..110,
+                                        node_index: NodeIndex(None),
+                                        range: 78..82,
                                         value: true,
                                     },
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 99..102,
+                                        node_index: NodeIndex(None),
+                                        range: 71..74,
                                         id: Name("int"),
                                         ctx: Load,
                                     },
                                 ),
                                 orelse: Name(
                                     ExprName {
-                                        range: 116..119,
+                                        node_index: NodeIndex(None),
+                                        range: 88..91,
                                         id: Name("str"),
                                         ctx: Load,
                                     },
@@ -229,10 +207,12 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 121..124,
+                                node_index: NodeIndex(None),
+                                range: 93..96,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 121..124,
+                                        node_index: NodeIndex(None),
+                                        range: 93..96,
                                     },
                                 ),
                             },

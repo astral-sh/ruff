@@ -1,199 +1,439 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
+use log::warn;
 use serde::{Serialize, Serializer};
-use serde_json::json;
 
-use ruff_source_file::OneIndexed;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode, Severity};
+use ruff_source_file::{OneIndexed, SourceFile};
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::VERSION;
 use crate::codes::Rule;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
 use crate::registry::{Linter, RuleNamespace};
-use crate::VERSION;
 
-pub struct SarifEmitter;
+/// An emitter for producing SARIF 2.1.0-compliant JSON output.
+///
+/// Static Analysis Results Interchange Format (SARIF) is a standard format
+/// for static analysis results. For full specification, see:
+/// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+pub struct SarifEmitter<'a> {
+    config: &'a DisplayDiagnosticConfig,
+}
 
-impl Emitter for SarifEmitter {
+impl<'a> SarifEmitter<'a> {
+    pub fn new(config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { config }
+    }
+}
+
+impl Emitter for SarifEmitter<'_> {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
-        let results = messages
+        let results = diagnostics
             .iter()
-            .map(SarifResult::from_message)
+            .map(|diagnostic| SarifResult::from_message(diagnostic, self.config))
             .collect::<Result<Vec<_>>>()?;
 
-        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.rule).collect();
-        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.code.cmp(&b.code));
-
-        let output = json!({
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "ruff",
-                        "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": rules,
-                        "version": VERSION.to_string(),
-                    }
-                },
-                "results": results,
-            }],
+        let unique_rules_and_severities: HashSet<_> = results
+            .iter()
+            .filter(|result| result.is_lint_rule)
+            // Here we implicitly assume that, for a fixed rule, all diagnostics
+            // have the same severity. If we ever introduce a way for users
+            // to locally change the severity of a diagnostic we will have to
+            // refactor in such a way that we know the _configured_ severity at
+            // this point (rather than just the severities of each diagnostic).
+            .map(|result| {
+                let code = result.rule_id.as_str();
+                (code, result.level)
+            })
+            .collect();
+        let mut rules: Vec<SarifRule> = unique_rules_and_severities
+            .into_iter()
+            .map(SarifRule::from)
+            .collect();
+        rules.sort_by(|a, b| {
+            a.properties
+                .problem_severity
+                .cmp(&b.properties.problem_severity)
+                .then_with(|| a.id.cmp(b.id))
         });
+        let output = SarifOutput {
+            schema: "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: [SarifRun {
+                tool: SarifTool {
+                    driver: SarifDriver {
+                        name: "ruff",
+                        information_uri: "https://github.com/astral-sh/ruff",
+                        rules,
+                        version: VERSION.to_string(),
+                    },
+                },
+                results: &results,
+            }],
+        };
         serde_json::to_writer_pretty(writer, &output)?;
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
-struct SarifRule<'a> {
-    name: &'a str,
-    code: String,
-    linter: &'a str,
-    summary: &'a str,
-    explanation: Option<&'a str>,
-    url: Option<String>,
+#[derive(Serialize)]
+struct SarifOutput<'a> {
+    #[serde(rename = "$schema")]
+    schema: &'static str,
+    runs: [SarifRun<'a>; 1],
+    version: &'static str,
 }
 
-impl From<Rule> for SarifRule<'_> {
-    fn from(rule: Rule) -> Self {
-        let code = rule.noqa_code().to_string();
-        let (linter, _) = Linter::parse_code(&code).unwrap();
+#[derive(Serialize)]
+struct SarifRun<'a> {
+    results: &'a [SarifResult<'a>],
+    tool: SarifTool<'a>,
+}
+
+#[derive(Serialize)]
+struct SarifTool<'a> {
+    driver: SarifDriver<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifDriver<'a> {
+    information_uri: &'static str,
+    name: &'static str,
+    rules: Vec<SarifRule<'a>>,
+    version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifRule<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_description: Option<SarifMessage<'a>>,
+    help: SarifMessage<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    help_uri: Option<String>,
+    id: &'a str,
+    properties: SarifProperties<'a>,
+    short_description: SarifMessage<'a>,
+}
+
+impl<'a> From<(&'a str, SarifLevel)> for SarifRule<'a> {
+    fn from(code_and_level: (&'a str, SarifLevel)) -> Self {
+        let (code, level) = code_and_level;
+        // This is a manual re-implementation of Rule::from_code, but we also want the Linter. This
+        // avoids calling Linter::parse_code twice.
+        let (kind, rule) = match Linter::parse_code(code) {
+            Some((linter, suffix)) => {
+                let rule = linter
+                    .all_rules()
+                    .find(|rule| rule.noqa_code().suffix() == suffix)
+                    .expect("Expected a valid noqa code corresponding to a rule");
+                (Some(linter.name()), rule)
+            }
+            None => {
+                let rule = Rule::from_name(code).expect("expected a valid rule name");
+                (None, rule)
+            }
+        };
         Self {
-            name: rule.into(),
-            code,
-            linter: linter.name(),
-            summary: rule.message_formats()[0],
-            explanation: rule.explanation(),
-            url: rule.url(),
+            id: code,
+            short_description: SarifMessage {
+                text: rule.message_formats()[0].into(),
+            },
+            full_description: rule
+                .explanation()
+                .map(|text| SarifMessage { text: text.into() }),
+            help: SarifMessage {
+                text: rule.message_formats()[0].into(),
+            },
+            help_uri: rule.url(),
+            properties: SarifProperties {
+                id: code,
+                kind,
+                name: rule.into(),
+                problem_severity: level,
+            },
         }
     }
 }
 
-impl Serialize for SarifRule<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        json!({
-            "id": self.code,
-            "shortDescription": {
-                "text": self.summary,
-            },
-            "fullDescription": {
-                "text": self.explanation,
-            },
-            "help": {
-                "text": self.summary,
-            },
-            "helpUri": self.url,
-            "properties": {
-                "id": self.code,
-                "kind": self.linter,
-                "name": self.name,
-                "problem.severity": "error".to_string(),
-            },
-        })
-        .serialize(serializer)
-    }
-}
-
 #[derive(Debug)]
-struct SarifResult {
-    rule: Option<Rule>,
-    level: String,
-    message: String,
-    uri: String,
-    start_line: OneIndexed,
-    start_column: OneIndexed,
-    end_line: OneIndexed,
-    end_column: OneIndexed,
+enum RuleCode<'a> {
+    SecondaryCode(&'a SecondaryCode),
+    LintId(&'a str),
 }
 
-impl SarifResult {
-    #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Result<Self> {
-        let start_location = message.compute_start_location();
-        let end_location = message.compute_end_location();
-        let path = normalize_path(message.filename());
-        Ok(Self {
-            rule: message.rule(),
-            level: "error".to_string(),
-            message: message.body().to_string(),
-            uri: url::Url::from_file_path(&path)
-                .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
-                .to_string(),
-            start_line: start_location.row,
-            start_column: start_location.column,
-            end_line: end_location.row,
-            end_column: end_location.column,
-        })
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    #[allow(clippy::unnecessary_wraps)]
-    fn from_message(message: &Message) -> Result<Self> {
-        let start_location = message.compute_start_location();
-        let end_location = message.compute_end_location();
-        let path = normalize_path(message.filename());
-        Ok(Self {
-            rule: message.rule(),
-            level: "error".to_string(),
-            message: message.body().to_string(),
-            uri: path.display().to_string(),
-            start_line: start_location.row,
-            start_column: start_location.column,
-            end_line: end_location.row,
-            end_column: end_location.column,
-        })
+impl RuleCode<'_> {
+    fn as_str(&self) -> &str {
+        match self {
+            RuleCode::SecondaryCode(code) => code.as_str(),
+            RuleCode::LintId(id) => id,
+        }
     }
 }
 
-impl Serialize for SarifResult {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl Serialize for RuleCode<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        json!({
-            "level": self.level,
-            "message": {
-                "text": self.message,
-            },
-            "locations": [{
-                "physicalLocation": {
-                    "artifactLocation": {
-                        "uri": self.uri,
-                    },
-                    "region": {
-                        "startLine": self.start_line,
-                        "startColumn": self.start_column,
-                        "endLine": self.end_line,
-                        "endColumn": self.end_column,
-                    }
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'a> RuleCode<'a> {
+    fn from_diagnostic(code: &'a Diagnostic, config: &'a DisplayDiagnosticConfig) -> Self {
+        match code.secondary_code() {
+            Some(diagnostic) if !config.preview_enabled() => Self::SecondaryCode(diagnostic),
+            _ => Self::LintId(code.id().as_str()),
+        }
+    }
+}
+
+/// Represents a single result in a SARIF 2.1.0 report.
+///
+/// See the SARIF 2.1.0 specification for details:
+/// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifResult<'a> {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fixes: Vec<SarifFix>,
+    level: SarifLevel,
+    locations: Vec<SarifLocation>,
+    message: SarifMessage<'a>,
+    rule_id: RuleCode<'a>,
+    #[serde(skip)]
+    is_lint_rule: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifMessage<'a> {
+    text: Cow<'a, str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifPhysicalLocation {
+    artifact_location: SarifArtifactLocation,
+    region: SarifRegion,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifLocation {
+    physical_location: SarifPhysicalLocation,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifFix {
+    artifact_changes: Vec<SarifArtifactChange>,
+    description: RuleDescription,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuleDescription {
+    text: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifArtifactChange {
+    artifact_location: SarifArtifactLocation,
+    replacements: Vec<SarifReplacement>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifArtifactLocation {
+    uri: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifReplacement {
+    deleted_region: SarifRegion,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inserted_content: Option<InsertedContent>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InsertedContent {
+    text: String,
+}
+
+#[derive(Debug, Serialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+struct SarifRegion {
+    end_column: OneIndexed,
+    end_line: OneIndexed,
+    start_column: OneIndexed,
+    start_line: OneIndexed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SarifProperties<'a> {
+    id: &'a str,
+    kind: Option<&'a str>,
+    name: &'a str,
+    #[serde(rename = "problem.severity")]
+    problem_severity: SarifLevel,
+}
+
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum SarifLevel {
+    Note,
+    Warning,
+    Error,
+}
+
+impl From<Severity> for SarifLevel {
+    fn from(value: Severity) -> Self {
+        match value {
+            Severity::Info => SarifLevel::Note,
+            Severity::Warning => SarifLevel::Warning,
+            Severity::Error | Severity::Fatal => SarifLevel::Error,
+        }
+    }
+}
+
+impl<'a> SarifResult<'a> {
+    fn range_to_sarif_region(source_file: &SourceFile, range: TextRange) -> SarifRegion {
+        let source_code = source_file.to_source_code();
+        let start_location = source_code.line_column(range.start());
+        let end_location = source_code.line_column(range.end());
+
+        SarifRegion {
+            start_line: start_location.line,
+            start_column: start_location.column,
+            end_line: end_location.line,
+            end_column: end_location.column,
+        }
+    }
+
+    fn fix(diagnostic: &'a Diagnostic, uri: &str) -> Option<SarifFix> {
+        let fix = diagnostic.fix()?;
+
+        let Some(source_file) = diagnostic.ruff_source_file() else {
+            debug_assert!(
+                false,
+                "Omitting the fix for diagnostic with id `{}` because the source file is missing. This is a bug in Ruff, please report an issue.",
+                diagnostic.id()
+            );
+
+            warn!(
+                "Omitting the fix for diagnostic with id `{}` because the source file is missing. This is a bug in Ruff, please report an issue.",
+                diagnostic.id()
+            );
+            return None;
+        };
+
+        let fix_description = diagnostic
+            .first_help_text()
+            .map(std::string::ToString::to_string);
+
+        let replacements: Vec<SarifReplacement> = fix
+            .edits()
+            .iter()
+            .map(|edit| {
+                let range = edit.range();
+                let deleted_region = Self::range_to_sarif_region(source_file, range);
+                SarifReplacement {
+                    deleted_region,
+                    inserted_content: edit.content().map(|content| InsertedContent {
+                        text: content.to_string(),
+                    }),
                 }
-            }],
-            "ruleId": self.rule.map(|rule| rule.noqa_code().to_string()),
+            })
+            .collect();
+
+        let artifact_changes = vec![SarifArtifactChange {
+            artifact_location: SarifArtifactLocation {
+                uri: uri.to_string(),
+            },
+            replacements,
+        }];
+
+        Some(SarifFix {
+            description: RuleDescription {
+                text: fix_description,
+            },
+            artifact_changes,
         })
-        .serialize(serializer)
+    }
+
+    #[allow(clippy::unnecessary_wraps)]
+    fn uri(diagnostic: &Diagnostic) -> Result<String> {
+        let path = normalize_path(&*diagnostic.expect_ruff_filename());
+        #[cfg(not(target_arch = "wasm32"))]
+        return url::Url::from_file_path(&path)
+            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))
+            .map(|u| u.to_string());
+        #[cfg(target_arch = "wasm32")]
+        return Ok(format!("file://{}", path.display()));
+    }
+
+    fn from_message(
+        diagnostic: &'a Diagnostic,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> Result<Self> {
+        let start_location = diagnostic.ruff_start_location().unwrap_or_default();
+        let end_location = diagnostic.ruff_end_location().unwrap_or_default();
+        let region = SarifRegion {
+            start_line: start_location.line,
+            start_column: start_location.column,
+            end_line: end_location.line,
+            end_column: end_location.column,
+        };
+
+        let uri = Self::uri(diagnostic)?;
+
+        Ok(Self {
+            rule_id: RuleCode::from_diagnostic(diagnostic, config),
+            level: SarifLevel::from(diagnostic.severity()),
+            message: SarifMessage {
+                text: diagnostic.concise_message().to_str(),
+            },
+            fixes: Self::fix(diagnostic, &uri).into_iter().collect(),
+            locations: vec![SarifLocation {
+                physical_location: SarifPhysicalLocation {
+                    artifact_location: SarifArtifactLocation { uri },
+                    region,
+                },
+            }],
+            is_lint_rule: diagnostic.id().is_lint(),
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
-    };
+    use ruff_db::diagnostic::DisplayDiagnosticConfig;
+
     use crate::message::SarifEmitter;
+    use crate::message::tests::{
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
+    };
 
     fn get_output() -> String {
-        let mut emitter = SarifEmitter {};
-        capture_emitter_output(&mut emitter, &create_messages())
+        let config = DisplayDiagnosticConfig::new("ruff");
+        let mut emitter = SarifEmitter::new(&config);
+        capture_emitter_output(&mut emitter, &create_diagnostics())
     }
 
     #[test]
@@ -204,8 +444,9 @@ mod tests {
 
     #[test]
     fn valid_syntax_error_json() {
-        let mut emitter = SarifEmitter {};
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let config = DisplayDiagnosticConfig::new("ruff");
+        let mut emitter = SarifEmitter::new(&config);
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
         serde_json::from_str::<serde_json::Value>(&content).unwrap();
     }
 
@@ -217,6 +458,7 @@ mod tests {
         insta::assert_json_snapshot!(value, {
             ".runs[0].tool.driver.version" => "[VERSION]",
             ".runs[0].results[].locations[].physicalLocation.artifactLocation.uri" => "[URI]",
+            ".runs[0].results[].fixes[].artifactChanges[].artifactLocation.uri" => "[URI]",
         });
     }
 }

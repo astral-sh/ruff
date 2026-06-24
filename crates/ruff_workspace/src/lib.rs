@@ -3,7 +3,6 @@ pub mod options;
 pub mod pyproject;
 pub mod resolver;
 
-pub mod options_base;
 mod settings;
 
 pub use settings::{FileResolverSettings, FormatterSettings, Settings};

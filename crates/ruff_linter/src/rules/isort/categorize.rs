@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::iter;
 use std::path::{Path, PathBuf};
-use std::{fs, iter};
 
 use log::debug;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
-use crate::settings::types::PythonVersion;
+use crate::settings::types::IdentifierPattern;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PythonVersion;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
 use super::types::{ImportBlock, Importable};
@@ -63,7 +64,7 @@ pub enum ImportSection {
 impl fmt::Display for ImportSection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}",),
+            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}"),
             Self::UserDefined(string) => fmt::Debug::fmt(string, f),
         }
     }
@@ -79,16 +80,16 @@ enum Reason<'a> {
     Future,
     KnownStandardLibrary,
     SamePackage,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
     NoSections,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     DisabledSection(&'a ImportSection),
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn categorize<'a>(
     module_name: &str,
     is_relative: bool,
@@ -117,7 +118,7 @@ pub(crate) fn categorize<'a>(
             )
         } else if let Some((import_type, reason)) = known_modules.categorize(module_name) {
             (import_type, reason)
-        } else if is_known_standard_library(target_version.minor(), module_base) {
+        } else if is_known_standard_library(target_version.minor, module_base) {
             (
                 &ImportSection::Known(ImportType::StandardLibrary),
                 Reason::KnownStandardLibrary,
@@ -127,7 +128,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
             )
-        } else if let Some(src) = match_sources(src, module_base) {
+        } else if let Some(src) = match_sources(src, module_name) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
@@ -146,10 +147,7 @@ pub(crate) fn categorize<'a>(
         reason = Reason::DisabledSection(import_type);
         import_type = default_section;
     }
-    debug!(
-        "Categorized '{}' as {:?} ({:?})",
-        module_name, import_type, reason
-    );
+    debug!("Categorized '{module_name}' as {import_type:?} ({reason:?})");
     import_type
 }
 
@@ -159,23 +157,35 @@ fn same_package(package: Option<PackageRoot<'_>>, module_base: &str) -> bool {
         .is_some_and(|package| package.ends_with(module_base))
 }
 
-fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
-    for path in paths {
-        if let Ok(metadata) = fs::metadata(path.join(base)) {
-            if metadata.is_dir() {
-                return Some(path);
-            }
+/// Returns the source path with respect to which the module `name`
+/// should be considered first party, or `None` if no path is found.
+///
+/// # Examples
+///
+/// - The module named `foo` will match `[SRC]` if `[SRC]/foo` is a directory
+///
+/// - The module named `foo.baz` will match `[SRC]` only if `[SRC]/foo/baz`
+///   is a directory, or `[SRC]/foo/baz.py` exists,
+///   or `[SRC]/foo/baz.pyi` exists.
+fn match_sources<'a>(paths: &'a [PathBuf], name: &str) -> Option<&'a Path> {
+    let relative_path: PathBuf = name.split('.').collect();
+    relative_path.components().next()?;
+    for root in paths {
+        let candidate = root.join(&relative_path);
+        if candidate.is_dir() {
+            return Some(root);
         }
-        if let Ok(metadata) = fs::metadata(path.join(format!("{base}.py"))) {
-            if metadata.is_file() {
-                return Some(path);
-            }
+        if ["py", "pyi"]
+            .into_iter()
+            .any(|extension| candidate.with_extension(extension).is_file())
+        {
+            return Some(root);
         }
     }
     None
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
@@ -189,6 +199,10 @@ pub(crate) fn categorize_imports<'a>(
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
@@ -209,6 +223,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert(alias, comments);
     }
     // Categorize `Stmt::ImportFrom` (without re-export).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_name(),
@@ -229,6 +247,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert(import_from, aliases);
     }
     // Categorize `Stmt::ImportFrom` (with re-export).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_name(),
@@ -249,6 +271,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert((import_from, alias), aliases);
     }
     // Categorize `Stmt::ImportFrom` (with star).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
             &import_from.module_name(),
@@ -274,20 +300,20 @@ pub(crate) fn categorize_imports<'a>(
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: Vec<(glob::Pattern, ImportSection)>,
+    known: Vec<(IdentifierPattern, ImportSection)>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
 
 impl KnownModules {
     pub fn new(
-        first_party: Vec<glob::Pattern>,
-        third_party: Vec<glob::Pattern>,
-        local_folder: Vec<glob::Pattern>,
-        standard_library: Vec<glob::Pattern>,
-        user_defined: FxHashMap<String, Vec<glob::Pattern>>,
+        first_party: Vec<IdentifierPattern>,
+        third_party: Vec<IdentifierPattern>,
+        local_folder: Vec<IdentifierPattern>,
+        standard_library: Vec<IdentifierPattern>,
+        user_defined: FxHashMap<String, Vec<IdentifierPattern>>,
     ) -> Self {
-        let known: Vec<(glob::Pattern, ImportSection)> = user_defined
+        let known: Vec<(IdentifierPattern, ImportSection)> = user_defined
             .into_iter()
             .flat_map(|(section, modules)| {
                 modules
@@ -320,7 +346,9 @@ impl KnownModules {
         let mut seen = FxHashSet::with_capacity_and_hasher(known.len(), FxBuildHasher);
         for (module, _) in &known {
             if !seen.insert(module) {
-                warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
+                warn_user_once!(
+                    "One or more modules are part of multiple import sections, including: `{module}`"
+                );
                 break;
             }
         }
@@ -338,7 +366,7 @@ impl KnownModules {
 
     /// Return the [`ImportSection`] for a given module, if it's been categorized as a known module
     /// by the user.
-    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason)> {
+    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason<'_>)> {
         if self.has_submodules {
             // Check all module prefixes from the longest to the shortest (e.g., given
             // `foo.bar.baz`, check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first,
@@ -362,7 +390,7 @@ impl KnownModules {
         }
     }
 
-    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
+    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason<'_>)> {
         let section = self.known.iter().find_map(|(pattern, section)| {
             if pattern.matches(submodule) {
                 Some(section)
@@ -384,8 +412,8 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
-        let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();
+    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&IdentifierPattern>> {
+        let mut user_defined: FxHashMap<&str, Vec<&IdentifierPattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined
@@ -410,5 +438,303 @@ impl fmt::Display for KnownModules {
             write!(f, "}}")?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rules::isort::categorize::match_sources;
+
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use tempfile::tempdir;
+
+    /// Helper function to create a file with parent directories
+    fn create_file<P: AsRef<Path>>(path: P) {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, "").unwrap();
+    }
+
+    /// Helper function to create a directory and all parent directories
+    fn create_dir<P: AsRef<Path>>(path: P) {
+        fs::create_dir_all(path).unwrap();
+    }
+
+    /// Tests a traditional Python package layout:
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     ├── module1.py
+    ///     └── module2.py
+    /// ```
+    #[test]
+    fn test_traditional_layout() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create traditional layout
+        create_dir(project_dir.join("mypackage"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/module1.py"));
+        create_file(project_dir.join("mypackage/module2.py"));
+
+        let paths = vec![project_dir.clone()];
+
+        assert_eq!(
+            match_sources(&paths, "mypackage"),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1"),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(match_sources(&paths, "mypackage.nonexistent",), None);
+    }
+
+    /// Tests a src-based Python package layout:
+    /// ```
+    /// project/
+    /// └── src/
+    ///     └── mypackage/
+    ///         ├── __init__.py
+    ///         └── module1.py
+    /// ```
+    #[test]
+    fn test_src_layout() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        let src_dir = project_dir.join("src");
+
+        // Create src layout
+        create_dir(src_dir.join("mypackage"));
+        create_file(src_dir.join("mypackage/__init__.py"));
+        create_file(src_dir.join("mypackage/module1.py"));
+
+        let paths = vec![src_dir.clone()];
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1"),
+            Some(src_dir.as_path())
+        );
+
+        assert_eq!(match_sources(&paths, "mypackage.nonexistent"), None);
+    }
+
+    /// Tests a nested package layout:
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     ├── module1.py
+    ///     └── subpackage/
+    ///         ├── __init__.py
+    ///         └── module2.py
+    /// ```
+    #[test]
+    fn test_nested_packages() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create nested package layout
+        create_dir(project_dir.join("mypackage/subpackage"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/module1.py"));
+        create_file(project_dir.join("mypackage/subpackage/__init__.py"));
+        create_file(project_dir.join("mypackage/subpackage/module2.py"));
+
+        let paths = vec![project_dir.clone()];
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.subpackage.module2"),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.subpackage.nonexistent"),
+            None
+        );
+    }
+
+    /// Tests a namespace package layout (PEP 420):
+    /// ```
+    /// project/
+    /// └── namespace/        # No __init__.py (namespace package)
+    ///     └── package1/
+    ///         ├── __init__.py
+    ///         └── module1.py
+    /// ```
+    #[test]
+    fn test_namespace_packages() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create namespace package layout
+        create_dir(project_dir.join("namespace/package1"));
+        create_file(project_dir.join("namespace/package1/__init__.py"));
+        create_file(project_dir.join("namespace/package1/module1.py"));
+
+        let paths = vec![project_dir.clone()];
+        assert_eq!(
+            match_sources(&paths, "namespace.package1"),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "namespace.package1.module1"),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(match_sources(&paths, "namespace.package2.module1"), None);
+    }
+
+    /// Tests a package with type stubs (.pyi files):
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     └── module1.pyi   # Only .pyi file, no .py
+    /// ```
+    #[test]
+    fn test_type_stubs() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create package with type stub
+        create_dir(project_dir.join("mypackage"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/module1.pyi")); // Only create .pyi file, not .py
+
+        let paths = vec![project_dir.clone()];
+
+        // Module "mypackage.module1" should match project_dir using .pyi file
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1"),
+            Some(project_dir.as_path())
+        );
+    }
+
+    /// Tests a package with both a module and a directory having the same name:
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     ├── feature.py      # Module with same name as directory
+    ///     └── feature/        # Directory with same name as module
+    ///         ├── __init__.py
+    ///         └── submodule.py
+    /// ```
+    #[test]
+    fn test_same_name_module_and_directory() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create package with module and directory of the same name
+        create_dir(project_dir.join("mypackage/feature"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/feature.py")); // Module with same name as directory
+        create_file(project_dir.join("mypackage/feature/__init__.py"));
+        create_file(project_dir.join("mypackage/feature/submodule.py"));
+
+        let paths = vec![project_dir.clone()];
+
+        // Module "mypackage.feature" should match project_dir
+        assert_eq!(
+            match_sources(&paths, "mypackage.feature"),
+            Some(project_dir.as_path())
+        );
+
+        // Module "mypackage.feature.submodule" should match project_dir
+        assert_eq!(
+            match_sources(&paths, "mypackage.feature.submodule"),
+            Some(project_dir.as_path())
+        );
+    }
+
+    /// Tests multiple source directories with different packages:
+    /// ```
+    /// project1/
+    /// └── package1/
+    ///     ├── __init__.py
+    ///     └── module1.py
+    ///
+    /// project2/
+    /// └── package2/
+    ///     ├── __init__.py
+    ///     └── module2.py
+    /// ```
+    #[test]
+    fn test_multiple_source_paths() {
+        let temp_dir = tempdir().unwrap();
+        let project1_dir = temp_dir.path().join("project1");
+        let project2_dir = temp_dir.path().join("project2");
+
+        // Create files in project1
+        create_dir(project1_dir.join("package1"));
+        create_file(project1_dir.join("package1/__init__.py"));
+        create_file(project1_dir.join("package1/module1.py"));
+
+        // Create files in project2
+        create_dir(project2_dir.join("package2"));
+        create_file(project2_dir.join("package2/__init__.py"));
+        create_file(project2_dir.join("package2/module2.py"));
+
+        // Test with multiple paths in search order
+        let paths = vec![project1_dir.clone(), project2_dir.clone()];
+
+        // Module "package1" should match project1_dir
+        assert_eq!(
+            match_sources(&paths, "package1"),
+            Some(project1_dir.as_path())
+        );
+
+        // Module "package2" should match project2_dir
+        assert_eq!(
+            match_sources(&paths, "package2"),
+            Some(project2_dir.as_path())
+        );
+
+        // Try with reversed order to check search order
+        let paths_reversed = vec![project2_dir, project1_dir.clone()];
+
+        // Module "package1" should still match project1_dir
+        assert_eq!(
+            match_sources(&paths_reversed, "package1"),
+            Some(project1_dir.as_path())
+        );
+    }
+
+    /// Tests behavior with an empty module name
+    /// ```
+    /// project/
+    /// └── mypackage/
+    /// ```
+    ///
+    /// In theory this should never happen since we expect
+    /// module names to have been normalized by the time we
+    /// call `match_sources`.
+    #[test]
+    fn test_empty_module_name() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        create_dir(project_dir.join("mypackage"));
+
+        let paths = vec![project_dir];
+
+        assert_eq!(match_sources(&paths, ""), None);
+    }
+
+    /// Tests behavior with an empty list of source paths
+    #[test]
+    fn test_empty_paths() {
+        let paths: Vec<PathBuf> = vec![];
+
+        assert_eq!(match_sources(&paths, "mypackage"), None);
     }
 }

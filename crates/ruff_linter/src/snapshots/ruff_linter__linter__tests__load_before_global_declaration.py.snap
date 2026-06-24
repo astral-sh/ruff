@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+PLE0118 Name `x` is used prior to global declaration on line 10
+  --> resources/test/fixtures/syntax_errors/load_before_global_declaration.py:9:5
+   |
+ 7 | x = 10
+ 8 | def test_2():
+ 9 |     x += 1      # error
+   |     ^
+10 |     global x
+   |
+
+PLE0118 Name `x` is used prior to global declaration on line 14
+  --> resources/test/fixtures/syntax_errors/load_before_global_declaration.py:13:11
+   |
+12 | def test_3():
+13 |     print(x)  # error
+   |           ^
+14 |     global x
+15 |     x = 5
+   |

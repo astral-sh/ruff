@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/f-string-carriage-return-newline.py
+---
+## Input
+```python
+# Regression test for https://github.com/astral-sh/ruff/issues/18667
+f"{
+1=
+}"
+
+t"{
+1=
+}"
+```
+
+## Output
+```python
+# Regression test for https://github.com/astral-sh/ruff/issues/18667
+f"{
+1=
+}"
+
+t"{
+1=
+}"
+```

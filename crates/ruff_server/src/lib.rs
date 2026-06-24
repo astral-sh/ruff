@@ -1,12 +1,15 @@
 //! ## The Ruff Language Server
 
-pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
-use lsp_types::CodeActionKind;
-pub use server::{Server, Workspace, Workspaces};
-pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
+use std::num::NonZeroUsize;
 
-#[macro_use]
-mod message;
+use anyhow::Context as _;
+use edit::DocumentKey;
+pub use logging::{LogLevel, init_logging};
+use lsp_types::CodeActionKind;
+pub use server::{ConnectionInitializer, Server};
+use session::{ClientOptions, Session};
+
+pub use edit::{PositionEncoding, TextDocument};
 
 mod edit;
 mod fix;
@@ -16,6 +19,7 @@ mod logging;
 mod resolve;
 mod server;
 mod session;
+mod workspace;
 
 pub(crate) const SERVER_NAME: &str = "ruff";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";
@@ -34,4 +38,36 @@ pub(crate) type Result<T> = anyhow::Result<T>;
 
 pub(crate) fn version() -> &'static str {
     ruff_linter::VERSION
+}
+
+pub fn run(preview: Option<bool>) -> Result<()> {
+    let four = NonZeroUsize::new(4).unwrap();
+
+    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
+    let worker_threads = std::thread::available_parallelism()
+        .unwrap_or(four)
+        .min(four);
+
+    let (connection, io_threads) = ConnectionInitializer::stdio();
+
+    let server_result = Server::new(worker_threads, connection, preview, false)
+        .context("Failed to start server")?
+        .run();
+
+    let io_result = io_threads.join();
+
+    let result = match (server_result, io_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(server), Err(io)) => Err(server).context(format!("IO thread error: {io}")),
+        (Err(server), _) => Err(server),
+        (_, Err(io)) => Err(io).context("IO thread error"),
+    };
+
+    if let Err(err) = result.as_ref() {
+        tracing::warn!("Server shut down with an error: {err}");
+    } else {
+        tracing::info!("Server shut down");
+    }
+
+    result
 }

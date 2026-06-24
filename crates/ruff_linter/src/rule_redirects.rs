@@ -134,6 +134,7 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("TCH005", "TC005"),
         ("TCH006", "TC010"),
         ("TCH010", "TC010"),
+        ("RUF035", "S704"),
     ])
 });
 
@@ -149,7 +150,7 @@ mod tests {
         for rule in Rule::iter() {
             let (code, group) = (rule.noqa_code(), rule.group());
 
-            if matches!(group, RuleGroup::Removed) {
+            if matches!(group, RuleGroup::Removed { .. }) {
                 continue;
             }
 

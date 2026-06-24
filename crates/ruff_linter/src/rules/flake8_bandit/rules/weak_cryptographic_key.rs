@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [CSRC: Transitioning the Use of Cryptographic Algorithms and Key Lengths](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct WeakCryptographicKey {
     cryptographic_key: CryptographicKey,
 }
@@ -55,10 +56,7 @@ pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCall) {
     };
 
     if cryptographic_key.is_vulnerable() {
-        checker.report_diagnostic(Diagnostic::new(
-            WeakCryptographicKey { cryptographic_key },
-            range,
-        ));
+        checker.report_diagnostic(WeakCryptographicKey { cryptographic_key }, range);
     }
 }
 
@@ -103,37 +101,42 @@ fn extract_cryptographic_key(
 ) -> Option<(CryptographicKey, TextRange)> {
     let qualified_name = checker.semantic().resolve_qualified_name(&call.func)?;
     match qualified_name.segments() {
-        ["cryptography", "hazmat", "primitives", "asymmetric", function, "generate_private_key"] => {
-            match *function {
-                "dsa" => {
-                    let (key_size, range) = extract_int_argument(call, "key_size", 0)?;
-                    Some((CryptographicKey::Dsa { key_size }, range))
-                }
-                "rsa" => {
-                    let (key_size, range) = extract_int_argument(call, "key_size", 1)?;
-                    Some((CryptographicKey::Rsa { key_size }, range))
-                }
-                "ec" => {
-                    let argument = call.arguments.find_argument_value("curve", 0)?;
-                    let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
-                    let qualified_name = checker.semantic().resolve_qualified_name(value)?;
-                    if matches!(
-                        qualified_name.segments(),
-                        ["cryptography", "hazmat", "primitives", "asymmetric", "ec"]
-                    ) {
-                        Some((
-                            CryptographicKey::Ec {
-                                algorithm: attr.to_string(),
-                            },
-                            argument.range(),
-                        ))
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
+        [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "asymmetric",
+            function,
+            "generate_private_key",
+        ] => match *function {
+            "dsa" => {
+                let (key_size, range) = extract_int_argument(call, "key_size", 0)?;
+                Some((CryptographicKey::Dsa { key_size }, range))
             }
-        }
+            "rsa" => {
+                let (key_size, range) = extract_int_argument(call, "key_size", 1)?;
+                Some((CryptographicKey::Rsa { key_size }, range))
+            }
+            "ec" => {
+                let argument = call.arguments.find_argument_value("curve", 0)?;
+                let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
+                let qualified_name = checker.semantic().resolve_qualified_name(value)?;
+                if matches!(
+                    qualified_name.segments(),
+                    ["cryptography", "hazmat", "primitives", "asymmetric", "ec"]
+                ) {
+                    Some((
+                        CryptographicKey::Ec {
+                            algorithm: attr.to_string(),
+                        },
+                        argument.range(),
+                    ))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
         ["Crypto" | "Cryptodome", "PublicKey", function, "generate"] => match *function {
             "DSA" => {
                 let (key_size, range) = extract_int_argument(call, "bits", 0)?;

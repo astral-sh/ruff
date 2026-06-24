@@ -5,9 +5,9 @@ use ruff_python_ast::{Expr, Identifier, Pattern};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{SourceComment, leading_comments, trailing_comments};
 use crate::expression::parentheses::{
-    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, empty_parenthesized, parenthesized,
 };
 use crate::prelude::*;
 
@@ -21,6 +21,7 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
             patterns,
             rest,
             range: _,
+            node_index: _,
         } = item;
 
         debug_assert_eq!(keys.len(), patterns.len());
@@ -163,6 +164,7 @@ fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(Text
         patterns,
         rest,
         range: _,
+        node_index: _,
     } = pattern;
 
     // If there's no `rest` element, there's no `**`.

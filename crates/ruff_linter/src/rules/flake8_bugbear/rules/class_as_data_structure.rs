@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for classes that only have a public `__init__` method,
@@ -34,6 +34,7 @@ use crate::settings::types::PythonVersion;
 ///     y: float
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.0")]
 pub(crate) struct ClassAsDataStructure;
 
 impl Violation for ClassAsDataStructure {
@@ -78,7 +79,7 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
                         // skip `self`
                         .skip(1)
                         .all(|param| param.annotation().is_some() && !param.is_variadic())
-                    && (func_def.parameters.kwonlyargs.is_empty() || checker.settings.target_version >= PythonVersion::Py310)
+                    && (func_def.parameters.kwonlyargs.is_empty() || checker.target_version() >= PythonVersion::PY310)
                     // `__init__` should not have complicated logic in it
                     // only assignments
                     && func_def
@@ -105,7 +106,7 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
     }
 
     if has_dunder_init && public_methods == 1 {
-        checker.report_diagnostic(Diagnostic::new(ClassAsDataStructure, class_def.range()));
+        checker.report_diagnostic(ClassAsDataStructure, class_def.range());
     }
 }
 

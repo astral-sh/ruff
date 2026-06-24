@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+expression: transformed.source_code()
+---
+# Reproduces the scenario from issue #9472:
+# F401 removes unused imports leaving empty `if` blocks,
+# RUF050 removes those blocks, then F401 cleans up the
+# now-unused guard imports on subsequent fix iterations.
+
+import os
+
+# F401 removes the unused `ExceptionGroup` import, leaving `pass`.
+# Then RUF050 removes the empty `if`, and F401 removes `sys`.
+
+# Already-empty block handled in a single pass by RUF050
+
+print(os.getcwd())

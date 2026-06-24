@@ -174,3 +174,43 @@ def _():
         global global_foo
         for [a, b, (global_foo, c)] in d:
             f.write((a, b))
+
+
+# Test cases for lambda and ternary expressions - https://github.com/astral-sh/ruff/issues/18590
+
+def _():
+    with Path("file.txt").open("w", encoding="utf-8") as f:
+        for l in lambda: 0:
+            f.write(f"[{l}]")
+
+
+def _():
+    with Path("file.txt").open("w", encoding="utf-8") as f:
+        for l in (1,) if True else (2,):
+            f.write(f"[{l}]")
+
+
+# don't need to add parentheses when making a function argument
+def _():
+    with open("file", "w") as f:
+        for line in lambda: 0:
+            f.write(line)
+
+
+def _():
+    with open("file", "w") as f:
+        for line in (1,) if True else (2,):
+            f.write(line)
+
+
+# don't add extra parentheses if they're already parenthesized
+def _():
+    with open("file", "w") as f:
+        for line in (lambda: 0):
+            f.write(f"{line}")
+
+
+def _():
+    with open("file", "w") as f:
+        for line in ((1,) if True else (2,)):
+            f.write(f"{line}")

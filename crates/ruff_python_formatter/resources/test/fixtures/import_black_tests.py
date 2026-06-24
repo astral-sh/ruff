@@ -58,8 +58,7 @@ def import_fixture(fixture: Path, fixture_set: str):
             if "--minimum-version=" in flags:
                 [_, version] = flags.split("--minimum-version=", 1)
                 version = version.split(" ", 1)[0]
-                # Convert 3.10 to py310
-                black_options["target_version"] = f"py{version.strip().replace('.', '')}"
+                black_options["target_version"] = version.strip()
 
             if "--skip-magic-trailing-comma" in flags:
                 black_options["magic_trailing_comma"] = "ignore"
@@ -114,10 +113,10 @@ IGNORE_LIST = [
 # Specs for which to override the formatter options
 OPTIONS_OVERRIDES = {
     "context_managers_38.py": {
-        "target_version": "py38"
+        "target_version": "3.8"
     },
     "context_managers_autodetect_38.py" : {
-        "target_version": "py38"
+        "target_version": "3.8"
     }
 }
 

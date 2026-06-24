@@ -3,22 +3,22 @@ use std::borrow::Cow;
 use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use ruff_python_parser::TokenKind;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `str.format` calls that can be replaced with f-strings.
@@ -40,6 +40,7 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.224")]
 pub(crate) struct FString;
 
 impl Violation for FString {
@@ -85,6 +86,7 @@ impl<'a> FormatSummaryValues<'a> {
                 arg,
                 value,
                 range: _,
+                node_index: _,
             } = keyword;
             let key = arg.as_ref()?;
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
@@ -144,7 +146,6 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             Expr::BinOp(_)
             | Expr::UnaryOp(_)
             | Expr::BoolOp(_)
-            | Expr::Named(_)
             | Expr::Compare(_)
             | Expr::If(_)
             | Expr::Lambda(_)
@@ -160,12 +161,17 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
                 value: ast::Number::Int(..),
                 ..
             }),
-        ) => text.chars().all(|c| c.is_ascii_digit()),
+        ) => text
+            .chars()
+            // Ignore digit separators so decimal literals like `1_2` still count as pure digits.
+            .filter(|c| *c != '_')
+            .all(|c| c.is_ascii_digit()),
         // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
         (
             _,
             Expr::Generator(_)
             | Expr::Dict(_)
+            | Expr::Named(_)
             | Expr::Set(_)
             | Expr::SetComp(_)
             | Expr::DictComp(_),
@@ -269,7 +275,11 @@ impl FStringConversion {
         }
 
         // Parse the format string.
-        let format_string = FormatString::from_str(contents)?;
+        let format_string = if raw {
+            FormatString::from_raw_str(contents)
+        } else {
+            FormatString::from_str(contents)
+        }?;
 
         // If the format string contains only literal parts, it doesn't need to be converted.
         if format_string
@@ -317,10 +327,11 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) {
-                        if any_over_expr(arg, &Expr::is_call_expr) {
-                            return Ok(Self::SideEffects);
-                        }
+                    //
+                    // This is also true for builtins, so we don't treat them as special when
+                    // checking for effects here.
+                    if !seen.insert(specifier) && contains_effect(arg, |_| false) {
+                        return Ok(Self::SideEffects);
                     }
 
                     converted.push_str(&formatted_expr(
@@ -429,7 +440,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 // dot is the start of an attribute access.
                 break token.start();
             }
-            TokenKind::String => {
+            TokenKind::String if !token.unwrap_string_flags().is_unclosed() => {
                 match FStringConversion::try_convert(token.range(), &mut summary, checker.locator())
                 {
                     // If the format string contains side effects that would need to be repeated,
@@ -453,23 +464,28 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let mut prev_end = call.start();
     for (range, conversion) in patches {
         let fstring = match conversion {
-            FStringConversion::Convert(fstring) => Some(fstring),
-            FStringConversion::EmptyLiteral => None,
+            FStringConversion::Convert(fstring) => fstring,
+            FStringConversion::EmptyLiteral => {
+                // Keep a leading empty literal to avoid orphaning a space, parenthesis, or comment
+                // before the first kept segment; drop later ones by advancing `prev_end`.
+                if !contents.is_empty() {
+                    prev_end = range.end();
+                }
+                continue;
+            }
             FStringConversion::NonEmptyLiteral => {
                 // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
-                Some(curly_unescape(checker.locator().slice(range)).to_string())
+                curly_unescape(checker.locator().slice(range)).to_string()
             }
             // We handled this in the previous loop.
             FStringConversion::SideEffects => unreachable!(),
         };
-        if let Some(fstring) = fstring {
-            contents.push_str(
-                checker
-                    .locator()
-                    .slice(TextRange::new(prev_end, range.start())),
-            );
-            contents.push_str(&fstring);
-        }
+        contents.push_str(
+            checker
+                .locator()
+                .slice(TextRange::new(prev_end, range.start())),
+        );
+        contents.push_str(&fstring);
         prev_end = range.end();
     }
     contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
@@ -504,7 +520,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FString, call.range());
+    let mut diagnostic = checker.report_diagnostic(FString, call.range());
 
     // Avoid fix if there are comments within the call:
     // ```
@@ -527,6 +543,5 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 call.range(),
             )));
         }
-    };
-    checker.report_diagnostic(diagnostic);
+    }
 }

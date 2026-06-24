@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_trivia::indentation_at_offset;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of a classmethod being made without the decorator.
@@ -33,6 +33,7 @@ use crate::fix;
 ///     def bar(cls): ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.7")]
 pub(crate) struct NoClassmethodDecorator;
 
 impl AlwaysFixableViolation for NoClassmethodDecorator {
@@ -69,6 +70,7 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     def bar(arg1, arg2): ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.7")]
 pub(crate) struct NoStaticmethodDecorator;
 
 impl AlwaysFixableViolation for NoStaticmethodDecorator {
@@ -104,9 +106,9 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
 
     let mut explicit_decorator_calls: HashMap<Name, &Stmt> = HashMap::default();
 
-    let (method_name, diagnostic_type): (&str, DiagnosticKind) = match method_type {
-        MethodType::Classmethod => ("classmethod", NoClassmethodDecorator.into()),
-        MethodType::Staticmethod => ("staticmethod", NoStaticmethodDecorator.into()),
+    let method_name = match method_type {
+        MethodType::Classmethod => "classmethod",
+        MethodType::Staticmethod => "staticmethod",
     };
 
     // gather all explicit *method calls
@@ -135,16 +137,16 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                             if target_name == *id {
                                 explicit_decorator_calls.insert(id.clone(), stmt);
                             }
-                        };
+                        }
                     }
                 }
             }
-        };
+        }
     }
 
     if explicit_decorator_calls.is_empty() {
         return;
-    };
+    }
 
     for stmt in &class_def.body {
         if let Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -170,10 +172,13 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_type.clone(),
-                TextRange::new(stmt.range().start(), stmt.range().start()),
-            );
+            let range = TextRange::new(stmt.range().start(), stmt.range().start());
+            let mut diagnostic = match method_type {
+                MethodType::Classmethod => checker.report_diagnostic(NoClassmethodDecorator, range),
+                MethodType::Staticmethod => {
+                    checker.report_diagnostic(NoStaticmethodDecorator, range)
+                }
+            };
 
             let indentation = indentation_at_offset(stmt.range().start(), checker.source());
 
@@ -191,12 +196,11 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                             checker.indexer(),
                         )],
                     ));
-                    checker.report_diagnostic(diagnostic);
                 }
                 None => {
                     continue;
                 }
-            };
-        };
+            }
+        }
     }
 }

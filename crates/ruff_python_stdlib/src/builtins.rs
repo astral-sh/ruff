@@ -20,8 +20,14 @@ pub const MAGIC_GLOBALS: &[&str] = &[
     "__annotations__",
     "__builtins__",
     "__cached__",
+    "__warningregistry__",
     "__file__",
 ];
+
+/// Magic globals that are only available starting in specific Python versions.
+///
+/// `__annotate__` was introduced in Python 3.14.
+static PY314_PLUS_MAGIC_GLOBALS: &[&str] = &["__annotate__"];
 
 static ALWAYS_AVAILABLE_BUILTINS: &[&str] = &[
     "ArithmeticError",
@@ -180,6 +186,12 @@ static ALWAYS_AVAILABLE_BUILTINS: &[&str] = &[
 static PY310_PLUS_BUILTINS: &[&str] = &["EncodingWarning", "aiter", "anext"];
 static PY311_PLUS_BUILTINS: &[&str] = &["BaseExceptionGroup", "ExceptionGroup"];
 static PY313_PLUS_BUILTINS: &[&str] = &["PythonFinalizationError"];
+static PY315_PLUS_BUILTINS: &[&str] = &[
+    "frozendict",
+    "sentinel",
+    "__lazy_import__",
+    "ImportCycleError",
+];
 
 /// Return the list of builtins for the given Python minor version.
 ///
@@ -200,6 +212,11 @@ pub fn python_builtins(minor_version: u8, is_notebook: bool) -> impl Iterator<It
     } else {
         None
     };
+    let py315_builtins = if minor_version >= 15 {
+        Some(PY315_PLUS_BUILTINS)
+    } else {
+        None
+    };
     let ipython_builtins = if is_notebook {
         Some(IPYTHON_BUILTINS)
     } else {
@@ -210,9 +227,25 @@ pub fn python_builtins(minor_version: u8, is_notebook: bool) -> impl Iterator<It
         .into_iter()
         .chain(py311_builtins)
         .chain(py313_builtins)
+        .chain(py315_builtins)
         .chain(ipython_builtins)
         .flatten()
         .chain(ALWAYS_AVAILABLE_BUILTINS)
+        .copied()
+}
+
+/// Return the list of magic globals for the given Python minor version.
+pub fn python_magic_globals(minor_version: u8) -> impl Iterator<Item = &'static str> {
+    let py314_magic_globals = if minor_version >= 14 {
+        Some(PY314_PLUS_MAGIC_GLOBALS)
+    } else {
+        None
+    };
+
+    py314_magic_globals
+        .into_iter()
+        .flatten()
+        .chain(MAGIC_GLOBALS)
         .copied()
 }
 
@@ -382,6 +415,10 @@ pub fn is_python_builtin(name: &str, minor_version: u8, is_notebook: bool) -> bo
         ) | (10.., "EncodingWarning" | "aiter" | "anext")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
             | (13.., "PythonFinalizationError")
+            | (
+                15..,
+                "frozendict" | "sentinel" | "__lazy_import__" | "ImportCycleError"
+            )
     )
 }
 
@@ -394,6 +431,8 @@ pub fn version_builtin_was_added(name: &str) -> Option<u8> {
         Some(11)
     } else if PY313_PLUS_BUILTINS.contains(&name) {
         Some(13)
+    } else if PY315_PLUS_BUILTINS.contains(&name) {
+        Some(15)
     } else if ALWAYS_AVAILABLE_BUILTINS.contains(&name) {
         Some(0)
     } else {
@@ -491,6 +530,6 @@ pub fn is_exception(name: &str, minor_version: u8) -> bool {
                 | "UserWarning"
         ) | (10.., "EncodingWarning")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
-            | (13.., "PythonFinalizationError")
+            | (13.., "PythonFinalizationError" | "ImportCycleError")
     )
 }

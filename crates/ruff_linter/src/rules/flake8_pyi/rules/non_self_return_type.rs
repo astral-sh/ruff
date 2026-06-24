@@ -1,9 +1,8 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::settings::types::PythonVersion;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use crate::checkers::ast::{Checker, TypingImporter};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
@@ -43,13 +42,37 @@ use ruff_text_size::Ranged;
 /// Specifically, this check enforces that the return type of the following
 /// methods is `Self`:
 ///
-/// 1. In-place binary-operation dunder methods, like `__iadd__`, `__imul__`, etc.
+/// 1. In-place binary-operation dunder methods, like `__iadd__`, `__imul__`, etc.,
+///    if those methods return the class name.
 /// 1. `__new__`, `__enter__`, and `__aenter__`, if those methods return the
 ///    class name.
 /// 1. `__iter__` methods that return `Iterator`, despite the class inheriting
 ///    directly from `Iterator`.
 /// 1. `__aiter__` methods that return `AsyncIterator`, despite the class
 ///    inheriting directly from `AsyncIterator`.
+///
+/// The rule attempts to avoid flagging methods on metaclasses, since
+/// [PEP 673] specifies that `Self` is disallowed in metaclasses. Ruff can
+/// detect a class as being a metaclass if it inherits from a stdlib
+/// metaclass such as `builtins.type` or `abc.ABCMeta`, and additionally
+/// infers that a class may be a metaclass if it has a `__new__` method
+/// with a similar signature to `type.__new__`. The heuristic used to
+/// identify a metaclass-like `__new__` method signature is that it:
+///
+/// 1. Has exactly 5 parameters (including `cls`)
+/// 1. Has a second parameter annotated with `str`
+/// 1. Has a third parameter annotated with a `tuple` type
+/// 1. Has a fourth parameter annotated with a `dict` type
+/// 1. Has a fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example, the following class would be detected as a metaclass, disabling
+/// the rule:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
 ///
 /// ## Example
 ///
@@ -76,9 +99,22 @@ use ruff_text_size::Ranged;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe as it changes the meaning of your type annotations.
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
+///
+/// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,
@@ -97,7 +133,9 @@ impl Violation for NonSelfReturnType {
         if matches!(class_name.as_str(), "__new__") {
             "`__new__` methods usually return `self` at runtime".to_string()
         } else {
-            format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
+            format!(
+                "`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime"
+            )
         }
     }
 
@@ -131,7 +169,10 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if analyze::class::is_metaclass(class_def, semantic).is_yes() {
+    if !matches!(
+        analyze::class::is_metaclass(class_def, semantic),
+        analyze::class::IsMetaclass::No
+    ) {
         return;
     }
 
@@ -142,7 +183,7 @@ pub(crate) fn non_self_return_type(
 
     if is_async {
         if name == "__aenter__"
-            && is_name(returns, &class_def.name)
+            && is_name_or_stringized_name(returns, &class_def.name, checker)
             && !is_final(&class_def.decorator_list, semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
@@ -152,13 +193,13 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if !is_self(returns, checker) {
+        if is_name_or_stringized_name(returns, &class_def.name, checker) {
             add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
 
-    if is_name(returns, &class_def.name) {
+    if is_name_or_stringized_name(returns, &class_def.name, checker) {
         if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
@@ -167,19 +208,17 @@ pub(crate) fn non_self_return_type(
     }
 
     match name {
-        "__iter__" => {
+        "__iter__"
             if is_iterable_or_iterator(returns, semantic)
-                && subclasses_iterator(class_def, semantic)
-            {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
-        "__aiter__" => {
+        "__aiter__"
             if is_async_iterable_or_iterator(returns, semantic)
-                && subclasses_async_iterator(class_def, semantic)
-            {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_async_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         _ => {}
     }
@@ -193,7 +232,11 @@ fn add_diagnostic(
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
+        return;
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
             method_name: method_name.to_string(),
@@ -201,30 +244,19 @@ fn add_diagnostic(
         stmt.identifier(),
     );
 
-    diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
-
-    checker.report_diagnostic(diagnostic);
+    diagnostic.try_set_fix(|| {
+        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
+    });
 }
 
 fn replace_with_self_fix(
-    checker: &Checker,
+    semantic: &SemanticModel,
+    importer: &TypingImporter,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
 ) -> anyhow::Result<Fix> {
-    let semantic = checker.semantic();
-
-    let (self_import, self_binding) = {
-        let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-
-        let (importer, semantic) = (checker.importer(), checker.semantic());
-        let request = ImportRequest::import_from(source_module, "Self");
-        importer.get_or_import_symbol(&request, returns.start(), semantic)?
-    };
+    let (self_import, self_binding) = importer.import(returns.start())?;
 
     let mut others = Vec::with_capacity(2);
 
@@ -240,7 +272,7 @@ fn replace_with_self_fix(
     others.extend(remove_first_argument_type_hint());
     others.push(Edit::range_replacement(self_binding, returns.range()));
 
-    let applicability = if might_be_generic(class_def, checker.semantic()) {
+    let applicability = if might_be_generic(class_def, semantic) {
         Applicability::DisplayOnly
     } else {
         Applicability::Unsafe
@@ -294,16 +326,14 @@ fn is_name(expr: &ast::Expr, name: &str) -> bool {
     id.as_str() == name
 }
 
-/// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &ast::Expr, checker: &Checker) -> bool {
-    checker.match_maybe_stringized_annotation(expr, |expr| {
-        checker.semantic().match_typing_expr(expr, "Self")
-    })
+/// Return `true` if the given expression resolves to the given name,
+fn is_name_or_stringized_name(expr: &ast::Expr, name: &str, checker: &Checker) -> bool {
+    checker.match_maybe_stringized_annotation(expr, |expr| is_name(expr, name))
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
 fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
@@ -326,7 +356,7 @@ fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
 fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]

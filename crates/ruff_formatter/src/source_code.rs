@@ -65,7 +65,10 @@ pub struct SourceCodeSlice {
 impl SourceCodeSlice {
     /// Returns the slice's text.
     pub fn text<'a>(&self, code: SourceCode<'a>) -> &'a str {
-        assert!(usize::from(self.range.end()) <= code.text.len(), "The range of this slice is out of bounds. Did you provide the correct source code for this slice?");
+        assert!(
+            usize::from(self.range.end()) <= code.text.len(),
+            "The range of this slice is out of bounds. Did you provide the correct source code for this slice?"
+        );
         &code.text[self.range]
     }
 }

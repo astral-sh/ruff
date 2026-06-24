@@ -1,0 +1,281 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/valid_annotation_class.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..137,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 0..23,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("F"),
+                        range: 6..7,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 7..18,
+                            node_index: NodeIndex(None),
+                            args: [
+                                Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 8..17,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 8..9,
+                                                id: Name("y"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 13..17,
+                                                id: Name("list"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 20..23,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 20..23,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 24..93,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 28..29,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 29..31,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ClassDef(
+                            StmtClassDef {
+                                node_index: NodeIndex(None),
+                                range: 37..60,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("G"),
+                                    range: 43..44,
+                                    node_index: NodeIndex(None),
+                                },
+                                type_params: None,
+                                arguments: Some(
+                                    Arguments {
+                                        range: 44..55,
+                                        node_index: NodeIndex(None),
+                                        args: [
+                                            Yield(
+                                                ExprYield {
+                                                    node_index: NodeIndex(None),
+                                                    range: 46..53,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 52..53,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 57..60,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 57..60,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ClassDef(
+                            StmtClassDef {
+                                node_index: NodeIndex(None),
+                                range: 65..93,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("H"),
+                                    range: 71..72,
+                                    node_index: NodeIndex(None),
+                                },
+                                type_params: None,
+                                arguments: Some(
+                                    Arguments {
+                                        range: 72..88,
+                                        node_index: NodeIndex(None),
+                                        args: [
+                                            YieldFrom(
+                                                ExprYieldFrom {
+                                                    node_index: NodeIndex(None),
+                                                    range: 74..86,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 85..86,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 90..93,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 90..93,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 94..136,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 104..105,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 105..107,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ClassDef(
+                            StmtClassDef {
+                                node_index: NodeIndex(None),
+                                range: 113..136,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("G"),
+                                    range: 119..120,
+                                    node_index: NodeIndex(None),
+                                },
+                                type_params: None,
+                                arguments: Some(
+                                    Arguments {
+                                        range: 120..131,
+                                        node_index: NodeIndex(None),
+                                        args: [
+                                            Await(
+                                                ExprAwait {
+                                                    node_index: NodeIndex(None),
+                                                    range: 122..129,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 128..129,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 133..136,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 133..136,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

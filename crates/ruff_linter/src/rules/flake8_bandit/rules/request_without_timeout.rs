@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 /// - [Requests documentation: Timeouts](https://requests.readthedocs.io/en/latest/user/advanced/#timeouts)
 /// - [httpx documentation: Timeouts](https://www.python-httpx.org/advanced/timeouts/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct RequestWithoutTimeout {
     implicit: bool,
     module: String,
@@ -56,27 +57,36 @@ pub(crate) fn request_without_timeout(checker: &Checker, call: &ast::ExprCall) {
         .semantic()
         .resolve_qualified_name(&call.func)
         .and_then(|qualified_name| match qualified_name.segments() {
-            ["requests", "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"] => {
-                Some("requests")
-            }
-            ["httpx", "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request" | "stream" | "Client" | "AsyncClient"] => {
-                Some("httpx")
-            }
+            [
+                "requests",
+                "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request",
+            ] => Some("requests"),
+            [
+                "httpx",
+                "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"
+                | "stream" | "Client" | "AsyncClient",
+            ] => Some("httpx"),
             _ => None,
         })
     {
         if let Some(keyword) = call.arguments.find_keyword("timeout") {
             if keyword.value.is_none_literal_expr() {
-                checker.report_diagnostic(Diagnostic::new(
-                    RequestWithoutTimeout { implicit: false, module: module.to_string() },
+                checker.report_diagnostic(
+                    RequestWithoutTimeout {
+                        implicit: false,
+                        module: module.to_string(),
+                    },
                     keyword.range(),
-                ));
+                );
             }
         } else if module == "requests" {
-            checker.report_diagnostic(Diagnostic::new(
-                RequestWithoutTimeout { implicit: true, module: module.to_string() },
+            checker.report_diagnostic(
+                RequestWithoutTimeout {
+                    implicit: true,
+                    module: module.to_string(),
+                },
                 call.func.range(),
-            ));
+            );
         }
     }
 }

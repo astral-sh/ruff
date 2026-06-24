@@ -1,0 +1,25 @@
+---
+source: crates/ty_ide/src/docstring/markdown/structured/rst.rs
+expression: rendered
+---
+## Parameters
+**value**: `str`  
+The value.
+
+**option**: `int`  
+The option.
+
+**retries**: `int`  
+Retry attempts.
+
+## Attributes
+**state**: `bool`  
+Current state.
+
+## Returns
+`bool`  
+Whether validation passed.
+
+## Raises
+`ValueError`  
+If validation fails.

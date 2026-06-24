@@ -1,5 +1,6 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::{AlwaysFixableViolation, Violation};
 
 /// ## What it does
 /// Checks for uses of `str.format` to format logging messages.
@@ -74,6 +75,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingStringFormat;
 
 impl Violation for LoggingStringFormat {
@@ -158,6 +160,7 @@ impl Violation for LoggingStringFormat {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingPercentFormat;
 
 impl Violation for LoggingPercentFormat {
@@ -241,6 +244,7 @@ impl Violation for LoggingPercentFormat {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingStringConcat;
 
 impl Violation for LoggingStringConcat {
@@ -323,12 +327,19 @@ impl Violation for LoggingStringConcat {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingFString;
 
 impl Violation for LoggingFString {
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging statement uses f-string".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Convert to lazy `%` formatting".to_string())
     }
 }
 
@@ -374,6 +385,7 @@ impl Violation for LoggingFString {
 /// - [Python documentation: `logging.warning`](https://docs.python.org/3/library/logging.html#logging.warning)
 /// - [Python documentation: `logging.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingWarn;
 
 impl AlwaysFixableViolation for LoggingWarn {
@@ -441,6 +453,7 @@ impl AlwaysFixableViolation for LoggingWarn {
 /// ## References
 /// - [Python documentation: LogRecord attributes](https://docs.python.org/3/library/logging.html#logrecord-attributes)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingExtraAttrClash(pub String);
 
 impl Violation for LoggingExtraAttrClash {
@@ -503,6 +516,7 @@ impl Violation for LoggingExtraAttrClash {
 /// - [Python documentation: `logging.error`](https://docs.python.org/3/library/logging.html#logging.error)
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingExcInfo;
 
 impl Violation for LoggingExcInfo {
@@ -565,6 +579,7 @@ impl Violation for LoggingExcInfo {
 /// - [Python documentation: `logging.error`](https://docs.python.org/3/library/logging.html#logging.error)
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct LoggingRedundantExcInfo;
 
 impl Violation for LoggingRedundantExcInfo {

@@ -1,0 +1,373 @@
+import {
+  lazy,
+  use,
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  type DiagnosticDetailLocation,
+  ErrorMessage,
+  HorizontalResizeHandle,
+  Theme,
+  VerticalResizeHandle,
+} from "shared";
+import { type DiagnosticTag, FileHandle, Hint, Workspace } from "ty_wasm";
+import {
+  Panel,
+  Group as PanelGroup,
+  useDefaultLayout,
+} from "react-resizable-panels";
+import { Files, isPythonFile } from "./Files";
+import SecondarySideBar from "./SecondarySideBar";
+import SecondaryPanel, {
+  SecondaryPanelResult,
+  SecondaryTool,
+} from "./SecondaryPanel";
+import Diagnostics, { type Diagnostic } from "./Diagnostics";
+import VendoredFileBanner from "./VendoredFileBanner";
+import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
+import type { EditorHandle } from "./Editor";
+
+const Editor = lazy(() => import("./Editor"));
+
+interface CheckResult {
+  diagnostics: Diagnostic[];
+  hints: Hint[];
+  error: string | null;
+  secondary: SecondaryPanelResult;
+}
+
+export interface Props {
+  sessionPromise: Promise<PlaygroundSession>;
+  files: ReadonlyFiles;
+  theme: Theme;
+  selectedFileName: string;
+  onRun(): Promise<string>;
+
+  onAddFile(session: PlaygroundSession, name: string): void;
+
+  onRenameFile(session: PlaygroundSession, file: FileId, newName: string): void;
+
+  onRemoveFile(session: PlaygroundSession, file: FileId): void;
+
+  onSelectFile(id: FileId): void;
+
+  onSelectVendoredFile(handle: FileHandle): void;
+
+  onClearVendoredFile(): void;
+}
+
+export default function Chrome({
+  files,
+  selectedFileName,
+  sessionPromise,
+  theme,
+  onRun,
+  onAddFile,
+  onRenameFile,
+  onRemoveFile,
+  onSelectFile,
+  onSelectVendoredFile,
+  onClearVendoredFile,
+}: Props) {
+  const session = use(sessionPromise);
+  const workspace = session.workspace;
+
+  const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
+    null,
+  );
+
+  const editorRef = useRef<EditorHandle | null>(null);
+
+  const handleFileRenamed = (file: FileId, newName: string) => {
+    onRenameFile(session, file, newName);
+    editorRef.current?.editor.focus();
+  };
+
+  const handleAdd = useCallback(
+    (name: string) => {
+      onAddFile(session, name);
+    },
+    [session, onAddFile],
+  );
+
+  const handleBackToUserFile = useCallback(() => {
+    if (editorRef.current && files.selected != null) {
+      const selectedFile = files.metadata[files.selected];
+      if (selectedFile != null) {
+        const monaco = editorRef.current.monaco;
+        const userModel = monaco.editor.getModel(selectedFile.uri);
+
+        if (userModel != null) {
+          onClearVendoredFile();
+          editorRef.current.editor.setModel(userModel);
+        }
+      }
+    }
+  }, [files.selected, files.metadata, onClearVendoredFile]);
+
+  const handleSecondaryToolSelected = useCallback(
+    (tool: SecondaryTool | null) => {
+      setSecondaryTool((secondaryTool) => {
+        if (tool === secondaryTool) {
+          return null;
+        }
+
+        return tool;
+      });
+    },
+    [],
+  );
+
+  const handleEditorMount = useCallback((handle: EditorHandle) => {
+    editorRef.current = handle;
+  }, []);
+
+  const handleGoTo = useCallback((location: DiagnosticDetailLocation) => {
+    editorRef.current?.goToLocation(location);
+  }, []);
+
+  const handleRemoved = useCallback(
+    (id: FileId) => {
+      onRemoveFile(session, id);
+    },
+    [session, onRemoveFile],
+  );
+
+  const { defaultLayout, onLayoutChange } = useDefaultLayout({
+    groupId: "editor-diagnostics",
+    storage: localStorage,
+  });
+
+  const checkResult = useCheckResult(
+    files,
+    workspace,
+    secondaryTool,
+    files.currentVendoredFile ?? null,
+    files.revision,
+  );
+  const currentFilePath =
+    files.selected == null
+      ? null
+      : (files.metadata[files.selected].handle?.path() ?? null);
+
+  return (
+    <>
+      {files.selected != null ? (
+        <>
+          <Files
+            order={files.order}
+            metadata={files.metadata}
+            theme={theme}
+            selected={files.selected}
+            onAdd={handleAdd}
+            onRename={handleFileRenamed}
+            onSelect={onSelectFile}
+            onRemove={handleRemoved}
+          />
+          <PanelGroup
+            id="main-group"
+            orientation="horizontal"
+            className="h-full"
+          >
+            <Panel id="main" minSize={100}>
+              <PanelGroup
+                id="editor-diagnostics"
+                orientation="vertical"
+                className="h-full"
+                defaultLayout={defaultLayout}
+                onLayoutChange={onLayoutChange}
+              >
+                <Panel id="editor" minSize={100}>
+                  {files.currentVendoredFile != null && (
+                    <VendoredFileBanner
+                      currentVendoredFile={files.currentVendoredFile}
+                      selectedFile={{
+                        id: files.selected,
+                        name: selectedFileName,
+                      }}
+                      onBackToUserFile={handleBackToUserFile}
+                    />
+                  )}
+                  <Editor
+                    theme={theme}
+                    visible={true}
+                    files={files}
+                    fileName={selectedFileName}
+                    diagnostics={checkResult.diagnostics}
+                    hints={checkResult.hints}
+                    workspace={workspace}
+                    onMount={handleEditorMount}
+                    onOpenFile={onSelectFile}
+                    onVendoredFileChange={onSelectVendoredFile}
+                    onBackToUserFile={handleBackToUserFile}
+                    isViewingVendoredFile={files.currentVendoredFile != null}
+                  />
+                  {checkResult.error ? (
+                    <div
+                      style={{
+                        position: "fixed",
+                        left: "10%",
+                        right: "10%",
+                        bottom: "10%",
+                      }}
+                    >
+                      <ErrorMessage>{checkResult.error}</ErrorMessage>
+                    </div>
+                  ) : null}
+                </Panel>
+                <VerticalResizeHandle />
+                <Panel id="diagnostics" minSize={150} className="my-2">
+                  <Diagnostics
+                    diagnostics={checkResult.diagnostics}
+                    currentFilePath={currentFilePath}
+                    onGoTo={handleGoTo}
+                    theme={theme}
+                  />
+                </Panel>
+              </PanelGroup>
+            </Panel>
+            {secondaryTool != null && (
+              <>
+                <HorizontalResizeHandle />
+                <Panel id="secondary-panel" minSize={100}>
+                  <SecondaryPanel
+                    files={files}
+                    onRun={onRun}
+                    theme={theme}
+                    tool={secondaryTool}
+                    result={checkResult.secondary}
+                  />
+                </Panel>
+              </>
+            )}
+            <SecondarySideBar
+              selected={secondaryTool}
+              onSelected={handleSecondaryToolSelected}
+            />
+          </PanelGroup>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function useCheckResult(
+  files: ReadonlyFiles,
+  workspace: Workspace,
+  secondaryTool: SecondaryTool | null,
+  currentVendoredFileHandle: FileHandle | null,
+  revision: number,
+): CheckResult {
+  const deferredRevision = useDeferredValue(revision);
+
+  return useMemo(() => {
+    // Determine which file handle to use
+    const currentHandle =
+      currentVendoredFileHandle ??
+      (files.selected == null ? null : files.metadata[files.selected].handle);
+
+    const isVendoredFile = currentVendoredFileHandle != null;
+
+    // Regular file handling
+    if (currentHandle == null || !isPythonFile(currentHandle)) {
+      return {
+        diagnostics: [],
+        hints: [],
+        error: null,
+        secondary: null,
+      };
+    }
+
+    try {
+      // Don't run diagnostics for vendored files - always empty
+      const diagnostics = isVendoredFile
+        ? []
+        : workspace.checkFile(currentHandle);
+      const hints = isVendoredFile ? [] : workspace.hints(currentHandle);
+
+      let secondary: SecondaryPanelResult = null;
+
+      try {
+        switch (secondaryTool) {
+          case "AST":
+            secondary = {
+              status: "ok",
+              content: workspace.parsed(currentHandle),
+            };
+            break;
+
+          case "Tokens":
+            secondary = {
+              status: "ok",
+              content: workspace.tokens(currentHandle),
+            };
+            break;
+
+          case "Run":
+            secondary = isVendoredFile
+              ? {
+                  status: "error",
+                  error: "Cannot run vendored/standard library files",
+                }
+              : {
+                  status: "ok",
+                  content: "",
+                };
+            break;
+        }
+      } catch (error: unknown) {
+        secondary = {
+          status: "error",
+          error: error instanceof Error ? error.message : error + "",
+        };
+      }
+
+      // Convert diagnostics (empty array for vendored files)
+      const serializedDiagnostics = diagnostics.map((diagnostic) => ({
+        id: diagnostic.id(),
+        message: diagnostic.message(),
+        annotations: diagnostic.annotations(workspace),
+        subDiagnostics: diagnostic.subDiagnostics(workspace),
+        severity: diagnostic.severity(),
+        tags: diagnostic.tags() as DiagnosticTag[],
+        range: diagnostic.toRange(workspace) ?? null,
+        textRange: diagnostic.textRange() ?? null,
+        raw: diagnostic,
+      }));
+
+      return {
+        diagnostics: serializedDiagnostics,
+        hints,
+        error: null,
+        secondary,
+      };
+    } catch (e) {
+      return {
+        diagnostics: [],
+        hints: [],
+        error: formatError(e),
+        secondary: null,
+      };
+    }
+    // Monaco document edits mutate the workspace in place. The deferred
+    // revision is an invalidation token for this memoized check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    files,
+    workspace,
+    secondaryTool,
+    currentVendoredFileHandle,
+    deferredRevision,
+  ]);
+}
+
+export function formatError(error: unknown): string {
+  const message = error instanceof Error ? error.message : `${error}`;
+  return message.startsWith("Error: ")
+    ? message.slice("Error: ".length)
+    : message;
+}

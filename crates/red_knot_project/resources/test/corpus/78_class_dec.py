@@ -1,4 +1,0 @@
-@foo
-class C:
-   pass
-

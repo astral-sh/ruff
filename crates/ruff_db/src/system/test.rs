@@ -1,16 +1,16 @@
-use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
-use ruff_python_trivia::textwrap;
+use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
 use std::sync::{Arc, Mutex};
 
+use crate::Db;
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
+    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult,
 };
-use crate::Db;
 
+use super::WritableSystem;
 use super::walk_directory::WalkDirectoryBuilder;
 
 /// System implementation intended for testing.
@@ -20,12 +20,44 @@ use super::walk_directory::WalkDirectoryBuilder;
 ///
 /// ## Warning
 /// Don't use this system for production code. It's intended for testing only.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestSystem {
-    inner: Arc<dyn System + RefUnwindSafe + Send + Sync>,
+    inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
+    /// Environment variable overrides. If a key is present here, it takes precedence
+    /// over the inner system's environment variables.
+    env_overrides: Arc<Mutex<FxHashMap<String, Option<String>>>>,
+}
+
+impl Clone for TestSystem {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env_overrides: self.env_overrides.clone(),
+        }
+    }
 }
 
 impl TestSystem {
+    pub fn new(inner: impl WritableSystem + RefUnwindSafe + Send + Sync + 'static) -> Self {
+        Self {
+            inner: Arc::new(inner),
+            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
+        }
+    }
+
+    /// Sets an environment variable override. This takes precedence over the inner system.
+    pub fn set_env_var(&self, name: impl Into<String>, value: impl Into<String>) {
+        self.env_overrides
+            .lock()
+            .unwrap()
+            .insert(name.into(), Some(value.into()));
+    }
+
+    /// Removes an environment variable override, making it appear as not set.
+    pub fn remove_env_var(&self, name: impl Into<String>) {
+        self.env_overrides.lock().unwrap().insert(name.into(), None);
+    }
+
     /// Returns the [`InMemorySystem`].
     ///
     /// ## Panics
@@ -50,12 +82,12 @@ impl TestSystem {
 
     fn use_system<S>(&mut self, system: S)
     where
-        S: System + Send + Sync + RefUnwindSafe + 'static,
+        S: WritableSystem + Send + Sync + RefUnwindSafe + 'static,
     {
         self.inner = Arc::new(system);
     }
 
-    pub fn system(&self) -> &dyn System {
+    pub fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
@@ -67,6 +99,10 @@ impl System for TestSystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.system().canonicalize_path(path)
+    }
+
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.system().is_same_file(first, second)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -96,6 +132,14 @@ impl System for TestSystem {
         self.system().user_config_directory()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        self.system().cache_dir()
+    }
+
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -107,14 +151,8 @@ impl System for TestSystem {
         self.system().walk_directory(path)
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        PatternError,
-    > {
-        self.system().glob(pattern)
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -124,13 +162,102 @@ impl System for TestSystem {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        // Check overrides first
+        if let Some(override_value) = self.env_overrides.lock().unwrap().get(name) {
+            return match override_value {
+                Some(value) => Ok(value.clone()),
+                None => Err(std::env::VarError::NotPresent),
+            };
+        }
+        // Fall back to inner system
+        self.system().env_var(name)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
 }
 
 impl Default for TestSystem {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(InMemorySystem::default()),
+        Self::new(InMemorySystem::default())
+    }
+}
+
+impl WritableSystem for TestSystem {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        self.system().create_new_file(path)
+    }
+
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.system().write_file_bytes(path, content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        self.system().create_directory_all(path)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
+    }
+}
+
+/// Extension trait for databases that use a [`WritableSystem`].
+///
+/// Provides various helper function that ease testing.
+pub trait DbWithWritableSystem: Db + Sized {
+    type System: WritableSystem;
+
+    fn writable_system(&self) -> &Self::System;
+
+    /// Writes the content of the given file and notifies the Db about the change.
+    fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl AsRef<str>) -> Result<()> {
+        let path = path.as_ref();
+        match self.writable_system().write_file(path, content.as_ref()) {
+            Ok(()) => {
+                File::sync_path(self, path);
+                Ok(())
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(parent) = path.parent() {
+                    self.writable_system().create_directory_all(parent)?;
+
+                    for ancestor in parent.ancestors() {
+                        File::sync_path(self, ancestor);
+                    }
+
+                    self.writable_system().write_file(path, content.as_ref())?;
+                    File::sync_path(self, path);
+
+                    Ok(())
+                } else {
+                    Err(error)
+                }
+            }
+            err => err,
         }
+    }
+
+    /// Writes auto-dedented text to a file.
+    fn write_dedented(&mut self, path: &str, content: &str) -> Result<()> {
+        self.write_file(path, ruff_python_trivia::textwrap::dedent(content))?;
+        Ok(())
+    }
+
+    /// Writes the content of the given files and notifies the Db about the change.
+    fn write_files<P, C, I>(&mut self, files: I) -> Result<()>
+    where
+        I: IntoIterator<Item = (P, C)>,
+        P: AsRef<SystemPath>,
+        C: AsRef<str>,
+    {
+        for (path, content) in files {
+            self.write_file(path, content)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -142,70 +269,19 @@ pub trait DbWithTestSystem: Db + Sized {
 
     fn test_system_mut(&mut self) -> &mut TestSystem;
 
-    /// Writes the content of the given file and notifies the Db about the change.
-    ///
-    /// ## Panics
-    /// If the db isn't using the [`InMemorySystem`].
-    fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
-        let path = path.as_ref();
-
-        let memory_fs = self.test_system().memory_file_system();
-
-        let sync_ancestors = path
-            .parent()
-            .is_some_and(|parent| !memory_fs.exists(parent));
-        let result = memory_fs.write_file(path, content);
-
-        if result.is_ok() {
-            File::sync_path(self, path);
-
-            // Sync the ancestor paths if the path's parent
-            // directory didn't exist before.
-            if sync_ancestors {
-                for ancestor in path.ancestors() {
-                    File::sync_path(self, ancestor);
-                }
-            }
-        }
-
-        result
-    }
-
     /// Writes the content of the given virtual file.
     ///
     /// ## Panics
     /// If the db isn't using the [`InMemorySystem`].
-    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    fn write_virtual_file(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<[u8]>,
+    ) {
         let path = path.as_ref();
         self.test_system()
             .memory_file_system()
             .write_virtual_file(path, content);
-    }
-
-    /// Writes auto-dedented text to a file.
-    ///
-    /// ## Panics
-    /// If the db isn't using the [`InMemorySystem`].
-    fn write_dedented(&mut self, path: &str, content: &str) -> crate::system::Result<()> {
-        self.write_file(path, textwrap::dedent(content))?;
-        Ok(())
-    }
-
-    /// Writes the content of the given files and notifies the Db about the change.
-    ///
-    /// ## Panics
-    /// If the db isn't using the [`InMemorySystem`].
-    fn write_files<P, C, I>(&mut self, files: I) -> crate::system::Result<()>
-    where
-        I: IntoIterator<Item = (P, C)>,
-        P: AsRef<SystemPath>,
-        C: ToString,
-    {
-        for (path, content) in files {
-            self.write_file(path, content)?;
-        }
-
-        Ok(())
     }
 
     /// Uses the given system instead of the testing system.
@@ -215,7 +291,7 @@ pub trait DbWithTestSystem: Db + Sized {
     /// Note that any files written to the memory file system won't be copied over.
     fn use_system<S>(&mut self, os: S)
     where
-        S: System + Send + Sync + RefUnwindSafe + 'static,
+        S: WritableSystem + Send + Sync + RefUnwindSafe + 'static,
     {
         self.test_system_mut().use_system(os);
     }
@@ -229,13 +305,38 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 }
 
-#[derive(Default, Debug)]
+impl<T> DbWithWritableSystem for T
+where
+    T: DbWithTestSystem,
+{
+    type System = TestSystem;
+
+    fn writable_system(&self) -> &Self::System {
+        self.test_system()
+    }
+}
+
+#[derive(Clone, Default, Debug)]
 pub struct InMemorySystem {
-    user_config_directory: Mutex<Option<SystemPathBuf>>,
+    user_config_directory: Arc<Mutex<Option<SystemPathBuf>>>,
     memory_fs: MemoryFileSystem,
 }
 
 impl InMemorySystem {
+    pub fn new(cwd: SystemPathBuf) -> Self {
+        Self {
+            user_config_directory: Mutex::new(None).into(),
+            memory_fs: MemoryFileSystem::with_current_directory(cwd),
+        }
+    }
+
+    pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
+        Self {
+            user_config_directory: Mutex::new(None).into(),
+            memory_fs,
+        }
+    }
+
     pub fn fs(&self) -> &MemoryFileSystem {
         &self.memory_fs
     }
@@ -253,6 +354,12 @@ impl System for InMemorySystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.memory_fs.canonicalize(path)
+    }
+
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -284,6 +391,14 @@ impl System for InMemorySystem {
         self.user_config_directory.lock().unwrap().clone()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -295,15 +410,8 @@ impl System for InMemorySystem {
         self.memory_fs.walk_directory(path)
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        PatternError,
-    > {
-        let iterator = self.memory_fs.glob(pattern)?;
-        Ok(Box::new(iterator))
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -312,5 +420,27 @@ impl System for InMemorySystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
+
+impl WritableSystem for InMemorySystem {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        self.memory_fs.create_new_file(path)
+    }
+
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.memory_fs.write_file(path, content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        self.memory_fs.create_directory_all(path)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }

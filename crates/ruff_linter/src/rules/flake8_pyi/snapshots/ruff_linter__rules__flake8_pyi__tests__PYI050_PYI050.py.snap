@@ -1,40 +1,44 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
-PYI050.py:13:24: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+  --> PYI050.py:13:24
    |
 13 | def foo_no_return(arg: NoReturn):
-   |                        ^^^^^^^^ PYI050
+   |                        ^^^^^^^^
 14 |     ...
    |
 
-PYI050.py:18:10: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+  --> PYI050.py:18:10
    |
 17 | def foo_no_return_typing_extensions(
 18 |     arg: typing_extensions.NoReturn,
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI050
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 19 | ):
 20 |     ...
    |
 
-PYI050.py:23:44: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+  --> PYI050.py:23:44
    |
 23 | def foo_no_return_kwarg(arg: int, *, arg2: NoReturn):
-   |                                            ^^^^^^^^ PYI050
+   |                                            ^^^^^^^^
 24 |     ...
    |
 
-PYI050.py:27:47: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+  --> PYI050.py:27:47
    |
 27 | def foo_no_return_pos_only(arg: int, /, arg2: NoReturn):
-   |                                               ^^^^^^^^ PYI050
+   |                                               ^^^^^^^^
 28 |     ...
    |
 
-PYI050.py:35:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+  --> PYI050.py:35:21
    |
 35 | def stringized(arg: "NoReturn"):
-   |                     ^^^^^^^^^^ PYI050
+   |                     ^^^^^^^^^^
 36 |     ...
    |

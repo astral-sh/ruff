@@ -1,26 +1,30 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: NodeIndex(None),
             range: 0..16,
             value: FString(
                 ExprFString {
+                    node_index: NodeIndex(None),
                     range: 0..16,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..16,
+                                    node_index: NodeIndex(None),
                                     elements: [
-                                        Expression(
-                                            FStringExpressionElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 2..15,
+                                                node_index: NodeIndex(None),
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 3..6,
                                                         id: Name("foo"),
                                                         ctx: Load,
@@ -29,14 +33,17 @@ snapshot_kind: text
                                                 debug_text: None,
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FStringFormatSpec {
+                                                    InterpolatedStringFormatSpec {
                                                         range: 7..14,
+                                                        node_index: NodeIndex(None),
                                                         elements: [
-                                                            Expression(
-                                                                FStringExpressionElement {
+                                                            Interpolation(
+                                                                InterpolatedElement {
                                                                     range: 7..14,
+                                                                    node_index: NodeIndex(None),
                                                                     expression: StringLiteral(
                                                                         ExprStringLiteral {
+                                                                            node_index: NodeIndex(None),
                                                                             range: 8..13,
                                                                             value: StringLiteralValue {
                                                                                 inner: Concatenated(
@@ -44,20 +51,24 @@ snapshot_kind: text
                                                                                         strings: [
                                                                                             StringLiteral {
                                                                                                 range: 8..10,
+                                                                                                node_index: NodeIndex(None),
                                                                                                 value: "",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Single,
                                                                                                     prefix: Empty,
                                                                                                     triple_quoted: false,
+                                                                                                    unclosed: false,
                                                                                                 },
                                                                                             },
                                                                                             StringLiteral {
                                                                                                 range: 11..13,
+                                                                                                node_index: NodeIndex(None),
                                                                                                 value: "",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Single,
                                                                                                     prefix: Empty,
                                                                                                     triple_quoted: false,
+                                                                                                    unclosed: false,
                                                                                                 },
                                                                                             },
                                                                                         ],
@@ -82,6 +93,7 @@ snapshot_kind: text
                                         quote_style: Double,
                                         prefix: Regular,
                                         triple_quoted: false,
+                                        unclosed: false,
                                     },
                                 },
                             ),

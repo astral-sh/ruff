@@ -1,13 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
 
-use crate::settings::LinterSettings;
 use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::detection::comment_contains_code;
+use crate::rules::eradicate::detection::comment_contains_code;
 
 /// ## What it does
 /// Checks for commented-out Python code.
@@ -30,6 +30,7 @@ use super::super::detection::comment_contains_code;
 ///
 /// [#4845]: https://github.com/astral-sh/ruff/issues/4845
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.145")]
 pub(crate) struct CommentedOutCode;
 
 impl Violation for CommentedOutCode {
@@ -47,10 +48,9 @@ impl Violation for CommentedOutCode {
 
 /// ERA001
 pub(crate) fn commented_out_code(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    settings: &LinterSettings,
 ) {
     let mut comments = comment_ranges.into_iter().peekable();
     // Iterate over all comments in the document.
@@ -64,12 +64,16 @@ pub(crate) fn commented_out_code(
         }
 
         // Verify that the comment is on its own line, and that it contains code.
-        if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
-            diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
-                locator.full_lines_range(range),
-            )));
-            diagnostics.push(diagnostic);
+        if is_own_line_comment(line)
+            && comment_contains_code(line, &context.settings().task_tags[..])
+        {
+            if let Some(mut diagnostic) =
+                context.report_diagnostic_if_enabled(CommentedOutCode, range)
+            {
+                diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
+                    locator.full_lines_range(range),
+                )));
+            }
         }
     }
 }
@@ -161,8 +165,8 @@ mod tests {
     use ruff_source_file::LineRanges;
     use ruff_text_size::TextSize;
 
-    use crate::rules::eradicate::rules::commented_out_code::skip_script_comments;
     use crate::Locator;
+    use crate::rules::eradicate::rules::commented_out_code::skip_script_comments;
 
     #[test]
     fn script_comment() {

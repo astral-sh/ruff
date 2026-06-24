@@ -1,22 +1,22 @@
-use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
-
-use filetime::FileTime;
-
-use ruff_notebook::{Notebook, NotebookError};
-
-use crate::system::{
-    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
-};
+#![allow(clippy::disallowed_methods)]
 
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
+use crate::max_parallelism;
+use crate::system::{
+    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
+};
+use filetime::FileTime;
+use ruff_notebook::{Notebook, NotebookError};
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use std::{any::Any, path::PathBuf};
 
 /// A system implementation that uses the OS file system.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }
@@ -36,9 +36,14 @@ impl OsSystem {
         let cwd = cwd.as_ref();
         assert!(cwd.as_utf8_path().is_absolute());
 
+        tracing::debug!(
+            "Architecture: {}, OS: {}",
+            std::env::consts::ARCH,
+            std::env::consts::OS,
+        );
+
         Self {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
-            #[allow(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
                 ..Default::default()
@@ -79,6 +84,10 @@ impl System for OsSystem {
         })
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        same_file::is_same_file(first.as_std_path(), second.as_std_path())
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
     }
@@ -102,11 +111,25 @@ impl System for OsSystem {
         path.as_std_path().exists()
     }
 
+    fn which(&self, name: &str) -> WhichResult {
+        let path = which::which(name).map_err(|err| match err {
+            which::Error::CannotFindBinaryPath => WhichError::CannotFindBinaryPath,
+            which::Error::CannotGetCurrentDirAndPathListEmpty => {
+                WhichError::CannotGetCurrentDirAndPathListEmpty
+            }
+            which::Error::CannotCanonicalize => WhichError::CannotCanonicalize,
+        })?;
+
+        match SystemPathBuf::from_path_buf(path) {
+            Ok(path) => Ok(path),
+            Err(_) => Err(WhichError::NonUtf8Path),
+        }
+    }
+
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
         // In testing, we allow overriding the user configuration directory by using a
         // thread local because overriding the environment variables breaks test isolation
@@ -123,16 +146,29 @@ impl System for OsSystem {
         SystemPathBuf::from_path_buf(strategy.config_dir()).ok()
     }
 
-    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
-    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
-    #[cfg(target_arch = "wasm32")]
-    fn user_config_directory(&self) -> Option<SystemPathBuf> {
-        #[cfg(feature = "testing")]
-        if let Ok(directory_override) = self.try_get_user_config_directory_override() {
-            return directory_override;
-        }
+    /// Returns an absolute cache directory on the system.
+    ///
+    /// On Linux and macOS, uses `$XDG_CACHE_HOME/ty` or `.cache/ty`.
+    /// On Windows, uses `C:\Users\User\AppData\Local\ty\cache`.
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        use etcetera::BaseStrategy as _;
 
-        None
+        let cache_dir = etcetera::base_strategy::choose_base_strategy()
+            .ok()
+            .map(|dirs| dirs.cache_dir().join("ty"))
+            .map(|cache_dir| {
+                if cfg!(windows) {
+                    // On Windows, we append `cache` to the LocalAppData directory, i.e., prefer
+                    // `C:\Users\User\AppData\Local\ty\cache` over `C:\Users\User\AppData\Local\ty`.
+                    cache_dir.join("cache")
+                } else {
+                    cache_dir
+                }
+            })
+            .and_then(|path| SystemPathBuf::from_path_buf(path).ok())
+            .unwrap_or_else(|| SystemPathBuf::from(".ty_cache"));
+
+        Some(cache_dir)
     }
 
     /// Creates a builder to recursively walk `path`.
@@ -140,31 +176,16 @@ impl System for OsSystem {
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+        WalkDirectoryBuilder::new(
+            path,
+            OsDirectoryWalker {
+                cwd: self.current_directory().to_path_buf(),
+            },
+        )
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        glob::PatternError,
-    > {
-        glob::glob(pattern).map(|inner| {
-            let iterator = inner.map(|result| {
-                let path = result?;
-
-                let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| GlobError {
-                    path,
-                    error: GlobErrorKind::NonUtf8Path,
-                })?;
-
-                Ok(system_path)
-            });
-
-            let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
-            boxed
-        })
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -189,10 +210,47 @@ impl System for OsSystem {
             })
         })))
     }
+
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        std::env::var(name)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
+
+impl WritableSystem for OsSystem {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        std::fs::File::create_new(path).map(drop)
+    }
+
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        std::fs::write(path.as_std_path(), content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        std::fs::create_dir_all(path.as_std_path())
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
+    }
+}
+
+impl Default for OsSystem {
+    fn default() -> Self {
+        Self::new(
+            SystemPathBuf::from_path_buf(std::env::current_dir().unwrap_or_default())
+                .unwrap_or_default(),
+        )
+    }
 }
 
 #[derive(Debug)]
-struct OsDirectoryWalker;
+struct OsDirectoryWalker {
+    cwd: SystemPathBuf,
+}
 
 impl DirectoryWalker for OsDirectoryWalker {
     fn walk(
@@ -211,6 +269,7 @@ impl DirectoryWalker for OsDirectoryWalker {
         };
 
         let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
         builder.hidden(hidden);
@@ -219,11 +278,7 @@ impl DirectoryWalker for OsDirectoryWalker {
             builder.add(additional_path.as_std_path());
         }
 
-        builder.threads(
-            std::thread::available_parallelism()
-                .map_or(1, std::num::NonZeroUsize::get)
-                .min(12),
-        );
+        builder.threads(max_parallelism().min(NonZeroUsize::new(12).unwrap()).get());
 
         builder.build_parallel().run(|| {
             let mut visitor = visitor_builder.build();
@@ -420,8 +475,8 @@ pub(super) mod testing {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
 

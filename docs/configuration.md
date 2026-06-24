@@ -47,11 +47,11 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.9
-    target-version = "py39"
+    # Assume Python 3.10
+    target-version = "py310"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -129,11 +129,11 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.9
-    target-version = "py39"
+    # Assume Python 3.10
+    target-version = "py310"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -270,7 +270,7 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    configuration, with `${config_dir}` being determined via [`etcetera`'s base strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
     and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
@@ -307,6 +307,17 @@ If Ruff detects multiple configuration files in the same directory, the `.ruff.t
 precedence over the `ruff.toml` file, and the `ruff.toml` file will take precedence over
 the `pyproject.toml` file.
 
+### Inferring the Python version
+When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fall back to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
+The rules for this behavior are as follows:
+
+1. If a configuration file is passed directly, Ruff does not attempt to infer a missing `target-version`.
+1. If a configuration file is found in the filesystem hierarchy, Ruff will infer a missing `target-version` from the `requires-python` field in a `pyproject.toml` file in the same directory as the found configuration.
+1. If we are using a user-level configuration from `${config_dir}/ruff/pyproject.toml`, the `requires-python` field in the first `pyproject.toml` file found in an ancestor of the current working directory takes precedence over the `target-version` in the user-level configuration.
+1. If no configuration files are found, Ruff will infer the `target-version` from the `requires-python` field in the first `pyproject.toml` file found in an ancestor of the current working directory.
+
+Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
+
 ## Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that
@@ -334,12 +345,14 @@ formatting `.pyi` files, but would continue to include them in linting:
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](settings.md#respect-gitignore)).
 
-Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
-For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
+Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria, 
+unless [`force-exclude`](settings.md#force-exclude) is also enabled (via CLI or settings file).
+For example, without `force-exclude` enabled, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
 By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
+In [preview](preview.md) mode, Ruff will also discover `*.pyw` by default.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
 You can also change the default selection using the [`include`](settings.md#include) setting.
@@ -527,7 +540,7 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
+  -h, --help     Print help (see more with '--help')
   -V, --version  Print version
 
 Log levels:
@@ -541,11 +554,16 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -562,7 +580,8 @@ Run Ruff on the given files or directories
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check [default: .]
+  [FILES]...  List of files or directories to check, or `-` to read from stdin
+              [default: .]
 
 Options:
       --fix
@@ -597,7 +616,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314, py315]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -607,14 +626,15 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
+      --add-noqa[=<REASON>]
+          Enable automatic additions of `noqa` directives to failing lines.
+          Optionally provide a reason to append after the codes
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Rule selection:
       --select <RULE_CODE>
@@ -677,11 +697,16 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated check help. -->
@@ -696,7 +721,8 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format [default: .]
+  [FILES]...  List of files or directories to format, or `-` to read from stdin
+              [default: .]
 
 Options:
       --check
@@ -712,10 +738,15 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314, py315]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
+      --output-format <OUTPUT_FORMAT>
+          Output serialization format for violations, when used with `--check`.
+          The default serialization format is "full" [env: RUFF_OUTPUT_FORMAT=]
+          [possible values: concise, full, json, json-lines, junit, grouped,
+          github, gitlab, pylint, rdjson, azure, sarif]
   -h, --help
           Print help (see more with '--help')
 
@@ -726,6 +757,9 @@ Miscellaneous:
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --exit-non-zero-on-format
+          Exit with a non-zero status code if any files were modified via
+          format, even if all files were formatted successfully
 
 File selection:
       --respect-gitignore
@@ -759,11 +793,16 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated format help. -->
@@ -774,15 +813,43 @@ Ruff supports autocompletion for most shells. A shell-specific completion script
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
 `powershell`, or `zsh`.
 
-The exact steps required to enable autocompletion will vary by shell. For example instructions,
-see the [Poetry](https://python-poetry.org/docs/#enable-tab-completion-for-bash-fish-or-zsh) or
-[ripgrep](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#complete) documentation.
+!!! tip
 
-As an example: to enable autocompletion for Zsh, run
-`ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
-`~/.zshrc` file, if they're not already present:
+    You can run `echo $SHELL` to help you determine your shell.
 
-```zsh
-fpath+=~/.zfunc
-autoload -Uz compinit && compinit
-```
+To enable shell autocompletion for Ruff, run one of the following:
+
+=== "Bash"
+
+    ```bash
+    echo 'eval "$(ruff generate-shell-completion bash)"' >> ~/.bashrc
+    ```
+
+=== "Zsh"
+
+    ```bash
+    echo 'eval "$(ruff generate-shell-completion zsh)"' >> ~/.zshrc
+    ```
+
+=== "fish"
+
+    ```bash
+    echo 'ruff generate-shell-completion fish | source' > ~/.config/fish/completions/ruff.fish
+    ```
+
+=== "Elvish"
+
+    ```bash
+    echo 'eval (ruff generate-shell-completion elvish | slurp)' >> ~/.elvish/rc.elv
+    ```
+
+=== "PowerShell / pwsh"
+
+    ```powershell
+    if (!(Test-Path -Path $PROFILE)) {
+      New-Item -ItemType File -Path $PROFILE -Force
+    }
+    Add-Content -Path $PROFILE -Value '(& ruff generate-shell-completion powershell) | Out-String | Invoke-Expression'
+    ```
+
+Then restart the shell or source the shell config file.

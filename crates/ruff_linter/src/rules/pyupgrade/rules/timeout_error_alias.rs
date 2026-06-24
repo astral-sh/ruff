@@ -1,14 +1,15 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `TimeoutError`.
@@ -27,6 +28,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 /// ```python
+/// import asyncio
+///
 /// raise asyncio.TimeoutError
 /// ```
 ///
@@ -35,9 +38,14 @@ use crate::settings::types::PythonVersion;
 /// raise TimeoutError
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if it would delete any comments
+/// within the exception expression range.
+///
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct TimeoutErrorAlias {
     name: Option<String>,
 }
@@ -62,7 +70,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
-            if target_version >= PythonVersion::Py311 {
+            if target_version >= PythonVersion::PY311 {
                 matches!(
                     qualified_name.segments(),
                     ["socket", "timeout"] | ["asyncio", "TimeoutError"]
@@ -73,7 +81,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
                 // fix in Python <3.10. We add an assert to make this assumption
                 // explicit.
                 assert!(
-                    target_version >= PythonVersion::Py310,
+                    target_version >= PythonVersion::PY310,
                     "lint should only be used for Python 3.10+",
                 );
                 matches!(qualified_name.segments(), ["socket", "timeout"])
@@ -83,7 +91,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &Checker, target: &Expr) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         TimeoutErrorAlias {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
@@ -95,17 +103,24 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
             target.start(),
             checker.semantic(),
         )?;
-        Ok(Fix::safe_edits(
+
+        let applicability = if checker.comment_ranges().intersects(target.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Fix::applicable_edits(
             Edit::range_replacement(binding, target.range()),
             import_edit,
+            applicability,
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(TimeoutErrorAlias { name: None }, tuple.range());
+    let mut diagnostic = checker.report_diagnostic(TimeoutErrorAlias { name: None }, tuple.range());
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
@@ -129,6 +144,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 id: Name::new_static("TimeoutError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             remaining.insert(0, node.into());
         }
@@ -140,17 +156,26 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
         };
 
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(content, tuple.range(), checker.locator()),
-            tuple.range(),
-        )));
+        let applicability = if checker.comment_ranges().intersects(tuple.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                pad(content, tuple.range(), checker.locator()),
+                tuple.range(),
+            ),
+            applicability,
+        ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// UP041
@@ -161,16 +186,16 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
             continue;
         };
         match expr.as_ref() {
-            Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(expr, checker.semantic(), checker.settings.target_version) {
-                    atom_diagnostic(checker, expr);
-                }
+            Expr::Name(_) | Expr::Attribute(_)
+                if is_alias(expr, checker.semantic(), checker.target_version()) =>
+            {
+                atom_diagnostic(checker, expr);
             }
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `TimeoutError`.
                 let mut aliases: Vec<&Expr> = vec![];
                 for element in tuple {
-                    if is_alias(element, checker.semantic(), checker.settings.target_version) {
+                    if is_alias(element, checker.semantic(), checker.target_version()) {
                         aliases.push(element);
                     }
                 }
@@ -185,7 +210,7 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
 
 /// UP041
 pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
-    if is_alias(func, checker.semantic(), checker.settings.target_version) {
+    if is_alias(func, checker.semantic(), checker.target_version()) {
         atom_diagnostic(checker, func);
     }
 }
@@ -193,7 +218,7 @@ pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
 /// UP041
 pub(crate) fn timeout_error_alias_raise(checker: &Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
-        if is_alias(expr, checker.semantic(), checker.settings.target_version) {
+        if is_alias(expr, checker.semantic(), checker.target_version()) {
             atom_diagnostic(checker, expr);
         }
     }

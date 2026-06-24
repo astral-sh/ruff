@@ -1,0 +1,1 @@
+def f(): yield *x

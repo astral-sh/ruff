@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
@@ -7,6 +6,7 @@ use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for loops in which a `set` is modified during iteration.
@@ -38,9 +38,15 @@ use crate::checkers::ast::Checker;
 ///     nums.add(num + 5)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe because it changes the program’s behavior. Replacing the
+/// original set with a copy during iteration allows code that would previously raise a
+/// `RuntimeError` to run without error.
+///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.5")]
 pub(crate) struct ModifiedIteratingSet {
     name: Name,
 }
@@ -49,7 +55,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ModifiedIteratingSet { name } = self;
-        format!("Iterated set `{name}` is modified within the `for` loop",)
+        format!("Iterated set `{name}` is modified within the `for` loop")
     }
 
     fn fix_title(&self) -> String {
@@ -71,7 +77,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
         return;
     }
 
-    let is_modified = any_over_body(&for_stmt.body, &|expr| {
+    let is_modified = any_over_body(&for_stmt.body, |expr| {
         let Some(func) = expr.as_call_expr().map(|call| &call.func) else {
             return false;
         };
@@ -92,7 +98,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     });
 
     if is_modified {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ModifiedIteratingSet {
                 name: name.id.clone(),
             },
@@ -102,7 +108,6 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
             format!("{}.copy()", checker.locator().slice(name)),
             name.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 

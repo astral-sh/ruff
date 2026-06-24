@@ -1,12 +1,15 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
-use ruff_python_parser::{TokenKind, Tokens};
-use ruff_text_size::{Ranged, TextRange};
+use std::fmt::Write as _;
 
-use crate::checkers::ast::Checker;
-use crate::fix::edits::{pad, remove_argument, Parentheses};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, StringLiteral, StringLiteralValue};
+use ruff_python_trivia::Cursor;
+use ruff_text_size::{Ranged, TextLen, TextRange};
+
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::fix::edits::{Parentheses, pad, remove_argument};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.
@@ -28,6 +31,7 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
@@ -94,23 +98,20 @@ enum EncodingArg<'a> {
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
+fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex `"".encode()`
         ([], []) => return Some(EncodingArg::Empty),
         // Ex `"".encode(encoding)`
-        ([arg], []) => {
-            if is_utf8_encoding_arg(arg) {
-                return Some(EncodingArg::Positional(arg));
-            }
+        ([arg], []) if is_utf8_encoding_arg(arg) => {
+            return Some(EncodingArg::Positional(arg));
         }
         // Ex `"".encode(kwarg=kwarg)`
-        ([], [keyword]) => {
-            if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding") {
-                if is_utf8_encoding_arg(&keyword.value) {
-                    return Some(EncodingArg::Keyword(keyword));
-                }
-            }
+        ([], [keyword])
+            if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding")
+                && is_utf8_encoding_arg(&keyword.value) =>
+        {
+            return Some(EncodingArg::Keyword(keyword));
         }
         // Ex `"".encode(*args, **kwargs)`
         _ => {}
@@ -129,10 +130,11 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
             TokenKind::String => {
                 replacement.push_str(locator.slice(TextRange::new(prev, token.start())));
                 let string = locator.slice(token);
-                replacement.push_str(&format!(
+                let _ = write!(
+                    &mut replacement,
                     "b{}",
                     &string.trim_start_matches('u').trim_start_matches('U')
-                ));
+                );
             }
             _ => {
                 replacement.push_str(locator.slice(TextRange::new(prev, token.end())));
@@ -154,11 +156,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
     };
     match variable {
         Expr::StringLiteral(ast::ExprStringLiteral { value: literal, .. }) => {
+            if string_contains_string_only_escapes(literal, checker.locator()) {
+                return;
+            }
+
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
             if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
                 if literal.to_str().is_ascii() {
                     // Ex) Convert `"foo".encode()` to `b"foo"`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::BytesLiteral,
                         },
@@ -169,11 +175,10 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                         call,
                         checker.tokens(),
                     ));
-                    checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode(encoding="utf-8")` to
                     // `"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -185,13 +190,13 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode("utf-8")` to `"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -203,10 +208,10 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -216,7 +221,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to
                     // `f"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -228,13 +233,13 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode("utf-8")` to `f"unicode text©".encode()`.
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
@@ -246,13 +251,94 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
         _ => {}
     }
+}
+/// In a string, there are two kinds of escape sequences: "single" and "multi".
+///
+/// A "single" escape sequence is formed if a backslash is followed by
+/// a newline, another backslash, `'`, `"`, `a`, `b`, `f`, `n`, `t`, or `v`.
+/// A "multi" escape sequence is formed if a backslash is followed by
+/// `x` and 2 hex digits, `N` and a Unicode character name enclosed in a pair of braces,
+/// `u` and 4 hex digits, `U` and 8 hex digits, or 1 to 3 oct digits.
+///
+/// Out of the aforementioned, `u`, `U` and `N` are only valid in a string.
+/// However, an octal escape `\ooo` where `ooo` is greater than 377 base 8
+/// currently raises a `SyntaxWarning` (will eventually be a `SyntaxError`)
+/// in both strings and bytes and thus is not considered `bytes`-compatible.
+///
+/// An unrecognized escape sequence is ignored, resulting in both
+/// the backslash and the following character being part of the string.
+///
+/// Reference: [Lexical analysis &sect; 2.4.1.1. Escape sequences][escape-sequences]
+///
+/// [escape-sequences]: https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences
+fn string_contains_string_only_escapes(string: &StringLiteralValue, locator: &Locator) -> bool {
+    for literal in string {
+        let flags = literal.flags;
+
+        if flags.prefix().is_raw() {
+            continue;
+        }
+
+        if literal.content_range().len() > literal.as_str().text_len()
+            && literal_contains_string_only_escapes(literal, locator)
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locator) -> bool {
+    let inner_in_source = locator.slice(literal.content_range());
+
+    let mut cursor = Cursor::new(inner_in_source);
+
+    while let Some(backslash_offset) = memchr::memchr(b'\\', cursor.as_bytes()) {
+        cursor.skip_bytes(backslash_offset + "\\".len());
+
+        let Some(escaped) = cursor.bump() else {
+            continue;
+        };
+
+        match escaped {
+            'N' | 'u' | 'U' => return true,
+            'x' => {
+                cursor.skip_bytes(2);
+            }
+            '0'..='7' => {
+                let (second, third) = (cursor.first(), cursor.second());
+
+                let octal_codepoint = match (is_octal_digit(second), is_octal_digit(third)) {
+                    (false, _) => escaped.to_string(),
+                    (true, false) => format!("{escaped}{second}"),
+                    (true, true) => format!("{escaped}{second}{third}"),
+                };
+
+                if u8::from_str_radix(&octal_codepoint, 8).is_err() {
+                    return true;
+                }
+
+                // Cursor is currently at first octal digit, so we just
+                // skip the remaining.
+                cursor.skip_bytes(octal_codepoint.len().saturating_sub(1));
+            }
+            _ => {}
+        }
+    }
+
+    false
+}
+
+const fn is_octal_digit(char: char) -> bool {
+    matches!(char, '0'..='7')
 }

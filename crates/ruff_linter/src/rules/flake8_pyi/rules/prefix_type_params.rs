@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -46,6 +46,7 @@ impl fmt::Display for VarKind {
 /// _T = TypeVar("_T")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct UnprefixedTypeParam {
     kind: VarKind,
 }
@@ -73,7 +74,7 @@ pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Exp
         if id.starts_with('_') {
             return;
         }
-    };
+    }
 
     let Expr::Call(ast::ExprCall { func, .. }) = value else {
         return;
@@ -106,5 +107,5 @@ pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Exp
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
+    checker.report_diagnostic(UnprefixedTypeParam { kind }, value.range());
 }

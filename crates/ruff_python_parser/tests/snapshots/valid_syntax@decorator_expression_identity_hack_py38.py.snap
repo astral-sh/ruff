@@ -1,0 +1,186 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_identity_hack_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..111,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 45..63,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("_"),
+                        range: 49..50,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 50..53,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 51..52,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 51..52,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 51..52,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                node_index: NodeIndex(None),
+                                range: 55..63,
+                                value: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 62..63,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 64..110,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 64..94,
+                            node_index: NodeIndex(None),
+                            expression: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 65..94,
+                                    func: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 65..66,
+                                            id: Name("_"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 66..94,
+                                        node_index: NodeIndex(None),
+                                        args: [
+                                            Attribute(
+                                                ExprAttribute {
+                                                    node_index: NodeIndex(None),
+                                                    range: 67..93,
+                                                    value: Attribute(
+                                                        ExprAttribute {
+                                                            node_index: NodeIndex(None),
+                                                            range: 67..85,
+                                                            value: Subscript(
+                                                                ExprSubscript {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 67..77,
+                                                                    value: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 67..74,
+                                                                            id: Name("buttons"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    slice: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 75..76,
+                                                                            value: Int(
+                                                                                0,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            attr: Identifier {
+                                                                id: Name("clicked"),
+                                                                range: 78..85,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    attr: Identifier {
+                                                        id: Name("connect"),
+                                                        range: 86..93,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("spam"),
+                        range: 99..103,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 103..105,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 107..110,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 107..110,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

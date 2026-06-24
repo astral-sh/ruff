@@ -4,7 +4,7 @@ use ruff_python_ast::ExprDictComp;
 use ruff_text_size::Ranged;
 
 use crate::comments::dangling_comments;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -14,6 +14,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
     fn fmt_fields(&self, item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprDictComp {
             range: _,
+            node_index: _,
             key,
             value,
             generators,
@@ -31,20 +32,32 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
         //     for (x, y) in z
         // }
         // ```
-        let (open_parenthesis_comments, key_value_comments) =
-            dangling.split_at(dangling.partition_point(|comment| comment.end() < key.start()));
+        let first_expression = key.as_deref().unwrap_or(value);
+        let (open_parenthesis_comments, key_value_comments) = dangling
+            .split_at(dangling.partition_point(|comment| comment.end() < first_expression.start()));
 
         write!(
             f,
             [parenthesized(
                 "{",
                 &group(&format_with(|f| {
-                    write!(f, [group(&key.format()), token(":")])?;
+                    if let Some(key) = key {
+                        write!(f, [group(&key.format()), token(":")])?;
 
-                    if key_value_comments.is_empty() {
-                        space().fmt(f)?;
+                        if key_value_comments.is_empty() {
+                            space().fmt(f)?;
+                        } else {
+                            dangling_comments(key_value_comments).fmt(f)?;
+                        }
                     } else {
-                        dangling_comments(key_value_comments).fmt(f)?;
+                        write!(f, [token("**")])?;
+                        if let Some(first) = comments.leading(value.as_ref()).first() {
+                            if first.line_position().is_own_line() {
+                                hard_line_break().fmt(f)?;
+                            } else {
+                                write!(f, [space(), space()])?;
+                            }
+                        }
                     }
 
                     write!(f, [value.format(), soft_line_break_or_space()])?;

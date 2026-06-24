@@ -1,11 +1,11 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -49,6 +49,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.39")]
 pub(crate) struct TypeComparison;
 
 impl Violation for TypeComparison {
@@ -76,7 +77,7 @@ pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
             }
 
             // Disallow the comparison.
-            checker.report_diagnostic(Diagnostic::new(TypeComparison, compare.range()));
+            checker.report_diagnostic(TypeComparison, compare.range());
         }
     }
 }

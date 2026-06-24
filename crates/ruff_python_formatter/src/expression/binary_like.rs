@@ -11,14 +11,14 @@ use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
+use crate::comments::{Comments, SourceComment, leading_comments, trailing_comments};
+use crate::expression::OperatorPrecedence;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_if_group_breaks,
+    Parentheses, in_parentheses_only_group, in_parentheses_only_if_group_breaks,
     in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
     is_expression_parenthesized, write_in_parentheses_only_group_end_tag,
-    write_in_parentheses_only_group_start_tag, Parentheses,
+    write_in_parentheses_only_group_start_tag,
 };
-use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
 use crate::string::implicit::FormatImplicitConcatenatedString;
 
@@ -571,7 +571,7 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
             "Operand slice must contain at least one operand"
         );
 
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         unsafe {
             // SAFETY: `BinaryChainSlice` has the same layout as a slice because it uses `repr(transparent)`
             &*(std::ptr::from_ref::<[OperandOrOperator<'a>]>(slice)
@@ -1095,9 +1095,9 @@ impl OperandIndex {
         }
     }
 
-    /// Returns the index of the operand's right operator. The method always returns an index
-    /// even if the operand has no right operator. Use [`BinaryCallChain::get_operator`] to test if
-    /// the operand has a right operator.
+    /// Returns the index of the operand's right operator. The method always returns an index even
+    /// if the operand has no right operator. Use [`FlatBinaryExpressionSlice::get_operator`] to
+    /// test if the operand has a right operator.
     fn right_operator(self) -> OperatorIndex {
         OperatorIndex::new(self.0 + 1)
     }

@@ -1,15 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
-use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::Scope;
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for static methods that use `self` or `cls` as their first argument.
+/// This rule also applies to `__new__` methods, which are implicitly static.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
@@ -33,8 +35,14 @@ use crate::checkers::ast::Checker;
 ///         pass
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct BadStaticmethodArgument {
     argument_name: String,
 }
@@ -69,11 +77,15 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
-    if !matches!(type_, function_type::FunctionType::StaticMethod) {
-        return;
+
+    match type_ {
+        FunctionType::StaticMethod | FunctionType::NewMethod => {}
+        FunctionType::Function | FunctionType::Method | FunctionType::ClassMethod => {
+            return;
+        }
     }
 
     let Some(ParameterWithDefault {
@@ -95,10 +107,10 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         _ => return,
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),
-    ));
+    );
 }

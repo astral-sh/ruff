@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -15,7 +15,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// It's unnecessary to use a dict/list/set comprehension to build a data structure if the
 /// elements are unchanged. Wrap the iterable with `dict()`, `list()`, or `set()` instead.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: b for a, b in iterable}
 /// [x for x in iterable]
@@ -43,7 +43,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// >>> {x: y for x, y in d1}  # Iterates over the keys of a mapping
 /// {1: 2, 4: 5}
 /// >>> dict(d1)               # Ruff's incorrect suggested fix
-/// (1, 2): 3, (4, 5): 6}
+/// {(1, 2): 3, (4, 5): 6}
 /// >>> dict(d1.keys())        # Correct fix
 /// {1: 2, 4: 5}
 /// ```
@@ -52,11 +52,14 @@ use crate::rules::flake8_comprehensions::fixes;
 /// cannot consistently infer if the iterable type is a sequence or a mapping and cannot suggest
 /// the correct fix for mappings.
 ///
-/// ## Fix safety
-/// Due to the known problem with dictionary comprehensions, this fix is marked as unsafe.
+/// Additionally, rewriting comprehensions inside an object's `__len__` method may cause a
+/// `RecursionError`, as collection constructors can call back into `__len__`.
 ///
-/// Additionally, this fix may drop comments when rewriting the comprehension.
+/// ## Fix safety
+/// This rule's fix is always marked as unsafe because of the known problems described above and
+/// because comments may be dropped when rewriting the comprehension.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UnnecessaryComprehension {
     kind: ComprehensionKind,
 }
@@ -85,7 +88,7 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryComprehension {
             kind: comprehension_kind,
         },
@@ -95,7 +98,6 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
         fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// C416
@@ -115,9 +117,12 @@ pub(crate) fn unnecessary_dict_comprehension(
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-    let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-        id: target_value, ..
-    })] = elts.as_slice()
+    let [
+        Expr::Name(ast::ExprName { id: target_key, .. }),
+        Expr::Name(ast::ExprName {
+            id: target_value, ..
+        }),
+    ] = elts.as_slice()
     else {
         return;
     };
@@ -158,14 +163,19 @@ pub(crate) fn unnecessary_list_set_comprehension(
                 }),
                 Expr::Tuple(ast::ExprTuple { elts, .. }),
             ) => {
-                let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-                    id: target_value, ..
-                })] = target_elts.as_slice()
+                let [
+                    Expr::Name(ast::ExprName { id: target_key, .. }),
+                    Expr::Name(ast::ExprName {
+                        id: target_value, ..
+                    }),
+                ] = target_elts.as_slice()
                 else {
                     return;
                 };
-                let [Expr::Name(ast::ExprName { id: key, .. }), Expr::Name(ast::ExprName { id: value, .. })] =
-                    elts.as_slice()
+                let [
+                    Expr::Name(ast::ExprName { id: key, .. }),
+                    Expr::Name(ast::ExprName { id: value, .. }),
+                ] = elts.as_slice()
                 else {
                     return;
                 };

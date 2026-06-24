@@ -156,3 +156,8 @@ def f():
 def f():
     global x
     print(f"{x=}")
+
+
+# surprisingly still an error, global in module scope
+x = None
+global x

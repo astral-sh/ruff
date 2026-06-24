@@ -1,1 +1,2 @@
-nonlocal x + 1
+def _():
+    nonlocal x + 1

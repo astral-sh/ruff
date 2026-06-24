@@ -10,12 +10,12 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::flake8_builtins;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
     #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
@@ -53,13 +53,35 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: true,
+                    strict_checking: true,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
+    fn deferred_annotations_diff(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "deferred_annotations_diff_{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..LinterSettings::for_rule(rule_code)
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                ..LinterSettings::for_rule(rule_code)
+            },
+        );
         Ok(())
     }
 
@@ -83,13 +105,13 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: strict,
+                    strict_checking: strict,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -106,13 +128,13 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path(src.join(path.parent().unwrap()))],
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: false,
+                    strict_checking: false,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -130,13 +152,13 @@ mod tests {
             &LinterSettings {
                 project_root: test_resource_path(src.join(path.parent().unwrap())),
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: false,
+                    strict_checking: false,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -156,14 +178,14 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: super::settings::Settings {
-                    builtins_ignorelist: vec!["id".to_string(), "dir".to_string()],
+                    ignorelist: vec!["id".to_string(), "dir".to_string()],
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![rule_code])
             },
         )?;
 
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -199,15 +221,15 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: super::settings::Settings {
-                    builtins_allowed_modules: vec!["xml".to_string(), "logging".to_string()],
-                    builtins_strict_checking: true,
+                    allowed_modules: vec!["xml".to_string(), "logging".to_string()],
+                    strict_checking: true,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![rule_code])
             },
         )?;
 
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -217,11 +239,11 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                target_version: PythonVersion::Py38,
+                unresolved_target_version: PythonVersion::PY38.into(),
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

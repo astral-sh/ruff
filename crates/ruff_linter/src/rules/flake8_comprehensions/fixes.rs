@@ -1,6 +1,6 @@
 use std::iter;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use itertools::Itertools;
 use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Comma, Comment, CompFor, Dict, DictComp,
@@ -10,17 +10,17 @@ use libcst_native::{
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
-use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::cst::helpers::{negate, space};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::pad;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
-use crate::Locator;
+use crate::{Edit, Fix};
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -43,7 +43,10 @@ pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> 
     // Extract the (k, v) from `(k, v) for ...`.
     let generator_exp = match_generator_exp(&arg.value)?;
     let tuple = match_tuple(&generator_exp.elt)?;
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    let [
+        Element::Simple { value: key, .. },
+        Element::Simple { value, .. },
+    ] = &tuple.elements[..]
     else {
         bail!("Expected tuple to contain two elements");
     };
@@ -103,7 +106,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
 
     let tuple = match_tuple(&list_comp.elt)?;
 
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    let [
+        Element::Simple { value: key, .. },
+        Element::Simple { value, .. },
+    ] = &tuple.elements[..]
     else {
         bail!("Expected tuple with two elements");
     };
@@ -230,7 +236,9 @@ pub(crate) fn fix_unnecessary_collection_call(
     // below.
     let mut arena: Vec<String> = vec![];
 
-    let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+    let quote = checker
+        .interpolated_string_quote_style()
+        .unwrap_or(stylist.quote());
 
     // Quote each argument.
     for arg in &call.args {
@@ -311,7 +319,7 @@ pub(crate) fn pad_expression(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content;
     }
 
@@ -343,7 +351,7 @@ pub(crate) fn pad_start(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content.into();
     }
 
@@ -364,7 +372,7 @@ pub(crate) fn pad_end(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content.into();
     }
 
@@ -426,7 +434,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
             tree = Expression::Call(Box::new((*inner_call).clone()));
             if inner_needs_parens {
                 tree = tree.with_parens(LeftParen::default(), RightParen::default());
-            };
+            }
         } else {
             // If the `reverse` argument is used...
             let args = if inner_call.args.iter().any(|arg| {
@@ -792,10 +800,10 @@ pub(crate) fn fix_unnecessary_map(
 
     let mut content = tree.codegen_stylist(stylist);
 
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // If the expression is embedded in an interpolated string, surround it with spaces to avoid
     // syntax errors.
     if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-        if parent.is_some_and(Expr::is_f_string_expr) {
+        if parent.is_some_and(|expr| expr.is_f_string_expr() || expr.is_t_string_expr()) {
             content = format!(" {content} ");
         }
     }

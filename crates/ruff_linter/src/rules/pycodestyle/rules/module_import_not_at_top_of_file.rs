@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,
 }
@@ -58,11 +59,11 @@ impl Violation for ModuleImportNotAtTopOfFile {
 /// E402
 pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             ModuleImportNotAtTopOfFile {
                 source_type: checker.source_type,
             },
             stmt.range(),
-        ));
+        );
     }
 }
