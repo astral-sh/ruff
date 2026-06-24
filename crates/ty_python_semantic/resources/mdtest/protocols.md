@@ -2966,6 +2966,22 @@ class ContextManagerImplementation:
     def open(cls) -> Iterator[Self]:
         yield cls()
 
+class PRegularContextManager(Protocol):
+    @contextmanager
+    def open(self) -> Iterator[int]: ...
+
+class ClassContextManagerImplementation:
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[int]:
+        yield 1
+
+class StaticContextManagerImplementation:
+    @staticmethod
+    @contextmanager
+    def open() -> Iterator[int]:
+        yield 1
+
 def use_decorated_protocol_methods(class_method: PClassMethod, static_method: PStaticMethod) -> None:
     reveal_type(class_method.x(1))  # revealed: str
     reveal_type(static_method.x(1))  # revealed: str
@@ -3015,6 +3031,12 @@ static_assert(not is_subtype_of(BadFactory, PFactory))
 static_assert(not is_assignable_to(BadFactory, PFactory))
 static_assert(is_subtype_of(ContextManagerImplementation, PContextManager1))
 static_assert(is_assignable_to(ContextManagerImplementation, PContextManager1))
+
+# Wrapped classmethods and staticmethods can also satisfy regular method members.
+static_assert(is_subtype_of(ClassContextManagerImplementation, PRegularContextManager))
+static_assert(is_assignable_to(ClassContextManagerImplementation, PRegularContextManager))
+static_assert(is_subtype_of(StaticContextManagerImplementation, PRegularContextManager))
+static_assert(is_assignable_to(StaticContextManagerImplementation, PRegularContextManager))
 
 static_assert(is_subtype_of(OverloadedClassMethod, POverloadedClassMethod))
 static_assert(is_subtype_of(OverloadedClassMethod, POverloadedStaticMethod))
