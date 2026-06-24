@@ -826,7 +826,23 @@ impl<'db> ProtocolMemberKind<'db> {
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
         match (self, previous) {
             (Self::Method(current), Self::Method(previous)) => {
-                Self::Method(current.cycle_normalized(db, previous, cycle))
+                let (Type::Callable(current_callable), Type::Callable(previous_callable)) =
+                    (current.ty(), previous.ty())
+                else {
+                    return Self::Method(current.cycle_normalized(db, previous, cycle));
+                };
+                debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
+                let signatures = current_callable.signatures(db).cycle_normalized(
+                    db,
+                    previous_callable.signatures(db),
+                    cycle,
+                );
+                Self::Method(current.with_ty(Type::Callable(CallableType::new(
+                    db,
+                    signatures,
+                    current_callable.kind(db),
+                    current_callable.provenance(db),
+                ))))
             }
             (
                 Self::Property {

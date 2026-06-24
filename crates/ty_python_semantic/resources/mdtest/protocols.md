@@ -1058,15 +1058,15 @@ class AssignmentForms(Protocol):
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:321:9
+   --> src/mdtest_snippet.py:324:9
     |
-321 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+324 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
     |
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
-   --> src/mdtest_snippet.py:313:7
+   --> src/mdtest_snippet.py:316:7
     |
-313 | class AssignmentForms(Protocol):
+316 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
     |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
@@ -2618,6 +2618,28 @@ class CovariantList(Protocol[T_co]):
     def __iter__(self) -> Iterator[T_co]: ...
 
 static_assert(is_assignable_to(list[int], CovariantList[float]))
+```
+
+Protocol method return types can contain mutually recursive protocols. Reducing methods to their
+instance and class access capabilities must preserve callable-specific cycle normalization:
+
+```py
+from collections.abc import Iterable
+from typing import Protocol
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class RichCast(Protocol):
+    def __rich__(self) -> "ConsoleRenderable | RichCast": ...
+
+class ConsoleRenderable(Protocol):
+    def __rich_console__(self) -> "Iterable[ConsoleRenderable | RichCast | int]": ...
+
+class Text:
+    def __rich_console__(self) -> Iterable[int]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Text, ConsoleRenderable))
+static_assert(is_assignable_to(Text, ConsoleRenderable))
 ```
 
 ## Subtyping of protocols with generic method members
