@@ -1103,9 +1103,17 @@ impl Session {
                 .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
                 .map(|(_, path)| path)
                 .chain(roots);
-            ruff_db::system::deduplicate_nested_paths(paths)
+            let mut watchers: Vec<_> = ruff_db::system::deduplicate_nested_paths(paths)
                 .map(|path| make_relative_watcher(path, "**"))
-                .collect()
+                .collect();
+            watchers.extend(
+                self.project_dbs()
+                    .flat_map(|db| db.project().metadata(db).extra_configuration_paths().iter())
+                    .filter_map(|path| {
+                        Some(make_relative_watcher(path.parent()?, path.file_name()?))
+                    }),
+            );
+            watchers
         };
         Some(DidChangeWatchedFilesRegistrationOptions { watchers })
     }

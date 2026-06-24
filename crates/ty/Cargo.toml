@@ -65,6 +65,7 @@ toml = { workspace = true }
 
 [features]
 default = []
+test-uv = []
 
 [lints]
 workspace = true
