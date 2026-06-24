@@ -2131,28 +2131,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let target_typevartuple = if self.typevar_evaluation == TypeVarEvaluation::Lazy {
-            target.parameters.variadic().and_then(|(_, parameter)| {
+            target.parameters.variadic().and_then(|(index, parameter)| {
                 if parameter.has_starred_annotation()
                     && let Type::TypeVar(typevartuple) = parameter.annotated_type()
                     && typevartuple.is_typevartuple(db)
                 {
-                    Some(typevartuple)
+                    Some((index, typevartuple))
                 } else {
                     None
                 }
             })
         } else {
             None
-        };
-        let as_target_typevartuple = |parameter: &Parameter<'db>| match target_typevartuple {
-            Some(typevartuple)
-                if parameter.is_variadic()
-                    && parameter.has_starred_annotation()
-                    && parameter.annotated_type() == Type::TypeVar(typevartuple) =>
-            {
-                Some(typevartuple)
-            }
-            _ => None,
         };
 
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
@@ -3046,6 +3036,60 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             source.parameters.clone()
         };
+        // Align the fixed target prefix and suffix before entering the parameter loop so that the
+        // target TypeVarTuple captures only the source parameter entries between them.
+        let typevartuple_source_parameter_count = if let Some((typevartuple_index, _)) =
+            target_typevartuple
+        {
+            let source_positional_len = source_parameters
+                .iter()
+                .take_while(|parameter| parameter.is_positional() || parameter.is_variadic())
+                .count();
+            let target_suffix_len = target.parameters.as_slice()[typevartuple_index + 1..]
+                .iter()
+                .take_while(|parameter| parameter.is_positional())
+                .count();
+
+            let source_capture_start = if let Some((source_variadic_index, _)) = source_parameters
+                .variadic()
+                .filter(|(index, _)| *index < source_positional_len)
+            {
+                let source_suffix_len = source_positional_len - source_variadic_index - 1;
+                if source_suffix_len < target_suffix_len {
+                    return self.never();
+                }
+
+                if source_variadic_index < typevartuple_index {
+                    source_variadic_index + 1
+                } else {
+                    typevartuple_index
+                }
+            } else {
+                typevartuple_index
+            };
+            let Some(source_parameter_count) = source_positional_len
+                .checked_sub(source_capture_start)
+                .and_then(|len| len.checked_sub(target_suffix_len))
+            else {
+                return self.never();
+            };
+            Some(source_parameter_count)
+        } else {
+            None
+        };
+        let as_target_typevartuple = |parameter: &Parameter<'db>| match (
+            target_typevartuple,
+            typevartuple_source_parameter_count,
+        ) {
+            (Some((_, typevartuple)), Some(source_parameter_count))
+                if parameter.is_variadic()
+                    && parameter.has_starred_annotation()
+                    && parameter.annotated_type() == Type::TypeVar(typevartuple) =>
+            {
+                Some(source_parameter_count)
+            }
+            _ => None,
+        };
         let mut parameters = ParametersZip {
             current_source: None,
             current_target: None,
@@ -3123,16 +3167,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 EitherOrBoth::Right(target_parameter) => {
-                    if let Some(typevartuple) = as_target_typevartuple(target_parameter) {
-                        let typevartuple_matches = self.check_type_pair(
-                            db,
-                            Type::TypeVar(typevartuple),
+                    if let Some(source_parameter_count) = as_target_typevartuple(target_parameter) {
+                        if source_parameter_count > 0 {
+                            return self.never();
+                        }
+                        if !check_types(
+                            &mut result,
+                            target_parameter.annotated_type(),
                             Type::empty_tuple(db),
-                        );
-                        if result
-                            .intersect(db, self.constraints, typevartuple_matches)
-                            .is_never_satisfied(db)
-                        {
+                            target_parameter.name(),
+                            target_index,
+                        ) {
                             return result;
                         }
                         target_index += 1;
@@ -3145,89 +3190,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 EitherOrBoth::Both(source_param, target_param) => {
-                    if let Some(typevartuple) = as_target_typevartuple(target_param) {
-                        let source_tail = parameters.source_iter.as_slice();
-                        let source_positional = || {
-                            std::iter::once(source_param).chain(source_tail).take_while(
-                                |parameter| parameter.is_positional() || parameter.is_variadic(),
-                            )
-                        };
-                        let source_positional_len = source_positional().count();
-                        let target_suffix_len = parameters
-                            .target_iter
-                            .clone()
-                            .take_while(|parameter| parameter.is_positional())
-                            .count();
-
-                        let (inferred_tuple, consumed_source_len) =
-                            if let Some((source_variadic_index, source_variadic)) =
-                                source_positional()
-                                    .find_position(|parameter| parameter.is_variadic())
-                            {
-                                let source_suffix_len =
-                                    source_positional_len - source_variadic_index - 1;
-                                if source_suffix_len < target_suffix_len {
-                                    return self.never();
-                                }
-
-                                let inferred_suffix_len = source_suffix_len - target_suffix_len;
-                                (
-                                    Type::tuple(TupleType::mixed(
-                                        db,
-                                        source_positional()
-                                            .take(source_variadic_index)
-                                            .map(Parameter::annotated_type),
-                                        source_variadic.annotated_type(),
-                                        source_positional()
-                                            .skip(source_variadic_index + 1)
-                                            .take(inferred_suffix_len)
-                                            .map(Parameter::annotated_type),
-                                    )),
-                                    source_variadic_index + 1 + inferred_suffix_len,
-                                )
-                            } else {
-                                let Some(middle_end) =
-                                    source_positional_len.checked_sub(target_suffix_len)
-                                else {
-                                    return self.never();
-                                };
-                                (
-                                    Type::heterogeneous_tuple(
-                                        db,
-                                        source_positional()
-                                            .take(middle_end)
-                                            .map(Parameter::annotated_type),
-                                    ),
-                                    middle_end,
-                                )
-                            };
-
-                        reuse_current_source = consumed_source_len == 0;
-                        for _ in 1..consumed_source_len {
-                            parameters.next_source();
-                        }
-                        target_index += 1;
-
-                        let typevartuple_matches =
-                            self.check_type_pair(db, Type::TypeVar(typevartuple), inferred_tuple);
-                        if result
-                            .intersect(db, self.constraints, typevartuple_matches)
-                            .is_never_satisfied(db)
-                        {
-                            return result;
-                        }
-
-                        if source.parameters.is_gradual() {
-                            return match self.relation {
-                                TypeRelation::Assignability => result,
-                                TypeRelation::Subtyping
-                                | TypeRelation::SubtypingAssuming
-                                | TypeRelation::Redundancy { .. } => self.never(),
-                            };
-                        }
-                        continue;
-                    }
-
                     match (source_param.kind(), target_param.kind()) {
                         (
                             ParameterKind::PositionalOnly {
@@ -3353,7 +3315,69 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             }
                         }
 
-                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                        (_, ParameterKind::Variadic { .. }) => {
+                            if let Some(source_parameter_count) =
+                                as_target_typevartuple(target_param)
+                            {
+                                let source_tail = parameters.source_iter.as_slice();
+                                let captured_source_parameters = || {
+                                    std::iter::once(source_param)
+                                        .chain(source_tail)
+                                        .take(source_parameter_count)
+                                };
+                                let inferred_tuple =
+                                    if let Some((source_variadic_index, source_variadic)) =
+                                        captured_source_parameters()
+                                            .find_position(|parameter| parameter.is_variadic())
+                                    {
+                                        Type::tuple(TupleType::mixed(
+                                            db,
+                                            captured_source_parameters()
+                                                .take(source_variadic_index)
+                                                .map(Parameter::annotated_type),
+                                            source_variadic.annotated_type(),
+                                            captured_source_parameters()
+                                                .skip(source_variadic_index + 1)
+                                                .map(Parameter::annotated_type),
+                                        ))
+                                    } else {
+                                        Type::heterogeneous_tuple(
+                                            db,
+                                            captured_source_parameters()
+                                                .map(Parameter::annotated_type),
+                                        )
+                                    };
+
+                                reuse_current_source = source_parameter_count == 0;
+                                for _ in 1..source_parameter_count {
+                                    parameters.next_source();
+                                }
+
+                                if !check_types(
+                                    &mut result,
+                                    target_param.annotated_type(),
+                                    inferred_tuple,
+                                    target_param.name(),
+                                    target_index,
+                                ) {
+                                    return result;
+                                }
+                                target_index += 1;
+
+                                if source.parameters.is_gradual() {
+                                    return match self.relation {
+                                        TypeRelation::Assignability => result,
+                                        TypeRelation::Subtyping
+                                        | TypeRelation::SubtypingAssuming
+                                        | TypeRelation::Redundancy { .. } => self.never(),
+                                    };
+                                }
+                                continue;
+                            }
+
+                            if !source_param.is_variadic() {
+                                return self.never();
+                            }
                             if !check_types(
                                 &mut result,
                                 target_param.annotated_type(),
