@@ -30,7 +30,7 @@ ty.
 
 Like `Any` and `Unknown`, `@Todo` is a dynamic type, so ty allows any operation on it. Unlike `Any`,
 it is not explicitly provided in an annotation; unlike `Unknown`, it specifically indicates a
-limitation in ty. Any message shown in parentheses identifies the missing feature.
+limitation in ty.
 
 It is an internal type used by ty and cannot be used in annotations. These types should disappear
 as ty implements the missing functionality.
