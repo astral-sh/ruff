@@ -768,19 +768,25 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
-    /// Create a precise intersection from a list of elements, returning `None` if distributing
-    /// unions would exceed the intermediate DNF term budget.
+    /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements, while
+    /// ensuring that we only expand an intersection of unions within a limited budget.
     ///
-    /// Like [`IntersectionType::from_elements`], a successful result is exact. Unlike that method,
-    /// this returns `None` instead of materializing an intersection that exceeds the budget; it
-    /// never returns an arbitrary strict subtype. Bottom and redundant terms do not count toward
-    /// the budget.
+    /// Our `Type` representation is in DNF, which means that the size of an intersection of
+    /// unions is quadratic in the total number of union elements.
+    /// [`from_elements`][Self::from_elements] will blindly calculate that full expansion. This
+    /// method detects when we exceed a fixed budget of work, and if so, returns `None`. (Redundant
+    /// terms do not count toward the budget.)
+    ///
+    /// Like [`from_elements`][Self::from_elements], a successful result is exact.
     pub(crate) fn bounded_from_elements<I, T>(db: &'db dyn Db, elements: I) -> Option<Type<'db>>
     where
         I: IntoIterator<Item = T>,
         I::IntoIter: Clone,
         Type<'db>: From<T>,
     {
+        // TODO: Consider folding this logic into IntersectionBuilder itself, and having it check
+        // an optional budget as part of its existing `add_positive` methods.
+
         let elements = elements.into_iter().map(Type::from);
         if !elements.clone().any(Type::is_union) {
             return Some(Self::from_elements(db, elements));
