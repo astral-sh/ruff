@@ -46,6 +46,52 @@ while 1:
     y = (y, *y)
 ```
 
+## Literal reduction during cycle recovery
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3851>. Constructing a union
+during cycle recovery must not run redundancy checks between a literal and a protocol instance.
+Resolving the protocol interface can depend on the expression inference query that is already being
+recovered, which would introduce a new Salsa cycle.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, runtime_checkable
+
+_: Any
+
+@property
+def prop(self) -> A:
+    raise NotImplementedError
+
+@runtime_checkable
+class B(Protocol):
+    _: A
+
+x = 5
+
+while isinstance(x, B):
+    x = B()  # error: [call-non-callable]
+
+type(x)
+x = 2
+
+from typing import Any, assert_type
+
+assert_type(prop, property)
+
+if bool:
+    x = 5
+
+while isinstance(x, B):
+    x = B()  # error: [call-non-callable]
+
+class A: ...
+```
+
 ## Self-referential bare type alias
 
 ```toml

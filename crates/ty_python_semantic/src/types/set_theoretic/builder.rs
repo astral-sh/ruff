@@ -374,7 +374,33 @@ impl<'db> UnionElement<'db> {
     }
 
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
-    fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
+    fn try_reduce(
+        &mut self,
+        db: &'db dyn Db,
+        other_type: Type<'db>,
+        cycle_recovery: bool,
+    ) -> ReduceResult<'db> {
+        if cycle_recovery {
+            // Preserve literal widening using exact class identity without running relation queries.
+            return match self {
+                UnionElement::Type(existing) => ReduceResult::Type(*existing),
+                UnionElement::IntLiterals(_) => {
+                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Int))
+                }
+                UnionElement::StringLiterals(_) => {
+                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Str))
+                }
+                UnionElement::BytesLiterals(_) => {
+                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Bytes))
+                }
+                UnionElement::EnumLiterals { enum_class, .. } => ReduceResult::KeepIf(
+                    other_type
+                        .as_nominal_instance()
+                        .is_none_or(|instance| instance.class_literal(db) != *enum_class),
+                ),
+            };
+        }
+
         let mut other_type_negated_cache = None;
 
         let mut collapse = false;
@@ -506,9 +532,8 @@ pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
-    /// This is enabled when joining types in a `cycle_recovery` function.
-    /// Since a cycle cannot be created within a `cycle_recovery` function,
-    /// execution of `is_redundant_with` is skipped.
+    /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
+    /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
 }
@@ -713,7 +738,7 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing) => {
+                                UnionElement::Type(existing) if !cycle_recovery => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -760,7 +785,7 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing) => {
+                                UnionElement::Type(existing) if !cycle_recovery => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -809,7 +834,7 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing) => {
+                                UnionElement::Type(existing) if !cycle_recovery => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -879,7 +904,7 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing) => {
+                                UnionElement::Type(existing) if !cycle_recovery => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -957,7 +982,7 @@ impl<'db> UnionBuilder<'db> {
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty) {
+            let element_type = match element.try_reduce(self.db, ty, self.cycle_recovery) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -983,12 +1008,14 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if should_preserve_hashable_union(self.db, ty, element_type) {
+            if !self.cycle_recovery && should_preserve_hashable_union(self.db, ty, element_type) {
                 continue;
             }
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
-            if let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type) {
+            if !self.cycle_recovery
+                && let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type)
+            {
                 to_remove.push(i);
                 ty = merged_type;
                 continue;
@@ -1868,7 +1895,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, Type, UnionBuilder, UnionType,
+        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MAX_RECURSIVE_UNION_LITERALS,
+        RecursivelyDefined, Type, UnionBuilder, UnionType,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -1906,6 +1934,53 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+    }
+
+    #[test]
+    fn cycle_recovery_widens_recursive_literal_union() {
+        let db = setup_db();
+        let literal_limit =
+            i64::try_from(MAX_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
+
+        let union = (0..=literal_limit).map(Type::int_literal).fold(
+            UnionBuilder::new(&db)
+                .cycle_recovery(true)
+                .recursively_defined(RecursivelyDefined::Yes),
+            UnionBuilder::add,
+        );
+
+        assert_eq!(union.build(), KnownClass::Int.to_instance(&db));
+
+        let assert_widens = |literal, instance| {
+            let union = UnionBuilder::new(&db)
+                .cycle_recovery(true)
+                .add(literal)
+                .add(instance)
+                .build();
+            assert_eq!(union, instance);
+        };
+
+        assert_widens(
+            Type::string_literal(&db, "literal"),
+            KnownClass::Str.to_instance(&db),
+        );
+        assert_widens(
+            Type::bytes_literal(&db, b"literal"),
+            KnownClass::Bytes.to_instance(&db),
+        );
+
+        let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
+            .place
+            .expect_type()
+            .expect_class_literal();
+        let enum_literal = enum_member_literals(&db, safe_uuid_class, None)
+            .expect("SafeUUID is an enum")
+            .next()
+            .expect("SafeUUID has members");
+        assert_widens(
+            enum_literal,
+            enum_literal.expect_enum_literal().enum_class_instance(&db),
+        );
     }
 
     #[test]
