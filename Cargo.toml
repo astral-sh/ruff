@@ -40,6 +40,7 @@ ruff_python_trivia = { version = "0.0.2", path = "crates/ruff_python_trivia" }
 ruff_server = { version = "0.0.2", path = "crates/ruff_server" }
 ruff_source_file = { version = "0.0.2", path = "crates/ruff_source_file" }
 ruff_mdtest = { path = "crates/ruff_mdtest" }
+ruff_ranged_value = { version = "0.0.1", path = "crates/ruff_ranged_value" }
 ruff_text_size = { version = "0.0.2", path = "crates/ruff_text_size" }
 ruff_workspace = { version = "0.0.2", path = "crates/ruff_workspace" }
 

@@ -16,6 +16,7 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
+ruff_ranged_value = { workspace = true }
 
 ordermap = { workspace = true }
 

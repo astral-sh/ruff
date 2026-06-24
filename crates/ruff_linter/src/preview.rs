@@ -372,3 +372,8 @@ pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSe
 pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/26113
+pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
