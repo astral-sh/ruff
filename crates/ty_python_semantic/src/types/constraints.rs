@@ -1387,73 +1387,7 @@ impl<'db> UpperBound<'db> {
             builder.load(db, &when_clause)
         })
     }
-
-    /// Returns the precise ordinary [`Type`] intersection of this upper bound and, if present, an
-    /// additional declared upper bound.
-    ///
-    /// This explores a bounded portion of the full factored upper bound. It returns a result only
-    /// when every non-bottom, non-redundant intermediate DNF term fits within
-    /// [`MAX_INTERSECTION_DNF_TERMS`], rather than returning an arbitrary strict subtype when the
-    /// search exceeds that budget. `None` means that the search budget prevented us from producing
-    /// the precise result.
-    pub(crate) fn bounded_intersection(
-        &self,
-        db: &'db dyn Db,
-        declared_upper: Option<Type<'db>>,
-    ) -> Option<Type<'db>> {
-        let clauses = self.clauses.iter().copied().chain(declared_upper);
-        if !clauses.clone().any(Type::is_union) {
-            return Some(IntersectionType::from_elements(db, clauses));
-        }
-
-        let non_union_clauses = clauses.clone().filter(|clause| !clause.is_union());
-        let initial = IntersectionType::from_elements(db, non_union_clauses);
-
-        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
-            if new_ty.is_never()
-                || candidates
-                    .iter()
-                    .any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
-            {
-                return Some(());
-            }
-
-            candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
-            if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
-                return None;
-            }
-            candidates.push(new_ty);
-            Some(())
-        };
-
-        let mut frontier = Vec::new();
-        let mut next = Vec::new();
-        insert_candidate(&mut frontier, initial)?;
-
-        let union_clauses = clauses.filter_map(Type::as_union);
-        for union_clause in union_clauses {
-            next.clear();
-            let alternatives = union_clause.elements(db);
-
-            for candidate in &frontier {
-                for alternative in alternatives {
-                    let refined = IntersectionType::from_two_elements(db, *candidate, *alternative);
-                    insert_candidate(&mut next, refined)?;
-                }
-            }
-
-            if next.is_empty() {
-                return Some(Type::Never);
-            }
-
-            std::mem::swap(&mut frontier, &mut next);
-        }
-
-        Some(UnionType::from_elements(db, frontier))
-    }
 }
-
-const MAX_INTERSECTION_DNF_TERMS: usize = 4;
 
 impl ConstraintId {
     fn new<'db>(
@@ -3698,9 +3632,15 @@ impl<'db> PathBounds<'db> {
                 }
 
                 if path_bound.has_upper() {
-                    return Ok(path_bound
-                        .upper
-                        .bounded_intersection(db, Some(declared_upper)));
+                    return Ok(IntersectionType::bounded_from_elements(
+                        db,
+                        path_bound
+                            .upper
+                            .clauses
+                            .iter()
+                            .copied()
+                            .chain([declared_upper]),
+                    ));
                 }
 
                 Ok(None)
@@ -6938,33 +6878,6 @@ mod tests {
             union_upper.materialize_exact_if_no_visible_unions(&db),
             None
         );
-    }
-
-    #[test]
-    fn upper_bound_bounded_intersection_respects_budget() {
-        let db = setup_db();
-        let bool_ty = known_instance(&db, KnownClass::Bool);
-        let int = known_instance(&db, KnownClass::Int);
-        let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
-        let bytearray = known_instance(&db, KnownClass::Bytearray);
-        let float = known_instance(&db, KnownClass::Float);
-        let left = UnionType::from_elements(&db, [int, str, bytes, float]);
-        let right = UnionType::from_elements(&db, [bool_ty, str, bytes, bytearray]);
-        let upper = UpperBound::from_clauses(&db, [left, right]);
-
-        let intersection = upper
-            .bounded_intersection(&db, None)
-            .expect("expected the precise intersection to fit within the budget");
-
-        let intersection_union_size = match intersection {
-            Type::Union(union) => union.elements(&db).len(),
-            Type::Never => 0,
-            _ => 1,
-        };
-        assert!(intersection_union_size <= MAX_INTERSECTION_DNF_TERMS);
-        assert!(intersection.is_constraint_set_assignable_to(&db, left));
-        assert!(intersection.is_constraint_set_assignable_to(&db, right));
     }
 
     #[test]

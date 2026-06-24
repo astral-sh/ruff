@@ -697,6 +697,8 @@ impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
 
+const MAX_INTERSECTION_DNF_TERMS: usize = 4;
+
 pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     intersection: IntersectionType<'db>,
@@ -764,6 +766,66 @@ impl<'db> IntersectionType<'db> {
         } else {
             Type::object()
         }
+    }
+
+    /// Create a precise intersection from a list of elements, returning `None` if distributing
+    /// unions would exceed the intermediate DNF term budget.
+    ///
+    /// Like [`IntersectionType::from_elements`], a successful result is exact. Unlike that method,
+    /// this returns `None` instead of materializing an intersection that exceeds the budget; it
+    /// never returns an arbitrary strict subtype. Bottom and redundant terms do not count toward
+    /// the budget.
+    pub(crate) fn bounded_from_elements<I, T>(db: &'db dyn Db, elements: I) -> Option<Type<'db>>
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: Clone,
+        Type<'db>: From<T>,
+    {
+        let elements = elements.into_iter().map(Type::from);
+        if !elements.clone().any(Type::is_union) {
+            return Some(Self::from_elements(db, elements));
+        }
+
+        let non_union_elements = elements.clone().filter(|element| !element.is_union());
+        let initial = Self::from_elements(db, non_union_elements);
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
+            if new_ty.is_never()
+                || candidates
+                    .iter()
+                    .any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
+            {
+                return Some(());
+            }
+
+            candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
+            if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
+                return None;
+            }
+            candidates.push(new_ty);
+            Some(())
+        };
+
+        let mut frontier = Vec::new();
+        let mut next = Vec::new();
+        insert_candidate(&mut frontier, initial)?;
+
+        for union in elements.filter_map(Type::as_union) {
+            next.clear();
+            for candidate in &frontier {
+                for alternative in union.elements(db) {
+                    let refined = Self::from_two_elements(db, *candidate, *alternative);
+                    insert_candidate(&mut next, refined)?;
+                }
+            }
+
+            if next.is_empty() {
+                return Some(Type::Never);
+            }
+
+            std::mem::swap(&mut frontier, &mut next);
+        }
+
+        Some(UnionType::from_elements(db, frontier))
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
