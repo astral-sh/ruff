@@ -765,30 +765,33 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     }
 }
 
-/// If `value_ty` is a hashable literal and already exists in `enum_values`,
-/// record it as an alias and return `true`. Otherwise track it as canonical.
+/// If `value_ty` has the same supported literal kind and payload as a value in `enum_values`, record
+/// it as an alias and return `true`. Otherwise track it as canonical. Literal metadata does not
+/// affect enum aliasing at runtime, so the map is keyed by [`LiteralValueTypeKind`] rather than
+/// [`Type`].
 fn try_register_alias<'db>(
     value_ty: Type<'db>,
     name: &Name,
-    enum_values: &mut FxHashMap<Type<'db>, Name>,
+    enum_values: &mut FxHashMap<LiteralValueTypeKind<'db>, Name>,
     aliases: &mut FxHashMap<Name, Name>,
 ) -> bool {
+    let Some(value) = value_ty.as_literal_value_kind() else {
+        return false;
+    };
     if !matches!(
-        value_ty.as_literal_value_kind(),
-        Some(
-            LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
+        value,
+        LiteralValueTypeKind::Bool(_)
+            | LiteralValueTypeKind::Int(_)
+            | LiteralValueTypeKind::String(_)
+            | LiteralValueTypeKind::Bytes(_)
     ) {
         return false;
     }
-    if let Some(canonical) = enum_values.get(&value_ty) {
+    if let Some(canonical) = enum_values.get(&value) {
         aliases.insert(name.clone(), canonical.clone());
         return true;
     }
-    enum_values.insert(value_ty, name.clone());
+    enum_values.insert(value, name.clone());
     false
 }
 
@@ -820,7 +823,7 @@ pub(crate) fn enum_metadata<'db>(
             }
             let mut members = FxIndexMap::default();
             let mut aliases = FxHashMap::default();
-            let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+            let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
             for (name, ty) in spec.members(db) {
                 if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
                     continue;
@@ -855,7 +858,7 @@ pub(crate) fn enum_metadata<'db>(
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
-    let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+    let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
     let mut prev_value_was_non_literal_int = false;

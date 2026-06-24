@@ -637,6 +637,22 @@ fn benchmark_large_enum_membership(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_enum_comparison(criterion: &mut Criterion, name: &str, code: &str) {
+    setup_rayon();
+
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3830>.
 fn benchmark_str_enum_comparison_after_truthiness_narrowing(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
@@ -677,22 +693,6 @@ fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
     code.push_str("]\n\n\ndef compare(left: Left, right: Right):\n    return left == right\n");
 
     benchmark_enum_comparison(criterion, "ty_micro[enum_literal_union_comparison]", &code);
-}
-
-fn benchmark_enum_comparison(criterion: &mut Criterion, name: &str, code: &str) {
-    setup_rayon();
-
-    criterion.bench_function(name, |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
 }
 
 /// Ensure the comparison profile is reused instead of scanning every member per expression.

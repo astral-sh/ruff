@@ -507,7 +507,13 @@ def after_excluding_red_mixed(x: Color | int):
         reveal_type(x)  # revealed: Literal[Color.GREEN] | int
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
+```
 
+When the container's element type is a union of enum literals, membership narrows to that union.
+Without the annotation, the tuple's elements are widened to `Color`, so the comprehension remains
+`list[Color]`:
+
+```py
 SelectedColor = Literal[Color.RED, Color.GREEN]
 SELECTED_COLORS: tuple[SelectedColor, ...] = (Color.RED, Color.GREEN)
 
@@ -517,9 +523,6 @@ def selected_colors(colors: list[Color]) -> list[SelectedColor]:
     return result
 
 def _(colors: list[Color]):
-    annotated = [color for color in colors if color in SELECTED_COLORS]
-    reveal_type(annotated)  # revealed: list[Literal[Color.RED, Color.GREEN]]
-
     inline = [color for color in colors if color in (Color.RED, Color.GREEN)]
     reveal_type(inline)  # revealed: list[Color]
 ```
@@ -536,14 +539,14 @@ class InjectingEnumMeta(EnumMeta):
         namespace["INJECTED"] = 2
         return super().__new__(metacls, name, bases, namespace, **kwargs)
 
-class OpenEnum(Enum, metaclass=InjectingEnumMeta):
+class InjectedEnum(Enum, metaclass=InjectingEnumMeta):
     ONLY = 1
 
-def _(value: OpenEnum):
-    if value in (OpenEnum.ONLY,):
-        reveal_type(value)  # revealed: Literal[OpenEnum.ONLY]
+def _(value: InjectedEnum):
+    if value in (InjectedEnum.ONLY,):
+        reveal_type(value)  # revealed: Literal[InjectedEnum.ONLY]
     else:
-        reveal_type(value)  # revealed: OpenEnum & ~Literal[OpenEnum.ONLY]
+        reveal_type(value)  # revealed: InjectedEnum & ~Literal[InjectedEnum.ONLY]
 ```
 
 ## Union with enum and `int`
