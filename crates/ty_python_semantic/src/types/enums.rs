@@ -636,7 +636,7 @@ impl<'db> EnumComplementType<'db> {
     /// Expand this complement to the enum literals that remain possible.
     pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
-            .map(|name| self.remaining_literal_type(db, name.clone()))
+            .map(|name| self.remaining_literal_type(db, name))
             .collect()
     }
 
@@ -658,7 +658,7 @@ impl<'db> EnumComplementType<'db> {
     }
 
     /// Build the type for one remaining canonical member, preserving any positive rest components.
-    fn remaining_literal_type(self, db: &'db dyn Db, name: Name) -> Type<'db> {
+    fn remaining_literal_type(self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         let literal =
             Type::enum_literal(EnumLiteralType::new(db, self.enum_class_literal(db), name));
         if self.rest(db).is_empty() {
@@ -740,7 +740,7 @@ impl<'db> EnumComplementType<'db> {
             negative.insert(Type::enum_literal(EnumLiteralType::new(
                 db,
                 self.enum_class_literal(db),
-                name.clone(),
+                name,
             )));
         }
 
@@ -1271,7 +1271,7 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
             .member_names(db)
             .filter(move |name| Some(*name) != exclude_member)
             .map(move |name| {
-                Type::enum_literal(EnumLiteralType::new(db, enum_class_literal, name.clone()))
+                Type::enum_literal(EnumLiteralType::new(db, enum_class_literal, name))
             }),
     )
 }

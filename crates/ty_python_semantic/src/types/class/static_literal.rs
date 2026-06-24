@@ -158,7 +158,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.body_scope(db),
             self.known(db),
             self.deprecated(db),
@@ -2073,7 +2073,7 @@ impl<'db> StaticClassLiteral<'db> {
                     default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
-                    alias = field.alias(db);
+                    alias.clone_from(field.alias(db));
                     converter = field.converter(db);
                 }
 

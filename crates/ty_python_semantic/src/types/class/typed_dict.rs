@@ -854,7 +854,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
         ))
