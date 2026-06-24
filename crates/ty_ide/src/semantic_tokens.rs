@@ -42,7 +42,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
-    HasType, SemanticModel,
+    HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel, definitions_for_attribute,
+    definitions_for_imported_symbol,
     types::ide_support::{
         CallArgumentForm, call_argument_forms, definition_for_name,
         static_member_type_for_attribute,
@@ -300,6 +301,10 @@ impl<'db> SemanticTokenVisitor<'db> {
         let db = self.model.db();
         let model = SemanticModel::new(db, definition.file(db));
 
+        if model.is_type_alias_definition(definition) {
+            return Some((SemanticTokenType::Class, modifiers));
+        }
+
         match definition.kind(db) {
             DefinitionKind::Function(_) => {
                 // Check if this is a method based on current scope
@@ -342,7 +347,6 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::Parameter, modifiers))
             }
             DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
-            DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
             | DefinitionKind::StarImport(_) => {
@@ -383,6 +387,25 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::Variable, modifiers))
             }
         }
+    }
+
+    fn classify_type_alias_from_resolved_definitions(
+        &self,
+        definitions: &[ResolvedDefinition<'db>],
+    ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
+        if definitions.is_empty() {
+            return None;
+        }
+
+        if !definitions.iter().all(|resolved| {
+            resolved
+                .definition()
+                .is_some_and(|definition| self.model.is_type_alias_definition(definition))
+        }) {
+            return None;
+        }
+
+        Some((SemanticTokenType::Class, SemanticTokenModifier::empty()))
     }
 
     fn classify_from_type_and_name_str(
@@ -807,11 +830,21 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.add_dotted_name_tokens(module, SemanticTokenType::Namespace);
                 }
                 for alias in &import.names {
-                    // Get the type of the imported name
-                    let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
-                    if let Some((token_type, modifiers)) =
-                        self.classify_from_alias_type(ty, &alias.name)
-                    {
+                    let classification = self
+                        .classify_type_alias_from_resolved_definitions(
+                            &definitions_for_imported_symbol(
+                                self.model,
+                                import,
+                                alias.name.as_str(),
+                                ImportAliasResolution::ResolveAliases,
+                            ),
+                        )
+                        .or_else(|| {
+                            let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
+                            self.classify_from_alias_type(ty, &alias.name)
+                        });
+
+                    if let Some((token_type, modifiers)) = classification {
                         // Add token for the imported name (Y in "from X import Y" or "from X import Y as Z")
                         self.add_token(&alias.name, token_type, modifiers);
 
@@ -862,10 +895,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if let Some(value) = &assignment.value {
                     // PEP 613 alias values are type forms even though they appear as annotated
                     // assignments rather than dedicated `type` statements.
-                    if matches!(
-                        assignment.annotation.inferred_type(self.model),
-                        Some(Type::SpecialForm(SpecialFormType::TypeAlias))
-                    ) {
+                    if self.model.is_type_alias_annotation(&assignment.annotation) {
                         self.visit_annotation(value);
                     } else {
                         self.visit_expr(value);
@@ -951,11 +981,18 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = static_member_type_for_attribute(self.model, attr)
-                    .unwrap_or_else(|| expr.inferred_type(self.model).unwrap_or(Type::unknown()));
-                if let Some((token_type, modifiers)) =
-                    self.classify_from_type_for_attribute(ty, &attr.attr)
-                {
+                let classification = self
+                    .classify_type_alias_from_resolved_definitions(&definitions_for_attribute(
+                        self.model, attr,
+                    ))
+                    .or_else(|| {
+                        let ty = static_member_type_for_attribute(self.model, attr).unwrap_or_else(
+                            || expr.inferred_type(self.model).unwrap_or(Type::unknown()),
+                        );
+                        self.classify_from_type_for_attribute(ty, &attr.attr)
+                    });
+
+                if let Some((token_type, modifiers)) = classification {
                     self.add_token(&attr.attr, token_type, modifiers);
                 }
             }
@@ -1774,7 +1811,7 @@ result = check(None)
         "int" @ 123..126: Class
         "float" @ 129..134: Class
         "h" @ 139..140: Variable [definition]
-        "U" @ 142..143: TypeParameter
+        "U" @ 142..143: Class
         "#);
     }
 
@@ -2832,6 +2869,72 @@ LegacyStyle: TypeAlias = IO[str]
                 .expect("semantic token for `IO` type-form use");
             assert_eq!(token.token_type, SemanticTokenType::Class);
         }
+    }
+
+    #[test]
+    fn type_alias_classified_consistently() {
+        let test = SemanticTokenTest::new(
+            "
+from typing import TypeAlias
+
+type NewAlias = int
+OldAlias: TypeAlias = int
+def f(x: NewAlias, y: OldAlias): ...
+
+marker = TypeAlias
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "TypeAlias" @ 20..29: Variable
+        "NewAlias" @ 36..44: Class [definition]
+        "int" @ 47..50: Class
+        "OldAlias" @ 51..59: Class [definition]
+        "TypeAlias" @ 61..70: Variable
+        "int" @ 73..76: Class
+        "f" @ 81..82: Function [definition]
+        "x" @ 83..84: Parameter [definition]
+        "NewAlias" @ 86..94: Class
+        "y" @ 96..97: Parameter [definition]
+        "OldAlias" @ 99..107: Class
+        "marker" @ 115..121: Variable [definition]
+        "TypeAlias" @ 124..133: Variable
+        "#);
+    }
+
+    #[test]
+    fn imported_type_aliases_classified_consistently() {
+        let mut test = SemanticTokenTest::new(
+            "
+from aliases import OldAlias
+import aliases
+
+aliases.OldAlias
+",
+        );
+        test.db
+            .write_file(
+                SystemPath::new("src/aliases.py"),
+                "
+from typing import TypeAlias
+
+OldAlias: TypeAlias = int | str
+",
+            )
+            .expect("writing to the memory file system should succeed");
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "aliases" @ 6..13: Namespace
+        "OldAlias" @ 21..29: Class
+        "aliases" @ 37..44: Namespace
+        "aliases" @ 46..53: Namespace
+        "OldAlias" @ 54..62: Class
+        "#);
     }
 
     #[test]
