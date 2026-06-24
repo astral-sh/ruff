@@ -182,7 +182,7 @@ pub(super) fn attribute_write_requirement<'db>(
 
         Type::ProtocolInstance(protocol) => protocol
             .interface(db)
-            .instance_write_requirement(db, attribute)
+            .instance_write_requirement(db, object_ty, attribute)
             .map_or_else(
                 || instance_attribute_write_requirement(db, object_ty, attribute),
                 |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {

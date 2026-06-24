@@ -297,6 +297,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn instance_write_requirement(
         self,
         db: &'db dyn Db,
+        receiver_ty: Type<'db>,
         name: &str,
     ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
         self.member_by_name(db, name).map(|member| {
@@ -305,8 +306,7 @@ impl<'db> ProtocolInterface<'db> {
                 capabilities
                     .instance
                     .write
-                    .and_then(|write| write.resolve(db))
-                    .map(ProtocolMemberType::ty),
+                    .and_then(|write| write.bind_self(db, receiver_ty)),
                 member.qualifiers(),
             )
         })
