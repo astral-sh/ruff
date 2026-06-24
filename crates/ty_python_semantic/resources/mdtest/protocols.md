@@ -2903,6 +2903,32 @@ static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [
 static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
 ```
 
+Until classmethod protocol members are fully supported, their placeholder representation should not
+incorrectly require a mutable instance attribute. In particular, a frozen dataclass can satisfy a
+protocol bound through a classmethod:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol, TypeVar
+from typing_extensions import Self
+
+class Factory(Protocol):
+    @classmethod
+    def make(cls, value: int) -> Self: ...
+
+T = TypeVar("T", bound=Factory)
+
+def load(target: type[T]) -> None: ...
+
+@dataclass(frozen=True)
+class Frozen:
+    @classmethod
+    def make(cls, value: int) -> Self:
+        return cls()
+
+load(Frozen)
+```
+
 ## Subtyping of protocols with decorated method members
 
 Protocol methods can be decorated with other decorators like `@contextmanager`. When matching
