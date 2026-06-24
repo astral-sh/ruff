@@ -19,6 +19,17 @@ class C:
         reveal_type(__class__)  # revealed: <class 'C'>
 ```
 
+## Lambda scopes
+
+Lambdas defined directly in a class body also capture the cell. Lambda parameters continue to take
+precedence over it.
+
+```py
+class C:
+    lambda_method = lambda: reveal_type(__class__)  # revealed: <class 'C'>
+    shadowed = lambda __class__: reveal_type(__class__)  # revealed: Unknown
+```
+
 ## Class bodies and method defaults
 
 The cell is not available directly in the class body or while evaluating a method's default
@@ -57,10 +68,11 @@ class D:
 
 ## Known limitations
 
-The implicit cell is currently only modeled in direct method bodies. The following valid uses are
-left unresolved until the cell can be represented at the correct lexical scope boundary.
+The implicit cell is currently only modeled in direct method bodies and lambdas defined directly in
+a class body. The following valid uses are left unresolved until the cell can be represented at the
+correct lexical scope boundary.
 
-### Nested function and lambda scopes
+### Nested function scopes
 
 ```py
 class C:
@@ -70,13 +82,6 @@ class C:
             # error: [unresolved-reference]
             # revealed: Unknown
             reveal_type(__class__)
-
-    lambda_method = lambda: (
-        # TODO: This should reveal `<class 'C'>` without an error.
-        # error: [unresolved-reference]
-        # revealed: Unknown
-        reveal_type(__class__)
-    )
 ```
 
 ### Generator expressions

@@ -1685,10 +1685,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
-    /// Returns the type of the implicit `__class__` cell in the current direct method body.
+    /// Returns the type of the implicit `__class__` cell in the current direct method body or
+    /// class-body lambda.
     fn dunder_class_cell_type(&self) -> Option<Type<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
-        let class_definition = self.index.class_definition_of_method(current_scope_id)?;
+        let class_definition =
+            if let Some(definition) = self.index.class_definition_of_method(current_scope_id) {
+                definition
+            } else {
+                let current_scope = self.index.scope(current_scope_id);
+                if !matches!(current_scope.node(), NodeWithScopeKind::Lambda(_)) {
+                    return None;
+                }
+                let class = self
+                    .index
+                    .parent_scope(current_scope_id)?
+                    .node()
+                    .as_class()?;
+                self.index.expect_single_definition(class)
+            };
         original_class_type(self.db(), class_definition).map(Type::ClassLiteral)
     }
 
