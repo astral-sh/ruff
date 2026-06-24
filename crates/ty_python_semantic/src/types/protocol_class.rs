@@ -607,6 +607,12 @@ struct ProtocolMemberCapabilities<'db> {
     class: ProtocolMemberAccess<'db>,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum ProtocolMemberAccessMode {
+    Instance,
+    Class,
+}
+
 fn cycle_normalized_optional_type<'db>(
     db: &'db dyn Db,
     current: Option<ProtocolMemberType<'db>>,
@@ -994,13 +1000,16 @@ fn protocol_member_read_type<'db>(
     ty: Type<'db>,
     receiver_ty: Type<'db>,
     member: &ProtocolMember<'_, 'db>,
-    instance_access: bool,
+    access: ProtocolMemberAccessMode,
 ) -> Option<Type<'db>> {
-    if instance_access && member.is_method() && member.name == "__call__" {
+    if access == ProtocolMemberAccessMode::Instance
+        && member.is_method()
+        && member.name == "__call__"
+    {
         return Some(ty);
     }
 
-    let place = if instance_access && member.is_method() {
+    let place = if access == ProtocolMemberAccessMode::Instance && member.is_method() {
         ty.invoke_descriptor_protocol(
             db,
             ty,
@@ -1235,11 +1244,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
         required_ty: ProtocolMemberType<'db>,
-        instance_access: bool,
+        access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         let fallback_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
-        let Some(attribute_type) =
-            protocol_member_read_type(db, ty, receiver_ty, member, instance_access)
+        let Some(attribute_type) = protocol_member_read_type(db, ty, receiver_ty, member, access)
         else {
             return self.never();
         };
@@ -1253,7 +1261,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.always();
         }
 
-        if member.is_method() && instance_access {
+        if member.is_method() && access == ProtocolMemberAccessMode::Instance {
             let Some(required_ty) = required_ty.resolve(db) else {
                 return self.never();
             };
@@ -1307,9 +1315,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
         required: ProtocolMemberAccess<'db>,
-        instance_access: bool,
+        access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        if !instance_access
+        if access == ProtocolMemberAccessMode::Class
             && member.is_method()
             && (member.name == "__call__"
                 || matches!(
@@ -1327,21 +1335,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return ConstraintSet::from_bool(
                 self.constraints,
                 member.name == "__call__"
-                    || protocol_member_read_type(db, ty, receiver_ty, member, false).is_some(),
+                    || protocol_member_read_type(
+                        db,
+                        ty,
+                        receiver_ty,
+                        member,
+                        ProtocolMemberAccessMode::Class,
+                    )
+                    .is_some(),
             );
         }
 
         let read_result = required.read.map_or_else(
             || self.always(),
             |required_ty| {
-                self.check_protocol_member_read(
-                    db,
-                    ty,
-                    receiver_ty,
-                    member,
-                    required_ty,
-                    instance_access,
-                )
+                self.check_protocol_member_read(db, ty, receiver_ty, member, required_ty, access)
             },
         );
 
@@ -1372,10 +1380,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let capabilities = member.capabilities(db);
         if self.is_context_collection_enabled() {
             let instance_read_missing = capabilities.instance.read.is_some()
-                && protocol_member_read_type(db, ty, ty, member, true).is_none();
+                && protocol_member_read_type(
+                    db,
+                    ty,
+                    ty,
+                    member,
+                    ProtocolMemberAccessMode::Instance,
+                )
+                .is_none();
             let class_read_missing = capabilities.class.read.is_some()
                 && !(member.is_method() && member.name == "__call__")
-                && protocol_member_read_type(db, ty, ty.to_meta_type(db), member, false).is_none();
+                && protocol_member_read_type(
+                    db,
+                    ty,
+                    ty.to_meta_type(db),
+                    member,
+                    ProtocolMemberAccessMode::Class,
+                )
+                .is_none();
             if instance_read_missing || class_read_missing {
                 self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                     member_name: member.name.into(),
@@ -1386,7 +1408,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let result = self
-            .type_satisfies_protocol_member_access(db, ty, ty, member, capabilities.instance, true)
+            .type_satisfies_protocol_member_access(
+                db,
+                ty,
+                ty,
+                member,
+                capabilities.instance,
+                ProtocolMemberAccessMode::Instance,
+            )
             .and(db, self.constraints, || {
                 self.type_satisfies_protocol_member_access(
                     db,
@@ -1394,7 +1423,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ty.to_meta_type(db),
                     member,
                     capabilities.class,
-                    false,
+                    ProtocolMemberAccessMode::Class,
                 )
             });
         if result.is_never_satisfied(db) {
@@ -1411,19 +1440,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_type: Type<'db>,
         source_member: &ProtocolMember<'_, 'db>,
         target_member: &ProtocolMember<'_, 'db>,
-        instance_access: bool,
+        access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         let source_capabilities = source_member.capabilities(db);
         let target_capabilities = target_member.capabilities(db);
-        let (source, target) = if instance_access {
-            (source_capabilities.instance, target_capabilities.instance)
-        } else if source_member.is_method() && target_member.is_method() {
-            // The receiver type of an unbound method is specific to the class that
-            // defines it. Compare the corresponding bound access types after separately
-            // establishing that both methods are available through their classes.
-            (source_capabilities.instance, target_capabilities.instance)
-        } else {
-            (source_capabilities.class, target_capabilities.class)
+        let (source, target) = match access {
+            ProtocolMemberAccessMode::Instance => {
+                (source_capabilities.instance, target_capabilities.instance)
+            }
+            ProtocolMemberAccessMode::Class
+                if source_member.is_method() && target_member.is_method() =>
+            {
+                // The receiver type of an unbound method is specific to the class that
+                // defines it. Compare the corresponding bound access types after separately
+                // establishing that both methods are available through their classes.
+                (source_capabilities.instance, target_capabilities.instance)
+            }
+            ProtocolMemberAccessMode::Class => {
+                (source_capabilities.class, target_capabilities.class)
+            }
         };
 
         let read_result = match (source.read, target.read) {
@@ -1500,7 +1535,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source_type,
                         &source_member,
                         &target_member,
-                        true,
+                        ProtocolMemberAccessMode::Instance,
                     )
                     .and(db, self.constraints, || {
                         self.check_protocol_member_access_pair(
@@ -1508,7 +1543,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             source_type,
                             &source_member,
                             &target_member,
-                            false,
+                            ProtocolMemberAccessMode::Class,
                         )
                     })
                 });
