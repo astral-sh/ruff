@@ -262,6 +262,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
                 | SpecialFormType::Divergent
+                | SpecialFormType::Todo
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy
                 | SpecialFormType::TypeForm => None,

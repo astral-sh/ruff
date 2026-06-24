@@ -2460,6 +2460,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             | SpecialFormType::TypedDict
             | SpecialFormType::Unknown
             | SpecialFormType::Divergent
+            | SpecialFormType::Todo
             | SpecialFormType::Any
             | SpecialFormType::NamedTuple => {
                 if !self.in_string_annotation() {
