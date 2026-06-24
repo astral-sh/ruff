@@ -1858,7 +1858,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     {
                         self.provide_context(|| ErrorContext::InferredCallableType {
                             source,
-                            callable: callables.into_type(db),
+                            callable: callables.to_type(db),
                         });
                     }
 

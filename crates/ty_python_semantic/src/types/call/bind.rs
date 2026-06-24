@@ -919,7 +919,7 @@ impl<'db> Bindings<'db> {
             Type::Never
         } else {
             CallableTypes::from_elements(partial_callables)
-                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
+                .to_precise_functools_partial_instance(db, wrapped_callable_ty)
         }
     }
 
@@ -2021,16 +2021,18 @@ impl<'db> Bindings<'db> {
                             let [Some(ty)] = overload.parameter_types() else {
                                 continue;
                             };
-                            let Some(callables) = ty.try_upcast_to_callable(db).map(|callables| {
-                                if into_callable == KnownFunction::IntoRegularCallable {
-                                    callables.map(|callable| callable.into_regular(db))
-                                } else {
-                                    callables
-                                }
-                            }) else {
+                            let Some(callables) = ty.try_upcast_to_callable(db) else {
                                 continue;
                             };
-                            overload.set_return_type(callables.into_type(db));
+                            let callable_type =
+                                if into_callable == KnownFunction::IntoRegularCallable {
+                                    callables
+                                        .map(|callable| callable.into_regular(db))
+                                        .to_type(db)
+                                } else {
+                                    callables.to_type(db)
+                                };
+                            overload.set_return_type(callable_type);
                         }
 
                         Some(KnownFunction::DunderAllNames) => {

@@ -1334,7 +1334,7 @@ fn check_final_class_abstract_methods<'db>(
                     db,
                     Signature::new(Parameters::gradual_form(), Type::none(db)),
                 )
-                .is_assignable_to(db, callables.into_type(db))
+                .is_assignable_to(db, callables.to_type(db))
             {
                 diagnostic.help(format_args!(
                     "Change the body of `{first_method_name}` to `return` \
