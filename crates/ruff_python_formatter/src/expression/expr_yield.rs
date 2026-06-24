@@ -55,11 +55,7 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
         // FormatStmtExpr, does not add parenthesis
         if parent.is_stmt_assign() || parent.is_stmt_ann_assign() || parent.is_stmt_aug_assign() {
             if let Some(value) = self.value() {
-                if is_expression_parenthesized(
-                    value.into(),
-                    context.comments().ranges(),
-                    context.source(),
-                ) {
+                if is_expression_parenthesized(value.into(), context) {
                     // Ex) `x = yield (1)`
                     OptionalParentheses::Never
                 } else {

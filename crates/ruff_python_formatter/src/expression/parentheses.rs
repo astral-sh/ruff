@@ -2,11 +2,13 @@ use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{Argument, Arguments, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprRef;
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
     BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 use crate::comments::{
     SourceComment, dangling_comments, dangling_open_parenthesis_comments, trailing_comments,
@@ -108,8 +110,59 @@ pub enum Parentheses {
     Never,
 }
 
+/// Index of source offsets immediately inside parentheses.
+///
+/// Formatting frequently needs to know if an expression was parenthesized in the source. Building
+/// this index once avoids re-tokenizing the source for every expression.
+#[derive(Debug)]
+pub(crate) struct ParenthesesIndex {
+    starts_after_l_paren: FxHashSet<TextSize>,
+    ends_before_r_paren: FxHashSet<TextSize>,
+}
+
+impl ParenthesesIndex {
+    pub(crate) fn from_tokens(tokens: &Tokens) -> Self {
+        let mut starts_after_l_paren = FxHashSet::default();
+        let mut ends_before_r_paren = FxHashSet::default();
+        let mut previous = None::<Token>;
+
+        for token in tokens.iter().copied() {
+            if token.kind().is_trivia() {
+                continue;
+            }
+
+            if previous.is_some_and(|previous| previous.kind() == TokenKind::Lpar) {
+                starts_after_l_paren.insert(token.start());
+            }
+            if token.kind() == TokenKind::Rpar
+                && let Some(previous) = previous
+            {
+                ends_before_r_paren.insert(previous.end());
+            }
+
+            previous = Some(token);
+        }
+
+        Self {
+            starts_after_l_paren,
+            ends_before_r_paren,
+        }
+    }
+
+    pub(crate) fn is_expression_parenthesized(&self, expression: ExprRef) -> bool {
+        self.starts_after_l_paren.contains(&expression.start())
+            && self.ends_before_r_paren.contains(&expression.end())
+    }
+}
+
 /// Returns `true` if the [`ExprRef`] is enclosed by parentheses in the source code.
-pub(crate) fn is_expression_parenthesized(
+pub(crate) fn is_expression_parenthesized(expr: ExprRef, context: &PyFormatContext) -> bool {
+    context.is_expression_parenthesized(expr)
+}
+
+/// Returns `true` if the [`ExprRef`] is enclosed by parentheses by re-tokenizing the surrounding
+/// source. Prefer [`is_expression_parenthesized`] when a formatting context is available.
+pub(crate) fn is_expression_parenthesized_in_source(
     expr: ExprRef,
     comment_ranges: &CommentRanges,
     contents: &str,
@@ -466,20 +519,76 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::ExprRef;
+    use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
+    use ruff_python_ast::{Expr, ExprRef};
     use ruff_python_parser::parse_expression;
     use ruff_python_trivia::CommentRanges;
 
-    use crate::expression::parentheses::is_expression_parenthesized;
+    use crate::expression::parentheses::{ParenthesesIndex, is_expression_parenthesized_in_source};
+
+    struct AssertEquivalent<'a> {
+        source: &'a str,
+        comment_ranges: &'a CommentRanges,
+        parentheses: &'a ParenthesesIndex,
+    }
+
+    impl<'a> SourceOrderVisitor<'a> for AssertEquivalent<'_> {
+        fn visit_expr(&mut self, expression: &'a Expr) {
+            let expression_ref = ExprRef::from(expression);
+            assert_eq!(
+                self.parentheses.is_expression_parenthesized(expression_ref),
+                is_expression_parenthesized_in_source(
+                    expression_ref,
+                    self.comment_ranges,
+                    self.source,
+                ),
+                "parentheses index mismatch for {expression_ref:?} in {:?}",
+                self.source,
+            );
+            walk_expr(self, expression);
+        }
+    }
 
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
         let parsed = parse_expression(expression).unwrap();
-        assert!(!is_expression_parenthesized(
+        assert!(!is_expression_parenthesized_in_source(
             ExprRef::from(parsed.expr()),
             &CommentRanges::default(),
             expression
         ));
+    }
+
+    #[test]
+    fn parenthesized_ranges_match_source_tokenizer() {
+        let cases = [
+            "value",
+            "(value)",
+            "((value))",
+            "call(value)",
+            "call(value, (other))",
+            "(value + other).attribute",
+            "(value + (other))",
+            "((value) + other)",
+            "(\n    value  # trailing\n)",
+            "(lambda: (value if condition else other))",
+            "{key: (value) for key in iterable}",
+            "[(item := value) for value in iterable]",
+            "f'{(value)}'",
+        ];
+
+        for source in cases {
+            let parsed = parse_expression(source).unwrap();
+            let comment_ranges = CommentRanges::from(parsed.tokens());
+            let parentheses = ParenthesesIndex::from_tokens(parsed.tokens());
+
+            AssertEquivalent {
+                source,
+                comment_ranges: &comment_ranges,
+                parentheses: &parentheses,
+            }
+            .visit_expr(parsed.expr());
+        }
     }
 }

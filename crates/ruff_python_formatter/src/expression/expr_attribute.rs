@@ -41,11 +41,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         let format_inner = format_with(|f: &mut PyFormatter| {
             let parenthesize_value =
                 is_base_ten_number_literal(value.as_ref(), f.context().source()) || {
-                    is_expression_parenthesized(
-                        value.into(),
-                        f.context().comments().ranges(),
-                        f.context().source(),
-                    )
+                    is_expression_parenthesized(value.into(), f.context())
                 };
 
             if call_chain_layout.is_fluent() {
@@ -194,21 +190,11 @@ impl NeedsParentheses for ExprAttribute {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if CallChainLayout::from_expression(
-            self.into(),
-            context.comments().ranges(),
-            context.source(),
-        )
-        .is_fluent()
-        {
+        if CallChainLayout::from_expression(self.into(), context).is_fluent() {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if is_expression_parenthesized(
-            self.value.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        ) {
+        } else if is_expression_parenthesized(self.value.as_ref().into(), context) {
             // We have to avoid creating syntax errors like
             // ```python
             // variable = (something) # trailing

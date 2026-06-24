@@ -72,11 +72,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         // Avoid parenthesizing the value for single-target assignments where the
         // target has its own parentheses (list, dict, tuple, ...) and the target expands.
         else if has_target_own_parentheses(first, f.context())
-            && !is_expression_parenthesized(
-                first.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            )
+            && !is_expression_parenthesized(first.into(), f.context())
         {
             FormatStatementsLastExpression::RightToLeft {
                 before_operator: AnyBeforeOperator::Expression(first),

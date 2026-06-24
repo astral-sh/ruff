@@ -106,11 +106,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         // if the `with` has a single item without a target.
         // E.g., it returns `true` for `with (a)` even though the parentheses
         // belong to the with statement and not the expression but it can't determine that.
-        let is_parenthesized = is_expression_parenthesized(
-            context_expr.into(),
-            f.context().comments().ranges(),
-            f.context().source(),
-        );
+        let is_parenthesized = is_expression_parenthesized(context_expr.into(), f.context());
 
         match self.layout {
             // Remove the parentheses of the `with_items` if the with statement adds parentheses

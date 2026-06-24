@@ -36,11 +36,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 // ]
                 // ```
                 let will_be_parenthesized = self.preserve_parentheses
-                    && is_expression_parenthesized(
-                        self.expression.into(),
-                        f.context().comments().ranges(),
-                        f.context().source(),
-                    );
+                    && is_expression_parenthesized(self.expression.into(), f.context());
 
                 if has_leading_comments && !will_be_parenthesized {
                     soft_line_break_or_space().fmt(f)

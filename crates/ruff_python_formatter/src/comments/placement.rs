@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
-use crate::expression::parentheses::is_expression_parenthesized;
+use crate::expression::parentheses::is_expression_parenthesized_in_source;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
@@ -2359,7 +2359,11 @@ fn handle_trailing_implicit_concatenated_string_comment<'a>(
     };
 
     if source.contains_line_break(TextRange::new(second_last.end(), last.start()))
-        && is_expression_parenthesized(string_like.as_expression_ref(), comment_ranges, source)
+        && is_expression_parenthesized_in_source(
+            string_like.as_expression_ref(),
+            comment_ranges,
+            source,
+        )
     {
         let range = TextRange::new(last.end(), comment.start());
 

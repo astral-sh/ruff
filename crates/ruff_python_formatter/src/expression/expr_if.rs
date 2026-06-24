@@ -105,13 +105,7 @@ struct FormatOrElse<'a> {
 impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.orelse {
-            Expr::If(expr)
-                if !is_expression_parenthesized(
-                    expr.into(),
-                    f.context().comments().ranges(),
-                    f.context().source(),
-                ) =>
-            {
+            Expr::If(expr) if !is_expression_parenthesized(expr.into(), f.context()) => {
                 write!(f, [expr.format().with_options(ExprIfLayout::Nested)])
             }
             _ => write!(f, [in_parentheses_only_group(&self.orelse.format())]),

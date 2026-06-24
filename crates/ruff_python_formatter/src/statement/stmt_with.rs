@@ -292,11 +292,7 @@ impl<'a> WithItemsLayout<'a> {
 
             // Preserve the parentheses around the context expression instead of parenthesizing the entire
             // with items.
-            if is_expression_parenthesized(
-                (&single.context_expr).into(),
-                context.comments().ranges(),
-                context.source(),
-            ) {
+            if is_expression_parenthesized((&single.context_expr).into(), context) {
                 return Ok(Self::SingleParenthesizedContextManager(single));
             }
         }

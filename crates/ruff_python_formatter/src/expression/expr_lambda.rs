@@ -322,9 +322,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             // )
             // ```
             let comments = f.context().comments();
-            if is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
-                && comments.has_leading(body)
-            {
+            if is_expression_parenthesized(body.into(), f.context()) && comments.has_leading(body) {
                 trailing_comments(dangling_header_comments).fmt(f)?;
 
                 // Note that `leading_body_comments` have already been formatted as part of

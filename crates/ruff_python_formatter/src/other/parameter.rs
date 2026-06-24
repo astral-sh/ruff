@@ -20,11 +20,7 @@ impl FormatNodeRule<Parameter> for FormatParameter {
             token(":").fmt(f)?;
 
             if f.context().comments().has_leading(annotation)
-                && !is_expression_parenthesized(
-                    annotation.into(),
-                    f.context().comments().ranges(),
-                    f.context().source(),
-                )
+                && !is_expression_parenthesized(annotation.into(), f.context())
             {
                 hard_line_break().fmt(f)?;
             } else {

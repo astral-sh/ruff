@@ -24,11 +24,7 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
         } = item;
 
         if has_target_own_parentheses(target, f.context())
-            && !is_expression_parenthesized(
-                target.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            )
+            && !is_expression_parenthesized(target.into(), f.context())
         {
             FormatStatementsLastExpression::RightToLeft {
                 before_operator: AnyBeforeOperator::Expression(target),

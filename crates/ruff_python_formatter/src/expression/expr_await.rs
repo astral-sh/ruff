@@ -40,11 +40,7 @@ impl NeedsParentheses for ExprAwait {
     ) -> OptionalParentheses {
         if parent.is_expr_await() || is_type_annotation_of(self.range(), parent) {
             OptionalParentheses::Always
-        } else if is_expression_parenthesized(
-            self.value.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        ) {
+        } else if is_expression_parenthesized(self.value.as_ref().into(), context) {
             // Prefer splitting the value if it is parenthesized.
             OptionalParentheses::Never
         } else {
