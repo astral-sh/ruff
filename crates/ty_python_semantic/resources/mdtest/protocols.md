@@ -2917,6 +2917,27 @@ class OverloadedClassMethod:
     def convert(cls, value: int | str) -> int | str:
         return value
 
+class POverloadedSelf(Protocol):
+    @overload
+    @classmethod
+    def copy(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def copy(cls, value: str) -> tuple[Self, Self]: ...
+
+class OverloadedSelf:
+    @overload
+    @classmethod
+    def copy(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def copy(cls, value: str) -> tuple[Self, Self]: ...
+    @classmethod
+    def copy(cls, value: int | str) -> Self | tuple[Self, Self]:
+        if isinstance(value, int):
+            return cls()
+        return cls(), cls()
+
 class Factory:
     @classmethod
     def create(cls) -> Self:
@@ -2976,6 +2997,8 @@ static_assert(not is_assignable_to(BadFactory, PFactory))
 
 static_assert(is_subtype_of(OverloadedClassMethod, POverloadedClassMethod))
 static_assert(is_subtype_of(OverloadedClassMethod, POverloadedStaticMethod))
+static_assert(is_subtype_of(OverloadedSelf, POverloadedSelf))
+static_assert(is_assignable_to(OverloadedSelf, POverloadedSelf))
 ```
 
 Until classmethod protocol members are fully supported, their placeholder representation should not

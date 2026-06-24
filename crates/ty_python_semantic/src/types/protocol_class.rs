@@ -460,10 +460,10 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
 enum ProtocolMemberType<'db> {
     Value {
         ty: Type<'db>,
-        // Accessor annotations can contain `Self` bound by the accessor definition. Retain that
-        // context after reducing a property to its read/write types so relation checks only bind
+        // Member annotations can contain `Self` scoped to one definition or, for overloads, to
+        // each signature's definition. Retain the binding strategy so relation checks only bind
         // the `Self` that belongs to this member.
-        self_binding_context: Option<BindingContext<'db>>,
+        self_binding: ProtocolMemberSelfBinding<'db>,
     },
     // Property accessors remain as raw callable types until a relation or ordinary member access
     // needs the exposed value type. Resolving every property while constructing a protocol
@@ -472,18 +472,35 @@ enum ProtocolMemberType<'db> {
     PropertySetter(Type<'db>),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum ProtocolMemberSelfBinding<'db> {
+    /// Bind `Self` belonging to the given member context.
+    Context(Option<BindingContext<'db>>),
+    /// Bind each callable signature using its own definition as the context.
+    CallableSignatures,
+}
+
 impl<'db> ProtocolMemberType<'db> {
     const fn new(ty: Type<'db>) -> Self {
         Self::Value {
             ty,
-            self_binding_context: None,
+            self_binding: ProtocolMemberSelfBinding::Context(None),
         }
     }
 
     fn with_definition(ty: Type<'db>, definition: Option<Definition<'db>>) -> Self {
         Self::Value {
             ty,
-            self_binding_context: definition.map(BindingContext::Definition),
+            self_binding: ProtocolMemberSelfBinding::Context(
+                definition.map(BindingContext::Definition),
+            ),
+        }
+    }
+
+    const fn with_callable_signatures(ty: Type<'db>) -> Self {
+        Self::Value {
+            ty,
+            self_binding: ProtocolMemberSelfBinding::CallableSignatures,
         }
     }
 
@@ -503,13 +520,7 @@ impl<'db> ProtocolMemberType<'db> {
 
     const fn with_ty(self, ty: Type<'db>) -> Self {
         match self {
-            Self::Value {
-                self_binding_context,
-                ..
-            } => Self::Value {
-                ty,
-                self_binding_context,
-            },
+            Self::Value { self_binding, .. } => Self::Value { ty, self_binding },
             Self::PropertyGetter(_) => Self::PropertyGetter(ty),
             Self::PropertySetter(_) => Self::PropertySetter(ty),
         }
@@ -526,22 +537,26 @@ impl<'db> ProtocolMemberType<'db> {
 
     /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
     fn bind_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
-        let Self::Value {
-            ty,
-            self_binding_context,
-        } = self.resolve(db)?
-        else {
+        let Self::Value { ty, self_binding } = self.resolve(db)? else {
             return None;
         };
         if !ty.contains_self(db) {
             return Some(ty);
         }
 
-        Some(ty.apply_type_mapping(
-            db,
-            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, self_binding_context)),
-            TypeContext::default(),
-        ))
+        match self_binding {
+            ProtocolMemberSelfBinding::Context(context) => Some(ty.apply_type_mapping(
+                db,
+                &TypeMapping::BindSelf(SelfBinding::new(db, self_type, context)),
+                TypeContext::default(),
+            )),
+            ProtocolMemberSelfBinding::CallableSignatures => {
+                let Type::Callable(callable) = ty else {
+                    return None;
+                };
+                Some(Type::Callable(callable.apply_self(db, self_type)))
+            }
+        }
     }
 
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
@@ -667,6 +682,9 @@ impl<'db> ProtocolMemberData<'db> {
         };
         let ty = match kind {
             ProtocolMethodKind::Instance => ProtocolMemberType::new(Type::Callable(callable)),
+            ProtocolMethodKind::ClassOrStatic if callable.signatures(db).overloads.len() > 1 => {
+                ProtocolMemberType::with_callable_signatures(Type::Callable(callable))
+            }
             ProtocolMethodKind::ClassOrStatic => {
                 ProtocolMemberType::with_definition(Type::Callable(callable), definition)
             }
