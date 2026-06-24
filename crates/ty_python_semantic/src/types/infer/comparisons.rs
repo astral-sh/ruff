@@ -545,6 +545,21 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     Some(Ok(result))
                 }
 
+                // Same-kind literals and the special relationship between `int` and `bool` are
+                // handled above. Any remaining pair of exact builtin literals compares unequal.
+                (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                ) if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) => {
+                    Some(Ok(Type::bool_literal(op == ast::CmpOp::NotEq)))
+                }
+
                 (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
                     if op == ast::CmpOp::Eq =>
                 {
