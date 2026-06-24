@@ -1685,6 +1685,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
+    /// Returns the type of the implicit `__class__` closure cell visible from the current scope.
+    fn dunder_class_cell_type(&self) -> Option<Type<'db>> {
+        self.index
+            .ancestor_scopes(self.scope().file_scope_id(self.db()))
+            .tuple_windows()
+            .find_map(|((_, inner), (_, outer))| {
+                if !outer.kind().is_class()
+                    || !matches!(
+                        inner.node(),
+                        NodeWithScopeKind::Function(_)
+                            | NodeWithScopeKind::FunctionTypeParameters(_)
+                            | NodeWithScopeKind::Lambda(_)
+                    )
+                {
+                    return None;
+                }
+
+                let class = outer.node().as_class()?;
+                let definition = self.index.expect_single_definition(class);
+                original_class_type(self.db(), definition).map(Type::ClassLiteral)
+            })
+    }
+
     /// If the current scope is a (non-lambda) function, return that function's AST node.
     ///
     /// If the current scope is not a function (or it is a lambda function), return `None`.
@@ -9771,6 +9794,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 )
                             });
                         }
+                    }
+                    Place::Undefined.into()
+                })
+                // Methods receive an implicit `__class__` closure cell. The cell is also visible
+                // from nested scopes and takes precedence over a global with the same name.
+                .or_fall_back_to(db, || {
+                    if place_expr
+                        .as_symbol()
+                        .is_some_and(|symbol| symbol.name() == "__class__")
+                        && let Some(ty) = self.dunder_class_cell_type()
+                    {
+                        return Place::bound(ty).into();
                     }
                     Place::Undefined.into()
                 })
