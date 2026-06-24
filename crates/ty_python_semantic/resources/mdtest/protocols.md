@@ -2861,6 +2861,9 @@ class PStaticMethod(Protocol):
     @staticmethod
     def x(val: int) -> str: ...
 
+class PInstanceMethod(Protocol):
+    def x(self, val: int) -> str: ...
+
 class NNotCallable:
     x = None
 
@@ -2992,6 +2995,15 @@ def use_decorated_protocol_methods(class_method: PClassMethod, static_method: PS
 static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
 static_assert(is_equivalent_to(POverloadedClassMethod, POverloadedStaticMethod))
 static_assert(is_equivalent_to(PContextManager1, PContextManager2))
+
+# Like nominal classmethod and staticmethod implementations, protocols containing these members
+# satisfy an ordinary method requirement with the same bound signature.
+static_assert(is_subtype_of(PClassMethod, PInstanceMethod))
+static_assert(is_assignable_to(PClassMethod, PInstanceMethod))
+static_assert(is_subtype_of(PStaticMethod, PInstanceMethod))
+static_assert(is_assignable_to(PStaticMethod, PInstanceMethod))
+static_assert(not is_assignable_to(PInstanceMethod, PClassMethod))
+static_assert(not is_assignable_to(PInstanceMethod, PStaticMethod))
 
 static_assert(not is_assignable_to(NNotCallable, PClassMethod))
 static_assert(not is_assignable_to(NNotCallable, PStaticMethod))

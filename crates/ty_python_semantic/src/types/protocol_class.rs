@@ -1683,11 +1683,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (source_capabilities.instance, target_capabilities.instance)
             }
             ProtocolMemberAccessMode::Class
-                if source_member.is_instance_method() && target_member.is_instance_method() =>
+                if source_member.is_method() && target_member.is_instance_method() =>
             {
-                // The receiver type of an unbound method is specific to the class that
-                // defines it. Compare the corresponding bound access types after separately
-                // establishing that both methods are available through their classes.
+                // The receiver type of an unbound method is specific to the class that defines
+                // it. Compare the corresponding bound access types; this also applies when the
+                // source is a classmethod or staticmethod, which can satisfy an ordinary method
+                // requirement using its bound signature.
                 (source_capabilities.instance, target_capabilities.instance)
             }
             ProtocolMemberAccessMode::Class => {
