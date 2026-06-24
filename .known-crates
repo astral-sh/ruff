@@ -28,6 +28,10 @@ ruff_source_file
 ruff_text_size
 ruff_wasm
 ruff_workspace
+ty_combine
 ty_module_resolver
+ty_python_core
+ty_python_semantic
 ty_site_packages
 ty_static
+ty_vendored
