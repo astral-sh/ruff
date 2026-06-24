@@ -10,9 +10,12 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 ruff_db = { workspace = true }
-ruff_macros = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
 

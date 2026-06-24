@@ -3571,7 +3571,6 @@ version = "0.0.1"
 dependencies = [
  "get-size2",
  "ruff_db",
- "ruff_macros",
  "ruff_text_size",
  "schemars",
  "serde",
