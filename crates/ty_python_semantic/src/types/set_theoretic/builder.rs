@@ -738,6 +738,12 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(self.db) == *existing =>
+                                {
+                                    return;
+                                }
                                 UnionElement::Type(existing) if !cycle_recovery => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
@@ -784,6 +790,12 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                     found = Some(literals);
                                     continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(self.db) == *existing =>
+                                {
+                                    return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -833,6 +845,12 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                     found = Some(literals);
                                     continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(self.db) == *existing =>
+                                {
+                                    return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -903,6 +921,12 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                     found = Some(literals);
                                     continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(self.db) == *existing =>
+                                {
+                                    return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -1952,14 +1976,17 @@ mod tests {
         assert_eq!(union.build(), KnownClass::Int.to_instance(&db));
 
         let assert_widens = |literal, instance| {
-            let union = UnionBuilder::new(&db)
-                .cycle_recovery(true)
-                .add(literal)
-                .add(instance)
-                .build();
-            assert_eq!(union, instance);
+            for (first, second) in [(literal, instance), (instance, literal)] {
+                let union = UnionBuilder::new(&db)
+                    .cycle_recovery(true)
+                    .add(first)
+                    .add(second)
+                    .build();
+                assert_eq!(union, instance);
+            }
         };
 
+        assert_widens(Type::int_literal(1), KnownClass::Int.to_instance(&db));
         assert_widens(
             Type::string_literal(&db, "literal"),
             KnownClass::Str.to_instance(&db),
