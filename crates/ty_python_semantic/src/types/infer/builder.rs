@@ -1698,7 +1698,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(protocol) = nearest_enclosing_class(db, self.index, self.scope())
+        let current_scope_id = self.scope().file_scope_id(db);
+        let Some(protocol) = self
+            .index
+            .ancestor_scopes(current_scope_id)
+            .find_map(|(scope_id, scope)| scope.node().as_function().map(|_| scope_id))
+            .and_then(|method_scope_id| self.index.class_definition_of_method(method_scope_id))
+            .and_then(|definition| original_class_type(db, definition))
+            .map(|class| class.default_specialization(db))
             .and_then(|class| class.into_protocol_class(db))
         else {
             return;

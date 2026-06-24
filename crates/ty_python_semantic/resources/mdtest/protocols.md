@@ -1086,6 +1086,11 @@ class WithReboundReceiver(Protocol):
         self = Holder()
         self.extra = 1  # no error
 
+class WithEagerNestedClass(Protocol):
+    def method(self) -> None:
+        class Nested:
+            self.extra = 1  # error: [ambiguous-protocol-member]
+
 class WithStaticMethod(Protocol):
     @staticmethod
     def method(value: Holder) -> None:
