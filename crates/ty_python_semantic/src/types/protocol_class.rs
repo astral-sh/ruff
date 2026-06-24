@@ -9,7 +9,6 @@ use rustc_hash::FxHashMap;
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
-    instance_attribute_write_member_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::callable::CallableTypeKind;
@@ -1092,8 +1091,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             } => self.check_type_pair(db, value_ty, *write_ty),
             AttributeWriteRequirement::Module(None)
             | AttributeWriteRequirement::ProtocolMember { write_ty: None, .. } => self.never(),
-            AttributeWriteRequirement::Instance(object_ty) => {
-                self.check_instance_property_write(db, *object_ty, member_name, value_ty)
+            AttributeWriteRequirement::Instance { object_ty, member } => {
+                self.check_instance_property_write(db, *object_ty, member, member_name, value_ty)
             }
             AttributeWriteRequirement::Class { object_ty, member } => {
                 self.check_class_property_write(db, *object_ty, member, value_ty)
@@ -1105,6 +1104,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         object_ty: Type<'db>,
+        member: &InstanceAttributeWriteMember<'db>,
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -1122,8 +1122,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
-        let member = instance_attribute_write_member_requirement(db, object_ty, member_name);
-        match &member {
+        match member {
             InstanceAttributeWriteMember::ClassVar => self.never(),
             InstanceAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
