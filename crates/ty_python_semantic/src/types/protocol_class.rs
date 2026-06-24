@@ -1249,6 +1249,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
 
+        // Checking a class object against a protocol's instance capabilities can expose the
+        // property descriptor itself rather than the value returned by its getter. Compatibility
+        // for properties on class objects is not yet modeled; retain the previous name-only
+        // behavior until generic upper-bound solving can handle the large recursive unions this
+        // otherwise creates.
+        if member.is_property() && matches!(attribute_type, Type::PropertyInstance(_)) {
+            return self.always();
+        }
+
         if member.is_method() && instance_access {
             let Some(required_ty) = required_ty.resolve(db) else {
                 return self.never();
@@ -1547,6 +1556,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // An unbound property descriptor does not establish that the value returned by its
+        // getter is disjoint from the required property type.
+        if member.is_property() && matches!(ty, Type::PropertyInstance(_)) {
+            return self.never();
+        }
         let capabilities = member.capabilities(db);
         if !member.is_method() {
             capabilities
