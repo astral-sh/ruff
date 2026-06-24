@@ -1006,7 +1006,7 @@ the class body are disallowed. This is mandated by [the spec][spec_protocol_memb
 Ordinary, annotated, and annotation-only assignments are treated the same:
 
 ```py
-from typing import Any
+from typing import Any, ClassVar
 
 class Foo(Protocol):
     x: int
@@ -1054,13 +1054,13 @@ class AssignmentForms(Protocol):
 ```
 
 ```snapshot
-warning[ambiguous-protocol-member]: Cannot assign to an undeclared instance attribute in a protocol method
+warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
    --> src/mdtest_snippet.py:321:9
     |
 321 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
     |
-info: Assigning to an undeclared instance attribute in a protocol method leads to an ambiguous interface
+info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:313:7
     |
 313 | class AssignmentForms(Protocol):
@@ -1086,9 +1086,9 @@ reveal_type(get_protocol_members(Super))  # revealed: frozenset[Literal["x"]]
 reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["x"]]
 ```
 
-Only assignments through an instance method's `self` parameter can trigger this diagnostic. Static
-methods, `cls` in class methods, other parameters, and concrete subclasses do not write to a
-protocol instance:
+Assignments through an instance method's `self` parameter or a classmethod's `cls` parameter can
+trigger this diagnostic. Static methods have no implicit receiver, while other parameters and
+methods on concrete subclasses do not affect a protocol's declared interface:
 
 ```py
 class Holder:
@@ -1100,6 +1100,13 @@ class WithStaticMethod(Protocol):
         value.extra = 1  # no error
 
 class WithClassMethod(Protocol):
+    @classmethod
+    def method(cls: Any) -> None:
+        cls.extra = 1  # error: [ambiguous-protocol-member]
+
+class WithDeclaredClassVariable(Protocol):
+    extra: ClassVar[int]
+
     @classmethod
     def method(cls: Any) -> None:
         cls.extra = 1  # no error
@@ -1114,8 +1121,9 @@ class ConcreteSubclass(Foo):
 ```
 
 Assignments can also occur in scopes nested inside a method. A nested class body or function that
-uses the method's `self` still writes to the protocol instance. An inner parameter named `self` and
-a nested function that uses a classmethod's `cls` refer to other objects and are not reported:
+uses the method's `self` still writes to the protocol instance, and a nested function can similarly
+capture a classmethod's `cls`. An inner parameter named `self` refers to another object and is not
+reported:
 
 ```py
 class NestedScopes(Protocol):
@@ -1138,7 +1146,7 @@ class NestedScopes(Protocol):
     @classmethod
     def class_method(cls: Any) -> None:
         def inner() -> None:
-            cls.extra = 1  # no error
+            cls.extra = 1  # error: [ambiguous-protocol-member]
 
         inner()
 ```

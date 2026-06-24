@@ -2847,7 +2847,7 @@ pub(crate) fn report_undeclared_protocol_member(
     );
 }
 
-pub(crate) fn report_undeclared_protocol_instance_attribute(
+pub(crate) fn report_undeclared_protocol_attribute(
     context: &InferContext,
     target: &ast::ExprAttribute,
     protocol_class: ProtocolClass,
@@ -2858,8 +2858,8 @@ pub(crate) fn report_undeclared_protocol_instance_attribute(
     };
 
     let symbol_name = target.attr.as_str();
-    let mut diagnostic = builder
-        .into_diagnostic("Cannot assign to an undeclared instance attribute in a protocol method");
+    let mut diagnostic =
+        builder.into_diagnostic("Cannot assign to an undeclared attribute in a protocol method");
     diagnostic.set_primary_message(format_args!(
         "`{symbol_name}` is not declared as a protocol member"
     ));
@@ -2869,7 +2869,7 @@ pub(crate) fn report_undeclared_protocol_instance_attribute(
         db,
         protocol_class,
         symbol_name,
-        "Assigning to an undeclared instance attribute in a protocol method leads to an ambiguous interface",
+        "Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface",
     );
 }
 

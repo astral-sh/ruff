@@ -1685,11 +1685,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
-    /// Report an undeclared protocol attribute written through an instance-method receiver.
+    /// Report an undeclared protocol attribute written through a method receiver.
     ///
-    /// The receiver may be referenced directly, from an eager nested scope, or through a capture
-    /// in a nested function. Writes through classmethod receivers are excluded.
-    fn report_undeclared_protocol_instance_attribute(&self, target: &ast::ExprAttribute) {
+    /// The instance or class receiver may be referenced directly, from an eager nested scope, or
+    /// through a capture in a nested function.
+    fn report_undeclared_protocol_attribute(&self, target: &ast::ExprAttribute) {
         let db = self.db();
         let Some(receiver) = target.value.as_name_expr() else {
             return;
@@ -1712,20 +1712,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        // A classmethod receiver writes to a class object, not a protocol instance, regardless of
-        // whether the write occurs directly or through a capture in a nested function.
-        let method_scope = self.index.scope(method_scope_id);
-        if method_scope
-            .node()
-            .as_function()
-            .map(|function| function.node(self.module()))
-            .and_then(|function| self.function_type(function))
-            .is_some_and(|function| function.is_classmethod(db))
-        {
-            return;
-        }
-
-        diagnostic::report_undeclared_protocol_instance_attribute(&self.context, target, protocol);
+        diagnostic::report_undeclared_protocol_attribute(&self.context, target, protocol);
     }
 
     /// Returns the implicit `__class__` cell in the current direct method body or
@@ -3750,7 +3737,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
             ) => {
                 let object_ty = self.infer_expression(object, TypeContext::default());
-                self.report_undeclared_protocol_instance_attribute(attr_expr);
+                self.report_undeclared_protocol_attribute(attr_expr);
 
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
@@ -4531,7 +4518,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
             if let ast::Expr::Attribute(target) = target.as_ref() {
-                self.report_undeclared_protocol_instance_attribute(target);
+                self.report_undeclared_protocol_attribute(target);
             }
 
             // For annotated assignments like `self.x: Final[int] = 1`, the `Final` qualifier
@@ -4996,7 +4983,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
-                self.report_undeclared_protocol_instance_attribute(attr_expr);
+                self.report_undeclared_protocol_attribute(attr_expr);
                 self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
             }
         }
