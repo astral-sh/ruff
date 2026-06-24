@@ -3111,6 +3111,34 @@ class ManyCycles:
         reveal_type(self.x6)  # revealed: int
         reveal_type(self.x7)  # revealed: int
 
+# A wide finite cycle needs more than the minimum iteration budget to converge.
+class WideCycle:
+    def __init__(self):
+        self.x1 = 0
+        self.x2 = 0
+        self.x3 = 0
+        self.x4 = 0
+        self.x5 = 0
+        self.x6 = 0
+        self.x7 = 0
+        self.x8 = 0
+        self.x9 = 0
+        self.x10 = 1
+
+    def update(self):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7 + self.x8 + self.x9 + self.x10
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7 + self.x8 + self.x9 + self.x10
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7 + self.x8 + self.x9 + self.x10
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7 + self.x8 + self.x9 + self.x10
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7 + self.x8 + self.x9 + self.x10
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7 + self.x8 + self.x9 + self.x10
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x8 + self.x9 + self.x10
+        self.x8 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7 + self.x9 + self.x10
+        self.x9 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7 + self.x8 + self.x10
+        self.x10 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7 + self.x8 + self.x9
+
+        reveal_type(self.x1)  # revealed: int
+
 class ManyCycles2:
     def __init__(self: "ManyCycles2"):
         self.x1 = [0]

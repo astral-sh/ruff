@@ -51,12 +51,14 @@ use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
+use std::cell::Cell;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
 };
@@ -94,6 +96,15 @@ struct TypeAndRange<'db> {
 }
 
 type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
+
+/// Returns `true` if the eagerly available graph for `ty` contains more than `limit` nodes.
+fn type_exceeds_node_limit<'db>(db: &'db dyn Db, ty: Type<'db>, limit: usize) -> bool {
+    let count = Cell::new(0usize);
+    any_over_type(db, ty, false, |_| {
+        count.set(count.get().saturating_add(1));
+        count.get() > limit
+    })
+}
 
 /// Extends the current collection-use constraints with those from the previous cycle iteration.
 ///
@@ -1261,6 +1272,86 @@ impl<'db> DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
+    /// Maximum size of an unstable type graph retained during cycle recovery, regardless of the
+    /// number of cycle heads.
+    const MAX_PRECISE_CYCLE_TYPE_NODES: usize = 128;
+    const PRECISE_CYCLE_TYPE_NODES_PER_HEAD: usize = 8;
+
+    /// Maximum number of iterations for which definition inference preserves a precise result,
+    /// regardless of the number of cycle heads.
+    ///
+    /// Some recursive definitions form an infinite ascending chain by wrapping the previous
+    /// result in another structural layer. Salsa requires cycle recovery to converge, so after a
+    /// bounded precision phase we return the deterministic cycle-initial result instead. Applying
+    /// the same widening on every later iteration guarantees convergence without trying to align
+    /// unrelated structural positions between successive results.
+    const MAX_PRECISE_CYCLE_ITERATIONS: u32 = 128;
+    const PRECISE_CYCLE_ITERATIONS_PER_HEAD: u32 = 2;
+
+    fn cycle_head_count(cycle: &salsa::Cycle) -> usize {
+        cycle.head_ids().count().max(2)
+    }
+
+    fn max_precise_cycle_type_nodes(cycle: &salsa::Cycle) -> usize {
+        Self::cycle_head_count(cycle)
+            .saturating_mul(Self::PRECISE_CYCLE_TYPE_NODES_PER_HEAD)
+            .min(Self::MAX_PRECISE_CYCLE_TYPE_NODES)
+    }
+
+    fn max_precise_cycle_iterations(cycle: &salsa::Cycle) -> u32 {
+        let cycle_heads = u32::try_from(Self::cycle_head_count(cycle))
+            .unwrap_or(Self::MAX_PRECISE_CYCLE_ITERATIONS);
+        let topology_allowance =
+            cycle_heads.saturating_mul(Self::PRECISE_CYCLE_ITERATIONS_PER_HEAD);
+        crate::TAINTED_CYCLES
+            .saturating_add(topology_allowance)
+            .min(Self::MAX_PRECISE_CYCLE_ITERATIONS)
+    }
+
+    fn exceeds_cycle_type_node_limit(
+        &self,
+        db: &'db dyn Db,
+        previous: &Self,
+        owner: Definition<'db>,
+        node_limit: usize,
+    ) -> bool {
+        let previous_fallback = previous.fallback_type();
+
+        for (definition, current) in self.types.bindings(owner) {
+            if let Some(previous) = previous
+                .types
+                .binding_type(owner, definition)
+                .or(previous_fallback)
+                && current != previous
+                && type_exceeds_node_limit(db, current, node_limit)
+            {
+                return true;
+            }
+        }
+
+        for (definition, current) in self.types.declarations(owner) {
+            if let Some(previous) = previous
+                .types
+                .declaration_type(owner, definition)
+                .map(|ty| ty.inner_type())
+                .or(previous_fallback)
+                && current.inner_type() != previous
+                && type_exceeds_node_limit(db, current.inner_type(), node_limit)
+            {
+                return true;
+            }
+        }
+
+        for (expression, current) in &self.expressions {
+            let previous = previous.expression_type(*expression);
+            if *current != previous && type_exceeds_node_limit(db, *current, node_limit) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -1312,6 +1403,12 @@ impl<'db> DefinitionInference<'db> {
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
+        // Once an unstable cycle result has been widened, keep returning the same deterministic
+        // seed. Otherwise, later iterations can start growing again from `Unknown`.
+        if previous_inference.fallback_type() == Some(Type::unknown()) {
+            return Self::cycle_initial(db, definition, Type::unknown());
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
@@ -1322,6 +1419,17 @@ impl<'db> DefinitionInference<'db> {
             cycle,
             definition,
         );
+
+        if cycle.iteration() > crate::TAINTED_CYCLES + 1
+            && self.exceeds_cycle_type_node_limit(
+                db,
+                previous_inference,
+                definition,
+                Self::max_precise_cycle_type_nodes(cycle),
+            )
+        {
+            return Self::cycle_initial(db, definition, Type::unknown());
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference
@@ -1341,6 +1449,12 @@ impl<'db> DefinitionInference<'db> {
                 previous_constraints,
             );
             self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
+        }
+
+        if cycle.iteration() > Self::max_precise_cycle_iterations(cycle)
+            && self != *previous_inference
+        {
+            return Self::cycle_initial(db, definition, Type::unknown());
         }
 
         self
