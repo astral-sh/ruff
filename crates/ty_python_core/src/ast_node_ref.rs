@@ -32,7 +32,7 @@ use ruff_text_size::Ranged;
 /// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
 /// us some form of scope-stable identity for expressions. Only queries accessing the node field
 /// run on every AST change. All other queries only run when the expression's identity changes.
-#[derive(Clone)]
+#[derive(Clone, salsa::Update)]
 pub struct AstNodeRef<T> {
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -48,6 +48,9 @@ pub struct AstNodeRef<T> {
     #[cfg(debug_assertions)]
     file: File,
 
+    // Always consider the node changed because its identity also depends on the module address,
+    // which is omitted in release builds. Customizing this field avoids requiring `T: Update`.
+    #[update(unsafe(with(|_, _| true)))]
     _node: PhantomData<T>,
 }
 
@@ -98,20 +101,6 @@ where
             .try_into()
             .ok()
             .expect("AST indices should never change within the same revision")
-    }
-}
-
-#[expect(unsafe_code)]
-unsafe impl<T> salsa::Update for AstNodeRef<T> {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut (*old_pointer) };
-
-        // The equality of an `AstNodeRef` depends on both the module address and the node index,
-        // but the former is not stored in release builds to save memory. As such, AST nodes
-        // are always considered change when the AST is reparsed, which is acceptable because
-        // any change to the AST is likely to invalidate most node indices anyways.
-        *old_ref = new_value;
-        true
     }
 }
 
