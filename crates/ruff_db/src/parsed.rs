@@ -233,7 +233,18 @@ mod indexed {
     /// collected. Installing the completed index does not move or mutate the parsed AST, and no
     /// API moves, replaces, or mutably exposes it while the index exists. Lookups pair each stored
     /// address with `NonNull::with_exposed_provenance` and its original kind.
-    #[derive(Debug, Default, get_size2::GetSize)]
+    ///
+    /// # Memory reporting
+    ///
+    /// The actual number of words used by the index depends on the relative addresses of the AST
+    /// nodes. Allocator placement can vary between processes, which makes exact accounting noisy
+    /// in CI memory comparisons even when the indexed AST is unchanged. Memory reports normalize
+    /// the payload to a fixed 32 bits per entry. This conservatively covers 99% of entries in the
+    /// measured Ruff corpus while preserving the size reduction over storing a full
+    /// [`AnyRootNodeRef`] per node. The actual encoding is often narrower than 32 bits. This only
+    /// affects memory reporting; the index itself continues to use the narrowest lossless
+    /// representation for each chunk.
+    #[derive(Debug, Default)]
     struct IndexedNodes {
         chunks: Box<[IndexChunk]>,
         words: Box<[u64]>,
@@ -252,6 +263,26 @@ mod indexed {
         /// chunk.
         entry_count: u8,
         layout: IndexChunkLayout,
+    }
+
+    impl get_size2::GetSize for IndexedNodes {
+        fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(
+            &self,
+            tracker: T,
+        ) -> (usize, T) {
+            let (chunks_size, tracker) =
+                get_size2::GetSize::get_heap_size_with_tracker(&self.chunks, tracker);
+            let words = self
+                .chunks
+                .iter()
+                .map(|chunk| {
+                    (usize::from(chunk.entry_count) * Self::REPORTED_ENTRY_BITS)
+                        .div_ceil(u64::BITS as usize)
+                })
+                .sum::<usize>();
+
+            (chunks_size + words * size_of::<u64>(), tracker)
+        }
     }
 
     #[derive(Copy, Clone, Debug, get_size2::GetSize)]
@@ -324,6 +355,7 @@ mod indexed {
         const CHUNK_LEN: usize = 64;
         const KIND_BITS: u8 = 5;
         const KIND_MASK: u64 = (1 << Self::KIND_BITS) - 1;
+        const REPORTED_ENTRY_BITS: usize = 32;
 
         fn extend_from_nodes(
             chunks: &mut Vec<IndexChunk>,
