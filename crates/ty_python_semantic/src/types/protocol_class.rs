@@ -986,8 +986,9 @@ fn property_set_member_type<'db>(
 fn property_set_type<'db>(
     db: &'db dyn Db,
     property: PropertyInstanceType<'db>,
+    receiver_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    property_set_member_type(db, property.setter(db)?).map(ProtocolMemberType::ty)
+    property_set_member_type(db, property.setter(db)?)?.bind_self(db, receiver_ty)
 }
 
 fn protocol_member_read_type<'db>(
@@ -1194,7 +1195,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ..
             } => {
                 if let Some(property) = descriptor_ty.as_property_instance()
-                    && let Some(set_type) = property_set_type(db, property)
+                    && let Some(set_type) = property_set_type(db, property, object_ty)
                 {
                     return self.check_type_pair(db, value_ty, set_type);
                 }
