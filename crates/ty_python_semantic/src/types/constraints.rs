@@ -1388,13 +1388,15 @@ impl<'db> UpperBound<'db> {
         })
     }
 
-    /// Returns a compact ordinary [`Type`] witness that satisfies this upper bound and, if
-    /// present, an additional declared upper bound.
+    /// Returns the precise ordinary [`Type`] intersection of this upper bound and, if present, an
+    /// additional declared upper bound.
     ///
-    /// This is an under-approximation of the full factored upper bound. When disjunctive clauses
-    /// are present, it returns at most [`MAX_PARTIAL_DNF_TERMS`] satisfying DNF product terms
-    /// instead of materializing the full cross product.
-    pub(crate) fn bounded_partial_dnf_witness(
+    /// This explores a bounded portion of the full factored upper bound. It returns a result only
+    /// when every non-bottom, non-redundant intermediate DNF term fits within
+    /// [`MAX_INTERSECTION_DNF_TERMS`], rather than returning an arbitrary strict subtype when the
+    /// search exceeds that budget. `None` means that the search budget prevented us from producing
+    /// the precise result.
+    pub(crate) fn bounded_intersection(
         &self,
         db: &'db dyn Db,
         declared_upper: Option<Type<'db>>,
@@ -1407,44 +1409,41 @@ impl<'db> UpperBound<'db> {
         let non_union_clauses = clauses.clone().filter(|clause| !clause.is_union());
         let initial = IntersectionType::from_elements(db, non_union_clauses);
 
-        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| {
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
             if new_ty.is_never()
                 || candidates
                     .iter()
                     .any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
             {
-                return;
+                return Some(());
             }
 
             candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
-            if candidates.len() < MAX_PARTIAL_DNF_TERMS {
-                candidates.push(new_ty);
+            if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
+                return None;
             }
+            candidates.push(new_ty);
+            Some(())
         };
 
         let mut frontier = Vec::new();
         let mut next = Vec::new();
-        insert_candidate(&mut frontier, initial);
+        insert_candidate(&mut frontier, initial)?;
 
         let union_clauses = clauses.filter_map(Type::as_union);
         for union_clause in union_clauses {
             next.clear();
+            let alternatives = union_clause.elements(db);
 
             for candidate in &frontier {
-                for alternative in union_clause.elements(db) {
+                for alternative in alternatives {
                     let refined = IntersectionType::from_two_elements(db, *candidate, *alternative);
-                    insert_candidate(&mut next, refined);
-                    if next.len() >= MAX_PARTIAL_DNF_TERMS {
-                        break;
-                    }
-                }
-                if next.len() >= MAX_PARTIAL_DNF_TERMS {
-                    break;
+                    insert_candidate(&mut next, refined)?;
                 }
             }
 
             if next.is_empty() {
-                return None;
+                return Some(Type::Never);
             }
 
             std::mem::swap(&mut frontier, &mut next);
@@ -1454,7 +1453,7 @@ impl<'db> UpperBound<'db> {
     }
 }
 
-const MAX_PARTIAL_DNF_TERMS: usize = 4;
+const MAX_INTERSECTION_DNF_TERMS: usize = 4;
 
 impl ConstraintId {
     fn new<'db>(
@@ -3701,7 +3700,7 @@ impl<'db> PathBounds<'db> {
                 if path_bound.has_upper() {
                     return Ok(path_bound
                         .upper
-                        .bounded_partial_dnf_witness(db, Some(declared_upper)));
+                        .bounded_intersection(db, Some(declared_upper)));
                 }
 
                 Ok(None)
@@ -6942,7 +6941,7 @@ mod tests {
     }
 
     #[test]
-    fn upper_bound_bounded_witness_respects_budget() {
+    fn upper_bound_bounded_intersection_respects_budget() {
         let db = setup_db();
         let bool_ty = known_instance(&db, KnownClass::Bool);
         let int = known_instance(&db, KnownClass::Int);
@@ -6954,18 +6953,18 @@ mod tests {
         let right = UnionType::from_elements(&db, [bool_ty, str, bytes, bytearray]);
         let upper = UpperBound::from_clauses(&db, [left, right]);
 
-        let witness = upper
-            .bounded_partial_dnf_witness(&db, None)
-            .expect("expected a witness");
+        let intersection = upper
+            .bounded_intersection(&db, None)
+            .expect("expected the precise intersection to fit within the budget");
 
-        let witness_union_size = match witness {
+        let intersection_union_size = match intersection {
             Type::Union(union) => union.elements(&db).len(),
             Type::Never => 0,
             _ => 1,
         };
-        assert!(witness_union_size <= MAX_PARTIAL_DNF_TERMS);
-        assert!(witness.is_constraint_set_assignable_to(&db, left));
-        assert!(witness.is_constraint_set_assignable_to(&db, right));
+        assert!(intersection_union_size <= MAX_INTERSECTION_DNF_TERMS);
+        assert!(intersection.is_constraint_set_assignable_to(&db, left));
+        assert!(intersection.is_constraint_set_assignable_to(&db, right));
     }
 
     #[test]

@@ -314,10 +314,41 @@ def consume_right(value: B | D | E) -> None: ...
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: B
 ```
 
-## Incompatible inferred union upper bounds
+## Inferred union upper bound exceeding the solution budget
 
-If no type satisfying all inferred union upper bounds can be found, the type variable remains
-unsolved and receives the usual `Unknown` fallback.
+If the precise inferred solution has more elements than the bounded intersection can retain, the
+type variable remains unsolved rather than using an arbitrary strict subtype of the correct result.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+def consume(value: A | B | C | D | E) -> None: ...
+
+reveal_type(infer_from_consumer(consume))  # revealed: Unknown
+```
+
+## Disjoint inferred union upper bounds
+
+If `Never` is the only type satisfying all inferred union upper bounds, it is the valid inferred
+specialization for the type variable.
 
 ```py
 from typing import Callable, final
@@ -343,7 +374,7 @@ class D: ...
 def consume_left(value: A | B) -> None: ...
 def consume_right(value: C | D) -> None: ...
 
-reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
 ```
 
 ## Combining inferred and declared upper bounds

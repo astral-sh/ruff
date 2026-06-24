@@ -1220,7 +1220,7 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
 /// contravariance. Fully materializing the conjunction of these bounds would require constructing
-/// the cross product of all union alternatives. Factored path bounds and bounded witness extraction
+/// the cross product of all union alternatives. Factored path bounds and bounded intersection
 /// keep the work bounded instead.
 fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     const NUM_CLAUSES: usize = 12;
