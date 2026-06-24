@@ -218,15 +218,26 @@ fn class_pattern_is_exhaustive(
         })
 }
 
+/// The static lookup result for a pattern class's `__match_args__` member.
+///
+/// `PossiblyUndefined` is distinct from `Undefined` because a conditional definition can take
+/// precedence over match-self behavior at runtime, so that behavior cannot be assumed.
 enum ClassMatchArgs<'db> {
+    /// The class and its metaclass hierarchy do not define `__match_args__`.
     Undefined,
+    /// `__match_args__` is definitely bound with this type.
     Defined(Type<'db>),
+    /// `__match_args__` is defined along some control-flow paths but not others.
     PossiblyUndefined,
 }
 
+/// The value supplied to one positional subpattern in a class pattern.
 enum ClassPatternPositionalSource {
+    /// The complete subject, as used by Python's special built-in class patterns.
     MatchSelf,
+    /// The named attribute extracted from the subject according to `__match_args__`.
     Attribute(Name),
+    /// No value source can be determined statically, so the subpattern is not exhaustive.
     Unknown,
 }
 
@@ -256,6 +267,11 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
     }
 }
 
+/// Return whether `class` inherits Python's special match-self class-pattern behavior.
+///
+/// Callers must first establish that `__match_args__` is statically absent. A definite definition
+/// overrides match-self behavior, while a conditional definition makes it runtime-dependent;
+/// neither case should consult this flag.
 fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
     class
         .iter_mro(db)
@@ -280,6 +296,26 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         })
 }
 
+/// Resolve the value supplied to each positional subpattern, preserving source order and length.
+///
+/// A fixed tuple of string literals in `__match_args__` maps positions to subject attributes.
+/// Python's special built-in classes map only the first position to the complete subject. Missing,
+/// extra, widened, or conditionally defined positions resolve to
+/// [`ClassPatternPositionalSource::Unknown`].
+///
+/// ```python
+/// class Point:
+///     __match_args__ = ("x",)
+///     x: int
+///
+/// match point:
+///     case Point(_):  # The positional subpattern receives `point.x`.
+///         pass
+///
+/// match number:
+///     case int(_):  # The positional subpattern receives `number` itself.
+///         pass
+/// ```
 fn class_pattern_positional_sources(
     db: &dyn Db,
     class: ClassLiteral<'_>,
