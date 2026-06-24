@@ -2193,7 +2193,8 @@ static_assert(is_subtype_of(XCustomDescriptor, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XCustomDescriptor, HasAsymmetricXProperty))
 ```
 
-A property setter that never returns does not make an attribute writable:
+A property's setter return type does not affect whether it satisfies a writable protocol member.
+Ordinary assignment still reports an error if the setter never returns:
 
 ```py
 from typing_extensions import Never
@@ -2207,19 +2208,8 @@ class TerminalPropertySetter:
     def x(self, value: int) -> Never:
         raise RuntimeError
 
-class NeverAttribute:
-    x: Never
-
-class HasNeverAttribute(Protocol):
-    @property
-    def x(self) -> Never: ...
-    @x.setter
-    def x(self, value: Never) -> None: ...
-
-static_assert(not is_subtype_of(TerminalPropertySetter, HasMutableXProperty))
-static_assert(not is_assignable_to(TerminalPropertySetter, HasMutableXProperty))
-static_assert(is_subtype_of(NeverAttribute, HasNeverAttribute))
-static_assert(is_assignable_to(NeverAttribute, HasNeverAttribute))
+static_assert(is_subtype_of(TerminalPropertySetter, HasMutableXProperty))
+static_assert(is_assignable_to(TerminalPropertySetter, HasMutableXProperty))
 
 terminal_property = TerminalPropertySetter()
 terminal_property.x = 1  # error: [invalid-assignment]
