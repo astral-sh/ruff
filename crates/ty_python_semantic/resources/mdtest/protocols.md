@@ -1091,6 +1091,14 @@ class WithClassMethod(Protocol):
     def method(cls) -> None:
         cls.extra = 1  # no error
 
+    @classmethod
+    def gradual_receiver(cls: Any) -> None:
+        cls.extra = 1  # no error
+
+    @classmethod
+    def bare_type_receiver(cls: type) -> None:
+        cls.extra = 1  # error: [unresolved-attribute]
+
 class WithOtherParameter(Protocol):
     def method(self, value: Holder) -> None:
         value.extra = 1  # no error
