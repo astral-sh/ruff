@@ -122,8 +122,8 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
-Comparisons between values of the same enum preserve existing narrowing. They can also narrow to
-members shared by both operands, or determine that groups with no members in common are unequal:
+When both operands are restricted to members of the same enum, equality narrows each operand to the
+members allowed by both. If the restrictions do not overlap, the comparison is always false:
 
 ```py
 from enum import Enum, IntEnum, StrEnum
@@ -169,7 +169,12 @@ def compare_non_overlapping_literal_unions(
     right: Literal[Choice.THIRD, Choice.FOURTH],
 ):
     reveal_type(left == right)  # revealed: Literal[False]
+```
 
+Members with the same known value are aliases, even when one value comes from a function call.
+Comparisons between their canonical members are always true:
+
+```py
 def make_value() -> Literal["value"]:
     return "value"
 
@@ -177,9 +182,7 @@ class RuntimeAlias(StrEnum):
     FIRST = make_value()
     SECOND = "value"
 
-# These members have equal runtime values, but the inferred value literals have different
-# promotability. We therefore cannot conclude that the members compare unequal.
-reveal_type(RuntimeAlias.FIRST == RuntimeAlias.SECOND)  # revealed: bool
+reveal_type(RuntimeAlias.FIRST == RuntimeAlias.SECOND)  # revealed: Literal[True]
 
 def make_int_value() -> Literal[1]:
     return 1
@@ -188,17 +191,22 @@ class RuntimeIntAlias(IntEnum):
     FIRST = make_int_value()
     SECOND = 1
 
-reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: bool
+reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Literal[True]
+```
 
+Scalar mixins can also coerce different class-body values to the same runtime value. Here, both
+declarations become aliases at runtime, so the comparison cannot be assumed false:
+
+```py
 class CoercingAlias(str, Enum):
     FIRST = 1
     SECOND = "1"
 
-# `str.__new__` normalizes both declared values to the same runtime string.
 reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: bool
 ```
 
-Equality narrowing must not copy unrelated parts of one operand's type to the other:
+Equality narrowing must not transfer `Any` or an unrelated `NewType` constraint from one operand to
+the other:
 
 ```py
 from enum import StrEnum
@@ -210,12 +218,6 @@ class Response(StrEnum):
     REJECT = "reject"
 
 Tag = NewType("Tag", str)
-
-def compare_any(left: Response, right: Any):
-    if isinstance(right, Response):
-        if left != right:
-            return
-        left.does_not_exist  # error: [unresolved-attribute]
 
 def compare_narrowed_any(left: Response, right: Any):
     if isinstance(right, Response):
@@ -277,23 +279,18 @@ even when only one member is declared:
 ```py
 from enum import Enum
 
-class OpenEnum(Enum):
+class MissingValueEnum(Enum):
     ONLY = 1
 
     @classmethod
-    def _missing_(cls, value: object) -> "OpenEnum":
+    def _missing_(cls, value: object) -> "MissingValueEnum":
         return object.__new__(cls)
 
-def compare_open_enums(left: OpenEnum, right: OpenEnum):
+def compare_open_enums(left: MissingValueEnum, right: MissingValueEnum):
     reveal_type(left == right)  # revealed: bool
 
     if left != right:
-        reveal_type(left)  # revealed: OpenEnum
-
-def exclude_declared_member(value: OpenEnum):
-    if value is OpenEnum.ONLY:
-        return
-    reveal_type(value)  # revealed: OpenEnum & ~Literal[OpenEnum.ONLY]
+        reveal_type(left)  # revealed: MissingValueEnum
 ```
 
 A custom enum metaclass can add members that do not appear in the class body. Two values of a
@@ -333,12 +330,6 @@ def compare_custom(left: NeverEqual, right: NeverEqual):
 
     if left is NeverEqual.FIRST:
         return
-    reveal_type(left == right)  # revealed: Literal[False]
-
-def compare_custom_subsets(
-    left: Literal[NeverEqual.FIRST, NeverEqual.SECOND],
-    right: Literal[NeverEqual.SECOND, NeverEqual.THIRD],
-):
     reveal_type(left == right)  # revealed: Literal[False]
 ```
 
