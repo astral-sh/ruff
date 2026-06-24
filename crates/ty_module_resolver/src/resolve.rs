@@ -1044,14 +1044,14 @@ fn desperately_resolve_name(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
-    let search_paths = absolute_desperate_search_paths(db, importing_file);
+    let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
     resolve_name_impl(
         db,
         name,
         mode,
-        search_paths.into_iter().flatten(),
+        search_paths.iter(),
         &if mode.stubs_allowed() {
-            StubPackageSearchPaths::from_search_paths(db, search_paths.into_iter().flatten())
+            StubPackageSearchPaths::from_search_paths(db, search_paths.iter())
         } else {
             StubPackageSearchPaths::empty()
         },
