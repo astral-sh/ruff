@@ -1961,6 +1961,31 @@ static_assert(not is_assignable_to(HasStrXProperty, HasXProperty))
 static_assert(not is_assignable_to(HasXProperty, HasStrXProperty))
 ```
 
+Property getters with an explicitly typed `self` parameter are bound to the implementing instance
+before their read types are compared:
+
+```py
+from typing import Callable, Protocol, TypeVar
+from ty_extensions import is_assignable_to, static_assert
+
+T = TypeVar("T")
+
+class HasProperty(Protocol):
+    @property
+    def value(self: T) -> T: ...
+    def transform(self, value: T, callback: Callable[[T], str]) -> str: ...
+
+class Implementation:
+    @property
+    def value(self: T) -> T:
+        return self
+
+    def transform(self, value: T, callback: Callable[[T], str]) -> str:
+        return callback(value)
+
+static_assert(is_assignable_to(Implementation, HasProperty))
+```
+
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below
 example satisfies the `HasXProperty` interface even though the type of the `x` attribute on `XSub`
 is a subtype of `int` rather than being exactly `int`.
