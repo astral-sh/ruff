@@ -532,13 +532,14 @@ class Connection:
 
               progress_handler
                 A callable that takes no arguments.
-                If the callable returns non-zero, the current query is terminated,
-                and an exception is raised.
+                If the callable returns non-zero, the current query is
+                terminated, and an exception is raised.
               n
                 The number of SQLite virtual machine instructions that are
                 executed between invocations of 'progress_handler'.
 
-            If 'progress_handler' is None or 'n' is 0, the progress handler is disabled.
+            If 'progress_handler' is None or 'n' is 0, the progress handler is
+            disabled.
 
             Note: Passing keyword argument 'progress_handler' to
             _sqlite3.Connection.set_progress_handler() is deprecated. Parameter

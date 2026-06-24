@@ -870,7 +870,7 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
-            Self::Sentinel => "Sentinel",
+            Self::Sentinel => "sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
@@ -1257,12 +1257,18 @@ impl KnownClass {
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
-            | Self::Sentinel
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::Sentinel => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY315 {
+                    KnownModule::Builtins
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1574,7 +1580,7 @@ impl KnownClass {
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
-            "Sentinel" => &[Self::Sentinel],
+            "sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
             "defaultdict" => &[Self::DefaultDict],

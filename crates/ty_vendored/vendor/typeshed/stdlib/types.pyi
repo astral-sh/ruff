@@ -339,7 +339,7 @@ class MappingProxyType(Mapping[_KT_co, _VT_co]):  # type: ignore[type-var]  # py
     def get(self, key: _KT_co, default: _T2, /) -> _VT_co | _T2: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """mappingproxy objects are generic over two types, signifying (respectively) the types of their keys and values"""
 
     def __reversed__(self) -> Iterator[_KT_co]:
         """D.__reversed__() -> reverse iterator"""
@@ -488,7 +488,7 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
 
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
-            """See PEP 585"""
+            """generators are generic over the types of their yield, send, and return values"""
 
 @final
 class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
@@ -543,7 +543,7 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
         """aclose() -> raise GeneratorExit inside generator."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """async generators are generic over the types of their yield and send values"""
 
 # Non-default variations to accommodate coroutines
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
@@ -603,7 +603,7 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
 
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
-            """See PEP 585"""
+            """coroutines are generic over the types of their yield, send, and return values"""
 
 @final
 class MethodType:
@@ -958,7 +958,8 @@ def coroutine(func: _Fn) -> _Fn: ...
 class GenericAlias:
     """Represent a PEP 585 generic type
 
-    E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+    For example, for t = list[int], t.__origin__ is list and t.__args__
+    is (int,).
     """
 
     @property
@@ -982,10 +983,12 @@ class GenericAlias:
         @property
         def __typing_unpacked_tuple_args__(self) -> tuple[Any, ...] | None: ...
 
-    def __or__(self, value: Any, /) -> UnionType:
+    # `other` can be any legal form for unions.
+    # `list[int] | list[int]` creates a `GenericAlias` instance, not a `UnionType` instance
+    def __or__(self, value: Any, /) -> UnionType | GenericAlias:
         """Return self|value."""
 
-    def __ror__(self, value: Any, /) -> UnionType:
+    def __ror__(self, value: Any, /) -> UnionType | GenericAlias:
         """Return value|self."""
 
     # GenericAlias delegates attr access to `__origin__`
