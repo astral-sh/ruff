@@ -2296,7 +2296,7 @@ pub(super) struct AbstractMethod<'db> {
 }
 
 /// The decorator category for a method-like function.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, get_size2::GetSize)]
 pub enum MethodDecorator {
     /// An instance method with an implicit instance receiver, conventionally named `self`.
     #[default]
