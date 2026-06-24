@@ -1464,6 +1464,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 || self.always(),
                 |write_ty| {
                     let fallback_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
+                    let receiver_ty = if access == ProtocolMemberAccessMode::Instance
+                        && matches!(ty, Type::LiteralValue(_))
+                    {
+                        fallback_ty
+                    } else {
+                        receiver_ty
+                    };
                     write_ty.bind_self(db, fallback_ty).when_some_and(
                         db,
                         self.constraints,

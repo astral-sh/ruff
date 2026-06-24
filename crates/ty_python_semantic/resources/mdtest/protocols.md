@@ -2100,6 +2100,19 @@ static_assert(not is_assignable_to(HasMutableXAttrWrongType, HasMutableXProperty
 static_assert(not is_assignable_to(HasMutableXProperty, HasMutableXAttrWrongType))
 ```
 
+Literal values use their fallback instance type when checking writable property requirements:
+
+```py
+class JustInt(Protocol):
+    @property
+    def __class__(self) -> type[int]: ...
+    @__class__.setter
+    def __class__(self, value: type[int]) -> None: ...
+
+int_value: JustInt = 1
+bool_value: JustInt = True  # error: [invalid-assignment]
+```
+
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
 getter, can be satisfied by a mutable attribute of any type bounded by the upper bound of the
 getter-returned type and the lower bound of the setter-accepted type.
