@@ -241,11 +241,22 @@ fn comparison_truthiness<'db>(
     right: Type<'db>,
     operator: ComparisonOperator,
 ) -> Truthiness {
-    match ComparisonEvaluator::new(db).evaluate(left, right, ComparisonBranch::Positive, operator) {
+    match ComparisonEvaluator::for_truthiness(db).evaluate(
+        left,
+        right,
+        ComparisonBranch::Positive,
+        operator,
+    ) {
         ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
         ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
         ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => Truthiness::Ambiguous,
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComparisonGoal {
+    Constraint,
+    Truthiness,
 }
 
 /// Identifies an active comparison evaluation.
@@ -263,6 +274,7 @@ struct ComparisonKey<'db> {
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     active: FxHashSet<ComparisonKey<'db>>,
+    goal: ComparisonGoal,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
@@ -270,6 +282,15 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             active: FxHashSet::default(),
+            goal: ComparisonGoal::Constraint,
+        }
+    }
+
+    fn for_truthiness(db: &'db dyn Db) -> Self {
+        Self {
+            db,
+            active: FxHashSet::default(),
+            goal: ComparisonGoal::Truthiness,
         }
     }
 
@@ -713,6 +734,14 @@ fn evaluate_union_left<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return combine_definite_truthiness(
+            elements
+                .iter()
+                .map(|element| evaluator.evaluate(*element, other, branch, operator)),
+        );
+    }
+
     let db = evaluator.db;
     evaluate_target_union(db, elements, branch, |element| {
         evaluator.evaluate(element, other, branch, operator)
@@ -806,6 +835,14 @@ fn evaluate_union_right<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return combine_definite_truthiness(
+            elements
+                .iter()
+                .map(|element| evaluator.evaluate(left, *element, branch, operator)),
+        );
+    }
+
     let db = evaluator.db;
     evaluate_against_results(
         db,
@@ -815,6 +852,34 @@ fn evaluate_union_right<'db>(
             .iter()
             .map(|element| evaluator.evaluate(left, *element, branch, operator)),
     )
+}
+
+/// Combine results when the caller only needs definite truthiness.
+///
+/// Any ambiguous or narrowing result, or any disagreement between definite results, makes the
+/// aggregate ambiguous. In each case, later alternatives cannot make it definite again.
+fn combine_definite_truthiness<'db>(
+    results: impl IntoIterator<Item = ComparisonResult<'db>>,
+) -> ComparisonResult<'db> {
+    let mut definite = None;
+
+    for result in results {
+        let current = match result {
+            ComparisonResult::AlwaysTrue => true,
+            ComparisonResult::AlwaysFalse => false,
+            ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
+                return ComparisonResult::Ambiguous;
+            }
+        };
+
+        match definite {
+            Some(previous) if previous != current => return ComparisonResult::Ambiguous,
+            Some(_) => {}
+            None => definite = Some(current),
+        }
+    }
+
+    definite.map_or(ComparisonResult::Ambiguous, ComparisonResult::from_bool)
 }
 
 /// Combine comparison results produced by alternatives of the non-target operand.
@@ -880,6 +945,14 @@ fn evaluate_intersection_left<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return combine_definite_truthiness(
+            positive
+                .iter()
+                .map(|element| evaluator.evaluate(*element, other, branch, operator)),
+        );
+    }
+
     let db = evaluator.db;
     let mut any_true = false;
     let mut any_false = false;
