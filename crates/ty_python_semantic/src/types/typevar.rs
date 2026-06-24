@@ -1321,7 +1321,7 @@ pub enum TypeVarKind {
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
     /// `Ts = TypeVarTuple("Ts")`
-    TypeVarTuple,
+    LegacyTypeVarTuple,
     /// `def foo[*Ts]() -> None: ...`
     Pep695TypeVarTuple,
     /// `Alias: typing.TypeAlias = T`
@@ -1334,7 +1334,7 @@ impl TypeVarKind {
     }
 
     pub(super) const fn is_typevartuple(self) -> bool {
-        matches!(self, Self::TypeVarTuple | Self::Pep695TypeVarTuple)
+        matches!(self, Self::LegacyTypeVarTuple | Self::Pep695TypeVarTuple)
     }
 }
 

@@ -6821,7 +6821,7 @@ impl<'db> Type<'db> {
                 {
                     Some(*bound_typevar)
                 }
-                TypeVarKind::TypeVarTuple
+                TypeVarKind::LegacyTypeVarTuple
                     if binding_context.is_none_or(|binding_context| {
                         bound_typevar.binding_context(db)
                             == BindingContext::Definition(binding_context)

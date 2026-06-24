@@ -895,7 +895,7 @@ impl<'db> GenericContext<'db> {
             db,
             self.variables(db)
                 .map(|typevar| match typevar.kind(db) {
-                    TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
                         Type::homogeneous_tuple(db, Type::unknown())
                     }
                     TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
@@ -1043,7 +1043,7 @@ impl<'db> GenericContext<'db> {
         let mut expanded = Vec::with_capacity(types.len());
         for typevar in variables.clone() {
             expanded.push(match typevar.kind(db) {
-                TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
                     Type::homogeneous_tuple(db, Type::unknown())
                 }
                 TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
@@ -2390,7 +2390,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // https://github.com/astral-sh/ty/issues/1778
                         // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
                     }
-                    TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
                         // Repeated uses of a `TypeVarTuple` must have the same length, but the typing
                         // spec leaves the exact inference behavior unspecified. Merge equal-length
                         // candidates element-wise using unions.
