@@ -42,8 +42,8 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, assignment_attribute_members,
-    attribute_write_requirement, descriptor_setter_returns_never,
-    instance_attribute_write_member_requirement,
+    attribute_write_requirement, instance_attribute_write_member_requirement,
+    property_setter_returns_never,
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -10849,6 +10849,33 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     false
                 }
             }
+            AttributeWriteRequirement::ProtocolMember {
+                write_ty,
+                qualifiers,
+            } => {
+                if let Some(write_ty) = write_ty {
+                    let value_ty =
+                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                    self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
+                } else {
+                    self.infer_value(TypeContext::default(), emit_diagnostics);
+                    let reported_final = !qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                        && qualifiers.contains(TypeQualifiers::FINAL)
+                        && !self.final_assignment_is_valid(
+                            self.object_ty,
+                            *qualifiers,
+                            emit_diagnostics,
+                        );
+                    if emit_diagnostics && !reported_final {
+                        self.report(if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                            AssignmentAttributeWriteDiagnostic::CannotAssignToClassVar
+                        } else {
+                            AssignmentAttributeWriteDiagnostic::CannotAssign
+                        });
+                    }
+                    false
+                }
+            }
             AttributeWriteRequirement::Instance(object_ty) => {
                 self.evaluate_instance(*object_ty, emit_diagnostics)
             }
@@ -11059,13 +11086,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     db,
                     &CallArguments::positional([*descriptor_ty, object_ty, value_ty]),
                 );
-                if descriptor_setter_returns_never(
-                    db,
-                    *descriptor_ty,
-                    *setter_ty,
-                    object_ty,
-                    value_ty,
-                ) {
+                if property_setter_returns_never(db, *descriptor_ty, object_ty, value_ty) {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
                     }

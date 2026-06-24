@@ -28,6 +28,11 @@ pub(super) enum AttributeWriteRequirement<'db> {
     /// The object type does not permit writes at all.
     CannotAssign,
     Module(Option<Type<'db>>),
+    /// The effective instance-write type of a declared protocol member, if it is writable.
+    ProtocolMember {
+        write_ty: Option<Type<'db>>,
+        qualifiers: TypeQualifiers,
+    },
     Instance(Type<'db>),
     Class {
         object_ty: Type<'db>,
@@ -122,8 +127,18 @@ pub(super) fn attribute_write_requirement<'db>(
             AttributeWriteRequirement::Unconstrained
         }
 
+        Type::ProtocolInstance(protocol) => protocol
+            .interface(db)
+            .instance_write_requirement(db, attribute)
+            .map_or(
+                AttributeWriteRequirement::Instance(object_ty),
+                |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
+                    write_ty,
+                    qualifiers,
+                },
+            ),
+
         Type::NominalInstance(..)
-        | Type::ProtocolInstance(_)
         | Type::LiteralValue(..)
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
@@ -361,35 +376,20 @@ fn effective_write_type<'db>(
     }
 }
 
-pub(super) fn descriptor_setter_returns_never<'db>(
+pub(super) fn property_setter_returns_never<'db>(
     db: &'db dyn Db,
-    descriptor_ty: Type<'db>,
-    setter_ty: Type<'db>,
+    property_ty: Type<'db>,
     object_ty: Type<'db>,
     value_ty: Type<'db>,
 ) -> bool {
-    // `Never` permits arbitrary operations only because there can be no runtime
-    // value to write through; it is not a terminal concrete descriptor.
-    let setter_returns_never = !descriptor_ty.is_never()
-        && match setter_ty.try_call(
-            db,
-            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
-        ) {
-            Ok(result) => result.return_type(db).is_never(),
-            Err(error) => error.return_type(db).is_never(),
-        };
-
-    setter_returns_never
-        || descriptor_ty
-            .as_property_instance()
-            .is_some_and(|property| {
-                property.setter(db).is_some_and(|setter| {
-                    match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
-                        Ok(result) => result.return_type(db).is_never(),
-                        Err(error) => error.return_type(db).is_never(),
-                    }
-                })
-            })
+    property_ty.as_property_instance().is_some_and(|property| {
+        property.setter(db).is_some_and(|setter| {
+            match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
+                Ok(result) => result.return_type(db).is_never(),
+                Err(error) => error.return_type(db).is_never(),
+            }
+        })
+    })
 }
 
 pub(super) fn assignment_attribute_members<'db>(

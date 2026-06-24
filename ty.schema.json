@@ -522,7 +522,7 @@
         },
         "final-without-value": {
           "title": "detects `Final` declarations without a value",
-          "description": "## What it does\n\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\n\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n\n```python\nfrom typing import Final\n\n# `Final` symbol without a value\nMY_CONSTANT: Final[int]  # error\n\n# OK: `Final` symbol with a value\nINITIALIZED_CONSTANT: Final[int] = 1\n```",
+          "description": "## What it does\n\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\n\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\nProtocol members are declarations of an interface and do not require a value.\n\n## Examples\n\n```python\nfrom typing import Final\n\n# `Final` symbol without a value\nMY_CONSTANT: Final[int]  # error\n\n# OK: `Final` symbol with a value\nINITIALIZED_CONSTANT: Final[int] = 1\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1292,7 +1292,7 @@
         },
         "redundant-final-classvar": {
           "title": "detects redundant combinations of `ClassVar` and `Final`",
-          "description": "## What it does\n\nChecks for redundant combinations of the `ClassVar` and `Final` type qualifiers.\n\n## Why is this bad?\n\nAn attribute that is marked `Final` in a class body is implicitly a class variable.\nMarking it as `ClassVar` is therefore redundant.\n\nNote that this diagnostic is not emitted for dataclass fields, where\n`ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.\n\n## Examples\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass C:\n    # redundant\n    x: ClassVar[Final[int]] = 1  # error\n    # redundant\n    y: Final[ClassVar[int]] = 1  # error\n```",
+          "description": "## What it does\n\nChecks for redundant combinations of the `ClassVar` and `Final` type qualifiers.\n\n## Why is this bad?\n\nAn attribute that is marked `Final` in a class body is implicitly a class variable.\nMarking it as `ClassVar` is therefore redundant.\n\nNote that this diagnostic is not emitted for dataclass fields or protocol members,\nwhere `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.\n\n## Examples\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass C:\n    # redundant\n    x: ClassVar[Final[int]] = 1  # error\n    # redundant\n    y: Final[ClassVar[int]] = 1  # error\n```",
           "default": "warn",
           "oneOf": [
             {
