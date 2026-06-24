@@ -12,8 +12,9 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    DynamicType, KnownClass, MemberLookupPolicy, ProjectionEvidenceSet, ProjectionSolutions, Type,
+    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -916,6 +917,35 @@ impl<'db> PlaceAndQualifiers<'db> {
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        self.cycle_normalized_with_projection_evidence(db, previous_place, cycle, None)
+    }
+
+    pub(crate) fn cycle_normalized_with_projection_evidence(
+        self,
+        db: &'db dyn Db,
+        previous_place: Self,
+        cycle: &salsa::Cycle,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        self.cycle_join_for_recovery(db, previous_place, cycle)
+            .recursive_type_normalized_with_projection_solutions(
+                db,
+                cycle,
+                None,
+                projection_evidence,
+            )
+    }
+
+    /// Cycle-recovery-time API: combines the current and previous fixed-point iteration results.
+    ///
+    /// This keeps projection artifacts intact so callers can solve all result slots together before
+    /// applying recursive normalization.
+    pub(crate) fn cycle_join_for_recovery(
+        self,
+        db: &'db dyn Db,
+        previous_place: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let qualifiers = if cycle.iteration() <= 1 {
             self.qualifiers
         } else {
@@ -927,7 +957,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                ty: current.ty.cycle_join_for_recovery(db, prev.ty, cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -948,7 +978,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, cycle),
+                ty: current.ty,
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -963,7 +993,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        ty: prev.ty,
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -972,6 +1002,34 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
         PlaceAndQualifiers { place, qualifiers }
+    }
+
+    /// Cycle-recovery-time API: normalizes a joined place using result-wide projection solutions.
+    pub(crate) fn recursive_type_normalized_with_projection_solutions(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+        projection_solutions: Option<&ProjectionSolutions<'db>>,
+        projection_evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        let place = match self.place {
+            Place::Defined(place) => Place::Defined(DefinedPlace {
+                ty: place
+                    .ty
+                    .recursive_type_normalized_with_projection_solutions(
+                        db,
+                        cycle,
+                        projection_solutions,
+                        projection_evidence,
+                    ),
+                ..place
+            }),
+            Place::Undefined => Place::Undefined,
+        };
+        PlaceAndQualifiers {
+            place,
+            qualifiers: self.qualifiers,
+        }
     }
 }
 
@@ -1017,9 +1075,8 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, None)
-            .place
-            .with_qualifiers(qualifiers);
+        let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+        return inferred.place.with_qualifiers(qualifiers);
     }
 
     match declared {
@@ -1037,7 +1094,8 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            match inferred.place {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1130,8 +1188,9 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place;
+            let inferred_result =
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let mut inferred = inferred_result.place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1178,14 +1237,14 @@ pub(crate) fn place_by_id<'db>(
                 || scope_has_private_visibility
                 || in_stub_file
             {
-                inferred.into()
+                inferred.with_qualifiers(TypeQualifiers::empty())
             } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
                 inferred
                     .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
+                    .with_qualifiers(TypeQualifiers::empty())
             }
         }
     }

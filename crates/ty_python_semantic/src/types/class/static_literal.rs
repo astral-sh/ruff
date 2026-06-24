@@ -21,9 +21,10 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, ProjectionEvidenceSet,
+        ProjectionRecoveryBuilder, PropertyInstanceType, Signature, SpecialFormType,
+        StaticMroError, SubclassOfType, Truthiness, Type, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -42,8 +43,8 @@ use crate::{
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::infer_unpack_types,
-        infer_expression_type, inferred_declaration,
+        infer::{infer_expression_types, infer_unpack_types},
+        inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
@@ -56,7 +57,7 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    attribute_scopes,
+    EvaluationMode, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -1166,8 +1167,8 @@ impl<'db> StaticClassLiteral<'db> {
         ) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
-                return Member {
-                    inner: Place::declared(KnownClass::Dict.to_specialized_instance(
+                return Member::new(
+                    Place::declared(KnownClass::Dict.to_specialized_instance(
                         db,
                         &[
                             KnownClass::Str.to_instance(db),
@@ -1175,12 +1176,12 @@ impl<'db> StaticClassLiteral<'db> {
                         ],
                     ))
                     .with_qualifiers(TypeQualifiers::CLASS_VAR),
-                };
+                );
             } else if name == "__dataclass_params__" {
                 // There is no typeshed class for this. For now, we model it as `Any`.
-                return Member {
-                    inner: Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR),
-                };
+                return Member::new(
+                    Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR),
+                );
             }
         }
 
@@ -2203,19 +2204,20 @@ impl<'db> StaticClassLiteral<'db> {
             db,
             ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
         )
+        .member
     }
 
     #[salsa::tracked(
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _| Member {
-            inner: Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|_, id, _| {
+            ImplicitAttributeMember::new(Member::new(Place::bound(Type::divergent(id)).into()))
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn implicit_attribute_inner(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
-    ) -> Member<'db> {
+    ) -> ImplicitAttributeMember<'db> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db);
         let target_method_decorator = attribute.target_method_decorator(db);
@@ -2228,6 +2230,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let mut is_attribute_bound = false;
         let mut provenance = Provenance::Unknown;
+        let mut projection_evidence = None;
 
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
@@ -2316,16 +2319,31 @@ impl<'db> StaticClassLiteral<'db> {
                         // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
                         // on the right-hand side.
 
-                        let inferred_ty = infer_expression_type(
+                        let inference = infer_expression_types(
                             db,
                             index.expression(value),
                             TypeContext::default(),
                         );
-                        return Member {
-                            inner: Place::bound(inferred_ty)
+                        projection_evidence = ProjectionEvidenceSet::merged(
+                            db,
+                            projection_evidence,
+                            inference.projection_evidence(),
+                        );
+                        let inferred_ty = inference.expression_type(value);
+                        projection_evidence = ProjectionEvidenceSet::merged(
+                            db,
+                            projection_evidence,
+                            // Projection demand can be introduced after this implicit-attribute
+                            // result is produced. The attribute inference cannot know ahead of
+                            // time whether evidence will be needed, so collect eagerly.
+                            ProjectionEvidenceSet::from_types(db, [inferred_ty]),
+                        );
+                        return ImplicitAttributeMember::new(Member::new(
+                            Place::bound(inferred_ty)
                                 .with_definition(declaration)
                                 .with_qualifiers(all_qualifiers),
-                        };
+                        ))
+                        .with_projection_evidence(projection_evidence);
                     }
 
                     // If there is no right-hand side, just record that we saw a `Final` qualifier
@@ -2333,7 +2351,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                return Member { inner: annotation };
+                return ImplicitAttributeMember::new(Member::new(annotation));
             }
         }
 
@@ -2411,6 +2429,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //     [.., self.name, ..] = <value>
 
                             let unpacked = infer_unpack_types(db, unpack);
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                unpacked.projection_evidence(),
+                            );
                             Some(unpacked.expression_type(assign.target(&module)))
                         }
                         None => {
@@ -2418,11 +2441,18 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     self.name = <value>
 
-                            Some(infer_expression_type(
+                            let value = assign.value(&module);
+                            let inference = infer_expression_types(
                                 db,
-                                index.expression(assign.value(&module)),
+                                index.expression(value),
                                 TypeContext::default(),
-                            ))
+                            );
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                inference.projection_evidence(),
+                            );
+                            Some(inference.expression_type(value))
                         }
                     },
                     DefinitionKind::For(for_stmt) => match for_stmt.target_kind() {
@@ -2432,6 +2462,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //     for .., self.name, .. in <iterable>:
 
                             let unpacked = infer_unpack_types(db, unpack);
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                unpacked.projection_evidence(),
+                            );
                             Some(unpacked.expression_type(for_stmt.target(&module)))
                         }
                         TargetKind::Single => {
@@ -2439,13 +2474,42 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     for self.name in <iterable>:
 
-                            let iterable_ty = infer_expression_type(
+                            let iterable = for_stmt.iterable(&module);
+                            let inference = infer_expression_types(
                                 db,
-                                index.expression(for_stmt.iterable(&module)),
+                                index.expression(iterable),
                                 TypeContext::default(),
                             );
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                inference.projection_evidence(),
+                            );
+                            let iterable_ty = inference.expression_type(iterable);
                             // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                            Some(iterable_ty.iterate(db).homogeneous_element_type(db))
+                            if let Some(projected) = iterable_ty
+                                .try_iter_projection_result_with_mode(
+                                    db,
+                                    EvaluationMode::from_is_async(for_stmt.is_async()),
+                                )
+                            {
+                                projection_evidence = ProjectionEvidenceSet::merged(
+                                    db,
+                                    projection_evidence,
+                                    projected.projection_evidence(),
+                                );
+                                Some(projected.ty())
+                            } else {
+                                Some(
+                                    iterable_ty
+                                        .try_iterate_with_mode(
+                                            db,
+                                            EvaluationMode::from_is_async(for_stmt.is_async()),
+                                        )
+                                        .map(|tuple| tuple.homogeneous_element_type(db))
+                                        .unwrap_or_else(|err| err.fallback_element_type(db)),
+                                )
+                            }
                         }
                     },
                     DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
@@ -2455,6 +2519,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //     with <context_manager> as .., self.name, ..:
 
                             let unpacked = infer_unpack_types(db, unpack);
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                unpacked.projection_evidence(),
+                            );
                             Some(unpacked.expression_type(with_item.target(&module)))
                         }
                         TargetKind::Single => {
@@ -2462,11 +2531,18 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     with <context_manager> as self.name:
 
-                            let context_ty = infer_expression_type(
+                            let context_expr = with_item.context_expr(&module);
+                            let inference = infer_expression_types(
                                 db,
-                                index.expression(with_item.context_expr(&module)),
+                                index.expression(context_expr),
                                 TypeContext::default(),
                             );
+                            projection_evidence = ProjectionEvidenceSet::merged(
+                                db,
+                                projection_evidence,
+                                inference.projection_evidence(),
+                            );
+                            let context_ty = inference.expression_type(context_expr);
                             Some(if with_item.is_async() {
                                 context_ty.aenter(db)
                             } else {
@@ -2482,6 +2558,11 @@ impl<'db> StaticClassLiteral<'db> {
                                 //     [... for .., self.name, .. in <iterable>]
 
                                 let unpacked = infer_unpack_types(db, unpack);
+                                projection_evidence = ProjectionEvidenceSet::merged(
+                                    db,
+                                    projection_evidence,
+                                    unpacked.projection_evidence(),
+                                );
                                 Some(unpacked.expression_type(comprehension.target(&module)))
                             }
                             TargetKind::Single => {
@@ -2489,11 +2570,18 @@ impl<'db> StaticClassLiteral<'db> {
                                 //
                                 //     [... for self.name in <iterable>]
 
-                                let iterable_ty = infer_expression_type(
+                                let iterable = comprehension.iterable(&module);
+                                let inference = infer_expression_types(
                                     db,
-                                    index.expression(comprehension.iterable(&module)),
+                                    index.expression(iterable),
                                     TypeContext::default(),
                                 );
+                                projection_evidence = ProjectionEvidenceSet::merged(
+                                    db,
+                                    projection_evidence,
+                                    inference.projection_evidence(),
+                                );
+                                let iterable_ty = inference.expression_type(iterable);
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 Some(iterable_ty.iterate(db).homogeneous_element_type(db))
                             }
@@ -2517,20 +2605,27 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        Member {
-            inner: if is_attribute_bound {
-                Place::bound(
-                    union_of_inferred_types
-                        .build()
-                        .promote(db)
-                        .promote_singletons(db),
-                )
+        let inner = if is_attribute_bound {
+            let inferred_ty = union_of_inferred_types
+                .build()
+                .promote(db)
+                .promote_singletons(db);
+            projection_evidence = ProjectionEvidenceSet::merged(
+                db,
+                projection_evidence,
+                // Projection demand can be introduced after this implicit-attribute result is
+                // produced. The attribute inference cannot know ahead of time whether evidence
+                // will be needed, so collect eagerly.
+                ProjectionEvidenceSet::from_types(db, [inferred_ty]),
+            );
+            Place::bound(inferred_ty)
                 .with_provenance(provenance)
                 .with_qualifiers(qualifiers)
-            } else {
-                Place::Undefined.with_qualifiers(qualifiers)
-            },
-        }
+        } else {
+            Place::Undefined.with_qualifiers(qualifiers)
+        };
+        ImplicitAttributeMember::new(Member::new(inner))
+            .with_projection_evidence(projection_evidence)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -2618,12 +2713,10 @@ impl<'db> StaticClassLiteral<'db> {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,
                                 // we trust the declared type.
-                                Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                }
+                                Member::new(declared.with_qualifiers(qualifiers))
                             } else {
-                                Member {
-                                    inner: Place::Defined(DefinedPlace {
+                                Member::new(
+                                    Place::Defined(DefinedPlace {
                                         ty: UnionType::from_two_elements(
                                             db,
                                             declared_ty,
@@ -2635,7 +2728,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         provenance: implicit_provenance.or(declared_provenance),
                                     })
                                     .with_qualifiers(qualifiers),
-                                }
+                                )
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty
@@ -2652,9 +2745,7 @@ impl<'db> StaticClassLiteral<'db> {
                             // `__get__`), we return unbound so that the descriptor
                             // protocol in `member_lookup_with_policy` can resolve
                             // the attribute type through `__get__`.
-                            Member {
-                                inner: declared.with_qualifiers(qualifiers),
-                            }
+                            Member::new(declared.with_qualifiers(qualifiers))
                         } else {
                             // The symbol is declared and bound in the class body,
                             // but we did not find any attribute assignments in
@@ -2672,9 +2763,7 @@ impl<'db> StaticClassLiteral<'db> {
                         // union with the inferred type from attribute assignments.
 
                         if declaredness == Definedness::AlwaysDefined {
-                            Member {
-                                inner: declared.with_qualifiers(qualifiers),
-                            }
+                            Member::new(declared.with_qualifiers(qualifiers))
                         } else {
                             if let Place::Defined(DefinedPlace {
                                 ty: implicit_ty,
@@ -2689,8 +2778,8 @@ impl<'db> StaticClassLiteral<'db> {
                             .inner
                             .place
                             {
-                                Member {
-                                    inner: Place::Defined(DefinedPlace {
+                                Member::new(
+                                    Place::Defined(DefinedPlace {
                                         ty: UnionType::from_two_elements(
                                             db,
                                             declared_ty,
@@ -2702,11 +2791,9 @@ impl<'db> StaticClassLiteral<'db> {
                                         provenance: implicit_provenance.or(declared_provenance),
                                     })
                                     .with_qualifiers(qualifiers),
-                                }
+                                )
                             } else {
-                                Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                }
+                                Member::new(declared.with_qualifiers(qualifiers))
                             }
                         }
                     }
@@ -3212,15 +3299,65 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
     names.into_boxed_slice()
 }
 
+/// Result for the implicit-attribute query, plus inference-time projection facts used during
+/// cycle recovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct ImplicitAttributeMember<'db> {
+    member: Member<'db>,
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+}
+
+impl<'db> ImplicitAttributeMember<'db> {
+    const fn new(member: Member<'db>) -> Self {
+        Self {
+            member,
+            projection_evidence: None,
+        }
+    }
+
+    fn with_projection_evidence(
+        mut self,
+        projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        self.projection_evidence = projection_evidence;
+        self
+    }
+}
+
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
-    previous_member: &Member<'db>,
-    member: Member<'db>,
+    previous_member: &ImplicitAttributeMember<'db>,
+    member: ImplicitAttributeMember<'db>,
     _attribute: ImplicitAttributeName<'db>,
-) -> Member<'db> {
-    let inner = member
+) -> ImplicitAttributeMember<'db> {
+    let projection_evidence = ProjectionEvidenceSet::merged(
+        db,
+        member.projection_evidence,
+        previous_member.projection_evidence,
+    );
+    let previous_inner = previous_member.member.inner;
+    let previous_ty = match previous_inner.place {
+        Place::Defined(previous) => Some(previous.ty),
+        Place::Undefined => None,
+    };
+    let mut projection_recovery = ProjectionRecoveryBuilder::new(cycle);
+    let mut joined = member
+        .member
         .inner
-        .cycle_normalized(db, previous_member.inner, cycle);
-    Member { inner }
+        .cycle_join_for_recovery(db, previous_inner, cycle);
+    if let Place::Defined(current) = joined.place {
+        joined.place = Place::Defined(DefinedPlace {
+            ty: projection_recovery.push_candidate(db, previous_ty, current.ty),
+            ..current
+        });
+    }
+    let projection_solutions = projection_recovery.finish(db, projection_evidence.as_ref());
+    let inner = joined.recursive_type_normalized_with_projection_solutions(
+        db,
+        cycle,
+        projection_solutions.as_ref(),
+        projection_evidence.as_ref(),
+    );
+    ImplicitAttributeMember::new(Member::new(inner)).with_projection_evidence(projection_evidence)
 }

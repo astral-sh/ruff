@@ -956,6 +956,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
+            // `Projection` is an internal type representation.
+            // Ultimately, it should be solved as a normal type or a type that includes `Divergent`,
+            // so if this type is leaked in the user-facing result, it is a bug.
+            Type::Projection(_) => f.with_type(self.ty).write_str("Projection"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);

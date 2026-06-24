@@ -996,7 +996,7 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 4 suppressions
+        Added 3 suppressions
 
         ## Fixed source
 

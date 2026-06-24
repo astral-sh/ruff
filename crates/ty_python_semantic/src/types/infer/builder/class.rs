@@ -492,7 +492,7 @@ fn class_decorator_preserves_class_binding<'db>(
             .subclass_of()
             .into_class(db)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
-        Type::Divergent(_) => true,
+        Type::Divergent(_) | Type::Projection(_) => true,
         Type::Union(union) => union
             .elements(db)
             .iter()

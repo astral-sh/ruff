@@ -427,6 +427,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
+        if let Some(projection) = value_ty.try_subscript_projection_result(db, slice_ty) {
+            self.extend_projection_result(projection);
+        }
         let result_ty = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
@@ -1320,10 +1323,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         };
 
-                        self.collection_use_constraints
-                            .entry(collection_def)
-                            .or_default()
-                            .insert(constraints);
+                        self.record_collection_use_constraint(collection_def, constraints);
                     }
                 }
             }
@@ -1552,6 +1552,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             _ => {
+                if object_ty.contains_cycle_artifact(db) {
+                    // A recursive receiver can feed a growing type context back into the
+                    // subscript and RHS expressions. Infer them once without that context;
+                    // cycle recovery will widen the receiver if the shape keeps growing.
+                    infer_slice_ty(self, TypeContext::default());
+                    infer_rhs_value(self, TypeContext::default());
+                    return true;
+                }
+
                 let ast_arguments = [
                     ArgOrKeyword::Arg(&target.slice),
                     ArgOrKeyword::Arg(rhs_value_node),
