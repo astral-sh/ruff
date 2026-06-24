@@ -3009,6 +3009,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_parser",
  "ruff_python_trivia",
+ "ruff_ranged_value",
  "ruff_server",
  "ruff_source_file",
  "ruff_text_size",
@@ -3059,6 +3060,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_parser",
  "ruff_python_trivia",
+ "ruff_ranged_value",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -3270,6 +3272,7 @@ dependencies = [
  "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_python_trivia",
+ "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -3330,6 +3333,7 @@ dependencies = [
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",
+ "ruff_ranged_value",
  "ruff_workspace",
  "salsa",
 ]
@@ -3562,6 +3566,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_ranged_value"
+version = "0.0.1"
+dependencies = [
+ "get-size2",
+ "ruff_db",
+ "ruff_text_size",
+ "schemars",
+ "serde",
+ "toml 1.1.2+spec-1.1.0",
+]
+
+[[package]]
 name = "ruff_server"
 version = "0.0.2"
 dependencies = [
@@ -3587,6 +3603,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_index",
  "ruff_python_parser",
+ "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
@@ -3642,6 +3659,7 @@ dependencies = [
  "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
+ "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
@@ -3672,6 +3690,7 @@ dependencies = [
  "pep440_rs",
  "regex",
  "ruff_cache",
+ "ruff_db",
  "ruff_formatter",
  "ruff_graph",
  "ruff_linter",
@@ -3681,6 +3700,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_semantic",
  "ruff_python_stdlib",
+ "ruff_ranged_value",
  "ruff_source_file",
  "rustc-hash",
  "schemars",
@@ -4532,6 +4552,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_python_trivia",
+ "ruff_ranged_value",
  "salsa",
  "serde",
  "serde_json",
@@ -4558,6 +4579,7 @@ dependencies = [
  "ordermap",
  "ruff_db",
  "ruff_python_ast",
+ "ruff_ranged_value",
 ]
 
 [[package]]
@@ -4683,6 +4705,7 @@ dependencies = [
  "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_ranged_value",
  "ruff_text_size",
  "rustc-hash",
  "salsa",
@@ -4807,6 +4830,7 @@ dependencies = [
  "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
+ "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -4903,6 +4927,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_notebook",
  "ruff_python_formatter",
+ "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",
  "serde-wasm-bindgen",

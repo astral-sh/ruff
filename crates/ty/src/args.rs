@@ -5,9 +5,10 @@ use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
-use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_python_semantic::lint;
 use ty_static::EnvVars;
 

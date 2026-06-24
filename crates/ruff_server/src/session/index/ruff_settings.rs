@@ -521,12 +521,12 @@ impl ConfigurationTransformer for IdentityTransformer {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
-    use ruff_linter::RuleSelector;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::registry::Rule;
     use ruff_python_ast::PythonVersion;
+    use ruff_ranged_value::{ValueSource, ValueSourceGuard};
     use ruff_workspace::options::Options;
 
     use super::*;
@@ -613,6 +613,7 @@ mod tests {
     #[test]
     fn conflicting_editor_settings_fall_back_to_defaults() -> anyhow::Result<()> {
         let root = Path::new("/src/project");
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
         let configuration = toml::from_str(
             r#"
             [lint.isort]
@@ -621,7 +622,10 @@ mod tests {
         )?;
         let editor_settings = EditorSettings {
             configuration: Some(ResolvedConfiguration::Inline(Box::new(configuration))),
-            select: Some(vec![RuleSelector::from_str("PYI025")?]),
+            select: Some(vec![UnresolvedRuleSelector::new(
+                "PYI025",
+                ValueSource::Editor,
+            )]),
             ..Default::default()
         };
 

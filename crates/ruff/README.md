@@ -37,6 +37,7 @@ The following Ruff workspace members are also available:
 - [ruff_python_semantic](https://crates.io/crates/ruff_python_semantic)
 - [ruff_python_stdlib](https://crates.io/crates/ruff_python_stdlib)
 - [ruff_python_trivia](https://crates.io/crates/ruff_python_trivia)
+- [ruff_ranged_value](https://crates.io/crates/ruff_ranged_value)
 - [ruff_server](https://crates.io/crates/ruff_server)
 - [ruff_source_file](https://crates.io/crates/ruff_source_file)
 - [ruff_text_size](https://crates.io/crates/ruff_text_size)
