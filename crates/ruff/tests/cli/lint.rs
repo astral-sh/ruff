@@ -775,7 +775,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
 
     Could not parse the supplied argument as a `ruff.toml` configuration option:
 
-    Unknown rule selector: `F481`
+    Unknown rule selector: `F481`. External rule selectors are not supported yet.
 
     For more information, try '--help'.
     ");
