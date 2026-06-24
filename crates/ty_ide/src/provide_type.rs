@@ -2,7 +2,7 @@ use crate::Db;
 use ruff_db::files::File;
 use ruff_text_size::TextRange;
 use ty_python_semantic::SemanticModel;
-use ty_python_semantic::types::print_type;
+use ty_python_semantic::types::{TypeFormType, print_type};
 
 /// Returns the endpoint-specific public type representation for the requested range.
 ///
@@ -10,6 +10,11 @@ use ty_python_semantic::types::print_type;
 pub fn provide_type(db: &dyn Db, file: File, range: TextRange) -> Option<String> {
     let model = SemanticModel::new(db, file);
     let ty = model.inferred_type_at(range)?;
+    let ty = if model.is_type_expression_at(range) {
+        TypeFormType::from_type_expression(db, ty)
+    } else {
+        ty
+    };
 
     print_type(db, ty).ok()
 }
@@ -115,9 +120,114 @@ mod tests {
             "#,
         );
 
-        // TODO: This should be `ty_extensions.TypeOf[builtins.int]` once semantic lookup can
-        // infer the runtime value type of a name in an annotation.
-        assert_snapshot!(test.provided_type(), @"builtins.int");
+        assert_snapshot!(
+            test.provided_type(),
+            @"typing.TypeForm[builtins.int]"
+        );
+    }
+
+    #[test]
+    fn provide_annotated_subexpressions() {
+        let annotation = ProvideTypeTest::with_source(
+            r#"
+            from typing import Annotated
+
+            value: <START>Annotated[int, list[str]]<END>
+            "#,
+        );
+        assert_snapshot!(
+            annotation.provided_type(),
+            @"typing.TypeForm[builtins.int]"
+        );
+
+        let literal_argument = ProvideTypeTest::with_source(
+            r#"
+            from typing import Literal
+
+            value: Literal[<START>1<END>]
+            "#,
+        );
+        assert_snapshot!(literal_argument.provided_type(), @"typing.Literal[1]");
+
+        let annotated_literal_type = ProvideTypeTest::with_source(
+            r#"
+            from typing import Annotated, Literal
+
+            value: Annotated[<START>Literal[1]<END>, 1]
+            "#,
+        );
+        assert_snapshot!(
+            annotated_literal_type.provided_type(),
+            @"typing.TypeForm[typing.Literal[1]]"
+        );
+
+        let annotated_literal_metadata = ProvideTypeTest::with_source(
+            r#"
+            from typing import Annotated, Literal
+
+            value: Annotated[Literal[1], <START>1<END>]
+            "#,
+        );
+        assert_snapshot!(
+            annotated_literal_metadata.provided_type(),
+            @"typing.Literal[1]"
+        );
+    }
+
+    #[test]
+    fn provide_string_annotation_subexpressions() {
+        let type_argument = ProvideTypeTest::with_source(
+            r#"
+            from typing import Annotated
+
+            value: "Annotated[<START>int<END>, list[str]]"
+            "#,
+        );
+        assert_snapshot!(
+            type_argument.provided_type(),
+            @"typing.TypeForm[builtins.int]"
+        );
+
+        let metadata = ProvideTypeTest::with_source(
+            r#"
+            from typing import Annotated
+
+            value: "Annotated[int, <START>list[str]<END>]"
+            "#,
+        );
+        assert_snapshot!(
+            metadata.provided_type(),
+            @"ty_extensions.TypeOf[builtins.list[builtins.str]]"
+        );
+    }
+
+    #[test]
+    fn provide_non_annotation_type_expressions() {
+        let cast = ProvideTypeTest::with_source(
+            r#"
+            from typing import cast
+
+            value = cast(<START>list[int]<END>, [])
+            "#,
+        );
+
+        assert_snapshot!(
+            cast.provided_type(),
+            @"typing.TypeForm[builtins.list[builtins.int]]"
+        );
+
+        let typevar_keyword = ProvideTypeTest::with_source(
+            r#"
+            from typing import TypeVar
+
+            T = TypeVar("T", <START>bound<END>=int)
+            "#,
+        );
+
+        assert_snapshot!(
+            typevar_keyword.provided_type(),
+            @"typing.TypeForm[builtins.int]"
+        );
     }
 
     #[test]

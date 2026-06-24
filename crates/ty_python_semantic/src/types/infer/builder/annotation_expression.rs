@@ -6,7 +6,7 @@ use crate::place::TypeOrigin;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR};
 use crate::types::infer::builder::InferenceFlags;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
-use crate::types::infer::nearest_enclosing_class;
+use crate::types::infer::{TypeExpressionFlags, nearest_enclosing_class};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::{
     SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifier, TypeQualifiers, todo_type,
@@ -24,6 +24,7 @@ struct AnnotationExpressionInference<'db> {
     annotation_ty: TypeAndQualifiers<'db>,
     /// The type exposed for the annotation expression itself, including to IDE features.
     expression_ty: Type<'db>,
+    is_type_expression: bool,
 }
 
 impl<'db> AnnotationExpressionInference<'db> {
@@ -31,6 +32,7 @@ impl<'db> AnnotationExpressionInference<'db> {
         Self {
             expression_ty: annotation_ty.inner_type(),
             annotation_ty,
+            is_type_expression: true,
         }
     }
 
@@ -41,6 +43,7 @@ impl<'db> AnnotationExpressionInference<'db> {
         Self {
             annotation_ty,
             expression_ty,
+            is_type_expression: false,
         }
     }
 }
@@ -365,7 +368,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let AnnotationExpressionInference {
             annotation_ty,
             expression_ty,
+            is_type_expression,
         } = inferred;
+        if is_type_expression {
+            self.store_type_expression_flags(annotation, TypeExpressionFlags::TYPE_EXPRESSION);
+        }
         self.store_expression_type(annotation, expression_ty);
         self.store_qualifiers(annotation, annotation_ty.qualifiers());
 

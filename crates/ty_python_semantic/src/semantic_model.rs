@@ -395,6 +395,57 @@ impl<'db> SemanticModel<'db> {
         self.inferred_type_for_covering_node(&target, range)
     }
 
+    /// Returns whether the inferred type at `range` is the result of evaluating a type
+    /// expression.
+    pub fn is_type_expression_at(&self, range: TextRange) -> bool {
+        let parsed = parsed_module(self.db, self.file).load(self.db);
+        let Some(target) = covering_type_node(parsed.syntax().into(), range) else {
+            return false;
+        };
+        self.is_type_expression_for_covering_node(&target, range)
+    }
+
+    fn is_type_expression_for_covering_node(
+        &self,
+        target: &CoveringNode<'_>,
+        range: TextRange,
+    ) -> bool {
+        let expression = match (target.node(), target.parent()) {
+            (ast::AnyNodeRef::Identifier(identifier), Some(ast::AnyNodeRef::Keyword(keyword)))
+                if keyword
+                    .arg
+                    .as_ref()
+                    .is_some_and(|argument| argument.range == identifier.range) =>
+            {
+                Some(ExprRef::from(&keyword.value))
+            }
+            (ast::AnyNodeRef::ExprStringLiteral(string_expr), _) => {
+                if let Some((parsed, model)) = self.enter_string_annotation(string_expr)
+                    && let Some(target) = covering_type_node(parsed.syntax().into(), range)
+                {
+                    return model.is_type_expression_for_covering_node(&target, range);
+                }
+                return false;
+            }
+            (node, parent) => node
+                .as_expr_ref()
+                .or_else(|| parent.and_then(ast::AnyNodeRef::as_expr_ref)),
+        };
+
+        expression.is_some_and(|expression| self.expression_is_type_expression(expression))
+    }
+
+    fn expression_is_type_expression(&self, expression: ExprRef<'_>) -> bool {
+        let index = semantic_index(self.db, self.file);
+        let Some(file_scope) = index.try_expression_scope_id(&self.expr_ref_in_ast(expression))
+        else {
+            return false;
+        };
+        let scope = file_scope.to_scope_id(self.db, self.file);
+
+        infer_complete_scope_types(self.db, scope).is_type_expression(expression)
+    }
+
     /// Returns the inferred type for an already resolved covering node.
     ///
     /// `range` identifies the selected part of compound targets such as dotted module names and
