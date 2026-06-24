@@ -1086,6 +1086,11 @@ class WithReboundReceiver(Protocol):
         self = Holder()
         self.extra = 1  # no error
 
+    def conditionally_rebound(self, flag: bool) -> None:
+        if flag:
+            self = Holder()
+        self.extra = 1  # error: [ambiguous-protocol-member]
+
 class WithEagerNestedClass(Protocol):
     def method(self) -> None:
         class Nested:

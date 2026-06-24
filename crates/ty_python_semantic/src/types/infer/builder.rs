@@ -1694,7 +1694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(receiver) = target.value.as_name_expr() else {
             return;
         };
-        if !self.is_unrebound_receiver_parameter(receiver) {
+        if !self.is_receiver_parameter_reachable(receiver) {
             return;
         }
 
@@ -1728,8 +1728,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diagnostic::report_undeclared_protocol_instance_attribute(&self.context, target, protocol);
     }
 
-    fn is_unrebound_receiver_parameter(&self, receiver: &ast::ExprName) -> bool {
-        fn bindings_are_parameter<'db>(
+    fn is_receiver_parameter_reachable(&self, receiver: &ast::ExprName) -> bool {
+        fn bindings_include_parameter<'db>(
             db: &'db dyn Db,
             bindings: impl Iterator<Item = DefinitionState<'db>>,
         ) -> Option<bool> {
@@ -1739,17 +1739,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 };
                 saw_definition = true;
-                if !definition.kind(db).is_parameter_def() {
-                    return Some(false);
+                if definition.kind(db).is_parameter_def() {
+                    return Some(true);
                 }
             }
-            saw_definition.then_some(true)
+            saw_definition.then_some(false)
         }
 
         let db = self.db();
         let file_scope_id = self.scope().file_scope_id(db);
         let use_def = self.index.use_def_map(file_scope_id);
-        if let Some(is_parameter) = bindings_are_parameter(
+        if let Some(is_parameter) = bindings_include_parameter(
             db,
             use_def
                 .bindings_at_use(receiver.scoped_use_id(db, self.file()))
@@ -1768,7 +1768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.index
                     .enclosing_snapshot(enclosing_scope_id, receiver_place, file_scope_id)
                 && let Some(is_parameter) =
-                    bindings_are_parameter(db, bindings.map(|binding| binding.binding))
+                    bindings_include_parameter(db, bindings.map(|binding| binding.binding))
             {
                 return is_parameter;
             }
