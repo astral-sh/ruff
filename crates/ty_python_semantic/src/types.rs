@@ -3691,6 +3691,57 @@ impl<'db> Type<'db> {
             policy: MemberLookupPolicy,
             receiver: Option<Type<'db>>,
         ) -> PlaceAndQualifiers<'db> {
+            fn instance_like_member_lookup<'db>(
+                db: &'db dyn Db,
+                this: Type<'db>,
+                name: &Name,
+                policy: MemberLookupPolicy,
+                receiver: Type<'db>,
+            ) -> PlaceAndQualifiers<'db> {
+                let name_str = name.as_str();
+
+                // Enum members can be accessed through enum instances and other enum members,
+                // e.g. `answer.YES` or `Answer.YES.NO`.
+                if let Some(enum_class) = match this {
+                    Type::LiteralValue(literal) => literal
+                        .as_enum()
+                        .map(|enum_literal| enum_literal.enum_class_literal(db)),
+                    _ => this
+                        .nominal_class(db)
+                        .map(|class| class.class_literal(db))
+                        .and_then(|class| class.into_enum_class(db)),
+                } && let Some(resolved_name) = enum_class.resolve_member(db, name)
+                {
+                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
+                        db,
+                        enum_class,
+                        resolved_name,
+                    )))
+                    .into();
+                }
+
+                let fallback = this.instance_member(db, name_str);
+
+                let result = this.invoke_descriptor_protocol(
+                    db,
+                    receiver,
+                    name_str,
+                    fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    policy,
+                );
+
+                if result.is_class_var() && this.is_typed_dict() {
+                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
+                    // They can only be accessed on `SomeTypedDict` directly.
+                    return Place::Undefined.into();
+                }
+
+                let result = this.fallback_to_getattr(db, name, result, policy);
+
+                result.map_type(|ty| ty.bind_self_typevars(db, receiver))
+            }
+
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);
             if let Some(fallback) = this.materialized_divergent_fallback() {
                 return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
@@ -4019,6 +4070,26 @@ impl<'db> Type<'db> {
                     ))
                     .into()
                 }
+                Type::TypeVar(typevar) => {
+                    let receiver = receiver.unwrap_or(this);
+                    if let Some(bound) = typevar
+                        .typevar(db)
+                        .bound_or_constraints(db)
+                        .map(|bound| bound.as_type(db))
+                        && bound.to_instance(db).is_some()
+                    {
+                        // A TypeVar can be bounded by a class-object type such as `type[A]`, which
+                        // requires the full lookup path rather than instance-member lookup.
+                        return bound.member_lookup_with_policy_and_receiver(
+                            db,
+                            name,
+                            policy,
+                            Some(receiver),
+                        );
+                    }
+
+                    instance_like_member_lookup(db, this, &name, policy, receiver)
+                }
 
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
@@ -4084,7 +4155,6 @@ impl<'db> Type<'db> {
                 | Type::ProtocolInstance(..)
                 | Type::NewTypeInstance(..)
                 | Type::LiteralValue(..)
-                | Type::TypeVar(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)
                 | Type::PropertyInstance(..)
@@ -4096,50 +4166,13 @@ impl<'db> Type<'db> {
                 | Type::TypeForm(..)
                 | Type::TypedDict(_) => {
                     let receiver = receiver.unwrap_or(this);
-
-                    // Enum members can be accessed through enum instances and other enum members,
-                    // e.g. `answer.YES` or `Answer.YES.NO`.
-                    if let Some(enum_class) = match this {
-                        Type::LiteralValue(literal) => literal
-                            .as_enum()
-                            .map(|enum_literal| enum_literal.enum_class_literal(db)),
-                        _ => this
-                            .nominal_class(db)
-                            .map(|class| class.class_literal(db))
-                            .and_then(|class| class.into_enum_class(db)),
-                    } && let Some(resolved_name) = enum_class.resolve_member(db, &name)
-                    {
-                        return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                            db,
-                            enum_class,
-                            resolved_name,
-                        )))
-                        .into();
-                    }
-
-                    let fallback = this.instance_member(db, name_str);
-
-                    let result = this.invoke_descriptor_protocol(
-                        db,
-                        receiver,
-                        name_str,
-                        fallback,
-                        InstanceFallbackShadowsNonDataDescriptor::No,
-                        policy,
-                    );
-
-                    if result.is_class_var() && this.is_typed_dict() {
-                        // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
-                        // They can only be accessed on `SomeTypedDict` directly.
-                        return Place::Undefined.into();
-                    }
-
-                    let result = this.fallback_to_getattr(db, &name, result, policy);
-
-                    result.map_type(|ty| ty.bind_self_typevars(db, receiver))
+                    instance_like_member_lookup(db, this, &name, policy, receiver)
                 }
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
+                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
+                    let receiver = receiver.unwrap_or(this);
                     let enum_class = match this {
                         Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
@@ -4161,18 +4194,23 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = this
-                    .to_instance(db)
-                    .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
+                    let self_instance = receiver.to_instance(db).expect(
+                        "The receiver for a class-object lookup should always be instantiable",
+                    );
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                    let class_attr_fallback =
-                        Type::try_call_dunder_get_on_attribute(db, class_attr_plain, None, this).0;
+                    let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        class_attr_plain,
+                        None,
+                        receiver,
+                    )
+                    .0;
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        this,
+                        receiver,
                         name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,

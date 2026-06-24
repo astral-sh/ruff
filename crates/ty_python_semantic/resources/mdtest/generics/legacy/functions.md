@@ -727,6 +727,38 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Attribute access on TypeVars bounded by `type[...]`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3782>.
+
+```py
+from typing import ClassVar, TypeVar
+from typing_extensions import Self
+
+class A:
+    attr: ClassVar[str]
+    current: ClassVar[Self]
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class B:
+    attr: ClassVar[int]
+
+T = TypeVar("T", bound=type[A])
+
+def single_bound(cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str
+    reveal_type(cls.current)  # revealed: T'instance@single_bound
+    reveal_type(cls.create())  # revealed: T'instance@single_bound
+
+U = TypeVar("U", bound=type[A] | type[B])
+
+def union_bound(cls: U) -> None:
+    reveal_type(cls.attr)  # revealed: str | int
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
