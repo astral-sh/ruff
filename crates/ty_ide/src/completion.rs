@@ -973,10 +973,7 @@ impl<'m> ContextCursor<'m> {
             ast::AnyNodeRef::StmtAnnAssign(stmt) => {
                 contains(&stmt.annotation)
                     || (stmt.value.as_deref().is_some_and(contains)
-                        && matches!(
-                            stmt.annotation.inferred_type(model),
-                            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
-                        ))
+                        && model.is_type_alias_annotation(&stmt.annotation))
             }
             ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
             ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),

@@ -516,6 +516,14 @@ nested: list[tuple[TypeOf[nested]]]
 nested = [(1,)]
 reveal_type(nested)  # revealed: list[Divergent]
 
+variadic_tuple: tuple[TypeOf[variadic_tuple], ...]
+variadic_tuple = (1,)
+reveal_type(variadic_tuple)  # revealed: tuple[Literal[1]]
+
+mixed_variadic_tuple: tuple[TypeOf[mixed_variadic_tuple], *tuple[int, ...]]
+mixed_variadic_tuple = (1,)
+reveal_type(mixed_variadic_tuple)  # revealed: tuple[Literal[1]]
+
 optional: list[TypeOf[optional]] | None
 optional = [1]
 reveal_type(optional)  # revealed: list[Divergent]

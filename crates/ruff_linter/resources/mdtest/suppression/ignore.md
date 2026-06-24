@@ -1053,3 +1053,19 @@ help: Remove unused suppression
   |
 note: This is an unsafe fix and may change runtime behavior
 ```
+
+## Empty diagnostic range before a shebang
+
+An ignore comment at the start of the second line should suppress diagnostics with an empty range
+at offset zero, as with `noqa`.
+
+```toml
+[lint]
+preview = true
+select = ["D100"]
+```
+
+```py
+#!/usr/bin/env python
+# ruff:ignore[D100]
+```

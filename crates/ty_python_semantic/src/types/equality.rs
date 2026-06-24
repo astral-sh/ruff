@@ -15,6 +15,10 @@ use super::{
     enums::{enum_member_literals, enum_metadata},
 };
 
+mod enums;
+
+pub(super) use self::enums::enum_membership_constraint;
+
 /// The result of evaluating a runtime comparison between two types.
 ///
 /// Definite truthiness is represented separately from a constraint for the operand currently being
