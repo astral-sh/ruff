@@ -1339,5 +1339,80 @@ class Y(X):
 test(Y())
 ```
 
+## Intersections of invariant generics
+
+For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+class P: ...
+class Q: ...
+
+class Invariant[T]:
+    value: T
+
+type InvariantAny = Invariant[Any]
+
+def _(
+    i1: Invariant[Any] & Invariant[P],
+    i2: Invariant[P] & Invariant[Any],
+    i3: InvariantAny & Invariant[P],
+    i4: Invariant[Unknown] & Invariant[P],
+    i5: Invariant[Any] & Q & Invariant[P],
+    i6: Invariant[P] & Q & Invariant[Any],
+) -> None:
+    reveal_type(i1)  # revealed: Invariant[P]
+    reveal_type(i2)  # revealed: Invariant[P]
+    reveal_type(i3)  # revealed: Invariant[P]
+    reveal_type(i4)  # revealed: Invariant[P]
+    reveal_type(i5)  # revealed: Q & Invariant[P]
+    reveal_type(i6)  # revealed: Invariant[P] & Q
+
+def _(
+    i1: list[Any] & list[int],
+    i2: dict[str, int] & dict[str, Any],
+    i3: dict[Any, str] & dict[int, str],
+    i4: dict[str, int] & dict[Any, Any],
+) -> None:
+    reveal_type(i1)  # revealed: list[int]
+    reveal_type(i2)  # revealed: dict[str, int]
+    reveal_type(i3)  # revealed: dict[int, str]
+    reveal_type(i4)  # revealed: dict[str, int]
+
+def _(
+    i1: list[Any] & list[Any | int],
+    i2: list[Any] & list[Any],
+) -> None:
+    reveal_type(i1)  # revealed: list[Any | int]
+    reveal_type(i2)  # revealed: list[Any]
+```
+
+Intersections with typevars and NewTypes are not affected by this:
+
+```py
+from typing import Any, NewType, TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T", bound=list[Any])
+ListId = NewType("ListId", list[Any])
+
+def is_int_list(value: object) -> TypeIs[list[int]]:
+    return isinstance(value, list) and all(isinstance(item, int) for item in value)
+
+def preserve_id(value: ListId) -> ListId:
+    if is_int_list(value):
+        reveal_type(value)  # revealed: ListId & list[int]
+        return value
+    return value
+
+def preserve_type(value: T) -> T:
+    if is_int_list(value):
+        reveal_type(value)  # revealed: T@preserve_type & list[int]
+        return value
+    return value
+```
+
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)
 [de morgan's laws]: https://en.wikipedia.org/wiki/De_Morgan%27s_laws

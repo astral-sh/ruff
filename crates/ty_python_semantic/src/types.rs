@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::TypeTransformer;
+pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -35,9 +35,9 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    callable_pattern_type, definite_match_pattern_type, definite_sequence_pattern_type,
-    exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    callable_pattern_type, definite_match_pattern_type, exact_sequence_pattern_type,
+    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_fallthrough_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -1259,14 +1259,22 @@ impl<'db> Type<'db> {
                     .collect::<Option<smallvec::SmallVec<[(Type<'db>, Type<'db>); 2]>>>()
                 && replacements.len() > 1
             {
-                return Some(current.map_leave_aliases(db, |element| {
+                let normalized = current.map_leave_aliases(db, |element| {
                     replacements
                         .iter()
                         .find_map(|(original, normalized)| {
                             (*original == *element).then_some(*normalized)
                         })
                         .unwrap_or(*element)
-                }));
+                });
+
+                // Multi-arm matching cannot prove a one-to-one correspondence between previous
+                // and growing current arms. Union with the entire previous result to keep recovery
+                // monotonic when a stable arm shares a nominal class with a wrapper.
+                return Some(UnionType::from_elements_cycle_recovery(
+                    db,
+                    [Type::Union(previous), normalized],
+                ));
             }
 
             // Only align unions when each iteration has exactly one changed arm. With multiple
@@ -1327,16 +1335,28 @@ impl<'db> Type<'db> {
         wrapped: Self,
         div: Self,
     ) -> Option<Self> {
+        // A variadic tuple can flatten the previous cycle result before the result appears again
+        // as a fixed element, as in `x = (*x, x)`. If the fixed prefix or suffix grows between
+        // iterations, replacing only that nested occurrence would leave the flattened prefix
+        // growing by one element on every iteration. Variadic tuples with stable fixed elements
+        // still need nominal growth recovery for recursive `TypeOf` references.
+        if let Some(current_tuple) = current.own_tuple_spec(db)
+            && current_tuple.is_variadic()
+            && let Some(previous_tuple) = wrapped.exact_tuple_instance_spec(db)
+            && current_tuple.fixed_elements().count() > previous_tuple.fixed_elements().count()
+        {
+            return None;
+        }
+
+        let type_mapping = TypeMapping::ReplaceType {
+            from: wrapped,
+            to: div,
+        };
+
         let current_class = current.class(db);
         let alias = current_class.into_generic_alias()?;
         let original_specialization = alias.specialization(db);
-        let specialization = original_specialization.apply_type_mapping(
-            db,
-            &TypeMapping::ReplaceType {
-                from: wrapped,
-                to: div,
-            },
-        );
+        let specialization = original_specialization.apply_type_mapping(db, &type_mapping);
         if specialization == original_specialization {
             return None;
         }

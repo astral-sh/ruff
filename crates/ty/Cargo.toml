@@ -1,6 +1,7 @@
 [package]
 name = "ty"
 version = "0.0.0"
+publish = false
 # required for correct pypi metadata
 homepage = "https://github.com/astral-sh/ty/"
 documentation = "https://docs.astral.sh/ty/"

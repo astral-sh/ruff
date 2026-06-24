@@ -23,9 +23,10 @@ use get_size2::GetSize;
 ///
 /// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
 /// bits of overhead on 32-bit platforms.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize, salsa::Update)]
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
+    #[update(fallback)]
     bits: RankBitBoxStorage,
     chunk_ranks: Box<[u32]>,
 }
@@ -44,21 +45,6 @@ type Chunk = u64;
 type Chunk = u32;
 
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
-
-// SAFETY: This is the standard pattern for implementing salsa::Update. Salsa ensures that the
-// `old_pointer` we are provided can safely be used as a mutable reference to the old value.
-#[expect(unsafe_code)]
-unsafe impl salsa::Update for RankBitBox {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut *old_pointer };
-        if *old_ref != new_value {
-            *old_ref = new_value;
-            true
-        } else {
-            false
-        }
-    }
-}
 
 impl RankBitBox {
     pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {
