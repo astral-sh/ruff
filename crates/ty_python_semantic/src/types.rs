@@ -2088,6 +2088,21 @@ impl<'db> Type<'db> {
         self.promote_singletons_impl(db)
     }
 
+    /// Promote top-level class literals to the class objects represented by `type[...]`.
+    ///
+    /// This is intentionally separate from regular promotion. Applying it during collection
+    /// inference would lose useful precision for local and module-level collections of class
+    /// objects.
+    pub(crate) fn promote_class_literals(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::ClassLiteral(class) => SubclassOfType::from(db, class.default_specialization(db)),
+            Type::Union(union) => {
+                union.map_leave_aliases(db, |element| element.promote_class_literals(db))
+            }
+            _ => self,
+        }
+    }
+
     /// Recursively promote singleton types (like `None`, `EllipsisType`) to
     /// `T | Unknown` within nominal type parameters, without recursing into unions.
     /// Used for collection literal inference so that `[None]` is inferred as
@@ -3581,8 +3596,25 @@ impl<'db> Type<'db> {
                 }
 
                 let result = this.fallback_to_getattr(db, name, result, policy);
+                // An inferred attribute accessed through an instance can resolve to an override
+                // on a subclass, so an exact class object is not a safe public type here.
+                let should_promote_class_literals =
+                    matches!(
+                        result.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Inferred,
+                            ..
+                        })
+                    ) && !result.qualifiers.contains(TypeQualifiers::FINAL);
 
-                result.map_type(|ty| ty.bind_self_typevars(db, receiver))
+                result.map_type(|ty| {
+                    let ty = ty.bind_self_typevars(db, receiver);
+                    if should_promote_class_literals {
+                        ty.promote_class_literals(db)
+                    } else {
+                        ty
+                    }
+                })
             }
 
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);

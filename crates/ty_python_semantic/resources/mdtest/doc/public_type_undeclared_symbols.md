@@ -21,6 +21,68 @@ class Counter:
 reveal_type(Counter().value)  # revealed: int
 ```
 
+Class literals stored in inferred attributes are widened when accessed through an instance. A
+subclass can override an undeclared class attribute, so a method that accesses the attribute through
+`self` cannot assume that it still holds the original class object. Direct access on a specific
+class object remains exact:
+
+```py
+from typing import Final
+
+class Response: ...
+class HtmlResponse(Response): ...
+
+class TestResponse:
+    response_class = Response
+
+    def check(self) -> None:
+        reveal_type(self.response_class)  # revealed: type[Response]
+
+class TestHtmlResponse(TestResponse):
+    response_class = HtmlResponse
+
+reveal_type(TestResponse.response_class)  # revealed: <class 'Response'>
+
+class AnnotatedResponse:
+    response_class: type[Response] = Response
+
+    def check(self) -> None:
+        reveal_type(self.response_class)  # revealed: type[Response]
+
+class FixedResponse:
+    response_class: Final = Response
+
+    def check(self) -> None:
+        reveal_type(self.response_class)  # revealed: <class 'Response'>
+```
+
+The same widening applies to undeclared instance attributes assigned in methods:
+
+```py
+class InstanceResponse: ...
+
+class Wrapper:
+    def __init__(self) -> None:
+        self.response_class = InstanceResponse
+
+reveal_type(Wrapper().response_class)  # revealed: type[InstanceResponse]
+```
+
+Widening distributes over unions of class literals:
+
+```py
+class UnionA: ...
+class UnionB: ...
+
+def get_flag() -> bool:
+    return bool()
+
+class EitherClass:
+    value = UnionA if get_flag() else UnionB
+
+reveal_type(EitherClass().value)  # revealed: type[UnionA | UnionB]
+```
+
 ## Widening of non-literal singleton types
 
 It's similarly unlikely that an unannotated attribute initialized to a singleton type (like `None`)
