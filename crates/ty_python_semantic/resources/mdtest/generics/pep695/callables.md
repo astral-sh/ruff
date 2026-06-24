@@ -345,6 +345,70 @@ def consume(value: A | B | C | D | E) -> None: ...
 reveal_type(infer_from_consumer(consume))  # revealed: Unknown
 ```
 
+## Overlapping inferred union upper bounds exceeding the solution budget
+
+Even if the precise intersection of two large union upper bounds is small, processing either union
+currently exceeds the solution budget before we can discover that intersection.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: A | B | F | G | H) -> None: ...
+
+# TODO: The precise intersection fits within the budget and should be `A | B`.
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+```
+
+## Contextual generic return exceeding the solution budget
+
+A generic call can receive an upper bound from the type context in which its return value is used.
+An existing union in that upper bound should not consume the bounded-intersection budget unless an
+intersection actually needs to be distributed over it.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+
+def make_list[T](value: T) -> list[T]:
+    return [value]
+
+def consume(values: Sequence[Literal["a", "b", "c", "d", "e"]] | None) -> None: ...
+
+# TODO: This is a false positive. Reuse the existing literal union without distributing it.
+consume(make_list("a"))  # error: [invalid-argument-type]
+```
+
 ## Disjoint inferred union upper bounds
 
 If `Never` is the only type satisfying all inferred union upper bounds, it is the valid inferred
@@ -375,6 +439,57 @@ def consume_left(value: A | B) -> None: ...
 def consume_right(value: C | D) -> None: ...
 
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
+```
+
+## Disjoint inferred union upper bounds exceeding the solution budget
+
+Large disjoint union upper bounds also exceed the budget before we can discover that their precise
+intersection is bottom.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+@final
+class I: ...
+
+@final
+class J: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: F | G | H | I | J) -> None: ...
+
+# TODO: These upper bounds are disjoint, so the precise solution is `Never`.
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
 ```
 
 ## Combining inferred and declared upper bounds
