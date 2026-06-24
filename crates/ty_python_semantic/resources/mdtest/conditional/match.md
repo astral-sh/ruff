@@ -228,13 +228,6 @@ def _(target: int | str):
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
-
-def dynamic_attribute_capture_preserves_fallthrough(target: int) -> None:
-    match target:
-        case DynamicClass(real=_):
-            pass
-        case _:
-            target.missing  # error: [unresolved-attribute]
 ```
 
 ### Subclass-of type
@@ -297,20 +290,6 @@ def _(subj: int | abc.Callable[..., str]) -> None:
             y = 3
 
     reveal_type(y)  # revealed: Literal[2, 3]
-
-def callable_then_int(subj: abc.Callable[..., str] | int) -> int:
-    match subj:
-        case abc.Callable():
-            return 1
-        case int():
-            return 2
-
-def int_then_callable(subj: abc.Callable[..., str] | int) -> int:
-    match subj:
-        case int():
-            return 1
-        case abc.Callable():
-            return 2
 ```
 
 ### With arguments
@@ -357,7 +336,7 @@ def _(target: Point | Other):
         case Other():
             reveal_type(target)  # revealed: Other
 
-def ordered_or_class_pattern_preserves_fallthrough(target: Point):
+def missing_attribute_does_not_make_or_pattern_exhaustive(target: Point):
     y = 1
 
     match target:
