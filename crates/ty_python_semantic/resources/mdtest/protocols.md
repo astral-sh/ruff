@@ -1081,6 +1081,11 @@ subclasses of protocols do not implicitly define instance attributes on a protoc
 class Holder:
     extra: int
 
+class WithReboundReceiver(Protocol):
+    def method(self) -> None:
+        self = Holder()
+        self.extra = 1  # no error
+
 class WithStaticMethod(Protocol):
     @staticmethod
     def method(value: Holder) -> None:

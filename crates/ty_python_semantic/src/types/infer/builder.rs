@@ -1691,6 +1691,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
+        let Some(receiver) = target.value.as_name_expr() else {
+            return;
+        };
+        if !self.is_unrebound_receiver_parameter(receiver) {
+            return;
+        }
+
         let Some(protocol) = nearest_enclosing_class(db, self.index, self.scope())
             .and_then(|class| class.into_protocol_class(db))
         else {
@@ -1710,6 +1717,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         diagnostic::report_undeclared_protocol_instance_attribute(&self.context, target, protocol);
+    }
+
+    fn is_unrebound_receiver_parameter(&self, receiver: &ast::ExprName) -> bool {
+        fn bindings_are_parameter<'db>(
+            db: &'db dyn Db,
+            bindings: impl Iterator<Item = DefinitionState<'db>>,
+        ) -> Option<bool> {
+            let mut saw_definition = false;
+            for binding in bindings {
+                let DefinitionState::Defined(definition) = binding else {
+                    continue;
+                };
+                saw_definition = true;
+                if !definition.kind(db).is_parameter_def() {
+                    return Some(false);
+                }
+            }
+            saw_definition.then_some(true)
+        }
+
+        let db = self.db();
+        let file_scope_id = self.scope().file_scope_id(db);
+        let use_def = self.index.use_def_map(file_scope_id);
+        if let Some(is_parameter) = bindings_are_parameter(
+            db,
+            use_def
+                .bindings_at_use(receiver.scoped_use_id(db, self.file()))
+                .map(|binding| binding.binding),
+        ) {
+            return is_parameter;
+        }
+
+        let place_table = self.index.place_table(file_scope_id);
+        let Some(receiver_id) = place_table.symbol_id(receiver.id.as_str()) else {
+            return false;
+        };
+        let receiver_place = place_table.symbol(receiver_id).into();
+        for (enclosing_scope_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+            if let EnclosingSnapshotResult::FoundBindings(bindings) =
+                self.index
+                    .enclosing_snapshot(enclosing_scope_id, receiver_place, file_scope_id)
+                && let Some(is_parameter) =
+                    bindings_are_parameter(db, bindings.map(|binding| binding.binding))
+            {
+                return is_parameter;
+            }
+        }
+        false
     }
 
     /// Returns the implicit `__class__` cell in the current direct method body or
