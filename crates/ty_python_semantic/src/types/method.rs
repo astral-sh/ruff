@@ -72,7 +72,7 @@ impl<'db> BoundMethodType<'db> {
 
         CallableType::new(
             db,
-            self.bound_signatures(db).clone(),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
                 function.has_explicit_return_annotation(db),
