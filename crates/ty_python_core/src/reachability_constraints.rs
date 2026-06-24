@@ -5,7 +5,7 @@
 use std::cmp::Ordering;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
@@ -175,6 +175,7 @@ impl ReachabilityConstraints {
 pub struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
     interior_used: RankBitBoxVec,
+    source_ordered_atoms: FxHashSet<ScopedPredicateId>,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -258,12 +259,21 @@ impl ReachabilityConstraintsBuilder {
         } else if b.is_terminal() {
             Ordering::Less
         } else {
-            // See https://github.com/astral-sh/ruff/pull/20098 for an explanation of why this
-            // ordering is reversed.
-            self.interiors[a]
-                .atom
-                .cmp(&self.interiors[b].atom)
-                .reverse()
+            let a = self.interiors[a].atom;
+            let b = self.interiors[b].atom;
+            match (
+                self.source_ordered_atoms.contains(&a),
+                self.source_ordered_atoms.contains(&b),
+            ) {
+                // Test ordinary control-flow predicates before call predicates. Calls are then
+                // tested in source order, avoiding a backwards type-inference dependency chain.
+                (false, true) => Ordering::Less,
+                (true, false) => Ordering::Greater,
+                (true, true) => a.cmp(&b),
+                // See https://github.com/astral-sh/ruff/pull/20098 for why the default ordering is
+                // reversed.
+                (false, false) => a.cmp(&b).reverse(),
+            }
         }
     }
 
@@ -309,6 +319,19 @@ impl ReachabilityConstraintsBuilder {
                 if_false: ALWAYS_FALSE,
             })
         }
+    }
+
+    /// Adds an atom after marking it as dependency-ordered.
+    ///
+    /// Dependency-ordered atoms are placed below ordinary control-flow predicates and in source
+    /// order relative to each other. This is used for call predicates, whose type inference can
+    /// depend on the reachability of later bindings.
+    pub(crate) fn add_source_ordered_atom(
+        &mut self,
+        predicate: ScopedPredicateId,
+    ) -> ScopedReachabilityConstraintId {
+        self.source_ordered_atoms.insert(predicate);
+        self.add_atom(predicate)
     }
 
     /// Adds a new reachability constraint that is the ternary NOT of an existing one.
@@ -484,5 +507,34 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn predicate(index: usize) -> ScopedPredicateId {
+        ScopedPredicateId::new(index)
+    }
+
+    #[test]
+    fn source_ordered_atoms_follow_control_flow_predicates() {
+        let mut constraints = ReachabilityConstraintsBuilder::default();
+        let early_call = constraints.add_source_ordered_atom(predicate(0));
+        let late_call = constraints.add_source_ordered_atom(predicate(1));
+        let condition = constraints.add_atom(predicate(2));
+
+        let calls = constraints.add_and_constraint(early_call, late_call);
+        let formula = constraints.add_and_constraint(condition, calls);
+
+        let condition_node = constraints.interiors[formula];
+        assert_eq!(condition_node.atom, predicate(2));
+
+        let early_call_node = constraints.interiors[condition_node.if_true];
+        assert_eq!(early_call_node.atom, predicate(0));
+
+        let late_call_node = constraints.interiors[early_call_node.if_true];
+        assert_eq!(late_call_node.atom, predicate(1));
     }
 }

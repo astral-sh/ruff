@@ -195,6 +195,8 @@
 
 use std::cell::RefCell;
 
+use ruff_db::parsed::parsed_module;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -208,6 +210,7 @@ use crate::{
     },
 };
 use ruff_index::{Idx, IndexSlice};
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -227,6 +230,7 @@ use ty_python_core::{
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -518,6 +522,11 @@ fn accumulate_constraint<'db>(
     }
 }
 
+std::thread_local! {
+    static ACTIVE_SCOPE_CALL_PREPARATIONS: ActiveRecursionDetector<salsa::Id> = ActiveRecursionDetector::default();
+    static ACTIVE_IMPLICIT_ATTRIBUTE_SCOPES: RefCell<Vec<salsa::Id>> = const { RefCell::new(Vec::new()) };
+}
+
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
@@ -530,205 +539,104 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     }
 }
 
-std::thread_local! {
-    static ACTIVE_REACHABILITY_EVALUATIONS: ActiveRecursionDetector<salsa::Id> =
-        ActiveRecursionDetector::default();
-    static ACTIVE_NON_TERMINAL_CALLS: ActiveNonTerminalCalls = ActiveNonTerminalCalls::default();
-}
+/// Prepares context-independent call predicates in a scope in source order.
+#[salsa::tracked]
+fn prepare_non_terminal_calls_in_scope<'db>(db: &'db dyn Db, scope: ScopeId<'db>) {
+    let use_def = use_def_map(db, scope);
+    let predicates = use_def.predicates();
+    let module = parsed_module(db, scope.file(db)).load(db);
 
-#[derive(Default)]
-struct ActiveNonTerminalCalls {
-    calls: RefCell<Vec<(salsa::Id, ScopedPredicateId)>>,
-    sessions: RefCell<Vec<(salsa::Id, FxHashSet<ScopedPredicateId>)>>,
-}
-
-impl ActiveNonTerminalCalls {
-    fn visit_scope<R>(&self, scope: salsa::Id, f: impl FnOnce() -> R) -> R {
-        self.sessions
-            .borrow_mut()
-            .push((scope, FxHashSet::default()));
-        let _guard = ActiveNonTerminalCallSessionGuard {
-            sessions: &self.sessions,
-            expected_scope: scope,
+    for predicate in predicates.iter() {
+        let PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) = predicate.node
+        else {
+            continue;
         };
-        f()
-    }
-
-    fn visit<R>(&self, scope: salsa::Id, predicate: ScopedPredicateId, f: impl FnOnce() -> R) -> R {
-        self.calls.borrow_mut().push((scope, predicate));
-        let result = {
-            let _guard = ActiveNonTerminalCallGuard {
-                calls: &self.calls,
-                expected: (scope, predicate),
-            };
-            f()
-        };
-        self.mark_prepared(scope, predicate);
-        result
-    }
-
-    fn frontier(&self, scope: salsa::Id) -> Option<ScopedPredicateId> {
-        self.calls
-            .borrow()
-            .iter()
-            .rev()
-            .find_map(|(active_scope, predicate)| (*active_scope == scope).then_some(*predicate))
-    }
-
-    fn is_prepared(&self, scope: salsa::Id, predicate: ScopedPredicateId) -> bool {
-        self.sessions
-            .borrow()
-            .iter()
-            .rev()
-            .find_map(|(active_scope, prepared)| {
-                (*active_scope == scope).then(|| prepared.contains(&predicate))
-            })
-            .unwrap_or(false)
-    }
-
-    fn mark_prepared(&self, scope: salsa::Id, predicate: ScopedPredicateId) {
-        let mut sessions = self.sessions.borrow_mut();
-        let session = sessions
-            .iter_mut()
-            .rev()
-            .find(|(active_scope, _)| *active_scope == scope);
-        debug_assert!(session.is_some(), "an active call needs a worklist session");
-        if let Some((_, prepared)) = session {
-            prepared.insert(predicate);
+        if callable_is_context_independent(callable.node_ref(db).node(&module)) {
+            analyze_single(db, predicate);
         }
     }
 }
 
-struct ActiveNonTerminalCallSessionGuard<'a> {
-    sessions: &'a RefCell<Vec<(salsa::Id, FxHashSet<ScopedPredicateId>)>>,
-    expected_scope: salsa::Id,
-}
-
-impl Drop for ActiveNonTerminalCallSessionGuard<'_> {
-    fn drop(&mut self) {
-        let scope = self.sessions.borrow_mut().pop().map(|(scope, _)| scope);
-        debug_assert_eq!(scope, Some(self.expected_scope));
+fn callable_is_context_independent(callable: &ast::Expr) -> bool {
+    match callable {
+        ast::Expr::Name(_) => true,
+        ast::Expr::Attribute(attribute) => matches!(attribute.value.as_ref(), ast::Expr::Name(_)),
+        _ => false,
     }
 }
 
-struct ActiveNonTerminalCallGuard<'a> {
-    calls: &'a RefCell<Vec<(salsa::Id, ScopedPredicateId)>>,
-    expected: (salsa::Id, ScopedPredicateId),
-}
-
-impl Drop for ActiveNonTerminalCallGuard<'_> {
-    fn drop(&mut self) {
-        debug_assert_eq!(self.calls.borrow_mut().pop(), Some(self.expected));
-    }
-}
-
-fn non_terminal_call_recovery_frontier(
-    db: &dyn Db,
-    predicate: &Predicate,
-) -> Option<ScopedPredicateId> {
-    let scope = predicate_scope(db, predicate).as_id();
-    ACTIVE_NON_TERMINAL_CALLS.with(|active| active.frontier(scope))
-}
-
-fn should_recover_non_terminal_call(
-    db: &dyn Db,
-    predicate_id: ScopedPredicateId,
-    predicate: &Predicate,
-) -> bool {
-    non_terminal_call_recovery_frontier(db, predicate)
-        .is_some_and(|frontier| predicate_id.index() > frontier.index())
-}
-
-/// Infers call predicates reachable from one constraint root in source order.
-///
-/// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
-/// predicates in reverse to reduce their size. Walking the requested graph and inferring its calls
-/// in source order turns a deeply recursive query chain into cache lookups without analyzing calls
-/// from unrelated control-flow paths.
-///
-/// During reentry, calls at or beyond the active frontier cannot be prepared without recreating
-/// the cycle. Calls before it are safe to prepare unless the active scope session already did so.
-fn analyze_non_terminal_call_worklist<'db>(
+pub(crate) fn with_implicit_attribute_call_recovery<'db, R>(
     db: &'db dyn Db,
-    constraints: &ReachabilityConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root: ScopedReachabilityConstraintId,
-    recovery_frontier: Option<ScopedPredicateId>,
-) {
-    let mut pending = vec![root];
-    let mut visited = FxHashSet::default();
-    let mut calls = Vec::new();
+    scopes: impl IntoIterator<Item = ScopeId<'db>>,
+    f: impl FnOnce() -> R,
+) -> R {
+    // Preparing calls can affect which Salsa cycle participant supplies the initial value. Keep
+    // the workaround below the query depth at which it is needed, so ordinary functions retain
+    // their existing inference order. The problematic dependency chain grows with call predicates,
+    // not with the total number of control-flow predicates in the scope.
+    const MIN_CALLS_TO_PREPARE: usize = 512;
 
-    while let Some(id) = pending.pop() {
-        if id.is_terminal() || !visited.insert(id) {
-            continue;
-        }
-
-        let node = constraints.get_interior_node(id);
-        if matches!(
-            predicates[node.atom()].node,
-            PredicateNode::IsNonTerminalCall(_)
-        ) {
-            calls.push(node.atom());
-        }
-
-        pending.extend([node.if_true(), node.if_ambiguous(), node.if_false()]);
+    let scopes = scopes
+        .into_iter()
+        .filter(|scope| {
+            use_def_map(db, *scope)
+                .predicates()
+                .iter()
+                .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
+                .take(MIN_CALLS_TO_PREPARE)
+                .count()
+                == MIN_CALLS_TO_PREPARE
+        })
+        .collect::<Vec<_>>();
+    if scopes.is_empty() {
+        return f();
     }
 
-    calls.sort_unstable_by_key(|predicate| predicate.index());
-    calls.dedup();
-    for predicate in calls {
-        if recovery_frontier.is_some_and(|frontier| predicate.index() >= frontier.index()) {
-            continue;
-        }
-
-        let predicate_data = &predicates[predicate];
-        let scope = predicate_scope(db, predicate_data).as_id();
-        ACTIVE_NON_TERMINAL_CALLS.with(|active| {
-            if !active.is_prepared(scope, predicate) {
-                active.visit(scope, predicate, || analyze_single(db, predicate_data));
-            }
+    for &scope in &scopes {
+        let key = scope.as_id();
+        ACTIVE_SCOPE_CALL_PREPARATIONS.with(|active| {
+            active.visit(
+                &key,
+                || {},
+                || prepare_non_terminal_calls_in_scope(db, scope),
+            );
         });
     }
+
+    ACTIVE_IMPLICIT_ATTRIBUTE_SCOPES.with(|active| {
+        let original_len = active.borrow().len();
+        active.borrow_mut().extend(scopes.iter().map(AsId::as_id));
+        let _guard = ImplicitAttributeScopesGuard {
+            active,
+            original_len,
+        };
+        f()
+    })
 }
 
-fn evaluate_reachability_constraint<'db>(
-    db: &'db dyn Db,
-    constraints: &ReachabilityConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    mut id: ScopedReachabilityConstraintId,
-    recovery_frontier: Option<ScopedPredicateId>,
-) -> Truthiness {
-    type Id = ScopedReachabilityConstraintId;
+struct ImplicitAttributeScopesGuard<'a> {
+    active: &'a RefCell<Vec<salsa::Id>>,
+    original_len: usize,
+}
 
-    loop {
-        let node = match id {
-            Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-            Id::AMBIGUOUS => return Truthiness::Ambiguous,
-            Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-            _ => constraints.get_interior_node(id),
-        };
-        let predicate = &predicates[node.atom()];
-        let truthiness = if recovery_frontier
-            .is_some_and(|frontier| node.atom().index() > frontier.index())
-            && matches!(predicate.node, PredicateNode::IsNonTerminalCall(_))
-        {
-            // Match `analyze_non_terminal_call`'s conservative cycle-initial value. The future
-            // call can affect whether a later implicit-attribute binding is reachable, but it
-            // cannot make the current source position reachable if it was not already. Assuming
-            // that it returns therefore avoids false unreachable results while breaking the
-            // backwards inference cycle.
-            Truthiness::AlwaysTrue.negate_if(!predicate.is_positive)
-        } else {
-            analyze_single(db, predicate)
-        };
-
-        match truthiness {
-            Truthiness::AlwaysTrue => id = node.if_true(),
-            Truthiness::Ambiguous => id = node.if_ambiguous(),
-            Truthiness::AlwaysFalse => id = node.if_false(),
-        }
+impl Drop for ImplicitAttributeScopesGuard<'_> {
+    fn drop(&mut self) {
+        self.active.borrow_mut().truncate(self.original_len);
     }
+}
+
+fn should_recover_implicit_attribute_call(db: &dyn Db, predicate: &Predicate) -> bool {
+    let PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) = predicate.node
+    else {
+        return false;
+    };
+    let scope = callable.scope(db);
+    if !ACTIVE_IMPLICIT_ATTRIBUTE_SCOPES.with(|active| active.borrow().contains(&scope.as_id())) {
+        return false;
+    }
+
+    let module = parsed_module(db, scope.file(db)).load(db);
+    !callable_is_context_independent(callable.node_ref(db).node(&module))
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -747,35 +655,24 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        id: ScopedReachabilityConstraintId,
+        mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        if id.is_terminal() {
-            return evaluate_reachability_constraint(db, self, predicates, id, None);
-        }
+        type Id = ScopedReachabilityConstraintId;
 
-        let predicate = &predicates[self.get_interior_node(id).atom()];
-        let scope = predicate_scope(db, predicate).as_id();
-        ACTIVE_REACHABILITY_EVALUATIONS.with(|active| {
-            active.visit(
-                &scope,
-                || {
-                    let recovery_frontier = non_terminal_call_recovery_frontier(db, predicate);
-                    // This graph can contain earlier calls from a control-flow path that is absent
-                    // from the outer graph. Prepare those calls in source order before evaluating
-                    // the graph, while leaving the active and future calls to cycle recovery.
-                    analyze_non_terminal_call_worklist(db, self, predicates, id, recovery_frontier);
-                    evaluate_reachability_constraint(db, self, predicates, id, recovery_frontier)
-                },
-                || {
-                    ACTIVE_NON_TERMINAL_CALLS.with(|calls| {
-                        calls.visit_scope(scope, || {
-                            analyze_non_terminal_call_worklist(db, self, predicates, id, None);
-                            evaluate_reachability_constraint(db, self, predicates, id, None)
-                        })
-                    })
-                },
-            )
-        })
+        loop {
+            let node = match id {
+                Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+                Id::AMBIGUOUS => return Truthiness::Ambiguous,
+                Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+                _ => self.get_interior_node(id),
+            };
+            let predicate = &predicates[node.atom()];
+            match analyze_single(db, predicate) {
+                Truthiness::AlwaysTrue => id = node.if_true(),
+                Truthiness::Ambiguous => id = node.if_ambiguous(),
+                Truthiness::AlwaysFalse => id = node.if_false(),
+            }
+        }
     }
 }
 
@@ -1096,20 +993,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
-                    // Call predicates also gate narrowing. Recover future calls while a worklist
-                    // is active, but retain precise results for calls it has already processed.
-                    let branch = if should_recover_non_terminal_call(self.db, node.atom, &predicate)
+                    let truthiness = if should_recover_implicit_attribute_call(self.db, &predicate)
                     {
-                        node.if_true
+                        Truthiness::AlwaysTrue.negate_if(!predicate.is_positive)
                     } else {
-                        match analyze_single(self.db, &predicate) {
-                            Truthiness::AlwaysTrue => node.if_true,
-                            Truthiness::AlwaysFalse => node.if_false,
-                            Truthiness::Ambiguous => {
-                                unreachable!(
-                                    "`IsNonTerminalCall` predicates should never be Ambiguous"
-                                )
-                            }
+                        analyze_single(self.db, &predicate)
+                    };
+                    let branch = match truthiness {
+                        Truthiness::AlwaysTrue => node.if_true,
+                        Truthiness::AlwaysFalse => node.if_false,
+                        Truthiness::Ambiguous => {
+                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
                         }
                     };
 
@@ -1715,7 +1609,6 @@ mod tests {
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
-    use ty_python_core::scope::ScopeKind;
     use ty_python_core::semantic_index;
 
     #[test]
@@ -1781,7 +1674,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_never_call_is_preserved_during_scope_reentry() -> anyhow::Result<()> {
+    fn never_call_narrowing_is_preserved_during_implicit_attribute_lookup() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_files([
             ("/src/package/__init__.py", ""),
@@ -1812,38 +1705,16 @@ class Form(Ui):
             ),
         ])?;
 
-        let ui_file = system_path_to_file(&db, "/src/package/ui.py").unwrap();
-        let index = semantic_index(&db, ui_file);
-        let class_scope = index
-            .child_scopes(FileScopeId::global())
-            .find(|(scope, _)| index.scope(*scope).kind() == ScopeKind::Class)
-            .unwrap()
-            .0;
-        let method_scope = index.child_scopes(class_scope).next().unwrap().0;
-        let scope = method_scope.to_scope_id(&db, ui_file).as_id();
         let consumer_file = system_path_to_file(&db, "/src/package/consumer.py").unwrap();
-
-        ACTIVE_NON_TERMINAL_CALLS.with(|calls| {
-            calls.visit_scope(scope, || {
-                ACTIVE_REACHABILITY_EVALUATIONS.with(|active| {
-                    active.visit(
-                        &scope,
-                        || panic!("test unexpectedly reentered its synthetic outer evaluation"),
-                        || {
-                            let diagnostics = check_types(&db, consumer_file);
-                            assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
-                            assert_eq!(diagnostics[0].id(), DiagnosticId::RevealedType);
-                            assert_eq!(
-                                diagnostics[0]
-                                    .primary_annotation()
-                                    .and_then(|annotation| annotation.get_message()),
-                                Some("`int`")
-                            );
-                        },
-                    );
-                });
-            });
-        });
+        let diagnostics = check_types(&db, consumer_file);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].id(), DiagnosticId::RevealedType);
+        assert_eq!(
+            diagnostics[0]
+                .primary_annotation()
+                .and_then(|annotation| annotation.get_message()),
+            Some("`int`")
+        );
 
         Ok(())
     }

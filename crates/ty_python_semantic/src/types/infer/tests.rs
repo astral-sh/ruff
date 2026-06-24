@@ -351,7 +351,7 @@ const MANY_NON_TERMINAL_CALLS: usize = 1_100;
 const FEW_NON_TERMINAL_CALLS: usize = 80;
 
 #[test]
-fn non_terminal_call_worklist_skips_non_reaching_branch() -> anyhow::Result<()> {
+fn reachability_skips_call_on_non_reaching_branch() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
         "/src/test.py",
@@ -582,8 +582,7 @@ class Ui:
             let function_scope = index.child_scopes(class_scope).next().unwrap().0;
             let use_def = index.use_def_map(function_scope);
             // The fallthrough graph only contains the call on the non-returning branch. Inferring
-            // its receiver reenters the assignment graph on the returning branch, whose calls
-            // therefore have not been prepared by the outer worklist.
+            // its receiver reenters the assignment graph on the returning branch.
             assert_eq!(
                 use_def.reachability_constraints().evaluate(
                     &db,

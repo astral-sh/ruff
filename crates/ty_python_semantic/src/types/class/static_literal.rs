@@ -16,7 +16,9 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin, place_from_bindings, place_from_declarations,
     },
-    reachability::{DeclarationsIteratorExtension, binding_reachability},
+    reachability::{
+        DeclarationsIteratorExtension, binding_reachability, with_implicit_attribute_call_recovery,
+    },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
@@ -2199,10 +2201,15 @@ impl<'db> StaticClassLiteral<'db> {
             return Member::unbound();
         }
 
-        Self::implicit_attribute_inner(
-            db,
-            ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
-        )
+        let file = class_body_scope.file(db);
+        let method_scopes = attribute_assignments(db, class_body_scope, name)
+            .map(|(_, method_scope)| method_scope.to_scope_id(db, file));
+        with_implicit_attribute_call_recovery(db, method_scopes, || {
+            Self::implicit_attribute_inner(
+                db,
+                ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
+            )
+        })
     }
 
     #[salsa::tracked(

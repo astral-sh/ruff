@@ -4101,7 +4101,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .add_atom(predicate_id);
 
                         if self.in_function_scope() {
-                            self.record_reachability_constraint_id(predicate_id);
+                            let reachability_constraint = self
+                                .current_reachability_constraints_mut()
+                                .add_source_ordered_atom(predicate_id);
+                            self.current_use_def_map_mut()
+                                .record_reachability_constraint(reachability_constraint);
 
                             // Also gate narrowing by this constraint: if the call returns
                             // `Never`, any narrowing in the current branch should be
