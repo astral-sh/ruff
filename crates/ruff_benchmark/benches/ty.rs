@@ -712,13 +712,12 @@ fn benchmark_repeated_str_enum_comparisons(criterion: &mut Criterion) {
 fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code = "from enum import StrEnum\n\nclass Left(StrEnum):\n".to_string();
-    for index in 0..NUM_ENUM_MEMBERS {
-        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
-    }
-    code.push_str("\n\nclass Right(StrEnum):\n");
-    for index in 0..NUM_ENUM_MEMBERS {
-        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    let mut code = "from enum import StrEnum\n".to_string();
+    for side in ["Left", "Right"] {
+        writeln!(&mut code, "\nclass {side}(StrEnum):").ok();
+        for index in 0..NUM_ENUM_MEMBERS {
+            writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+        }
     }
     code.push_str(
         "\n\ndef compare(left: Left, right: Right):\n    if left != right:\n        return\n    return left == right\n",
@@ -745,21 +744,19 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
             }
         }
     }
-    code.push_str("\ndef compare(left: ");
-    for class_index in 0..NUM_ENUM_CLASSES {
-        if class_index > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Left{class_index}").ok();
-    }
-    code.push_str(", right: ");
-    for class_index in 0..NUM_ENUM_CLASSES {
-        if class_index > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Right{class_index}").ok();
-    }
-    code.push_str("):\n    if left != right:\n        return\n    return left == right\n");
+    let class_union = |side| {
+        (0..NUM_ENUM_CLASSES)
+            .map(|index| format!("{side}{index}"))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    };
+    writeln!(
+        &mut code,
+        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
+        class_union("Left"),
+        class_union("Right"),
+    )
+    .ok();
 
     benchmark_enum_comparison(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
 }

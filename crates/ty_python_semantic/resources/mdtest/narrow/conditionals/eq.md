@@ -436,8 +436,8 @@ def compare_subsets(
 ```
 
 The same comparison-key projection applies when each operand spans several enum classes. This
-example represents 16 possible values on the left and 20 on the right, so comparing every member
-pair would exceed the finite-comparison budget:
+example represents 18 possible values on each side, which would otherwise require 324 pairwise
+comparisons:
 
 ```py
 from enum import IntEnum
@@ -447,62 +447,52 @@ class MixedLeft0(IntEnum):
     B = 1
     C = 2
     D = 3
+    E = 4
+    F = 5
+    G = 6
+    H = 7
+    I = 8
 
 class MixedLeft1(IntEnum):
-    A = 4
-    B = 5
-    C = 6
-    D = 7
-
-class MixedLeft2(IntEnum):
-    A = 8
-    B = 9
-    C = 10
-    D = 11
-
-class MixedLeft3(IntEnum):
-    A = 12
-    B = 13
-    C = 14
-    D = 15
+    A = 9
+    B = 10
+    C = 11
+    D = 12
+    E = 13
+    F = 14
+    G = 15
+    H = 16
+    I = 17
 
 class MixedRight0(IntEnum):
     A = 0
     B = 1
     C = 2
     D = 3
+    E = 4
+    F = 5
+    G = 6
+    H = 7
+    I = 8
 
 class MixedRight1(IntEnum):
-    A = 4
-    B = 5
-    C = 6
-    D = 7
-
-class MixedRight2(IntEnum):
-    A = 8
-    B = 9
-    C = 10
-    D = 11
-
-class MixedRight3(IntEnum):
-    A = 16
-    B = 17
-    C = 18
-    D = 19
-
-class MixedRight4(IntEnum):
-    A = 20
-    B = 21
-    C = 22
-    D = 23
+    A = 18
+    B = 19
+    C = 20
+    D = 21
+    E = 22
+    F = 23
+    G = 24
+    H = 25
+    I = 26
 
 def compare_mixed_domains(
-    left: MixedLeft0 | MixedLeft1 | MixedLeft2 | MixedLeft3,
-    right: MixedRight0 | MixedRight1 | MixedRight2 | MixedRight3 | MixedRight4,
+    left: MixedLeft0 | MixedLeft1,
+    right: MixedRight0 | MixedRight1,
 ):
     if left == right:
-        reveal_type(left)  # revealed: MixedLeft0 | MixedLeft1 | MixedLeft2
-        reveal_type(right)  # revealed: MixedRight0 | MixedRight1 | MixedRight2
+        reveal_type(left)  # revealed: MixedLeft0
+        reveal_type(right)  # revealed: MixedRight0
 ```
 
 An open identity-comparing enum can still be narrowed to all of its declared members. Undeclared
