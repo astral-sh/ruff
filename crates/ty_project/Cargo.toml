@@ -23,6 +23,7 @@ ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
+ruff_ranged_value = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
 ty_module_resolver = { workspace = true }

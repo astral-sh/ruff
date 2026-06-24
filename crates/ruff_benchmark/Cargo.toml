@@ -22,6 +22,7 @@ ruff_linter = { workspace = true, optional = true }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
+ruff_ranged_value = { workspace = true }
 ty_module_resolver = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
 

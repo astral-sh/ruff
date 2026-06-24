@@ -527,10 +527,10 @@ mod tests {
         assert_eq!(selector.source(), &RuleSelectorSource::Editor);
         assert_eq!(
             selector
-                .resolve("select", PreviewMode::Disabled)
+                .resolve(PreviewMode::Disabled)
                 .unwrap_err()
                 .to_string(),
-            "Unknown rule selector `F481` in `select` from the editor configuration"
+            "Unknown rule selector `F481` from the editor configuration"
         );
     }
 

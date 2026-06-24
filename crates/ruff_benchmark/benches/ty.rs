@@ -18,9 +18,10 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_ranged_value::RangedValue;
 use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 

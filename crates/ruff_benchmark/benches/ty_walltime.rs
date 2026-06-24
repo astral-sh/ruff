@@ -6,9 +6,10 @@ use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
+use ruff_ranged_value::RangedValue;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 struct Benchmark<'a> {

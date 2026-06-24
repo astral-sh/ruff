@@ -20,6 +20,7 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
 ty_python_semantic = { workspace = true, features = ["serde"] }

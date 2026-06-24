@@ -4,9 +4,7 @@ use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
-use crate::metadata::value::{
-    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
-};
+use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use anyhow::Context;
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
@@ -20,6 +18,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -1762,7 +1761,18 @@ pub struct OverrideOptions {
     pub analysis: Option<AnalysisOptions>,
 }
 
-impl RangedValue<OverrideOptions> {
+trait ToOverride {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        global_analysis: Option<&AnalysisOptions>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>>;
+}
+
+impl ToOverride for RangedValue<OverrideOptions> {
     fn to_override(
         &self,
         db: &dyn Db,
