@@ -1481,11 +1481,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         if member.is_method() && access == ProtocolMemberAccessMode::Instance {
-            let Some(required_ty) = required_ty.resolve(db) else {
-                return self.never();
-            };
-            let Type::Callable(required_callable) = required_ty.ty() else {
-                return self.never();
+            let required_callable = if member.is_instance_method() {
+                let Some(required_ty) = required_ty.resolve(db) else {
+                    return self.never();
+                };
+                let Type::Callable(required_callable) = required_ty.ty() else {
+                    return self.never();
+                };
+                required_callable.apply_self(db, fallback_ty)
+            } else {
+                let Some(Type::Callable(required_callable)) =
+                    required_ty.bind_self(db, fallback_ty)
+                else {
+                    return self.never();
+                };
+                required_callable
             };
             attribute_type
                 .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
@@ -1493,7 +1503,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_callables_vs_callable(
                         db,
                         &callables.map(|callable| callable.apply_self(db, fallback_ty)),
-                        required_callable.apply_self(db, fallback_ty),
+                        required_callable,
                     )
                 })
         } else if member.is_instance_method() {
@@ -1691,8 +1701,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (Some(source), Some(target)) => {
                 let bind_read = |member_type: ProtocolMemberType<'db>,
                                  member: &ProtocolMember<'_, 'db>| {
-                    let member_type = member_type.resolve(db)?;
-                    if member.is_method()
+                    if member.is_instance_method()
+                        && let member_type = member_type.resolve(db)?
                         && let Type::Callable(callable) = member_type.ty()
                     {
                         Some(Type::Callable(callable.apply_self(db, source_type)))

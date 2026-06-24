@@ -2847,6 +2847,8 @@ of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent t
 `P.x` after the descriptor protocol has been invoked on `P.x`:
 
 ```py
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Protocol, overload
 from typing_extensions import Self
 from ty_extensions import static_assert, is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
@@ -2948,6 +2950,22 @@ class BadFactory:
     def create(cls) -> int:
         return 42
 
+class PContextManager1(Protocol):
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[Self]: ...
+
+class PContextManager2(Protocol):
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[Self]: ...
+
+class ContextManagerImplementation:
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[Self]:
+        yield cls()
+
 def use_decorated_protocol_methods(class_method: PClassMethod, static_method: PStaticMethod) -> None:
     reveal_type(class_method.x(1))  # revealed: str
     reveal_type(static_method.x(1))  # revealed: str
@@ -2957,6 +2975,7 @@ def use_decorated_protocol_methods(class_method: PClassMethod, static_method: PS
 # That means that they are equivalent protocols!
 static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
 static_assert(is_equivalent_to(POverloadedClassMethod, POverloadedStaticMethod))
+static_assert(is_equivalent_to(PContextManager1, PContextManager2))
 
 static_assert(not is_assignable_to(NNotCallable, PClassMethod))
 static_assert(not is_assignable_to(NNotCallable, PStaticMethod))
@@ -2994,6 +3013,8 @@ static_assert(is_subtype_of(Factory, PFactory))
 static_assert(is_assignable_to(Factory, PFactory))
 static_assert(not is_subtype_of(BadFactory, PFactory))
 static_assert(not is_assignable_to(BadFactory, PFactory))
+static_assert(is_subtype_of(ContextManagerImplementation, PContextManager1))
+static_assert(is_assignable_to(ContextManagerImplementation, PContextManager1))
 
 static_assert(is_subtype_of(OverloadedClassMethod, POverloadedClassMethod))
 static_assert(is_subtype_of(OverloadedClassMethod, POverloadedStaticMethod))
