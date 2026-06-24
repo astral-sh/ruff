@@ -7,6 +7,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
+use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -169,6 +170,15 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
     };
+
+    let comparison_truthiness = match op {
+        ast::CmpOp::Eq => equality_truthiness(db, left, right),
+        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
+        _ => Truthiness::Ambiguous,
+    };
+    if comparison_truthiness != Truthiness::Ambiguous {
+        return Ok(Type::from_truthiness(db, comparison_truthiness));
+    }
 
     let comparison_result = match (left, right) {
         (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
