@@ -200,9 +200,9 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
-        definite_match_pattern_type, equality_truthiness, expand_type, infer_narrowing_constraints,
+        CallableTypes, EnumClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
+        Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
+        equality_truthiness, expand_type, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
@@ -518,10 +518,6 @@ fn accumulate_constraint<'db>(
     }
 }
 
-std::thread_local! {
-    static ACTIVE_NON_TERMINAL_CALL_PREFIXES: ActiveRecursionDetector<salsa::Id> = ActiveRecursionDetector::default();
-}
-
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
@@ -532,50 +528,6 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
     }
-}
-
-/// Infers preceding call predicates in source order.
-///
-/// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
-/// predicates in reverse to reduce their size. Inferring a later call can depend on the
-/// reachability of all preceding calls, which otherwise creates a deeply recursive Salsa query
-/// chain. Inferring the expressions in source order turns that chain into cache lookups while
-/// preserving normal reachability and narrowing during every inference.
-///
-/// Reentrant analysis of the same predicate graph skips the prefix pass: because the outer pass is
-/// proceeding in source order, any preceding call needed by the current expression has already
-/// been inferred. A different predicate graph performs its own pass, which is necessary when
-/// inferring a call crosses into another large scope.
-fn analyze_non_terminal_call_prefix<'db>(
-    db: &'db dyn Db,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root_predicate: ScopedPredicateId,
-) {
-    let range = 0..=root_predicate.index();
-    if !range.clone().any(|index| {
-        matches!(
-            predicates[ScopedPredicateId::new(index)].node,
-            PredicateNode::IsNonTerminalCall(_)
-        )
-    }) {
-        return;
-    }
-
-    let key = predicate_scope(db, &predicates[root_predicate]).as_id();
-    ACTIVE_NON_TERMINAL_CALL_PREFIXES.with(|active| {
-        active.visit(
-            &key,
-            || {},
-            || {
-                for index in range {
-                    let predicate = &predicates[ScopedPredicateId::new(index)];
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                        analyze_single(db, predicate);
-                    }
-                }
-            },
-        );
-    });
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -598,32 +550,12 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
 
-        // Analyze statement-level calls through this root one by one in source order, so any
-        // earlier call needed while inferring a later one is already cached instead of deepening
-        // the Salsa query stack. This avoids growing an excessive stack for deeply nested
-        // reachability queries.
-        //
-        // Without this prefix analysis, given:
-        //
-        //   call_a()  # predicate 0
-        //   call_b()  # predicate 1
-        //   call_c()  # predicate 2
-        //
-        // we'd analyze them backwards:
-        //
-        //   analyze call_c
-        //   └─ analyze call_b
-        //      └─ analyze call_a
-        //
-        // The prefix pass explicitly analyzes them forwards:
-        //
-        //   analyze call_a  → cached
-        //   analyze call_b  → call_a is already cached
-        //   analyze call_c  → call_b is already cached
-        if !id.is_terminal() {
-            let root_predicate = self.get_interior_node(id).atom();
-            analyze_non_terminal_call_prefix(db, predicates, root_predicate);
-        }
+        let _call_termination_table = if id.is_terminal() {
+            None
+        } else {
+            let predicate = &predicates[self.get_interior_node(id).atom()];
+            enter_call_termination_table(predicate_scope(db, predicate).as_id())
+        };
 
         loop {
             let node = match id {
@@ -632,8 +564,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
                 Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.get_interior_node(id),
             };
-            let predicate = &predicates[node.atom()];
-            match analyze_single(db, predicate) {
+            match analyze_single(db, predicates, node.atom()) {
                 Truthiness::AlwaysTrue => id = node.if_true(),
                 Truthiness::Ambiguous => id = node.if_ambiguous(),
                 Truthiness::AlwaysFalse => id = node.if_false(),
@@ -958,8 +889,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 }
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(self.db, &predicate) {
+                    let branch = match analyze_single(self.db, self.predicates, node.atom) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
@@ -1221,6 +1151,134 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+enum CallTermination {
+    ReturnsNormally,
+    Never,
+}
+
+impl CallTermination {
+    const fn truthiness(self) -> Truthiness {
+        match self {
+            Self::ReturnsNormally => Truthiness::AlwaysTrue,
+            Self::Never => Truthiness::AlwaysFalse,
+        }
+    }
+}
+
+// Keep only the in-progress population cursor thread-local; completed cells are Salsa query
+// results. This is safe because the cursor affects evaluation order, not the returned value, and
+// reentrant query execution remains on the same thread/query stack. Salsa may block that thread on
+// work running elsewhere, but it does not migrate the active Rust stack to another thread. If that
+// execution model changes, this should become an explicitly propagated evaluation context.
+std::thread_local! {
+    static CALL_TERMINATION_TABLES: RefCell<SmallVec<[CallTerminationTableState; 4]>> = RefCell::default();
+}
+
+struct CallTerminationTableState {
+    scope: salsa::Id,
+    /// The first predicate that has not been populated, or `None` while population is active.
+    next_predicate: Option<usize>,
+}
+
+struct CallTerminationTableGuard {
+    scope: salsa::Id,
+}
+
+impl Drop for CallTerminationTableGuard {
+    fn drop(&mut self) {
+        CALL_TERMINATION_TABLES.with(|tables| {
+            let mut tables = tables.borrow_mut();
+            if let Some(index) = tables.iter().rposition(|table| table.scope == self.scope) {
+                tables.remove(index);
+            }
+        });
+    }
+}
+
+fn enter_call_termination_table(scope: salsa::Id) -> Option<CallTerminationTableGuard> {
+    CALL_TERMINATION_TABLES.with(|tables| {
+        let mut tables = tables.borrow_mut();
+        if tables.iter().any(|table| table.scope == scope) {
+            return None;
+        }
+        tables.push(CallTerminationTableState {
+            scope,
+            next_predicate: Some(0),
+        });
+        Some(CallTerminationTableGuard { scope })
+    })
+}
+
+/// Returns one cell from the source-order call termination table for `scope`.
+///
+/// Predicate IDs are assigned in source order, while the reachability decision diagrams visit
+/// them in reverse order. Populating the table in order lets a later call reuse the cached result
+/// for an earlier call instead of creating a deeply nested Salsa query chain. For example:
+///
+/// ```text
+/// predicate 0 (`call_a`) -> returns normally
+/// predicate 1 (`call_b`) -> returns normally
+/// predicate 2 (`call_c`) -> never
+/// ```
+///
+/// The table cells are the memoized [`infer_call_termination`] results. The evaluation-local state
+/// only coordinates their source-order population through reentrant queries. Making the entire
+/// table one Salsa query would pull it into each call-inference cycle and repeatedly recompute the
+/// whole scope.
+fn call_termination<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicate_index: usize,
+    root_call: CallableAndCallExpr<'db>,
+) -> CallTermination {
+    let key = scope.as_id();
+    let start = CALL_TERMINATION_TABLES.with(|tables| {
+        let mut tables = tables.borrow_mut();
+        let table = tables.iter_mut().rfind(|table| table.scope == key)?;
+        match table.next_predicate {
+            Some(next) if predicate_index >= next => table.next_predicate.take(),
+            Some(_) | None => None,
+        }
+    });
+
+    let Some(start) = start else {
+        return infer_call_termination(
+            db,
+            root_call.callable,
+            root_call.call_expr,
+            root_call.is_await,
+        );
+    };
+
+    for index in start..predicate_index {
+        let predicate_id = ScopedPredicateId::new(index);
+        let PredicateNode::IsNonTerminalCall(call) = predicates[predicate_id].node else {
+            continue;
+        };
+
+        infer_call_termination(db, call.callable, call.call_expr, call.is_await);
+    }
+
+    let termination = infer_call_termination(
+        db,
+        root_call.callable,
+        root_call.call_expr,
+        root_call.is_await,
+    );
+    CALL_TERMINATION_TABLES.with(|tables| {
+        if let Some(table) = tables
+            .borrow_mut()
+            .iter_mut()
+            .rfind(|table| table.scope == key)
+        {
+            table.next_predicate = Some(predicate_index + 1);
+        }
+    });
+    termination
+}
+
 /// Determines whether a statement-level call can return.
 ///
 /// Only a call known to return `Never` is treated as terminal. Unsupported or uncertain callable
@@ -1229,15 +1287,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
 /// Cycle recovery conservatively treats the call as returning so that a cyclic type inference
 /// dependency cannot make subsequent code unreachable.
 #[salsa::tracked(
-    cycle_initial = |_, _, _, _, _| Truthiness::AlwaysTrue,
+    cycle_initial = |_, _, _, _, _| CallTermination::ReturnsNormally,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_non_terminal_call<'db>(
+fn infer_call_termination<'db>(
     db: &'db dyn Db,
     callable: Expression<'db>,
     call_expr: Expression<'db>,
     is_await: bool,
-) -> Truthiness {
+) -> CallTermination {
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
     // the more expensive work of inferring the entire call expression (which could involve
@@ -1252,7 +1310,7 @@ fn analyze_non_terminal_call<'db>(
     // so heavily congested because there are only very few dynamic types, in which case Salsa's
     // sharding the locks by value doesn't help much. See <https://github.com/astral-sh/ty/issues/968>.
     if matches!(ty, Type::Dynamic(_)) {
-        return Truthiness::AlwaysTrue;
+        return CallTermination::ReturnsNormally;
     }
 
     let overloads_iterator = if let Some(callable) = ty
@@ -1261,7 +1319,7 @@ fn analyze_non_terminal_call<'db>(
     {
         callable.signatures(db).overloads.iter()
     } else {
-        return Truthiness::AlwaysTrue;
+        return CallTermination::ReturnsNormally;
     };
 
     let mut no_overloads_return_never = true;
@@ -1276,20 +1334,25 @@ fn analyze_non_terminal_call<'db>(
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
-        Truthiness::AlwaysTrue
+        CallTermination::ReturnsNormally
     } else if all_overloads_return_never {
-        Truthiness::AlwaysFalse
+        CallTermination::Never
     } else {
         let call_expr_ty = infer_same_file_expression_type(db, call_expr, TypeContext::default());
         if call_expr_ty.is_equivalent_to(db, Type::Never) {
-            Truthiness::AlwaysFalse
+            CallTermination::Never
         } else {
-            Truthiness::AlwaysTrue
+            CallTermination::ReturnsNormally
         }
     }
 }
 
-fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+fn analyze_single(
+    db: &dyn Db,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate>,
+    predicate_id: ScopedPredicateId,
+) -> Truthiness {
+    let predicate = &predicates[predicate_id];
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
@@ -1298,12 +1361,15 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 .bool(db)
                 .negate_if(!predicate.is_positive)
         }
-        PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
-            callable,
-            call_expr,
-            is_await,
-        }) => analyze_non_terminal_call(db, callable, call_expr, is_await)
-            .negate_if(!predicate.is_positive),
+        PredicateNode::IsNonTerminalCall(call) => call_termination(
+            db,
+            predicate_scope(db, predicate),
+            predicates,
+            predicate_id.index(),
+            call,
+        )
+        .truthiness()
+        .negate_if(!predicate.is_positive),
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)
