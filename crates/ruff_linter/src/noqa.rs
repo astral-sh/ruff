@@ -852,7 +852,7 @@ fn build_noqa_edits_by_diagnostic(
 
 fn build_noqa_edits_by_line<'a>(
     comments: Vec<Option<NoqaComment<'a>>>,
-    locator: &Locator,
+    locator: &Locator<'a>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
 ) -> BTreeMap<TextSize, NoqaEdit<'a>> {
@@ -983,6 +983,9 @@ struct NoqaEdit<'a> {
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
+    /// Text that followed the existing codes on the line (e.g. a trailing reason or a
+    /// `# fmt: skip` comment) and must be preserved when rewriting the directive.
+    trailing: &'a str,
     blank_line: bool,
 }
 
@@ -1017,6 +1020,9 @@ impl NoqaEdit<'_> {
         if let Some(reason) = self.reason {
             write!(writer, " {reason}").unwrap();
         }
+        if !self.trailing.is_empty() {
+            write!(writer, "{}", self.trailing).unwrap();
+        }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
     }
 }
@@ -1031,7 +1037,7 @@ fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
     noqa_codes: FxHashSet<&'a SecondaryCode>,
-    locator: &Locator,
+    locator: &Locator<'a>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
 ) -> Option<NoqaEdit<'a>> {
@@ -1040,6 +1046,7 @@ fn generate_noqa_edit<'a>(
     let edit_range;
     let codes;
     let blank_line;
+    let trailing;
 
     // Add codes.
     match directive {
@@ -1048,6 +1055,7 @@ fn generate_noqa_edit<'a>(
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
+            trailing = "";
         }
         Some(Directive::Codes(existing_codes)) => {
             // find trimmed line without the noqa
@@ -1057,6 +1065,11 @@ fn generate_noqa_edit<'a>(
             blank_line = false;
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = Some(existing_codes);
+            // Preserve any content that followed the existing codes (e.g. a trailing reason
+            // or a `# fmt: skip` comment), which the rewritten directive would otherwise drop.
+            trailing = locator
+                .slice(TextRange::new(existing_codes.end(), line_range.end()))
+                .trim_end();
         }
         Some(Directive::All(_)) => return None,
     }
@@ -1067,6 +1080,7 @@ fn generate_noqa_edit<'a>(
         codes,
         line_ending,
         reason,
+        trailing,
         blank_line,
     })
 }
@@ -2972,6 +2986,74 @@ mod tests {
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
+
+        // Amending an existing directive must preserve any trailing reason text that
+        // follows the codes (https://github.com/astral-sh/ruff/issues/26287).
+        let contents = "x = 1  # noqa: E741 with a reason\n";
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = [
+            AmbiguousVariableName("x".to_string()).into_diagnostic(
+                TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
+            ),
+            UnusedVariable {
+                name: "x".to_string(),
+            }
+            .into_diagnostic(
+                TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
+            ),
+        ];
+        let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(33))]);
+        let (count, output) = add_noqa_inner(
+            path,
+            &messages,
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        assert_eq!(output, "x = 1  # noqa: E741, F841 with a reason\n");
+
+        // The same is true of a trailing comment such as `# fmt: skip`, which must not be
+        // swallowed when the directive is rewritten.
+        let contents = "x = 1  # noqa: E741 # fmt: skip\n";
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = [
+            AmbiguousVariableName("x".to_string()).into_diagnostic(
+                TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
+            ),
+            UnusedVariable {
+                name: "x".to_string(),
+            }
+            .into_diagnostic(
+                TextRange::new(TextSize::from(0), TextSize::from(0)),
+                &source_file,
+            ),
+        ];
+        let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(31))]);
+        let (count, output) = add_noqa_inner(
+            path,
+            &messages,
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        assert_eq!(output, "x = 1  # noqa: E741, F841 # fmt: skip\n");
     }
 
     #[test]
