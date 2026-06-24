@@ -2158,7 +2158,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
         // without checking return types or individual parameter types. The full parameter
         // comparison below reaches the same result, but only after doing work that is expensive for
-        // large overload sets.
+        // large overload sets. An unpacked target TypeVarTuple bypasses this fast path so it can be
+        // constrained from the source parameters.
         if source.parameters.is_standard()
             && target.parameters.is_standard()
             && source.parameters.variadic().is_none()
@@ -2838,7 +2839,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
-        // any other parameter list, but not a subtype or supertype of any other parameter list.
+        // any other parameter list, but not a subtype or supertype of any other parameter list. An
+        // unpacked target TypeVarTuple instead continues to the ordinary parameter comparison so it
+        // can be constrained from the source parameters.
         if target_typevartuple.is_none()
             && (source.parameters.is_gradual() || target.parameters.is_gradual())
         {
