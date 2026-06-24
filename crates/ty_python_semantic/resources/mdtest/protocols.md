@@ -1030,7 +1030,14 @@ class Foo(Protocol):
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
 ```
 
-An explicit `Any` annotation on `self` does not change the object that Python passes to the method.
+An explicit `Any` annotation on `self` does not change the object that Python passes to the method:
+
+```py
+class AnySelf(Protocol):
+    def method(self: Any) -> None:
+        self.attribute = 1  # error: [ambiguous-protocol-member]
+```
+
 Assignments in a comprehension and augmented assignments are also writes to the instance.
 `__getattr__` provides the read side of `+=` below, so that case tests only the write:
 
@@ -1038,9 +1045,6 @@ Assignments in a comprehension and augmented assignments are also writes to the 
 class AssignmentForms(Protocol):
     def __getattr__(self, name: str) -> int:
         return 0
-
-    def any_self(self: Any) -> None:
-        self.from_any = 1  # error: [ambiguous-protocol-member]
 
     def comprehension(self) -> None:
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
@@ -1057,9 +1061,9 @@ warning[ambiguous-protocol-member]: Cannot assign to an undeclared instance attr
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
     |
 info: Assigning to an undeclared instance attribute in a protocol method leads to an ambiguous interface
-   --> src/mdtest_snippet.py:310:7
+   --> src/mdtest_snippet.py:313:7
     |
-310 | class AssignmentForms(Protocol):
+313 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
     |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
