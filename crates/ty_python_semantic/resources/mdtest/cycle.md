@@ -32,6 +32,20 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
 ```
 
+## Unpacking a recursively growing tuple
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
+
+```py
+while 1:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    x = (*x, x)
+
+while 1:
+    y = (y, *y)
+```
+
 ## Self-referential bare type alias
 
 ```toml
