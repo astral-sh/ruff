@@ -6063,12 +6063,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             constraints,
             call_expression_tcx,
         );
+        let mut next_argument_types = baseline_argument_types.clone();
+        let mut next_bindings = bindings.clone();
 
         // The active expression cache remains shared across every round. A cache hit restores the
         // complete expression inference into whichever round is ultimately committed, including
         // any diagnostics captured by the original inference.
         for round in 0..=generic_argument_indices.len() {
-            let mut next_argument_types = baseline_argument_types.clone();
+            // Reuse both round buffers; cloning these graphs from scratch is significant for
+            // overloaded and constructor calls.
+            next_argument_types.clone_from(&baseline_argument_types);
             let mut round_builder = self.speculate();
             round_builder.infer_all_argument_types_with_contexts(
                 ast_arguments.clone(),
@@ -6085,7 +6089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
 
-            let mut next_bindings = bindings.clone();
+            next_bindings.clone_from(bindings);
             let checked_result = next_bindings.check_types_impl(
                 db,
                 constraints,
@@ -6108,7 +6112,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Some(checked_result);
             }
 
-            context_argument_types = next_argument_types;
+            std::mem::swap(&mut context_argument_types, &mut next_argument_types);
             round_inference_contexts = next_inference_contexts;
         }
 
