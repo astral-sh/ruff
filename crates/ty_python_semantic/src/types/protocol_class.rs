@@ -710,13 +710,20 @@ impl<'db> ProtocolMemberData<'db> {
             ProtocolMemberKind::Attribute(member_ty) => {
                 let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
                 let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
+                // A `Todo` records a protocol member form that is not modeled yet. In particular,
+                // classmethod and staticmethod members currently use the attribute representation;
+                // do not infer a write requirement from that temporary representation.
+                let is_todo = member_ty.ty().is_todo();
                 ProtocolMemberCapabilities {
                     instance: ProtocolMemberAccess::new(
                         Some(member_ty),
-                        (!is_class_var && !is_final).then_some(member_ty),
+                        (!is_class_var && !is_final && !is_todo).then_some(member_ty),
                     ),
                     class: if is_class_var {
-                        ProtocolMemberAccess::new(Some(member_ty), (!is_final).then_some(member_ty))
+                        ProtocolMemberAccess::new(
+                            Some(member_ty),
+                            (!is_final && !is_todo).then_some(member_ty),
+                        )
                     } else {
                         ProtocolMemberAccess::NONE
                     },
