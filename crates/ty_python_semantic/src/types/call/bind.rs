@@ -919,7 +919,7 @@ impl<'db> Bindings<'db> {
             Type::Never
         } else {
             CallableTypes::from_elements(partial_callables)
-                .to_precise_functools_partial_instance(db, wrapped_callable_ty)
+                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
         }
     }
 

@@ -679,20 +679,25 @@ impl<'db> CallableTypes<'db> {
         UnionType::from_elements(db, self.0.iter().copied().map(Type::Callable))
     }
 
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        assert!(!self.0.is_empty(), "CallableTypes should not be empty");
+        UnionType::from_elements(db, self.0.into_iter().map(Type::Callable))
+    }
+
     pub(crate) fn map(&self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
 
     /// Merges reduced callables into one precise `functools.partial(...)` instance type.
-    pub(crate) fn to_precise_functools_partial_instance(
-        &self,
+    pub(crate) fn into_precise_functools_partial_instance(
+        self,
         db: &'db dyn Db,
         wrapped: Type<'db>,
     ) -> Type<'db> {
         let mut overloads = Vec::new();
         let mut seen_overloads = FxHashSet::default();
 
-        for &callable in &self.0 {
+        for callable in self.0 {
             for signature in callable.signatures(db) {
                 let signature = signature.clone();
                 let dedup_key = signature.clone().with_definition(None);

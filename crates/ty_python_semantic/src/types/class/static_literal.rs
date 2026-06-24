@@ -1325,7 +1325,7 @@ impl<'db> StaticClassLiteral<'db> {
                 )
             });
 
-            return Some(synthesized_callables.to_type(db));
+            return Some(synthesized_callables.into_type(db));
         }
 
         // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the

@@ -6319,7 +6319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferable = class_generic_context.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
         let path_bounds = source_callable
-            .to_type(db)
+            .into_type(db)
             .assignable_solutions_with_inferable(db, Type::Callable(target_callable), inferable);
         let Solutions::Constrained(solutions) = path_bounds.solve(db, &constraints) else {
             return ty;
