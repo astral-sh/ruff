@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
 use lsp_types::Uri;
-use ruff_ranged_value::ValueSource;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use ruff_linter::{UnresolvedRuleSelector, line_width::LineLength};
+use ruff_ranged_value::ValueSource;
 
 use crate::{
     format::FormatBackend,

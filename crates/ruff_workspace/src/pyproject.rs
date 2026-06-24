@@ -285,10 +285,10 @@ mod tests {
     use std::sync::Arc;
 
     use anyhow::{Context, Result};
-    use ruff_db::system::SystemPathBuf;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
+    use ruff_db::system::SystemPathBuf;
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;

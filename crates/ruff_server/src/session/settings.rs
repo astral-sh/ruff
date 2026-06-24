@@ -1,10 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
-use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use thiserror::Error;
 
 use ruff_linter::UnresolvedRuleSelector;
 use ruff_linter::line_width::LineLength;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_workspace::options::Options;
 
 use crate::{
