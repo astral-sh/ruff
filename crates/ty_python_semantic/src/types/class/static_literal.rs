@@ -2201,7 +2201,7 @@ impl<'db> StaticClassLiteral<'db> {
         Self::implicit_attribute_inner(
             db,
             class_body_scope,
-            name.to_string(),
+            Name::new(name),
             target_method_decorator,
         )
     }
@@ -2216,7 +2216,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn implicit_attribute_inner(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
-        name: String,
+        name: Name,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
@@ -3206,7 +3206,7 @@ fn implicit_attribute_cycle_recover<'db>(
     previous_member: &Member<'db>,
     member: Member<'db>,
     _class_body_scope: ScopeId<'db>,
-    _name: String,
+    _name: Name,
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
     let inner = member
