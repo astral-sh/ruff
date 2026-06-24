@@ -87,8 +87,8 @@ pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_const
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::recursive::RecursiveOrigin;
 use crate::types::recursive::{Foldable, RecursiveType};
-pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::walk_signature;
+pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
@@ -3965,6 +3965,16 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
+        if let Type::Recursive(rec) = self {
+            if rec.is_non_contractive(db) {
+                return Place::bound(self).into();
+            }
+
+            return rec.map(db, |unfolded| {
+                unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+            });
+        }
+
         #[salsa::tracked(
             // Seed the member cycle with the μα.α recursion marker (`Recursive`), matching
             // `place_by_id`'s seed, so every cycle-recovery query starts in the same shape.
@@ -6484,7 +6494,6 @@ impl<'db> Type<'db> {
             self,
             Type::Dynamic(_)
                 | Type::Divergent(_)
-                | Type::Recursive(_)
                 | Type::Never
                 | Type::WrapperDescriptor(_)
                 | Type::DataclassDecorator(_)

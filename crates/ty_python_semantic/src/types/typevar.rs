@@ -1475,7 +1475,9 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     match (previous_default, default) {
-        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, Some(*previous), cycle)),
+        (Some(previous), Some(default)) => {
+            Some(default.cycle_normalized(db, Some(*previous), cycle))
+        }
         (None, Some(default)) => Some(default.cycle_normalized(db, None, cycle)),
         (_, None) => None,
     }

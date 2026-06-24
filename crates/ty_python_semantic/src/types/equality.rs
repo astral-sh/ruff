@@ -334,12 +334,12 @@ fn evaluate_comparison_once<'db>(
     }
 
     match (left, right) {
-        (Type::Recursive(rec), other) if !rec.is_non_contractive(db) => {
-            rec.map(db, |unfolded| evaluator.evaluate(unfolded, other, branch, operator))
-        }
-        (other, Type::Recursive(rec)) if !rec.is_non_contractive(db) => {
-            rec.map(db, |unfolded| evaluator.evaluate(other, unfolded, branch, operator))
-        }
+        (Type::Recursive(rec), other) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+            evaluator.evaluate(unfolded, other, branch, operator)
+        }),
+        (other, Type::Recursive(rec)) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+            evaluator.evaluate(other, unfolded, branch, operator)
+        }),
         (Type::Recursive(_), _) | (_, Type::Recursive(_)) => ComparisonResult::Ambiguous,
 
         (

@@ -118,12 +118,20 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
+        let self_instance = if normalization.is_nested() {
+            self.self_instance(db)
+                .recursive_type_normalized_impl(db, normalization.nested())?
+        } else {
+            self.self_instance(db)
+                .recursive_type_normalized_impl(db, normalization.nested())
+                .unwrap_or(normalization.marker())
+        };
+
         Some(Self::new(
             db,
             self.function(db)
                 .recursive_type_normalized_impl(db, normalization)?,
-            self.self_instance(db)
-                .recursive_type_normalized_impl(db, normalization.nested())?,
+            self_instance,
         ))
     }
 }

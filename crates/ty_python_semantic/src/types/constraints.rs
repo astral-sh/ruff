@@ -5101,7 +5101,12 @@ impl SequentMap {
 
         // If L is _never_ assignable to U, this constraint would violate transitivity, and should
         // never have been added.
-        debug_assert!(!when.is_never_satisfied(db));
+        debug_assert!(
+            !when.is_never_satisfied(db),
+            "{} should be assignable to {}",
+            lower.display(db),
+            upper.display(db)
+        );
 
         // Fast path: If L is trivially always assignable to U, there are no derived constraints
         // that we can infer. This would be handled correctly by the logic below, but this is a

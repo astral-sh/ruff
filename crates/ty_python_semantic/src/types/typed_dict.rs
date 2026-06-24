@@ -20,9 +20,8 @@ use super::diagnostic::{
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::recursive::{Foldable, RecursiveType};
 use super::{
-    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping,
-    TypeQualifiers, UnionBuilder, definition_expression_annotation, definition_expression_type,
-    visitor,
+    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
+    UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;

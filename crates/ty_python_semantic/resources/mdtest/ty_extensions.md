@@ -494,7 +494,7 @@ def foo(x: "TypeOf[foo]"):
 ```
 
 A `TypeOf` self-reference nested in a nominal specialization forms a recursive type. Cycle recovery
-preserves the outer nominal structure and replaces the recursive argument with `Divergent`:
+preserves the recursive shape, so finite concrete values do not satisfy the annotation:
 
 ```toml
 [environment]
@@ -509,24 +509,24 @@ direct = 1
 reveal_type(direct)  # revealed: Literal[1]
 
 x: list[TypeOf[x]]
-x = [1]
+x = [1]  # error: [invalid-assignment]
 reveal_type(x)  # revealed: list[Divergent]
 
 nested: list[tuple[TypeOf[nested]]]
-nested = [(1,)]
+nested = [(1,)]  # error: [invalid-assignment]
 reveal_type(nested)  # revealed: list[Divergent]
 
 variadic_tuple: tuple[TypeOf[variadic_tuple], ...]
-variadic_tuple = (1,)
-reveal_type(variadic_tuple)  # revealed: tuple[Literal[1]]
+variadic_tuple = (1,)  # error: [invalid-assignment]
+reveal_type(variadic_tuple)  # revealed: tuple[Divergent, ...]
 
 mixed_variadic_tuple: tuple[TypeOf[mixed_variadic_tuple], *tuple[int, ...]]
-mixed_variadic_tuple = (1,)
-reveal_type(mixed_variadic_tuple)  # revealed: tuple[Literal[1]]
+mixed_variadic_tuple = (1,)  # error: [invalid-assignment]
+reveal_type(mixed_variadic_tuple)  # revealed: tuple[Divergent, *tuple[int, ...]]
 
 optional: list[TypeOf[optional]] | None
-optional = [1]
-reveal_type(optional)  # revealed: list[Divergent]
+optional = [1]  # error: [invalid-assignment]
+reveal_type(optional)  # revealed: list[Divergent] | None
 
 class Container[T]: ...
 
@@ -536,12 +536,10 @@ reveal_type(y)  # revealed: Container[Divergent]
 
 # Regression test for https://github.com/astral-sh/ty/issues/3837.
 union: list[TypeOf[union]] | Container[TypeOf[union]]
-union = [1]
-reveal_type(union)  # revealed: list[Divergent]
+union = [1]  # error: [invalid-assignment]
 
 stable_union: list[TypeOf[stable_union]] | Container[TypeOf[stable_union]] | None
-stable_union = [1]
-reveal_type(stable_union)  # revealed: list[Divergent]
+stable_union = [1]  # error: [invalid-assignment]
 ```
 
 ## Recursive `TypeOf` in returned callables
