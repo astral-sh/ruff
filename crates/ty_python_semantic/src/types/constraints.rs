@@ -1256,7 +1256,7 @@ impl<'db> ConstraintBounds<'db> {
 ///
 /// An empty `UpperBound` represents a _missing_ upper bound, which (in the absence of other
 /// constraints) we solve to `Unknown`. An upper bound of `object` is treated as an explicit
-/// requeset for "any type" as a solution, so we solve it to `object`.
+/// request for "any type" as a solution, so we solve it to `object`.
 ///
 /// As an optimization, we will remove redundant clauses as we build up an `UpperBound`. This
 /// reduces the amount of work `IntersectionBuilder` needs to do when producing the solution for
@@ -1274,8 +1274,8 @@ impl<'db> UpperBound<'db> {
     /// Creates an upper bound from one explicit clause.
     ///
     /// This preserves an explicit `object` clause so callers can distinguish `T <= object` from a
-    /// missing upper bound. Use [`UpperBound::add_clause`] / [`UpperBound::from_clauses`] when
-    /// accumulating clauses that should be canonicalized by redundancy pruning.
+    /// missing upper bound. Use [`UpperBound::add_clause`] when accumulating clauses that should
+    /// be canonicalized by redundancy pruning.
     pub(crate) fn from_clause(clause: Type<'db>) -> Self {
         let clauses = FxOrderSet::from_iter([clause]);
         Self { clauses }
