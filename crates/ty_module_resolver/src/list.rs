@@ -28,7 +28,7 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
     for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+        for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
                     entry.insert(new);
@@ -69,7 +69,7 @@ struct SearchPathIngredient<'db> {
 }
 
 /// List all available top-level modules in the given `SearchPath`.
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
