@@ -145,7 +145,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Baz`
 info: `Baz` and `Foo & Bar` are not equivalent types
 ```
 
-When narrowing leaves only one enum member, the inferred type is the corresponding literal.
+Compact enum complements that are equivalent to a literal union are still spellable.
 
 ```py
 from enum import Enum
