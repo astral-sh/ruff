@@ -1113,21 +1113,6 @@ class ConcreteSubclass(Foo):
         self.extra = 1  # no error
 ```
 
-Reassigning `self` changes the object that a later attribute assignment may update. We report the
-assignment only if execution can reach that line without first reassigning `self`:
-
-```py
-class ReassignedSelf(Protocol):
-    def always(self) -> None:
-        self = Holder()
-        self.extra = 1  # no error
-
-    def sometimes(self, flag: bool) -> None:
-        if flag:
-            self = Holder()
-        self.extra = 1  # error: [ambiguous-protocol-member]
-```
-
 Assignments can also occur in scopes nested inside a method. A nested class body or function that
 uses the method's `self` still writes to the protocol instance. An inner parameter named `self` and
 a nested function that uses a classmethod's `cls` refer to other objects and are not reported:
