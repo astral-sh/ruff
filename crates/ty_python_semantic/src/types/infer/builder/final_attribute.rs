@@ -11,6 +11,7 @@ use crate::{
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
+use ty_python_core::scope::FileScopeId;
 use ty_python_core::semantic_index;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -123,9 +124,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let Some(receiver) = target.value.as_name_expr() else {
             return false;
         };
+        self.captured_receiver_method_scope(receiver).is_some()
+    }
+
+    /// Resolve the method scope for a receiver captured by the current scope.
+    pub(super) fn captured_receiver_method_scope(
+        &self,
+        receiver: &ast::ExprName,
+    ) -> Option<FileScopeId> {
         let receiver_name = receiver.id.as_str();
         let current_scope_id = self.scope().file_scope_id(self.db());
-        let Some((receiver_scope_id, receiver_scope, receiver_symbol)) = self
+        let (receiver_scope_id, receiver_scope, receiver_symbol) = self
             .index
             .visible_ancestor_scopes(current_scope_id)
             .find_map(|(scope_id, scope)| {
@@ -134,22 +143,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .symbol_by_name(receiver_name)
                     .filter(|symbol| symbol.is_local() || symbol.is_global())
                     .map(|symbol| (scope_id, scope, symbol))
-            })
-        else {
-            return false;
-        };
+            })?;
         if receiver_symbol.is_global() || receiver_scope_id == current_scope_id {
-            return false;
+            return None;
         }
-        let Some(function) = receiver_scope
+        let function = receiver_scope
             .node()
             .as_function()
-            .map(|node| node.node(self.module()))
-        else {
-            return false;
-        };
+            .map(|node| node.node(self.module()))?;
 
-        self.index
+        (self
+            .index
             .class_definition_of_method(receiver_scope_id)
             .is_some()
             && function
@@ -159,7 +163,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .is_some_and(|parameter| parameter.name() == receiver_name)
             && self
                 .function_type(function)
-                .is_some_and(|function| function.has_implicit_receiver(self.db()))
+                .is_some_and(|function| function.has_implicit_receiver(self.db())))
+        .then_some(receiver_scope_id)
     }
 
     pub(super) fn invalid_assignment_to_final_attribute(

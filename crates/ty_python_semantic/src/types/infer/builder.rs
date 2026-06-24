@@ -1686,24 +1686,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn report_undeclared_protocol_instance_attribute(&self, target: &ast::ExprAttribute) {
-        if !self.is_instance_attribute_assignment(target) {
-            return;
-        }
-
         let db = self.db();
         let Some(receiver) = target.value.as_name_expr() else {
             return;
+        };
+        let current_scope_id = self.scope().file_scope_id(db);
+        let method_scope_id = if self.is_instance_attribute_assignment(target) {
+            let Some(method_scope_id) =
+                self.index
+                    .ancestor_scopes(current_scope_id)
+                    .find_map(|(scope_id, _)| {
+                        self.index
+                            .class_definition_of_method(scope_id)
+                            .map(|_| scope_id)
+                    })
+            else {
+                return;
+            };
+            method_scope_id
+        } else {
+            let Some(method_scope_id) = self.captured_receiver_method_scope(receiver) else {
+                return;
+            };
+            method_scope_id
         };
         if !self.is_receiver_parameter_reachable(receiver) {
             return;
         }
 
-        let current_scope_id = self.scope().file_scope_id(db);
         let Some(protocol) = self
             .index
-            .ancestor_scopes(current_scope_id)
-            .find_map(|(scope_id, scope)| scope.node().as_function().map(|_| scope_id))
-            .and_then(|method_scope_id| self.index.class_definition_of_method(method_scope_id))
+            .class_definition_of_method(method_scope_id)
             .and_then(|definition| original_class_type(db, definition))
             .map(|class| class.default_specialization(db))
             .and_then(|class| class.into_protocol_class(db))
@@ -1716,10 +1729,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        // The semantic index marks writes through both instance-method and classmethod receivers,
-        // regardless of the receiver's explicit annotation. A classmethod receiver writes to a
-        // class object, not a protocol instance.
-        if nearest_enclosing_function(db, self.index, self.scope())
+        // A classmethod receiver writes to a class object, not a protocol instance, regardless of
+        // whether the write occurs directly or through a capture in a nested function.
+        let method_scope = self.index.scope(method_scope_id);
+        if method_scope
+            .node()
+            .as_function()
+            .map(|function| function.node(self.module()))
+            .and_then(|function| self.function_type(function))
             .is_some_and(|function| function.is_classmethod(db))
         {
             return;

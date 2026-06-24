@@ -1096,6 +1096,26 @@ class WithEagerNestedClass(Protocol):
         class Nested:
             self.extra = 1  # error: [ambiguous-protocol-member]
 
+class WithCapturedReceiver(Protocol):
+    def method(self: Any) -> None:
+        def inner() -> None:
+            self.extra = 1  # error: [ambiguous-protocol-member]
+
+        inner()
+
+    def shadowed(self) -> None:
+        def inner(self: Holder) -> None:
+            self.extra = 1  # no error
+
+        inner(Holder())
+
+    @classmethod
+    def class_method(cls: Any) -> None:
+        def inner() -> None:
+            cls.extra = 1  # no error
+
+        inner()
+
 class WithExcludedMember(Protocol):
     __doc__: str
 
