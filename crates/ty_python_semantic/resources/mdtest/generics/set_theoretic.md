@@ -27,8 +27,8 @@ class Invariant[T](Co[T], Contra[T]): ...
 ```
 
 Further, we use `P` and `Q` as placeholders for arbitrary fully-static (non-generic types) that are
-not related in any way, and we use `Base` and `Sub` as examples for types that are in a subtyping
-relationship `Sub <: Base`:
+not related in any way and not disjoint. Further, we use `Base` and `Sub` as examples for types that
+are in a subtyping relationship `Sub <: Base`:
 
 ```pyi
 # Two unrelated placeholder types:
@@ -144,6 +144,16 @@ Co[P] | Co[Any] = Co[P] | Co[Never] | Co[object] & Any
                 = Co[P | Any]
 ```
 
+This result highlights a tension between a naive "replace `Any` with a more precise type"
+understanding of materialization, and the "interval" representation of gradual types. The type
+`Co[P] | Co[Any]` clearly has something like `Co[P] | Co[Q]` as a possible materialization. However,
+this is much less clear for `Co[P | Any]`. Following a strict "gradual types are intervals"
+approach, `Co[P | Any]` also needs to be able to materialize to to `Co[P] | Co[Q]`, though. It is a
+supertype of the bottom materialization `Co[P | Never] = Co[P]`, and a subtype of the top
+materialization `Co[P | object] = Co[object]`. See
+[this discussion](https://github.com/astral-sh/ruff/pull/26054/changes#r3429787797) for more
+details.
+
 For intersections, we need to do slightly more work to arrive at a structurally similar result:
 
 ```ignore
@@ -227,12 +237,35 @@ Invariant[P] & Invariant[Any]
 
 If we use the interpretation where `Bottom[Invariant[Any]]` is a special bottom type that captures
 "being an instance of `Invariant`", then we can see that this last line simplifies to
-`Invariant[P]`, beause there is no (true) subtype of `Invariant[P]` that is also an instance of
+`Invariant[P]`, because there is no (true) subtype of `Invariant[P]` that is also an instance of
 `Invariant`. And so we get:
 
 ```ignore
 Invariant[P] & Invariant[Any] = Invariant[P]
 ```
+
+One seemingly problematic observation here is the following. If we compute the bottom materalization
+of the left hand side of this relation by "distributing" `Bottom` over the intersection, we get:
+
+```ignore
+Bottom[Invariant[P] & Invariant[Any]]  
+  = Bottom[Invariant[P]] & Bottom[Invariant[Any]]  
+  = Invariant[P] & Bottom[Invariant[Any]]  
+  = Bottom[Invariant[Any]]  
+```
+
+On the other hand, if we simplify the intersection according to this relation first, we get:
+
+```ignore
+Bottom[Invariant[P] & Invariant[Any]]  
+  = Bottom[Invariant[P]]  
+  = Invariant[P]
+```
+
+These two results are not necessarily in disagreement. `Bottom[Invariant[Any]]` is a strict subtype
+of `Invariant[P]`, and therefore appears to be a lower upper bound, but this does not add any new
+materializations to the gradual interval from `Bottom[Invariant[P]]` to `Invariant[P]`, since the
+`Bottom[Invariant[P]]` is not inhabited.
 
 If we compare this to the covariant and contravariant versions (4b) and (5b), we see that
 "combining" `P & Any` (the interval from `Never` to `P`) and `P | Any` (the interval from `P` to
