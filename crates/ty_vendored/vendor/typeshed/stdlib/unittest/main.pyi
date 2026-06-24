@@ -1,3 +1,5 @@
+"""Unittest main program"""
+
 import sys
 import unittest.case
 import unittest.loader
@@ -5,19 +7,24 @@ import unittest.result
 import unittest.suite
 from collections.abc import Iterable
 from types import ModuleType
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, type_check_only
 from typing_extensions import deprecated
 
 MAIN_EXAMPLES: Final[str]
 MODULE_EXAMPLES: Final[str]
 
+@type_check_only
 class _TestRunner(Protocol):
     def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase, /) -> unittest.result.TestResult: ...
 
 # not really documented
 class TestProgram:
+    """A command-line program that runs a set of tests; this is primarily
+    for making test modules conveniently executable.
+    """
+
     result: unittest.result.TestResult
-    module: None | str | ModuleType
+    module: ModuleType | None
     verbosity: int
     failfast: bool | None
     catchbreak: bool | None
@@ -29,7 +36,7 @@ class TestProgram:
         durations: unittest.result._DurationsType | None
         def __init__(
             self,
-            module: None | str | ModuleType = "__main__",
+            module: ModuleType | str | None = "__main__",
             defaultTest: str | Iterable[str] | None = None,
             argv: list[str] | None = None,
             testRunner: type[_TestRunner] | _TestRunner | None = None,
@@ -63,7 +70,7 @@ class TestProgram:
         ) -> None: ...
 
     if sys.version_info < (3, 13):
-        @deprecated("Deprecated in Python 3.11; removal scheduled for Python 3.13")
+        @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
         def usageExit(self, msg: Any = None) -> None: ...
 
     def parseArgs(self, argv: list[str]) -> None: ...

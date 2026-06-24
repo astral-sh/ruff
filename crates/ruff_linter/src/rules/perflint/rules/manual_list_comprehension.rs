@@ -49,6 +49,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// filtered.extend(x for x in original if x % 2)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,
@@ -187,7 +188,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     }
 
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
-    if any_over_expr(arg, &|expr| {
+    if any_over_expr(arg, |expr| {
         expr.as_name_expr()
             .is_some_and(|expr| expr.id == list_name.id)
     }) {
@@ -221,7 +222,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = [x for x in y if x in filtered]
     // ```
     if if_test.is_some_and(|test| {
-        any_over_expr(test, &|expr| {
+        any_over_expr(test, |expr| {
             expr.as_name_expr()
                 .is_some_and(|expr| expr.id == list_name.id)
         })
@@ -249,6 +250,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         .iter()
         .find(|binding| for_stmt.target.range() == binding.range)
         .unwrap();
+    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
+    // then it is intended to be used elsewhere outside the for loop.
+    if target_binding.is_global() || target_binding.is_nonlocal() {
+        return;
+    }
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding
@@ -406,14 +412,26 @@ fn convert_to_list_extend(
     };
     let target_str = locator.slice(for_stmt.target.range());
     let elt_str = locator.slice(to_append);
-    let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
+    let generator_str = if to_append
+        .as_generator_expr()
+        .is_some_and(|generator| !generator.parenthesized)
+    {
+        format!("({elt_str}) {for_type} {target_str} in {for_iter_str}{if_str}")
+    } else {
+        format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}")
+    };
 
     let variable_name = locator.slice(binding);
-    let for_loop_inline_comments = comment_strings_in_range(
-        checker,
-        for_stmt.range,
-        &[to_append.range(), for_stmt.iter.range()],
-    );
+    let mut ranges_to_ignore = vec![
+        to_append.range(),
+        for_stmt.iter.range(),
+        for_stmt.target.range(),
+    ];
+    if let Some(test) = if_test {
+        ranges_to_ignore.push(test.range());
+    }
+    let for_loop_inline_comments =
+        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 

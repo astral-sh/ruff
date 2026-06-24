@@ -3,10 +3,10 @@
 
 #![no_main]
 
-use libfuzzer_sys::{fuzz_target, Corpus};
+use libfuzzer_sys::{Corpus, fuzz_target};
 use similar::TextDiff;
 
-use ruff_python_formatter::{format_module_source, PyFormatOptions};
+use ruff_python_formatter::{PyFormatOptions, format_module_source};
 
 fn do_fuzz(case: &[u8]) -> Corpus {
     // Throw away inputs which aren't utf-8

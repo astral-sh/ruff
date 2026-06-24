@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -19,16 +20,20 @@ use ruff_source_file::LineIndex;
 
 /// A simultaneous fix made across a single text document or among an arbitrary
 /// number of notebook cells.
-pub(crate) type Fixes = FxHashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
+pub(crate) type Fixes = FxHashMap<lsp_types::Uri, Vec<lsp_types::TextEdit>>;
 
 pub(crate) fn fix_all(
     query: &DocumentQuery,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let source_kind = query.make_source_kind();
     let settings = query.settings();
     let document_path = query.virtual_file_path();
+
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
+        return Ok(Fixes::default());
+    };
+    let source_kind = query.make_python_source_kind(source_type);
 
     // If the document is excluded, return an empty list of fixes.
     if is_document_excluded_for_linting(
@@ -52,8 +57,6 @@ pub(crate) fn fix_all(
     } else {
         None
     };
-
-    let source_type = query.source_type();
 
     // We need to iteratively apply all safe fixes onto a single file and then
     // create a diff between the modified file and the original source to use as a single workspace
@@ -99,12 +102,12 @@ pub(crate) fn fix_all(
             anyhow::bail!("Notebook document expected from notebook source kind");
         };
         let mut fixes = Fixes::default();
-        for ((source, modified), url) in source_notebook
+        for ((source, modified), uri) in source_notebook
             .cells()
             .iter()
             .map(cell_source)
             .zip(modified_notebook.cells().iter().map(cell_source))
-            .zip(notebook.urls())
+            .zip(notebook.uris())
         {
             let source_index = LineIndex::from_source_text(&source);
             let modified_index = LineIndex::from_source_text(&modified);
@@ -120,7 +123,7 @@ pub(crate) fn fix_all(
             );
 
             fixes.insert(
-                url.clone(),
+                uri.clone(),
                 vec![lsp_types::TextEdit {
                     range: source_range.to_range(&source, &source_index, encoding),
                     new_text: modified[modified_range].to_owned(),
@@ -144,7 +147,7 @@ pub(crate) fn fix_all(
             modified_index.line_starts(),
         );
         Ok([(
-            query.make_key().into_url(),
+            query.make_key().into_uri(),
             vec![lsp_types::TextEdit {
                 range: source_range.to_range(source_kind.source_code(), &source_index, encoding),
                 new_text: modified[modified_range].to_owned(),

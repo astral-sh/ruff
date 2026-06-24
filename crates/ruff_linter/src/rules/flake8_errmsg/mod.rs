@@ -44,4 +44,16 @@ mod tests {
         assert_diagnostics!("custom", diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn string_exception() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_errmsg/EM101_byte_string.py"),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rule(Rule::RawStringInException)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

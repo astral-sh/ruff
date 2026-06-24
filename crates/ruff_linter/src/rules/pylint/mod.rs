@@ -16,10 +16,10 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{flake8_tidy_imports, pylint};
 
-    use crate::assert_diagnostics;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(
@@ -46,11 +46,17 @@ mod tests {
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
+    #[test_case(
+        Rule::SwapWithTemporaryVariable,
+        Path::new("swap_with_temporary_variable.py")
+    )]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
+    #[test_case(Rule::EmptyComment, Path::new("empty_comment_line_continuation.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::IfStmtMinMax, Path::new("if_stmt_min_max.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
+    #[test_case(Rule::StopIterationReturn, Path::new("stop_iteration_return.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_2.py"))]
@@ -146,6 +152,10 @@ mod tests {
     #[test_case(
         Rule::TooManyReturnStatements,
         Path::new("too_many_return_statements.py")
+    )]
+    #[test_case(
+        Rule::TooManyStatementsInTryClause,
+        Path::new("too_many_try_statements.py")
     )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
     #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
@@ -248,6 +258,32 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::UselessExceptionStatement,
+        Path::new("useless_exception_statement.py")
+    )]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pylint").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
         Ok(())
     }
 
@@ -420,19 +456,6 @@ mod tests {
     }
 
     #[test]
-    fn preview_useless_import_alias() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/import_aliasing_2/__init__.py"),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(Rule::UselessImportAlias)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn import_outside_top_level_with_banned() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/import_outside_top_level_with_banned.py"),
@@ -451,6 +474,20 @@ mod tests {
                     Rule::ImportOutsideTopLevel,
                 ])
             },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/23587>.
+    #[test]
+    fn conflict_with_definition_rules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/swap_with_temporary_variable_1.py"),
+            &LinterSettings::for_rules(vec![
+                Rule::SwapWithTemporaryVariable,
+                Rule::MissingTypeFunctionArgument,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

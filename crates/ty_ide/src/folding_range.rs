@@ -1,0 +1,2957 @@
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
+use ruff_python_ast::token::{TokenKind, Tokens, parenthesized_range};
+use ruff_python_ast::visitor::source_order::{
+    SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
+};
+use ruff_python_ast::{
+    AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt,
+};
+use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
+use ruff_source_file::{LineRanges, UniversalNewlines};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::Db;
+
+const PARENTHESES: (TokenKind, TokenKind) = (TokenKind::Lpar, TokenKind::Rpar);
+const BRACKETS: (TokenKind, TokenKind) = (TokenKind::Lsqb, TokenKind::Rsqb);
+const BRACES: (TokenKind, TokenKind) = (TokenKind::Lbrace, TokenKind::Rbrace);
+
+/// The kind of a folding range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FoldingRangeKind {
+    /// A comment block.
+    Comment,
+    /// An import block.
+    Imports,
+    /// A region (e.g., `# region` / `# endregion`).
+    Region,
+}
+
+/// A folding range in the source code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingRange {
+    /// The range to fold.
+    pub range: TextRange,
+    /// The kind of folding range.
+    pub kind: Option<FoldingRangeKind>,
+}
+
+impl FoldingRange {
+    fn with_kind(self, kind: FoldingRangeKind) -> Self {
+        Self {
+            kind: Some(kind),
+            ..self
+        }
+    }
+}
+
+impl From<TextRange> for FoldingRange {
+    fn from(range: TextRange) -> FoldingRange {
+        FoldingRange { range, kind: None }
+    }
+}
+
+/// Returns a list of folding ranges for the given file.
+pub fn folding_ranges(
+    db: &dyn Db,
+    file: File,
+    range_filter: Option<TextRange>,
+) -> Vec<FoldingRange> {
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, file);
+
+    let mut visitor = FoldingRangeVisitor {
+        source: source.as_str(),
+        ranges: vec![],
+        active_block_fold_start_lines: vec![],
+        tokens: parsed.tokens(),
+        range_filter,
+    };
+    walk_node(&mut visitor, AnyNodeRef::from(parsed.syntax()));
+    debug_assert!(
+        visitor.active_block_fold_start_lines.is_empty(),
+        "all active block fold start lines should be cleared after traversal"
+    );
+
+    // Add remaining ranges not covered by the AST visitor.
+    let own_line_comment_ranges: Vec<_> = parsed
+        .tokens()
+        .iter()
+        .filter_map(|token| {
+            if token.kind() == TokenKind::Comment
+                && CommentLinePosition::for_range(token.range(), source.as_str()).is_own_line()
+            {
+                Some(TextRange::new(
+                    source.as_str().line_start(token.start()),
+                    token.end(),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+    visitor.add_comment_ranges(&own_line_comment_ranges);
+    visitor.add_custom_region_ranges(&own_line_comment_ranges);
+
+    visitor.ranges
+}
+
+struct FoldingRangeVisitor<'a> {
+    source: &'a str,
+    ranges: Vec<FoldingRange>,
+    active_block_fold_start_lines: Vec<ActiveBlockFoldStartLine<'a>>,
+    tokens: &'a Tokens,
+    range_filter: Option<TextRange>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ActiveBlockFoldStartLine<'a> {
+    parent: AnyNodeRef<'a>,
+    line_start: TextSize,
+}
+
+impl<'a> FoldingRangeVisitor<'a> {
+    fn intersects_range_filter(&self, range: TextRange) -> bool {
+        self.range_filter
+            .is_none_or(|range_filter| range_filter.intersect(range).is_some())
+    }
+
+    fn contains_range_filter(&self, range: TextRange) -> bool {
+        self.range_filter
+            .is_none_or(|range_filter| range_filter.contains_range(range))
+    }
+
+    /// Add the given folding range if it spans multiple lines.
+    fn add_range(&mut self, folding_range: impl Into<FoldingRange>) -> bool {
+        let folding_range = folding_range.into();
+        if !self.contains_range_filter(folding_range.range) {
+            return false;
+        }
+        if !self.is_multiline(folding_range.range) {
+            return false;
+        }
+        self.ranges.push(folding_range);
+        true
+    }
+
+    /// Adds a single folding range for a block.
+    fn add_block_range(&mut self, parent: AnyNodeRef<'a>, range: TextRange) {
+        if self.add_range(range) {
+            self.active_block_fold_start_lines
+                .push(ActiveBlockFoldStartLine {
+                    parent,
+                    line_start: self.source.line_start(range.start()),
+                });
+        }
+    }
+
+    /// Adds a folding range for an expression.
+    fn add_expression_range(&mut self, range: TextRange) -> bool {
+        // Block folds preserve statement headers, so they take precedence over expression folds
+        // when both would render a folding trigger on the same line.
+        let line_start = self.source.line_start(range.start());
+        if self
+            .active_block_fold_start_lines
+            .iter()
+            .any(|block_fold| block_fold.line_start == line_start)
+        {
+            return false;
+        }
+
+        self.add_range(range)
+    }
+
+    /// Add a folding range for an expression that excludes enclosing delimiters like parentheses
+    /// or square braces.
+    fn add_delimited_expression_range(
+        &mut self,
+        range: TextRange,
+        delimiters: (TokenKind, TokenKind),
+    ) -> bool {
+        if !self.is_multiline(range) {
+            return false;
+        }
+
+        let Some(range) = self.delimited_range(range, delimiters) else {
+            return false;
+        };
+
+        self.add_expression_range(range)
+    }
+
+    /// Adds a folding range for an expression if it is enclosed in parentheses.
+    fn add_parenthesized_expression_range(
+        &mut self,
+        expr: ExprRef<'a>,
+        parent: AnyNodeRef<'a>,
+    ) -> bool {
+        let Some(range) = parenthesized_range(expr, parent, self.tokens) else {
+            return false;
+        };
+
+        self.add_delimited_expression_range(range, PARENTHESES)
+    }
+
+    fn add_call_expression_ranges(&mut self, call: &'a ExprCall, node: AnyNodeRef<'a>) {
+        if !self.is_multiline(node.range()) {
+            return;
+        }
+
+        let arguments_range = call.arguments.range();
+
+        self.add_parenthesized_expression_range(call.func.as_ref().into(), node);
+        self.add_delimited_expression_range(arguments_range, PARENTHESES);
+    }
+
+    fn add_attribute_expression_range(
+        &mut self,
+        attribute: &'a ExprAttribute,
+        node: AnyNodeRef<'a>,
+    ) {
+        if !self.is_multiline(node.range()) {
+            return;
+        }
+
+        self.add_parenthesized_expression_range(attribute.value.as_ref().into(), node);
+    }
+
+    fn add_subscript_expression_ranges(
+        &mut self,
+        subscript: &'a ExprSubscript,
+        node: AnyNodeRef<'a>,
+    ) {
+        if !self.is_multiline(node.range()) {
+            return;
+        }
+
+        let search_range = TextRange::new(subscript.value.end(), node.end());
+        let Some(opening) = self.find_token_start(TokenKind::Lsqb, search_range) else {
+            return;
+        };
+
+        self.add_parenthesized_expression_range(subscript.value.as_ref().into(), node);
+
+        let subscript_range = TextRange::new(opening, node.end());
+        self.add_delimited_expression_range(subscript_range, BRACKETS);
+    }
+
+    fn add_generator_expression_range(
+        &mut self,
+        generator: &'a ExprGenerator,
+        node: AnyNodeRef<'a>,
+    ) {
+        if generator.parenthesized {
+            self.add_delimited_expression_range(node.range(), PARENTHESES);
+        } else {
+            self.add_expression_range(node.range());
+        }
+    }
+
+    fn is_multiline(&self, range: TextRange) -> bool {
+        self.source[range].contains('\n') || self.source[range].contains('\r')
+    }
+
+    /// Compute folding ranges for consecutive import statements.
+    /// Import blocks separated by blank lines are folded separately.
+    ///
+    /// TODO: It might be better to move this logic into the AST
+    /// visitor via `enter_node`. I found it clearer to write it as
+    /// a single separate pass over a sequence of statements. But if
+    /// this ends up being a perf issue, it should be possible to
+    /// do this within the existing AST pass.
+    fn add_import_ranges(&mut self, stmts: &[Stmt]) {
+        let mut import_range: Option<TextRange> = None;
+        let mut prev_import_end: Option<TextSize> = None;
+
+        for stmt in stmts {
+            if !self.intersects_range_filter(stmt.range()) {
+                if let Some(range) = import_range {
+                    self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Imports));
+                }
+                import_range = None;
+                prev_import_end = None;
+                continue;
+            }
+
+            if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
+                // Check if there's a blank line between this import and the previous one.
+                let has_blank_line = prev_import_end
+                    .is_some_and(|prev_end| self.has_blank_line_between(prev_end, stmt.start()));
+
+                if has_blank_line {
+                    // Finalize the current import block and start a new one.
+                    if let Some(range) = import_range {
+                        self.add_range(
+                            FoldingRange::from(range).with_kind(FoldingRangeKind::Imports),
+                        );
+                    }
+                    import_range = Some(stmt.range());
+                } else if let Some(ref mut range) = import_range {
+                    *range = range.with_end(stmt.end());
+                } else {
+                    import_range = Some(stmt.range());
+                }
+                prev_import_end = Some(stmt.end());
+            } else {
+                if let Some(range) = import_range {
+                    self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Imports));
+                }
+                import_range = None;
+                prev_import_end = None;
+            }
+        }
+        if let Some(range) = import_range {
+            self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Imports));
+        }
+    }
+
+    /// Check if there's a blank line appearing anywhere between two positions.
+    fn has_blank_line_between(&self, start: TextSize, end: TextSize) -> bool {
+        let mut count = 0usize;
+        for line in self.source[TextRange::new(start, end)].universal_newlines() {
+            if !line.is_empty() {
+                return count >= 2;
+            }
+            count += 1;
+        }
+        count >= 2
+    }
+
+    /// Compute folding ranges for `# region` / `# endregion` comments.
+    fn add_custom_region_ranges(&mut self, own_line_comment_ranges: &[TextRange]) {
+        let mut region_starts: Vec<TextSize> = Vec::new();
+
+        for &comment_range in own_line_comment_ranges {
+            if !self.intersects_range_filter(comment_range) {
+                continue;
+            }
+            let text = &self.source[comment_range];
+            let trimmed = text.strip_prefix('#').unwrap_or(text).trim_start();
+            if trimmed.starts_with("region") {
+                region_starts.push(comment_range.start());
+            } else if trimmed.starts_with("endregion") {
+                if let Some(start) = region_starts.pop() {
+                    self.add_range(
+                        FoldingRange::from(TextRange::new(start, comment_range.end()))
+                            .with_kind(FoldingRangeKind::Region),
+                    );
+                }
+            }
+        }
+    }
+
+    /// Compute folding ranges for consecutive comment lines.
+    fn add_comment_ranges(&mut self, own_line_comment_ranges: &[TextRange]) {
+        let mut comment_block_range: Option<TextRange> = None;
+
+        for &comment_range in own_line_comment_ranges {
+            if !self.intersects_range_filter(comment_range) {
+                if let Some(range) = comment_block_range {
+                    self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Comment));
+                    comment_block_range = None;
+                }
+                continue;
+            }
+
+            let comment = &self.source[comment_range];
+            let text = comment.strip_prefix('#').unwrap_or(comment).trim_start();
+
+            // Check if this is a comment line (but not a region marker)
+            let is_non_region_comment =
+                !text.starts_with("region") && !text.starts_with("endregion");
+
+            if is_non_region_comment {
+                // Extend the current comment block unless a blank line or a statement separates the comments.
+                if let Some(ref mut comment_block_range) = comment_block_range {
+                    let has_text_between = !self.source
+                        [TextRange::new(comment_block_range.end(), comment_range.start())]
+                    .trim_matches(|c| matches!(c, '\n' | '\r') || is_python_whitespace(c))
+                    .is_empty();
+
+                    if has_text_between
+                        || self.has_blank_line_between(
+                            comment_block_range.end(),
+                            comment_range.start(),
+                        )
+                    {
+                        self.add_range(
+                            FoldingRange::from(*comment_block_range)
+                                .with_kind(FoldingRangeKind::Comment),
+                        );
+                        *comment_block_range = comment_range;
+                    } else {
+                        *comment_block_range = comment_block_range.with_end(comment_range.end());
+                    }
+                } else {
+                    comment_block_range = Some(comment_range);
+                }
+            } else if let Some(range) = comment_block_range {
+                self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Comment));
+                comment_block_range = None;
+            }
+        }
+        if let Some(range) = comment_block_range {
+            self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Comment));
+        }
+    }
+
+    /// Add a folding range for a docstring if present at the start of a body.
+    /// Handles string literals, f-strings, and t-strings (but not bytes literals).
+    fn add_docstring_range(&mut self, body: &[Stmt]) {
+        let Some(first_stmt) = body.first() else {
+            return;
+        };
+        if !self.contains_range_filter(first_stmt.range()) {
+            return;
+        }
+        let Stmt::Expr(ref expr_stmt) = *first_stmt else {
+            return;
+        };
+        let is_string_like = expr_stmt.value.is_string_literal_expr()
+            || expr_stmt.value.is_f_string_expr()
+            || expr_stmt.value.is_t_string_expr();
+        if !is_string_like {
+            return;
+        }
+        self.add_range(FoldingRange::from(first_stmt.range()).with_kind(FoldingRangeKind::Comment));
+    }
+
+    /// Attempts to find the start of the given token in the given range.
+    fn find_token_start(&self, target: TokenKind, search_range: TextRange) -> Option<TextSize> {
+        self.tokens
+            .in_range(search_range)
+            .iter()
+            .find(|tok| tok.kind() == target)
+            .map(Ranged::start)
+    }
+
+    /// Finds where a class or function definition actually starts once we skip over decorators.
+    fn definition_header_start<D: Ranged>(
+        &self,
+        keyword: TokenKind,
+        statement_start: TextSize,
+        decorators: &[D],
+        name_start: TextSize,
+    ) -> TextSize {
+        let search_start = decorators.last().map_or(statement_start, Ranged::end);
+        self.find_token_start(keyword, TextRange::new(search_start, name_start))
+            .unwrap_or(search_start)
+    }
+
+    /// Returns the start offsets for a block's full fold and body fold.
+    ///
+    /// The first offset marks the line on which we should start the full fold (the actual character
+    /// offset will be computed as the end of this line).
+    ///
+    /// The second offset marks where we start scanning for the newline that begins the body fold.
+    fn block_range_starts(&self, parent: AnyNodeRef<'a>) -> (TextSize, TextSize) {
+        match parent {
+            AnyNodeRef::StmtFunctionDef(func) => {
+                let keyword = if func.is_async {
+                    TokenKind::Async
+                } else {
+                    TokenKind::Def
+                };
+                (
+                    self.definition_header_start(
+                        keyword,
+                        func.start(),
+                        &func.decorator_list,
+                        func.name.start(),
+                    ),
+                    func.name.end(),
+                )
+            }
+            AnyNodeRef::StmtClassDef(class) => (
+                self.definition_header_start(
+                    TokenKind::Class,
+                    class.start(),
+                    &class.decorator_list,
+                    class.name.start(),
+                ),
+                class.name.end(),
+            ),
+            _ => (parent.start(), parent.start()),
+        }
+    }
+
+    /// Adds folding ranges for a block.
+    fn add_block_ranges<T: Ranged>(&mut self, parent: AnyNodeRef<'a>, block: &[T]) {
+        let (block_start, body_header_start) = self.block_range_starts(parent);
+        let full_range = self.full_block_range(block_start, block);
+        let body_range = self.block_body_range(body_header_start, block);
+        self.add_distinct_block_ranges(parent, full_range, body_range);
+    }
+
+    /// Adds the full range if present, and also adds the body range if both present and distinct
+    /// from the full range.
+    fn add_distinct_block_ranges(
+        &mut self,
+        parent: AnyNodeRef<'a>,
+        full_range: Option<TextRange>,
+        body_range: Option<TextRange>,
+    ) {
+        if let Some(full_range) = full_range {
+            self.add_block_range(parent, full_range);
+        }
+        if body_range != full_range
+            && let Some(body_range) = body_range
+        {
+            self.add_block_range(parent, body_range);
+        }
+    }
+
+    /// Returns a folding range for a full block, preserving the first line of the block header.
+    fn full_block_range<T: Ranged>(&self, block_start: TextSize, block: &[T]) -> Option<TextRange> {
+        let last_block_statement = block.last()?;
+        let start = self.source.line_end(block_start);
+        let end = last_block_statement.end();
+
+        if start >= end {
+            return None;
+        }
+
+        Some(TextRange::new(start, end))
+    }
+
+    /// Returns a folding range for just the body of a block.
+    fn block_body_range<T: Ranged>(
+        &self,
+        header_start: TextSize,
+        block: &[T],
+    ) -> Option<TextRange> {
+        let (Some(first_block_statement), Some(last_block_statement)) =
+            (block.first(), block.last())
+        else {
+            return None;
+        };
+        let block_fold_start = self.find_token_start(
+            TokenKind::Newline,
+            TextRange::new(header_start, first_block_statement.start()),
+        )?;
+
+        Some(TextRange::new(block_fold_start, last_block_statement.end()))
+    }
+
+    /// Returns the range inside a delimiter pair that bounds the given range.
+    fn delimited_range(
+        &self,
+        range: TextRange,
+        (opening, closing): (TokenKind, TokenKind),
+    ) -> Option<TextRange> {
+        let mut tokens = self
+            .tokens
+            .in_range(range)
+            .iter()
+            .filter(|token| !token.kind().is_trivia());
+
+        let opening_token = tokens.next()?;
+        let closing_token = tokens.next_back()?;
+
+        if opening_token.kind() != opening || closing_token.kind() != closing {
+            return None;
+        }
+
+        Some(TextRange::new(opening_token.end(), closing_token.start()))
+    }
+
+    /// Searches for a given keyword and, if present, adds folds for the block it defines.
+    fn add_block_ranges_after_keyword<T: Ranged>(
+        &mut self,
+        parent: AnyNodeRef<'a>,
+        keyword: TokenKind,
+        previous_block_end: TextSize,
+        block: &[T],
+    ) {
+        let Some(first_body_statement) = block.first() else {
+            return;
+        };
+        let Some(keyword_start) = self.find_token_start(
+            keyword,
+            TextRange::new(previous_block_end, first_body_statement.start()),
+        ) else {
+            return;
+        };
+
+        self.add_distinct_block_ranges(
+            parent,
+            self.full_block_range(keyword_start, block),
+            self.block_body_range(keyword_start, block),
+        );
+    }
+}
+
+impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        if !self.intersects_range_filter(node.range()) {
+            return TraversalSignal::Skip;
+        }
+
+        match node {
+            AnyNodeRef::ModModule(module) => {
+                self.add_docstring_range(&module.body);
+            }
+            // Compound statements that create folding regions
+            AnyNodeRef::StmtFunctionDef(func) => {
+                self.add_block_ranges(node, &func.body);
+                // Note that this may be duplicative with folding
+                // ranges added for string literals. But I don't think
+                // the LSP protocol specifies that this is a problem.
+                // If we do need to de-dupe, then we'll want to keep
+                // this one since it attaches a "comment" folding range
+                // kind to the range. So we'll need to skip over the
+                // corresponding range for the literal.
+                self.add_docstring_range(&func.body);
+            }
+            AnyNodeRef::StmtClassDef(class) => {
+                self.add_block_ranges(node, &class.body);
+                // See comment above for class docstrings about this
+                // being duplicative with adding folding ranges for
+                // string literals.
+                self.add_docstring_range(&class.body);
+            }
+            AnyNodeRef::StmtIf(if_stmt) => {
+                // Fold each branch individually rather than the entire if block.
+                self.add_block_ranges(node, &if_stmt.body);
+            }
+            AnyNodeRef::ElifElseClause(clause) => {
+                // Each elif/else clause has its own range.
+                self.add_block_ranges(node, &clause.body);
+            }
+            AnyNodeRef::StmtFor(for_stmt) => {
+                // Fold the for body separately from the else block.
+                self.add_block_ranges(node, &for_stmt.body);
+                if let Some(body_last) = for_stmt.body.last() {
+                    self.add_block_ranges_after_keyword(
+                        node,
+                        TokenKind::Else,
+                        body_last.end(),
+                        &for_stmt.orelse,
+                    );
+                }
+            }
+            AnyNodeRef::StmtWhile(while_stmt) => {
+                // Fold the while body separately from the else block.
+                self.add_block_ranges(node, &while_stmt.body);
+                if let Some(body_last) = while_stmt.body.last() {
+                    self.add_block_ranges_after_keyword(
+                        node,
+                        TokenKind::Else,
+                        body_last.end(),
+                        &while_stmt.orelse,
+                    );
+                }
+            }
+            AnyNodeRef::StmtWith(with_stmt) => {
+                self.add_block_ranges(node, &with_stmt.body);
+            }
+            AnyNodeRef::StmtTry(try_stmt) => {
+                // Fold the try body separately from handlers, else, and finally.
+                self.add_block_ranges(node, &try_stmt.body);
+                // Exception handlers are folded via ExceptHandlerExceptHandler.
+                // Fold the else block if present.
+                if let Some(previous_block_end) = try_stmt
+                    .handlers
+                    .last()
+                    .map(Ranged::end)
+                    .or_else(|| try_stmt.body.last().map(Ranged::end))
+                {
+                    self.add_block_ranges_after_keyword(
+                        node,
+                        TokenKind::Else,
+                        previous_block_end,
+                        &try_stmt.orelse,
+                    );
+                }
+                // Fold the finally block if present.
+                if let Some(previous_block_end) = try_stmt
+                    .orelse
+                    .last()
+                    .map(Ranged::end)
+                    .or_else(|| try_stmt.handlers.last().map(Ranged::end))
+                    .or_else(|| try_stmt.body.last().map(Ranged::end))
+                {
+                    self.add_block_ranges_after_keyword(
+                        node,
+                        TokenKind::Finally,
+                        previous_block_end,
+                        &try_stmt.finalbody,
+                    );
+                }
+            }
+            AnyNodeRef::StmtMatch(match_stmt) => {
+                self.add_block_ranges(node, &match_stmt.cases);
+            }
+
+            // Match cases within match statements
+            AnyNodeRef::MatchCase(case) => {
+                self.add_block_ranges(node, &case.body);
+            }
+
+            // Exception handlers
+            AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                self.add_block_ranges(node, &handler.body);
+            }
+
+            // Multiline expressions
+            AnyNodeRef::ExprList(_) | AnyNodeRef::ExprListComp(_) | AnyNodeRef::TypeParams(_) => {
+                self.add_delimited_expression_range(node.range(), BRACKETS);
+            }
+            AnyNodeRef::ExprTuple(tuple)
+                // Only fold parenthesized tuples.
+                if tuple.parenthesized => {
+                    self.add_delimited_expression_range(node.range(), PARENTHESES);
+                }
+            AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_) => {
+                self.add_delimited_expression_range(node.range(), BRACES);
+            }
+            AnyNodeRef::ExprGenerator(generator) => {
+                self.add_generator_expression_range(generator, node);
+            }
+            AnyNodeRef::ExprAttribute(attribute) => {
+                self.add_attribute_expression_range(attribute, node);
+            }
+            AnyNodeRef::ExprSubscript(subscript) => {
+                self.add_subscript_expression_ranges(subscript, node);
+            }
+
+            // Function calls with foldable callables or arguments.
+            AnyNodeRef::ExprCall(call) => {
+                self.add_call_expression_ranges(call, node);
+            }
+
+            // String and bytes literals
+            AnyNodeRef::ExprStringLiteral(_)
+            | AnyNodeRef::ExprBytesLiteral(_)
+            | AnyNodeRef::ExprFString(_)
+            | AnyNodeRef::ExprTString(_) => {
+                self.add_expression_range(node.range());
+            }
+
+            _ => {}
+        }
+
+        TraversalSignal::Traverse
+    }
+
+    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+        while self
+            .active_block_fold_start_lines
+            .last()
+            .is_some_and(|block_fold| block_fold.parent.ptr_eq(node))
+        {
+            self.active_block_fold_start_lines.pop();
+        }
+    }
+
+    fn visit_body(&mut self, body: &'a [Stmt]) {
+        // Handle import blocks in any body (module, function, class, etc.).
+        self.add_import_ranges(body);
+        walk_body(self, body);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::CursorTest;
+    use insta::assert_snapshot;
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+
+    #[test]
+    fn test_folding_range_class() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class MyClass:
+    def __init__(self):
+        self.value = 1
+
+    def method(self):
+        return self.value
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:15
+          |
+        2 |   class MyClass:
+          |  _______________^
+        3 | |     def __init__(self):
+        4 | |         self.value = 1
+        5 | |
+        6 | |     def method(self):
+        7 | |         return self.value
+          | |_________________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:24
+          |
+        3 |       def __init__(self):
+          |  ________________________^
+        4 | |         self.value = 1
+          | |______________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:22
+          |
+        6 |       def method(self):
+          |  ______________________^
+        7 | |         return self.value
+          | |_________________________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_attribute_comments() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class MyClass:
+    def __init__(self):
+        self.value = 1
+        """
+        This is an
+        attribute comment.
+        """
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:15
+          |
+        2 |   class MyClass:
+          |  _______________^
+        3 | |     def __init__(self):
+        4 | |         self.value = 1
+        5 | |         """
+        6 | |         This is an
+        7 | |         attribute comment.
+        8 | |         """
+          | |___________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:24
+          |
+        3 |       def __init__(self):
+          |  ________________________^
+        4 | |         self.value = 1
+        5 | |         """
+        6 | |         This is an
+        7 | |         attribute comment.
+        8 | |         """
+          | |___________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:9
+          |
+        5 | /         """
+        6 | |         This is an
+        7 | |         attribute comment.
+        8 | |         """
+          | |___________^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_imports_basic() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import os
+import sys
+from typing import List, Dict
+<CURSOR>
+def main():
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range (imports)
+         --> main.py:2:1
+          |
+        2 | / import os
+        3 | | import sys
+        4 | | from typing import List, Dict
+          | |_____________________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:12
+          |
+        6 |   def main():
+          |  ____________^
+        7 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_imports_blocks1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import os
+import sys
+
+import numpy
+import pandas
+import requests
+
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range (imports)
+         --> main.py:2:1
+          |
+        2 | / import os
+        3 | | import sys
+          | |__________^
+          |
+
+        info[folding-range]: Folding Range (imports)
+         --> main.py:5:1
+          |
+        5 | / import numpy
+        6 | | import pandas
+        7 | | import requests
+          | |_______________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_imports_blocks2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import os
+from math import prod
+
+try:
+    import foo
+    import bar
+except ImportError:
+    first = None
+    bar = None
+
+import requests
+from fastapi import FastAPI
+
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range (imports)
+         --> main.py:2:1
+          |
+        2 | / import os
+        3 | | from math import prod
+          | |_____________________^
+          |
+
+        info[folding-range]: Folding Range (imports)
+          --> main.py:12:1
+           |
+        12 | / import requests
+        13 | | from fastapi import FastAPI
+           | |___________________________^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:5
+          |
+        5 |   try:
+          |  _____^
+        6 | |     import foo
+        7 | |     import bar
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range (imports)
+         --> main.py:6:5
+          |
+        6 | /     import foo
+        7 | |     import bar
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:8:20
+           |
+         8 |   except ImportError:
+           |  ____________________^
+         9 | |     first = None
+        10 | |     bar = None
+           | |______________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_imports_nested() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_function():
+    import os
+    import sys
+
+    import numpy
+    import pandas
+
+    do_something()
+
+
+class MyClass:
+    import typing
+    import collections
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:19
+          |
+        2 |   def my_function():
+          |  ___________________^
+        3 | |     import os
+        4 | |     import sys
+        5 | |
+        6 | |     import numpy
+        7 | |     import pandas
+        8 | |
+        9 | |     do_something()
+          | |__________________^
+          |
+
+        info[folding-range]: Folding Range (imports)
+         --> main.py:3:5
+          |
+        3 | /     import os
+        4 | |     import sys
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range (imports)
+         --> main.py:6:5
+          |
+        6 | /     import numpy
+        7 | |     import pandas
+          | |_________________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:15
+           |
+        12 |   class MyClass:
+           |  _______________^
+        13 | |     import typing
+        14 | |     import collections
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range (imports)
+          --> main.py:13:5
+           |
+        13 | /     import typing
+        14 | |     import collections
+           | |______________________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_control_flow() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+if condition:
+    do_something()
+elif other:
+    do_other()
+else:
+    default()
+
+for item in items:
+    process(item)
+else:
+    okay()
+
+while running:
+    continue_work()
+else:
+    doit()
+
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:14
+          |
+        2 |   if condition:
+          |  ______________^
+        3 | |     do_something()
+          | |__________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:12
+          |
+        4 |   elif other:
+          |  ____________^
+        5 | |     do_other()
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:6
+          |
+        6 |   else:
+          |  ______^
+        7 | |     default()
+          | |_____________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:9:19
+           |
+         9 |   for item in items:
+           |  ___________________^
+        10 | |     process(item)
+           | |_________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:11:6
+           |
+        11 |   else:
+           |  ______^
+        12 | |     okay()
+           | |__________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:14:15
+           |
+        14 |   while running:
+           |  _______________^
+        15 | |     continue_work()
+           | |___________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:16:6
+           |
+        16 |   else:
+           |  ______^
+        17 | |     doit()
+           | |__________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multi_line_block_headers() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def choose(
+    value,
+    fallback,
+):
+    if any(
+        [
+            value,
+        ]
+    ):
+        return value
+    elif (
+        fallback
+    ):
+        return fallback
+
+class Repository[
+    Model,
+    Key,
+](
+    Mapping[Key, Model],
+    Protocol,
+):
+    pass
+
+try:
+    pass
+except (
+    ValueError,
+    TypeError,
+) as error:
+    raise error
+
+match value:
+    case {
+        "kind": kind,
+        "payload": payload,
+    }:
+        handle_mapping()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+          --> main.py:2:12
+           |
+         2 |   def choose(
+           |  ____________^
+         3 | |     value,
+         4 | |     fallback,
+         5 | | ):
+         6 | |     if any(
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+        12 | |     elif (
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:5:3
+           |
+         5 |   ):
+           |  ___^
+         6 | |     if any(
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+        12 | |     elif (
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:6:12
+           |
+         6 |       if any(
+           |  ____________^
+         7 | |         [
+         8 | |             value,
+         9 | |         ]
+        10 | |     ):
+        11 | |         return value
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:10:7
+           |
+        10 |       ):
+           |  _______^
+        11 | |         return value
+           | |____________________^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:7:10
+          |
+        7 |           [
+          |  __________^
+        8 | |             value,
+        9 | |         ]
+          | |________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:11
+           |
+        12 |       elif (
+           |  ___________^
+        13 | |         fallback
+        14 | |     ):
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:14:7
+           |
+        14 |       ):
+           |  _______^
+        15 | |         return fallback
+           | |_______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:17:18
+           |
+        17 |   class Repository[
+           |  __________________^
+        18 | |     Model,
+        19 | |     Key,
+        20 | | ](
+        21 | |     Mapping[Key, Model],
+        22 | |     Protocol,
+        23 | | ):
+        24 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:23:3
+           |
+        23 |   ):
+           |  ___^
+        24 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:26:5
+           |
+        26 |   try:
+           |  _____^
+        27 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:28:9
+           |
+        28 |   except (
+           |  _________^
+        29 | |     ValueError,
+        30 | |     TypeError,
+        31 | | ) as error:
+        32 | |     raise error
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:31:12
+           |
+        31 |   ) as error:
+           |  ____________^
+        32 | |     raise error
+           | |_______________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:34:13
+           |
+        34 |   match value:
+           |  _____________^
+        35 | |     case {
+        36 | |         "kind": kind,
+        37 | |         "payload": payload,
+        38 | |     }:
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:35:11
+           |
+        35 |       case {
+           |  ___________^
+        36 | |         "kind": kind,
+        37 | |         "payload": payload,
+        38 | |     }:
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:38:7
+           |
+        38 |       }:
+           |  _______^
+        39 | |         handle_mapping()
+           | |________________________^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_suppresses_header_expression_on_block_start_line() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def foo(x=[
+    bar,
+    baz,
+]):
+    qux = x[0] + 1
+    return qux
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:12
+          |
+        2 |   def foo(x=[
+          |  ____________^
+        3 | |     bar,
+        4 | |     baz,
+        5 | | ]):
+        6 | |     qux = x[0] + 1
+        7 | |     return qux
+          | |______________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:4
+          |
+        5 |   ]):
+          |  ____^
+        6 | |     qux = x[0] + 1
+        7 | |     return qux
+          | |______________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_preserves_inline_block_header_comment() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+if condition:  # why
+    do_work()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:21
+          |
+        2 |   if condition:  # why
+          |  _____________________^
+        3 | |     do_work()
+          | |_____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_nested_control_flow() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+if condition:
+    while running:
+        do_this()
+        and_that()
+        if maybe:
+            and_maybe_this()
+            and_maybe_this()
+            and_maybe_this()
+            and_maybe_this()
+
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+          --> main.py:2:14
+           |
+         2 |   if condition:
+           |  ______________^
+         3 | |     while running:
+         4 | |         do_this()
+         5 | |         and_that()
+         6 | |         if maybe:
+         7 | |             and_maybe_this()
+         8 | |             and_maybe_this()
+         9 | |             and_maybe_this()
+        10 | |             and_maybe_this()
+           | |____________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:3:19
+           |
+         3 |       while running:
+           |  ___________________^
+         4 | |         do_this()
+         5 | |         and_that()
+         6 | |         if maybe:
+         7 | |             and_maybe_this()
+         8 | |             and_maybe_this()
+         9 | |             and_maybe_this()
+        10 | |             and_maybe_this()
+           | |____________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:6:18
+           |
+         6 |           if maybe:
+           |  __________________^
+         7 | |             and_maybe_this()
+         8 | |             and_maybe_this()
+         9 | |             and_maybe_this()
+        10 | |             and_maybe_this()
+           | |____________________________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_loop_else() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+for item in items:
+    process(item)
+    validate(item)
+else:
+    log_success()
+    notify_complete()
+
+while condition:
+    do_work()
+    check_status()
+else:
+    handle_done()
+    cleanup_resources()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:19
+          |
+        2 |   for item in items:
+          |  ___________________^
+        3 | |     process(item)
+        4 | |     validate(item)
+          | |__________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:6
+          |
+        5 |   else:
+          |  ______^
+        6 | |     log_success()
+        7 | |     notify_complete()
+          | |_____________________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:9:17
+           |
+         9 |   while condition:
+           |  _________________^
+        10 | |     do_work()
+        11 | |     check_status()
+           | |__________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:6
+           |
+        12 |   else:
+           |  ______^
+        13 | |     handle_done()
+        14 | |     cleanup_resources()
+           | |_______________________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_try_except() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+try:
+    risky_operation()
+except ValueError:
+    handle_value_error()
+except TypeError:
+    handle_type_error()
+else:
+    success_action()
+finally:
+    cleanup()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:5
+          |
+        2 |   try:
+          |  _____^
+        3 | |     risky_operation()
+          | |_____________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:8:6
+          |
+        8 |   else:
+          |  ______^
+        9 | |     success_action()
+          | |____________________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:10:9
+           |
+        10 |   finally:
+           |  _________^
+        11 | |     cleanup()
+           | |_____________^
+           |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:19
+          |
+        4 |   except ValueError:
+          |  ___________________^
+        5 | |     handle_value_error()
+          | |________________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:18
+          |
+        6 |   except TypeError:
+          |  __________________^
+        7 | |     handle_type_error()
+          | |_______________________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_collections() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+my_list = [
+    1,
+    2,
+    3,
+]
+
+my_dict = {
+    "a": 1,
+    "b": 2,
+}
+
+my_list_with_trailing_element_comment = [
+    1,
+    2,
+    3,  # reason
+]
+
+my_list_with_trailing_own_line_comment = [
+    1,
+    2,
+    3,
+    # comment
+]
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:12
+          |
+        2 |   my_list = [
+          |  ____________^
+        3 | |     1,
+        4 | |     2,
+        5 | |     3,
+          | |_______^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:8:12
+           |
+         8 |   my_dict = {
+           |  ____________^
+         9 | |     "a": 1,
+        10 | |     "b": 2,
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:13:42
+           |
+        13 |   my_list_with_trailing_element_comment = [
+           |  __________________________________________^
+        14 | |     1,
+        15 | |     2,
+        16 | |     3,  # reason
+           | |_________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:19:43
+           |
+        19 |   my_list_with_trailing_own_line_comment = [
+           |  ___________________________________________^
+        20 | |     1,
+        21 | |     2,
+        22 | |     3,
+        23 | |     # comment
+           | |______________^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_expression_delimiters() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+result = call(
+    first,
+    second,
+)
+
+my_set = {
+    "a",
+    "b",
+}
+
+my_tuple = (
+    first,
+    second,
+)
+
+my_generator = (
+    item
+    for item in items
+)
+
+my_list_comp = [
+    item
+    for item in items
+]
+
+my_set_comp = {
+    item
+    for item in items
+}
+
+my_dict_comp = {
+    key: value
+    for key, value in items
+}
+
+type Alias[
+    T,
+    U,
+] = tuple[T, U]
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:15
+          |
+        2 |   result = call(
+          |  _______________^
+        3 | |     first,
+        4 | |     second,
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:7:11
+          |
+        7 |   my_set = {
+          |  ___________^
+        8 | |     "a",
+        9 | |     "b",
+          | |_________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:13
+           |
+        12 |   my_tuple = (
+           |  _____________^
+        13 | |     first,
+        14 | |     second,
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:17:17
+           |
+        17 |   my_generator = (
+           |  _________________^
+        18 | |     item
+        19 | |     for item in items
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:22:17
+           |
+        22 |   my_list_comp = [
+           |  _________________^
+        23 | |     item
+        24 | |     for item in items
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:27:16
+           |
+        27 |   my_set_comp = {
+           |  ________________^
+        28 | |     item
+        29 | |     for item in items
+           | |______________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:32:17
+           |
+        32 |   my_dict_comp = {
+           |  _________________^
+        33 | |     key: value
+        34 | |     for key, value in items
+           | |____________________________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:37:12
+           |
+        37 |   type Alias[
+           |  ____________^
+        38 | |     T,
+        39 | |     U,
+           | |_______^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_multiline_call_callables() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+callable_and_arguments = (
+    factory
+)(
+    arg,
+)
+
+parenthesized_method_callable = (
+    factory
+).method(arg)
+
+chained_call = (
+    factory
+)(
+    first,
+)(
+    second,
+)
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:27
+          |
+        2 |   callable_and_arguments = (
+          |  ___________________________^
+        3 | |     factory
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:3
+          |
+        4 |   )(
+          |  ___^
+        5 | |     arg,
+          | |_________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:8:34
+          |
+        8 |   parenthesized_method_callable = (
+          |  __________________________________^
+        9 | |     factory
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:16:3
+           |
+        16 |   )(
+           |  ___^
+        17 | |     second,
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:17
+           |
+        12 |   chained_call = (
+           |  _________________^
+        13 | |     factory
+           | |____________^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:14:3
+           |
+        14 |   )(
+           |  ___^
+        15 | |     first,
+           | |___________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_multiline_subscripts() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+grouped_subscript = (data)[
+    key
+]
+
+parenthesized_subscript_value = (
+    data
+)[key]
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:28
+          |
+        2 |   grouped_subscript = (data)[
+          |  ____________________________^
+        3 | |     key
+          | |________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:6:34
+          |
+        6 |   parenthesized_subscript_value = (
+          |  __________________________________^
+        7 | |     data
+          | |_________^
+          |
+
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_string_literals() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+multiline_string = """
+This is a
+multiline string
+"""
+
+multiline_bytes = b"""
+This is
+multiline bytes
+"""
+
+multiline_fstring = f"""
+This is a
+multiline f-string
+"""
+
+multiline_tstring = t"""
+This is a
+multiline t-string
+"""
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:20
+          |
+        2 |   multiline_string = """
+          |  ____________________^
+        3 | | This is a
+        4 | | multiline string
+        5 | | """
+          | |___^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:7:19
+           |
+         7 |   multiline_bytes = b"""
+           |  ___________________^
+         8 | | This is
+         9 | | multiline bytes
+        10 | | """
+           | |___^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:12:21
+           |
+        12 |   multiline_fstring = f"""
+           |  _____________________^
+        13 | | This is a
+        14 | | multiline f-string
+        15 | | """
+           | |___^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:17:21
+           |
+        17 |   multiline_tstring = t"""
+           |  _____________________^
+        18 | | This is a
+        19 | | multiline t-string
+        20 | | """
+           | |___^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_match() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+match value:
+    case 1:
+        one()
+    case 2:
+        two()
+    case _:
+        default()
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:13
+          |
+        2 |   match value:
+          |  _____________^
+        3 | |     case 1:
+        4 | |         one()
+        5 | |     case 2:
+        6 | |         two()
+        7 | |     case _:
+        8 | |         default()
+          | |_________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:12
+          |
+        3 |       case 1:
+          |  ____________^
+        4 | |         one()
+          | |_____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:12
+          |
+        5 |       case 2:
+          |  ____________^
+        6 | |         two()
+          | |_____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:7:12
+          |
+        7 |       case _:
+          |  ____________^
+        8 | |         default()
+          | |_________________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_regions() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+# region Imports
+import os
+import sys
+# endregion
+
+# region Main
+def main():
+    pass
+# endregion
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range (imports)
+         --> main.py:3:1
+          |
+        3 | / import os
+        4 | | import sys
+          | |__________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:8:12
+          |
+        8 |   def main():
+          |  ____________^
+        9 | |     pass
+          | |________^
+          |
+
+        info[folding-range]: Folding Range (region)
+         --> main.py:2:1
+          |
+        2 | / # region Imports
+        3 | | import os
+        4 | | import sys
+        5 | | # endregion
+          | |___________^
+          |
+
+        info[folding-range]: Folding Range (region)
+          --> main.py:7:1
+           |
+         7 | / # region Main
+         8 | | def main():
+         9 | |     pass
+        10 | | # endregion
+           | |___________^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_regions_inside_multiline_fstring() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+message = f"""
+    # region Not a real region
+    text inside an f-string
+    # endregion
+"""
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:11
+          |
+        2 |   message = f"""
+          |  ___________^
+        3 | |     # region Not a real region
+        4 | |     text inside an f-string
+        5 | |     # endregion
+        6 | | """
+          | |___^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_docstring() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_function():
+    """
+    This is a multiline
+    docstring.
+    """
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:19
+          |
+        2 |   def my_function():
+          |  ___________________^
+        3 | |     """
+        4 | |     This is a multiline
+        5 | |     docstring.
+        6 | |     """
+        7 | |     pass
+          | |________^
+          |
+
+        info[folding-range]: Folding Range (comment)
+         --> main.py:3:5
+          |
+        3 | /     """
+        4 | |     This is a multiline
+        5 | |     docstring.
+        6 | |     """
+          | |_______^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:5
+          |
+        3 | /     """
+        4 | |     This is a multiline
+        5 | |     docstring.
+        6 | |     """
+          | |_______^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_docstring_variants() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def with_fstring_doc():
+    f"""
+    This is an f-string
+    used as a docstring.
+    """
+    pass
+
+
+def with_tstring_doc():
+    t"""
+    This is a t-string
+    used as a docstring.
+    """
+    pass
+
+
+def with_rawstring_doc():
+    r"""
+    This is a raw string
+    used as a docstring.
+    """
+    pass
+
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:24
+          |
+        2 |   def with_fstring_doc():
+          |  ________________________^
+        3 | |     f"""
+        4 | |     This is an f-string
+        5 | |     used as a docstring.
+        6 | |     """
+        7 | |     pass
+          | |________^
+          |
+
+        info[folding-range]: Folding Range (comment)
+         --> main.py:3:5
+          |
+        3 | /     f"""
+        4 | |     This is an f-string
+        5 | |     used as a docstring.
+        6 | |     """
+          | |_______^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:5
+          |
+        3 | /     f"""
+        4 | |     This is an f-string
+        5 | |     used as a docstring.
+        6 | |     """
+          | |_______^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:10:24
+           |
+        10 |   def with_tstring_doc():
+           |  ________________________^
+        11 | |     t"""
+        12 | |     This is a t-string
+        13 | |     used as a docstring.
+        14 | |     """
+        15 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range (comment)
+          --> main.py:11:5
+           |
+        11 | /     t"""
+        12 | |     This is a t-string
+        13 | |     used as a docstring.
+        14 | |     """
+           | |_______^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:11:5
+           |
+        11 | /     t"""
+        12 | |     This is a t-string
+        13 | |     used as a docstring.
+        14 | |     """
+           | |_______^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:18:26
+           |
+        18 |   def with_rawstring_doc():
+           |  __________________________^
+        19 | |     r"""
+        20 | |     This is a raw string
+        21 | |     used as a docstring.
+        22 | |     """
+        23 | |     pass
+           | |________^
+           |
+
+        info[folding-range]: Folding Range (comment)
+          --> main.py:19:5
+           |
+        19 | /     r"""
+        20 | |     This is a raw string
+        21 | |     used as a docstring.
+        22 | |     """
+           | |_______^
+           |
+
+        info[folding-range]: Folding Range
+          --> main.py:19:5
+           |
+        19 | /     r"""
+        20 | |     This is a raw string
+        21 | |     used as a docstring.
+        22 | |     """
+           | |_______^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_comments() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+# This is a comment block
+# that spans multiple lines
+# explaining something important
+
+def foo():
+    pass
+
+# Another comment block
+# with more details
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(
+            test.folding_ranges(),
+            @"
+        info[folding-range]: Folding Range
+         --> main.py:6:11
+          |
+        6 |   def foo():
+          |  ___________^
+        7 | |     pass
+          | |________^
+          |
+
+        info[folding-range]: Folding Range (comment)
+         --> main.py:2:1
+          |
+        2 | / # This is a comment block
+        3 | | # that spans multiple lines
+        4 | | # explaining something important
+          | |________________________________^
+          |
+
+        info[folding-range]: Folding Range (comment)
+          --> main.py:9:1
+           |
+         9 | / # Another comment block
+        10 | | # with more details
+           | |___________________^
+           |
+        ",
+        );
+    }
+
+    #[test]
+    fn test_folding_range_with() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+with open("file.txt") as f:
+    content = f.read()
+    process(content)
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+         --> main.py:2:28
+          |
+        2 |   with open("file.txt") as f:
+          |  ____________________________^
+        3 | |     content = f.read()
+        4 | |     process(content)
+          | |____________________^
+          |
+        "#);
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ty/issues/3106>
+    #[test]
+    fn folding_range_comment_block() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                def chunk_date_range():
+                    """Split a date range into chunks respecting the maximum days limit.
+
+                    The API has a 1-month limit, so this function splits larger ranges
+                    into smaller chunks that can be requested individually.
+                    """
+                    # Handle both date-only and datetime strings
+                    a = 10
+
+                    while current <= end:
+                        # Calculate the end of the current chunk
+                        # Go to the last day of the current month
+                        b = 20
+
+                        # Don't exceed the overall end date or max_days limit
+                        c = 30
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+          --> main.py:2:40
+           |
+         2 |                   def chunk_date_range():
+           |  ________________________________________^
+         3 | |                     """Split a date range into chunks respecting the maximum days limit.
+         4 | |
+         5 | |                     The API has a 1-month limit, so this function splits larger ranges
+         6 | |                     into smaller chunks that can be requested individually.
+         7 | |                     """
+         8 | |                     # Handle both date-only and datetime strings
+         9 | |                     a = 10
+        10 | |
+        11 | |                     while current <= end:
+        12 | |                         # Calculate the end of the current chunk
+        13 | |                         # Go to the last day of the current month
+        14 | |                         b = 20
+        15 | |
+        16 | |                         # Don't exceed the overall end date or max_days limit
+        17 | |                         c = 30
+           | |______________________________^
+           |
+
+        info[folding-range]: Folding Range (comment)
+         --> main.py:3:21
+          |
+        3 | /                     """Split a date range into chunks respecting the maximum days limit.
+        4 | |
+        5 | |                     The API has a 1-month limit, so this function splits larger ranges
+        6 | |                     into smaller chunks that can be requested individually.
+        7 | |                     """
+          | |_______________________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:21
+          |
+        3 | /                     """Split a date range into chunks respecting the maximum days limit.
+        4 | |
+        5 | |                     The API has a 1-month limit, so this function splits larger ranges
+        6 | |                     into smaller chunks that can be requested individually.
+        7 | |                     """
+          | |_______________________^
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:11:42
+           |
+        11 |                       while current <= end:
+           |  __________________________________________^
+        12 | |                         # Calculate the end of the current chunk
+        13 | |                         # Go to the last day of the current month
+        14 | |                         b = 20
+        15 | |
+        16 | |                         # Don't exceed the overall end date or max_days limit
+        17 | |                         c = 30
+           | |______________________________^
+           |
+
+        info[folding-range]: Folding Range (comment)
+          --> main.py:12:1
+           |
+        12 | /                         # Calculate the end of the current chunk
+        13 | |                         # Go to the last day of the current month
+           | |_________________________________________________________________^
+           |
+        "#);
+    }
+
+    #[test]
+    fn test_folding_range_single_line_class() {
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass: pass\n<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"No folding ranges found");
+    }
+
+    #[test]
+    fn test_folding_range_single_line_class_with_trailing_comment() {
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass: pass  # comment\n<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"No folding ranges found");
+    }
+
+    #[test]
+    fn test_folding_multiline() {
+        // A single LF new-line results in a folding range.
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass:\n    pass\n<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:1:15
+          |
+        1 |   class MyClass:
+          |  _______________^
+        2 | |     pass
+          | |________^
+          |
+        ");
+
+        // So does a single CRLF new-line.
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass:\r\n    pass\r\n<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:1:15
+          |
+        1 |   class MyClass:
+          |  _______________^
+        2 | |     pass
+          | |________^
+          |
+        ");
+
+        // And so to does a single CR new-line.
+        let test = CursorTest::builder()
+            .source("main.py", "class MyClass:\r    pass\r<CURSOR>")
+            .build();
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:1:15
+          |
+        1 |   class MyClass:
+          |  _______________^
+        2 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    impl CursorTest {
+        fn folding_ranges(&self) -> String {
+            let ranges = folding_ranges(&self.db, self.cursor.file, None);
+
+            if ranges.is_empty() {
+                return "No folding ranges found".to_string();
+            }
+
+            let diagnostics: Vec<FoldingRangeDiagnostic> = ranges
+                .into_iter()
+                .map(|fr| FoldingRangeDiagnostic::new(self.cursor.file, fr))
+                .collect();
+
+            self.render_diagnostics(diagnostics)
+        }
+    }
+
+    #[test]
+    fn test_folding_range_decorated_function_single() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator
+def my_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:3:19
+          |
+        3 |   def my_function():
+          |  ___________________^
+        4 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_function_multiple() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@first
+@second
+@third
+def my_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:5:19
+          |
+        5 |   def my_function():
+          |  ___________________^
+        6 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_class_single() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@dataclass
+class MyClass:
+    value: int
+    name: str
+<CURSOR>
+"#,
+            )
+            .build();
+
+        // Single decorator is one line, so no decorator folding range is emitted.
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:3:15
+          |
+        3 |   class MyClass:
+          |  _______________^
+        4 | |     value: int
+        5 | |     name: str
+          | |_____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_class_multiple() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator_a
+@decorator_b
+class MyClass:
+    value: int
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:4:15
+          |
+        4 |   class MyClass:
+          |  _______________^
+        5 | |     value: int
+          | |______________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_async_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator
+async def my_async_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:3:31
+          |
+        3 |   async def my_async_function():
+          |  _______________________________^
+        4 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_nested_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def outer_function():
+    @decorator
+    def inner_function():
+        pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:22
+          |
+        2 |   def outer_function():
+          |  ______________________^
+        3 | |     @decorator
+        4 | |     def inner_function():
+        5 | |         pass
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:26
+          |
+        4 |       def inner_function():
+          |  __________________________^
+        5 | |         pass
+          | |____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_async_method() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class MyClass:
+    @decorator
+    async def my_async_method(self):
+        pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:15
+          |
+        2 |   class MyClass:
+          |  _______________^
+        3 | |     @decorator
+        4 | |     async def my_async_method(self):
+        5 | |         pass
+          | |____________^
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:37
+          |
+        4 |       async def my_async_method(self):
+          |  _____________________________________^
+        5 | |         pass
+          | |____________^
+          |
+        ");
+    }
+
+    struct FoldingRangeDiagnostic {
+        file: File,
+        folding_range: FoldingRange,
+    }
+
+    impl FoldingRangeDiagnostic {
+        fn new(file: File, folding_range: FoldingRange) -> Self {
+            Self {
+                file,
+                folding_range,
+            }
+        }
+    }
+
+    impl crate::tests::IntoDiagnostic for FoldingRangeDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let message = match self.folding_range.kind {
+                Some(FoldingRangeKind::Comment) => "Folding Range (comment)",
+                Some(FoldingRangeKind::Imports) => "Folding Range (imports)",
+                Some(FoldingRangeKind::Region) => "Folding Range (region)",
+                None => "Folding Range",
+            };
+
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("folding-range")),
+                Severity::Info,
+                message.to_string(),
+            );
+
+            diagnostic.annotate(Annotation::primary(
+                Span::from(self.file).with_range(self.folding_range.range),
+            ));
+
+            diagnostic
+        }
+    }
+}

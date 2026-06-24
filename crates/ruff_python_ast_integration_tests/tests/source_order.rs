@@ -148,7 +148,7 @@ fn f_strings() {
 
 #[test]
 fn t_strings() {
-    let source = r"'pre' t'foo {bar:.{x}f} baz'";
+    let source = r"t'pre' t'foo {bar:.{x}f} baz'";
 
     let trace = trace_source_order_visitation(source);
 

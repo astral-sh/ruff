@@ -37,6 +37,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextlib.suppress`](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.118")]
 pub(crate) struct UselessContextlibSuppress;
 
 impl Violation for UselessContextlibSuppress {

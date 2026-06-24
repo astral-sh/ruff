@@ -2,33 +2,34 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllOptions, ClientOptions, Session};
+use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
+use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
+use anyhow::Context;
 use lsp_server::Connection;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url,
+    ClientCapabilities, InitializeParams, MessageType, Uri, WorkspaceFolders,
+    WorkspaceFoldersInitializeParams,
 };
+use ruff_db::system::System;
 use std::num::NonZeroUsize;
-use std::panic::PanicHookInfo;
+use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
-mod connection;
+mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
-pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
-
+pub(crate) use api::publish_settings_diagnostics;
+pub(crate) use main_loop::{
+    Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
+};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
-pub(crate) struct Server {
+pub struct Server {
     connection: Connection,
-    client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
     main_loop_receiver: MainLoopReceiver,
     main_loop_sender: MainLoopSender,
@@ -36,30 +37,61 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
+    pub fn new(
         worker_threads: NonZeroUsize,
-        connection: ConnectionInitializer,
+        connection: Connection,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        in_test: bool,
     ) -> crate::Result<Self> {
-        let (id, init_params) = connection.initialize_start()?;
+        let (id, init_value) = connection.initialize_start()?;
 
-        let AllOptions {
-            global: global_options,
-            workspace: mut workspace_options,
-        } = AllOptions::from_value(
-            init_params
-                .initialization_options
-                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
-        );
+        let InitializeParams {
+            initialization_options,
+            capabilities: client_capabilities,
+            workspace_folders_initialize_params:
+                WorkspaceFoldersInitializeParams { workspace_folders },
+            client_info,
+            ..
+        } = serde_json::from_value(init_value)
+            .context("Failed to deserialize initialization parameters")?;
 
-        let client_capabilities = init_params.capabilities;
+        let (initialization_options, deserialization_error) =
+            InitializationOptions::from_value(initialization_options);
+
+        if !in_test {
+            crate::logging::init_logging(
+                initialization_options.log_level.unwrap_or_default(),
+                initialization_options.log_file.as_deref(),
+            );
+        }
+
+        if let Some(error) = deserialization_error {
+            tracing::error!("Failed to deserialize initialization options: {error}");
+        }
+
+        tracing::debug!("Client info: {client_info:#?}");
+        tracing::debug!("Initialization options: {initialization_options:#?}");
+
+        let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
+
+        tracing::debug!("Resolved client capabilities: {resolved_client_capabilities}");
+
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
+        let server_capabilities =
+            server_capabilities(position_encoding, resolved_client_capabilities);
 
-        let connection = connection.initialize_finish(
+        let version = ruff_db::program_version().unwrap_or("Unknown");
+        tracing::info!("Version: {version}");
+
+        connection.initialize_finish(
             id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
+            serde_json::json!({
+                "capabilities": server_capabilities,
+                "serverInfo": {
+                    "name": crate::SERVER_NAME,
+                    "version": version
+                }
+            }),
         )?;
 
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
@@ -67,43 +99,41 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
-        crate::logging::init_logging(
-            global_options.tracing.log_level.unwrap_or_default(),
-            global_options.tracing.log_file.as_deref(),
-        );
+        let unknown_options = &initialization_options.options.unknown;
+        if !unknown_options.is_empty() {
+            warn_about_unknown_options(&client, None, unknown_options);
+        }
 
-        let mut workspace_for_url = |url: Url| {
-            let Some(workspace_settings) = workspace_options.as_mut() else {
-                return (url, ClientOptions::default());
-            };
-            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
-                tracing::warn!(
-                    "No workspace options found for {}, using default options",
-                    url
-                );
-                ClientOptions::default()
-            });
-            (url, settings)
-        };
-
-        let workspaces = init_params
-            .workspace_folders
-            .filter(|folders| !folders.is_empty())
+        // Get workspace URLs without settings - settings will come from workspace/configuration
+        let workspace_urls = workspace_folders
+            .and_then(|folders| {
+                if let WorkspaceFolders::WorkspaceFolderList(folders) = folders
+                    && !folders.is_empty()
+                {
+                    Some(folders)
+                } else {
+                    None
+                }
+            })
             .map(|folders| {
                 folders
                     .into_iter()
-                    .map(|folder| workspace_for_url(folder.uri))
-                    .collect()
+                    .map(|folder| folder.uri)
+                    .collect::<Vec<_>>()
             })
             .or_else(|| {
-                let current_dir = std::env::current_dir().ok()?;
+                let current_dir = native_system
+                    .current_directory()
+                    .as_std_path()
+                    .to_path_buf();
                 tracing::warn!(
                     "No workspace(s) were provided during initialization. \
-                    Using the current working directory as a default workspace: {}",
+                    Using the current working directory from the fallback system as a \
+                    default workspace: {}",
                     current_dir.display()
                 );
-                let uri = Url::from_file_path(current_dir).ok()?;
-                Some(vec![workspace_for_url(uri)])
+                let uri = Uri::from_file_path(current_dir).ok()?;
+                Some(vec![uri])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -112,37 +142,24 @@ impl Server {
                 )
             })?;
 
-        let workspaces = if workspaces.len() > 1 {
-            let first_workspace = workspaces.into_iter().next().unwrap();
-            tracing::warn!(
-                "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace.0
-            );
-            client.show_warning_message(format_args!(
-                "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace.0,
-            ));
-            vec![first_workspace]
-        } else {
-            workspaces
-        };
-
         Ok(Self {
             connection,
             worker_threads,
             main_loop_receiver,
             main_loop_sender,
             session: Session::new(
-                &client_capabilities,
+                resolved_client_capabilities,
                 position_encoding,
-                global_options,
-                &workspaces,
+                workspace_urls,
+                initialization_options,
+                native_system,
+                ClientName::from(client_info),
+                in_test,
             )?,
-            client_capabilities,
         })
     }
 
-    pub(crate) fn run(mut self) -> crate::Result<()> {
+    pub fn run(mut self) -> crate::Result<()> {
         let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),
@@ -165,34 +182,6 @@ impl Server {
                     .max() // this selects the highest priority position encoding
             })
             .unwrap_or_default()
-    }
-
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
-        ServerCapabilities {
-            position_encoding: Some(position_encoding.into()),
-            diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
-                identifier: Some(crate::DIAGNOSTIC_NAME.into()),
-                inter_file_dependencies: true,
-                ..Default::default()
-            })),
-            text_document_sync: Some(TextDocumentSyncCapability::Options(
-                TextDocumentSyncOptions {
-                    open_close: Some(true),
-                    change: Some(TextDocumentSyncKind::INCREMENTAL),
-                    ..Default::default()
-                },
-            )),
-            type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
-            hover_provider: Some(HoverProviderCapability::Simple(true)),
-            inlay_hint_provider: Some(lsp_types::OneOf::Right(
-                InlayHintServerCapabilities::Options(InlayHintOptions::default()),
-            )),
-            completion_provider: Some(lsp_types::CompletionOptions {
-                trigger_characters: Some(vec!['.'.to_string()]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
     }
 }
 
@@ -227,12 +216,10 @@ impl ServerPanicHookHandler {
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
             if let Some(client) = hook_client.upgrade() {
-                client
-                    .show_message(
-                        "The ty language server exited with a panic. See the logs for more details.",
-                        MessageType::ERROR,
-                    )
-                    .ok();
+                client.show_message(
+                    "The ty language server exited with a panic. See the logs for more details.",
+                    MessageType::Error,
+                );
             }
         }));
 

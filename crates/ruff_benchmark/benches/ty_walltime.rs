@@ -1,53 +1,61 @@
+use divan::{Bencher, bench};
 use std::fmt::{Display, Formatter};
 
-use divan::{Bencher, bench};
-
 use rayon::ThreadPoolBuilder;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
+use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
-use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 struct Benchmark<'a> {
-    project: InstalledProject<'a>,
+    project: RealWorldProject<'a>,
+    installed_project: std::sync::OnceLock<InstalledProject<'a>>,
     max_diagnostics: usize,
 }
 
 impl<'a> Benchmark<'a> {
-    fn new(project: RealWorldProject<'a>, max_diagnostics: usize) -> Self {
-        let setup_project = project.setup().expect("Failed to setup project");
-
+    const fn new(project: RealWorldProject<'a>, max_diagnostics: usize) -> Self {
         Self {
-            project: setup_project,
+            project,
+            installed_project: std::sync::OnceLock::new(),
             max_diagnostics,
         }
     }
 
+    fn installed_project(&self) -> &InstalledProject<'a> {
+        self.installed_project.get_or_init(|| {
+            self.project
+                .clone()
+                .setup()
+                .expect("Failed to setup project")
+        })
+    }
+
     fn setup_iteration(&self) -> ProjectDatabase {
-        let root = SystemPathBuf::from_path_buf(self.project.path.clone()).unwrap();
+        let installed_project = self.installed_project();
+        let root = SystemPathBuf::from_path_buf(installed_project.path.clone()).unwrap();
         let system = OsSystem::new(&root);
 
         let mut metadata = ProjectMetadata::discover(&root, &system).unwrap();
 
         metadata.apply_options(Options {
             environment: Some(EnvironmentOptions {
-                python_version: Some(RangedValue::cli(self.project.config.python_version)),
-                python: (!self.project.config().dependencies.is_empty())
-                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                python_version: Some(RangedValue::cli(installed_project.config.python_version)),
+                python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
-            self.project
+            installed_project
                 .check_paths()
                 .iter()
                 .map(|path| SystemPath::absolute(path, &root))
@@ -59,199 +67,226 @@ impl<'a> Benchmark<'a> {
 
 impl Display for Benchmark<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.project.config.name)
+        self.project.name.fmt(f)
     }
 }
 
-fn check_project(db: &ProjectDatabase, max_diagnostics: usize) {
+#[track_caller]
+#[expect(clippy::cast_precision_loss)]
+fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usize) {
     let result = db.check();
     let diagnostics = result.len();
 
     assert!(
         diagnostics > 1 && diagnostics <= max_diagnostics,
-        "Expected between {} and {} diagnostics but got {}",
-        1,
-        max_diagnostics,
-        diagnostics
+        "Expected between 1 and {max_diagnostics} diagnostics on project '{project_name}' but got {diagnostics}",
     );
+
+    if (max_diagnostics - diagnostics) as f64 / max_diagnostics as f64 > 0.10 {
+        tracing::warn!(
+            "The expected diagnostics for project `{project_name}` can be reduced: expected {max_diagnostics} but got {diagnostics}"
+        );
+    }
 }
 
-static ALTAIR: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "altair",
-            repository: "https://github.com/vega/altair",
-            commit: "d1f4a1ef89006e5f6752ef1f6df4b7a509336fba",
-            paths: vec![SystemPath::new("altair")],
-            dependencies: vec![
-                "jinja2",
-                "narwhals",
-                "numpy",
-                "packaging",
-                "pandas-stubs",
-                "pyarrow-stubs",
-                "pytest",
-                "scipy-stubs",
-                "types-jsonschema",
-            ],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        1000,
-    )
-});
+static ALTAIR: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "altair",
+        repository: "https://github.com/vega/altair",
+        commit: "a9765713566095349cb1cfbbe85d6ad258c84245",
+        paths: &["altair", "tests"],
+        dependencies: &[
+            "jinja2",
+            "narwhals",
+            "numpy",
+            "packaging",
+            "pandas-stubs",
+            "pyarrow-stubs",
+            "pytest",
+            "scipy-stubs",
+            "types-jsonschema",
+        ],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    3,
+);
 
-static COLOUR_SCIENCE: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "colour-science",
-            repository: "https://github.com/colour-science/colour",
-            commit: "a17e2335c29e7b6f08080aa4c93cfa9b61f84757",
-            paths: vec![SystemPath::new("colour")],
-            dependencies: vec![
-                "matplotlib",
-                "numpy",
-                "pandas-stubs",
-                "pytest",
-                "scipy-stubs",
-            ],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY310,
-        },
-        477,
-    )
-});
+static COLOUR_SCIENCE: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "colour-science",
+        repository: "https://github.com/colour-science/colour",
+        commit: "4ee3b72a2c6205c1d0cd964075621ec19290d571",
+        paths: &["colour"],
+        dependencies: &[
+            "matplotlib",
+            "numpy",
+            "pandas-stubs",
+            "pytest",
+            "scipy-stubs",
+        ],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    450,
+);
 
-static FREQTRADE: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "freqtrade",
-            repository: "https://github.com/freqtrade/freqtrade",
-            commit: "2d842ea129e56575852ee0c45383c8c3f706be19",
-            paths: vec![SystemPath::new("freqtrade")],
-            dependencies: vec![
-                "numpy",
-                "pandas-stubs",
-                "pydantic",
-                "sqlalchemy",
-                "types-cachetools",
-                "types-filelock",
-                "types-python-dateutil",
-                "types-requests",
-                "types-tabulate",
-            ],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        400,
-    )
-});
+static FREQTRADE: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "freqtrade",
+        repository: "https://github.com/freqtrade/freqtrade",
+        commit: "9fca9c818529c51ba19a1e76bc9428cf3ad56e4b",
+        paths: &["freqtrade", "scripts"],
+        dependencies: &[
+            "numpy",
+            "pandas-stubs",
+            "pydantic",
+            "sqlalchemy",
+            "types-cachetools",
+            "types-filelock",
+            "types-python-dateutil",
+            "requests",
+            "types-tabulate",
+        ],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    717,
+);
 
-static PANDAS: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "pandas",
-            repository: "https://github.com/pandas-dev/pandas",
-            commit: "5909621e2267eb67943a95ef5e895e8484c53432",
-            paths: vec![SystemPath::new("pandas")],
-            dependencies: vec![
-                "numpy",
-                "types-python-dateutil",
-                "types-pytz",
-                "types-PyMySQL",
-                "types-setuptools",
-                "pytest",
-            ],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        3000,
-    )
-});
+static PANDAS: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "pandas",
+        repository: "https://github.com/pandas-dev/pandas",
+        commit: "19b0ecf5d5b7fa0b8391a6d2cc1e2a7d1ea5f660",
+        paths: &["pandas"],
+        dependencies: &[
+            "numpy",
+            "types-python-dateutil",
+            "types-pytz",
+            "types-PyMySQL",
+            "types-setuptools",
+            "pytest",
+        ],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    6700,
+);
 
-static PYDANTIC: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "pydantic",
-            repository: "https://github.com/pydantic/pydantic",
-            commit: "0c4a22b64b23dfad27387750cf07487efc45eb05",
-            paths: vec![SystemPath::new("pydantic")],
-            dependencies: vec![
-                "annotated-types",
-                "pydantic-core",
-                "typing-extensions",
-                "typing-inspection",
-            ],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY39,
-        },
-        1000,
-    )
-});
+static PYDANTIC: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "pydantic",
+        repository: "https://github.com/pydantic/pydantic",
+        commit: "7974d591c7d22d6667ea9d09831ba9caddcbb373",
+        paths: &["pydantic"],
+        dependencies: &["annotated-types", "pydantic-core", "typing-inspection"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    1600,
+);
 
-static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "sympy",
-            repository: "https://github.com/sympy/sympy",
-            commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
-            paths: vec![SystemPath::new("sympy")],
-            dependencies: vec!["mpmath"],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        13000,
-    )
-});
+static SYMPY: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "sympy",
+        repository: "https://github.com/sympy/sympy",
+        commit: "8381f0c42956f60caed72aedb2ca4e82420b9992",
+        paths: &["sympy"],
+        dependencies: &["mpmath"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    16500,
+);
 
-static TANJUN: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "tanjun",
-            repository: "https://github.com/FasterSpeeding/Tanjun",
-            commit: "69f40db188196bc59516b6c69849c2d85fbc2f4a",
-            paths: vec![SystemPath::new("tanjun")],
-            dependencies: vec!["hikari", "alluka"],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        100,
-    )
-});
+static TANJUN: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "tanjun",
+        repository: "https://github.com/FasterSpeeding/Tanjun",
+        commit: "88d43a267a5bcd995d4929f62b14fbe5c18e59de",
+        paths: &["tanjun"],
+        dependencies: &["hikari", "alluka"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    110,
+);
+
+static STATIC_FRAME: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "static-frame",
+        repository: "https://github.com/static-frame/static-frame",
+        commit: "0b1e2fc2e819cde1b9b99be7cc57be08ee43d8de",
+        paths: &["static_frame"],
+        // N.B. `arraykit` is installed as a dependency during ecosystem runs,
+        // but it takes much longer to be installed in a Codspeed run
+        // (seems to be built from source on the Codspeed CI runners for some reason).
+        dependencies: &["numpy"],
+        max_dep_date: TY_ECOSYSTEM_PIN,
+        python_version: SupportedPythonVersion::Py311,
+    },
+    1950,
+);
 
 #[track_caller]
 fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
     bencher
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_refs(|db| {
-            check_project(db, benchmark.max_diagnostics);
+            check_project(db, benchmark.project.name, benchmark.max_diagnostics);
         });
 }
 
-#[bench(args=[&*ALTAIR, &*FREQTRADE, &*PYDANTIC, &*TANJUN], sample_size=2, sample_count=3)]
-fn small(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn altair(bencher: Bencher) {
+    run_single_threaded(bencher, &ALTAIR);
 }
 
-#[bench(args=[&*COLOUR_SCIENCE, &*PANDAS], sample_size=1, sample_count=3)]
-fn medium(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn freqtrade(bencher: Bencher) {
+    run_single_threaded(bencher, &FREQTRADE);
 }
 
-#[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
-fn large(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn tanjun(bencher: Bencher) {
+    run_single_threaded(bencher, &TANJUN);
 }
 
-#[bench(args=[&*PYDANTIC], sample_size=3, sample_count=3)]
-fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+#[bench(sample_size = 2, sample_count = 3)]
+fn pydantic(bencher: Bencher) {
+    run_single_threaded(bencher, &PYDANTIC);
+}
+
+#[bench(sample_size = 1, sample_count = 3)]
+fn static_frame(bencher: Bencher) {
+    run_single_threaded(bencher, &STATIC_FRAME);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn colour_science(bencher: Bencher) {
+    run_single_threaded(bencher, &COLOUR_SCIENCE);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn pandas(bencher: Bencher) {
+    run_single_threaded(bencher, &PANDAS);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn sympy(bencher: Bencher) {
+    run_single_threaded(bencher, &SYMPY);
+}
+
+#[bench(sample_size = 3, sample_count = 8)]
+fn multithreaded(bencher: Bencher) {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
     bencher
-        .with_inputs(|| benchmark.setup_iteration())
+        .with_inputs(|| ALTAIR.setup_iteration())
         .bench_local_values(|db| {
             thread_pool.install(|| {
-                check_project(&db, benchmark.max_diagnostics);
+                check_project(&db, ALTAIR.project.name, ALTAIR.max_diagnostics);
                 db
             })
         });
@@ -275,7 +310,7 @@ fn main() {
     // branch when looking up the ingredient index.
     {
         let db = TANJUN.setup_iteration();
-        check_project(&db, TANJUN.max_diagnostics);
+        check_project(&db, TANJUN.project.name, TANJUN.max_diagnostics);
     }
 
     divan::main();

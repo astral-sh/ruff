@@ -47,7 +47,7 @@ Iterating over an ellipsis literal as part of a `for` loop in a stub is invalid,
 results in a diagnostic:
 
 ```pyi
-# error: [not-iterable] "Object of type `ellipsis` is not iterable"
+# error: [not-iterable] "Object of type `EllipsisType` is not iterable"
 for a, b in ...:
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -59,13 +59,13 @@ In a non-stub file, there's no special treatment of ellipsis literals. An ellips
 be assigned if `EllipsisType` is actually assignable to the annotated type.
 
 ```py
-# error: 7 [invalid-parameter-default] "Default value of type `ellipsis` is not assignable to annotated parameter type `int`"
+# error: [invalid-parameter-default] "Default value of type `EllipsisType` is not assignable to annotated parameter type `int`"
 def f(x: int = ...) -> None: ...
 
-# error: 1 [invalid-assignment] "Object of type `ellipsis` is not assignable to `int`"
+# error: [invalid-assignment] "Object of type `EllipsisType` is not assignable to `int`"
 a: int = ...
 b = ...
-reveal_type(b)  # revealed: ellipsis
+reveal_type(b)  # revealed: EllipsisType
 ```
 
 ## Use of `Ellipsis` symbol
@@ -73,6 +73,6 @@ reveal_type(b)  # revealed: ellipsis
 There is no special treatment of the builtin name `Ellipsis` in stubs, only of `...` literals.
 
 ```pyi
-# error: 7 [invalid-parameter-default] "Default value of type `ellipsis` is not assignable to annotated parameter type `int`"
+# error: [invalid-parameter-default] "Default value of type `EllipsisType` is not assignable to annotated parameter type `int`"
 def f(x: int = Ellipsis) -> None: ...
 ```

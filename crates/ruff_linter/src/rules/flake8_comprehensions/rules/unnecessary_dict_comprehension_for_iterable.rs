@@ -7,6 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, Exp
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad_start;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -48,6 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }
@@ -90,8 +92,18 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
+    let Some(key) = dict_comp.key.as_deref() else {
+        return;
+    };
+
     // Don't suggest `dict.keys` if the target is not the same as the key.
-    if ComparableExpr::from(&generator.target) != ComparableExpr::from(dict_comp.key.as_ref()) {
+    if ComparableExpr::from(&generator.target) != ComparableExpr::from(key) {
+        return;
+    }
+
+    // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
+    // (attributes, subscripts, or slices).
+    if contains_side_effecting_sub_expression(&generator.target) {
         return;
     }
 
@@ -102,7 +114,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     // Don't suggest `dict.fromkeys` if any of the expressions in the value are defined within
     // the comprehension (e.g., by the target).
-    let self_referential = any_over_expr(dict_comp.value.as_ref(), &|expr| {
+    let self_referential = any_over_expr(dict_comp.value.as_ref(), |expr| {
         let Expr::Name(name) = expr else {
             return false;
         };
@@ -136,12 +148,16 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     if checker.semantic().has_builtin_binding("dict") {
         let edit = Edit::range_replacement(
-            checker
-                .generator()
-                .expr(&fix_unnecessary_dict_comprehension(
-                    dict_comp.value.as_ref(),
-                    generator,
-                )),
+            pad_start(
+                checker
+                    .generator()
+                    .expr(&fix_unnecessary_dict_comprehension(
+                        dict_comp.value.as_ref(),
+                        generator,
+                    )),
+                dict_comp.start(),
+                checker.locator(),
+            ),
             dict_comp.range(),
         );
         diagnostic.set_fix(Fix::applicable_edit(
@@ -163,7 +179,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 /// Similarly, if the value contains a list comprehension, it cannot be shared, as `dict.fromkeys`
 /// would leave each value with a reference to the same list.
 fn is_constant_like(expr: &Expr) -> bool {
-    !any_over_expr(expr, &|expr| {
+    !any_over_expr(expr, |expr| {
         matches!(
             expr,
             Expr::Lambda(_)
@@ -196,19 +212,28 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         } else {
             Box::from([iterable, value.clone()])
         },
-        keywords: Box::from([]),
+        keywords: std::iter::empty().collect(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         arguments: args,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    })
+}
+
+fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+    any_over_expr(target, |expr| {
+        matches!(
+            expr,
+            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+        )
     })
 }

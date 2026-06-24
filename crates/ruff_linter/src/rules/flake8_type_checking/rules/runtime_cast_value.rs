@@ -43,6 +43,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// This fix is safe as long as the type expression doesn't span multiple
 /// lines and includes comments on any of the lines apart from the last one.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct RuntimeCastValue;
 
 impl AlwaysFixableViolation for RuntimeCastValue {

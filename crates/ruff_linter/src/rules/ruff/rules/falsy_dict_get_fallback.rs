@@ -40,6 +40,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [documentation]: https://docs.python.org/3.13/library/stdtypes.html#dict.get
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.8.5")]
 pub(crate) struct FalsyDictGetFallback;
 
 impl Violation for FalsyDictGetFallback {
@@ -127,7 +128,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
             &call.arguments,
             Parentheses::Preserve,
             checker.locator().contents(),
-            checker.comment_ranges(),
+            checker.tokens(),
         )
         .map(|edit| Fix::applicable_edit(edit, applicability))
     });

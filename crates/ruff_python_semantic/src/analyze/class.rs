@@ -13,24 +13,30 @@ use ruff_python_ast::{
 };
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
-pub fn any_qualified_base_class(
+pub fn any_qualified_base_class<F>(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &dyn Fn(QualifiedName) -> bool,
-) -> bool {
-    any_base_class(class_def, semantic, &mut |expr| {
+    func: F,
+) -> bool
+where
+    F: Fn(QualifiedName) -> bool,
+{
+    any_base_class(class_def, semantic, |expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(func)
+            .is_some_and(&func)
     })
 }
 
 /// Return `true` if any base class matches an [`Expr`] predicate.
-pub fn any_base_class(
+pub fn any_base_class<F>(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &mut dyn FnMut(&Expr) -> bool,
-) -> bool {
+    mut func: F,
+) -> bool
+where
+    F: FnMut(&Expr) -> bool,
+{
     fn inner(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
@@ -69,7 +75,7 @@ pub fn any_base_class(
         return false;
     }
 
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    inner(class_def, semantic, &mut func, &mut FxHashSet::default())
 }
 
 /// Returns an iterator over all base classes, beginning with the
@@ -122,11 +128,10 @@ pub fn iter_super_class<'stmt>(
 
 /// Return `true` if any base class, including the given class,
 /// matches an [`ast::StmtClassDef`] predicate.
-pub fn any_super_class(
-    class_def: &ast::StmtClassDef,
-    semantic: &SemanticModel,
-    func: &dyn Fn(&ast::StmtClassDef) -> bool,
-) -> bool {
+pub fn any_super_class<F>(class_def: &ast::StmtClassDef, semantic: &SemanticModel, func: F) -> bool
+where
+    F: Fn(&ast::StmtClassDef) -> bool,
+{
     iter_super_class(class_def, semantic).any(func)
 }
 
@@ -169,10 +174,10 @@ pub enum ClassMemberKind<'a> {
     FunctionDef(&'a ast::StmtFunctionDef),
 }
 
-pub fn any_member_declaration(
-    class: &ast::StmtClassDef,
-    func: &mut dyn FnMut(ClassMemberDeclaration) -> bool,
-) -> bool {
+pub fn any_member_declaration<F>(class: &ast::StmtClassDef, mut func: F) -> bool
+where
+    F: FnMut(ClassMemberDeclaration) -> bool,
+{
     fn any_stmt_in_body(
         body: &[Stmt],
         func: &mut dyn FnMut(ClassMemberDeclaration) -> bool,
@@ -287,12 +292,12 @@ pub fn any_member_declaration(
         })
     }
 
-    any_stmt_in_body(&class.body, func, ClassMemberBoundness::Bound)
+    any_stmt_in_body(&class.body, &mut func, ClassMemberBoundness::Bound)
 }
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
 pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             [
@@ -317,12 +322,97 @@ impl IsMetaclass {
     }
 }
 
+/// Check if a class has a metaclass-like `__new__` method signature.
+///
+/// A metaclass-like `__new__` method signature has:
+/// 1. Exactly 5 parameters (including cls)
+/// 2. Second parameter annotated with `str`
+/// 3. Third parameter annotated with a `tuple` type
+/// 4. Fourth parameter annotated with a `dict` type
+/// 5. Fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
+fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    // Look for a __new__ method in the class body
+    for stmt in &class_def.body {
+        let ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+            name, parameters, ..
+        }) = stmt
+        else {
+            continue;
+        };
+
+        if name != "__new__" {
+            continue;
+        }
+
+        // Check if we have exactly 5 parameters (cls + 4 others)
+        if parameters.len() != 5 {
+            continue;
+        }
+
+        // Check that there is no variadic parameter
+        if parameters.vararg.is_some() {
+            continue;
+        }
+
+        // Check that the last parameter is keyword-variadic (**kwargs)
+        if parameters.kwarg.is_none() {
+            continue;
+        }
+
+        // Check parameter annotations, skipping the first parameter (cls)
+        let mut param_iter = parameters.iter().skip(1);
+
+        // Check second parameter (name: str)
+        let Some(second_param) = param_iter.next() else {
+            continue;
+        };
+        if !second_param
+            .annotation()
+            .is_some_and(|annotation| semantic.match_builtin_expr(map_subscript(annotation), "str"))
+        {
+            continue;
+        }
+
+        // Check third parameter (bases: tuple[...])
+        let Some(third_param) = param_iter.next() else {
+            continue;
+        };
+        if !third_param.annotation().is_some_and(|annotation| {
+            semantic.match_builtin_expr(map_subscript(annotation), "tuple")
+        }) {
+            continue;
+        }
+
+        // Check fourth parameter (attrs: dict[...])
+        let Some(fourth_param) = param_iter.next() else {
+            continue;
+        };
+        if !fourth_param.annotation().is_some_and(|annotation| {
+            semantic.match_builtin_expr(map_subscript(annotation), "dict")
+        }) {
+            continue;
+        }
+
+        return true;
+    }
+
+    false
+}
+
 /// Returns `IsMetaclass::Yes` if the given class is definitely a metaclass,
 /// `IsMetaclass::No` if it's definitely *not* a metaclass, and
 /// `IsMetaclass::Maybe` otherwise.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
     let mut maybe = false;
-    let is_base_class = any_base_class(class_def, semantic, &mut |expr| match expr {
+    let is_base_class = any_base_class(class_def, semantic, |expr| match expr {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
@@ -349,7 +439,17 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
     match (is_base_class, maybe) {
         (true, true) => IsMetaclass::Maybe,
         (true, false) => IsMetaclass::Yes,
-        (false, _) => IsMetaclass::No,
+        (false, _) => {
+            // If it has >1 base class and a metaclass-like signature for `__new__`,
+            // then it might be a metaclass.
+            if class_def.bases().is_empty() {
+                IsMetaclass::No
+            } else if has_metaclass_new_signature(class_def, semantic) {
+                IsMetaclass::Maybe
+            } else {
+                IsMetaclass::No
+            }
+        }
     }
 }
 

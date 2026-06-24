@@ -12,8 +12,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// Checks for operations that compare a name to itself.
 ///
 /// ## Why is this bad?
-/// Comparing a name to itself always results in the same value, and is likely
-/// a mistake.
+/// Comparing a name to itself typically results in a truthy value, and is
+/// likely a mistake.
 ///
 /// ## Example
 /// ```python
@@ -31,6 +31,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct ComparisonWithItself {
     actual: SourceCodeSnippet,
 }

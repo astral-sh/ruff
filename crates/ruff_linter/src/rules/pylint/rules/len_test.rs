@@ -59,6 +59,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// [PEP 8: Programming Recommendations](https://peps.python.org/pep-0008/#programming-recommendations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct LenTest {
     expression: SourceCodeSnippet,
 }

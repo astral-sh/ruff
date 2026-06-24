@@ -4,13 +4,36 @@ A type is a singleton type iff it has exactly one inhabitant.
 
 ## Basic
 
-```py
-from typing_extensions import Literal, Never, Callable
-from ty_extensions import is_singleton, static_assert
+```pyi
+from types import UnionType
+from typing_extensions import Any, Callable, Literal, Never, TypeAliasType
+from ty_extensions import TypeOf, is_singleton, static_assert
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+class Single(Enum):
+    VALUE = 1
 
 static_assert(is_singleton(None))
 static_assert(is_singleton(Literal[True]))
 static_assert(is_singleton(Literal[False]))
+static_assert(is_singleton(Literal[Answer.YES]))
+static_assert(is_singleton(Literal[Answer.NO]))
+static_assert(is_singleton(Literal[Single.VALUE]))
+static_assert(is_singleton(Single))
+
+def _(answer: Answer) -> None:
+    if answer is Answer.NO:
+        return
+    static_assert(is_singleton(TypeOf[answer]))
+
+def _(answer: Answer & Any) -> None:
+    if answer is Answer.NO:
+        return
+    static_assert(not is_singleton(TypeOf[answer]))
 
 static_assert(is_singleton(type[bool]))
 
@@ -26,6 +49,10 @@ static_assert(not is_singleton(tuple[None, Literal[True]]))
 
 static_assert(not is_singleton(Callable[..., None]))
 static_assert(not is_singleton(Callable[[int, str], None]))
+
+static_assert(not is_singleton(TypeAliasType))
+static_assert(not is_singleton(UnionType))
+static_assert(not is_singleton(TypeOf[list[int]]))
 ```
 
 ## `NoDefault`
@@ -63,7 +90,7 @@ static_assert(is_singleton(_NoDefaultType))
 ### All Python versions
 
 The type of the builtin symbol `Ellipsis` is the same as the type of an ellipsis literal (`...`).
-The type is not actually exposed from the standard library on Python \<3.10, but we still recognise
+The type is not actually exposed from the standard library on Python \<3.10, but we still recognize
 the type as a singleton on any Python version.
 
 ```toml
@@ -75,13 +102,12 @@ python-version = "3.9"
 from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(Ellipsis.__class__))
-static_assert(is_singleton((...).__class__))
 ```
 
 ### Python 3.10+
 
 On Python 3.10+, the standard library exposes the type of `...` as `types.EllipsisType`, and we also
-recognise this as a singleton type when it is referenced directly:
+recognize this as a singleton type when it is referenced directly:
 
 ```toml
 [environment]

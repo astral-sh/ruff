@@ -7,7 +7,7 @@ Fuzzers and associated utilities for automatic testing of Ruff.
 To use the fuzzers provided in this directory, start by invoking:
 
 ```bash
-./fuzz/init-fuzzers.sh
+./fuzz/init-fuzzer.sh
 ```
 
 This will install [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) and optionally download a

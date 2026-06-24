@@ -7,20 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/inva
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..131,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..10,
                     value: Compare(
                         ExprCompare {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..10,
                             left: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -32,12 +32,12 @@ Module(
                             comparators: [
                                 UnaryOp(
                                     ExprUnaryOp {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 5..10,
                                         op: Not,
                                         operand: Name(
                                             ExprName {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 9..10,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -52,12 +52,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 35..41,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 35..36,
                                 id: Name("x"),
                                 ctx: Store,
@@ -66,11 +66,11 @@ Module(
                     ],
                     value: Compare(
                         ExprCompare {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 38..41,
                             left: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 38..38,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -82,7 +82,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 40..41,
                                         id: Name("y"),
                                         ctx: Load,
@@ -95,11 +95,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 120..121,
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 120..121,
                             id: Name("x"),
                             ctx: Load,
@@ -109,16 +109,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 122..128,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 122..128,
                             op: Not,
                             operand: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 126..128,
                                     id: Name("is"),
                                     ctx: Load,
@@ -130,11 +130,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 129..130,
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 129..130,
                             id: Name("y"),
                             ctx: Load,
@@ -175,7 +175,7 @@ Module(
   |
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
 7 | x not is y
-  |       ^^ Syntax Error: Expected an identifier, but found a keyword 'is' that cannot be used here
+  |       ^^ Syntax Error: Expected an identifier, but found a keyword `is` that cannot be used here
   |
 
 

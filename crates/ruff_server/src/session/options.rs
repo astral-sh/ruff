@@ -1,18 +1,21 @@
 use std::{path::PathBuf, str::FromStr as _};
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use ruff_linter::{RuleSelector, line_width::LineLength, rule_selector::ParseError};
 
-use crate::session::{
-    Client,
-    settings::{ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration},
+use crate::{
+    format::FormatBackend,
+    session::{
+        Client,
+        settings::{ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration},
+    },
 };
 
-pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
+pub(crate) type WorkspaceOptionsMap = FxHashMap<Uri, ClientOptions>;
 
 /// Determines how multiple conflicting configurations should be resolved - in this
 /// case, the configuration from the client settings and configuration from local
@@ -43,7 +46,7 @@ pub(super) enum ClientConfiguration {
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub struct GlobalOptions {
+pub(crate) struct GlobalOptions {
     #[serde(flatten)]
     client: ClientOptions,
 
@@ -63,7 +66,7 @@ impl GlobalOptions {
         &self.client
     }
 
-    pub fn into_settings(self, client: Client) -> GlobalClientSettings {
+    pub(crate) fn into_settings(self, client: Client) -> GlobalClientSettings {
         GlobalClientSettings {
             options: self.client,
             settings: std::cell::OnceCell::default(),
@@ -76,7 +79,7 @@ impl GlobalOptions {
 #[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub struct ClientOptions {
+pub(crate) struct ClientOptions {
     configuration: Option<ClientConfiguration>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
@@ -124,6 +127,7 @@ impl ClientOptions {
             configuration,
             lint_preview: lint.preview,
             format_preview: format.preview,
+            format_backend: format.backend,
             select: lint.select.and_then(|select| {
                 Self::resolve_rules(
                     &select,
@@ -243,7 +247,7 @@ pub(crate) struct TracingOptions {
 struct WorkspaceOptions {
     #[serde(flatten)]
     options: ClientOptions,
-    workspace: Url,
+    workspace: Uri,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -283,11 +287,13 @@ impl Combine for LintOptions {
 #[serde(rename_all = "camelCase")]
 struct FormatOptions {
     preview: Option<bool>,
+    backend: Option<FormatBackend>,
 }
 
 impl Combine for FormatOptions {
     fn combine_with(&mut self, other: Self) {
         self.preview.combine_with(other.preview);
+        self.backend.combine_with(other.backend);
     }
 }
 
@@ -384,6 +390,10 @@ impl AllOptions {
     pub(crate) fn set_preview(&mut self, preview: bool) {
         self.global.set_preview(preview);
         if let Some(workspace_options) = self.workspace.as_mut() {
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "the same preview value is applied independently to every workspace"
+            )]
             for options in workspace_options.values_mut() {
                 options.set_preview(preview);
             }
@@ -441,6 +451,12 @@ pub(crate) trait Combine {
     }
 
     fn combine_with(&mut self, other: Self);
+}
+
+impl Combine for FormatBackend {
+    fn combine_with(&mut self, other: Self) {
+        *self = other;
+    }
 }
 
 impl<T> Combine for Option<T>
@@ -584,6 +600,7 @@ mod tests {
                     format: Some(
                         FormatOptions {
                             preview: None,
+                            backend: None,
                         },
                     ),
                     code_action: Some(
@@ -640,6 +657,7 @@ mod tests {
                         format: Some(
                             FormatOptions {
                                 preview: None,
+                                backend: None,
                             },
                         ),
                         code_action: Some(
@@ -704,6 +722,7 @@ mod tests {
                         format: Some(
                             FormatOptions {
                                 preview: None,
+                                backend: None,
                             },
                         ),
                         code_action: Some(
@@ -757,7 +776,7 @@ mod tests {
             workspace: workspace_options,
         } = AllOptions::from_init_options(options);
         let path =
-            Url::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
+            Uri::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
         let all_workspace_options = workspace_options.expect("workspace options should exist");
 
         let workspace_options = all_workspace_options
@@ -782,6 +801,7 @@ mod tests {
                     configuration: None,
                     lint_preview: Some(true),
                     format_preview: None,
+                    format_backend: None,
                     select: Some(vec![
                         RuleSelector::Linter(Linter::Pyflakes),
                         RuleSelector::Linter(Linter::Isort)
@@ -795,7 +815,7 @@ mod tests {
             }
         );
         let path =
-            Url::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
+            Uri::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
         let workspace_options = all_workspace_options
             .get(&path)
             .expect("workspace setting should exist")
@@ -819,6 +839,7 @@ mod tests {
                     configuration: None,
                     lint_preview: Some(false),
                     format_preview: None,
+                    format_backend: None,
                     select: Some(vec![
                         RuleSelector::Linter(Linter::Pyflakes),
                         RuleSelector::Linter(Linter::Isort)
@@ -919,6 +940,7 @@ mod tests {
                     configuration: None,
                     lint_preview: None,
                     format_preview: None,
+                    format_backend: None,
                     select: None,
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
@@ -948,6 +970,10 @@ mod tests {
     fn assert_preview_all_options(all_options: &AllOptions, preview: bool) {
         assert_preview_client_options(all_options.global.client(), preview);
         if let Some(workspace_options) = all_options.workspace.as_ref() {
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "each workspace is asserted independently"
+            )]
             for options in workspace_options.values() {
                 assert_preview_client_options(options, preview);
             }

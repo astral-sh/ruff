@@ -46,7 +46,8 @@ def func():
 
 
 def func():
-    # OK (index doesn't start at 0
+    # SIM113
+    # https://github.com/astral-sh/ruff/pull/21395
     idx = 10
     for x in range(5):
         g(x, idx)
@@ -193,6 +194,31 @@ def func():
         for y in range(5):
             g(x, idx)
             idx += 1
+
+
+def func():
+    # SIM113 x2 (same variable name reused in sibling loops)
+    i = 0
+    for val in [1, 2, 3]:
+        print(f"{i}: {val}")
+        i += 1
+
+    i = 0
+    for val in [1, 2, 3]:
+        print(f"{i}: {val}")
+        i += 1
+
+
+def func():
+    # SIM113 (same variable name reused after an `enumerate` loop)
+    for i, val in enumerate([1, 2, 3]):
+        print(f"{i}: {val}")
+
+    i = 0
+    for val in [1, 2, 3]:
+        print(f"{i}: {val}")
+        i += 1
+
 
 async def func():
     # OK (for loop is async)

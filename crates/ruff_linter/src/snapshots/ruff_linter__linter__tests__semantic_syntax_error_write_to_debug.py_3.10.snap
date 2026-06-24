@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: cannot assign to `__debug__`
+ --> resources/test/fixtures/semantic_errors/write_to_debug.py:1:1
+  |
+1 | __debug__ = False
+  | ^^^^^^^^^
+2 |
+3 | def process(__debug__):
+  |
+
+invalid-syntax: cannot assign to `__debug__`
+ --> resources/test/fixtures/semantic_errors/write_to_debug.py:3:13
+  |
+1 | __debug__ = False
+2 |
+3 | def process(__debug__):
+  |             ^^^^^^^^^
+4 |     pass
+  |
+
+invalid-syntax: Cannot use type parameter lists on Python 3.10 (syntax was added in Python 3.12)
+ --> resources/test/fixtures/semantic_errors/write_to_debug.py:6:14
+  |
+4 |     pass
+5 |
+6 | class Generic[__debug__]:
+  |              ^^^^^^^^^^^
+7 |     pass
+  |
+
+invalid-syntax: cannot assign to `__debug__`
+ --> resources/test/fixtures/semantic_errors/write_to_debug.py:6:15
+  |
+4 |     pass
+5 |
+6 | class Generic[__debug__]:
+  |               ^^^^^^^^^
+7 |     pass
+  |

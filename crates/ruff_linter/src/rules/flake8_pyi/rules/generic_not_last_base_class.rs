@@ -21,27 +21,47 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// For example:
 /// ```python
+/// from collections.abc import Container, Iterable, Sized
+/// from typing import Generic, TypeVar
+///
+///
+/// T = TypeVar("T")
+/// K = TypeVar("K")
+/// V = TypeVar("V")
+///
+///
 /// class LinkedList(Generic[T], Sized):
 ///     def push(self, item: T) -> None:
 ///         self._items.append(item)
 ///
+///
 /// class MyMapping(
 ///     Generic[K, V],
-///     Iterable[Tuple[K, V]],
-///     Container[Tuple[K, V]],
+///     Iterable[tuple[K, V]],
+///     Container[tuple[K, V]],
 /// ):
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from collections.abc import Container, Iterable, Sized
+/// from typing import Generic, TypeVar
+///
+///
+/// T = TypeVar("T")
+/// K = TypeVar("K")
+/// V = TypeVar("V")
+///
+///
 /// class LinkedList(Sized, Generic[T]):
 ///     def push(self, item: T) -> None:
 ///         self._items.append(item)
 ///
+///
 /// class MyMapping(
-///     Iterable[Tuple[K, V]],
-///     Container[Tuple[K, V]],
+///     Iterable[tuple[K, V]],
+///     Container[tuple[K, V]],
 ///     Generic[K, V],
 /// ):
 ///     ...
@@ -64,6 +84,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// [1]: https://github.com/python/cpython/issues/106102
 /// [MRO]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct GenericNotLastBaseClass;
 
 impl Violation for GenericNotLastBaseClass {
@@ -120,7 +141,7 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
     // where we would naively try to put `Generic[T]` after `*[str]`, which is also after a keyword
     // argument, causing the error.
     if bases
-        .arguments_source_order()
+        .iter_source_order()
         .any(|arg| arg.value().is_starred_expr())
     {
         return;
@@ -139,20 +160,16 @@ fn generate_fix(
 ) -> anyhow::Result<Fix> {
     let locator = checker.locator();
     let source = locator.contents();
+    let tokens = checker.tokens();
 
     let deletion = remove_argument(
         generic_base,
         arguments,
         Parentheses::Preserve,
         source,
-        checker.comment_ranges(),
+        tokens,
     )?;
-    let insertion = add_argument(
-        locator.slice(generic_base),
-        arguments,
-        checker.comment_ranges(),
-        source,
-    );
+    let insertion = add_argument(locator.slice(generic_base), arguments, tokens);
 
     Ok(Fix::unsafe_edits(deletion, [insertion]))
 }

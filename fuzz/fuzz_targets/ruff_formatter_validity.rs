@@ -6,13 +6,13 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use libfuzzer_sys::{fuzz_target, Corpus};
+use libfuzzer_sys::{Corpus, fuzz_target};
 use ruff_linter::linter::ParseSource;
-use ruff_linter::settings::flags::Noqa;
 use ruff_linter::settings::LinterSettings;
+use ruff_linter::settings::flags::Noqa;
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{format_module_source, PyFormatOptions};
+use ruff_python_formatter::{PyFormatOptions, format_module_source};
 use similar::TextDiff;
 
 static SETTINGS: OnceLock<LinterSettings> = OnceLock::new();
@@ -32,12 +32,15 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         None,
         linter_settings,
         Noqa::Enabled,
-        &SourceKind::Python(code.to_string()),
+        &SourceKind::Python {
+            code: code.to_string(),
+            is_stub: false,
+        },
         PySourceType::Python,
         ParseSource::None,
     );
 
-    if linter_result.has_syntax_errors() {
+    if linter_result.has_invalid_syntax() {
         return Corpus::Keep; // keep, but don't continue
     }
 
@@ -57,13 +60,16 @@ fn do_fuzz(case: &[u8]) -> Corpus {
             None,
             linter_settings,
             Noqa::Enabled,
-            &SourceKind::Python(formatted.clone()),
+            &SourceKind::Python {
+                code: formatted.clone(),
+                is_stub: false,
+            },
             PySourceType::Python,
             ParseSource::None,
         );
 
         assert!(
-            !linter_result.has_syntax_errors(),
+            linter_result.has_invalid_syntax(),
             "formatter introduced a parse error"
         );
 

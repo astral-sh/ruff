@@ -50,6 +50,7 @@ use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct PytestWarnsWithMultipleStatements;
 
 impl Violation for PytestWarnsWithMultipleStatements {
@@ -76,11 +77,11 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning):
+///     with pytest.warns(Warning):
 ///         ...
 ///
 ///     # empty string is also an error
-///     with pytest.warns(RuntimeWarning, match=""):
+///     with pytest.warns(Warning, match=""):
 ///         ...
 /// ```
 ///
@@ -90,7 +91,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning, match="expected message"):
+///     with pytest.warns(Warning, match="expected message"):
 ///         ...
 /// ```
 ///
@@ -101,6 +102,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct PytestWarnsTooBroad {
     warning: String,
 }
@@ -146,6 +148,7 @@ impl Violation for PytestWarnsTooBroad {
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.2")]
 pub(crate) struct PytestWarnsWithoutWarning;
 
 impl Violation for PytestWarnsWithoutWarning {

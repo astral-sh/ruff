@@ -1,6 +1,8 @@
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+
+use ruff_python_ast::helpers::is_empty_f_string;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -9,7 +11,7 @@ use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for usages of `collections.deque` that have an empty iterable as the first argument.
+/// Checks for use of `collections.deque` with an empty iterable as the first argument.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use an empty literal as a deque's iterable, since this is already the default behavior.
@@ -44,6 +46,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }
@@ -102,7 +105,8 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         }
         Expr::StringLiteral(string) => string.value.is_empty(),
         Expr::BytesLiteral(bytes) => bytes.value.is_empty(),
-        Expr::FString(fstring) => fstring.value.is_empty_literal(),
+        Expr::FString(fstring) => is_empty_f_string(fstring),
+        Expr::TString(tstring) => tstring.value.is_empty_iterable(),
         _ => false,
     };
     if !is_empty_literal {
@@ -136,31 +140,19 @@ fn fix_unnecessary_literal_in_deque(
     // call. otherwise, we only delete the `iterable` argument and leave the others untouched.
     let edit = if let Some(maxlen) = maxlen {
         let deque_name = checker.locator().slice(
-            parenthesized_range(
-                deque.func.as_ref().into(),
-                deque.into(),
-                checker.comment_ranges(),
-                checker.source(),
-            )
-            .unwrap_or(deque.func.range()),
+            parenthesized_range(deque.func.as_ref().into(), deque.into(), checker.tokens())
+                .unwrap_or(deque.func.range()),
         );
         let len_str = checker.locator().slice(maxlen);
         let deque_str = format!("{deque_name}(maxlen={len_str})");
         Edit::range_replacement(deque_str, deque.range)
     } else {
-        let range = parenthesized_range(
-            iterable.value().into(),
-            (&deque.arguments).into(),
-            checker.comment_ranges(),
-            checker.source(),
-        )
-        .unwrap_or(iterable.range());
         remove_argument(
-            &range,
+            &iterable,
             &deque.arguments,
             Parentheses::Preserve,
             checker.source(),
-            checker.comment_ranges(),
+            checker.tokens(),
         )?
     };
     let has_comments = checker.comment_ranges().intersects(edit.range());

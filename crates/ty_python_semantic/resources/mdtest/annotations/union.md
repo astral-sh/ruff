@@ -65,15 +65,12 @@ def f():
 ```py
 from typing import Union
 
-# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a parameter annotation"
 def f(x: Union) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
 ## Implicit type aliases using new-style unions
-
-We don't recognise these as type aliases yet, but we also don't emit false-positive diagnostics if
-you use them in type expressions:
 
 ```toml
 [environment]
@@ -84,5 +81,5 @@ python-version = "3.10"
 X = int | str
 
 def f(y: X):
-    reveal_type(y)  # revealed: @Todo(Support for `types.UnionType` instances in type expressions)
+    reveal_type(y)  # revealed: int | str
 ```

@@ -1,13 +1,14 @@
 use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{TokenKind, string::InterpolatedStringKind};
+use crate::string::InterpolatedStringKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
@@ -42,6 +43,12 @@ impl From<LexicalError> for ParseError {
     }
 }
 
+impl Ranged for ParseError {
+    fn range(&self) -> TextRange {
+        self.location
+    }
+}
+
 impl ParseError {
     pub fn error(self) -> ParseErrorType {
         self.error
@@ -49,7 +56,7 @@ impl ParseError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string or t-string.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum InterpolatedStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
@@ -72,9 +79,9 @@ pub enum InterpolatedStringErrorType {
 impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::UnclosedLbrace => write!(f, "expecting '}}'"),
+            Self::UnclosedLbrace => write!(f, "expecting `}}`"),
             Self::InvalidConversionFlag => write!(f, "invalid conversion character"),
-            Self::SingleRbrace => write!(f, "single '}}' is not allowed"),
+            Self::SingleRbrace => write!(f, "single `}}` is not allowed"),
             Self::UnterminatedString => write!(f, "unterminated string"),
             Self::UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
             Self::LambdaWithoutParentheses => {
@@ -95,10 +102,13 @@ impl std::fmt::Display for InterpolatedStringErrorType {
 }
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
+
+    /// An error specific to stringified annotations occurred.
+    StringAnnotationError(&'static str),
 
     /// An empty slice was found during parsing, e.g `data[]`.
     EmptySlice,
@@ -128,6 +138,8 @@ pub enum ParseErrorType {
     InvalidStarredExpressionUsage,
     /// A star pattern was found outside a sequence pattern.
     InvalidStarPatternUsage,
+    /// An underscore was used as a binding target in a match pattern.
+    InvalidMatchPatternTarget,
 
     /// A parameter was found after a vararg.
     ParamAfterVarKeywordParam,
@@ -193,6 +205,9 @@ pub enum ParseErrorType {
     TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
+
+    /// Parser aborted because [`crate::ParseOptions::max_recursion_depth`] was exceeded.
+    RecursionLimitExceeded,
 }
 
 impl ParseErrorType {
@@ -212,9 +227,10 @@ impl std::error::Error for ParseErrorType {}
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
+            ParseErrorType::OtherError(msg) => f.write_str(msg),
+            ParseErrorType::StringAnnotationError(msg) => f.write_str(msg),
             ParseErrorType::ExpectedToken { found, expected } => {
-                write!(f, "Expected {expected}, found {found}",)
+                write!(f, "Expected {expected}, found {found}")
             }
             ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
@@ -226,7 +242,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedTokenAfterAsync(kind) => {
                 write!(
                     f,
-                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
+                    "Expected `def`, `with` or `for` to follow `async`, found {kind}",
                 )
             }
             ParseErrorType::InvalidArgumentUnpackingOrder => {
@@ -280,14 +296,15 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Parameter without a default cannot follow a parameter with a default")
             }
             ParseErrorType::ExpectedKeywordParam => {
-                f.write_str("Expected one or more keyword parameter after '*' separator")
+                f.write_str("Expected one or more keyword parameter after `*` separator")
             }
             ParseErrorType::VarParameterWithDefault => {
-                f.write_str("Parameter with '*' or '**' cannot have default value")
+                f.write_str("Parameter with `*` or `**` cannot have default value")
             }
             ParseErrorType::InvalidStarPatternUsage => {
                 f.write_str("Star pattern cannot be used here")
             }
+            ParseErrorType::InvalidMatchPatternTarget => f.write_str("cannot use '_' as a target"),
             ParseErrorType::ExpectedRealNumber => {
                 f.write_str("Expected a real number in complex literal pattern")
             }
@@ -322,6 +339,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
+            ParseErrorType::RecursionLimitExceeded => f.write_str("Source is too deeply nested"),
         }
     }
 }
@@ -384,7 +402,7 @@ impl std::fmt::Display for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
@@ -468,7 +486,7 @@ impl std::fmt::Display for LexicalErrorType {
 ///
 /// An example of a version-related error is the use of a `match` statement before Python 3.10, when
 /// it was first introduced. See [`UnsupportedSyntaxErrorKind`] for other kinds of errors.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct UnsupportedSyntaxError {
     pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
@@ -483,28 +501,39 @@ impl Ranged for UnsupportedSyntaxError {
 }
 
 /// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum StarTupleKind {
     Return,
     Yield,
 }
 
 /// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum FStringKind {
     Backslash,
     Comment,
+    LineBreak,
     NestedQuote,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+/// The type of PEP 798 unpacking-comprehension error for
+/// [`UnsupportedSyntaxErrorKind::UnpackingInComprehension`].
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
+pub enum ComprehensionUnpackingKind {
+    IterableInList,
+    IterableInSet,
+    IterableInGenerator,
+    DictInDict,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnparenthesizedNamedExprKind {
     SequenceIndex,
     SetLiteral,
     SetComprehension,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
@@ -703,6 +732,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 695]: https://peps.python.org/pep-0695/
     /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
     TypeParameterList,
+    LazyImportStatement,
     TypeAliasStatement,
     TypeParamDefault,
 
@@ -723,6 +753,11 @@ pub enum UnsupportedSyntaxErrorKind {
     /// f'''A complex trick: {
     ///     bag['bag']  # recursive bags!
     /// }'''
+    ///
+    /// # line breaks in a non-triple-quoted replacement field
+    /// f"{
+    ///     1
+    /// }"
     ///
     /// # arbitrary nesting
     /// f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"
@@ -828,6 +863,33 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 646]: https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
     StarAnnotation,
+
+    /// Represents the use of iterable or dictionary unpacking inside a comprehension before Python
+    /// 3.15.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.15, comprehensions could not use iterable or dictionary unpacking in their
+    /// element expression:
+    ///
+    /// ```python
+    /// [*x for x in y]  # SyntaxError
+    /// {*x for x in y}  # SyntaxError
+    /// (*x for x in y)  # SyntaxError
+    /// {**d for d in dicts}  # SyntaxError
+    /// ```
+    ///
+    /// Starting with Python 3.15, [PEP 798] allows unpacking within comprehensions:
+    ///
+    /// ```python
+    /// [*x for x in y]
+    /// {*x for x in y}
+    /// (*x for x in y)
+    /// {**d for d in dicts}
+    /// ```
+    ///
+    /// [PEP 798]: https://peps.python.org/pep-0798/
+    UnpackingInComprehension(ComprehensionUnpackingKind),
 
     /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
     /// 3.9.
@@ -950,6 +1012,7 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use positional-only parameter separator"
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
+            UnsupportedSyntaxErrorKind::LazyImportStatement => "Cannot use `lazy` import statement",
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
@@ -959,6 +1022,9 @@ impl Display for UnsupportedSyntaxError {
             }
             UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
                 "Cannot use comments in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::LineBreak) => {
+                "Cannot use line breaks in non-triple-quoted f-string replacement fields"
             }
             UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
                 "Cannot reuse outer quote character in f-strings"
@@ -970,6 +1036,18 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use star expression in index"
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::IterableInList,
+            ) => "Cannot use iterable unpacking in a list comprehension",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::IterableInSet,
+            ) => "Cannot use iterable unpacking in a set comprehension",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::IterableInGenerator,
+            ) => "Cannot use iterable unpacking in a generator expression",
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(
+                ComprehensionUnpackingKind::DictInDict,
+            ) => "Cannot use dictionary unpacking in a dict comprehension",
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
@@ -988,7 +1066,7 @@ impl Display for UnsupportedSyntaxError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum RelaxedDecoratorError {
     CallExpression,
     Other(&'static str),
@@ -1031,6 +1109,7 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Removed(PythonVersion::PY38)
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::LazyImportStatement => Change::Added(PythonVersion::PY315),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
             UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
@@ -1041,6 +1120,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY311)
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::UnpackingInComprehension(_) => {
+                Change::Added(PythonVersion::PY315)
+            }
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
             }

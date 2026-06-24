@@ -8,14 +8,16 @@ use crate::session::{Client, Session};
 use crate::{DIAGNOSTIC_NAME, DocumentKey};
 use crate::{edit::DocumentVersion, server};
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, TextDocumentIdentifier, request as req};
+use lsp_types::{
+    self as types, ApplyWorkspaceEditRequest, ExecuteCommandRequest, TextDocumentIdentifier,
+};
 use serde::Deserialize;
 
 pub(crate) struct ExecuteCommand;
 
 #[derive(Deserialize)]
 struct Argument {
-    uri: types::Url,
+    uri: types::Uri,
     version: DocumentVersion,
 }
 
@@ -31,7 +33,7 @@ struct DebugCommandArgument {
 }
 
 impl super::RequestHandler for ExecuteCommand {
-    type RequestType = req::ExecuteCommand;
+    type RequestType = ExecuteCommandRequest;
 }
 
 impl super::SyncRequestHandler for ExecuteCommand {
@@ -46,10 +48,17 @@ impl super::SyncRequestHandler for ExecuteCommand {
         if command == SupportedCommand::Debug {
             // TODO: Currently we only use the first argument i.e., the first document that's
             // provided but we could expand this to consider all *open* documents.
-            let argument: DebugCommandArgument = params.arguments.into_iter().next().map_or_else(
-                || Ok(DebugCommandArgument::default()),
-                |value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams),
-            )?;
+            let argument: DebugCommandArgument = params
+                .arguments
+                .unwrap_or_default()
+                .into_iter()
+                .next()
+                .map_or_else(
+                    || Ok(DebugCommandArgument::default()),
+                    |value| {
+                        serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams)
+                    },
+                )?;
             return Ok(Some(serde_json::Value::String(
                 debug_information(session, argument.text_document)
                     .with_failure_code(ErrorCode::InternalError)?,
@@ -63,6 +72,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
 
         let mut arguments: Vec<Argument> = params
             .arguments
+            .unwrap_or_default()
             .into_iter()
             .map(|value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams))
             .collect::<server::Result<_>>()?;
@@ -89,7 +99,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
                 SupportedCommand::Format => {
-                    let fixes = super::format::format_full_document(&snapshot)?;
+                    let fixes = super::format::format_full_document(&snapshot, client)?;
                     edit_tracker
                         .set_fixes_for_document(fixes, version)
                         .with_failure_code(ErrorCode::InternalError)?;
@@ -130,11 +140,12 @@ fn apply_edit(
     label: &str,
     edit: types::WorkspaceEdit,
 ) -> crate::Result<()> {
-    client.send_request::<req::ApplyWorkspaceEdit>(
+    client.send_request::<ApplyWorkspaceEditRequest>(
         session,
         types::ApplyWorkspaceEditParams {
             label: Some(format!("{DIAGNOSTIC_NAME}: {label}")),
             edit,
+            metadata: None,
         },
         move |client, response| {
             if !response.applied {
@@ -196,7 +207,7 @@ config_path = {config_path:?}
 {settings}
             ",
             uri = uri.clone(),
-            kind = match session.key_from_url(uri) {
+            kind = match session.key_from_uri(uri) {
                 DocumentKey::Notebook(_) => "Notebook",
                 DocumentKey::NotebookCell(_) => "NotebookCell",
                 DocumentKey::Text(_) => "Text",

@@ -8,10 +8,10 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::TokenIterWithContext;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::Tokens;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::TokenIterWithContext;
-use ruff_python_parser::TokenKind;
-use ruff_python_parser::Tokens;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
@@ -21,7 +21,6 @@ use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
-use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Edit, Fix, Locator, Violation};
 
 /// Number of blank lines around top level classes and functions.
@@ -61,8 +60,9 @@ const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.2")]
 pub(crate) struct BlankLineBetweenMethods;
 
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
@@ -114,8 +114,9 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.2")]
 pub(crate) struct BlankLinesTopLevel {
     actual_blank_lines: u32,
     expected_blank_lines: u32,
@@ -181,8 +182,9 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.2")]
 pub(crate) struct TooManyBlankLines {
     actual_blank_lines: u32,
 }
@@ -229,6 +231,7 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E304.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.2")]
 pub(crate) struct BlankLineAfterDecorator {
     actual_blank_lines: u32,
 }
@@ -278,8 +281,9 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.2")]
 pub(crate) struct BlankLinesAfterFunctionOrClass {
     actual_blank_lines: u32,
 }
@@ -332,8 +336,9 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.2")]
 pub(crate) struct BlankLinesBeforeNestedDefinition;
 
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
@@ -694,14 +699,12 @@ pub(crate) struct BlankLinesChecker<'a, 'b> {
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
     context: &'a LintContext<'b>,
-    settings: &'a LinterSettings,
 }
 
 impl<'a, 'b> BlankLinesChecker<'a, 'b> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
-        settings: &'a LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         context: &'a LintContext<'b>,
@@ -712,7 +715,6 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             source_type,
             cell_offsets,
             context,
-            settings,
         }
     }
 
@@ -733,7 +735,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         let line_preprocessor = LinePreprocessor::new(
             tokens,
             self.locator,
-            self.settings.tab_size,
+            self.context.settings().tab_size,
             self.cell_offsets,
         );
 
@@ -840,7 +842,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
+            // Only for class scope: we must be inside a class block
             && matches!(state.class_status, Status::Inside(_))
+            // But NOT inside a function body; nested defs inside methods are handled by E306
+            && matches!(state.fn_status, Status::Outside | Status::CommentAfter(_))
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
@@ -879,7 +884,8 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                 // `isort` defaults to 2 if before a class or function definition (except in stubs where it is one) and 1 otherwise.
                 // Defaulting to 2 (or 1 in stubs) here is correct because the variable is only used when testing the
                 // blank lines before a class or function definition.
-                u32::try_from(self.settings.isort.lines_after_imports).unwrap_or(max_lines_level)
+                u32::try_from(self.context.settings().isort.lines_after_imports)
+                    .unwrap_or(max_lines_level)
             } else {
                 max_lines_level
             }
@@ -941,8 +947,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             (LogicalLineKind::Import, Follows::FromImport)
                 | (LogicalLineKind::FromImport, Follows::Import)
         ) {
-            max_lines_level
-                .max(u32::try_from(self.settings.isort.lines_between_types).unwrap_or(u32::MAX))
+            max_lines_level.max(
+                u32::try_from(self.context.settings().isort.lines_between_types)
+                    .unwrap_or(u32::MAX),
+            )
         } else {
             expected_blank_lines_before_definition
         };

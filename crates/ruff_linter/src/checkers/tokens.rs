@@ -4,9 +4,9 @@ use std::path::Path;
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::Tokens;
 
 use crate::Locator;
 use crate::directives::TodoComment;
@@ -16,7 +16,6 @@ use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
     flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
-use crate::settings::LinterSettings;
 
 use super::ast::LintContext;
 
@@ -27,7 +26,6 @@ pub(crate) fn check_tokens(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
-    settings: &LinterSettings,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     context: &mut LintContext,
@@ -42,15 +40,8 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesAfterFunctionOrClass,
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
-        BlankLinesChecker::new(
-            locator,
-            stylist,
-            settings,
-            source_type,
-            cell_offsets,
-            context,
-        )
-        .check_lines(tokens);
+        BlankLinesChecker::new(locator, stylist, source_type, cell_offsets, context)
+            .check_lines(tokens);
     }
 
     if context.is_rule_enabled(Rule::BlanketTypeIgnore) {
@@ -58,17 +49,17 @@ pub(crate) fn check_tokens(
     }
 
     if context.is_rule_enabled(Rule::EmptyComment) {
-        pylint::rules::empty_comments(context, comment_ranges, locator);
+        pylint::rules::empty_comments(context, comment_ranges, locator, indexer);
     }
 
     if context.is_rule_enabled(Rule::AmbiguousUnicodeCharacterComment) {
         for range in comment_ranges {
-            ruff::rules::ambiguous_unicode_character_comment(context, locator, range, settings);
+            ruff::rules::ambiguous_unicode_character_comment(context, locator, range);
         }
     }
 
     if context.is_rule_enabled(Rule::CommentedOutCode) {
-        eradicate::rules::commented_out_code(context, locator, comment_ranges, settings);
+        eradicate::rules::commented_out_code(context, locator, comment_ranges);
     }
 
     if context.is_rule_enabled(Rule::UTF8EncodingDeclaration) {
@@ -86,8 +77,49 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
+        let mut interpolated_string_depths: Vec<u32> = Vec::new();
+        let target_version = context
+            .settings()
+            .resolve_target_version(path)
+            .linter_version();
+
         for token in tokens {
-            pylint::rules::invalid_string_characters(context, token, locator);
+            match token.kind() {
+                TokenKind::FStringStart | TokenKind::TStringStart => {
+                    interpolated_string_depths.push(0);
+                }
+                TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                    interpolated_string_depths.pop();
+                }
+                TokenKind::Lbrace => {
+                    if let Some(depth) = interpolated_string_depths.last_mut() {
+                        *depth += 1;
+                    }
+                }
+                TokenKind::Rbrace => {
+                    if let Some(depth) = interpolated_string_depths.last_mut() {
+                        *depth = depth.saturating_sub(1);
+                    }
+                }
+                _ => {}
+            }
+
+            let inside_interpolation = match token.kind() {
+                // Middle tokens are literal text or format specs for the current f/t-string, where
+                // backslash escapes are valid. They can still be inside an outer interpolation.
+                TokenKind::FStringMiddle | TokenKind::TStringMiddle => interpolated_string_depths
+                    .split_last()
+                    .is_some_and(|(_, outer_depths)| outer_depths.iter().any(|depth| *depth > 0)),
+                _ => interpolated_string_depths.iter().any(|depth| *depth > 0),
+            };
+
+            pylint::rules::invalid_string_characters(
+                context,
+                token,
+                locator,
+                target_version,
+                inside_interpolation,
+            );
         }
     }
 
@@ -110,7 +142,7 @@ pub(crate) fn check_tokens(
         Rule::SingleLineImplicitStringConcatenation,
         Rule::MultiLineImplicitStringConcatenation,
     ]) {
-        flake8_implicit_str_concat::rules::implicit(context, tokens, locator, indexer, settings);
+        flake8_implicit_str_concat::rules::implicit(context, tokens, locator, indexer);
     }
 
     if context.any_rule_enabled(&[
@@ -125,8 +157,8 @@ pub(crate) fn check_tokens(
         pyupgrade::rules::extraneous_parentheses(context, tokens, locator);
     }
 
-    if source_type.is_stub() && context.is_rule_enabled(Rule::TypeCommentInStub) {
-        flake8_pyi::rules::type_comment_in_stub(context, locator, comment_ranges);
+    if context.is_rule_enabled(Rule::LegacyTypeComment) {
+        flake8_pyi::rules::legacy_type_comment(context, locator, comment_ranges, source_type);
     }
 
     if context.any_rule_enabled(&[

@@ -2,7 +2,6 @@ import MonacoEditor from "@monaco-editor/react";
 import { AstralButton, Theme } from "shared";
 import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
-import { loadPyodide, PyodideInterface } from "pyodide";
 import classNames from "classnames";
 
 export enum SecondaryTool {
@@ -18,6 +17,7 @@ export type SecondaryPanelResult =
 
 export interface SecondaryPanelProps {
   files: ReadonlyFiles;
+  onRun(): Promise<string>;
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
@@ -27,6 +27,7 @@ export default function SecondaryPanel({
   tool,
   result,
   files,
+  onRun,
   theme,
 }: SecondaryPanelProps) {
   return (
@@ -35,7 +36,7 @@ export default function SecondaryPanel({
         tool={tool}
         result={result}
         theme={theme}
-        files={files}
+        onRun={onRun}
         revision={files.revision}
       />
     </div>
@@ -43,14 +44,14 @@ export default function SecondaryPanel({
 }
 
 function Content({
-  files,
   tool,
   result,
   theme,
   revision,
+  onRun,
 }: {
   tool: SecondaryTool;
-  files: ReadonlyFiles;
+  onRun(): Promise<string>;
   revision: number;
   result: SecondaryPanelResult;
   theme: Theme;
@@ -71,11 +72,11 @@ function Content({
             break;
 
           case "Run":
-            return <Run theme={theme} files={files} key={`${revision}`} />;
+            return <Run theme={theme} onRun={onRun} key={`${revision}`} />;
         }
 
         return (
-          <div className="flex-grow">
+          <div className="flex grow">
             <MonacoEditor
               options={{
                 readOnly: true,
@@ -93,98 +94,23 @@ function Content({
         );
       case "error":
         return (
-          <div className="flex-grow">
-            <code className="whitespace-pre-wrap">{result.error}</code>
+          <div className="flex grow">
+            <code className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+              {result.error}
+            </code>
           </div>
         );
     }
   }
 }
 
-let pyodidePromise: Promise<PyodideInterface> | null = null;
+function Run({ onRun, theme }: { onRun(): Promise<string>; theme: Theme }) {
+  const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
+  const handleRun = () => {
+    setRunOutput(onRun());
+  };
 
-function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
-  if (pyodidePromise == null) {
-    pyodidePromise = loadPyodide();
-  }
-
-  return (
-    <Suspense
-      fallback={<div className="text-center dark:text-white">Loading</div>}
-    >
-      <RunWithPyiodide
-        theme={theme}
-        files={files}
-        pyodidePromise={pyodidePromise}
-      />
-    </Suspense>
-  );
-}
-
-function RunWithPyiodide({
-  files,
-  pyodidePromise,
-  theme,
-}: {
-  files: ReadonlyFiles;
-  theme: Theme;
-  pyodidePromise: Promise<PyodideInterface>;
-}) {
-  const pyodide = use(pyodidePromise);
-
-  const [output, setOutput] = useState<string | null>(null);
-
-  if (output == null) {
-    const handleRun = () => {
-      let combined_output = "";
-
-      const outputHandler = (output: string) => {
-        combined_output += output + "\n";
-      };
-
-      pyodide.setStdout({ batched: outputHandler });
-      pyodide.setStderr({ batched: outputHandler });
-
-      const main = files.selected == null ? "" : files.contents[files.selected];
-
-      let fileName = "main.py";
-      for (const file of files.index) {
-        pyodide.FS.writeFile(file.name, files.contents[file.id]);
-
-        if (file.id === files.selected) {
-          fileName = file.name;
-        }
-      }
-
-      const dict = pyodide.globals.get("dict");
-      const globals = dict();
-
-      try {
-        // Patch up reveal types
-        pyodide.runPython(`
-        import builtins
-
-        def reveal_type(obj):
-          import typing
-          print(f"Runtime value is '{obj}'")
-          return typing.reveal_type(obj)
-
-        builtins.reveal_type = reveal_type`);
-
-        pyodide.runPython(main, {
-          globals,
-          locals: globals,
-          filename: fileName,
-        });
-
-        setOutput(combined_output);
-      } catch (e) {
-        setOutput(`Failed to run Python script: ${e}`);
-      } finally {
-        globals.destroy();
-        dict.destroy();
-      }
-    };
+  if (runOutput == null) {
     return (
       <div className="flex flex-auto flex-col justify-center  items-center">
         <AstralButton
@@ -202,6 +128,25 @@ function RunWithPyiodide({
       </div>
     );
   }
+
+  return (
+    <Suspense
+      fallback={<div className="text-center dark:text-white">Loading</div>}
+    >
+      <RunOutput theme={theme} runOutput={runOutput} />
+    </Suspense>
+  );
+}
+
+function RunOutput({
+  runOutput,
+  theme,
+}: {
+  theme: Theme;
+  runOutput: Promise<string>;
+}) {
+  const output = use(runOutput);
+
   return (
     <pre
       className={classNames(

@@ -1,9 +1,13 @@
+use bitvec::prelude::{BitBox, BitVec};
+use get_size2::GetSize;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
+use regex_automata::util::pool::Pool;
 use ruff_db::system::SystemPath;
 use std::fmt::Formatter;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
+use std::sync::Arc;
 use tracing::warn;
 
 use crate::glob::portable::AbsolutePortableGlobPattern;
@@ -29,19 +33,58 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 ///
 /// Because of that, two filters that include the exact same files but were
 /// constructed from different patterns (or even just order) compare unequal.
-#[derive(Clone)]
+#[derive(Clone, get_size2::GetSize)]
 pub(crate) struct IncludeFilter {
+    #[get_size(ignore)]
     glob_set: GlobSet,
-    original_patterns: Box<[String]>,
+    original_patterns: Box<[Box<str>]>,
+    #[get_size(size_fn = bit_box_size)]
+    literal_pattern_indices: BitBox,
+    #[get_size(size_fn = dfa_memory_usage)]
     dfa: Option<dfa::dense::DFA<Vec<u32>>>,
+    #[get_size(ignore)]
+    matches: Arc<Pool<Vec<usize>>>,
+}
+
+fn bit_box_size(bits: &BitBox) -> usize {
+    bits.as_raw_slice().get_heap_size()
+}
+
+#[expect(clippy::ref_option)]
+fn dfa_memory_usage(dfa: &Option<dfa::dense::DFA<Vec<u32>>>) -> usize {
+    dfa.as_ref().map(dfa::dense::DFA::memory_usage).unwrap_or(0)
 }
 
 impl IncludeFilter {
     /// Whether the file matches any of the globs.
-    pub(crate) fn match_file(&self, path: impl AsRef<SystemPath>) -> bool {
+    pub(crate) fn match_file(&self, path: impl AsRef<SystemPath>) -> MatchFile {
         let path = path.as_ref();
 
-        self.glob_set.is_match(path)
+        if self.literal_pattern_indices.is_empty() {
+            return if self.glob_set.is_match(path) {
+                MatchFile::Pattern
+            } else {
+                MatchFile::No
+            };
+        }
+
+        let mut matches = self.matches.get();
+        self.glob_set.matches_into(path, &mut matches);
+
+        if matches.is_empty() {
+            MatchFile::No
+        } else {
+            for match_index in matches.iter() {
+                if self
+                    .literal_pattern_indices
+                    .get(*match_index)
+                    .is_some_and(|bit| *bit)
+                {
+                    return MatchFile::Literal;
+                }
+            }
+            MatchFile::Pattern
+        }
     }
 
     /// Check whether a directory or any of its children can be matched by any of the globs.
@@ -113,18 +156,36 @@ impl PartialEq for IncludeFilter {
 
 impl Eq for IncludeFilter {}
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum MatchFile {
+    No,
+    /// The file path matches the glob literally exactly. This is only the case for globs
+    /// that don't use any wildcards.
+    Literal,
+
+    /// The file path matches the glob pattern.
+    Pattern,
+}
+
+impl MatchFile {}
+
 #[derive(Debug)]
 pub(crate) struct IncludeFilterBuilder {
     set: GlobSetBuilder,
-    original_pattern: Vec<String>,
+    set_len: usize,
+    original_patterns: Vec<Box<str>>,
     regexes: Vec<String>,
+    /// Indices of literal patterns (contain no meta characters).
+    literal_pattern_indices: BitVec,
 }
 
 impl IncludeFilterBuilder {
     pub(crate) fn new() -> Self {
         Self {
+            literal_pattern_indices: BitVec::new(),
             set: GlobSetBuilder::new(),
-            original_pattern: Vec::new(),
+            set_len: 0,
+            original_patterns: Vec::new(),
             regexes: Vec::new(),
         }
     }
@@ -154,13 +215,14 @@ impl IncludeFilterBuilder {
             // No need to support Windows-style paths, so the backslash can be used a escape.
             .backslash_escape(true)
             .build()?;
-        self.original_pattern.push(input.relative().to_string());
+
+        self.original_patterns.push(input.relative().into());
 
         // `lib` is the same as `lib/**`
         // Add a glob that matches `lib` exactly, change the glob to `lib/**`.
         if glob_pattern.ends_with("**") {
             self.push_prefix_regex(&glob);
-            self.set.add(glob);
+            self.add_glob(glob);
         } else {
             let prefix_glob = GlobBuilder::new(&format!("{glob_pattern}/**"))
                 .literal_separator(true)
@@ -169,17 +231,29 @@ impl IncludeFilterBuilder {
                 .build()?;
 
             self.push_prefix_regex(&prefix_glob);
-            self.set.add(prefix_glob);
+            self.add_glob(prefix_glob);
 
             // The reason we add the exact glob, e.g. `src` when the original pattern was `src/` is
             // so that `match_file` returns true when matching against a file. However, we don't
             // need to do this if this is a pattern that should only match a directory (specifically, its contents).
             if !only_directory {
-                self.set.add(glob);
+                let is_literal_pattern = globset::escape(glob_pattern) == glob_pattern;
+
+                if is_literal_pattern {
+                    self.literal_pattern_indices.resize(self.set_len, false);
+                    self.literal_pattern_indices.push(true);
+                }
+
+                self.add_glob(glob);
             }
         }
 
         Ok(self)
+    }
+
+    fn add_glob(&mut self, glob: Glob) {
+        self.set.add(glob);
+        self.set_len += 1;
     }
 
     fn push_prefix_regex(&mut self, glob: &Glob) {
@@ -232,7 +306,9 @@ impl IncludeFilterBuilder {
         Ok(IncludeFilter {
             glob_set,
             dfa,
-            original_patterns: self.original_pattern.into(),
+            literal_pattern_indices: self.literal_pattern_indices.into_boxed_bitslice(),
+            original_patterns: self.original_patterns.into(),
+            matches: Arc::new(Pool::new(Vec::new)),
         })
     }
 }
@@ -241,7 +317,7 @@ impl IncludeFilterBuilder {
 mod tests {
     use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
-    use crate::glob::include::{IncludeFilter, IncludeFilterBuilder};
+    use crate::glob::include::{IncludeFilter, IncludeFilterBuilder, MatchFile};
     use crate::glob::{PortableGlobKind, PortableGlobPattern};
     use ruff_db::system::{MemoryFileSystem, walk_directory::WalkState};
 
@@ -319,33 +395,33 @@ mod tests {
             "files/*.py",
         ]);
 
-        assert!(filter.match_file("lib"));
-        assert!(filter.match_file("lib/more/test"));
+        assert_eq!(filter.match_file("lib"), MatchFile::Literal);
+        assert_eq!(filter.match_file("lib/more/test"), MatchFile::Pattern);
 
         // Unlike `directory`, `directory/` only includes a directory with the given name and its contents
-        assert!(!filter.match_file("directory"));
-        assert!(filter.match_file("directory/more/test"));
+        assert_eq!(filter.match_file("directory"), MatchFile::No);
+        assert_eq!(filter.match_file("directory/more/test"), MatchFile::Pattern);
 
         // Unlike `src`, `src/*` only includes a directory with the given name.
-        assert!(!filter.match_file("src"));
-        assert!(filter.match_file("src/more/test"));
+        assert_eq!(filter.match_file("src"), MatchFile::No);
+        assert_eq!(filter.match_file("src/more/test"), MatchFile::Pattern);
 
         // Unlike `tests`, `tests/**` only includes files under `tests`, but not a file named tests
-        assert!(!filter.match_file("tests"));
-        assert!(filter.match_file("tests/more/test"));
+        assert_eq!(filter.match_file("tests"), MatchFile::No);
+        assert_eq!(filter.match_file("tests/more/test"), MatchFile::Pattern);
 
         // Unlike `match_directory`, prefixes should not be included.
-        assert!(!filter.match_file("a"));
-        assert!(!filter.match_file("a/test-b"));
+        assert_eq!(filter.match_file("a"), MatchFile::No);
+        assert_eq!(filter.match_file("a/test-b"), MatchFile::No);
 
-        assert!(!filter.match_file("a/test-b/x"));
-        assert!(!filter.match_file("a/test"));
+        assert_eq!(filter.match_file("a/test-b/x"), MatchFile::No);
+        assert_eq!(filter.match_file("a/test"), MatchFile::No);
 
-        assert!(filter.match_file("files/a.py"));
-        assert!(filter.match_file("files/a.py/bcd"));
+        assert_eq!(filter.match_file("files/a.py"), MatchFile::Pattern);
+        assert_eq!(filter.match_file("files/a.py/bcd"), MatchFile::Pattern);
 
-        assert!(!filter.match_file("not_included"));
-        assert!(!filter.match_file("files/a.pi"));
+        assert_eq!(filter.match_file("not_included"), MatchFile::No);
+        assert_eq!(filter.match_file("files/a.pi"), MatchFile::No);
     }
 
     /// Check that we skip directories that can never match.

@@ -1,9 +1,18 @@
-use crate::server::{ConnectionInitializer, Server};
-use anyhow::Context;
-pub use document::{NotebookDocument, PositionEncoding, TextDocument};
-pub use session::{DocumentQuery, DocumentSnapshot, Session};
-use std::num::NonZeroUsize;
+use std::{num::NonZeroUsize, sync::Arc};
 
+use anyhow::Context;
+use lsp_server::Connection;
+use ruff_db::system::{OsSystem, SystemPathBuf};
+
+use crate::db::Db;
+pub use crate::logging::{LogLevel, init_logging};
+pub use crate::server::Server;
+pub use crate::session::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
+pub use document::{NotebookDocument, PositionEncoding, TextDocument};
+pub(crate) use session::Session;
+
+mod capabilities;
+mod db;
 mod document;
 mod logging;
 mod server;
@@ -17,11 +26,8 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 /// result type is needed.
 pub(crate) type Result<T> = anyhow::Result<T>;
 
-pub(crate) fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
-
 pub fn run_server() -> anyhow::Result<()> {
+    let _ = print_interactive_warning();
     let four = NonZeroUsize::new(4).unwrap();
 
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
@@ -29,9 +35,23 @@ pub fn run_server() -> anyhow::Result<()> {
         .unwrap_or(four)
         .min(four);
 
-    let (connection, io_threads) = ConnectionInitializer::stdio();
+    let (connection, io_threads) = Connection::stdio();
 
-    let server_result = Server::new(worker_threads, connection)
+    let cwd = {
+        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+            anyhow::anyhow!(
+                "The current working directory `{}` contains non-Unicode characters. \
+                    ty only supports Unicode paths.",
+                path.display()
+            )
+        })?
+    };
+
+    // This is to complement the `LSPSystem` if the document is not available in the index.
+    let fallback_system = Arc::new(OsSystem::new(cwd));
+
+    let server_result = Server::new(worker_threads, connection, fallback_system, false)
         .context("Failed to start server")?
         .run();
 
@@ -51,4 +71,21 @@ pub fn run_server() -> anyhow::Result<()> {
     }
 
     result
+}
+
+fn print_interactive_warning() -> std::io::Result<()> {
+    use std::io::{IsTerminal, Write};
+
+    if std::io::stdin().is_terminal() {
+        let mut stderr = std::io::stderr().lock();
+        writeln!(
+            stderr,
+            "WARNING: the ty LSP server should not be run interactively"
+        )?;
+        writeln!(
+            stderr,
+            "See https://docs.astral.sh/ty/editors/ for how to configure your editor"
+        )?;
+    }
+    Ok(())
 }

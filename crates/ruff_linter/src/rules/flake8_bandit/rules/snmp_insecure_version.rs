@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_extended_snmp_api_path_detection_enabled;
 
 /// ## What it does
 /// Checks for uses of SNMPv1 or SNMPv2.
@@ -31,6 +32,7 @@ use crate::checkers::ast::Checker;
 /// - [Cybersecurity and Infrastructure Security Agency (CISA): Alert TA17-156A](https://www.cisa.gov/news-events/alerts/2017/06/05/reducing-risk-snmp-abuse)
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct SnmpInsecureVersion;
 
 impl Violation for SnmpInsecureVersion {
@@ -46,10 +48,17 @@ pub(crate) fn snmp_insecure_version(checker: &Checker, call: &ast::ExprCall) {
         .semantic()
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["pysnmp", "hlapi", "CommunityData"]
-            )
+            if is_extended_snmp_api_path_detection_enabled(checker.settings()) {
+                matches!(
+                    qualified_name.segments(),
+                    ["pysnmp", "hlapi", .., "CommunityData"]
+                )
+            } else {
+                matches!(
+                    qualified_name.segments(),
+                    ["pysnmp", "hlapi", "CommunityData"]
+                )
+            }
         })
     {
         if let Some(keyword) = call.arguments.find_keyword("mpModel") {

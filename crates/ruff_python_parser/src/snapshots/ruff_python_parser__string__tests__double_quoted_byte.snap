@@ -5,17 +5,17 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..738,
             value: BytesLiteral(
                 ExprBytesLiteral {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..738,
                     value: BytesLiteralValue {
                         inner: Single(
                             BytesLiteral {
                                 range: 0..738,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 value: [
                                     0,
                                     1,
@@ -278,6 +278,7 @@ expression: suite
                                     quote_style: Double,
                                     prefix: Regular,
                                     triple_quoted: false,
+                                    unclosed: false,
                                 },
                             },
                         ),

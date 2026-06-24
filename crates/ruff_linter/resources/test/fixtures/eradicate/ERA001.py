@@ -89,3 +89,27 @@ print(1)
 # ///
 #
 # Foobar
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/19713,
+# https://github.com/astral-sh/ruff/issues/24186,
+# https://github.com/astral-sh/ruff/issues/25535
+
+# ty: ignore
+# ruff: ignore[ARG001]
+# ruff: file-ignore[ARG001]
+
+# mypy: ignore-errors
+# pyright: ignore-errors
+# pyrefly: ignore-errors
+# ty: ignore[unresolved-import]
+# pyrefly: ignore[unused-import]
+
+print(1)
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25116,
+# note the leading tab character
+def foo():
+	# testing: Foo Bar Baz
+	...

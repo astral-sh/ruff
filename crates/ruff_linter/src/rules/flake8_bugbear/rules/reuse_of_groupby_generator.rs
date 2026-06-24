@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 ///         do_something_with_the_group(values)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.260")]
 pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {
@@ -285,7 +286,9 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 }
                 if !self.overridden {
                     self.nested = true;
-                    visitor::walk_expr(self, key);
+                    if let Some(key) = key {
+                        visitor::walk_expr(self, key);
+                    }
                     visitor::walk_expr(self, value);
                     self.nested = false;
                 }

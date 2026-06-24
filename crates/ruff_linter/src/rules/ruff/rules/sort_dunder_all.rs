@@ -89,6 +89,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// iteration order of the items in `__all__`, in which case this
 /// rule's fix could theoretically cause breakage.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct UnsortedDunderAll;
 
 impl Violation for UnsortedDunderAll {

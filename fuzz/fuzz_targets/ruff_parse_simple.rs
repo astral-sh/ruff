@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use libfuzzer_sys::{fuzz_target, Corpus};
+use libfuzzer_sys::{Corpus, fuzz_target};
 use ruff_python_codegen::{Generator, Stylist};
-use ruff_python_parser::{parse_module, ParseError};
+use ruff_python_parser::{ParseError, parse_module};
 use ruff_text_size::Ranged;
 
 fn do_fuzz(case: &[u8]) -> Corpus {

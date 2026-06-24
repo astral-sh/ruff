@@ -1,5 +1,15 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use ruff_db::vendored::VendoredFileSystem;
 use std::sync::LazyLock;
+
+/// The source commit of the vendored typeshed.
+pub const SOURCE_COMMIT: &str =
+    include_str!("../../../crates/ty_vendored/vendor/typeshed/source_commit.txt").trim_ascii_end();
+
+static_assertions::const_assert_eq!(SOURCE_COMMIT.len(), 40);
 
 // The file path here is hardcoded in this crate's `build.rs` script.
 // Luckily this crate will fail to build if this file isn't available at build time.

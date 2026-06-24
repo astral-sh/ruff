@@ -34,9 +34,9 @@ class _:
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
-    reveal_type(a.x)  # revealed: Unknown | int | None
-    reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.x)  # revealed: int | None
+    reveal_type(a.y)  # revealed: None | Unknown
+    reveal_type(a.z)  # revealed: None | Unknown
 
 if False:
     a = A()
@@ -47,8 +47,8 @@ reveal_type(a.z)  # revealed: Literal[0]
 if True:
     a = A()
 reveal_type(a.x)  # revealed: int | None
-reveal_type(a.y)  # revealed: Unknown | None
-reveal_type(a.z)  # revealed: Unknown | None
+reveal_type(a.y)  # revealed: None | Unknown
+reveal_type(a.z)  # revealed: None | Unknown
 
 a.x = 0
 a.y = 0
@@ -60,8 +60,8 @@ reveal_type(a.z)  # revealed: Literal[0]
 class _:
     a = A()
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None | Unknown
+    reveal_type(a.z)  # revealed: None | Unknown
 
 def cond() -> bool:
     return True
@@ -76,16 +76,16 @@ class _:
     if cond():
         a = A()
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None | Unknown
+    reveal_type(a.z)  # revealed: None | Unknown
 
 class _:
     a = A()
 
     class Inner:
         reveal_type(a.x)  # revealed: int | None
-        reveal_type(a.y)  # revealed: Unknown | None
-        reveal_type(a.z)  # revealed: Unknown | None
+        reveal_type(a.y)  # revealed: None | Unknown
+        reveal_type(a.z)  # revealed: None | Unknown
 
 a = A()
 # error: [unresolved-attribute]
@@ -96,7 +96,7 @@ reveal_type(a.dynamically_added)  # revealed: Literal[0]
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
-reveal_type(does.nt.exist)  # revealed: Unknown
+reveal_type(does.nt.exist)  # revealed: Literal[0]
 ```
 
 ### Narrowing chain
@@ -135,9 +135,9 @@ a.b = B()
 reveal_type(a.b)  # revealed: B
 reveal_type(a.b.c1)  # revealed: C | None
 reveal_type(a.b.c2)  # revealed: C | None
-# error: [possibly-unbound-attribute]
+# error: [unresolved-attribute]
 reveal_type(a.b.c1.d)  # revealed: D | None
-# error: [possibly-unbound-attribute]
+# error: [unresolved-attribute]
 reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
@@ -206,30 +206,26 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-# TODO: should be ChainMap[int, int]
-reveal_type(cm)  # revealed: ChainMap[Unknown, Unknown]
+reveal_type(cm)  # revealed: ChainMap[int, int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
 reveal_type(b[0])  # revealed: Literal[0]
 reveal_type(dd[0])  # revealed: Literal[0]
-# TODO: should be Literal[0]
-reveal_type(cm[0])  # revealed: Unknown
+reveal_type(cm[0])  # revealed: Literal[0]
 
 class C:
     reveal_type(l[0])  # revealed: Literal[0]
     reveal_type(d[0])  # revealed: Literal[0]
     reveal_type(b[0])  # revealed: Literal[0]
     reveal_type(dd[0])  # revealed: Literal[0]
-    # TODO: should be Literal[0]
-    reveal_type(cm[0])  # revealed: Unknown
+    reveal_type(cm[0])  # revealed: Literal[0]
 
 [reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(d[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(b[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(dd[0]) for _ in range(1)]  # revealed: Literal[0]
-# TODO: should be Literal[0]
-[reveal_type(cm[0]) for _ in range(1)]  # revealed: Unknown
+[reveal_type(cm[0]) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
     reveal_type(l[0])  # revealed: int | None
@@ -244,19 +240,18 @@ class D(TypedDict):
 
 td = D(x=1, label="a")
 td["x"] = 0
-# TODO: should be Literal[0]
-reveal_type(td["x"])  # revealed: @Todo(TypedDict)
+reveal_type(td["x"])  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does["not"]["exist"] = 0
 # error: [unresolved-reference]
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 
-non_subscriptable = 1
-# error: [non-subscriptable]
-non_subscriptable[0] = 0
-# error: [non-subscriptable]
-reveal_type(non_subscriptable[0])  # revealed: Unknown
+not_subscriptable = 1
+# error: [invalid-assignment]
+not_subscriptable[0] = 0
+# error: [not-subscriptable]
+reveal_type(not_subscriptable[0])  # revealed: Unknown
 ```
 
 ### No narrowing for custom classes with arbitrary `__getitem__` / `__setitem__`
@@ -283,6 +278,8 @@ reveal_type(c[0])  # revealed: str
 ## Complex target
 
 ```py
+from typing import Any
+
 class A:
     x: list[int | None] = []
 
@@ -299,11 +296,33 @@ class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
 
 def _():
-    # error: [possibly-unbound-attribute]
-    reveal_type(b.a.x[0])  # revealed: Unknown | int | None
-    # error: [possibly-unbound-attribute]
-    reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
-    reveal_type(b.a)  # revealed: Unknown | A | None
+    # error: [unresolved-attribute]
+    reveal_type(b.a.x[0])  # revealed: int | None
+    # error: [unresolved-attribute]
+    reveal_type(b.a.x)  # revealed: list[int | None]
+    reveal_type(b.a)  # revealed: A | None
+
+class D: ...
+
+class E:
+    def __init__(self):
+        self.d = D()
+
+class F:
+    def __init__(self):
+        self.e = E()
+
+class Mock(Any): ...
+
+f = F()
+reveal_type(f.e)  # revealed: E
+f.e = Mock()
+reveal_type(f.e)  # revealed: Mock
+
+f2 = F()
+reveal_type(f2.e.d)  # revealed: D
+f2.e.d = Mock()
+reveal_type(f2.e.d)  # revealed: Mock
 ```
 
 ## Invalid assignments are not used for narrowing
@@ -318,7 +337,7 @@ def f(c: C, s: str):
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
 
-    # TODO: This assignment is invalid and should result in an error.
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `str` on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int
 ```

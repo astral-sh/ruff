@@ -19,3 +19,11 @@ try:
     pass
 except (*list_exceptions,):
     pass
+
+try:
+    ...
+except (
+        ValueError,
+        # text
+        ):
+    ...

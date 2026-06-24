@@ -4,6 +4,9 @@ use lsp_server::Connection;
 use lsp_types as types;
 use lsp_types::InitializeParams;
 use lsp_types::MessageType;
+use lsp_types::NotebookCellLanguage;
+use lsp_types::NotebookDocumentFilterWithCells;
+use lsp_types::WorkspaceFoldersInitializeParams;
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
 use std::str::FromStr;
@@ -12,21 +15,17 @@ use types::ClientCapabilities;
 use types::CodeActionKind;
 use types::CodeActionOptions;
 use types::DiagnosticOptions;
-use types::NotebookCellSelector;
 use types::NotebookDocumentSyncOptions;
-use types::NotebookSelector;
-use types::OneOf;
-use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
 use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
-pub(crate) use self::connection::ConnectionInitializer;
-pub use self::connection::ConnectionSender;
+pub use self::connection::ConnectionInitializer;
+pub(crate) use self::connection::ConnectionSender;
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-pub use crate::server::main_loop::MainLoopSender;
+pub(crate) use crate::server::main_loop::MainLoopSender;
 pub(crate) use crate::server::main_loop::{Event, MainLoopReceiver};
 use crate::session::{AllOptions, Client, Session};
 use crate::workspace::Workspaces;
@@ -49,10 +48,11 @@ pub struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
+    pub fn new(
         worker_threads: NonZeroUsize,
         connection: ConnectionInitializer,
         preview: Option<bool>,
+        is_test: bool,
     ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
 
@@ -72,7 +72,8 @@ impl Server {
 
         let InitializeParams {
             initialization_options,
-            workspace_folders,
+            workspace_folders_initialize_params:
+                WorkspaceFoldersInitializeParams { workspace_folders },
             ..
         } = init_params;
 
@@ -92,10 +93,12 @@ impl Server {
             workspace: workspace_options,
         } = all_options;
 
-        crate::logging::init_logging(
-            global_options.tracing.log_level.unwrap_or_default(),
-            global_options.tracing.log_file.as_deref(),
-        );
+        if !is_test {
+            crate::logging::init_logging(
+                global_options.tracing.log_level.unwrap_or_default(),
+                global_options.tracing.log_file.as_deref(),
+            );
+        }
 
         let workspaces = Workspaces::from_workspace_folders(
             workspace_folders,
@@ -150,7 +153,7 @@ impl Server {
     fn server_capabilities(position_encoding: PositionEncoding) -> types::ServerCapabilities {
         types::ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
-            code_action_provider: Some(types::CodeActionProviderCapability::Options(
+            code_action_provider: Some(
                 CodeActionOptions {
                     code_action_kinds: Some(
                         SupportedCodeAction::all()
@@ -161,18 +164,21 @@ impl Server {
                         work_done_progress: Some(true),
                     },
                     resolve_provider: Some(true),
-                },
-            )),
-            workspace: Some(types::WorkspaceServerCapabilities {
+                    documentation: None,
+                }
+                .into(),
+            ),
+            workspace: Some(types::WorkspaceOptions {
                 workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                     supported: Some(true),
-                    change_notifications: Some(OneOf::Left(true)),
+                    change_notifications: Some(true.into()),
                 }),
                 file_operations: None,
+                text_document_content: None,
             }),
-            document_formatting_provider: Some(OneOf::Left(true)),
-            document_range_formatting_provider: Some(OneOf::Left(true)),
-            diagnostic_provider: Some(types::DiagnosticServerCapabilities::Options(
+            document_formatting_provider: Some(true.into()),
+            document_range_formatting_provider: Some(true.into()),
+            diagnostic_provider: Some(
                 DiagnosticOptions {
                     identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                     // multi-file analysis could change this
@@ -181,8 +187,9 @@ impl Server {
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
                     },
-                },
-            )),
+                }
+                .into(),
+            ),
             execute_command_provider: Some(types::ExecuteCommandOptions {
                 commands: SupportedCommand::all()
                     .map(|command| command.identifier().to_string())
@@ -191,26 +198,32 @@ impl Server {
                     work_done_progress: Some(false),
                 },
             }),
-            hover_provider: Some(types::HoverProviderCapability::Simple(true)),
-            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
-                save: Some(false),
-                notebook_selector: [NotebookSelector::ByCells {
-                    notebook: None,
-                    cells: vec![NotebookCellSelector {
-                        language: "python".to_string(),
-                    }],
-                }]
-                .to_vec(),
-            })),
-            text_document_sync: Some(TextDocumentSyncCapability::Options(
+            hover_provider: Some(true.into()),
+            notebook_document_sync: Some(
+                NotebookDocumentSyncOptions {
+                    save: Some(false),
+                    notebook_selector: vec![
+                        NotebookDocumentFilterWithCells {
+                            notebook: None,
+                            cells: vec![NotebookCellLanguage {
+                                language: "python".to_string(),
+                            }],
+                        }
+                        .into(),
+                    ],
+                }
+                .into(),
+            ),
+            text_document_sync: Some(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
-                    change: Some(TextDocumentSyncKind::INCREMENTAL),
+                    change: Some(TextDocumentSyncKind::Incremental),
                     will_save: Some(false),
                     will_save_wait_until: Some(false),
-                    ..Default::default()
-                },
-            )),
+                    save: None,
+                }
+                .into(),
+            ),
             ..Default::default()
         }
     }
@@ -243,7 +256,7 @@ impl SupportedCodeAction {
     /// Returns the LSP code action kind that map to this code action.
     fn to_kind(self) -> CodeActionKind {
         match self {
-            Self::QuickFix => CodeActionKind::QUICKFIX,
+            Self::QuickFix => CodeActionKind::QuickFix,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
             Self::NotebookSourceFixAll => crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF,
@@ -357,7 +370,7 @@ impl ServerPanicHookHandler {
                 client
                     .show_message(
                         "The Ruff language server exited with a panic. See the logs for more details.",
-                        MessageType::ERROR,
+                        MessageType::Error,
                     )
                     .ok();
             }

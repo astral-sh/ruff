@@ -1,4 +1,4 @@
-use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_parser::{ParseError, parse_expression};
 
 #[track_caller]
@@ -22,6 +22,32 @@ fn assert_noncomparable(left: &str, right: &str) -> Result<(), ParseError> {
     let right_compr = ComparableExpr::from(right_parsed.expr());
 
     assert_ne!(left_compr, right_compr);
+    Ok(())
+}
+
+#[track_caller]
+fn assert_hashable_equal(left: &str, right: &str) -> Result<(), ParseError> {
+    let left_parsed = parse_expression(left)?;
+    let right_parsed = parse_expression(right)?;
+
+    assert_eq!(
+        HashableExpr::from(left_parsed.expr()),
+        HashableExpr::from(right_parsed.expr())
+    );
+
+    Ok(())
+}
+
+#[track_caller]
+fn assert_hashable_unequal(left: &str, right: &str) -> Result<(), ParseError> {
+    let left_parsed = parse_expression(left)?;
+    let right_parsed = parse_expression(right)?;
+
+    assert_ne!(
+        HashableExpr::from(left_parsed.expr()),
+        HashableExpr::from(right_parsed.expr())
+    );
+
     Ok(())
 }
 
@@ -51,26 +77,10 @@ fn concatenated_fstrings_compare_equal() -> Result<(), ParseError> {
 
 #[test]
 fn concatenated_tstrings_compare_equal() -> Result<(), ParseError> {
-    let split_contents = r#"t"{foo!r} this" r"\n raw" t" and {bar!s} that""#;
+    let split_contents = r#"t"{foo!r} this" rt"\n raw" t" and {bar!s} that""#;
     let value_contents = r#"t"{foo!r} this\\n raw and {bar!s} that""#;
 
     assert_comparable(split_contents, value_contents)
-}
-
-#[test]
-fn concatenated_f_and_t_strings_interwoven_compare_equal() -> Result<(), ParseError> {
-    let split_contents = r#"f"{foo} this " t"{bar}" "baz""#;
-    let value_contents = r#"f"{foo}" t" this {bar}" "baz""#;
-
-    assert_comparable(split_contents, value_contents)
-}
-
-#[test]
-fn concatenated_f_and_t_strings_compare_unequal_when_swapped() -> Result<(), ParseError> {
-    let f_then_t_contents = r#"f"{foo!r} this" r"\n raw" t" and {bar!s} that""#;
-    let t_then_f_contents = r#"t"{foo!r} this" r"\n raw" f" and {bar!s} that""#;
-
-    assert_noncomparable(f_then_t_contents, t_then_f_contents)
 }
 
 #[test]
@@ -82,9 +92,28 @@ fn t_strings_literal_order_matters_compare_unequal() -> Result<(), ParseError> {
 }
 
 #[test]
-fn t_strings_empty_concat_equal() -> Result<(), ParseError> {
-    let empty_literal = r#""" t"hey{foo}""#;
-    let empty_f_string = r#"f""t"hey{foo}""#;
+fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
+    assert_hashable_equal("2", "2.0")?;
+    assert_hashable_equal("-1", "-1.0")?;
+    assert_hashable_equal("2", "2 + 0j")?;
+    assert_hashable_equal("1j", "0 + 1j")?;
+    assert_hashable_equal("9007199254740992", "9007199254740992.0")?;
+    assert_hashable_equal("9007199254740992", "9007199254740993 + 0j")?;
+    assert_hashable_equal("(2,)", "(2.0,)")?;
 
-    assert_comparable(empty_literal, empty_f_string)
+    assert_hashable_unequal("9007199254740993", "9007199254740992.0")?;
+    assert_hashable_unequal("9007199254740993", "9007199254740993 + 0j")?;
+    assert_hashable_unequal("18446744073709551615", "18446744073709551616.0")?;
+
+    Ok(())
+}
+
+#[test]
+fn large_integers_fall_back_to_structural_comparison() -> Result<(), ParseError> {
+    assert_hashable_unequal("18446744073709551616", "0x10000000000000000")
+}
+
+#[test]
+fn dynamic_tuple_elements_do_not_compare_by_value() -> Result<(), ParseError> {
+    assert_hashable_unequal("(f(), 2)", "(f(), 2.0)")
 }

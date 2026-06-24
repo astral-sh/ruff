@@ -22,13 +22,28 @@ def _(flag: bool):
 
     reveal_type(A.always_bound)  # revealed: int
 
-    reveal_type(A.union)  # revealed: Unknown | Literal[1, "abc"]
+    reveal_type(A.union)  # revealed: int | str
 
     reveal_type(A.union_declared)  # revealed: int | str
 
-    # error: [possibly-unbound-attribute] "Attribute `possibly_unbound` on type `<class 'A'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `possibly_unbound` may be missing on class `A`"
     reveal_type(A.possibly_unbound)  # revealed: str
 
-    # error: [unresolved-attribute] "Type `<class 'A'>` has no attribute `non_existent`"
+    # error: [unresolved-attribute] "Class `A` has no attribute `non_existent`"
     reveal_type(A.non_existent)  # revealed: Unknown
+```
+
+## Walrus attribute access after later rebinding
+
+```py
+class IntBox:
+    attr: int
+
+class StrBox:
+    attr: str
+
+def f() -> None:
+    (box := IntBox()).attr = 1
+    box = StrBox()
+    reveal_type(box.attr)  # revealed: str
 ```

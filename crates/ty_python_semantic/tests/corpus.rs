@@ -1,18 +1,23 @@
+use std::sync::Arc;
+
 use anyhow::{Context, anyhow};
-use ruff_db::Upcast;
+use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
+use ty_module_resolver::SearchPathSettings;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{
-    Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry,
-};
+use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
+use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
+use ty_python_core::Db as _;
 
 fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
     Ok(SystemPathBuf::from(String::from_utf8(
@@ -79,8 +84,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
     let mut db = CorpusDb::new();
-    db.memory_file_system()
-        .create_directory_all(root.as_ref())?;
+    db.memory_file_system().create_directory_all(&root)?;
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
@@ -116,13 +120,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             .with_context(|| format!("Failed to read test file: {path}"))?;
 
         let mut check_with_file_name = |path: &SystemPath| {
-            if relative_path.file_name() == Some("types.pyi") {
-                println!(
-                    "Skipping {relative_path:?}: paths with `types.pyi` as their final segment cause a stack overflow"
-                );
-                return;
-            }
-
             db.memory_file_system().write_file_all(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
@@ -176,9 +173,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // Fails with too-many-cycle-iterations due to a self-referential
-    // type alias, see https://github.com/astral-sh/ty/issues/256
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
 ];
 
 #[salsa::db]
@@ -189,6 +183,7 @@ pub struct CorpusDb {
     rule_selection: RuleSelection,
     system: TestSystem,
     vendored: VendoredFileSystem,
+    analysis_settings: Arc<AnalysisSettings>,
 }
 
 impl CorpusDb {
@@ -200,20 +195,22 @@ impl CorpusDb {
             vendored: ty_vendored::file_system().clone(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
+            analysis_settings: Arc::new(AnalysisSettings::default()),
         };
 
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource {
+                python_version: PythonVersionWithSource {
                     version: PythonVersion::latest_ty(),
                     source: PythonVersionSource::default(),
-                }),
+                },
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![]),
+                search_paths: SearchPathSettings::new(vec![])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .unwrap(),
             },
-        )
-        .unwrap();
+        );
 
         db
     }
@@ -248,19 +245,28 @@ impl ruff_db::Db for CorpusDb {
     }
 }
 
-impl Upcast<dyn ruff_db::Db> for CorpusDb {
-    fn upcast(&self) -> &(dyn ruff_db::Db + 'static) {
-        self
+#[salsa::db]
+impl ty_module_resolver::Db for CorpusDb {
+    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+        Program::get(self).search_paths(self)
     }
-    fn upcast_mut(&mut self) -> &mut (dyn ruff_db::Db + 'static) {
-        self
+}
+
+#[salsa::db]
+impl ty_python_core::Db for CorpusDb {
+    fn should_check_file(&self, file: File) -> bool {
+        !file.path(self).is_vendored_path()
     }
 }
 
 #[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
-    fn is_file_open(&self, file: File) -> bool {
-        !file.path(self).is_vendored_path()
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if self.should_check_file(file) {
+            check_file_unwrap(self, file)
+        } else {
+            Vec::new()
+        }
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -269,6 +275,18 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
+    }
+
+    fn verbose(&self) -> bool {
+        false
+    }
+
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
+        &self.analysis_settings
+    }
+
+    fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+        Box::new(self.clone())
     }
 }
 

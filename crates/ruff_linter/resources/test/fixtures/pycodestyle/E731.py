@@ -190,3 +190,12 @@ foo_tooltip = (
     more
 
 )
+
+# https://github.com/astral-sh/ruff/issues/20097
+def scope():
+    from collections.abc import Callable
+    from typing import ParamSpec
+
+    P = ParamSpec("P")
+    f1: Callable[P, str] = lambda x: str(x)
+    f2: Callable[..., str] = lambda x: str(x)

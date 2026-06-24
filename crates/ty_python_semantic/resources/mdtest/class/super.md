@@ -14,10 +14,20 @@ common usage.
 
 ### Explicit Super Object
 
+<!-- snapshot-diagnostics -->
+
 `super(pivot_class, owner)` performs attribute lookup along the MRO, starting immediately after the
 specified pivot class.
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
+from __future__ import annotations
+from ty_extensions import reveal_mro
+
 class A:
     def a(self): ...
     aa: int = 1
@@ -30,25 +40,19 @@ class C(B):
     def c(self): ...
     cc: int = 3
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
 super(C, C()).a
 super(C, C()).b
-# error: [unresolved-attribute] "Type `<super: <class 'C'>, C>` has no attribute `c`"
-super(C, C()).c
+super(C, C()).c  # error: [unresolved-attribute]
 
 super(B, C()).a
-# error: [unresolved-attribute] "Type `<super: <class 'B'>, C>` has no attribute `b`"
-super(B, C()).b
-# error: [unresolved-attribute] "Type `<super: <class 'B'>, C>` has no attribute `c`"
-super(B, C()).c
+super(B, C()).b  # error: [unresolved-attribute]
+super(B, C()).c  # error: [unresolved-attribute]
 
-# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `a`"
-super(A, C()).a
-# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `b`"
-super(A, C()).b
-# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `c`"
-super(A, C()).c
+super(A, C()).a  # error: [unresolved-attribute]
+super(A, C()).b  # error: [unresolved-attribute]
+super(A, C()).c  # error: [unresolved-attribute]
 
 reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
 reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
@@ -56,11 +60,103 @@ reveal_type(super(C, C()).aa)  # revealed: int
 reveal_type(super(C, C()).bb)  # revealed: int
 ```
 
+Examples of explicit `super()` with unusual types. We allow almost any type to be passed as the
+second argument to `super()` -- the only exceptions are "pure abstract" types such as `Callable` and
+synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`object` nominal type.
+
+```py
+import types
+from typing_extensions import Callable, TypeIs, Literal, NewType, TypedDict
+
+def f(): ...
+
+class Foo[T]:
+    def method(self): ...
+    @property
+    def some_property(self): ...
+
+type Alias = int
+
+class SomeTypedDict(TypedDict):
+    x: int
+    y: bytes
+
+N = NewType("N", int)
+
+# revealed: <super: <class 'object'>, FunctionType>
+reveal_type(super(object, f))
+# revealed: <super: <class 'object'>, WrapperDescriptorType>
+reveal_type(super(object, types.FunctionType.__get__))
+# revealed: <super: <class 'object'>, GenericAlias>
+reveal_type(super(object, Foo[int]))
+# revealed: <super: <class 'object'>, _SpecialForm>
+reveal_type(super(object, Literal))
+# revealed: <super: <class 'object'>, TypeAliasType>
+reveal_type(super(object, Alias))
+# revealed: <super: <class 'object'>, MethodType>
+reveal_type(super(object, Foo().method))
+# revealed: <super: <class 'object'>, property>
+reveal_type(super(object, Foo.some_property))
+# revealed: <super: <class 'object'>, int>
+reveal_type(super(object, N(42)))
+
+def g(x: object) -> TypeIs[list[object]]:
+    return isinstance(x, list)
+
+def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
+    if hasattr(x, "bar"):
+        # revealed: <Protocol with members 'bar'>
+        reveal_type(x)
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super(object, x))
+
+    # error: [invalid-super-argument]
+    # revealed: Unknown
+    reveal_type(super(object, z))
+
+    is_list = g(x)
+    # revealed: TypeIs[list[object] @ x]
+    reveal_type(is_list)
+    # revealed: <super: <class 'object'>, bool>
+    reveal_type(super(object, is_list))
+
+    # revealed: <super: <class 'object'>, dict[Literal["x", "y"], int | bytes]>
+    reveal_type(super(object, y))
+
+# The first argument to `super()` must be an actual class object;
+# instances of `GenericAlias` are not accepted at runtime:
+#
+# error: [invalid-super-argument]
+# revealed: Unknown
+reveal_type(super(list[int], []))
+```
+
+`super(pivot_class, owner)` can be called from inside methods, just like single-argument `super()`:
+
+```py
+class Super:
+    def method(self) -> int:
+        return 42
+
+class Sub(Super):
+    def method(self: Sub) -> int:
+        # revealed: <super: <class 'Sub'>, Sub>
+        return reveal_type(super(self.__class__, self)).method()
+```
+
 ### Implicit Super Object
+
+<!-- snapshot-diagnostics -->
 
 The implicit form `super()` is same as `super(__class__, <first argument>)`. The `__class__` refers
 to the class that contains the function where `super()` is used. The first argument refers to the
 current method’s first parameter (typically `self` or `cls`).
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from __future__ import annotations
@@ -72,18 +168,196 @@ class A:
 
 class B(A):
     def __init__(self, a: int):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, B>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, Self@__init__>
+        reveal_type(super(object, super()))  # revealed: <super: <class 'object'>, super>
         super().__init__(a)
 
     @classmethod
     def f(cls):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, type[Self@f]>
         super().f()
 
 super(B, B(42)).__init__(42)
 super(B, B).f()
+```
+
+Some examples with unusual annotations for `self` or `cls`:
+
+```py
+import enum
+from typing import Any, Self, Never, Protocol, Callable
+from ty_extensions import Intersection
+
+class BuilderMeta(type):
+    def __new__(
+        cls: type[Any],
+        name: str,
+        bases: tuple[type, ...],
+        dct: dict[str, Any],
+    ) -> BuilderMeta:
+        # revealed: <super: <class 'BuilderMeta'>, Any>
+        s = reveal_type(super())
+        # revealed: Any
+        return reveal_type(s.__new__(cls, name, bases, dct))
+
+class BuilderMeta2(type):
+    def __new__(
+        cls: type[BuilderMeta2],
+        name: str,
+        bases: tuple[type, ...],
+        dct: dict[str, Any],
+    ) -> BuilderMeta2:
+        # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
+        s = reveal_type(super())
+        return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
+
+class Foo[T]:
+    x: T
+
+    def method(self: Any):
+        reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
+
+        if isinstance(self, Foo):
+            reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
+
+    def method2(self: Foo[T]):
+        # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
+        reveal_type(super())
+
+    def method3(self: Foo):  # error: [missing-type-argument]
+        # revealed: <super: <class 'Foo'>, Foo[Unknown]>
+        reveal_type(super())
+
+    def method4(self: Self):
+        # revealed: <super: <class 'Foo'>, Self@method4>
+        reveal_type(super())
+
+    def method5[S: Foo[int]](self: S, other: S) -> S:
+        # revealed: <super: <class 'Foo'>, S@method5>
+        reveal_type(super())
+        return self
+
+    def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
+        # revealed: <super: <class 'Foo'>, S@method6> | <super: <class 'Foo'>, S@method6>
+        reveal_type(super())
+        return self
+
+    def method7[S](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+    def method8[S: int](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+    def method9[S: (int, str)](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+
+    def method10[S: Callable[..., str]](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+    # TypeVar bounded by `type[Foo]` rather than `Foo`
+    # TODO: Should error on signature - `self` is annotated as a class type, not an instance type
+    def method11[S: type[Foo[int]]](self: S, other: S) -> S:
+        # Delegates to the bound to resolve the super type
+        reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
+        return self
+    # TypeVar bounded by `type[Foo]`, used in `type[T]` position
+    # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
+    # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
+    @classmethod
+    def method12[S: type[Foo[int]]](cls: type[S]) -> S:
+        reveal_type(super())  # revealed: <super: <class 'Foo'>, Unknown>
+        raise NotImplementedError
+
+type Alias = Bar
+
+class Bar:
+    def method(self: Alias):
+        # revealed: <super: <class 'Bar'>, Bar>
+        reveal_type(super())
+
+    def pls_dont_call_me(self: Never):
+        # revealed: <super: <class 'Bar'>, Unknown>
+        reveal_type(super())
+
+    def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+        # revealed: <super: <class 'Bar'>, Bar>
+        reveal_type(super())
+
+class P(Protocol):
+    def method(self: P):
+        # revealed: <super: <class 'P'>, P>
+        reveal_type(super())
+
+class E(enum.Enum):
+    X = 1
+
+    def method(self: E):
+        match self:
+            case E.X:
+                # revealed: <super: <class 'E'>, E>
+                reveal_type(super())
+```
+
+### Metaclasses
+
+When the second argument to `super()` is a class object, the call can still be valid if that class
+object is an instance of the pivot metaclass. This includes both concrete class objects and
+`type[T]`-style annotations in metaclass methods:
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Any, TypeVar
+
+_TMeta = TypeVar("_TMeta", bound="BaseWithMeta")
+
+class MetaBase(type):
+    meta_base_value: int = 1
+
+    def plain(self: type[_TMeta]) -> type[_TMeta]:
+        return self
+
+class Meta(MetaBase):
+    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+        reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
+        reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
+        return super().__call__(*args, **kwargs)
+
+class BaseWithMeta(metaclass=Meta):
+    pass
+
+class SubWithMeta(BaseWithMeta):
+    def extra(self) -> int:
+        return 42
+
+reveal_type(SubWithMeta())  # revealed: SubWithMeta
+SubWithMeta().extra()
+reveal_type(super(Meta, BaseWithMeta).meta_base_value)  # revealed: int
+
+class OtherMeta(type):
+    pass
+
+class OtherBase(metaclass=OtherMeta):
+    pass
+
+super(Meta, OtherBase)  # error: [invalid-super-argument]
+
+T = TypeVar("T", bound=int)
+
+class BoundIntMeta(type):
+    def __call__(cls: type[T]) -> T:
+        return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```
 
 ### Unbound Super Object
@@ -99,7 +373,7 @@ class B(A): ...
 
 reveal_type(super(B))  # revealed: super
 
-# error: [unresolved-attribute] "Type `super` has no attribute `a`"
+# error: [unresolved-attribute] "Object of type `super` has no attribute `a`"
 super(B).a
 ```
 
@@ -149,15 +423,15 @@ from __future__ import annotations
 
 class A:
     def test(self):
-        reveal_type(super())  # revealed: <super: <class 'A'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'A'>, Self@test>
 
     class B:
         def test(self):
-            reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+            reveal_type(super())  # revealed: <super: <class 'B'>, Self@test>
 
             class C(A.B):
                 def test(self):
-                    reveal_type(super())  # revealed: <super: <class 'C'>, Unknown>
+                    reveal_type(super())  # revealed: <super: <class 'C'>, Self@test>
 
             def inner(t: C):
                 reveal_type(super())  # revealed: <super: <class 'B'>, C>
@@ -167,11 +441,27 @@ class A:
 ## Built-ins and Literals
 
 ```py
+from enum import Enum
+
 reveal_type(super(bool, True))  # revealed: <super: <class 'bool'>, bool>
 reveal_type(super(bool, bool()))  # revealed: <super: <class 'bool'>, bool>
 reveal_type(super(int, bool()))  # revealed: <super: <class 'int'>, bool>
 reveal_type(super(int, 3))  # revealed: <super: <class 'int'>, int>
 reveal_type(super(str, ""))  # revealed: <super: <class 'str'>, str>
+reveal_type(super(bytes, b""))  # revealed: <super: <class 'bytes'>, bytes>
+
+class E(Enum):
+    X = 42
+
+reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
+```
+
+## `type[Self]`
+
+```py
+class Foo:
+    def method(self):
+        super(self.__class__, self)
 ```
 
 ## Descriptor Behavior with Super
@@ -204,6 +494,9 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from typing import Literal
+from ty_extensions import reveal_mro
+
 class A: ...
 
 class B:
@@ -213,18 +506,16 @@ class C(A, B): ...
 class D(B, A): ...
 
 def f(x: C | D):
-    reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>]
-    reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>]
+    reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
+    reveal_mro(D)  # revealed: (<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [possibly-unbound-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` is possibly unbound"
+    # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
-def f(flag: bool):
-    x = str() if flag else str("hello")
-    reveal_type(x)  # revealed: Literal["", "hello"]
+def f(x: Literal["", "hello"]):
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
 def f(x: int | str):
@@ -256,10 +547,10 @@ def f(flag: bool):
 
     reveal_type(s)  # revealed: <super: <class 'B'>, B> | <super: <class 'D'>, D>
 
-    reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(s.x)  # revealed: int
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` is possibly unbound"
+    # error: [unresolved-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
     reveal_type(s.a)  # revealed: str
 ```
 
@@ -278,8 +569,8 @@ class A[T]:
         return a
 
 class B[T](A[T]):
-    def f(self, b: T) -> T:
-        return super().f(b)
+    def f(self, a: T) -> T:
+        return super().f(a)
 ```
 
 ## Invalid Usages
@@ -331,15 +622,18 @@ instance or a subclass of the first. If either condition is violated, a `TypeErr
 runtime.
 
 ```py
+import typing
+import collections
+
 def f(x: int):
     # error: [invalid-super-argument] "`int` is not a valid class"
     super(x, x)
 
     type IntAlias = int
-    # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
+    # error: [invalid-super-argument] "`TypeAliasType` is not a valid class"
     super(IntAlias, 0)
 
-# error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, Literal[""])` call"
+# error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
 # revealed: Unknown
 reveal_type(super(int, str()))
 
@@ -369,6 +663,63 @@ reveal_type(super(B, object))
 super(object, object()).__class__
 ```
 
+Not all objects valid in a class's bases list are valid as the first argument to `super()`. For
+example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to
+`super()`.
+
+```py
+# error: [invalid-super-argument] "`<special-form 'typing.ChainMap'>` is not a valid class"
+reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
+```
+
+It's not valid to inherit from unsubscripted `typing.Generic` or `typing.Protocol`, but it _is_
+valid as the first argument to `super()`. Still required that it be in the second argument's MRO,
+though:
+
+```py
+# revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
+reveal_type(super(typing.Generic, typing.SupportsInt))
+# error: [invalid-super-argument]
+super(typing.Generic, int)
+
+# revealed: <super: <special-form 'typing.Protocol'>, <class 'SupportsInt'>>
+reveal_type(super(typing.Protocol, typing.SupportsInt))
+# error: [invalid-super-argument]
+super(typing.Protocol, int)
+
+def _(x: type[typing.Any], y: typing.Any, z: int):
+    reveal_type(super(x, y))  # revealed: <super: Any, Any>
+```
+
+`typing.TypedDict` never appears in the MRO of any class, so it's not valid as the first argument to
+`super()`.
+
+```py
+class TD(typing.TypedDict):
+    x: int
+
+# error: [invalid-super-argument]
+super(typing.TypedDict, TD)
+```
+
+### Diagnostic when the invalid type is rendered very verbosely
+
+<!-- snapshot-diagnostics -->
+
+```py
+def coinflip() -> bool:
+    return False
+
+def f():
+    if coinflip():
+        class A: ...
+
+    else:
+        class A: ...
+
+    super(A, A())  # error: [invalid-super-argument]
+```
+
 ### Instance Member Access via `super`
 
 Accessing instance members through `super()` is not allowed.
@@ -383,10 +734,10 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
+        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
         super().a
 
-# error: [unresolved-attribute] "Type `<super: <class 'B'>, B>` has no attribute `a`"
+# error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
 ```
 
@@ -405,6 +756,86 @@ class B(A): ...
 
 reveal_type(A()[0])  # revealed: int
 reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
-# error: [non-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
 super(B, B())[0]
+```
+
+### Generic base initializer
+
+A generic base initializer can inherit both its own class's generic context and the subclass's
+generic context. The merged context is not the same as the subclass's enclosing context and should
+not be freshened as a recursive reference.
+
+```py
+from collections.abc import Callable
+from typing import Generic
+from typing_extensions import TypeVar
+
+T = TypeVar("T", bound=BaseException, covariant=True)
+S = TypeVar("S", bound=BaseException, default=BaseException, covariant=True)
+
+class Base(Generic[T]):
+    def __init__(self, check: Callable[[T], bool] | None) -> None:
+        self.check = check
+
+class Child(Base[S], Generic[S]):
+    def __init__(self, check: Callable[[S], bool] | None) -> None:
+        # Regression test: Freshening the merged context made this expect
+        # `Callable[[BaseException], bool]` instead of `Callable[[S], bool]`.
+        super().__init__(check)
+```
+
+## Subclass Using Concrete Type Instead of `Self`
+
+When a parent class uses `Self` in a parameter type and a subclass overrides it with a concrete
+type, passing that parameter to `super().__init__()` is a type error. This is because `Self` in the
+parent could represent a further subclass. The fix is to use `Self` consistently in the subclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+from collections.abc import Mapping
+from typing import Self
+
+class Parent:
+    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
+        self.children = children
+
+class Child(Parent):
+    def __init__(self, children: Mapping[str, Child] | None = None) -> None:
+        # error: [invalid-argument-type] "Argument to `Parent.__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
+        super().__init__(children)
+
+# The fix is to use `Self` consistently in the subclass:
+
+class Parent2:
+    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
+        self.children = children
+
+class Child2(Parent2):
+    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
+        super().__init__(children)  # OK
+```
+
+## Super in Protocol Classes
+
+Using `super()` in a class that inherits from `typing.Protocol` (similar to beartype's caching
+Protocol):
+
+```py
+from typing import Protocol, Generic, TypeVar
+
+_T_co = TypeVar("_T_co", covariant=True)
+
+class MyProtocol(Protocol, Generic[_T_co]):
+    def __class_getitem__(cls, item):
+        # Accessing parent's __class_getitem__ through super()
+        reveal_type(super())  # revealed: <super: <class 'MyProtocol'>, type[Self@__class_getitem__]>
+        parent_method = super().__class_getitem__
+        reveal_type(parent_method)  # revealed: (item: Unknown, /) -> type[Self@__class_getitem__]
+        return parent_method(item)
 ```

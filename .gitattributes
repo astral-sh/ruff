@@ -22,6 +22,7 @@ crates/ruff_linter/resources/test/fixtures/pyupgrade/UP018_CR.py text eol=cr
 crates/ruff_linter/resources/test/fixtures/pyupgrade/UP018_LF.py text eol=lf
 
 crates/ruff_python_parser/resources/inline linguist-generated=true
+crates/ty_python_semantic/resources/mdtest/external/*.lock linguist-generated=true
 
 ruff.schema.json -diff linguist-generated=true text=auto eol=lf
 ty.schema.json -diff linguist-generated=true text=auto eol=lf

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{PythonVersion, helpers};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -43,6 +43,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct SuppressibleException {
     exception: String,
 }
@@ -58,7 +59,9 @@ impl Violation for SuppressibleException {
 
     fn fix_title(&self) -> Option<String> {
         let SuppressibleException { exception } = self;
-        Some(format!("Replace with `contextlib.suppress({exception})`"))
+        Some(format!(
+            "Replace `try`-`except`-`pass` with `with contextlib.suppress({exception}): ...`"
+        ))
     }
 }
 
@@ -80,6 +83,7 @@ fn is_empty(body: &[Stmt]) -> bool {
 pub(crate) fn suppressible_exception(
     checker: &Checker,
     stmt: &Stmt,
+    is_star: bool,
     try_body: &[Stmt],
     handlers: &[ExceptHandler],
     orelse: &[Stmt],
@@ -98,6 +102,7 @@ pub(crate) fn suppressible_exception(
             | Stmt::Pass(_)]
     ) || !orelse.is_empty()
         || !finalbody.is_empty()
+        || (is_star && checker.target_version() <= PythonVersion::PY311)
     {
         return;
     }
@@ -154,14 +159,11 @@ pub(crate) fn suppressible_exception(
             let mut rest: Vec<Edit> = Vec::new();
             let content: String;
             if exception == "BaseException" && handler_names.is_empty() {
-                let (import_exception, binding_exception) =
-                    checker.importer().get_or_import_symbol(
-                        &ImportRequest::import("builtins", &exception),
-                        stmt.start(),
-                        checker.semantic(),
-                    )?;
+                let (import_exception, binding_exception) = checker
+                    .importer()
+                    .get_or_import_builtin_symbol(&exception, stmt.start(), checker.semantic())?;
                 content = format!("with {binding}({binding_exception})");
-                rest.push(import_exception);
+                rest.extend(import_exception);
             } else {
                 content = format!("with {binding}({exception})");
             }

@@ -38,24 +38,45 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// it can't because the string contains the preferred quotes OR
     /// it leads to more escaping.
     ///
-    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
-    /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
+    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`, make sure to also
+    /// add them to
+    /// [`FormatImplicitConcatenatedStringFlat::new`](crate::string::implicit::FormatImplicitConcatenatedStringFlat::new).
     pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
         let preferred_quote_style = self
             .preferred_quote_style
             .unwrap_or(self.context.options().quote_style());
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
-        // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let InterpolatedStringState::InsideInterpolatedElement(parent_context) =
+        // Preserve the existing quote style for nested interpolations more than one layer deep, if
+        // PEP 701 isn't supported.
+        if !supports_pep_701 && self.context.interpolated_string_state().is_nested() {
+            return QuoteStyle::Preserve;
+        }
+
+        // For f-strings and t-strings prefer alternating the quotes unless the outer string is
+        // triple quoted and the inner isn't. In Python 3.12+, `nested-string-quote-style =
+        // "preferred"` uses the configured quote style instead.
+        if let InterpolatedStringState::InsideInterpolatedElement(parent_context)
+        | InterpolatedStringState::NestedInterpolatedElement(parent_context) =
             self.context.interpolated_string_state()
         {
             let parent_flags = parent_context.flags();
+            let nested_string_quote_style = self.context.options().nested_string_quote_style();
+
             if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
+                // When `nested-string-quote-style = "preferred"` and we're targeting Python
+                // 3.12+, use the preferred quote style consistently.
+                if supports_pep_701
+                    && nested_string_quote_style.is_preferred()
+                    && !preferred_quote_style.is_preserve()
+                {
+                    return preferred_quote_style;
+                }
+                // Otherwise, use alternating quotes for compatibility.
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes
                 // for inner strings to avoid a syntax error: `string = "this is my string with " f'"{params.get("mine")}"'`
-                if !preferred_quote_style.is_preserve() || !supports_pep_701 {
+                else if !preferred_quote_style.is_preserve() || !supports_pep_701 {
                     return QuoteStyle::from(parent_flags.quote_style().opposite());
                 }
             }
@@ -99,14 +120,14 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                     return QuoteStyle::Preserve;
                 }
             }
-            StringLikePart::TString(tstring) => {
+            StringLikePart::TString(tstring)
                 if is_interpolated_string_with_quoted_format_spec_and_debug(
                     &tstring.elements,
                     tstring.flags.into(),
                     self.context,
-                ) {
-                    return QuoteStyle::Preserve;
-                }
+                ) =>
+            {
+                return QuoteStyle::Preserve;
             }
             _ => {}
         }
@@ -645,7 +666,7 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     new_flags: AnyStringFlags,
     escape_braces: bool,
-) -> Cow<str> {
+) -> Cow<'_, str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -798,7 +819,7 @@ impl UnicodeEscape {
     ///
     /// * `\u`, `\U'` and `\x`: To use lower case for the characters `a-f`.
     /// * `\N`: To use uppercase letters
-    fn normalize(self, input: &str) -> Option<Cow<str>> {
+    fn normalize(self, input: &str) -> Option<Cow<'_, str>> {
         let mut normalised = String::new();
 
         let len = match self {

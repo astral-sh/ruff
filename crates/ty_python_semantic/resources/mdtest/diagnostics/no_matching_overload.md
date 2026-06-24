@@ -263,7 +263,7 @@ def f(
     goat: int | str,
     capybara: int | str,
     chicken: int | str,
-    ostrict: int | str,
+    ostrich: int | str,
     gorilla: int | str,
     giraffe: int | str,
     condor: int | str,
@@ -294,6 +294,26 @@ class Foo:
 
 foo = Foo()
 foo.bar(b"wat")  # error: [no-matching-overload]
+```
+
+## An explicit `__get__` call on an overloaded function
+
+The overloads used to bind `__get__` are synthesized separately from the declarations of `f`.
+Diagnostics should still show every overload declaration of `f`.
+
+```py
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+@overload
+def f(x: bytes) -> bytes: ...
+def f(x: int | str | bytes) -> int | str | bytes:
+    return x
+
+f.__get__()  # error: [no-matching-overload]
 ```
 
 ## A class constructor with unmatched overloads

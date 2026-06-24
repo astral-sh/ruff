@@ -6,7 +6,7 @@ use ruff_text_size::TextRange;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
 #[cfg(target_family = "unix")]
-use crate::rules::flake8_executable::helpers::is_executable;
+use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 
 /// ## What it does
 /// Checks for a shebang directive in a file that is not executable.
@@ -38,6 +38,7 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 /// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.233")]
 pub(crate) struct ShebangNotExecutable;
 
 impl Violation for ShebangNotExecutable {
@@ -53,7 +54,7 @@ pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange, context:
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
 
-    if is_wsl::is_wsl() {
+    if is_wsl() {
         return;
     }
 

@@ -42,7 +42,6 @@ ellipsis (`...`) or `pass`.
 
 ```pyi
 def f() -> int: ...
-
 def f() -> int:
     pass
 
@@ -68,7 +67,7 @@ class Bar(Protocol):
     def f(self) -> int: ...
 
 class Baz(Bar):
-    # error: [invalid-return-type]
+    # error: [empty-body]
     def f(self) -> int: ...
 
 T = TypeVar("T")
@@ -80,7 +79,7 @@ class Foo(Protocol):
     def f[T](self, v: T) -> T: ...
 
 t = (Protocol, int)
-reveal_type(t[0])  # revealed: typing.Protocol
+reveal_type(t[0])  # revealed: <special-form 'typing.Protocol'>
 
 class Lorem(t[0]):
     def f(self) -> int: ...
@@ -106,9 +105,9 @@ class Bar[T](ABC):
     @abstractmethod
     def f(self) -> int: ...
     @abstractmethod
-    def g[T](self, x: T) -> T: ...
+    def g[U](self, x: U) -> U: ...
 
-# error: [invalid-return-type]
+# error: [empty-body]
 def f() -> int: ...
 @abstractmethod  # Semantically meaningless, accepted nevertheless
 def g() -> int: ...
@@ -125,6 +124,124 @@ def f(x: int) -> int: ...
 def f(x: str) -> str: ...
 def f(x: int | str):
     return x
+```
+
+### In `if TYPE_CHECKING` block
+
+Inside an `if TYPE_CHECKING` block, we allow "stub" style function definitions with empty bodies,
+since these functions will never actually be called.
+
+`compat/__init__.py`:
+
+```py
+```
+
+`compat/sub/__init__.py`:
+
+```py
+```
+
+`compat/sub/sub.py`:
+
+```py
+from typing import TYPE_CHECKING
+```
+
+`main.py`:
+
+```py
+from typing import TYPE_CHECKING
+import typing
+import typing as t
+import compat.sub.sub
+
+if TYPE_CHECKING:
+    def f() -> int: ...
+
+else:
+    def f() -> str:
+        return "hello"
+
+reveal_type(f)  # revealed: def f() -> int
+
+if not TYPE_CHECKING:
+    pass
+elif True:
+    def g() -> str: ...
+
+else:
+    def h() -> str: ...
+
+if not TYPE_CHECKING:
+    def i() -> int:
+        return 1
+
+else:
+    def i() -> str: ...
+
+reveal_type(i)  # revealed: def i() -> str
+
+if False:
+    pass
+elif TYPE_CHECKING:
+    def j() -> str: ...
+
+else:
+    def j():
+        raise NotImplementedError
+
+if False:
+    pass
+elif not TYPE_CHECKING:
+    def k() -> str:
+        raise NotImplementedError
+
+else:
+    def k() -> str: ...
+
+class Foo:
+    if TYPE_CHECKING:
+        def f(self) -> int: ...
+
+if TYPE_CHECKING:
+    class Bar:
+        def f(self) -> int: ...
+
+def get_bool() -> bool:
+    return True
+
+if TYPE_CHECKING:
+    if get_bool():
+        def l() -> str: ...
+
+if get_bool():
+    if TYPE_CHECKING:
+        def m() -> str: ...
+
+if TYPE_CHECKING:
+    if not TYPE_CHECKING:
+        def n() -> str: ...
+
+if typing.TYPE_CHECKING:
+    def o() -> str: ...
+
+if not typing.TYPE_CHECKING:
+    def p() -> str:
+        raise NotImplementedError
+
+if compat.sub.sub.TYPE_CHECKING:
+    def q() -> str: ...
+
+if not compat.sub.sub.TYPE_CHECKING:
+    def r() -> str:
+        raise NotImplementedError
+
+if t.TYPE_CHECKING:
+    def s() -> str: ...
+
+if not t.TYPE_CHECKING:
+    def t() -> str:
+        raise NotImplementedError
 ```
 
 ## Conditional return type
@@ -186,6 +303,11 @@ def f(cond: bool) -> int:
 
 <!-- snapshot-diagnostics -->
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 # error: [invalid-return-type]
 def f() -> int:
@@ -203,8 +325,20 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-return-type]
+# error: [empty-body]
 def m(x: T) -> T: ...
+
+class A[T]: ...
+
+def f() -> A[int]:
+    class A[T]: ...
+    return A[int]()  # error: [invalid-return-type]
+
+class B: ...
+
+def g() -> B:
+    class B: ...
+    return B()  # error: [invalid-return-type]
 ```
 
 ## Invalid return type in stub file
@@ -255,7 +389,6 @@ def f(cond: bool) -> str:
 ```py
 def f() -> None:
     if False:
-        # error: [invalid-return-type]
         return 1
 
 # error: [invalid-return-type]
@@ -336,11 +469,23 @@ def f(cond: bool) -> int:
     return "hello" if cond else NotImplemented
 ```
 
+`NotImplemented` is only special-cased for return types (mirroring the way the interpreter applies
+special casing for the symbol at runtime). It is not generally considered assignable to every other
+type:
+
+```py
+# Other type checkers do not emit an error here,
+# but this is likely not a deliberate feature they've implemented;
+# it's probably because `NotImplementedType` inherits from `Any`
+# according to typeshed. We override typeshed's incorrect MRO
+# for more precise type inference.
+x: int = NotImplemented  # error: [invalid-assignment]
+```
+
 ### Python 3.10+
 
-Unlike Ellipsis, `_NotImplementedType` remains in `builtins.pyi` regardless of the Python version.
-Even if `builtins._NotImplementedType` is fully replaced by `types.NotImplementedType` in the
-future, it should still work as expected.
+We correctly understand the semantics of `NotImplemented` on all Python versions, even though the
+class `types.NotImplementedType` is only exposed in the `types` module on Python 3.10+.
 
 ```toml
 [environment]
@@ -359,6 +504,8 @@ def f(cond: bool) -> str:
 
 <!-- snapshot-diagnostics -->
 
+### Synchronous
+
 A function with a `yield` or `yield from` expression anywhere in its body is a
 [generator function](https://docs.python.org/3/glossary.html#term-generator). A generator function
 implicitly returns an instance of `types.GeneratorType` even if it does not contain any `return`
@@ -368,24 +515,58 @@ statements.
 import types
 import typing
 
-def f() -> types.GeneratorType:
+def f() -> types.GeneratorType[int, None, None]:
     yield 42
 
-def g() -> typing.Generator:
+def g() -> typing.Generator[int]:
     yield 42
 
-def h() -> typing.Iterator:
+def h() -> typing.Iterator[int]:
     yield 42
 
-def i() -> typing.Iterable:
+def i() -> typing.Iterable[int]:
     yield 42
 
-def i2() -> typing.Generator:
+def i2() -> typing.Generator[int]:
     yield from i()
 
 def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+def invalid_return_type() -> typing.Generator[None, None, None]:
+    yield
+    return ""  # error: [invalid-return-type]
 ```
+
+The return value of the function must be assignable to the return type of the `Generator`. This is
+specified in the third type parameter.
+
+```py
+def wrong_return() -> typing.Generator[int, int, int]:
+    yield 1
+    return ""  # error: [invalid-return-type]
+```
+
+If the function has no return and it's implicitly returning it is still type checked.
+
+```py
+def bare_return_ok() -> typing.Generator[int, int, None]:
+    yield 1
+
+def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+    yield 1
+```
+
+Iterators must not return anything.
+
+```py
+def iterator_must_not_return() -> typing.Iterator[int]:
+    yield 2
+    # error: [invalid-return-type]
+    return "foo"
+```
+
+### Asynchronous
 
 If it is an `async` function with a `yield` statement in its body, it is an
 [asynchronous generator function](https://docs.python.org/3/glossary.html#term-asynchronous-generator).
@@ -396,23 +577,27 @@ if it does not contain any `return` statements.
 import types
 import typing
 
-async def f() -> types.AsyncGeneratorType:
+async def f() -> types.AsyncGeneratorType[int, None]:
     yield 42
 
-async def g() -> typing.AsyncGenerator:
+async def g() -> typing.AsyncGenerator[int]:
     yield 42
 
-async def h() -> typing.AsyncIterator:
+async def h() -> typing.AsyncIterator[int]:
     yield 42
 
-async def i() -> typing.AsyncIterable:
+async def i() -> typing.AsyncIterable[int]:
     yield 42
 
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+async def k() -> typing.AsyncGenerator[int]:
+    yield 42
+    return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
-## Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
 
 <!-- snapshot-diagnostics -->
 
@@ -425,5 +610,18 @@ class Abstract(Protocol):
     def method(self) -> str: ...
 
 class Concrete(Abstract):
-    def method(self) -> str: ...  # error: [invalid-return-type]
+    def method(self) -> str: ...  # error: [empty-body]
+```
+
+## Diagnostics for `invalid-return-type` on dynamic type
+
+```toml
+environment.python-version = "3.12"
+```
+
+```py
+from typing import Never, Any
+
+def f(func: Any) -> Never:  # error: [invalid-return-type]
+    func()
 ```

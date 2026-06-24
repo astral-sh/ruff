@@ -205,3 +205,12 @@ def func():
     if a.endswith("foo"):
         a = a[: -len("foo")]
     print(a)
+
+
+def example(filename: str, text: str):
+    filename = (
+        filename[:-4]  # text
+        if filename.endswith(".txt")  # text
+        else filename
+    )
+

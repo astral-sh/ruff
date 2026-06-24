@@ -32,6 +32,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UselessObjectInheritance {
     name: String,
 }
@@ -72,7 +73,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
                 arguments,
                 Parentheses::Remove,
                 checker.locator().contents(),
-                checker.comment_ranges(),
+                checker.tokens(),
             )?;
 
             let range = edit.range();

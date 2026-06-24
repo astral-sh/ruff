@@ -13,23 +13,15 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
-use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::Fix;
-use ruff_linter::message::OldDiagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
-use ruff_notebook::NotebookIndex;
-use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{Ranged, TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
-
-use crate::diagnostics::Diagnostics;
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
@@ -170,9 +162,8 @@ impl Cache {
         // Write the cache to a temporary file first and then rename it for an "atomic" write.
         // Protects against data loss if the process is killed during the write and races between different ruff
         // processes, resulting in a corrupted cache file. https://github.com/astral-sh/ruff/issues/8147#issuecomment-1943345964
-        let mut temp_file =
-            NamedTempFile::new_in(self.path.parent().expect("Write path must have a parent"))
-                .context("Failed to create temporary file")?;
+        let mut temp_file = tempfile_in(self.path.parent().expect("Write path must have a parent"))
+            .context("Failed to create temporary file")?;
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
@@ -208,7 +199,7 @@ impl Cache {
     #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
-        const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
+        const MAX_LAST_SEEN: Duration = Duration::from_hours(720); // 30 days.
 
         let changes = std::mem::take(self.changes.get_mut().unwrap());
         if changes.is_empty() {
@@ -297,18 +288,32 @@ impl Cache {
         });
     }
 
-    pub(crate) fn update_lint(
-        &self,
-        path: RelativePathBuf,
-        key: &FileCacheKey,
-        data: LintCacheData,
-    ) {
-        self.update(path, key, ChangeData::Lint(data));
+    pub(crate) fn set_linted(&self, path: RelativePathBuf, key: &FileCacheKey, yes: bool) {
+        self.update(path, key, ChangeData::Linted(yes));
     }
 
     pub(crate) fn set_formatted(&self, path: RelativePathBuf, key: &FileCacheKey) {
         self.update(path, key, ChangeData::Formatted);
     }
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+///
+/// Sets the permissions of the temporary file to `0o666`, to match the non-temporary file
+/// default. ([`NamedTempFile`] defaults to `0o600`.)
+#[cfg(unix)]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    use std::os::unix::fs::PermissionsExt;
+
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o666))
+        .tempfile_in(path)
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+#[cfg(not(unix))]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    tempfile::Builder::new().tempfile_in(path)
 }
 
 /// On disk representation of a cache of a package.
@@ -338,42 +343,15 @@ pub(crate) struct FileCache {
 }
 
 impl FileCache {
-    /// Convert the file cache into `Diagnostics`, using `path` as file name.
-    pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
-        self.data.lint.as_ref().map(|lint| {
-            let diagnostics = if lint.messages.is_empty() {
-                Vec::new()
-            } else {
-                let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
-                lint.messages
-                    .iter()
-                    .map(|msg| {
-                        OldDiagnostic::lint(
-                            &msg.body,
-                            msg.suggestion.as_ref(),
-                            msg.range,
-                            msg.fix.clone(),
-                            msg.parent,
-                            file.clone(),
-                            msg.noqa_offset,
-                            msg.rule,
-                        )
-                    })
-                    .collect()
-            };
-            let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
-                FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
-            } else {
-                FxHashMap::default()
-            };
-            Diagnostics::new(diagnostics, notebook_indexes)
-        })
+    /// Return whether or not the file in the cache was linted and found to have no diagnostics.
+    pub(crate) fn linted(&self) -> bool {
+        self.data.linted
     }
 }
 
 #[derive(Debug, Default, bincode::Decode, bincode::Encode)]
 struct FileCacheData {
-    lint: Option<LintCacheData>,
+    linted: bool,
     formatted: bool,
 }
 
@@ -407,88 +385,6 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     }
 
     Ok(())
-}
-
-#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
-pub(crate) struct LintCacheData {
-    /// Imports made.
-    // pub(super) imports: ImportMap,
-    /// Diagnostic messages.
-    pub(super) messages: Vec<CacheMessage>,
-    /// Source code of the file.
-    ///
-    /// # Notes
-    ///
-    /// This will be empty if `messages` is empty.
-    pub(super) source: String,
-    /// Notebook index if this file is a Jupyter Notebook.
-    #[bincode(with_serde)]
-    pub(super) notebook_index: Option<NotebookIndex>,
-}
-
-impl LintCacheData {
-    pub(crate) fn from_diagnostics(
-        diagnostics: &[OldDiagnostic],
-        notebook_index: Option<NotebookIndex>,
-    ) -> Self {
-        let source = if let Some(msg) = diagnostics.first() {
-            msg.source_file().source_text().to_owned()
-        } else {
-            String::new() // No messages, no need to keep the source!
-        };
-
-        let messages = diagnostics
-            .iter()
-            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
-            // this also serves to filter them out, but we shouldn't be caching files with syntax
-            // errors anyway.
-            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
-            .map(|(rule, msg)| {
-                // Make sure that all message use the same source file.
-                assert_eq!(
-                    msg.source_file(),
-                    diagnostics.first().unwrap().source_file(),
-                    "message uses a different source file"
-                );
-                CacheMessage {
-                    rule,
-                    body: msg.body().to_string(),
-                    suggestion: msg.suggestion().map(ToString::to_string),
-                    range: msg.range(),
-                    parent: msg.parent,
-                    fix: msg.fix().cloned(),
-                    noqa_offset: msg.noqa_offset(),
-                }
-            })
-            .collect();
-
-        Self {
-            messages,
-            source,
-            notebook_index,
-        }
-    }
-}
-
-/// On disk representation of a diagnostic message.
-#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
-pub(super) struct CacheMessage {
-    /// The rule for the cached diagnostic.
-    #[bincode(with_serde)]
-    rule: Rule,
-    /// The message body to display to the user, to explain the diagnostic.
-    body: String,
-    /// The message to display to the user, to explain the suggested fix.
-    suggestion: Option<String>,
-    /// Range into the message's [`FileCache::source`].
-    #[bincode(with_serde)]
-    range: TextRange,
-    #[bincode(with_serde)]
-    parent: Option<TextSize>,
-    #[bincode(with_serde)]
-    fix: Option<Fix>,
-    #[bincode(with_serde)]
-    noqa_offset: Option<TextSize>,
 }
 
 pub(crate) trait PackageCaches {
@@ -578,15 +474,15 @@ struct Change {
 
 #[derive(Debug)]
 enum ChangeData {
-    Lint(LintCacheData),
+    Linted(bool),
     Formatted,
 }
 
 impl ChangeData {
     fn apply(self, data: &mut FileCacheData) {
         match self {
-            ChangeData::Lint(new_lint) => {
-                data.lint = Some(new_lint);
+            ChangeData::Linted(yes) => {
+                data.linted = yes;
             }
             ChangeData::Formatted => {
                 data.formatted = true;
@@ -608,18 +504,18 @@ mod tests {
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
-    use ruff_linter::settings::LinterSettings;
+    use ruff_python_ast::SourceType;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::OldDiagnostic;
     use ruff_linter::package::PackageRoot;
+    use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_workspace::Settings;
 
-    use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
+    use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
     use crate::cache::{Cache, RelativePathBuf};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
@@ -646,7 +542,7 @@ mod tests {
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
-        let mut parse_errors = Vec::new();
+        let mut paths_with_diagnostics = Vec::new();
         let mut expected_diagnostics = Diagnostics::default();
         for entry in fs::read_dir(&package_root).unwrap() {
             let entry = entry.unwrap();
@@ -670,7 +566,7 @@ mod tests {
                     continue;
                 }
 
-                let diagnostics = lint_path(
+                let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
                     &settings.linter,
@@ -680,8 +576,15 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.inner.iter().any(OldDiagnostic::is_syntax_error) {
-                    parse_errors.push(path.clone());
+                if diagnostics.inner.is_empty() {
+                    // We won't load a notebook index from the cache for files without diagnostics,
+                    // so remove them from `expected_diagnostics` too. This allows us to keep the
+                    // full equality assertion below.
+                    diagnostics
+                        .notebook_indexes
+                        .remove(&path.to_string_lossy().to_string());
+                } else {
+                    paths_with_diagnostics.push(path.clone());
                 }
                 paths.push(path);
                 expected_diagnostics += diagnostics;
@@ -694,11 +597,11 @@ mod tests {
         let cache = Cache::open(package_root.clone(), &settings);
         assert_ne!(cache.package.files.len(), 0);
 
-        parse_errors.sort();
+        paths_with_diagnostics.sort();
 
         for path in &paths {
-            if parse_errors.binary_search(path).is_ok() {
-                continue; // We don't cache parsing errors.
+            if paths_with_diagnostics.binary_search(path).is_ok() {
+                continue; // We don't cache files with diagnostics.
             }
 
             let relative_path = cache.relative_path(path).unwrap();
@@ -732,7 +635,7 @@ mod tests {
 
     #[test]
     fn cache_adds_file_on_lint() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_adds_file_on_lint");
         let cache = test_cache.open();
@@ -756,7 +659,7 @@ mod tests {
 
     #[test]
     fn cache_adds_files_on_lint() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_adds_files_on_lint");
         let cache = test_cache.open();
@@ -778,6 +681,40 @@ mod tests {
             2,
             "Both files should be added to the cache"
         );
+        cache.persist().unwrap();
+    }
+
+    #[test]
+    fn cache_does_not_add_file_on_lint_with_diagnostic() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("cache_does_not_add_file_on_lint_with_diagnostic");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source.py", source);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
+
+        cache.persist().unwrap();
+        let cache = test_cache.open();
+
+        let results = test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        assert_eq!(results.inner.len(), 1, "Expected one F822 diagnostic");
+        assert_eq!(
+            cache.changes.lock().unwrap().len(),
+            1,
+            "Files with diagnostics still trigger change events"
+        );
+        assert!(
+            cache
+                .changes
+                .lock()
+                .unwrap()
+                .last()
+                .is_some_and(|change| matches!(change.new_data, ChangeData::Linted(false))),
+            "Files with diagnostics are marked as unlinted"
+        );
+
         cache.persist().unwrap();
     }
 
@@ -811,7 +748,7 @@ mod tests {
 
     #[test]
     fn cache_invalidated_on_file_modified_time() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_invalidated_on_file_modified_time");
         let cache = test_cache.open();
@@ -868,7 +805,7 @@ mod tests {
             file.set_permissions(perms)
         }
 
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_invalidated_on_permission_change");
         let cache = test_cache.open();
@@ -921,7 +858,7 @@ mod tests {
         );
 
         // Now actually lint a file.
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
         test_cache.write_source_file("new.py", source);
         let new_path_key = RelativePathBuf::from("new.py");
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
@@ -942,9 +879,43 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn cache_file_permissions_match_default_file_permissions() {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
+
+        let test_cache = TestCache::new("cache_file_permissions_match_default_file_permissions");
+        let cache = test_cache.open();
+        let cache_path = cache.path.clone();
+        test_cache.write_source_file("source.py", source);
+
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        cache.persist().unwrap();
+
+        let control_path = cache_path.with_extension("control");
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o666)
+            .open(&control_path)
+            .unwrap();
+
+        let cache_mode = fs::metadata(&cache_path).unwrap().permissions().mode() & 0o777;
+        let control_mode = fs::metadata(&control_path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(
+            cache_mode, control_mode,
+            "Cache files should respect the same default permissions as regular files"
+        );
+    }
+
     #[test]
     fn format_updates_cache_entry() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("format_updates_cache_entry");
         let cache = test_cache.open();
@@ -978,7 +949,7 @@ mod tests {
             panic!("Cache entry for `source.py` is missing.");
         };
 
-        assert!(file_cache.data.lint.is_some());
+        assert!(file_cache.data.linted);
         assert!(file_cache.data.formatted);
     }
 
@@ -1028,7 +999,7 @@ mod tests {
             panic!("Cache entry for `source.py` is missing.");
         };
 
-        assert_eq!(file_cache.data.lint, None);
+        assert!(!file_cache.data.linted);
         assert!(file_cache.data.formatted);
     }
 
@@ -1106,7 +1077,7 @@ mod tests {
             format_path(
                 &file_path,
                 &self.settings.formatter,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,
                 Some(cache),

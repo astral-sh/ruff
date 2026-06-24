@@ -1,7 +1,7 @@
+use crate::fix::edits::fresh_binding_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::is_mutable_expr;
+use ruff_python_semantic::{SemanticModel, analyze::typing::is_mutable_expr};
 
 use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
@@ -49,10 +49,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct MutableFromkeysValue;
 
 impl Violation for MutableFromkeysValue {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -89,20 +90,25 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
 
     let mut diagnostic = checker.report_diagnostic(MutableFromkeysValue, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        generate_dict_comprehension(keys, value, checker.generator()),
+        generate_dict_comprehension(keys, value, checker.generator(), checker.semantic()),
         call.range(),
     )));
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where
 /// `keys` and `value` are the parameters of `dict.fromkeys`.
-fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) -> String {
+fn generate_dict_comprehension(
+    keys: &Expr,
+    value: &Expr,
+    generator: Generator,
+    semantic: &SemanticModel<'_>,
+) -> String {
     // Construct `key`.
     let key = ast::ExprName {
-        id: Name::new_static("key"),
+        id: fresh_binding_name(semantic, "key"),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `key in keys`.
     let comp = ast::Comprehension {
@@ -110,16 +116,16 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         iter: keys.clone(),
         ifs: vec![],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         is_async: false,
     };
     // Construct the dict comprehension.
     let dict_comp = ast::ExprDictComp {
-        key: Box::new(key.into()),
+        key: Some(Box::new(key.into())),
         value: Box::new(value.clone()),
         generators: vec![comp],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.expr(&dict_comp.into())
 }

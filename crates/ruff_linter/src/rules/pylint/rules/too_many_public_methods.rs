@@ -83,6 +83,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-public-methods`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.290")]
 pub(crate) struct TooManyPublicMethods {
     methods: usize,
     max_methods: usize,

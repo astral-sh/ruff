@@ -31,6 +31,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
     // TODO: remove this test case when the fixes for `perf401` and `perf403` are stabilized
     #[test_case(Rule::ManualDictComprehension, Path::new("PERF403.py"))]
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]

@@ -1,0 +1,24 @@
+---
+source: crates/ruff/tests/cli/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--config"
+    - "lint.isort.required-imports = [\"from collections.abc import Set\"]"
+    - "--select"
+    - I002
+    - "-"
+  stdin: "1"
+---
+success: false
+exit_code: 1
+----- stdout -----
+-:1:1: I002 [*] Missing required import: `from collections.abc import Set`
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+
+----- stderr -----

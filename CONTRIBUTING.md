@@ -7,21 +7,58 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 > This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
 > guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
 
+## Finding ways to help
+
+We label issues that would be good for a first time contributor as
+[`good first issue`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+These usually do not require significant experience with Rust or the Ruff code base.
+
+We label issues that we think are a good opportunity for subsequent contributions as
+[`help wanted`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
+These require varying levels of experience with Rust and Ruff. Often, we want to accomplish these
+tasks but do not have the resources to do so ourselves.
+
+You don't need our permission to start on an issue we have labeled as appropriate for community
+contribution as described above. However, it's a good idea to indicate that you are going to work on
+an issue to avoid concurrent attempts to solve the same problem.
+
+Please check in with us before starting work on an issue that has not been labeled as appropriate
+for community contribution. We're happy to receive contributions for other issues, but it's
+important to make sure we have consensus on the solution to the problem first.
+
+Outside of issues with the labels above, issues labeled as
+[`bug`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22bug%22) are the
+best candidates for contribution. In contrast, issues labeled with `needs-decision` or
+`needs-design` are _not_ good candidates for contribution. Please do not open pull requests for
+issues with these labels.
+
+Please do not open pull requests for new features without prior discussion. While we appreciate
+exploration of new features, we will often close these pull requests immediately. Adding a
+new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
+team before it is appropriate to begin work on an implementation.
+
+## Use of AI
+
+We **require all use of AI in contributions to follow our
+[AI Policy](https://github.com/astral-sh/.github/blob/main/AI_POLICY.md)**.
+
+If your contribution does not follow the policy, it will be closed.
+
+### Local skills for Codex or Claude
+
+This repository includes local agent skills for ty development under `.agents/skills`.
+
+Contributors using Codex for development should find that Codex auto-discovers the skills and uses
+them automatically when necessary. Claude Code users may be prompted to install the
+`ty-skills@ruff-agent-skills` local plugin. If the skills are not installed automatically, install
+them manually from the repository root by running these slash commands inside Claude Code:
+
+```text
+/plugin marketplace add ./.agents
+/plugin install ty-skills@ruff-agent-skills
+```
+
 ## The Basics
-
-Ruff welcomes contributions in the form of pull requests.
-
-For small changes (e.g., bug fixes), feel free to submit a PR.
-
-For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
-creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [Discord](https://discord.com/invite/astral-sh) to discuss your idea with the
-community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
-and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
-that are ready for contributions.
-
-If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
 ### Prerequisites
 
@@ -37,12 +74,12 @@ cargo install cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-You can optionally install pre-commit hooks to automatically run the validation checks
+You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install pre-commit
-pre-commit install
+uv tool install prek
+prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
@@ -69,7 +106,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -134,6 +171,34 @@ At the time of writing, the repository includes the following crates:
 - `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Powers the
     [Ruff Playground](https://play.ruff.rs/).
 
+#### Adding a new crate
+
+When adding a workspace crate under `crates/`, first decide whether it should be published to
+crates.io as part of Ruff's releases:
+
+- Test, benchmark, development, and other non-release crates must set `publish = false` in their
+    `Cargo.toml`.
+- Publishable crates should inherit the workspace package metadata and follow Ruff's [crate
+    versioning policy](https://docs.astral.sh/ruff/versioning/#crate-versioning). If the crate is
+    listed under `[workspace.dependencies]`, specify both its path and matching version.
+
+For a publishable crate, generate its README and verify that the workspace can still be packaged:
+
+```shell
+uv run --script scripts/generate-crate-readmes.py
+cargo publish --workspace --dry-run
+```
+
+Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
+
+```shell
+CARGO_REGISTRY_TOKEN=<token> uv run --no-config --script scripts/setup-crates-io-publish.py
+```
+
+The bootstrap script reserves the crate name, configures the release workflow as its trusted
+publisher, requires trusted publishing for future versions, and adds the crate to `.known-crates`.
+Commit the generated README and `.known-crates` update with the new crate.
+
 ### Example: Adding a new lint rule
 
 At a high level, the steps involved in adding a new lint rule are as follows:
@@ -144,7 +209,10 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[derive(ViolationMetadata)]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples. You also need to add a
+    `#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]` attribute on your
+    `ViolationMetadata` struct. This adds the rule in preview, and the version will be filled in
+    automatically in the next release.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -158,8 +226,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
-    should be added in `RuleGroup::Preview`.
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -170,8 +237,9 @@ to call your new function at the appropriate time and with the appropriate input
 defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
 and calling out to lint rule analyzer functions as it goes.
 
-If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
+If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file or use the AST
+panel in the [playground](https://play.ruff.rs/?secondary=AST). Grep for the
+`Checker::report_diagnostic` invocations to understand how other, similar rules are implemented.
 
 Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
@@ -206,38 +274,117 @@ preserving the original rule name.
 
 #### Rule testing: fixtures and snapshots
 
-To test rules, Ruff uses snapshots of Ruff's output for a given file (fixture). Generally, there
-will be one file per rule (e.g., `E402.py`), and each file will contain all necessary examples of
-both violations and non-violations. `cargo insta review` will generate a snapshot file containing
-Ruff's output for each fixture, which you can then commit alongside your changes.
+To test rules, Ruff uses the mdtest framework, initially developed for ty. Mdtests are written as
+Markdown files with Python code and TOML configuration blocks alongside prose
+descriptions. Generally, there will be one directory per linter (e.g. `flake8-bandit` for the `S`
+rules) with nested files for each rule (e.g. `unsafe-markup-use.md` for `S704`). Within these
+files, you can define additional Markdown sections to group related tests and their settings
+together.
 
-Once you've completed the code for the rule itself, you can define tests with the following steps:
+You can see [the ty_test
+README](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/README.md) for a full description
+of the options supported by mdtest, but in general, you should use `# error` comments to assert that
+a particular rule fires on a given line. You can instead use `# snapshot` comments to also generate
+an inline snapshot of the resulting diagnostic. You can automatically accept these snapshot changes
+by setting the `MDTEST_UPDATE_SNAPSHOTS=1` environment variable when running your tests. Prefer
+using `# error` for the bulk of your assertions because it helps to keep the tests short, but
+`# snapshot` can be used to capture details of the diagnostic or suggested fix, when applicable.
 
-1. Add a Python file to `crates/ruff_linter/resources/test/fixtures/[linter]` that contains the code you
-    want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
-    examples of both violations and non-violations.
+For example, a minimal mdtest for `module-import-not-at-top-of-file` (`E402`) would look something
+like this:
 
-1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
-    with the output (you see the violations you expect, and no others), proceed to the next step.
-    For example, if you're adding a new rule named `E402`, you would run:
+````markdown
+<!-- crates/ruff_linter/resources/mdtest/pycodestyle/module-import-not-at-top-of-file.md -->
 
-    ```shell
-    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
-    ```
+# `module-import-not-at-top-of-file` (`E402`)
 
-    **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
-    you activate it by adding `--select ${rule_code}` to the command.
+## Basic examples
 
-1. Add the test to the relevant `crates/ruff_linter/src/rules/[linter]/mod.rs` file. If you're contributing
-    a rule to a pre-existing set, you should be able to find a similar example to pattern-match
-    against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
-    e.g., `crates/ruff_linter/src/rules/flake8_bugbear/mod.rs`)
+```toml
+lint.select = ["E402"]
+```
 
-1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
-    with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
-    then commit the snapshot file alongside the rest of your changes.
+This is an example of code flagged by the rule:
 
-1. Run `cargo test` again to ensure that your test passes.
+```py
+a = 1
+import os  # snapshot: module-import-not-at-top-of-file
+```
+
+```snapshot
+error[E402]: Module level import not at top of file
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | import os  # snapshot: module-import-not-at-top-of-file
+  | ^^^^^^^^^
+  |
+```
+
+Additional cases can just use `# error` since the diagnostics should look the same:
+
+```py
+b = 2
+import something_else  # error: [module-import-not-at-top-of-file]
+```
+
+## More complicated configuration
+
+If any of your tests require special configuration options, you can define additional TOML code
+blocks. These blocks accept all of the configuration options that Ruff itself does:
+
+
+```toml
+target-version = "py310"
+
+[lint]
+select = ["E"]
+
+[lint.pycodestyle]
+max-line-length = 100
+```
+````
+
+Mdtests are run as part of a normal `cargo test` invocation as part of the `ruff_mdtest` crate.
+
+### Example: Adding an auto-fix
+
+Sometimes a lint violation has a natural fix in the form of an edit to the
+source code. To surface this suggestion to the user, you will need to attach
+a `Fix` to the diagnostic using one of the helper methods on `DiagnosticGuard` found in `crates/ruff_linter/src/checkers/ast/mod.rs` (e.g. `set_fix`).
+
+You will also need to decide when to offer this fix
+and whether it is safe or unsafe. Please refer to the documentation on
+[fix safety](https://docs.astral.sh/ruff/linter/#fix-safety) to determine
+whether to offer a safe or unsafe fix. If a fix is (sometimes) unsafe,
+update the rule's documentation with an explanation under the heading
+`## Fix safety`.
+
+Often the nontrivial work lies in generating
+the new source code in the form of an `Edit`.
+There are three main ways to do this:
+
+1. **AST-based edits**. Here we construct the AST node that we wish
+    the new source code to parse to, and then generate the text using a method on
+    `checker.generator()`. The benefit of such edits is that they should essentially
+    never introduce syntax errors and they will have predictable formatting. On the
+    other hand, it can be cumbersome to build an AST node by hand, and one has less
+    fine-grained control over comments.
+1. **CST-based edits**. This is similar to
+    the above except that one leverages LibCST to first parse the source
+    into a concrete syntax tree and then modifies it as needed. This
+    retains more of the formatting of the original source while retaining
+    the other benefits of AST-based edits. However, it introduces
+    overhead.
+1. **Text-based edits**. Here we directly construct the replacement
+    text as a string. This gives you the most control over what the
+    edit will look like, and is often more performant. However,
+    it can be much more difficult to ensure that the fix does not
+    introduce syntax errors, especially on unusual source code.
+    If you adopt this approach, be sure to add even more test fixtures
+    than usual.
+
+You can find helpers for common edits in `crates/ruff_linter/src/fix/edits.rs`
+and `crates/ruff_linter/src/fix/codemods.rs`.
 
 ### Example: Adding a new configuration option
 
@@ -264,6 +411,55 @@ Note that plugin-specific configuration options are defined in their own modules
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+### Opening a PR
+
+After you finish your changes, the next step is to open a PR. By default, two
+sections will be filled into the PR body: the summary and the test plan.
+
+#### The summary
+
+The summary is intended to give us as maintainers information about your PR.
+This should typically include a link to the relevant issue(s) you're addressing
+in your PR, as well as a summary of the issue and your approach to fixing it. If
+you have any questions about your approach or design, or if you considered
+alternative approaches, that can also be helpful to include.
+
+AI can be helpful in generating both the code and summary of your PR, but a
+successful contribution should still be carefully reviewed by you and the
+summary editorialized before submitting a PR. A great summary is thorough but
+also succinct and gives us the context we need to review your PR.
+
+You can find examples of excellent issues and PRs by searching for the
+[`great writeup`](https://github.com/astral-sh/ruff/issues?q=label%3A%22great%20writeup%22)
+label.
+
+#### The test plan
+
+The test plan is likely to be shorter than the summary and can be as simple as
+"Added new snapshot tests for `RUF123`," at least for rule bugs. For LSP or some
+types of CLI changes, in particular, it can also be helpful to include
+screenshots or recordings of your change in action.
+
+#### Ecosystem report
+
+After opening the PR, an ecosystem report will be run as part of CI. This shows
+a diff of linter and formatter behavior before and after the changes in your PR.
+Going through these changes and reporting your findings in the PR summary or an
+additional comment help us to review your PR more efficiently. It's also a great
+way to find new test cases to incorporate into your PR if you identify any
+issues.
+
+#### PR status
+
+To help us know when your PR is ready for review again, please either move your
+PR back to a draft while working on it (marking it ready for review afterwards
+will ping the previous reviewers) or explicitly re-request a review. This helps
+us to avoid re-reviewing a PR while you're still working on it and also to
+prioritize PRs that are definitely ready for review.
+
+You can also thumbs-up or mark as resolved any comments we leave to let us know
+you addressed them.
+
 ## MkDocs
 
 To preview any changes to the documentation locally:
@@ -279,11 +475,7 @@ To preview any changes to the documentation locally:
 1. Run the development server with:
 
     ```shell
-    # For contributors.
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.public.yml
-
-    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    uvx --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
+    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at
@@ -298,9 +490,15 @@ them to [PyPI](https://pypi.org/project/ruff/).
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
 
-### Creating a new release
+### Installing tools
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+1. Install `npm`: `brew install npm` or similar
+
+### Creating a new release
+
+Commit each step of this process separately for easier review.
 
 1. Run `./scripts/release.sh`; this command will:
 
@@ -314,6 +512,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+    - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `prek`
 
     Additionally, for minor releases:
 
@@ -338,12 +537,15 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
     - The new version number (without starting `v`)
 
+1. Request a deployment approval from another team member
+
 1. The release workflow will do the following:
 
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
         make sure you're [re-running all the failed
         jobs](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs#re-running-failed-jobs-in-a-workflow) and not just a single failed job.
+    1. Wait for aforementioned approval
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
         after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
@@ -353,22 +555,17 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 1. Verify the GitHub release:
 
-    1. The Changelog should match the content of `CHANGELOG.md`
-    1. Append the contributors from the `scripts/release.sh` script
+    1. The changelog should match the content of `CHANGELOG.md`
 
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
-1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
-    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
-    the release instructions in those repositories. `ruff-lsp` should always be updated
-    before `ruff-vscode`.
-
-    This step is generally not required for a patch release, but should always be done
-    for a minor release.
+1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following
+    the [release instructions](https://github.com/astral-sh/ruff-vscode/blob/main/CONTRIBUTING.md#release) there.
 
 ## Ecosystem CI
 

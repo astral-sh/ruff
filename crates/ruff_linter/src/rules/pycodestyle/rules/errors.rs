@@ -25,6 +25,7 @@ use crate::Violation;
 /// - [UNIX Permissions introduction](https://mason.gmu.edu/~montecin/UNIXpermiss.htm)
 /// - [Command Line Basics: Symbolic Links](https://www.digitalocean.com/community/tutorials/workflow-symbolic-links)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub struct IOError {
     pub message: String,
 }
@@ -65,6 +66,7 @@ impl Violation for IOError {
 /// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "E999 has been removed")]
+#[violation_metadata(removed_since = "0.8.0")]
 pub(crate) struct SyntaxError;
 
 #[expect(deprecated)]

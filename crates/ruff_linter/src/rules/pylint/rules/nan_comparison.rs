@@ -33,6 +33,7 @@ use crate::linter::float::as_nan_float_string_literal;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NanComparison {
     nan: Nan,
 }

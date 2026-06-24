@@ -32,9 +32,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     bar(i)
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.dummy-variable-rgx`
+///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.84")]
 pub(crate) struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
     name: String,
@@ -91,6 +96,10 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         finder.names
     };
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "iteration order does not affect the diagnostics or fixes produced"
+    )]
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
         if checker.settings().dummy_variable_rgx.is_match(name) {
@@ -129,6 +138,11 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             },
             expr.range(),
         );
+
+        if certainty == Certainty::Certain {
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
+        }
+
         if let Some(rename) = rename {
             if certainty == Certainty::Certain {
                 // Avoid fixing if the variable, or any future bindings to the variable, are

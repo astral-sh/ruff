@@ -7,26 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/err/params_kwarg_after_st
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..26,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..25,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..20,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -34,11 +32,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 11..19,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 13..19,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                 },
                                 annotation: None,
                             },
@@ -48,11 +46,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 22..25,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 22..25,
                                     },
                                 ),
@@ -69,5 +67,5 @@ Module(
 
   |
 1 | def foo(*, **kwargs): ...
-  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after `*` separator
   |

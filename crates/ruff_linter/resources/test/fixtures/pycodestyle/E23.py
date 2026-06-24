@@ -142,3 +142,20 @@ class PEP696GoodWithEmptyBases[A: object="foo"[::-1], B: object =[[["foo", "bar"
 
 class PEP696GoodWithNonEmptyBases[A: object="foo"[::-1], B: object =[[["foo", "bar"]]], C: object= bytes](object, something_dynamic[x::-1]):
     pass
+
+# E231
+t"{(a,b)}"
+
+# Okay because it's hard to differentiate between the usages of a colon in a t-string
+t"{a:=1}"
+t"{ {'a':1} }"
+t"{a:.3f}"
+t"{(a:=1)}"
+t"{(lambda x:x)}"
+t"normal{t"{a:.3f}"}normal"
+
+#: Okay
+snapshot.file_uri[len(t's3://{self.s3_bucket_name}/'):]
+
+#: E231
+{len(t's3://{self.s3_bucket_name}/'):1}

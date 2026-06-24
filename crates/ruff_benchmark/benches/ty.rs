@@ -1,8 +1,13 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
+use ruff_benchmark::real_world_projects::{
+    InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, copy_directory_recursive,
+    get_project_cache_dir, install_dependencies_to_cache,
+};
 
+use std::fmt::Write;
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
@@ -13,11 +18,11 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
-use ruff_python_ast::PythonVersion;
-use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
-use ty_project::{Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 
 struct Case {
     db: ProjectDatabase,
@@ -81,13 +86,17 @@ fn setup_tomllib_case() -> Case {
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
+        }),
+        analysis: Some(AnalysisOptions {
+            respect_type_ignore_comments: Some(false),
+            ..AnalysisOptions::default()
         }),
         ..Options::default()
     });
 
-    let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
     let mut tomllib_files = FxHashSet::default();
     let mut re: Option<File> = None;
 
@@ -101,6 +110,7 @@ fn setup_tomllib_case() -> Case {
 
     let re = re.unwrap();
 
+    db.set_check_mode(CheckMode::OpenFiles);
     db.project().set_open_files(&mut db, tomllib_files);
 
     let re_path = re.path(&db).as_system_path().unwrap().to_owned();
@@ -153,7 +163,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         let Case { db, .. } = case;
 
         db.apply_changes(
-            vec![ChangeEvent::Changed {
+            &[ChangeEvent::Changed {
                 path: case.file_path.clone(),
                 kind: ChangedKind::FileContent,
             }],
@@ -213,13 +223,44 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
 }
 
 fn setup_micro_case(code: &str) -> Case {
+    setup_micro_case_inner(code, None)
+}
+
+fn setup_micro_case_venv(name: &str, dependencies: &[&str]) -> PathBuf {
+    let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
+    std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+    let venv_path = cache_dir.join(".venv");
+    install_dependencies_to_cache(
+        name,
+        dependencies,
+        &venv_path,
+        SupportedPythonVersion::Py312,
+        TY_ECOSYSTEM_PIN,
+    )
+    .expect("Failed to install dependencies");
+
+    venv_path
+}
+
+fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
+
+    let python = venv_path.map(|venv_path| {
+        // Copy the on-disk venv into the in-memory filesystem.
+        // ProjectMetadata::discover walks up from /src and uses / as the project root,
+        // so the venv must be at /.venv for the `python = ".venv"` option to resolve correctly.
+        copy_directory_recursive(&fs, venv_path, SystemPath::new("/.venv"))
+            .expect("Failed to copy venv to memory filesystem");
+
+        RelativePathBuf::cli(SystemPath::new(".venv"))
+    });
 
     let file_path = "src/test.py";
     fs.write_file_all(
         SystemPathBuf::from(file_path),
-        ruff_python_trivia::textwrap::dedent(code),
+        &*ruff_python_trivia::textwrap::dedent(code),
     )
     .unwrap();
 
@@ -227,15 +268,17 @@ fn setup_micro_case(code: &str) -> Case {
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
+            python,
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
     });
 
-    let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
     let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
 
+    db.set_check_mode(CheckMode::OpenFiles);
     db.project()
         .set_open_files(&mut db, FxHashSet::from_iter([file]));
 
@@ -348,6 +391,963 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_tuple_implicit_instance_attributes(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[many_tuple_assignments]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression benchmark for a case that used to hang:
+                // https://github.com/astral-sh/ty/issues/765
+                setup_micro_case(
+                    r#"
+                    from typing import Any
+
+                    class A:
+                        foo: tuple[Any, ...]
+
+                    class B(A):
+                        def __init__(self, parent: "C", x: tuple[Any]):
+                            self.foo = parent.foo + x
+
+                    class C(A):
+                        def __init__(self, parent: B, x: tuple[Any]):
+                            self.foo = parent.foo + x
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_1]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression benchmark for https://github.com/astral-sh/ty/issues/627.
+                // Before this was fixed, the following sample would take >1s to type check.
+                setup_micro_case(
+                    r#"
+                    class C:
+                        def f(self: "C"):
+                            if isinstance(self.a, str):
+                                return
+
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert!(!result.is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_2]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is similar to the case above, but now the attributes are actually defined.
+                // https://github.com/astral-sh/ty/issues/711
+                setup_micro_case(
+                    r#"
+                    class C:
+                        def f(self: "C"):
+                            if isinstance(self.a, str):
+                                return
+
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+
+                            self.a = ""
+                            self.b = ""
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_3]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression test for https://github.com/astral-sh/ty/issues/758
+                setup_micro_case(
+                    r#"
+                    class GridOut:
+                        def __init__(self: "GridOut") -> None:
+                            self._buffer = b""
+                            self._position = 0
+
+                        def _read_size_or_line(self: "GridOut", size: int = -1):
+                            if size > self._position:
+                                size = self._position
+                                pass
+                            if size == 0:
+                                return bytes()
+
+                            while size > 0:
+                                if self._buffer:
+                                    buf = self._buffer
+                                    self._buffer = b""
+                                else:
+                                    buf = b""
+
+                                if len(buf) > size:
+                                    self._buffer = buf
+                                    self._position -= len(self._buffer)
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_many_enum_members(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 512;
+
+    setup_rayon();
+
+    let mut code = "from enum import Enum\n".to_string();
+
+    code.push_str("class E(Enum):\n");
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+    code.push('\n');
+
+    code.push_str("print((");
+    for i in 0..NUM_ENUM_MEMBERS {
+        write!(&mut code, "E.m{i}, ").ok();
+    }
+    code.push_str("))");
+
+    criterion.bench_function("ty_micro[many_enum_members]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Micro-benchmark that tests our performance when slicing and unpacking
+/// a very large tuple that has many varied literal strings inside it.
+///
+/// Adapted from <https://github.com/MMD-Blender/blender_mmd_tools/blob/6ae13d6039763b6813832622c13da464983e93b3/mmd_tools/m17n.py>
+fn benchmark_very_large_tuple(criterion: &mut Criterion) {
+    /// Number of entries in the tuple -- must be >64 to trigger the literal-promotion optimization
+    const NUM_ENTRIES: usize = 65;
+
+    setup_rayon();
+
+    let mut code = "translations_tuple = (\n".to_string();
+    for i in 0..NUM_ENTRIES {
+        writeln!(
+            &mut code,
+            r#"    (("*", "Description {i}"), (("ref.path.{i}",), ()), ("ja_JP", "翻訳{i}", (False, ())), ("zh_HANS", "翻译{i}", (False, ()))),"#
+        )
+        .ok();
+    }
+    code.push_str(")\n\n");
+
+    // This slice operation (msg[2:]) is what triggers the expensive type inference:
+    // ty must compute the union of all possible slice results.
+    code.push_str(
+        "\
+for msg in translations_tuple:
+    for lang, trans, (is_fuzzy, comments) in msg[2:]:
+        pass
+",
+    );
+
+    criterion.bench_function("ty_micro[very_large_tuple]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 48;
+
+    setup_rayon();
+
+    let mut code = "\
+from enum import Enum
+from typing_extensions import assert_never
+
+class E(Enum):
+"
+    .to_string();
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+
+    code.push_str(
+        "
+    def method(self):
+        match self:",
+    );
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        write!(
+            &mut code,
+            "
+            case E.m{i}:
+                pass"
+        )
+        .ok();
+    }
+
+    code.push_str(
+        "
+            case _:
+                assert_never(self)",
+    );
+
+    criterion.bench_function("ty_micro[many_enum_members_2]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for protocol-to-protocol non-assignability when the target protocol
+/// has one more member than the source protocol.
+///
+/// Without the member-count gate, repeated return-type checks spend time comparing every shared
+/// protocol member before eventually failing on the missing one.
+fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
+    const NUM_MEMBERS: usize = 800;
+    const NUM_FUNCTIONS: usize = 400;
+
+    setup_rayon();
+
+    let mut code = "from typing import Protocol\n\nclass Small(Protocol):\n".to_string();
+    for i in 0..NUM_MEMBERS {
+        writeln!(&mut code, "    member_{i}: int").ok();
+    }
+
+    code.push_str("\nclass Big(Protocol):\n");
+    for i in 0..=NUM_MEMBERS {
+        writeln!(&mut code, "    member_{i}: int").ok();
+    }
+
+    code.push('\n');
+    for i in 0..NUM_FUNCTIONS {
+        writeln!(
+            &mut code,
+            "def check_{i}(value: Small) -> Big:\n    return value\n"
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[many_protocol_members_mismatch]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), NUM_FUNCTIONS);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for large calls to a gradual variadic tail.
+///
+/// Without the gradual-call shortcut, every positional argument type is folded into the same
+/// `*args` parameter type, making the call checker repeatedly grow a large union.
+fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(
+    0,
+"
+    .to_string();
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[gradual_vararg_call]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for many precise arguments flowing into one variadic parameter.
+///
+/// The declared type is intentionally non-gradual, so argument checks still run. The important
+/// part is that the call checker should not repeatedly rebuild a growing union for `*args`.
+fn benchmark_vararg_parameter_type_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def accepts_objects(first: int, *args: object) -> None: ...
+
+accepts_objects(
+    0,
+"
+    .to_string();
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[vararg_parameter_type_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for many precise arguments constraining the same type variable.
+///
+/// The parameters are distinct to avoid exercising the `*args` parameter-type accumulator. The
+/// important part is that specialization inference should not repeatedly rebuild a growing union
+/// for `T` as each argument adds another solution.
+fn benchmark_typevar_mapping_large_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "def combine[T](\n".to_string();
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, "    p{i}: T,").ok();
+    }
+    code.push_str(") -> T:\n    return p0\n\ncombine(\n");
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[typevar_mapping_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for many small type-variable accumulations.
+///
+/// This guards the common case where each type variable only receives a few constraints. Optimizing
+/// the large-accumulation case should not make these small generic calls slower.
+fn benchmark_typevar_mapping_small_accumulations(criterion: &mut Criterion) {
+    const NUM_CALLS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def combine[T](first: T, second: T, third: T) -> T:
+    return first
+
+"
+    .to_string();
+
+    for i in 0..NUM_CALLS {
+        writeln!(
+            &mut code,
+            r#"combine(("field_{i}", {i}), ("other_{i}", "{i}"), ("flag_{i}", True))"#
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[typevar_mapping_small_accumulations]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for narrowing a large union type through multiple match statements.
+///
+/// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
+/// (`AllDecls`) is narrowed by exhaustive match statements.
+///
+/// Sample code structure:
+/// ```python
+/// from __future__ import annotations
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class C0:
+///     value: int
+/// ...
+///
+/// AllDecls = C0 | C1 | ...
+///
+/// def process(decl: AllDecls) -> None:
+///     match decl:
+///         case C0(): pass
+///         ...
+///         case _: pass
+/// ```
+fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 30;
+    const NUM_MATCH_BRANCHES: usize = 29;
+
+    setup_rayon();
+
+    let mut code =
+        "from __future__ import annotations\nfrom dataclasses import dataclass\n\n".to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "@dataclass\nclass C{i}:\n    value: int\n").ok();
+    }
+
+    code.push_str("AllDecls = ");
+    for i in 0..NUM_CLASSES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "C{i}").ok();
+    }
+    code.push_str("\n\n");
+
+    code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
+    for i in 0..NUM_MATCH_BRANCHES {
+        writeln!(&mut code, "        case C{i}():\n            pass").ok();
+    }
+    code.push_str("        case _:\n            pass\n\n");
+
+    criterion.bench_function("ty_micro[large_union_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for narrowing through a long `isinstance` elif chain.
+///
+/// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
+/// `generate_schema_validator`) where a base class parameter is narrowed through
+/// many sequential `isinstance` checks.
+///
+/// Sample code structure:
+/// ```python
+/// class Base: ...
+/// class C0(Base): ...
+/// class C1(Base): ...
+/// ...
+///
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         pass
+///     elif isinstance(obj, C1):
+///         pass
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+
+    setup_rayon();
+
+    let mut code = "class Base: ...\n".to_string();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    code.push('\n');
+
+    code.push_str("def f(obj: Base) -> None:\n");
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+        }
+        code.push_str("        pass\n");
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+const NUM_LITERAL_FALLTHROUGH_ARMS: usize = 40;
+
+fn is_literal_fallthrough_arm(index: usize) -> bool {
+    index.is_multiple_of(8) || index == NUM_LITERAL_FALLTHROUGH_ARMS - 4
+}
+
+fn literal_fallthrough_value(index: usize) -> String {
+    let prefix = if is_literal_fallthrough_arm(index) {
+        'f'
+    } else {
+        'v'
+    };
+    format!("{prefix}{index:02}")
+}
+
+fn literal_fallthrough_prelude(guarded_any: bool) -> String {
+    let imports = if guarded_any {
+        "from typing import Any, Literal, TypeGuard\n\n"
+    } else {
+        "from typing import Literal\n\n"
+    };
+    let mut code = imports.to_string();
+
+    code.push_str("Value = Literal[\n");
+    for index in 0..NUM_LITERAL_FALLTHROUGH_ARMS {
+        writeln!(&mut code, r#"    "{}","#, literal_fallthrough_value(index)).ok();
+    }
+    code.push_str("]\n\n");
+
+    if guarded_any {
+        code.push_str("def keep_value(value: object) -> TypeGuard[Value]:\n    return True\n\n");
+    }
+
+    code
+}
+
+fn literal_match_fallthrough_code(guarded_any: bool) -> String {
+    let parameter_ty = if guarded_any { "Value | Any" } else { "Value" };
+    let mut code = literal_fallthrough_prelude(guarded_any);
+    writeln!(
+        &mut code,
+        "def check_literal_match(value: {parameter_ty}) -> None:\n    match value:"
+    )
+    .ok();
+
+    for index in 0..NUM_LITERAL_FALLTHROUGH_ARMS {
+        let guard = if guarded_any && index == 0 {
+            " if keep_value(value)"
+        } else {
+            ""
+        };
+        writeln!(
+            &mut code,
+            r#"        case "{}"{guard}:"#,
+            literal_fallthrough_value(index),
+        )
+        .ok();
+        code.push_str(if is_literal_fallthrough_arm(index) {
+            "            pass\n"
+        } else {
+            "            return\n"
+        });
+    }
+
+    code.push_str("\n    repr(value)\n");
+    code
+}
+
+fn literal_equality_fallthrough_code() -> String {
+    let mut code = literal_fallthrough_prelude(true);
+    code.push_str("def check_literal_equality(value: Value | Any) -> None:\n");
+
+    for index in 0..NUM_LITERAL_FALLTHROUGH_ARMS {
+        let keyword = if index == 0 { "if" } else { "elif" };
+        write!(
+            &mut code,
+            r#"    {keyword} value == "{}""#,
+            literal_fallthrough_value(index)
+        )
+        .ok();
+        if index == 0 {
+            code.push_str(" and keep_value(value)");
+        }
+        code.push_str(":\n");
+        code.push_str(if is_literal_fallthrough_arm(index) {
+            "        pass\n"
+        } else {
+            "        return\n"
+        });
+    }
+
+    code.push_str("\n    repr(value)\n");
+    code
+}
+
+/// Benchmarks `match` fallthrough over a finite `Literal` subject.
+///
+/// This generates a large version of this Python shape:
+/// ```python
+/// def check(value: Value) -> None:
+///     match value:
+///         case "f00":
+///             pass
+///         case "v01":
+///             return
+///         case "f08":
+///             pass
+///
+///     repr(value)
+/// ```
+///
+/// Some cases return and some continue after the `match`. This measures how long it takes to infer
+/// the type of `value` after many literal match cases when the subject has a finite literal type.
+fn benchmark_literal_match_fallthrough(criterion: &mut Criterion) {
+    benchmark_literal_fallthrough(
+        criterion,
+        "ty_micro[literal_match_fallthrough]",
+        &literal_match_fallthrough_code(false),
+    );
+}
+
+/// Benchmarks guarded `match` fallthrough over a gradual literal subject.
+///
+/// This generates a large version of this Python shape:
+/// ```python
+/// def keep_value(value: object) -> TypeGuard[Value]:
+///     return True
+///
+/// def check(value: Value | Any) -> None:
+///     match value:
+///         case "f00" if keep_value(value):
+///             pass
+///         case "v01":
+///             return
+///         case "f08":
+///             pass
+///
+///     repr(value)
+/// ```
+///
+/// This is the same match shape, but the subject can also be `Any` and the first continuing case
+/// uses a `TypeGuard`. It measures how that guard affects the type of `value` after many match
+/// cases.
+fn benchmark_literal_match_fallthrough_guarded_any(criterion: &mut Criterion) {
+    benchmark_literal_fallthrough(
+        criterion,
+        "ty_micro[literal_match_fallthrough_guarded_any]",
+        &literal_match_fallthrough_code(true),
+    );
+}
+
+/// Benchmarks guarded fallthrough through many equality checks.
+///
+/// This generates a large version of this Python shape:
+/// ```python
+/// def check(value: Value | Any) -> None:
+///     if value == "f00" and keep_value(value):
+///         pass
+///     elif value == "v01":
+///         return
+///     elif value == "f08":
+///         pass
+///
+///     repr(value)
+/// ```
+///
+/// This is the guarded gradual case written with `if`/`elif` equality checks instead of `match`.
+/// Some branches return and some continue after the conditional, so the benchmark measures the
+/// type of `value` after many comparisons.
+fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion) {
+    benchmark_literal_fallthrough(
+        criterion,
+        "ty_micro[literal_equality_fallthrough_guarded_any]",
+        &literal_equality_fallthrough_code(),
+    );
+}
+
+fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &str) {
+    setup_rayon();
+
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3120>.
+///
+/// Sequential (`TypeIs`) narrowing on a large `Literal` union, combined with
+/// `match`/`assert_never` on another `Literal` union, caused a combinatorial
+/// explosion when the `PredicateNode::IsNonTerminalCall` optimization was
+/// removed.
+fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[typeis_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(include_str!("../resources/typeis_narrowing.py")),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_pandas_tdd(criterion: &mut Criterion) {
+    setup_rayon();
+    let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
+    let code = r#"
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "a": [1, 2, 3],
+            "b": [4, 5, 6],
+            "c": [7, 8, 9],
+        })
+        df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
+            df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
+        "#;
+
+    // This example was reported in https://github.com/astral-sh/ty/issues/3039.
+    criterion.bench_function("ty_micro[pandas_tdd]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case_inner(code, Some(&venv_path)),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
+    const NUM_BRANCHES: usize = 11;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3663.
+    let mut code = "from typing import Literal, TypedDict\n\n".to_string();
+    for i in 0..NUM_BRANCHES {
+        writeln!(
+            &mut code,
+            "class Node{i}(TypedDict):\n    type: Literal['node-{i}']\n    children: list['Node']\n"
+        )
+        .ok();
+    }
+    code.push_str("class Leaf(TypedDict):\n    type: Literal['leaf']\n    text: str\n\n");
+    code.push_str("type Node = ");
+    for i in 0..NUM_BRANCHES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Node{i}").ok();
+    }
+    code.push_str(
+        r#" | Leaf
+
+value: list[Node] = [
+    {"type": "node-0", "children": [
+        {"type": "node-1", "children": [
+            {"type": "node-2", "children": [{"type": "leaf", "text": "x"}]},
+            {"type": "node-3", "children": [{"type": "leaf", "text": "y"}]},
+        ]},
+        {"type": "node-4", "children": [
+            {"type": "node-5", "children": [{"type": "leaf", "text": "z"}]},
+            {"type": "node-6", "children": [{"type": "leaf", "text": "w"}]},
+        ]},
+    ]},
+]
+"#,
+    );
+
+    criterion.bench_function(
+        "ty_micro[recursive_typed_dict_union_contextual_inference]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
+fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
+    const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
+
+    setup_rayon();
+
+    // Minimized from the pydantic and hydra-zen ecosystem regressions seen during the
+    // SpecializationBuilder pending-constraint-set migration. Pydantic has several empty dict
+    // literals with a type context equivalent to `dict[Hashable, core_schema.CoreSchema]`
+    // (including `schema.setdefault("metadata", {})` and tagged-union choice tables).
+    // `CoreSchema` is a large union of TypedDict schema types; this local `CoreSchema` alias is
+    // derived from pydantic-core's real `CoreSchema`, but reduced to enough variants to show the
+    // regression quickly. Solving the empty-dict specialization creates one lower-bound constraint
+    // per union element for `_VT@dict`. Combined with `_KT@dict = Hashable`,
+    // PathAssignments/SequentMap traversal derives cross-typevar facts like
+    // `TypedDictSchema <= _VT@dict <= Hashable`. This benchmark tracks the cost until constraint
+    // projection / path-bounds solving can avoid that work.
+    let mut code = "from collections.abc import Hashable\nfrom typing import Literal, NotRequired, TypedDict\n\n"
+        .to_string();
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Schema{i}(TypedDict):\n    type: Literal['schema-{i}']\n    ref: NotRequired[str]\n    value_{i}: NotRequired[int]\n"
+        )
+        .ok();
+    }
+    code.push_str("type CoreSchema = ");
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Schema{i}").ok();
+    }
+    code.push_str("\n\nchoices: dict[Hashable, CoreSchema] = {}\n");
+
+    criterion.bench_function("ty_micro[pydantic_core_schema_dict]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -377,21 +1377,20 @@ impl<'a> ProjectBenchmark<'a> {
         metadata.apply_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
-                python: (!self.project.config().dependencies.is_empty())
-                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
             self.project
                 .check_paths()
                 .iter()
-                .map(|path| path.to_path_buf())
+                .map(|path| SystemPathBuf::from(*path))
                 .collect(),
         );
 
@@ -401,17 +1400,21 @@ impl<'a> ProjectBenchmark<'a> {
 
 #[track_caller]
 fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
-    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
+    fn check_project(db: &mut ProjectDatabase, project_name: &str, max_diagnostics: usize) {
         let result = db.check();
         let diagnostics = result.len();
 
-        assert!(
-            diagnostics > 1 && diagnostics <= max_diagnostics,
-            "Expected between {} and {} diagnostics but got {}",
-            1,
-            max_diagnostics,
-            diagnostics
-        );
+        if diagnostics > max_diagnostics {
+            let details = result
+                .into_iter()
+                .map(|diagnostic| diagnostic.concise_message().to_string())
+                .collect::<Vec<_>>()
+                .join("\n  ");
+            assert!(
+                diagnostics <= max_diagnostics,
+                "{project_name}: Expected <={max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
+            );
+        }
     }
 
     setup_rayon();
@@ -421,7 +1424,7 @@ fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
     group.bench_function(benchmark.project.config.name, |b| {
         b.iter_batched_ref(
             || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark.max_diagnostics),
+            |db| check_project(db, benchmark.project.config.name, benchmark.max_diagnostics),
             BatchSize::SmallInput,
         );
     });
@@ -432,13 +1435,13 @@ fn hydra(criterion: &mut Criterion) {
         RealWorldProject {
             name: "hydra-zen",
             repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-            commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec!["pydantic", "beartype", "hydra-core"],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY313,
+            commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
+            paths: &["src", "tests/annotations"],
+            dependencies: &["pydantic", "beartype", "hydra-core"],
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        100,
+        510,
     );
 
     bench_project(&benchmark, criterion);
@@ -449,13 +1452,13 @@ fn attrs(criterion: &mut Criterion) {
         RealWorldProject {
             name: "attrs",
             repository: "https://github.com/python-attrs/attrs",
-            commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY313,
+            commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
+            paths: &["src/attrs", "src/attr", "typing-examples"],
+            dependencies: &[],
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        100,
+        102,
     );
 
     bench_project(&benchmark, criterion);
@@ -466,13 +1469,30 @@ fn anyio(criterion: &mut Criterion) {
         RealWorldProject {
             name: "anyio",
             repository: "https://github.com/agronholm/anyio",
-            commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY313,
+            commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
+            paths: &["src"],
+            dependencies: &["exceptiongroup", "idna", "pytest"],
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
         },
-        100,
+        110,
+    );
+
+    bench_project(&benchmark, criterion);
+}
+
+fn datetype(criterion: &mut Criterion) {
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "DateType",
+            repository: "https://github.com/glyph/DateType",
+            commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
+            paths: &["src"],
+            dependencies: &[],
+            max_dep_date: TY_ECOSYSTEM_PIN,
+            python_version: SupportedPythonVersion::Py311,
+        },
+        17,
     );
 
     bench_project(&benchmark, criterion);
@@ -483,6 +1503,27 @@ criterion_group!(
     micro,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
+    benchmark_tuple_implicit_instance_attributes,
+    benchmark_complex_constrained_attributes_1,
+    benchmark_complex_constrained_attributes_2,
+    benchmark_complex_constrained_attributes_3,
+    benchmark_many_enum_members,
+    benchmark_many_enum_members_2,
+    benchmark_many_protocol_members_mismatch,
+    benchmark_gradual_vararg_call,
+    benchmark_vararg_parameter_type_accumulation,
+    benchmark_typevar_mapping_large_accumulation,
+    benchmark_typevar_mapping_small_accumulations,
+    benchmark_very_large_tuple,
+    benchmark_large_union_narrowing,
+    benchmark_large_isinstance_narrowing,
+    benchmark_literal_match_fallthrough,
+    benchmark_literal_match_fallthrough_guarded_any,
+    benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_typeis_narrowing,
+    benchmark_pandas_tdd,
+    benchmark_recursive_typed_dict_union_contextual_inference,
+    benchmark_pydantic_core_schema_dict,
 );
-criterion_group!(project, anyio, attrs, hydra);
+criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

@@ -114,8 +114,17 @@ impl<'a> TypingTarget<'a> {
             Expr::StringLiteral(string_expr) => checker
                 .parse_type_annotation(string_expr)
                 .ok()
-                .map(|parsed_annotation| {
-                    TypingTarget::ForwardReference(parsed_annotation.expression())
+                .and_then(|parsed_annotation| {
+                    let inner = parsed_annotation.expression();
+                    if inner.is_string_literal_expr() {
+                        // A forward reference that resolves to another string literal
+                        // (e.g. `"'int'"`) is not a valid type annotation. Avoid
+                        // recursing, which would loop forever when `relocate_expr`
+                        // gives the inner literal the same text range as the outer.
+                        None
+                    } else {
+                        Some(TypingTarget::ForwardReference(inner))
+                    }
                 }),
             _ => semantic.resolve_qualified_name(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the

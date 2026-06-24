@@ -314,6 +314,7 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
         }
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {
@@ -462,7 +463,9 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
             }
-            visitor.visit_expr(key);
+            if let Some(key) = key {
+                visitor.visit_expr(key);
+            }
             visitor.visit_expr(value);
         }
         Expr::Generator(ast::ExprGenerator {
@@ -533,18 +536,8 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             }
         }
         Expr::TString(ast::ExprTString { value, .. }) => {
-            for t_string_part in value.iter_mut() {
-                match t_string_part {
-                    ast::TStringPart::Literal(string_literal) => {
-                        visitor.visit_string_literal(string_literal);
-                    }
-                    ast::TStringPart::FString(f_string) => {
-                        visitor.visit_f_string(f_string);
-                    }
-                    ast::TStringPart::TString(t_string) => {
-                        visitor.visit_t_string(t_string);
-                    }
-                }
+            for t_string in value.iter_mut() {
+                visitor.visit_t_string(t_string);
             }
         }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {

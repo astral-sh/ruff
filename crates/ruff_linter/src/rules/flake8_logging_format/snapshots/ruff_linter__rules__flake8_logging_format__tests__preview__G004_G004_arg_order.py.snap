@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+---
+G004 Logging statement uses f-string
+  --> G004_arg_order.py:9:14
+   |
+ 7 | X = 1
+ 8 | Y = 2
+ 9 | logger.error(f"{X} -> %s", Y)
+   |              ^^^^^^^^^^^^
+10 | logger.error(f"{Y} -> %s", X)
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004_arg_order.py:10:14
+   |
+ 8 | Y = 2
+ 9 | logger.error(f"{X} -> %s", Y)
+10 | logger.error(f"{Y} -> %s", X)
+   |              ^^^^^^^^^^^^
+   |
+help: Convert to lazy `%` formatting

@@ -72,6 +72,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UnderIndentation,
         Rule::UndocumentedMagicMethod,
         Rule::UndocumentedParam,
+        Rule::IncorrectSectionOrder,
+        Rule::PropertyDocstringStartsWithVerb,
         Rule::UndocumentedPublicClass,
         Rule::UndocumentedPublicFunction,
         Rule::UndocumentedPublicInit,
@@ -81,6 +83,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicPackage,
     ]);
     let enforce_pydoclint = checker.any_rule_enabled(&[
+        Rule::DocstringExtraneousParameter,
         Rule::DocstringMissingReturns,
         Rule::DocstringExtraneousReturns,
         Rule::DocstringMissingYields,
@@ -115,12 +118,15 @@ pub(crate) fn definitions(checker: &mut Checker) {
             })
     };
 
-    let definitions = std::mem::take(&mut checker.semantic.definitions);
     let mut overloaded_name: Option<&str> = None;
     for ContextualizedDefinition {
         definition,
         visibility,
-    } in definitions.resolve(exports.as_deref()).iter()
+    } in checker
+        .semantic
+        .definitions
+        .resolve(exports.as_deref())
+        .iter()
     {
         let docstring = docstrings::extraction::extract_docstring(definition);
 
@@ -145,9 +151,6 @@ pub(crate) fn definitions(checker: &mut Checker) {
         }
 
         // flake8-pyi
-        if enforce_stubs {
-            flake8_pyi::rules::docstring_in_stubs(checker, definition, docstring);
-        }
         if enforce_stubs_and_runtime {
             flake8_pyi::rules::iter_method_return_iterable(checker, definition);
         }
@@ -256,6 +259,13 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     &checker.settings().pydocstyle,
                 );
             }
+            if checker.is_rule_enabled(Rule::PropertyDocstringStartsWithVerb) {
+                pydocstyle::rules::property_docstring_starts_with_verb(
+                    checker,
+                    &docstring,
+                    &checker.settings().pydocstyle,
+                );
+            }
             if checker.is_rule_enabled(Rule::SignatureInDocstring) {
                 pydocstyle::rules::no_signature(checker, &docstring);
             }
@@ -288,6 +298,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::MismatchedSectionUnderlineLength,
                 Rule::OverindentedSectionUnderline,
                 Rule::UndocumentedParam,
+                Rule::IncorrectSectionOrder,
             ]);
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(

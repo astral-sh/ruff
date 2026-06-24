@@ -1,10 +1,11 @@
+use crate::diagnostic::did_you_mean;
 use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
 use rustc_hash::FxHashMap;
+use std::error::Error;
 use std::fmt::Formatter;
 use std::hash::Hasher;
-use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct LintMetadata {
@@ -15,9 +16,6 @@ pub struct LintMetadata {
     pub summary: &'static str,
 
     /// An in depth explanation of the lint in markdown. Covers what the lint does, why it's bad and possible fixes.
-    ///
-    /// The documentation may require post-processing to be rendered correctly. For example, lines
-    /// might have leading or trailing whitespace that should be removed.
     pub raw_documentation: &'static str,
 
     /// The default level of the lint if the user doesn't specify one.
@@ -32,7 +30,7 @@ pub struct LintMetadata {
     pub line: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -101,18 +99,32 @@ impl LintMetadata {
         self.summary
     }
 
-    /// Returns the documentation line by line with one leading space and all trailing whitespace removed.
+    /// Returns the documentation line by line with Rust doc-comment prefixes and trailing
+    /// whitespace removed.
     pub fn documentation_lines(&self) -> impl Iterator<Item = &str> {
-        self.raw_documentation.lines().map(|line| {
-            line.strip_prefix(char::is_whitespace)
-                .unwrap_or(line)
-                .trim_end()
-        })
+        let has_doc_comment_prefix = self.raw_documentation.starts_with(' ');
+
+        self.raw_documentation
+            .strip_suffix('\n')
+            .unwrap_or(self.raw_documentation)
+            .lines()
+            .map(move |line| {
+                let line = if has_doc_comment_prefix {
+                    line.strip_prefix(' ').unwrap_or(line)
+                } else {
+                    line
+                };
+                line.trim_end()
+            })
     }
 
     /// Returns the documentation as a single string.
     pub fn documentation(&self) -> String {
         self.documentation_lines().join("\n")
+    }
+
+    pub fn documentation_url(&self) -> String {
+        lint_documentation_url(self.name())
     }
 
     pub fn default_level(&self) -> Level {
@@ -132,6 +144,10 @@ impl LintMetadata {
     }
 }
 
+pub fn lint_documentation_url(lint_name: LintName) -> String {
+    format!("https://ty.dev/rules#{lint_name}")
+}
+
 #[doc(hidden)]
 pub const fn lint_metadata_defaults() -> LintMetadata {
     LintMetadata {
@@ -146,6 +162,11 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(tag = "type", rename_all = "lowercase")
+)]
 pub enum LintStatus {
     /// The lint has been added to the linter, but is not yet stable.
     Preview {
@@ -235,7 +256,8 @@ impl LintStatus {
 #[macro_export]
 macro_rules! declare_lint {
     (
-        $(#[doc = $doc:literal])+
+        $(#[expect($($expect:tt)*)])?
+        $(#[doc = $doc:expr])+
         $vis: vis static $name: ident = {
             summary: $summary: literal,
             status: $status: expr,
@@ -243,6 +265,7 @@ macro_rules! declare_lint {
             $( $key:ident: $value:expr, )*
         }
     ) => {
+        $(#[expect($($expect)*)])?
         $( #[doc = $doc] )+
         #[expect(clippy::needless_update)]
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
@@ -258,11 +281,51 @@ macro_rules! declare_lint {
     };
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{Level, LintStatus};
+
+    crate::declare_lint! {
+        /// First line.
+        ///
+        ///     indented
+        static INLINE_DOCUMENTATION = {
+            summary: "inline documentation",
+            status: LintStatus::preview("0.0.0"),
+            default_level: Level::Error,
+        }
+    }
+
+    crate::declare_lint! {
+        #[doc = include_str!("../resources/lint_docs/invalid-attribute-access.md")]
+        static INCLUDED_DOCUMENTATION = {
+            summary: "included documentation",
+            status: LintStatus::preview("0.0.0"),
+            default_level: Level::Error,
+        }
+    }
+
+    #[test]
+    fn inline_documentation_strips_doc_comment_prefixes() {
+        assert_eq!(
+            INLINE_DOCUMENTATION.documentation(),
+            "First line.\n\n    indented"
+        );
+    }
+
+    #[test]
+    fn included_documentation_preserves_indentation() {
+        let documentation = INCLUDED_DOCUMENTATION.documentation();
+        assert!(documentation.starts_with("## What it does"));
+        assert!(documentation.contains("\n    class_var: ClassVar[int] = 1\n"));
+    }
+}
+
 /// A unique identifier for a lint rule.
 ///
 /// Implements `PartialEq`, `Eq`, and `Hash` based on the `LintMetadata` pointer
 /// for fast comparison and lookup.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, get_size2::GetSize)]
 pub struct LintId {
     definition: &'static LintMetadata,
 }
@@ -380,7 +443,12 @@ impl LintRegistry {
                     }
                 }
 
-                Err(GetLintError::Unknown(code.to_string()))
+                let suggestion = did_you_mean(self.by_name.keys().copied(), code);
+
+                Err(GetLintError::Unknown {
+                    code: code.to_string(),
+                    suggestion: suggestion.map(str::to_string),
+                })
             }
         }
     }
@@ -405,7 +473,7 @@ impl LintRegistry {
 
     /// Iterates over all removed lints.
     pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.by_name.iter().filter_map(|(_, value)| {
+        self.by_name.values().filter_map(|value| {
             if let LintEntry::Removed(metadata) = value {
                 Some(*metadata)
             } else {
@@ -415,23 +483,43 @@ impl LintRegistry {
     }
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
-    #[error("lint `{0}` has been removed")]
     Removed(LintName),
 
     /// No lint with the given name is known.
-    #[error("unknown lint `{0}`")]
-    Unknown(String),
+    Unknown {
+        code: String,
+        suggestion: Option<String>,
+    },
 
     /// The name uses the full qualified diagnostic id `lint:<rule>` instead of just `rule`.
     /// The String is the name without the `lint:` category prefix.
-    #[error("unknown lint `{prefixed}`. Did you mean `{suggestion}`?")]
     PrefixedWithCategory {
         prefixed: String,
         suggestion: String,
     },
+}
+
+impl Error for GetLintError {}
+
+impl std::fmt::Display for GetLintError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GetLintError::Removed(code) => write!(f, "Removed rule `{code}`"),
+            GetLintError::Unknown { code, suggestion } => match suggestion {
+                None => write!(f, "Unknown rule `{code}`"),
+                Some(suggestion) => {
+                    write!(f, "Unknown rule `{code}`. Did you mean `{suggestion}`?")
+                }
+            },
+            GetLintError::PrefixedWithCategory {
+                prefixed,
+                suggestion,
+            } => write!(f, "Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -463,7 +551,7 @@ impl From<&'static LintMetadata> for LintEntry {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct RuleSelection {
     /// Map with the severity for each enabled lint rule.
     ///
@@ -541,7 +629,36 @@ impl RuleSelection {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+// The default `LintId` debug implementation prints the entire lint metadata.
+// This is way too verbose.
+impl fmt::Debug for RuleSelection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let lints = self.lints.iter().sorted_by_key(|(lint, _)| lint.name);
+
+        if f.alternate() {
+            let mut f = f.debug_map();
+
+            for (lint, (severity, source)) in lints {
+                f.entry(
+                    &lint.name().as_str(),
+                    &format_args!("{severity:?} ({source:?})"),
+                );
+            }
+
+            f.finish()
+        } else {
+            let mut f = f.debug_set();
+
+            for (lint, _) in lints {
+                f.entry(&lint.name());
+            }
+
+            f.finish()
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub enum LintSource {
     /// The user didn't enable the rule explicitly, instead it's enabled by default.
     #[default]
@@ -552,4 +669,7 @@ pub enum LintSource {
 
     /// The rule was enabled in a configuration file.
     File,
+
+    /// The rule was enabled from the configuration in the editor.
+    Editor,
 }

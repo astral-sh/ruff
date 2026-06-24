@@ -177,3 +177,12 @@ async def func():
     0 # comment
     )
     )
+
+
+async def func():
+    # https://github.com/astral-sh/ruff/issues/21693
+    # The autofix for anyio should use `import anyio.lowlevel` instead of
+    # `from anyio import lowlevel`, since `anyio.lowlevel` is a submodule.
+    from anyio import sleep as anyio_sleep
+
+    await anyio_sleep(0)  # ASYNC115

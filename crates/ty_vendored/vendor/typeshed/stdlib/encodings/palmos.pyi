@@ -1,3 +1,9 @@
+"""Python Character Mapping Codec for PalmOS 3.5.
+
+Written by Sjoerd Mullender (sjoerd@acm.org); based on iso8859_15.py.
+
+"""
+
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

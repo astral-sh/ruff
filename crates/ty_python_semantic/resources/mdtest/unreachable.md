@@ -187,8 +187,8 @@ python-platform = "all"
 
 If `python-platform` is set to `all`, we treat the platform as unspecified. This means that we do
 not infer a literal type like `Literal["win32"]` for `sys.platform`, but instead fall back to
-`LiteralString` (the `typeshed` annotation for `sys.platform`). This means that we can not
-statically determine the truthiness of a branch like `sys.platform == "win32"`.
+`LiteralString` (the `typeshed` annotation for `sys.platform`). This means that we cannot statically
+determine the truthiness of a branch like `sys.platform == "win32"`.
 
 See <https://github.com/astral-sh/ruff/issues/16983#issuecomment-2777146188> for a plan on how this
 could be improved.
@@ -198,7 +198,7 @@ import sys
 
 if sys.platform == "win32":
     # TODO: we should not emit an error here
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     sys.getwindowsversion()
 ```
 
@@ -241,16 +241,16 @@ def f():
 
 ### Use of variable in nested function
 
-In the example below, since we use `x` in the `inner` function, we use the "public" type of `x`,
-which currently refers to the end-of-scope type of `x`. Since the end of the `outer` scope is
-unreachable, we need to make sure that we do not emit an `unresolved-reference` diagnostic:
+This is a regression test for a behavior that previously caused problems when the public type still
+referred to the end-of-scope, which would result in an unresolved-reference error here since the end
+of the scope is unreachable.
 
 ```py
 def outer():
     x = 1
 
     def inner():
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: Literal[1]
     while True:
         pass
 ```
@@ -464,6 +464,29 @@ if False:
             print(x)
 ```
 
+This also applies to deferred annotations on Python 3.14+, which are resolved from the perspective
+of the end of the scope, which may not be part of the unreachable section.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TYPE_CHECKING
+
+class NonCallable:
+    pass
+
+if not TYPE_CHECKING:
+    def _(non_callable: NonCallable):
+        non_callable()
+
+if False:
+    def _(non_callable: NonCallable):
+        non_callable()
+```
+
 ### Type annotations
 
 Silencing of diagnostics also works for type annotations, even if they are stringified:
@@ -508,19 +531,19 @@ def _():
     class Sub(C): ...
 ```
 
-### Emit diagnostics for definitely wrong code
+### No diagnostics for unreachable statements
 
-Even though the expressions in the snippet below are unreachable, we still emit diagnostics for
-them:
+Our current strategy is to silence diagnostics unconditionally, even if the expression itself is
+obviously wrong in isolation:
 
 ```py
 if False:
-    1 + "a"  # error: [unsupported-operator]
+    1 + "a"
 
 def f():
     return
 
-    1 / 0  # error: [division-by-zero]
+    1 / 0
 ```
 
 ### Conflicting type information
@@ -580,4 +603,45 @@ if False:
     d()
 
     1 / number
+```
+
+## `Never`-inferred variables in type expressions
+
+We offer a helpful subdiagnostic if a variable in a type expression is inferred as having type
+`Never`, since this almost certainly resulted in the definition of the type being inferred by ty as
+being unreachable:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+`module.py`:
+
+```py
+import sys
+
+if sys.version_info >= (3, 14):
+    raise RuntimeError("this library doesn't support 3.14 yet!!!")
+
+class AwesomeAPI: ...
+```
+
+`main.py`:
+
+```py
+import module
+
+# snapshot: invalid-type-form
+def f(x: module.AwesomeAPI): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter annotation
+ --> src/main.py:4:10
+  |
+4 | def f(x: module.AwesomeAPI): ...
+  |          ^^^^^^^^^^^^^^^^^
+  |
+help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
 ```

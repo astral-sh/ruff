@@ -48,7 +48,14 @@ use crate::checkers::ast::Checker;
 ///         f = path2.open()
 ///     print(f.readline())  # prints a line from path2
 /// ```
+///
+/// ## Options
+///
+/// The rule ignores assignments to dummy variables, as specified by:
+///
+/// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct RedefinedLoopName {
     name: String,
     outer_kind: OuterBindingKind,

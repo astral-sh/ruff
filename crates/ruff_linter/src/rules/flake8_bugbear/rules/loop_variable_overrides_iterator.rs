@@ -37,6 +37,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `for` statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.121")]
 pub(crate) struct LoopVariableOverridesIterator {
     name: String,
 }
@@ -62,6 +63,10 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
         iter_finder.names
     };
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "iteration order does not affect the diagnostics produced"
+    )]
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
             checker.report_diagnostic(

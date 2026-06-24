@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast};
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -41,6 +41,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.89")]
 pub(crate) struct MixedCaseVariableInClassScope {
     name: String,
 }
@@ -56,7 +57,7 @@ impl Violation for MixedCaseVariableInClassScope {
 /// N815
 pub(crate) fn mixed_case_variable_in_class_scope(
     checker: &Checker,
-    expr: &Expr,
+    range: TextRange,
     name: &str,
     class_def: &ast::StmtClassDef,
 ) {
@@ -80,6 +81,6 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         MixedCaseVariableInClassScope {
             name: name.to_string(),
         },
-        expr.range(),
+        range,
     );
 }

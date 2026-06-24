@@ -33,6 +33,75 @@ def _(target: int):
     reveal_type(y)
 ```
 
+## With sequence wildcard
+
+```py
+from collections.abc import Sequence
+
+def sequence_star_pattern_is_exhaustive(paths: list[int]) -> None:
+    match paths:
+        case [*_paths]:
+            raise ValueError
+
+    reveal_type(paths)  # revealed: Never
+
+def sequence_star_pattern_is_not_exhaustive_for_text(paths: Sequence[str]) -> None:
+    match paths:
+        case [*_paths]:
+            raise ValueError
+
+    # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but sequence
+    # patterns explicitly do not match them.
+    # TODO: After https://github.com/astral-sh/ty/issues/3314 is fixed, the
+    # `Sequence[str] & bytes` and `Sequence[str] & bytearray` intersections
+    # should simplify to `Never`.
+    reveal_type(paths)  # revealed: str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+
+def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
+    match paths:
+        case []:
+            raise ValueError
+        case [_first]:
+            raise ValueError
+        case [_first, _second, *_paths]:
+            raise ValueError
+
+    # The failed length checks are not retained for a sequence whose length can change.
+    reveal_type(paths)  # revealed: Sequence[str]
+
+def normalize_version(
+    version: str | tuple[int, int] | tuple[int, int, int],
+) -> str:
+    match version:
+        case [major, minor, *_rest]:
+            return f"{major}.{minor}"
+
+    reveal_type(version)  # revealed: str
+    return version.strip()
+
+def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
+    match value:
+        case int(), str():
+            return 1
+
+def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(real=0)]:
+            return 1
+
+def guarded_exact_sequence_pattern_is_not_exhaustive(value: tuple[int, str], flag: bool) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(), str()] if flag:
+            return 1
+
+def guarded_then_unguarded_exact_sequence_patterns_are_exhaustive(value: tuple[int, str], flag: bool) -> int:
+    match value:
+        case [int(), str()] if flag:
+            return 1
+        case [int(), str()]:
+            return 2
+```
+
 ## Basic match
 
 ```py
@@ -79,6 +148,8 @@ def _(subject: C):
 
 A `case` branch with a class pattern is taken if the subject is an instance of the given class, and
 all subpatterns in the class pattern match.
+
+### Without arguments
 
 ```py
 from typing import final
@@ -136,6 +207,135 @@ def _(target: FooSub | str):
     reveal_type(y)  # revealed: Literal[1, 3, 4]
 ```
 
+### Dynamic class
+
+A dynamically typed class pattern is not known to match every subject, so later cases remain
+reachable.
+
+```py
+from typing import Any
+
+DynamicClass: Any = int
+
+def _(target: int | str):
+    match target:
+        case DynamicClass():
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### Subclass-of type
+
+A class pattern whose class expression has type `type[Base]` is not guaranteed to match a `Base`
+subject. `PatternClass` can evaluate to any subclass of `Base`, and a `Base` instance need not be an
+instance of that subclass. The `PatternClass` arm must therefore not be considered guaranteed to
+match, and the fallback arm remains reachable.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+PatternClass: type[Base] = Derived
+
+def _(target: Base):
+    match target:
+        case PatternClass():
+            reveal_type(target)  # revealed: Base
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: Base
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### `collections.abc.Callable`
+
+```py
+from collections import abc
+
+def _(subj: abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2]
+
+def _(subj: None) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1]
+
+def _(subj: int | abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2, 3]
+```
+
+### With arguments
+
+```py
+from typing_extensions import assert_never
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+class Other: ...
+
+def _(target: Point):
+    y = 1
+
+    match target:
+        case Point(0, 0):
+            y = 2
+        case Point(x=0, y=1):
+            y = 3
+        case Point(x=1, y=0):
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[1, 2, 3, 4]
+
+def _(target: Point):
+    match target:
+        case Point(x, y):  # irrefutable sub-patterns
+            pass
+        case _:
+            assert_never(target)
+
+def _(target: Point | Other):
+    match target:
+        case Point(0, 0):
+            reveal_type(target)  # revealed: Point
+        case Point(x=0, y=1):
+            reveal_type(target)  # revealed: Point
+        case Point(x=1, y=0):
+            reveal_type(target)  # revealed: Point
+        case Other():
+            reveal_type(target)  # revealed: Other
+```
+
 ## Singleton match
 
 Singleton patterns are matched based on identity, not equality comparisons or `isinstance()` checks.
@@ -154,8 +354,7 @@ def _(target: Literal[True, False]):
         case None:
             y = 4
 
-    # TODO: with exhaustiveness checking, this should be Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(target: bool):
     y = 1
@@ -168,8 +367,7 @@ def _(target: bool):
         case None:
             y = 4
 
-    # TODO: with exhaustiveness checking, this should be Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(target: None):
     y = 1
@@ -195,8 +393,7 @@ def _(target: None | Literal[True]):
         case None:
             y = 4
 
-    # TODO: with exhaustiveness checking, this should be Literal[2, 4]
-    reveal_type(y)  # revealed: Literal[1, 2, 4]
+    reveal_type(y)  # revealed: Literal[2, 4]
 
 # bool is an int subclass
 def _(target: int):
@@ -226,6 +423,60 @@ def _(target: str):
     reveal_type(y)  # revealed: Literal[1]
 ```
 
+## Matching on enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    y = 0
+    match answer:
+        case Answer.YES:
+            reveal_type(answer)  # revealed: Literal[Answer.YES]
+            y = 1
+        case Answer.NO:
+            reveal_type(answer)  # revealed: Literal[Answer.NO]
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+## Matching on enum value patterns in invalid code
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3481>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+def f(x: T): ...
+def g(x: T): ...
+
+f()  # error: [missing-argument] "No argument provided for required parameter `x`"
+g()  # error: [missing-argument]
+
+class C(Enum):
+    a = 1
+    b = 2
+
+match m:  # error: [unresolved-reference] "Name `m` used when not defined"
+    case C.a:
+        _()  # error: [unresolved-reference] "Name `_` used when not defined"
+    case _:
+        _()  # error: [unresolved-reference]
+
+T = TypeVar
+```
+
 ## Or match
 
 A `|` pattern matches if any of the subpatterns match.
@@ -242,8 +493,7 @@ def _(target: Literal["foo", "baz"]):
         case "baz":
             y = 3
 
-    # TODO: with exhaustiveness, this should be Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(target: None):
     y = 1
@@ -285,6 +535,68 @@ def _(target: None | Foo):
     reveal_type(y)  # revealed: Literal[1, 3]
 ```
 
+## `as` patterns
+
+An `as` pattern binds the value matched by the pattern on its left. The bound name gets the type of
+the subject after that pattern succeeds.
+
+### Value-pattern aliases
+
+Value patterns use `==`, and `as` binds the original subject rather than the value written in the
+pattern. An `int` or `str` subclass can define `__eq__` so that it compares equal to `1`, so `x`
+remains `int | str` in the first branch. If that branch fails, we can rule out the exact integer
+literal `1` and `True`, which compares equal to `1`, but not the rest of either class.
+
+```py
+def _(target: int | str):
+    y = 1
+
+    match target:
+        case 1 as x:
+            y = 2
+            reveal_type(x)  # revealed: int | str
+        case "foo" as x:
+            y = 3
+            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
+        case _:
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
+### Narrowing a value alias
+
+When every possible value has known equality behavior, the value pattern can narrow the bound name.
+Here, matching `1` narrows `item` to `Literal[1]`.
+
+```py
+from typing import Literal
+
+def value_alias(target: Literal[1, 2]):
+    match target:
+        case 1 as item:
+            reveal_type(item)  # revealed: Literal[1]
+```
+
+### Bindings that always match
+
+A wildcard alias and a capture pattern both match every subject, so they bind the subject's full
+type.
+
+```py
+from typing import Literal
+
+def wildcard_alias(target: Literal[1, 2]):
+    match target:
+        case _ as item:
+            reveal_type(item)  # revealed: Literal[1, 2]
+
+def capture_pattern(target: Literal[1, 2]):
+    match target:
+        case item:
+            reveal_type(item)  # revealed: Literal[1, 2]
+```
+
 ## Guard with object that implements `__bool__` incorrectly
 
 ```py
@@ -294,11 +606,133 @@ class NotBoolable:
 def _(target: int, flag: NotBoolable):
     y = 1
     match target:
-        # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+        # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
         case 1 if flag:
             y = 2
         case 2:
             y = 3
 
     reveal_type(y)  # revealed: Literal[1, 2, 3]
+```
+
+## Matching on enum | None without covering None
+
+When matching on a union of an enum and None, code after the match should still be reachable if None
+is not covered by any case, even when all enum members are covered.
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+def _(answer: Answer | None):
+    y = 0
+    match answer:
+        case Answer.YES:
+            y = 1
+        case Answer.NO:
+            y = 2
+
+    # The match is not exhaustive because None is not covered,
+    # so y could still be 0
+    reveal_type(y)  # revealed: Literal[0, 1, 2]
+
+def _(answer: Answer | None):
+    match answer:
+        case Answer.YES:
+            return 1
+        case Answer.NO:
+            return 2
+
+    # Code here is reachable because None is not covered
+    reveal_type(answer)  # revealed: None
+    return 3
+
+class Foo: ...
+
+def _(answer: Answer | None):
+    match answer:
+        case Answer.YES:
+            return
+        case Answer.NO:
+            return
+
+    # New assignments after the match should not be `Never`
+    x = Foo()
+    reveal_type(x)  # revealed: Foo
+```
+
+## Invalid class patterns
+
+For class patterns, the runtime first checks that the match pattern is an instance of `type`, and
+then uses `isinstance` to check the match.
+
+If the match pattern is not an instance of `type`, we raise a diagnostic:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
+    Invalid1 = "foo"
+
+    match val:
+        # error: [invalid-match-pattern] "`Literal["foo"]` cannot be used in a class pattern because it is not a type"
+        case Invalid1(): ...
+
+    Invalid2 = int | str
+
+    match val:
+        # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
+        case Invalid2():
+            pass
+        case Valid1():  # fine
+            pass
+        case Valid2():  # fine
+            pass
+        case Valid3():  # fine
+            pass
+        case Valid4():  # fine
+            pass
+```
+
+We also raise a diagnostic if the class cannot be used with `isinstance`:
+
+```py
+from typing import Any, TypedDict
+
+def _(val):
+    Invalid3 = Any
+
+    match val:
+        # TODO: this should be an `invalid-match-pattern` error
+        case Invalid3(): ...
+
+    class Invalid4(TypedDict): ...
+
+    match val:
+        # TODO: this could have the `invalid-match-pattern` error code instead.
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Invalid4` cannot be used in a class pattern"
+        case Invalid4(): ...
+```
+
+We do not raise a diagnostic for dynamic types:
+
+```py
+def _(val, UnknownSymbol):
+    reveal_type(UnknownSymbol)  # revealed: Unknown
+
+    match val:
+        case UnknownSymbol(): ...
+```
+
+We also do not raise a diagnostic if the match pattern is a non-statically known instance of `type`:
+
+```py
+def _(val, IntOrStr: type[int | str]):
+    match val:
+        case IntOrStr():
+            print(f"Matched as {IntOrStr}: {val!r}")
 ```

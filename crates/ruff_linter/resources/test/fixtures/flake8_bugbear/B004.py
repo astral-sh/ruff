@@ -39,3 +39,34 @@ hasattr(
     "__call__",  # comment 4
     # comment 5
 )
+
+import operator
+
+assert hasattr(operator, "__call__")
+assert callable(operator) is False
+
+
+class A:
+    def __init__(self): self.__call__ = None
+
+
+assert hasattr(A(), "__call__")
+assert callable(A()) is False
+
+# https://github.com/astral-sh/ruff/issues/20440
+def test_invalid_hasattr_calls():
+    hasattr(0, "__call__", 0)  # 3 args - invalid
+    hasattr(0, "__call__", x=0)  # keyword arg - invalid
+    hasattr(0, "__call__", 0, x=0)  # 3 args + keyword - invalid
+    hasattr()  # no args - invalid
+    hasattr(0)  # 1 arg - invalid
+    hasattr(*(), "__call__", "extra")  # unpacking - invalid
+    hasattr(*())  # unpacking - invalid
+
+def test_invalid_getattr_calls():
+    getattr(0, "__call__", None, "extra")  # 4 args - invalid
+    getattr(0, "__call__", default=None)  # keyword arg - invalid
+    getattr()  # no args - invalid
+    getattr(0)  # 1 arg - invalid
+    getattr(*(), "__call__", None, "extra")  # unpacking - invalid
+    getattr(*())  # unpacking - invalid

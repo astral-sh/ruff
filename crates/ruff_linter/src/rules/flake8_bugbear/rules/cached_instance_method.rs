@@ -58,11 +58,20 @@ use crate::checkers::ast::Checker;
 ///         return square(self.value)
 /// ```
 ///
+/// ## Options
+///
+/// This rule only applies to regular methods, not static or class methods. You can customize how
+/// Ruff categorizes methods with the following options:
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// ## References
 /// - [Python documentation: `functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 /// - [don't lru_cache methods!](https://www.youtube.com/watch?v=sVjtp6tGo0g)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.114")]
 pub(crate) struct CachedInstanceMethod;
 
 impl Violation for CachedInstanceMethod {

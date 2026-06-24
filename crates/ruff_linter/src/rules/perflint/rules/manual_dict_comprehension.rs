@@ -4,7 +4,7 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
@@ -46,6 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// result.update({x: y for x, y in pairs if y % 2})
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct ManualDictComprehension {
     fix_type: DictComprehensionType,
     is_async: bool,
@@ -139,28 +140,11 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     };
 
     // If any references to a target variable are after the loop,
-    // then removing the loop would cause a NameError
-    let any_references_after_for_loop = |target: &Expr| {
-        let target_binding = checker
-            .semantic()
-            .bindings
-            .iter()
-            .find(|binding| target.range() == binding.range);
-        debug_assert!(
-            target_binding.is_some(),
-            "for-loop target binding must exist"
-        );
-
-        let Some(target_binding) = target_binding else {
-            // All uses of this function will early-return if this returns true, so this must early-return the rule
-            return true;
-        };
-
-        target_binding
-            .references()
-            .map(|reference| checker.semantic().reference(reference))
-            .any(|other_reference| other_reference.start() > for_stmt.end())
-    };
+    // then removing the loop would cause a NameError. Make sure none
+    // of the variables are used outside the for loop.
+    if has_post_loop_references(checker, target, for_stmt.end()) {
+        return;
+    }
 
     match target {
         Expr::Tuple(tuple) => {
@@ -176,22 +160,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             {
                 return;
             }
-            // Make sure none of the variables are used outside the for loop
-            if tuple.iter().any(any_references_after_for_loop) {
-                return;
-            }
         }
         Expr::Name(_) => {
             if ComparableExpr::from(key) != ComparableExpr::from(target) {
                 return;
             }
             if ComparableExpr::from(value) != ComparableExpr::from(target) {
-                return;
-            }
-
-            // We know that `target` contains an ExprName, but closures can't take `&impl Ranged`,
-            // so we pass `target` itself instead of the inner ExprName
-            if any_references_after_for_loop(target) {
                 return;
             }
         }
@@ -228,7 +202,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = {x: y for x in y if x in filtered}
     // ```
     if if_test.is_some_and(|test| {
-        any_over_expr(test, &|expr| {
+        any_over_expr(test, |expr| {
             ComparableExpr::from(expr) == ComparableExpr::from(name)
         })
     }) {
@@ -380,19 +354,50 @@ fn convert_to_dict_comprehension(
     } else {
         "for"
     };
-    let elt_str = format!(
-        "{}: {}",
-        locator.slice(key.range()),
-        locator.slice(value.range())
-    );
+    // Handles the case where `key` has a trailing comma, e.g, `dict[x,] = y`
+    let key_str = if let Expr::Tuple(ast::ExprTuple {
+        elts,
+        parenthesized,
+        ..
+    }) = key
+    {
+        if elts.len() != 1 {
+            return None;
+        }
+        if *parenthesized {
+            locator.slice(key).to_string()
+        } else {
+            format!("({})", locator.slice(key))
+        }
+    } else {
+        locator.slice(key).to_string()
+    };
 
-    let comprehension_str = format!("{{{elt_str} {for_type} {target_str} in {iter_str}{if_str}}}");
+    // If the value is a tuple without parentheses, add them
+    let value_str = if let Expr::Tuple(ast::ExprTuple {
+        parenthesized: false,
+        ..
+    }) = value
+    {
+        format!("({})", locator.slice(value))
+    } else {
+        locator.slice(value).to_string()
+    };
 
-    let for_loop_inline_comments = comment_strings_in_range(
-        checker,
-        for_stmt.range,
-        &[key.range(), value.range(), for_stmt.iter.range()],
-    );
+    let comprehension_str =
+        format!("{{{key_str}: {value_str} {for_type} {target_str} in {iter_str}{if_str}}}");
+
+    let mut ranges_to_ignore = vec![
+        key.range(),
+        value.range(),
+        for_stmt.iter.range(),
+        for_stmt.target.range(),
+    ];
+    if let Some(test) = if_test {
+        ranges_to_ignore.push(test.range());
+    }
+    let for_loop_inline_comments =
+        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 
@@ -472,4 +477,30 @@ fn convert_to_dict_comprehension(
 enum DictComprehensionType {
     Update,
     Comprehension,
+}
+
+fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
+    any_over_expr(expr, |expr| match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .any(|expr| has_post_loop_references(checker, expr, loop_end)),
+        Expr::Name(name) => {
+            let Some(target_binding) = checker
+                .semantic()
+                .bindings
+                .iter()
+                .find(|binding| name.range() == binding.range)
+            else {
+                // no binding in for statement => err on the safe side and make the checker skip
+                // e.g., `for foo[0] in bar:` or `for foo.bar in baz:`
+                return true;
+            };
+
+            target_binding
+                .references()
+                .map(|reference| checker.semantic().reference(reference))
+                .any(|other_reference| other_reference.start() > loop_end)
+        }
+        _ => false,
+    })
 }

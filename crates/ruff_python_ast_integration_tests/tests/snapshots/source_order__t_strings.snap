@@ -5,7 +5,8 @@ expression: trace
 - ModModule
   - StmtExpr
     - ExprTString
-      - StringLiteral
+      - TString
+        - InterpolatedStringLiteralElement
       - TString
         - InterpolatedStringLiteralElement
         - InterpolatedElement

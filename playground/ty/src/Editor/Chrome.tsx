@@ -8,75 +8,106 @@ import {
   useState,
 } from "react";
 import {
+  type DiagnosticDetailLocation,
   ErrorMessage,
   HorizontalResizeHandle,
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import type { Workspace } from "ty_wasm";
-import { Panel, PanelGroup } from "react-resizable-panels";
+import { type DiagnosticTag, FileHandle, Hint, Workspace } from "ty_wasm";
+import {
+  Panel,
+  Group as PanelGroup,
+  useDefaultLayout,
+} from "react-resizable-panels";
 import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics, { Diagnostic } from "./Diagnostics";
-import { FileId, ReadonlyFiles } from "../Playground";
-import type { editor } from "monaco-editor";
-import type { Monaco } from "@monaco-editor/react";
+import Diagnostics, { type Diagnostic } from "./Diagnostics";
+import VendoredFileBanner from "./VendoredFileBanner";
+import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
+import type { EditorHandle } from "./Editor";
 
 const Editor = lazy(() => import("./Editor"));
 
 interface CheckResult {
   diagnostics: Diagnostic[];
+  hints: Hint[];
   error: string | null;
   secondary: SecondaryPanelResult;
 }
 
 export interface Props {
-  workspacePromise: Promise<Workspace>;
+  sessionPromise: Promise<PlaygroundSession>;
   files: ReadonlyFiles;
   theme: Theme;
   selectedFileName: string;
+  onRun(): Promise<string>;
 
-  onAddFile(workspace: Workspace, name: string): void;
+  onAddFile(session: PlaygroundSession, name: string): void;
 
-  onChangeFile(workspace: Workspace, content: string): void;
+  onRenameFile(session: PlaygroundSession, file: FileId, newName: string): void;
 
-  onRenameFile(workspace: Workspace, file: FileId, newName: string): void;
-
-  onRemoveFile(workspace: Workspace, file: FileId): void;
+  onRemoveFile(session: PlaygroundSession, file: FileId): void;
 
   onSelectFile(id: FileId): void;
+
+  onSelectVendoredFile(handle: FileHandle): void;
+
+  onClearVendoredFile(): void;
 }
 
 export default function Chrome({
   files,
   selectedFileName,
-  workspacePromise,
+  sessionPromise,
   theme,
+  onRun,
   onAddFile,
   onRenameFile,
   onRemoveFile,
   onSelectFile,
-  onChangeFile,
+  onSelectVendoredFile,
+  onClearVendoredFile,
 }: Props) {
-  const workspace = use(workspacePromise);
+  const session = use(sessionPromise);
+  const workspace = session.workspace;
 
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
     null,
   );
 
-  const editorRef = useRef<{
-    editor: editor.IStandaloneCodeEditor;
-    monaco: Monaco;
-  } | null>(null);
+  const editorRef = useRef<EditorHandle | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
-    onRenameFile(workspace, file, newName);
+    onRenameFile(session, file, newName);
     editorRef.current?.editor.focus();
   };
+
+  const handleAdd = useCallback(
+    (name: string) => {
+      onAddFile(session, name);
+    },
+    [session, onAddFile],
+  );
+
+  const handleBackToUserFile = useCallback(() => {
+    if (editorRef.current && files.selected != null) {
+      const selectedFile = files.metadata[files.selected];
+      if (selectedFile != null) {
+        const monaco = editorRef.current.monaco;
+        const userModel = monaco.editor.getModel(selectedFile.uri);
+
+        if (userModel != null) {
+          onClearVendoredFile();
+          editorRef.current.editor.setModel(userModel);
+        }
+      }
+    }
+  }, [files.selected, files.metadata, onClearVendoredFile]);
 
   const handleSecondaryToolSelected = useCallback(
     (tool: SecondaryTool | null) => {
@@ -91,84 +122,89 @@ export default function Chrome({
     [],
   );
 
-  const handleEditorMount = useCallback(
-    (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-      editorRef.current = { editor, monaco };
-    },
-    [],
-  );
+  const handleEditorMount = useCallback((handle: EditorHandle) => {
+    editorRef.current = handle;
+  }, []);
 
-  const handleGoTo = useCallback((line: number, column: number) => {
-    const editor = editorRef.current?.editor;
-
-    if (editor == null) {
-      return;
-    }
-
-    const range = {
-      startLineNumber: line,
-      startColumn: column,
-      endLineNumber: line,
-      endColumn: column,
-    };
-    editor.revealRange(range);
-    editor.setSelection(range);
+  const handleGoTo = useCallback((location: DiagnosticDetailLocation) => {
+    editorRef.current?.goToLocation(location);
   }, []);
 
   const handleRemoved = useCallback(
-    async (id: FileId) => {
-      const name = files.index.find((file) => file.id === id)?.name;
-
-      if (name != null && editorRef.current != null) {
-        // Remove the file from the monaco state to avoid that monaco "restores" the old content.
-        // An alternative is to use a `key` on the `Editor` but that means we lose focus and selection
-        // range when changing between tabs.
-        const monaco = await import("monaco-editor");
-        editorRef.current.monaco.editor
-          .getModel(monaco.Uri.file(name))
-          ?.dispose();
-      }
-
-      onRemoveFile(workspace, id);
+    (id: FileId) => {
+      onRemoveFile(session, id);
     },
-    [workspace, files.index, onRemoveFile],
+    [session, onRemoveFile],
   );
 
-  const checkResult = useCheckResult(files, workspace, secondaryTool);
+  const { defaultLayout, onLayoutChange } = useDefaultLayout({
+    groupId: "editor-diagnostics",
+    storage: localStorage,
+  });
+
+  const checkResult = useCheckResult(
+    files,
+    workspace,
+    secondaryTool,
+    files.currentVendoredFile ?? null,
+    files.revision,
+  );
+  const currentFilePath =
+    files.selected == null
+      ? null
+      : (files.metadata[files.selected].handle?.path() ?? null);
 
   return (
     <>
       {files.selected != null ? (
         <>
           <Files
-            files={files.index}
+            order={files.order}
+            metadata={files.metadata}
             theme={theme}
             selected={files.selected}
-            onAdd={(name) => onAddFile(workspace, name)}
+            onAdd={handleAdd}
             onRename={handleFileRenamed}
             onSelect={onSelectFile}
             onRemove={handleRemoved}
           />
-          <PanelGroup direction="horizontal" autoSaveId="main">
-            <Panel
-              id="main"
-              order={0}
-              className="flex flex-col gap-2 my-4"
-              minSize={10}
-            >
-              <PanelGroup id="vertical" direction="vertical">
-                <Panel minSize={10} className="my-2" order={0}>
+          <PanelGroup
+            id="main-group"
+            orientation="horizontal"
+            className="h-full"
+          >
+            <Panel id="main" minSize={100}>
+              <PanelGroup
+                id="editor-diagnostics"
+                orientation="vertical"
+                className="h-full"
+                defaultLayout={defaultLayout}
+                onLayoutChange={onLayoutChange}
+              >
+                <Panel id="editor" minSize={100}>
+                  {files.currentVendoredFile != null && (
+                    <VendoredFileBanner
+                      currentVendoredFile={files.currentVendoredFile}
+                      selectedFile={{
+                        id: files.selected,
+                        name: selectedFileName,
+                      }}
+                      onBackToUserFile={handleBackToUserFile}
+                    />
+                  )}
                   <Editor
                     theme={theme}
                     visible={true}
                     files={files}
-                    selected={files.selected}
                     fileName={selectedFileName}
                     diagnostics={checkResult.diagnostics}
+                    hints={checkResult.hints}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={(content) => onChangeFile(workspace, content)}
                     onOpenFile={onSelectFile}
+                    onVendoredFileChange={onSelectVendoredFile}
+                    onBackToUserFile={handleBackToUserFile}
+                    isViewingVendoredFile={files.currentVendoredFile != null}
                   />
                   {checkResult.error ? (
                     <div
@@ -182,16 +218,12 @@ export default function Chrome({
                       <ErrorMessage>{checkResult.error}</ErrorMessage>
                     </div>
                   ) : null}
-                  <VerticalResizeHandle />
                 </Panel>
-                <Panel
-                  id="diagnostics"
-                  minSize={3}
-                  order={1}
-                  className="my-2 flex grow"
-                >
+                <VerticalResizeHandle />
+                <Panel id="diagnostics" minSize={150} className="my-2">
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
+                    currentFilePath={currentFilePath}
                     onGoTo={handleGoTo}
                     theme={theme}
                   />
@@ -201,14 +233,10 @@ export default function Chrome({
             {secondaryTool != null && (
               <>
                 <HorizontalResizeHandle />
-                <Panel
-                  id="secondary-panel"
-                  order={1}
-                  className={"my-2"}
-                  minSize={10}
-                >
+                <Panel id="secondary-panel" minSize={100}>
                   <SecondaryPanel
                     files={files}
+                    onRun={onRun}
                     theme={theme}
                     tool={secondaryTool}
                     result={checkResult.secondary}
@@ -231,31 +259,35 @@ function useCheckResult(
   files: ReadonlyFiles,
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
+  currentVendoredFileHandle: FileHandle | null,
+  revision: number,
 ): CheckResult {
-  const deferredContent = useDeferredValue(
-    files.selected == null ? null : files.contents[files.selected],
-  );
+  const deferredRevision = useDeferredValue(revision);
 
   return useMemo(() => {
-    if (files.selected == null || deferredContent == null) {
-      return {
-        diagnostics: [],
-        error: null,
-        secondary: null,
-      };
-    }
+    // Determine which file handle to use
+    const currentHandle =
+      currentVendoredFileHandle ??
+      (files.selected == null ? null : files.metadata[files.selected].handle);
 
-    const currentHandle = files.handles[files.selected];
+    const isVendoredFile = currentVendoredFileHandle != null;
+
+    // Regular file handling
     if (currentHandle == null || !isPythonFile(currentHandle)) {
       return {
         diagnostics: [],
+        hints: [],
         error: null,
         secondary: null,
       };
     }
 
     try {
-      const diagnostics = workspace.checkFile(currentHandle);
+      // Don't run diagnostics for vendored files - always empty
+      const diagnostics = isVendoredFile
+        ? []
+        : workspace.checkFile(currentHandle);
+      const hints = isVendoredFile ? [] : workspace.hints(currentHandle);
 
       let secondary: SecondaryPanelResult = null;
 
@@ -276,10 +308,15 @@ function useCheckResult(
             break;
 
           case "Run":
-            secondary = {
-              status: "ok",
-              content: "",
-            };
+            secondary = isVendoredFile
+              ? {
+                  status: "error",
+                  error: "Cannot run vendored/standard library files",
+                }
+              : {
+                  status: "ok",
+                  content: "",
+                };
             break;
         }
       } catch (error: unknown) {
@@ -289,37 +326,42 @@ function useCheckResult(
         };
       }
 
-      // Eagerly convert the diagnostic to avoid out of bound errors
-      // when the diagnostics are "deferred".
+      // Convert diagnostics (empty array for vendored files)
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
+        annotations: diagnostic.annotations(workspace),
+        subDiagnostics: diagnostic.subDiagnostics(workspace),
         severity: diagnostic.severity(),
+        tags: diagnostic.tags() as DiagnosticTag[],
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,
+        raw: diagnostic,
       }));
 
       return {
         diagnostics: serializedDiagnostics,
+        hints,
         error: null,
         secondary,
       };
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(e);
-
       return {
         diagnostics: [],
+        hints: [],
         error: formatError(e),
         secondary: null,
       };
     }
+    // Monaco document edits mutate the workspace in place. The deferred
+    // revision is an invalidation token for this memoized check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    deferredContent,
+    files,
     workspace,
-    files.selected,
-    files.handles,
     secondaryTool,
+    currentVendoredFileHandle,
+    deferredRevision,
   ]);
 }
 

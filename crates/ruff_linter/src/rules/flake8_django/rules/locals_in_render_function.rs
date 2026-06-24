@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 ///     return render(request, "app/index.html", context)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct DjangoLocalsInRenderFunction;
 
 impl Violation for DjangoLocalsInRenderFunction {

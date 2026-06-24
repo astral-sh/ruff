@@ -24,6 +24,7 @@ use crate::checkers::ast::Checker;
 /// country = "Poland"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct SelfAssigningVariable {
     name: String,
 }
@@ -44,11 +45,11 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
         return;
     }
 
-    for (left, right) in assign
+    for [left, right] in assign
         .targets
         .iter()
         .chain(std::iter::once(assign.value.as_ref()))
-        .tuple_combinations()
+        .array_combinations()
     {
         visit_assignments(checker, left, right);
     }

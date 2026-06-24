@@ -20,6 +20,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-locals`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.9")]
 pub(crate) struct TooManyLocals {
     current_amount: usize,
     max_amount: usize,
@@ -32,7 +33,7 @@ impl Violation for TooManyLocals {
             current_amount,
             max_amount,
         } = self;
-        format!("Too many local variables ({current_amount}/{max_amount})")
+        format!("Too many local variables ({current_amount} > {max_amount})")
     }
 }
 

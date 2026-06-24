@@ -30,6 +30,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct NonAsciiImportName {
     name: String,
     kind: Kind,

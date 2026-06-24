@@ -1,4 +1,8 @@
 import { fetchPlayground, savePlayground } from "./api";
+import {
+  generatePlaygroundMarkdown,
+  generatePlaygroundMarkdownLink,
+} from "./markdown";
 
 interface Workspace {
   files: { [name: string]: string };
@@ -8,13 +12,36 @@ interface Workspace {
 }
 
 /**
- * Persist the configuration to a URL.
+ * Persist the workspace and generate a shareable URL.
+ */
+async function shareUrl(workspace: Workspace): Promise<string> {
+  const id = await savePlayground(workspace);
+  return `${window.location.origin}/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Persist the workspace and copy a shareable URL to clipboard.
  */
 export async function persist(workspace: Workspace): Promise<void> {
-  const id = await savePlayground(workspace);
+  const url = await shareUrl(workspace);
+  await navigator.clipboard.writeText(url);
+}
 
+/**
+ * Persist the workspace and copy a markdown link to clipboard.
+ */
+export async function copyAsMarkdownLink(workspace: Workspace): Promise<void> {
+  const url = await shareUrl(workspace);
+  await navigator.clipboard.writeText(generatePlaygroundMarkdownLink(url));
+}
+
+/**
+ * Persist the workspace and copy markdown with code to clipboard.
+ */
+export async function copyAsMarkdown(workspace: Workspace): Promise<void> {
+  const url = await shareUrl(workspace);
   await navigator.clipboard.writeText(
-    `${window.location.origin}/${encodeURIComponent(id)}`,
+    generatePlaygroundMarkdown(workspace.files, url),
   );
 }
 
@@ -40,6 +67,18 @@ export async function restore(): Promise<Workspace | null> {
 }
 
 export function persistLocal(workspace: Workspace) {
+  let totalLength = 0;
+  for (const fileContent of Object.values(workspace.files)) {
+    totalLength += fileContent.length;
+
+    // Don't persist large files to local storage because they can exceed the local storage quota
+    // The number here is picked rarely arbitrarily. Also note, JS uses UTF 16:
+    // that means the limit here is strings larger than 1MB (because UTf 16 uses 2 bytes per character)
+    if (totalLength > 500_000) {
+      return;
+    }
+  }
+
   localStorage.setItem("workspace", JSON.stringify(workspace));
 }
 

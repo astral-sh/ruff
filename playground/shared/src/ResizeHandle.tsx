@@ -1,13 +1,13 @@
-import { PanelResizeHandle } from "react-resizable-panels";
+import { Separator } from "react-resizable-panels";
 
 export function HorizontalResizeHandle() {
   return (
-    <PanelResizeHandle className="cursor-ew-resize w-0.5 bg-gray-200 hover:bg-gray-300"></PanelResizeHandle>
+    <Separator className="cursor-ew-resize w-0.5 bg-gray-200 hover:bg-gray-300"></Separator>
   );
 }
 
 export function VerticalResizeHandle() {
   return (
-    <PanelResizeHandle className="cursor-eh-resize h-0.5 bg-gray-200 hover:bg-gray-300"></PanelResizeHandle>
+    <Separator className="cursor-eh-resize h-0.5 bg-gray-200 hover:bg-gray-300"></Separator>
   );
 }

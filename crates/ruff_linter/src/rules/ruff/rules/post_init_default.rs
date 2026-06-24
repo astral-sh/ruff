@@ -2,6 +2,8 @@ use anyhow::Context;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
@@ -73,6 +75,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {
@@ -117,18 +120,12 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
-                use_initvar(
-                    current_scope,
-                    function_def,
-                    &parameter.parameter,
-                    default,
-                    checker,
-                )
+                use_initvar(current_scope, function_def, parameter, default, checker)
             });
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
             // following parameter with a default).
-            stopped_fixes |= diagnostic.fix.is_none();
+            stopped_fixes |= diagnostic.fix().is_none();
         }
     }
 }
@@ -138,15 +135,31 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 fn use_initvar(
     current_scope: &Scope,
     post_init_def: &ast::StmtFunctionDef,
-    parameter: &ast::Parameter,
+    parameter_with_default: &ast::ParameterWithDefault,
     default: &ast::Expr,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
+    let parameter = &parameter_with_default.parameter;
     if current_scope.has(&parameter.name) {
         return Err(anyhow::anyhow!(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
             parameter.name
         ));
+    }
+
+    // If the annotation references a type variable scoped to `__post_init__`
+    // (PEP 695), moving it to the class body would produce a `NameError`.
+    if let Some(annotation) = parameter.annotation() {
+        if let Some(type_params) = &post_init_def.type_params {
+            if any_over_expr(annotation, |expr| {
+                expr.as_name_expr()
+                    .is_some_and(|name| type_params.iter().any(|tp| tp.name().id == name.id))
+            }) {
+                return Err(anyhow::anyhow!(
+                    "Annotation references a type variable scoped to `__post_init__`"
+                ));
+            }
+        }
     }
 
     // Ensure that `dataclasses.InitVar` is accessible. For example,
@@ -157,17 +170,24 @@ fn use_initvar(
         checker.semantic(),
     )?;
 
+    let locator = checker.locator();
+
+    let default_loc = parenthesized_range(
+        default.into(),
+        parameter_with_default.into(),
+        checker.tokens(),
+    )
+    .unwrap_or(default.range());
+
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
     // + def __post_init__(self, foo: int) -> None: ...
-    let default_edit = Edit::deletion(parameter.end(), default.end());
+    let default_edit = Edit::deletion(parameter.end(), default_loc.end());
 
     // Add `dataclasses.InitVar` field to class body.
-    let locator = checker.locator();
-
     let content = {
+        let default = locator.slice(default_loc);
         let parameter_name = locator.slice(&parameter.name);
-        let default = locator.slice(default);
         let line_ending = checker.stylist().line_ending().as_str();
 
         if let Some(annotation) = &parameter
@@ -182,7 +202,7 @@ fn use_initvar(
 
     let indentation = indentation_at_offset(post_init_def.start(), checker.source())
         .context("Failed to calculate leading indentation of `__post_init__` method")?;
-    let content = textwrap::indent(&content, indentation);
+    let content = textwrap::indent_first_line(&content, indentation);
 
     let initvar_edit = Edit::insertion(
         content.into_owned(),

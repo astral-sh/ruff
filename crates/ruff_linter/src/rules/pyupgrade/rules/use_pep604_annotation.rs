@@ -1,13 +1,16 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
-use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::Pep604Operator;
+use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
+use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
+use crate::preview::is_pep604_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -42,18 +45,26 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
-/// alongside libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10. It may also lead to runtime errors
-/// in unusual and likely incorrect type annotations where the type does not
-/// support the `|` operator.
+/// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
+/// using the PEP-604 syntax may lead to runtime errors in libraries that rely
+/// on runtime type annotations, like Pydantic, or in unusual and likely
+/// incorrect type annotations where the type does not support the `|`
+/// operator. The fix is also marked as unsafe when it would remove comments
+/// present within the type annotation being rewritten.
+///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
 ///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP604AnnotationUnion;
 
 impl Violation for NonPEP604AnnotationUnion {
@@ -98,18 +109,26 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors
-/// using libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10. It may also lead to runtime errors
-/// in unusual and likely incorrect type annotations where the type does not
-/// support the `|` operator.
+/// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
+/// using the PEP-604 syntax may lead to runtime errors in libraries that rely
+/// on runtime type annotations, like Pydantic, or in unusual and likely
+/// incorrect type annotations where the type does not support the `|`
+/// operator. The fix is also marked as unsafe when it would remove comments
+/// present within the type annotation being rewritten.
+///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
 ///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {
@@ -132,6 +151,17 @@ pub(crate) fn non_pep604_annotation(
     slice: &Expr,
     operator: Pep604Operator,
 ) {
+    // `NamedTuple` is not a type; it's a type constructor. Using it in a type annotation doesn't
+    // make much sense. But since type checkers will currently (incorrectly) _not_ complain about it
+    // being used in a type annotation, we just ignore `Optional[typing.NamedTuple]` and
+    // `Union[...]` containing `NamedTuple`.
+    // <https://github.com/astral-sh/ruff/issues/18619>
+    if is_optional_named_tuple(checker, operator, slice)
+        || is_union_with_named_tuple(checker, operator, slice)
+    {
+        return;
+    }
+
     // Avoid fixing forward references, types not in an annotation, and expressions that would
     // lead to invalid syntax.
     let fixable = checker.semantic().in_type_definition()
@@ -139,10 +169,34 @@ pub(crate) fn non_pep604_annotation(
         && is_allowed_value(slice)
         && !is_optional_none(operator, slice);
 
-    let applicability = if checker.target_version() >= PythonVersion::PY310 {
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+
+    let applicability = if checker.target_version() >= PythonVersion::PY310 && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe
+    };
+
+    let future_import = is_pep604_future_annotations_fix_enabled(checker.settings())
+        && checker.target_version() < PythonVersion::PY310
+        && checker.settings().future_annotations
+        && !checker.future_annotations_or_stub();
+
+    let create_fix = |replacement: String| {
+        let edit = Edit::range_replacement(
+            pad(replacement, expr.range(), checker.locator()),
+            expr.range(),
+        );
+
+        if future_import {
+            Fix::applicable_edits(
+                edit,
+                vec![checker.importer().add_future_import()],
+                applicability,
+            )
+        } else {
+            Fix::applicable_edit(edit, applicability)
+        }
     };
 
     match operator {
@@ -160,17 +214,43 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_optional(slice)),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        // Unwrap all nested Optional[...] and wrap once as `X | None`.
+                        let mut inner = slice;
+                        while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
+                            if let Some(Pep604Operator::Optional) =
+                                to_pep604_operator(value, slice, checker.semantic())
+                            {
+                                inner = slice;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        // If the inner expression is a `BitOr` union that already
+                        // contains `None`, strip it out and re-add it only at the end.
+                        // This avoids generating `None | None` which is a runtime
+                        // `TypeError`. For example, `Optional[None | int]` should
+                        // become `int | None`, not `None | int | None`.
+                        let fix_expr = if let Expr::BinOp(ast::ExprBinOp {
+                            op: Operator::BitOr,
+                            ..
+                        }) = inner
+                        {
+                            let elements = collect_non_none(inner);
+                            if elements.is_empty() {
+                                // All elements were `None`; don't provide a fix.
+                                None
+                            } else {
+                                Some(pep_604_optional(&pep_604_union(&elements)))
+                            }
+                        } else {
+                            Some(pep_604_optional(inner))
+                        };
+
+                        if let Some(fix_expr) = fix_expr {
+                            let replacement = checker.generator().expr(&fix_expr);
+                            diagnostic.set_fix(create_fix(replacement));
+                        }
                     }
                 }
             }
@@ -187,31 +267,22 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_union(elts)),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        let replacement = checker.generator().expr(&pep_604_union(elts));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.locator().slice(slice).to_string(),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        let inner = checker.locator().slice(slice);
+                        let replacement = if checker.locator().contains_line_break(slice.range()) {
+                            // If the inner expression spans multiple lines, wrap in
+                            // parentheses since the `Union[...]` brackets that
+                            // previously provided implicit line continuation are being
+                            // removed.
+                            format!("({inner})")
+                        } else {
+                            inner.to_string()
+                        };
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                 }
             }
@@ -273,7 +344,50 @@ fn is_allowed_value(expr: &Expr) -> bool {
     }
 }
 
+/// Return `true` if this is an `Optional[typing.NamedTuple]` annotation.
+fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Optional) && is_named_tuple(checker, slice)
+}
+
+/// Return `true` if this is a `Union[...]` annotation containing `typing.NamedTuple`.
+fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Union)
+        && (is_named_tuple(checker, slice)
+            || slice
+                .as_tuple_expr()
+                .is_some_and(|tuple| tuple.elts.iter().any(|elt| is_named_tuple(checker, elt))))
+}
+
+/// Return `true` if this is a `typing.NamedTuple` annotation.
+fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
+    checker.semantic().match_typing_expr(expr, "NamedTuple")
+}
+
 /// Return `true` if this is an `Optional[None]` annotation.
 fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
     matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
+}
+
+/// Collect all non-`None` leaf elements of a chain of `BitOr` binary operations.
+///
+/// For example, `a | None | b` is collected as `[a, b]`.
+fn collect_non_none(expr: &Expr) -> Vec<Expr> {
+    fn inner(expr: &Expr, elements: &mut Vec<Expr>) {
+        if let Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+            ..
+        }) = expr
+        {
+            inner(left, elements);
+            inner(right, elements);
+        } else if !expr.is_none_literal_expr() {
+            elements.push(expr.clone());
+        }
+    }
+
+    let mut elements = Vec::new();
+    inner(expr, &mut elements);
+    elements
 }

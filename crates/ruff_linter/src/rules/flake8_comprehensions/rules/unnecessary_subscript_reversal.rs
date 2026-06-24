@@ -27,6 +27,7 @@ use crate::checkers::ast::Checker;
 /// iterable
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.64")]
 pub(crate) struct UnnecessarySubscriptReversal {
     func: String,
 }

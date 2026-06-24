@@ -1,7 +1,7 @@
 [package]
 name = "ruff_macros"
-version = "0.0.0"
-publish = false
+version = "0.0.2"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -13,15 +13,17 @@ license = { workspace = true }
 [lib]
 proc-macro = true
 doctest = false
+test = false
 
 [dependencies]
 ruff_python_trivia = { workspace = true }
 
 heck = { workspace = true }
+itertools = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
+regex = { workspace = true }
 syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
-itertools = { workspace = true }
 
 [lints]
 workspace = true

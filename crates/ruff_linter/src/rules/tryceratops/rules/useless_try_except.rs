@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.7.0")]
 pub(crate) struct UselessTryExcept;
 
 impl Violation for UselessTryExcept {

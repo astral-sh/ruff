@@ -1,6 +1,8 @@
+use crate::preview::is_enumerate_for_loop_int_index_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -11,6 +13,9 @@ use crate::checkers::ast::Checker;
 /// Checks for `for` loops with explicit loop-index variables that can be replaced
 /// with `enumerate()`.
 ///
+/// In [preview], this rule checks for index variables initialized with any integer rather than only
+/// a literal zero.
+///
 /// ## Why is this bad?
 /// When iterating over a sequence, it's often desirable to keep track of the
 /// index of each element alongside the element itself. Prefer the `enumerate`
@@ -20,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// fruits = ["apple", "banana", "cherry"]
+/// i = 0
 /// for fruit in fruits:
 ///     print(f"{i + 1}. {fruit}")
 ///     i += 1
@@ -34,7 +40,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct EnumerateForLoop {
     index: String,
 }
@@ -70,27 +79,32 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             };
 
             // If it's not an assignment (e.g., it's a function argument), ignore it.
-            let binding = checker.semantic().binding(id);
-            if !binding.kind.is_assignment() {
+            let initial_binding = checker.semantic().binding(id);
+            if !initial_binding.kind.is_assignment() {
                 continue;
             }
 
             // If the variable is global or nonlocal, ignore it.
-            if binding.is_global() || binding.is_nonlocal() {
+            if initial_binding.is_global() || initial_binding.is_nonlocal() {
                 continue;
             }
 
-            // Ensure that the index variable was initialized to 0.
-            let Some(value) = typing::find_binding_value(binding, checker.semantic()) else {
+            // Ensure that the index variable was initialized to 0 (or instance of `int` if preview is enabled).
+            let Some(value) = typing::find_binding_value(initial_binding, checker.semantic())
+            else {
                 continue;
             };
-            if !matches!(
+            if !(matches!(
                 value,
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(Int::ZERO),
                     ..
                 })
-            ) {
+            ) || matches!(
+                ResolvedPythonType::from(value),
+                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+            ) && is_enumerate_for_loop_int_index_enabled(checker.settings()))
+            {
                 continue;
             }
 
@@ -99,7 +113,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             let Some(for_loop_id) = checker.semantic().current_statement_id() else {
                 continue;
             };
-            let Some(assignment_id) = binding.source else {
+            let Some(assignment_id) = initial_binding.source else {
                 continue;
             };
             if checker.semantic().parent_statement_id(for_loop_id)
@@ -111,7 +125,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             // Identify the binding created by the augmented assignment.
             // TODO(charlie): There should be a way to go from `ExprName` to `BindingId` (like
             // `resolve_name`, but for bindings rather than references).
-            let binding = {
+            let increment_binding = {
                 let mut bindings = checker
                     .semantic()
                     .current_scope()
@@ -131,10 +145,13 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 binding
             };
 
-            // If the variable is used outside the loop, ignore it.
-            if binding.references.iter().any(|id| {
-                let reference = checker.semantic().reference(*id);
-                !for_stmt.range().contains_range(reference.range())
+            // Reassignments in the same scope inherit older references. Ignore anything that
+            // predates the counter's initialization and only consider uses in its current lifetime.
+            let initial_binding_start = initial_binding.range.start();
+            if increment_binding.references().any(|id| {
+                let reference = checker.semantic().reference(id);
+                reference.start() >= initial_binding_start
+                    && !for_stmt.range().contains_range(reference.range())
             }) {
                 continue;
             }

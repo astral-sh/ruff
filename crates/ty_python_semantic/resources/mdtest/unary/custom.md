@@ -24,11 +24,11 @@ reveal_type(+Sub())  # revealed: bool
 reveal_type(-Sub())  # revealed: str
 reveal_type(~Sub())  # revealed: int
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `No`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `No`"
 reveal_type(+No())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `No`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `No`"
 reveal_type(-No())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `No`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `No`"
 reveal_type(~No())  # revealed: Unknown
 ```
 
@@ -52,25 +52,25 @@ class Yes:
 class Sub(Yes): ...
 class No: ...
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `<class 'Yes'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'Yes'>`"
 reveal_type(+Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `<class 'Yes'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'Yes'>`"
 reveal_type(-Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `<class 'Yes'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'Yes'>`"
 reveal_type(~Yes)  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `<class 'Sub'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'Sub'>`"
 reveal_type(+Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `<class 'Sub'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'Sub'>`"
 reveal_type(-Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `<class 'Sub'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'Sub'>`"
 reveal_type(~Sub)  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'No'>`"
 reveal_type(+No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'No'>`"
 reveal_type(-No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'No'>`"
 reveal_type(~No)  # revealed: Unknown
 ```
 
@@ -80,11 +80,11 @@ reveal_type(~No)  # revealed: Unknown
 def f():
     pass
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `def f() -> Unknown`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `def f() -> Unknown`"
 reveal_type(+f)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `def f() -> Unknown`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `def f() -> Unknown`"
 reveal_type(-f)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `def f() -> Unknown`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `def f() -> Unknown`"
 reveal_type(~f)  # revealed: Unknown
 ```
 
@@ -113,26 +113,80 @@ def sub() -> type[Sub]:
 def no() -> type[No]:
     return No
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[Yes]`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[Yes]`"
 reveal_type(+yes())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[Yes]`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `type[Yes]`"
 reveal_type(-yes())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[Yes]`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `type[Yes]`"
 reveal_type(~yes())  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[Sub]`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[Sub]`"
 reveal_type(+sub())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[Sub]`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `type[Sub]`"
 reveal_type(-sub())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[Sub]`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `type[Sub]`"
 reveal_type(~sub())  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[No]`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[No]`"
 reveal_type(+no())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[No]`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `type[No]`"
 reveal_type(-no())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[No]`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `type[No]`"
 reveal_type(~no())  # revealed: Unknown
+```
+
+## Union where one member lacks the dunder
+
+```py
+class Yes:
+    def __pos__(self) -> bool:
+        return False
+
+    def __neg__(self) -> str:
+        return "negative"
+
+    def __invert__(self) -> int:
+        return 17
+
+class No: ...
+
+def _(x: Yes | No):
+    # snapshot: unsupported-operator
+    reveal_type(+x)  # revealed: bool
+
+    # snapshot: unsupported-operator
+    reveal_type(-x)  # revealed: str
+
+    # snapshot: unsupported-operator
+    reveal_type(~x)  # revealed: int
+```
+
+```snapshot
+error[unsupported-operator]: Unary operator `+` is not supported for object of type `Yes | No`
+  --> src/mdtest_snippet.py:15:17
+   |
+15 |     reveal_type(+x)  # revealed: bool
+   |                 ^^
+   |
+info: `No` does not implement `__pos__`
+
+
+error[unsupported-operator]: Unary operator `-` is not supported for object of type `Yes | No`
+  --> src/mdtest_snippet.py:18:17
+   |
+18 |     reveal_type(-x)  # revealed: str
+   |                 ^^
+   |
+info: `No` does not implement `__neg__`
+
+
+error[unsupported-operator]: Unary operator `~` is not supported for object of type `Yes | No`
+  --> src/mdtest_snippet.py:21:17
+   |
+21 |     reveal_type(~x)  # revealed: int
+   |                 ^^
+   |
+info: `No` does not implement `__invert__`
 ```
 
 ## Metaclass
@@ -160,10 +214,10 @@ reveal_type(+Sub)  # revealed: bool
 reveal_type(-Sub)  # revealed: str
 reveal_type(~Sub)  # revealed: int
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'No'>`"
 reveal_type(+No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'No'>`"
 reveal_type(-No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'No'>`"
 reveal_type(~No)  # revealed: Unknown
 ```

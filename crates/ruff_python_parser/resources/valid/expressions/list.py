@@ -32,3 +32,4 @@
 # Random expressions
 [1 + 2, [1, 2, 3, 4], (a, b + c, d), {a, b, c}, {a: 1}, x := 2]
 [call1(call2(value.attr()) for element in iter)]
+[item in xs]

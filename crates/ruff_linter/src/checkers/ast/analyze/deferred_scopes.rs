@@ -1,15 +1,11 @@
-use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
-use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
+use ruff_python_ast::PythonVersion;
+use ruff_python_semantic::{Binding, ScopeKind};
 
-use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::fix;
 use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, ruff,
+    pyflakes, pylint, pyupgrade, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -32,6 +28,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::RuntimeImportInTypeCheckingBlock,
         Rule::SingledispatchMethod,
         Rule::SingledispatchmethodFunction,
+        Rule::SwapWithTemporaryVariable,
         Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
@@ -50,6 +47,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedUnpackedVariable,
         Rule::UnusedVariable,
+        Rule::UnnecessaryFutureImport,
     ]) {
         return;
     }
@@ -76,7 +74,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                         flake8_type_checking::helpers::is_valid_runtime_import(
                             binding,
                             &checker.semantic,
-                            &checker.settings().flake8_type_checking,
+                            checker.settings(),
                         )
                     })
                     .collect()
@@ -93,265 +91,24 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             pyflakes::rules::undefined_local(checker, scope_id, scope);
         }
 
-        // PLW0602
         if checker.is_rule_enabled(Rule::GlobalVariableNotAssigned) {
-            for (name, binding_id) in scope.bindings() {
-                let binding = checker.semantic.binding(binding_id);
-                // If the binding is a `global`, then it's a top-level `global` that was never
-                // assigned in the current scope. If it were assigned, the `global` would be
-                // shadowed by the assignment.
-                if binding.kind.is_global() {
-                    // If the binding was conditionally deleted, it will include a reference within
-                    // a `Del` context, but won't be shadowed by a `BindingKind::Deletion`, as in:
-                    // ```python
-                    // if condition:
-                    //     del var
-                    // ```
-                    if binding
-                        .references
-                        .iter()
-                        .map(|id| checker.semantic.reference(*id))
-                        .all(ResolvedReference::is_load)
-                    {
-                        checker.report_diagnostic(
-                            pylint::rules::GlobalVariableNotAssigned {
-                                name: (*name).to_string(),
-                            },
-                            binding.range(),
-                        );
-                    }
-                }
-            }
+            pylint::rules::global_variable_not_assigned(checker, scope);
         }
 
-        // PLR1704
+        if checker.is_rule_enabled(Rule::SwapWithTemporaryVariable) {
+            pylint::rules::swap_with_temporary_variable(checker, scope_id, scope);
+        }
+
         if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
-            for (name, binding_id) in scope.bindings() {
-                for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
-                    let binding = &checker.semantic.bindings[shadow.binding_id()];
-                    if !matches!(
-                        binding.kind,
-                        BindingKind::LoopVar
-                            | BindingKind::BoundException
-                            | BindingKind::WithItemVar
-                    ) {
-                        continue;
-                    }
-                    let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
-                    if !shadowed.kind.is_argument() {
-                        continue;
-                    }
-                    if checker.settings().dummy_variable_rgx.is_match(name) {
-                        continue;
-                    }
-                    let scope = &checker.semantic.scopes[binding.scope];
-                    if scope.kind.is_generator() {
-                        continue;
-                    }
-                    checker.report_diagnostic(
-                        pylint::rules::RedefinedArgumentFromLocal {
-                            name: name.to_string(),
-                        },
-                        binding.range(),
-                    );
-                }
-            }
+            pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
         }
 
-        // F402
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
-            for (name, binding_id) in scope.bindings() {
-                for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
-                    // If the shadowing binding isn't a loop variable, abort.
-                    let binding = &checker.semantic.bindings[shadow.binding_id()];
-                    if !binding.kind.is_loop_var() {
-                        continue;
-                    }
-
-                    // If the shadowed binding isn't an import, abort.
-                    let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
-                    if !matches!(
-                        shadowed.kind,
-                        BindingKind::Import(..)
-                            | BindingKind::FromImport(..)
-                            | BindingKind::SubmoduleImport(..)
-                            | BindingKind::FutureImport
-                    ) {
-                        continue;
-                    }
-
-                    // If the bindings are in different forks, abort.
-                    if shadowed.source.is_none_or(|left| {
-                        binding
-                            .source
-                            .is_none_or(|right| !checker.semantic.same_branch(left, right))
-                    }) {
-                        continue;
-                    }
-
-                    checker.report_diagnostic(
-                        pyflakes::rules::ImportShadowedByLoopVar {
-                            name: name.to_string(),
-                            row: checker.compute_source_row(shadowed.start()),
-                        },
-                        binding.range(),
-                    );
-                }
-            }
+            pyflakes::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
         }
 
-        // F811
         if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
-            // Index the redefined bindings by statement.
-            let mut redefinitions = FxHashMap::default();
-
-            for (name, binding_id) in scope.bindings() {
-                for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
-                    // If the shadowing binding is a loop variable, abort, to avoid overlap
-                    // with F402.
-                    let binding = &checker.semantic.bindings[shadow.binding_id()];
-                    if binding.kind.is_loop_var() {
-                        continue;
-                    }
-
-                    // If the shadowed binding is used, abort.
-                    let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
-                    if shadowed.is_used() {
-                        continue;
-                    }
-
-                    // If the shadowing binding isn't considered a "redefinition" of the
-                    // shadowed binding, abort.
-                    if !binding.redefines(shadowed) {
-                        continue;
-                    }
-
-                    if shadow.same_scope() {
-                        // If the symbol is a dummy variable, abort, unless the shadowed
-                        // binding is an import.
-                        if !matches!(
-                            shadowed.kind,
-                            BindingKind::Import(..)
-                                | BindingKind::FromImport(..)
-                                | BindingKind::SubmoduleImport(..)
-                                | BindingKind::FutureImport
-                        ) && checker.settings().dummy_variable_rgx.is_match(name)
-                        {
-                            continue;
-                        }
-
-                        let Some(node_id) = shadowed.source else {
-                            continue;
-                        };
-
-                        // If this is an overloaded function, abort.
-                        if shadowed.kind.is_function_definition() {
-                            if checker
-                                .semantic
-                                .statement(node_id)
-                                .as_function_def_stmt()
-                                .is_some_and(|function| {
-                                    visibility::is_overload(
-                                        &function.decorator_list,
-                                        &checker.semantic,
-                                    )
-                                })
-                            {
-                                continue;
-                            }
-                        }
-                    } else {
-                        // Only enforce cross-scope shadowing for imports.
-                        if !matches!(
-                            shadowed.kind,
-                            BindingKind::Import(..)
-                                | BindingKind::FromImport(..)
-                                | BindingKind::SubmoduleImport(..)
-                                | BindingKind::FutureImport
-                        ) {
-                            continue;
-                        }
-                    }
-
-                    // If the bindings are in different forks, abort.
-                    if shadowed.source.is_none_or(|left| {
-                        binding
-                            .source
-                            .is_none_or(|right| !checker.semantic.same_branch(left, right))
-                    }) {
-                        continue;
-                    }
-
-                    redefinitions
-                        .entry(binding.source)
-                        .or_insert_with(Vec::new)
-                        .push((shadowed, binding));
-                }
-            }
-
-            // Create a fix for each source statement.
-            let mut fixes = FxHashMap::default();
-            for (source, entries) in &redefinitions {
-                let Some(source) = source else {
-                    continue;
-                };
-
-                let member_names = entries
-                    .iter()
-                    .filter_map(|(shadowed, binding)| {
-                        if let Some(shadowed_import) = shadowed.as_any_import() {
-                            if let Some(import) = binding.as_any_import() {
-                                if shadowed_import.qualified_name() == import.qualified_name() {
-                                    return Some(import.member_name());
-                                }
-                            }
-                        }
-                        None
-                    })
-                    .collect::<Vec<_>>();
-
-                if !member_names.is_empty() {
-                    let statement = checker.semantic.statement(*source);
-                    let parent = checker.semantic.parent_statement(*source);
-                    let Ok(edit) = fix::edits::remove_unused_imports(
-                        member_names.iter().map(std::convert::AsRef::as_ref),
-                        statement,
-                        parent,
-                        checker.locator(),
-                        checker.stylist(),
-                        checker.indexer(),
-                    ) else {
-                        continue;
-                    };
-                    fixes.insert(
-                        *source,
-                        Fix::safe_edit(edit).isolate(Checker::isolation(
-                            checker.semantic().parent_statement_id(*source),
-                        )),
-                    );
-                }
-            }
-
-            // Create diagnostics for each statement.
-            for (source, entries) in &redefinitions {
-                for (shadowed, binding) in entries {
-                    let mut diagnostic = checker.report_diagnostic(
-                        pyflakes::rules::RedefinedWhileUnused {
-                            name: binding.name(checker.source()).to_string(),
-                            row: checker.compute_source_row(shadowed.start()),
-                        },
-                        binding.range(),
-                    );
-
-                    if let Some(range) = binding.parent_range(&checker.semantic) {
-                        diagnostic.set_parent(range.start());
-                    }
-
-                    if let Some(fix) = source.as_ref().and_then(|source| fixes.get(source)) {
-                        diagnostic.set_fix(fix.clone());
-                    }
-                }
-            }
+            pyflakes::rules::redefined_while_unused(checker, scope_id, scope);
         }
 
         if checker.source_type.is_stub()
@@ -382,7 +139,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                ruff::rules::function_call_in_dataclass_default(checker, class_def);
+                ruff::rules::function_call_in_dataclass_default(checker, class_def, scope_id);
             }
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
@@ -473,6 +230,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
             if checker.is_rule_enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope);
+            }
+            if checker.is_rule_enabled(Rule::UnnecessaryFutureImport) {
+                if checker.target_version() >= PythonVersion::PY37 {
+                    pyupgrade::rules::unnecessary_future_import(checker, scope);
+                }
             }
 
             if checker.is_rule_enabled(Rule::ImportPrivateName) {

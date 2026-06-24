@@ -55,3 +55,12 @@ class Hash:
 
 
 Hash().digest().hex()
+
+
+hashed = (
+    sha512(b"some data")
+    .digest(
+        # text
+    )
+    .hex()
+)

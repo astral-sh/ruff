@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__str__` method](https://docs.python.org/3/reference/datamodel.html#object.__str__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct InvalidStrReturnType;
 
 impl Violation for InvalidStrReturnType {
@@ -59,10 +60,10 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
     }
 
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
-    let terminal = Terminal::from_function(function_def);
+    let terminal = Terminal::from_function(function_def, checker.semantic());
 
     // If every control flow path raises an exception, ignore the function.
-    if terminal == Terminal::Raise {
+    if terminal.is_always_raise() {
         return;
     }
 

@@ -31,7 +31,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// import pytest
 ///
 ///
-/// @pytest.mark.foo
+/// @pytest.mark.foo()
 /// def test_something(): ...
 /// ```
 ///
@@ -41,7 +41,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// import pytest
 ///
 ///
-/// @pytest.mark.foo()
+/// @pytest.mark.foo
 /// def test_something(): ...
 /// ```
 ///
@@ -64,6 +64,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// ## References
 /// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
     expected_parens: Parentheses,
@@ -119,6 +120,7 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestUseFixturesWithoutParameters;
 
 impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {

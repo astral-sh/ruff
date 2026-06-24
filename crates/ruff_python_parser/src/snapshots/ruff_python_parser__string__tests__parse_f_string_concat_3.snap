@@ -5,11 +5,11 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..22,
             value: FString(
                 ExprFString {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..22,
                     value: FStringValue {
                         inner: Concatenated(
@@ -17,45 +17,47 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 0..8,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
                                 FString(
                                     FString {
                                         range: 9..22,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 11..16,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "world",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 16..21,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: StringLiteral(
                                                         ExprStringLiteral {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 17..20,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
                                                                         range: 17..20,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: "!",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,
                                                                             prefix: Empty,
                                                                             triple_quoted: false,
+                                                                            unclosed: false,
                                                                         },
                                                                     },
                                                                 ),
@@ -72,6 +74,7 @@ expression: suite
                                             quote_style: Single,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),

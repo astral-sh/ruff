@@ -1,11 +1,13 @@
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, CodeActionRequest, CodeActionResponse};
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashSet;
-use types::{CodeActionKind, CodeActionOrCommand};
+use types::CodeActionKind;
 
 use crate::DIAGNOSTIC_NAME;
 use crate::edit::WorkspaceEditTracker;
 use crate::lint::{DiagnosticFix, fixes_for_diagnostics};
+use crate::resolve::is_document_excluded_for_linting;
 use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
@@ -16,17 +18,45 @@ use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_orga
 pub(crate) struct CodeActions;
 
 impl super::RequestHandler for CodeActions {
-    type RequestType = req::CodeActionRequest;
+    type RequestType = CodeActionRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActions {
-    super::define_document_url!(params: &types::CodeActionParams);
+    super::define_document_uri!(params: &types::CodeActionParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         params: types::CodeActionParams,
-    ) -> Result<Option<types::CodeActionResponse>> {
-        let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
+    ) -> Result<Option<Vec<types::CodeActionResponse>>> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(uri) => {
+                tracing::warn!("Returning no code actions because document `{uri}` isn't open.");
+                return Ok(None);
+            }
+        };
+
+        let mut response = Vec::new();
+
+        let query = snapshot.query();
+
+        // Don't provide code actions for non-Python documents (e.g., markdown files).
+        let SourceType::Python(_) = query.source_type_for_lint() else {
+            return Ok(Some(response));
+        };
+
+        let document_path = query.virtual_file_path();
+        let settings = query.settings();
+
+        if is_document_excluded_for_linting(
+            &document_path,
+            &settings.file_resolver,
+            &settings.linter,
+            query.text_document_language_id(),
+        ) {
+            return Ok(Some(response));
+        }
 
         let supported_code_actions = supported_code_actions(params.context.only.clone());
 
@@ -95,7 +125,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 fn quick_fix(
     snapshot: &DocumentSnapshot,
     fixes: &[DiagnosticFix],
-) -> crate::Result<Vec<CodeActionOrCommand>> {
+) -> crate::Result<Vec<CodeActionResponse>> {
     let document = snapshot.query();
 
     fixes
@@ -104,21 +134,21 @@ fn quick_fix(
         .map(|fix| {
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
-            let document_url = snapshot.query().make_key().into_url();
+            let document_uri = snapshot.query().make_key().into_uri();
 
             tracker.set_edits_for_document(
-                document_url.clone(),
+                document_uri.clone(),
                 document.version(),
                 fix.edits.clone(),
             )?;
 
-            Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+            Ok(CodeActionResponse::CodeAction(types::CodeAction {
                 title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
-                kind: Some(types::CodeActionKind::QUICKFIX),
+                kind: Some(types::CodeActionKind::QuickFix),
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
-                    serde_json::to_value(document_url).expect("document url should serialize"),
+                    serde_json::to_value(document_uri).expect("document uri should serialize"),
                 ),
                 ..Default::default()
             }))
@@ -126,7 +156,7 @@ fn quick_fix(
         .collect()
 }
 
-fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<CodeActionOrCommand> {
+fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<CodeActionResponse> {
     fixes
         .iter()
         .filter_map(|fix| {
@@ -136,20 +166,20 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
 
             tracker
                 .set_edits_for_document(
-                    snapshot.query().make_key().into_url(),
+                    snapshot.query().make_key().into_uri(),
                     snapshot.query().version(),
                     vec![edit],
                 )
                 .ok()?;
 
-            Some(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+            Some(CodeActionResponse::CodeAction(types::CodeAction {
                 title: format!("{DIAGNOSTIC_NAME} ({}): Disable for this line", fix.code),
-                kind: Some(types::CodeActionKind::QUICKFIX),
+                kind: Some(types::CodeActionKind::QuickFix),
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
-                    serde_json::to_value(snapshot.query().make_key().into_url())
-                        .expect("document url should serialize"),
+                    serde_json::to_value(snapshot.query().make_key().into_uri())
+                        .expect("document uri should serialize"),
                 ),
                 ..Default::default()
             }))
@@ -157,7 +187,7 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
         .collect()
 }
 
-fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -168,8 +198,8 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
         (
             None,
             Some(
-                serde_json::to_value(snapshot.query().make_key().into_url())
-                    .expect("document url should serialize"),
+                serde_json::to_value(snapshot.query().make_key().into_uri())
+                    .expect("document uri should serialize"),
             ),
         )
     } else {
@@ -183,7 +213,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
         kind: Some(crate::SOURCE_FIX_ALL_RUFF),
         edit,
@@ -192,7 +222,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     }))
 }
 
-fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -203,8 +233,8 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         (
             None,
             Some(
-                serde_json::to_value(snapshot.query().make_key().into_url())
-                    .expect("document url should serialize"),
+                serde_json::to_value(snapshot.query().make_key().into_uri())
+                    .expect("document uri should serialize"),
             ),
         )
     } else {
@@ -218,7 +248,7 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
         kind: Some(crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF),
         edit,
@@ -227,7 +257,7 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     }))
 }
 
-fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -238,8 +268,8 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         (
             None,
             Some(
-                serde_json::to_value(snapshot.query().make_key().into_url())
-                    .expect("document url should serialize"),
+                serde_json::to_value(snapshot.query().make_key().into_uri())
+                    .expect("document uri should serialize"),
             ),
         )
     } else {
@@ -253,7 +283,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
         kind: Some(crate::SOURCE_ORGANIZE_IMPORTS_RUFF),
         edit,
@@ -262,7 +292,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     }))
 }
 
-fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionResponse> {
     let document = snapshot.query();
 
     let (edit, data) = if snapshot
@@ -273,8 +303,8 @@ fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeA
         (
             None,
             Some(
-                serde_json::to_value(snapshot.query().make_key().into_url())
-                    .expect("document url should serialize"),
+                serde_json::to_value(snapshot.query().make_key().into_uri())
+                    .expect("document uri should serialize"),
             ),
         )
     } else {
@@ -288,7 +318,7 @@ fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeA
         )
     };
 
-    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+    Ok(CodeActionResponse::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
         kind: Some(crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF),
         edit,

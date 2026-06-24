@@ -44,6 +44,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html?highlight=list#mutable-sequence-types)
 /// - [Python documentation: `dict.clear()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#dict.clear)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.287")]
 pub(crate) struct DeleteFullSlice;
 
 impl Violation for DeleteFullSlice {

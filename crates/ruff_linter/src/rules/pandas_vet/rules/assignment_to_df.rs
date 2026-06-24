@@ -4,9 +4,9 @@ use ruff_text_size::Ranged;
 
 use crate::{Violation, checkers::ast::Checker};
 
-/// ## Deprecated
+/// ## Removed
 ///
-/// This rule has been deprecated as it's highly opinionated and overly strict in most cases.
+/// This rule has been removed as it's highly opinionated and overly strict in most cases.
 ///
 /// ## What it does
 /// Checks for assignments to the variable `df`.
@@ -32,6 +32,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// animals = pd.read_csv("animals.csv")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.13.0")]
 pub(crate) struct PandasDfVariableName;
 
 impl Violation for PandasDfVariableName {

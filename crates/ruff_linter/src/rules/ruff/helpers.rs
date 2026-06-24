@@ -25,14 +25,16 @@ fn is_stdlib_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["dataclasses", "field"]))
 }
 
-/// Returns `true` if the given [`Expr`] is a call to `attr.ib()` or `attrs.field()`.
+/// Returns `true` if the given [`Expr`] is a call to an `attrs` field function.
 fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["attrs", "field" | "Factory"] | ["attr", "ib"]
+                ["attrs", "field" | "Factory"]
+                // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L33
+                    | ["attr", "ib" | "attr" | "attrib" | "field" | "Factory"]
             )
         })
 }
@@ -120,7 +122,8 @@ pub(super) fn dataclass_kind<'a>(
 
         match qualified_name.segments() {
             ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
-            | ["attr", func @ ("s" | "attrs")] => {
+            // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L32
+            | ["attr", func @ ("s" | "attributes" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
@@ -201,7 +204,7 @@ pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             [
@@ -238,4 +241,24 @@ pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool
                 .is_some_and(|id| semantic.binding(id).kind.is_function_definition())
         })
     })
+}
+
+/// Returns `true` if the class has `ctypes.Structure` as a base
+/// and the first target is the `_fields_` attribute.
+pub(super) fn is_ctypes_structure_fields(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+    targets: &[Expr],
+) -> bool {
+    let is_ctypes_structure =
+        analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
+            matches!(qualified_name.segments(), ["ctypes", "Structure"])
+        });
+
+    let is_fields = matches!(
+        targets.first(),
+        Some(Expr::Name(ast::ExprName { id, .. })) if id == "_fields_"
+    );
+
+    is_ctypes_structure && is_fields
 }

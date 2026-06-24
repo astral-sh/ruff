@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_clos
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..110,
         body: [
             If(
                 StmtIf {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 90..97,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 93..97,
                             value: true,
                         },
@@ -27,7 +27,7 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 105..109,
                 },
             ),
@@ -40,7 +40,7 @@ Module(
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |        ^ Syntax Error: Expected ':', found ')'
+  |        ^ Syntax Error: Expected `:`, found `)`
 3 |     pass
   |
 

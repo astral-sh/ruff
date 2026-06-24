@@ -26,7 +26,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[global_allocator]
@@ -42,7 +43,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[unsafe(export_name = "_rjem_malloc_conf")]
@@ -77,19 +79,23 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                 b.iter_batched(
                     || parsed.clone(),
                     |parsed| {
+                        // Assert that file contains no parse errors
+                        assert!(parsed.has_valid_syntax());
+
                         let path = case.path();
-                        let result = lint_only(
+                        let py_source_type = PySourceType::from(path.as_path());
+                        lint_only(
                             &path,
                             None,
                             settings,
                             flags::Noqa::Enabled,
-                            &SourceKind::Python(case.code().to_string()),
-                            PySourceType::from(path.as_path()),
+                            &SourceKind::Python {
+                                code: case.code().to_string(),
+                                is_stub: py_source_type.is_stub(),
+                            },
+                            py_source_type,
                             ParseSource::Precomputed(parsed),
-                        );
-
-                        // Assert that file contains no parse errors
-                        assert!(!result.has_syntax_errors());
+                        )
                     },
                     criterion::BatchSize::SmallInput,
                 );

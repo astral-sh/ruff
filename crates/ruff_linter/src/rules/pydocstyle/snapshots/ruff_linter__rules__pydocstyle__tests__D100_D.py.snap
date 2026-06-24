@@ -1,5 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
-D.py:1:1: D100 Missing docstring in public module
+D100 Missing docstring in public module
+--> D.py:1:1

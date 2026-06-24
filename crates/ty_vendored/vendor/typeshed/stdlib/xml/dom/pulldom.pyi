@@ -1,8 +1,8 @@
 import sys
 from _typeshed import Incomplete, Unused
 from collections.abc import MutableSequence, Sequence
-from typing import Final, Literal, NoReturn
-from typing_extensions import Self, TypeAlias
+from typing import Final, Literal, NoReturn, TypeAlias
+from typing_extensions import Self
 from xml.dom.minidom import Comment, Document, DOMImplementation, Element, ProcessingInstruction, Text
 from xml.sax import _SupportsReadClose
 from xml.sax.handler import ContentHandler
@@ -69,7 +69,8 @@ class PullDOM(ContentHandler):
     def startDocument(self) -> None: ...
     def buildDocument(self, uri: str | None, tagname: str | None) -> Element: ...
     def endDocument(self) -> None: ...
-    def clear(self) -> None: ...
+    def clear(self) -> None:
+        """clear(): Explicitly release parsing structures"""
 
 class ErrorHandler:
     def warning(self, exception: BaseException) -> None: ...
@@ -90,7 +91,8 @@ class DOMEventStream:
     def getEvent(self) -> _Event | None: ...
     def expandNode(self, node: Document) -> None: ...
     def reset(self) -> None: ...
-    def clear(self) -> None: ...
+    def clear(self) -> None:
+        """clear(): Explicitly release parsing objects"""
 
 class SAX2DOM(PullDOM):
     def startElementNS(self, name: _NSName, tagName: str | None, attrs: AttributesNSImpl) -> None: ...
@@ -99,7 +101,7 @@ class SAX2DOM(PullDOM):
     def ignorableWhitespace(self, chars: str) -> None: ...
     def characters(self, chars: str) -> None: ...
 
-default_bufsize: int
+default_bufsize: Final[int]
 
 def parse(
     stream_or_string: str | _SupportsReadClose[bytes] | _SupportsReadClose[str],

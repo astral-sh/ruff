@@ -166,3 +166,53 @@ else:
 
 finally:
     pass
+
+
+try:
+    pass
+# These parens can be removed on 3.14+ but not earlier
+except (BaseException, Exception, ValueError):
+    pass
+# But black won't remove these parentheses
+except (ZeroDivisionError,):
+    pass
+except (  # We wrap these and preserve the parens
+        BaseException, Exception, ValueError):
+    pass
+except (
+        BaseException,
+        # Same with this comment
+        Exception,
+        ValueError
+):
+    pass
+
+try:
+    pass
+# They can also be omitted for `except*`
+except* (BaseException, Exception, ValueError):
+    pass
+
+# But parentheses are still required in the presence of an `as` binding
+try:
+    pass
+except (BaseException, Exception, ValueError) as e:
+    pass
+
+try:
+    pass
+except* (BaseException, Exception, ValueError) as e:
+    pass
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/23125
+# Parentheses cannot be removed if any of the tuple elements is starred
+try:
+    pass
+except (Exception, *exceptions):
+    pass
+
+try:
+    pass
+except (*exceptions, Exception):
+    pass

@@ -19,23 +19,141 @@ def _(p: P, q: Q):
 ## Instantiating tuples
 
 Like all classes, tuples can be instantiated by invoking the `tuple` class. When instantiating a
-specialization of `tuple` we (TODO: should) check that the values passed in match the element types
-defined in the specialization.
+specialization of `tuple` we check that the values passed in match the element types defined in the
+specialization.
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
-# TODO: revealed: tuple[()]
-reveal_type(tuple())  # revealed: tuple[Unknown, ...]
-# TODO: revealed: tuple[Literal[1]]
-reveal_type(tuple([1]))  # revealed: tuple[Unknown, ...]
-reveal_type(tuple[int]([1]))  # revealed: tuple[int]
-# TODO: error for invalid arguments
-reveal_type(tuple[int, str]([1]))  # revealed: tuple[int, str]
+from typing_extensions import Iterable, Never
 
+reveal_type(tuple())  # revealed: tuple[()]
+reveal_type(tuple[int]((1,)))  # revealed: tuple[int]
+reveal_type(tuple[int, *tuple[str, ...]]((1,)))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(().__class__())  # revealed: tuple[()]
-# TODO: error for invalid arguments
+reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+
+class LiskovUncompliantIterable(Iterable[int]):
+    # TODO we should emit an error here about the Liskov violation
+    __iter__ = None
+
+def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):
+    reveal_type(tuple(x))  # revealed: tuple[int, ...]
+    reveal_type(tuple(y))  # revealed: tuple[str, ...]
+    reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
+
+    # This is correct as the only inhabitants of `list[Never]` can be empty lists
+    reveal_type(tuple(aa))  # revealed: tuple[()]
+
+    # `tuple[int, ...] would probably also be fine here since `LiskovUncompliantIterable`
+    # inherits from `Iterable[int]`. Ultimately all bets are off when the Liskov Principle is
+    # violated, though -- this test is really just to make sure we don't crash in this situation.
+    reveal_type(tuple(bb))  # revealed: tuple[Unknown, ...]
+
+reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+
+reveal_type(tuple([1]))  # revealed: tuple[int, ...]
+
+x1: tuple[int, ...] = tuple([1])
+reveal_type(x1)  # revealed: tuple[int, ...]
+
+# error: [invalid-argument-type]
+reveal_type(tuple[int]([1]))  # revealed: tuple[int]
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int, str]`, found `tuple[Literal[1]]`"
+reveal_type(tuple[int, str]((1,)))  # revealed: tuple[int, str]
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
-# TODO: error for invalid arguments
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
+
+def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
+    reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
+    reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
+```
+
+## Instantiating tuple subclasses
+
+Tuple subclasses inherit the special-cased constructors from their tuple superclasses:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing_extensions import Any, Iterable, Never
+
+class VariadicAnyTupleSubclass(tuple[Any, ...]): ...
+class EmptyTupleSubclass(tuple[()]): ...
+class SingleElementTupleSubclass(tuple[int]): ...
+class VariadicTupleSubclass(tuple[int, ...]): ...
+class MixedTupleSubclass(tuple[int, *tuple[str, ...]]): ...
+
+reveal_type(VariadicAnyTupleSubclass())  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass(()))  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass((1, 2, "foo")))  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass([1, 2, "foo", b"bar"]))  # revealed: VariadicAnyTupleSubclass
+
+reveal_type(EmptyTupleSubclass())  # revealed: EmptyTupleSubclass
+reveal_type(EmptyTupleSubclass(()))  # revealed: EmptyTupleSubclass
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[()]`, found `tuple[Literal[1], Literal[2]]`"
+reveal_type(EmptyTupleSubclass((1, 2)))  # revealed: EmptyTupleSubclass
+
+reveal_type(SingleElementTupleSubclass((1,)))  # revealed: SingleElementTupleSubclass
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
+reveal_type(SingleElementTupleSubclass())  # revealed: SingleElementTupleSubclass
+
+reveal_type(VariadicTupleSubclass())  # revealed: VariadicTupleSubclass
+reveal_type(VariadicTupleSubclass(()))  # revealed: VariadicTupleSubclass
+reveal_type(VariadicTupleSubclass([1, 2, 3]))  # revealed: VariadicTupleSubclass
+reveal_type(VariadicTupleSubclass((1, 2, 3, 4)))  # revealed: VariadicTupleSubclass
+
+reveal_type(MixedTupleSubclass((1,)))  # revealed: MixedTupleSubclass
+reveal_type(MixedTupleSubclass((1, "foo")))  # revealed: MixedTupleSubclass
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[Literal[1], Literal[b"foo"]]`"
+reveal_type(MixedTupleSubclass((1, b"foo")))  # revealed: MixedTupleSubclass
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
+reveal_type(MixedTupleSubclass())  # revealed: MixedTupleSubclass
+
+def _(empty: EmptyTupleSubclass, single_element: SingleElementTupleSubclass, mixed: MixedTupleSubclass, x: tuple[int, int]):
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[()]`, found `tuple[Literal[1], Literal[2]]`"
+    empty.__class__((1, 2))
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int]`, found `tuple[Literal[1], Literal[2]]`"
+    single_element.__class__((1, 2))
+    # error: [missing-argument] "No argument provided for required parameter `iterable`"
+    mixed.__class__()
+```
+
+## Meta-type of tuple instances
+
+The type `tuple[str, int]` does not only have exact instances of `tuple` as its inhabitants: its
+inhabitants also include any instances of subclasses of `tuple[str, int]`. As such, the meta-type of
+`tuple[str, int]` should be `type[tuple[str, int]]` rather than `<class 'tuple[str, int]'>`. The
+former accurately reflects the fact that given an instance of `tuple[str, int]`, we do not know
+exactly what the `__class__` of that instance will be: we only know that it will be a subclass of
+`tuple[str, int]`. The latter would be incorrectly precise: it would imply that all instances of
+`tuple[str, int]` have the runtime object `tuple` as their `__class__`, which isn't true.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def f(x: tuple[int, ...], y: tuple[str, str], z: tuple[int, *tuple[str, ...], bytes]):
+    reveal_type(type(x))  # revealed: type[tuple[int, ...]]
+    reveal_type(type(y))  # revealed: type[tuple[str, str]]
+    reveal_type(type(z))  # revealed: type[tuple[int, *tuple[str, ...], bytes]]
 ```
 
 ## Subtyping relationships
@@ -270,8 +388,8 @@ static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
 static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
-We currently model tuple types to _not_ be disjoint from arbitrary instance types, because we allow
-for the possibility of `tuple` to be subclassed
+We model tuple types to _not_ be disjoint from arbitrary instance types, because we allow for the
+possibility of `tuple` to be subclassed.
 
 ```py
 class C: ...
@@ -281,17 +399,14 @@ static_assert(not is_disjoint_from(tuple[int, str], C))
 class CommonSubtype(tuple[int, str], C): ...
 ```
 
-Note: This is inconsistent with the fact that we model heterogeneous tuples to be disjoint from
-other heterogeneous tuples above:
+However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
+these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
+in the same MRO:
 
 ```py
 class I1(tuple[F1, F2]): ...
 class I2(tuple[F2, F1]): ...
-
-# TODO
-# This is a subtype of both `tuple[F1, F2]` and `tuple[F2, F1]`, so those two heterogeneous tuples
-# should not be disjoint from each other (see conflicting test above).
-class CommonSubtypeOfTuples(I1, I2): ...
+class CommonSubtypeOfTuples(I1, I2): ...  # error: [invalid-generic-class]
 ```
 
 ## Truthiness
@@ -372,6 +487,139 @@ class NotAlwaysTruthyTuple(tuple[int]):
         return False
 
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
+```
+
+## Unspecialized
+
+An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ...]`.
+
+```py
+from typing_extensions import Any, assert_type
+from ty_extensions import Unknown, is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
+
+def f(x: tuple, y: tuple[Unknown, ...]):  # error: [missing-type-argument]
+    reveal_type(x)  # revealed: tuple[Unknown, ...]
+    assert_type(x, tuple[Any, ...])
+    assert_type(x, tuple[Unknown, ...])
+    reveal_type(y)  # revealed: tuple[Unknown, ...]
+    assert_type(y, tuple[Any, ...])
+    assert_type(y, tuple[Unknown, ...])
+```
+
+## Converting a `tuple` to another `Sequence` type
+
+For covariant types, such as `frozenset`, the ideal behaviour would be to not promote `Literal`
+types to their instance supertypes: doing so causes more false positives than it fixes:
+
+```py
+reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
+reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[Literal[1], Literal[2], Literal[3]]]
+```
+
+Literals are always promoted for invariant containers such as `list`, however, even though this can
+in some cases cause false positives:
+
+```py
+from typing import Literal
+
+reveal_type(list((1, 2, 3)))  # revealed: list[int]
+reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
+
+x: list[Literal[1, 2, 3]] = list((1, 2, 3))
+reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
+```
+
+## Tuples with starred elements
+
+```py
+from typing import Literal, Sequence
+
+x = (1, *range(3), 3)
+reveal_type(x)  # revealed: tuple[Literal[1], *tuple[int, ...], Literal[3]]
+
+y = 1, 2
+
+reveal_type(("foo", *y))  # revealed: tuple[Literal["foo"], Literal[1], Literal[2]]
+
+aa: tuple[list[int], ...] = ([42], *{[56], [78]}, [100])
+reveal_type(aa)  # revealed: tuple[list[int], list[int], list[int], list[int]]
+
+bb: tuple[list[Literal[42, 56]], ...] = ([42], *{[56, 42], [42]}, [42, 42, 56])
+reveal_type(bb)  # revealed: tuple[list[Literal[42, 56]], list[Literal[42, 56]], list[Literal[42, 56]], list[Literal[42, 56]]]
+
+reveal_type((*[],))  # revealed: tuple[()]
+reveal_type((42, *[], 56, *[]))  # revealed: tuple[Literal[42], Literal[56]]
+
+tup: Sequence[str] = (*{"foo": 42, "bar": 56},)
+
+# TODO: `tuple[str, str]` would be better, given the type annotation
+reveal_type(tup)  # revealed: tuple[str, str]
+
+def f(x: list[int]):
+    reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]
+```
+
+## `Literal` promotion for large unannotated tuples
+
+We infer `Literal` types for a tuple's elements only if it has \<=64 elements. For larger tuples, if
+they are unannotated, we promote `Literal` types inside the tuple.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Final, Literal
+
+# fmt: off
+
+has_64_elements = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64)
+
+reveal_type(len(has_64_elements))  # revealed: Literal[64]
+
+# revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4], Literal[5], Literal[6], Literal[7], Literal[8], Literal[9], Literal[10], Literal[11], Literal[12], Literal[13], Literal[14], Literal[15], Literal[16], Literal[17], Literal[18], Literal[19], Literal[20], Literal[21], Literal[22], Literal[23], Literal[24], Literal[25], Literal[26], Literal[27], Literal[28], Literal[29], Literal[30], Literal[31], Literal[32], Literal[33], Literal[34], Literal[35], Literal[36], Literal[37], Literal[38], Literal[39], Literal[40], Literal[41], Literal[42], Literal[43], Literal[44], Literal[45], Literal[46], Literal[47], Literal[48], Literal[49], Literal[50], Literal[51], Literal[52], Literal[53], Literal[54], Literal[55], Literal[56], Literal[57], Literal[58], Literal[59], Literal[60], Literal[61], Literal[62], Literal[63], Literal[64]]
+reveal_type(has_64_elements)
+
+annotated_tuple_with_64: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64)
+
+reveal_type(len(annotated_tuple_with_64))  # revealed: Literal[64]
+
+# revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4], Literal[5], Literal[6], Literal[7], Literal[8], Literal[9], Literal[10], Literal[11], Literal[12], Literal[13], Literal[14], Literal[15], Literal[16], Literal[17], Literal[18], Literal[19], Literal[20], Literal[21], Literal[22], Literal[23], Literal[24], Literal[25], Literal[26], Literal[27], Literal[28], Literal[29], Literal[30], Literal[31], Literal[32], Literal[33], Literal[34], Literal[35], Literal[36], Literal[37], Literal[38], Literal[39], Literal[40], Literal[41], Literal[42], Literal[43], Literal[44], Literal[45], Literal[46], Literal[47], Literal[48], Literal[49], Literal[50], Literal[51], Literal[52], Literal[53], Literal[54], Literal[55], Literal[56], Literal[57], Literal[58], Literal[59], Literal[60], Literal[61], Literal[62], Literal[63], Literal[64]]
+reveal_type(annotated_tuple_with_64)
+
+has_65_elements = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(has_65_elements))  # revealed: Literal[65]
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(has_65_elements)
+
+final_tuple_with_65: Final = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(final_tuple_with_65))  # revealed: Literal[65]
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(final_tuple_with_65)
+
+# fmt: on
+```
+
+Literal promotion can always be avoided by providing explicit type annotations:
+
+```py
+# fmt: off
+
+annotated_tuple_with_65: tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[64], Literal[65]] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(annotated_tuple_with_65))  # revealed: Literal[65]
+
+# revealed: tuple[Literal[1], Literal[2], int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, Literal[64], Literal[65]]
+reveal_type(annotated_tuple_with_65)
+
+# fmt: on
 ```
 
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

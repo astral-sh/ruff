@@ -14,7 +14,6 @@ pub use rule_selector::RuleSelector;
 pub use rule_selector::clap_completion::RuleSelectorParser;
 pub use rules::pycodestyle::rules::IOError;
 
-pub use message::OldDiagnostic;
 pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
 pub use violation::{AlwaysFixableViolation, FixAvailability, Violation, ViolationMetadata};
 
@@ -47,11 +46,12 @@ pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod suppression;
 mod text_helpers;
 pub mod upstream_categories;
 mod violation;
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, fuzzing, feature = "testing"))]
 pub mod test;
 
 pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -60,7 +60,7 @@ pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 mod tests {
     use std::path::Path;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, SourceType};
 
     use crate::codes::Rule;
     use crate::settings::LinterSettings;
@@ -77,7 +77,7 @@ mod tests {
             Returns:
             """
 "#;
-        let source_type = PySourceType::Python;
+        let source_type = SourceType::Python(PySourceType::Python);
         let rule = Rule::OverIndentation;
 
         let source_kind = SourceKind::from_source_code(code.to_string(), source_type)

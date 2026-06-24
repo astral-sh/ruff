@@ -13,7 +13,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
 
     for reference in checker.semantic.unresolved_references() {
         if reference.is_wildcard_import() {
-            // F406
+            // F405
             checker.report_diagnostic_if_enabled(
                 pyflakes::rules::UndefinedLocalWithImportStarUsage {
                     name: reference.name(checker.source()).to_string(),
@@ -33,8 +33,20 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                 }
 
                 // Allow __path__.
-                if checker.path.ends_with("__init__.py") {
+                if checker.in_init_module() {
                     if reference.name(checker.source()) == "__path__" {
+                        continue;
+                    }
+                }
+
+                // Bare local annotations can be initialized through nested `nonlocal`
+                // rebindings. If such a rebinding exists, skip F821.
+                if let Some(annotation_binding_id) = reference.annotation_binding_id() {
+                    if checker
+                        .semantic
+                        .rebinding_scopes(annotation_binding_id)
+                        .is_some_and(|scopes| !scopes.is_empty())
+                    {
                         continue;
                     }
                 }

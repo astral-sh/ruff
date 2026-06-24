@@ -2,10 +2,9 @@ use ruff_formatter::prelude::{space, token};
 use ruff_formatter::write;
 use ruff_python_ast::StmtAssert;
 
-use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::{has_skip_comment, prelude::*};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtAssert;
@@ -40,13 +39,5 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
         }
 
         Ok(())
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }

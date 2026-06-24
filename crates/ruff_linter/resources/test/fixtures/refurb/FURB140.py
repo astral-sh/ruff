@@ -57,3 +57,11 @@ from itertools import starmap as sm
 [" ".join(x)(x, y) for x, y in zipped()]
 
 [" ".join(x)(*x) for x in zipped()]
+
+all(
+    predicate(a, b)
+    # text
+    for a, b
+    # text
+    in some_iterable
+)

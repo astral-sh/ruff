@@ -1,0 +1,97 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/class_def_unparenthesized_generator_argument.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..39,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 0..38,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 6..9,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 9..33,
+                            node_index: NodeIndex(None),
+                            args: [
+                                Generator(
+                                    ExprGenerator {
+                                        node_index: NodeIndex(None),
+                                        range: 10..32,
+                                        elt: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 10..14,
+                                                id: Name("base"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        generators: [
+                                            Comprehension {
+                                                range: 15..32,
+                                                node_index: NodeIndex(None),
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 19..23,
+                                                        id: Name("base"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 27..32,
+                                                        id: Name("bases"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: false,
+                                            },
+                                        ],
+                                        parenthesized: false,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 35..38,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 35..38,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | class Foo(base for base in bases): ...
+  |           ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+  |

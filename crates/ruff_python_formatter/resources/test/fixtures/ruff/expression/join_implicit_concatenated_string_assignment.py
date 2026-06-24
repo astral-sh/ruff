@@ -345,7 +345,7 @@ a[
     b
 ] = (
     t"ccccc{
-    expression}ccccccccccc" "cccccccccccccccccccccccc"  # comment
+    expression}ccccccccccc" t"cccccccccccccccccccccccc"  # comment
 )
 
 # Same but starting with a joined string. They should both result in the same formatting.
@@ -361,7 +361,7 @@ a[
     aaaaaaa,
     b
 ] = t"ccccc{
-expression}ccccccccccc" "ccccccccccccccccccccccccccccccccccccccccccc"  # comment
+expression}ccccccccccc" t"ccccccccccccccccccccccccccccccccccccccccccc"  # comment
 
 
 # Split an overlong target, but join the string if it fits
@@ -370,7 +370,7 @@ a[
     b
 ].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
     t"ccccc{
-    expression}ccccccccccc" "cccccccccccccccccccccccccccccc"  # comment
+    expression}ccccccccccc" t"cccccccccccccccccccccccccccccc"  # comment
 )
 
 # Split both if necessary and keep multiline
@@ -379,66 +379,66 @@ a[
     b
 ].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
     t"ccccc{
-    expression}cccccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccc"  # comment
+    expression}cccccccccccccccccccccccccccccccc" t"ccccccccccccccccccccccccccccccc"  # comment
 )
 
 # Don't inline t-strings that contain expressions that are guaranteed to split, e.b. because of a magic trailing comma
 aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 [a,]
-}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
 
 aaaaaaaaaaaaaaaaaa = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 [a,]
-}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
 )
 
 aaaaa[aaaaaaaaaaa] = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 [a,]
-}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
 
 aaaaa[aaaaaaaaaaa] = (t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 [a,]
-}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
 )
 
 # Don't inline t-strings that contain commented expressions
 aaaaaaaaaaaaaaaaaa = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{[
         a  # comment
-    ]}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    ]}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 aaaaa[aaaaaaaaaaa] = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{[
         a  # comment
-    ]}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    ]}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 # Don't inline t-strings with multiline debug expressions:
 aaaaaaaaaaaaaaaaaa = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    a=}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 aaaaaaaaaaaaaaaaaa = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
-    b=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    b=}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 aaaaaaaaaaaaaaaaaa = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
-    =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    =}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 aaaaa[aaaaaaaaaaa] = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    a=}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 aaaaa[aaaaaaaaaaa] = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
-    =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+    =}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 
@@ -499,7 +499,7 @@ a = (
 )
 
 logger.error(
-    f"Failed to run task {task} for job"  
+    f"Failed to run task {task} for job"
     f"with id {str(job.id)}" # type: ignore[union-attr]
 )
 

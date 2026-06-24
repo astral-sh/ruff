@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::AlwaysFixableViolation;
@@ -31,6 +31,7 @@ use super::{LogicalLine, Whitespace};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceAfterOpenBracket {
     symbol: char,
 }
@@ -70,6 +71,7 @@ impl AlwaysFixableViolation for WhitespaceAfterOpenBracket {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceBeforeCloseBracket {
     symbol: char,
 }
@@ -107,6 +109,7 @@ impl AlwaysFixableViolation for WhitespaceBeforeCloseBracket {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceBeforePunctuation {
     symbol: char,
 }
@@ -126,7 +129,7 @@ impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
 
 /// E201, E202, E203
 pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
-    let mut fstrings = 0u32;
+    let mut interpolated_strings = 0u32;
     let mut brackets = vec![];
     let mut prev_token = None;
     let mut iter = line.tokens().iter().peekable();
@@ -134,8 +137,10 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
     while let Some(token) = iter.next() {
         let kind = token.kind();
         match kind {
-            TokenKind::FStringStart => fstrings += 1,
-            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
+            TokenKind::FStringStart | TokenKind::TStringStart => interpolated_strings += 1,
+            TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                interpolated_strings = interpolated_strings.saturating_sub(1);
+            }
             TokenKind::Lsqb => {
                 brackets.push(kind);
             }
@@ -161,145 +166,138 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
             // Here, `{{` / `}} would be interpreted as a single raw `{` / `}`
             // character.
             match symbol {
-                BracketOrPunctuation::OpenBracket(symbol) if symbol != '{' || fstrings == 0 => {
+                BracketOrPunctuation::OpenBracket(symbol)
+                    if symbol != '{' || interpolated_strings == 0 =>
+                {
                     let (trailing, trailing_len) = line.trailing_whitespace(token);
                     if !matches!(trailing, Whitespace::None) {
+                        let range = TextRange::at(token.end(), trailing_len);
                         if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             WhitespaceAfterOpenBracket { symbol },
-                            TextRange::at(token.end(), trailing_len),
+                            range,
                         ) {
-                            let range = diagnostic.range();
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                         }
                     }
                 }
-                BracketOrPunctuation::CloseBracket(symbol) if symbol != '}' || fstrings == 0 => {
-                    if !matches!(prev_token, Some(TokenKind::Comma)) {
-                        if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
-                            line.leading_whitespace(token)
-                        {
-                            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                                WhitespaceBeforeCloseBracket { symbol },
-                                TextRange::at(token.start() - offset, offset),
-                            ) {
-                                let range = diagnostic.range();
-                                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                            }
+                BracketOrPunctuation::CloseBracket(symbol)
+                    if (symbol != '}' || interpolated_strings == 0)
+                        && !matches!(prev_token, Some(TokenKind::Comma)) =>
+                {
+                    if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
+                        line.leading_whitespace(token)
+                    {
+                        let range = TextRange::at(token.start() - offset, offset);
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                            WhitespaceBeforeCloseBracket { symbol },
+                            range,
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                         }
                     }
                 }
-                BracketOrPunctuation::Punctuation(symbol) => {
-                    if !matches!(prev_token, Some(TokenKind::Comma)) {
-                        let whitespace = line.leading_whitespace(token);
-                        if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
-                            whitespace
+                BracketOrPunctuation::Punctuation(symbol)
+                    if !matches!(prev_token, Some(TokenKind::Comma)) =>
+                {
+                    let whitespace = line.leading_whitespace(token);
+                    if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
+                        whitespace
+                    {
+                        // If we're in a slice, and the token is a colon, and it has
+                        // equivalent spacing on both sides, allow it.
+                        if symbol == ':'
+                            && brackets
+                                .last()
+                                .is_some_and(|kind| matches!(kind, TokenKind::Lsqb))
                         {
-                            // If we're in a slice, and the token is a colon, and it has
-                            // equivalent spacing on both sides, allow it.
-                            if symbol == ':'
-                                && brackets
-                                    .last()
-                                    .is_some_and(|kind| matches!(kind, TokenKind::Lsqb))
-                            {
-                                // If we're in the second half of a double colon, disallow
-                                // any whitespace (e.g., `foo[1: :2]` or `foo[1 : : 2]`).
-                                if matches!(prev_token, Some(TokenKind::Colon)) {
+                            // If we're in the second half of a double colon, disallow
+                            // any whitespace (e.g., `foo[1: :2]` or `foo[1 : : 2]`).
+                            if matches!(prev_token, Some(TokenKind::Colon)) {
+                                let range = TextRange::at(token.start() - offset, offset);
+                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                                    WhitespaceBeforePunctuation { symbol },
+                                    range,
+                                ) {
+                                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+                                }
+                            } else if iter.peek().is_some_and(|token| {
+                                matches!(token.kind(), TokenKind::Rsqb | TokenKind::Comma)
+                            }) {
+                                // Allow `foo[1 :]`, but not `foo[1  :]`.
+                                // Or `foo[index :, 2]`, but not `foo[index  :, 2]`.
+                                if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace {
+                                    let range = TextRange::at(token.start() - offset, offset);
                                     if let Some(mut diagnostic) = context
                                         .report_diagnostic_if_enabled(
                                             WhitespaceBeforePunctuation { symbol },
-                                            TextRange::at(token.start() - offset, offset),
+                                            range,
                                         )
                                     {
-                                        let range = diagnostic.range();
                                         diagnostic
                                             .set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                                     }
-                                } else if iter.peek().is_some_and(|token| {
-                                    matches!(token.kind(), TokenKind::Rsqb | TokenKind::Comma)
-                                }) {
-                                    // Allow `foo[1 :]`, but not `foo[1  :]`.
-                                    // Or `foo[index :, 2]`, but not `foo[index  :, 2]`.
-                                    if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
+                                }
+                            } else if iter.peek().is_some_and(|token| {
+                                matches!(
+                                    token.kind(),
+                                    TokenKind::NonLogicalNewline | TokenKind::Comment
+                                )
+                            }) {
+                                // Allow [
+                                //      long_expression_calculating_the_index() :
+                                // ]
+                                // But not [
+                                //      long_expression_calculating_the_index()  :
+                                // ]
+                                // distinct from the above case, because ruff format produces a
+                                // whitespace before the colon and so should the fix
+                                if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace {
+                                    let range = TextRange::at(token.start() - offset, offset);
+                                    if let Some(mut diagnostic) = context
+                                        .report_diagnostic_if_enabled(
+                                            WhitespaceBeforePunctuation { symbol },
+                                            range,
+                                        )
                                     {
-                                        if let Some(mut diagnostic) = context
-                                            .report_diagnostic_if_enabled(
-                                                WhitespaceBeforePunctuation { symbol },
-                                                TextRange::at(token.start() - offset, offset),
-                                            )
-                                        {
-                                            let range = diagnostic.range();
-                                            diagnostic.set_fix(Fix::safe_edit(
-                                                Edit::range_deletion(range),
-                                            ));
-                                        }
-                                    }
-                                } else if iter.peek().is_some_and(|token| {
-                                    matches!(
-                                        token.kind(),
-                                        TokenKind::NonLogicalNewline | TokenKind::Comment
-                                    )
-                                }) {
-                                    // Allow [
-                                    //      long_expression_calculating_the_index() :
-                                    // ]
-                                    // But not [
-                                    //      long_expression_calculating_the_index()  :
-                                    // ]
-                                    // distinct from the above case, because ruff format produces a
-                                    // whitespace before the colon and so should the fix
-                                    if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
-                                    {
-                                        if let Some(mut diagnostic) = context
-                                            .report_diagnostic_if_enabled(
-                                                WhitespaceBeforePunctuation { symbol },
-                                                TextRange::at(token.start() - offset, offset),
-                                            )
-                                        {
-                                            let range = diagnostic.range();
-                                            diagnostic.set_fix(Fix::safe_edits(
-                                                Edit::range_deletion(range),
-                                                [Edit::insertion(
-                                                    " ".into(),
-                                                    token.start() - offset,
-                                                )],
-                                            ));
-                                        }
-                                    }
-                                } else {
-                                    // Allow, e.g., `foo[1:2]` or `foo[1 : 2]` or `foo[1 :: 2]`.
-                                    let token = iter
-                                        .peek()
-                                        .filter(|next| matches!(next.kind(), TokenKind::Colon))
-                                        .unwrap_or(&token);
-                                    if line.trailing_whitespace(token) != whitespace {
-                                        if let Some(mut diagnostic) = context
-                                            .report_diagnostic_if_enabled(
-                                                WhitespaceBeforePunctuation { symbol },
-                                                TextRange::at(token.start() - offset, offset),
-                                            )
-                                        {
-                                            let range = diagnostic.range();
-                                            diagnostic.set_fix(Fix::safe_edit(
-                                                Edit::range_deletion(range),
-                                            ));
-                                        }
+                                        diagnostic.set_fix(Fix::safe_edits(
+                                            Edit::range_deletion(range),
+                                            [Edit::insertion(" ".into(), token.start() - offset)],
+                                        ));
                                     }
                                 }
                             } else {
-                                if fstrings > 0
-                                    && symbol == ':'
-                                    && matches!(prev_token, Some(TokenKind::Equal))
-                                {
-                                    // Avoid removing any whitespace for f-string debug expressions.
-                                    continue;
+                                // Allow, e.g., `foo[1:2]` or `foo[1 : 2]` or `foo[1 :: 2]`.
+                                let token = iter
+                                    .peek()
+                                    .filter(|next| matches!(next.kind(), TokenKind::Colon))
+                                    .unwrap_or(&token);
+                                if line.trailing_whitespace(token) != whitespace {
+                                    let range = TextRange::at(token.start() - offset, offset);
+                                    if let Some(mut diagnostic) = context
+                                        .report_diagnostic_if_enabled(
+                                            WhitespaceBeforePunctuation { symbol },
+                                            range,
+                                        )
+                                    {
+                                        diagnostic
+                                            .set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+                                    }
                                 }
-                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                                    WhitespaceBeforePunctuation { symbol },
-                                    TextRange::at(token.start() - offset, offset),
-                                ) {
-                                    let range = diagnostic.range();
-                                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                                }
+                            }
+                        } else {
+                            if interpolated_strings > 0
+                                && symbol == ':'
+                                && matches!(prev_token, Some(TokenKind::Equal))
+                            {
+                                // Avoid removing any whitespace for f-string debug expressions.
+                                continue;
+                            }
+                            let range = TextRange::at(token.start() - offset, offset);
+                            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                                WhitespaceBeforePunctuation { symbol },
+                                range,
+                            ) {
+                                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                             }
                         }
                     }

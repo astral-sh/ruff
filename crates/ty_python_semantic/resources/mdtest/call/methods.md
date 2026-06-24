@@ -34,7 +34,8 @@ from inspect import getattr_static
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(self, x: int) -> str
 
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(getattr_static(C, "f").__get__)
 
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f(self, x: int) -> str
 reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method C.f(x: int) -> str
@@ -69,7 +70,9 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-C.f(1)  # error: [missing-argument]
+# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Expected `C`, found `Literal[1]`"
+# error: [missing-argument]
+C.f(1)
 
 reveal_type(C.f(C(), 1))  # revealed: str
 ```
@@ -198,7 +201,53 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any) -> _SpecialForm
+reveal_type(IntOrStr.__or__)  # revealed: bound method TypeAliasType.__or__(right: Any, /) -> _SpecialForm
+```
+
+## Method calls on types not disjoint from `None`
+
+Very few methods are defined on `object`, `None`, and other types not disjoint from `None`. However,
+descriptor-binding behavior works on these types in exactly the same way as descriptor binding on
+other types. This is despite the fact that `None` is used as a sentinel internally by the descriptor
+protocol to indicate that a method was accessed on the class itself rather than an instance of the
+class:
+
+```py
+from typing import Protocol, Literal
+from ty_extensions import AlwaysFalsy
+
+class Foo: ...
+
+class SupportsStr(Protocol):
+    def __str__(self) -> str: ...
+
+class Falsy(Protocol):
+    def __bool__(self) -> Literal[False]: ...
+
+def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | None):
+    a.__str__()
+    b.__str__()
+    c.__str__()
+    d.__str__()
+    e.__str__()
+    f.__str__()
+```
+
+## Method calls on subclasses of `Any`
+
+```py
+from typing_extensions import assert_type, Any
+
+class SubclassOfAny(Any):
+    def method(self) -> int:
+        return 1
+
+a = SubclassOfAny()
+assert_type(a.method(), int)
+
+value: str = a.method()  # error: [invalid-assignment]
+
+assert_type(a.non_existing_method(), Any)
 ```
 
 ## Error cases: Calling `__get__` for methods
@@ -226,7 +275,7 @@ class C:
 
 method_wrapper = getattr_static(C, "f").__get__
 
-reveal_type(method_wrapper)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(method_wrapper)  # revealed: <method-wrapper '__get__' of function 'f'>
 
 # All of these are fine:
 method_wrapper(C(), C)
@@ -234,16 +283,18 @@ method_wrapper(C())
 method_wrapper(C(), None)
 method_wrapper(None, C)
 
-# Passing `None` without an `owner` argument is an
-# error: [invalid-argument-type] "Argument to method wrapper `__get__` of function `f` is incorrect: Expected `~None`, found `None`"
+reveal_type(object.__str__.__get__(object(), None)())  # revealed: str
+
+# TODO: passing `None` without an `owner` argument fails at runtime.
+# Ideally we would emit a diagnostic here:
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an
 # error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(None, 1)
 
-# Passing `None` as the `owner` argument when `instance` is `None` is an
-# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
+# TODO: passing `None` as the `owner` argument when `instance` is `None` fails at runtime.
+# Ideally we would emit a diagnostic here.
 method_wrapper(None, None)
 
 # Calling `__get__` without any arguments is an
@@ -274,10 +325,10 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
-The method `f` can not be accessed from an instance of the class:
+The method `f` cannot be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Type `C` has no attribute `f`"
+# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
@@ -293,7 +344,7 @@ class D(metaclass=Meta):
 reveal_type(D.f(1))  # revealed: Literal["a"]
 ```
 
-If the class method is possibly unbound, we union the return types:
+If the class method is possibly missing, we union the return types:
 
 ```py
 def flag() -> bool:
@@ -350,7 +401,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Argument to bound method `f` is incorrect: Expected `D`, found `<class 'D'>`"
+# error: [invalid-argument-type] "Argument to bound method `D.f` is incorrect: Expected `D`, found `<class 'D'>`"
 D.f()
 ```
 
@@ -367,6 +418,29 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
+### Implicit receivers in generic final classes
+
+For a generic final class, an implicit `type[Self]` receiver can bind to another classmethod on the
+exact generic class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    @classmethod
+    def call_method(cls) -> None:
+        cls.method()
+
+    @classmethod
+    def method(cls) -> None: ...
+```
+
 ### Accessing the classmethod as a static member
 
 Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
@@ -380,7 +454,8 @@ class C:
     def f(cls): ...
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(getattr_static(C, "f").__get__)
 ```
 
 But we correctly model how the `classmethod` descriptor works:
@@ -408,26 +483,326 @@ When a `@classmethod` is additionally decorated with another decorator, it is st
 class method:
 
 ```py
-from __future__ import annotations
-
 def does_nothing[T](f: T) -> T:
     return f
 
 class C:
     @classmethod
     @does_nothing
-    def f1(cls: type[C], x: int) -> str:
+    def f1(cls, x: int) -> str:
         return "a"
 
     @does_nothing
     @classmethod
-    def f2(cls: type[C], x: int) -> str:
+    def f2(cls, x: int) -> str:
         return "a"
 
 reveal_type(C.f1(1))  # revealed: str
 reveal_type(C().f1(1))  # revealed: str
 reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
+```
+
+### Classmethods with `Self` and callable-returning decorators
+
+When a classmethod is decorated with a decorator that returns a callable type (like
+`@contextmanager`), `Self` in the return type should correctly resolve to the subclass when accessed
+on a derived class.
+
+```py
+from contextlib import contextmanager
+from typing import Iterator
+from typing_extensions import Self
+
+class Base:
+    @classmethod
+    @contextmanager
+    def create(cls) -> Iterator[Self]:
+        yield cls()
+
+class Child(Base): ...
+
+reveal_type(Base.create())  # revealed: _GeneratorContextManager[Base, None, None]
+with Base.create() as base:
+    reveal_type(base)  # revealed: Base
+
+reveal_type(Base().create())  # revealed: _GeneratorContextManager[Base, None, None]
+with Base().create() as base:
+    reveal_type(base)  # revealed: Base
+
+reveal_type(Child.create())  # revealed: _GeneratorContextManager[Child, None, None]
+with Child.create() as child:
+    reveal_type(child)  # revealed: Child
+
+reveal_type(Child().create())  # revealed: _GeneratorContextManager[Child, None, None]
+with Child().create() as child:
+    reveal_type(child)  # revealed: Child
+```
+
+### `__init_subclass__`
+
+#### Basics
+
+The [`__init_subclass__`] method is implicitly a classmethod:
+
+```py
+class Base:
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.custom_attribute: int = 0
+
+class Derived(Base):
+    pass
+
+reveal_type(Derived.custom_attribute)  # revealed: int
+```
+
+Subclasses must be constructed with arguments matching the required arguments of the base
+`__init_subclass__` method.
+
+```py
+class Empty: ...
+
+class RequiresArg:
+    def __init_subclass__(cls, arg: int): ...
+
+class NoArg:
+    def __init_subclass__(cls): ...
+```
+
+Single-base definitions
+
+```py
+# snapshot: missing-argument
+class MissingArg(RequiresArg): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:18:1
+   |
+18 | class MissingArg(RequiresArg): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:13:32
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+   |
+```
+
+```py
+# snapshot: invalid-argument-type
+class InvalidType(RequiresArg, arg="foo"): ...
+class Valid(RequiresArg, arg=1): ...
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass__` is incorrect
+  --> src/mdtest_snippet.py:20:32
+   |
+20 | class InvalidType(RequiresArg, arg="foo"): ...
+   |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
+   |
+```
+
+```py
+# snapshot: missing-argument
+# snapshot: unknown-argument
+class IncorrectArg(RequiresArg, not_arg="foo"):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+    f = 6
+    g = 7
+    h = 8
+    i = 9
+    j = 10
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:24:1
+   |
+24 | class IncorrectArg(RequiresArg, not_arg="foo"):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:13:32
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+   |
+
+
+error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:24:33
+   |
+24 | class IncorrectArg(RequiresArg, not_arg="foo"):
+   |                                 ^^^^^^^^^^^^^
+   |
+info: Function signature here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
+```py
+class NotCallableInitSubclass:
+    __init_subclass__ = None
+
+# snapshot: non-callable-init-subclass
+class Bad(NotCallableInitSubclass):
+    a = 1
+    b = 2
+    c = 3
+```
+
+```snapshot
+error[non-callable-init-subclass]: Invalid definition of class `Bad`
+  --> src/mdtest_snippet.py:36:5
+   |
+36 |     __init_subclass__ = None
+   |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
+37 |
+38 | # snapshot: non-callable-init-subclass
+39 | class Bad(NotCallableInitSubclass):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
+   |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
+```
+
+The `metaclass` keyword is ignored, as it has special meaning and is not passed to
+`__init_subclass__` at runtime.
+
+```py
+class Base:
+    def __init_subclass__(cls, arg: int): ...
+
+class Valid(Base, arg=5, metaclass=object): ...
+
+# error: [invalid-argument-type]
+class Invalid(Base, metaclass=type, arg="foo"): ...
+```
+
+Overload matching is performed correctly:
+
+```py
+from typing import Literal, overload
+
+class Base:
+    @overload
+    def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+    @overload
+    def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+    def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+
+class Valid(Base, mode="a", arg=5): ...
+class Valid(Base, mode="b", arg="foo"): ...
+
+# error: [no-matching-overload]
+class InvalidType(Base, mode="b", arg=5):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+```
+
+#### More complex cases
+
+For multiple inheritance, the first resolved `__init_subclass__` method is used.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Empty: ...
+
+class RequiresArg:
+    def __init_subclass__(cls, arg: int): ...
+
+class NoArg:
+    def __init_subclass__(cls): ...
+
+class Valid(NoArg, RequiresArg): ...
+class MissingArg(RequiresArg, NoArg): ...  # error: [missing-argument]
+class InvalidType(RequiresArg, NoArg, arg="foo"): ...  # error: [invalid-argument-type]
+class Valid(RequiresArg, NoArg, arg=1): ...
+
+# Ensure base class without __init_subclass__ is ignored
+class Valid(Empty, NoArg): ...
+class Valid(Empty, RequiresArg, NoArg, arg=1): ...
+class MissingArg(Empty, RequiresArg): ...  # error: [missing-argument]
+class MissingArg(Empty, RequiresArg, NoArg): ...  # error: [missing-argument]
+class InvalidType(Empty, RequiresArg, NoArg, arg="foo"): ...  # error: [invalid-argument-type]
+
+# Multiple inheritance with args
+class Base(Empty, RequiresArg, NoArg, arg=1): ...
+class Valid(Base, arg=1): ...
+class MissingArg(Base): ...  # error: [missing-argument]
+class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+```
+
+Keyword splats are allowed if their type can be determined:
+
+```py
+from typing import TypedDict
+
+class RequiresKwarg:
+    def __init_subclass__(cls, arg: int): ...
+
+class WrongArg(TypedDict):
+    kwarg: int
+
+class InvalidType(TypedDict):
+    arg: str
+
+wrong_arg: WrongArg = {"kwarg": 5}
+
+# error: [missing-argument]
+# error: [unknown-argument]
+class MissingArg(RequiresKwarg, **wrong_arg): ...
+
+invalid_type: InvalidType = {"arg": "foo"}
+
+# error: [invalid-argument-type]
+class InvalidType(RequiresKwarg, **invalid_type): ...
+```
+
+So are generics:
+
+```py
+from typing import Generic, TypeVar, Literal, overload
+
+class Base[T]:
+    def __init_subclass__(cls, arg: T): ...
+
+class Valid(Base[int], arg=1): ...
+class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
+
+# Old generic syntax
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __init_subclass__(cls, arg: T) -> None: ...
+
+class Valid(Base[int], arg=1): ...
+class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
 ```
 
 ## `@staticmethod`
@@ -476,6 +851,32 @@ reveal_type(Derived().f)  # revealed: def f(x: int) -> str
 
 reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
+```
+
+### Staticmethod assigned in class body
+
+Assigning a `staticmethod(...)` object directly in the class body should preserve the callable
+behavior of the wrapped function when accessed on both classes and instances.
+
+```py
+def foo(*args, **kwargs) -> None:
+    print("foo", args, kwargs)
+
+class A:
+    __call__ = staticmethod(foo)
+    bar = staticmethod(foo)
+
+a = A()
+a()
+a.bar()
+a(5)
+a.bar(5)
+a(x=10)
+a.bar(x=10)
+
+A.bar()
+A.bar(5)
+A.bar(x=10)
 ```
 
 ### Accessing the staticmethod as a static member
@@ -538,4 +939,202 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+When a `@staticmethod` is decorated with `@contextmanager`, accessing it from an instance should not
+bind `self`:
+
+```py
+from contextlib import contextmanager
+from collections.abc import Iterator
+
+class D:
+    @staticmethod
+    @contextmanager
+    def ctx(num: int) -> Iterator[int]:
+        yield num
+
+    def use_ctx(self) -> None:
+        # Accessing via self should not bind self
+        with self.ctx(10) as x:
+            reveal_type(x)  # revealed: int
+
+# Accessing via class works
+reveal_type(D.ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+
+# Accessing via instance should also work (no self-binding)
+reveal_type(D().ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+```
+
+### `__new__`
+
+`__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
+argument:
+
+```py
+from typing_extensions import Self
+
+reveal_type(object.__new__)  # revealed: def __new__[Self](cls) -> Self
+reveal_type(object().__new__)  # revealed: def __new__[Self](cls) -> Self
+# revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
+reveal_type(int.__new__)
+# revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
+reveal_type((42).__new__)
+
+class X:
+    def __init__(self, val: int): ...
+    def make_another(self) -> Self:
+        reveal_type(self.__new__)  # revealed: def __new__[Self](cls) -> Self
+        return self.__new__(type(self))
+```
+
+## Bound-method attribute fallback
+
+Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying
+function object. A protocol refinement of the bound method must not be used as the receiver for that
+underlying-function fallback:
+
+```py
+from typing import Protocol, runtime_checkable
+
+class C:
+    def f(self, x: int) -> str:
+        return "a"
+
+@runtime_checkable
+class ReturnsStr(Protocol):
+    def __call__(self, x: str) -> str: ...
+
+def narrowed_bound_method_attribute():
+    method = C().f
+    if isinstance(method, ReturnsStr):
+        reveal_type(method)  # revealed: (bound method C.f(x: int) -> str) & ReturnsStr
+        reveal_type(method.__globals__)  # revealed: dict[str, Any]
+```
+
+## Builtin functions and methods
+
+Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
+properties are understood correctly for these functions and methods.
+
+```py
+import types
+from typing import Any, Callable
+from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
+
+def f(obj: type) -> None: ...
+
+class MyClass:
+    @property
+    def my_property(self) -> int:
+        return 42
+
+    @my_property.setter
+    def my_property(self, value: int | str) -> None: ...
+
+static_assert(is_assignable_to(types.FunctionType, Callable[..., Any]))
+
+# revealed: <wrapper-descriptor '__get__' of 'function' objects>
+reveal_type(types.FunctionType.__get__)
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable[..., Any]))
+
+# revealed: def f(obj: type) -> None
+reveal_type(f)
+static_assert(is_assignable_to(TypeOf[f], Callable[..., Any]))
+
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(f.__get__)
+static_assert(is_assignable_to(TypeOf[f.__get__], Callable[..., Any]))
+
+# revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
+reveal_type(types.FunctionType.__call__)
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable[..., Any]))
+
+# revealed: <method-wrapper '__call__' of function 'f'>
+reveal_type(f.__call__)
+static_assert(is_assignable_to(TypeOf[f.__call__], Callable[..., Any]))
+
+# revealed: <wrapper-descriptor '__get__' of 'property' objects>
+reveal_type(property.__get__)
+static_assert(is_assignable_to(TypeOf[property.__get__], Callable[..., Any]))
+
+# revealed: property
+reveal_type(MyClass.my_property)
+static_assert(is_assignable_to(TypeOf[property], Callable[..., Any]))
+static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable[..., Any]))
+
+# revealed: <method-wrapper '__get__' of property 'my_property'>
+reveal_type(MyClass.my_property.__get__)
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable[..., Any]))
+
+# revealed: <wrapper-descriptor '__set__' of 'property' objects>
+reveal_type(property.__set__)
+static_assert(is_assignable_to(TypeOf[property.__set__], Callable[..., Any]))
+
+# revealed: <method-wrapper '__set__' of property 'my_property'>
+reveal_type(MyClass.my_property.__set__)
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable[..., Any]))
+
+# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+reveal_type(str.startswith)
+static_assert(is_assignable_to(TypeOf[str.startswith], Callable[..., Any]))
+
+# revealed: <method-wrapper 'startswith' of string 'foo'>
+reveal_type("foo".startswith)
+static_assert(is_assignable_to(TypeOf["foo".startswith], Callable[..., Any]))
+
+def _(
+    a: RegularCallableTypeOf[types.FunctionType.__get__],
+    b: RegularCallableTypeOf[f],
+    c: RegularCallableTypeOf[f.__get__],
+    d: RegularCallableTypeOf[types.FunctionType.__call__],
+    e: RegularCallableTypeOf[f.__call__],
+    f: RegularCallableTypeOf[property],
+    g: RegularCallableTypeOf[property.__get__],
+    h: RegularCallableTypeOf[MyClass.my_property.__get__],
+    i: RegularCallableTypeOf[property.__set__],
+    j: RegularCallableTypeOf[MyClass.my_property.__set__],
+    k: RegularCallableTypeOf[str.startswith],
+    l: RegularCallableTypeOf["foo".startswith],
+):
+    # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(a)
+
+    # revealed: (obj: type) -> None
+    reveal_type(b)
+
+    # TODO: ideally this would have precise return types rather than `Unknown`
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(c)
+
+    # revealed: (self, *args: Any, **kwargs: Any) -> Any
+    reveal_type(d)
+
+    # revealed: (obj: type) -> None
+    reveal_type(e)
+
+    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> None) | None = None, doc: str | None = None) -> property
+    reveal_type(f)
+
+    # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(g)
+
+    # TODO: ideally this would have precise return types rather than `Unknown`
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(h)
+
+    # TODO: ideally this would have `-> None` rather than `-> Unknown`
+    # revealed: (self: property, instance: object, value: object, /) -> Unknown
+    reveal_type(i)
+
+    # TODO: ideally this would have a more precise input type and `-> None` rather than `-> Unknown`
+    # revealed: (instance: object, value: object, /) -> Unknown
+    reveal_type(j)
+
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    reveal_type(k)
+
+    # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    reveal_type(l)
+```
+
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
+[`__init_subclass__`]: https://docs.python.org/3/reference/datamodel.html#object.__init_subclass__

@@ -1,20 +1,20 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidChangeTextDocument;
-use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
+use lsp_types::{
+    DidChangeTextDocumentNotification, DidChangeTextDocumentParams, TextDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
+};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::diagnostics::publish_diagnostics;
+use crate::server::api::diagnostics::publish_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::AnySystemPath;
-use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
 impl NotificationHandler for DidChangeTextDocumentHandler {
-    type NotificationType = DidChangeTextDocument;
+    type NotificationType = DidChangeTextDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
@@ -24,36 +24,24 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
         let DidChangeTextDocumentParams {
-            text_document: VersionedTextDocumentIdentifier { uri, version },
+            text_document:
+                VersionedTextDocumentIdentifier {
+                    text_document_identifier: TextDocumentIdentifier { uri },
+                    version,
+                },
             content_changes,
         } = params;
 
-        let Ok(key) = session.key_from_url(uri.clone()) else {
-            tracing::debug!("Failed to create document key from URI: {}", uri);
-            return Ok(());
-        };
-
-        session
-            .update_text_document(&key, content_changes, version)
+        let mut document = session
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match key.path() {
-            AnySystemPath::System(path) => {
-                let db = match session.project_db_for_path_mut(path.as_std_path()) {
-                    Some(db) => db,
-                    None => session.default_project_db_mut(),
-                };
-                db.apply_changes(vec![ChangeEvent::file_content_changed(path.clone())], None);
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
-                db.apply_changes(
-                    vec![ChangeEvent::ChangedVirtual(virtual_path.clone())],
-                    None,
-                );
-            }
-        }
+        document
+            .update_text_document(session, content_changes, version)
+            .with_failure_code(ErrorCode::InternalError)?;
 
-        publish_diagnostics(session, &key, client)
+        publish_diagnostics_if_needed(&document, session, client);
+
+        Ok(())
     }
 }

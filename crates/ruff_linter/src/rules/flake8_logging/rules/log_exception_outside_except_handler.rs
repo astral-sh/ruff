@@ -39,11 +39,37 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logging.error("Foobar")
 /// ```
 ///
+/// ## Known limitations
+/// This rule checks whether a call is _defined_ inside an exception handler, not
+/// whether it _executes_ inside one. A function defined in an `except` block but
+/// called outside of it will not be flagged, despite the fact that the call may
+/// not have access to an active exception at runtime:
+///
+/// ```python
+/// import logging
+///
+///
+/// try:
+///     raise ValueError()
+/// except Exception:
+///
+///     def handler():
+///         logging.exception("Foobar")  # LOG004 not raised (false negative)
+///
+///
+/// handler()
+/// ```
+///
 /// ## Fix safety
 /// The fix, if available, will always be marked as unsafe, as it changes runtime behavior.
 ///
+/// ## Options
+///
+/// - `lint.logger-objects`
+///
 /// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.5")]
 pub(crate) struct LogExceptionOutsideExceptHandler;
 
 impl Violation for LogExceptionOutsideExceptHandler {

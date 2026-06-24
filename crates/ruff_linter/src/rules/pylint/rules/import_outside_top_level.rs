@@ -32,7 +32,7 @@ use crate::{
 /// def print_python_version():
 ///     import platform
 ///
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
 /// Use instead:
@@ -41,11 +41,19 @@ use crate::{
 ///
 ///
 /// def print_python_version():
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
+/// ## See also
+/// This rule will ignore import statements configured in
+/// [`lint.flake8-tidy-imports.banned-module-level-imports`][banned-module-level-imports]
+/// if the rule [`banned-module-level-imports`][TID253] is enabled.
+///
+/// [banned-module-level-imports]: https://docs.astral.sh/ruff/settings/#lint_flake8-tidy-imports_banned-module-level-imports
+/// [TID253]: https://docs.astral.sh/ruff/rules/banned-module-level-imports/
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ImportOutsideTopLevel;
 
 impl Violation for ImportOutsideTopLevel {

@@ -18,16 +18,48 @@ a = 4 + test  # ty: ignore[unresolved-reference]
 
 ```py
 test = 10
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'possibly-unresolved-reference'"
+# snapshot
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:3:15
+  |
+3 | a = test + 3  # ty: ignore[possibly-unresolved-reference]
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+  |
+2 | # snapshot
+  - a = test + 3  # ty: ignore[possibly-unresolved-reference]
+3 + a = test + 3
+  |
 ```
 
 ## Unused suppression if the error codes don't match
 
 ```py
+# snapshot: unused-ignore-comment
 # error: [unresolved-reference]
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'possibly-unresolved-reference'"
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
+print(a)
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:3:15
+  |
+3 | a = test + 3  # ty: ignore[possibly-unresolved-reference]
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+  |
+2 | # error: [unresolved-reference]
+  - a = test + 3  # ty: ignore[possibly-unresolved-reference]
+3 + a = test + 3
+4 | print(a)
+  |
 ```
 
 ## Suppressed unused comment
@@ -44,35 +76,117 @@ a = 10 / 2  # type: ignore # ty: ignore[unused-ignore-comment]
 ## Unused ignore comment
 
 ```py
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unused-ignore-comment'"
+# snapshot
 a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unused-ignore-comment'
+ --> src/mdtest_snippet.py:2:44
+  |
+2 | a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
+  |                                            ^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression code
+  |
+1 | # snapshot
+  - a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
+2 + a = 10 / 0  # ty: ignore[division-by-zero]
+  |
 ```
 
 ## Multiple unused comments
 
-Today, ty emits a diagnostic for every unused code. We might want to group the codes by comment at
-some point in the future.
+ty groups unused codes that are next to each other.
 
 ```py
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'division-by-zero'"
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+# snapshot
 a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+```
 
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:2:13
+  |
+2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+  |
+1 | # snapshot
+  - a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+2 + a = 10 / 2
+3 | # snapshot
+  |
+```
+
+```py
+# snapshot
+# snapshot
 a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment'
+ --> src/mdtest_snippet.py:5:26
+  |
+5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+  |                          ^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression code
+  |
+4 | # snapshot
+  - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+5 + a = 10 / 0  # ty: ignore[division-by-zero, unresolved-reference]
+6 | # snapshot
+  |
+
+
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
+ --> src/mdtest_snippet.py:5:64
+  |
+5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+  |                                                                ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression code
+  |
+4 | # snapshot
+  - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+5 + a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero]
+6 | # snapshot
+  |
+```
+
+```py
+# snapshot
+a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'
+ --> src/mdtest_snippet.py:7:26
+  |
+7 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression codes
+  |
+6 | # snapshot
+  - a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+7 + a = 10 / 0  # ty: ignore[division-by-zero]
+  |
 ```
 
 ## Multiple suppressions
 
 ```py
 # fmt: off
-def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...  # ty: ignore[fstring-type-annotation, byte-string-type-annotation]
+def test(a: f"f-string type annotation", b: unresolved_ref): ...  # ty: ignore[invalid-type-form, unresolved-reference]
 ```
 
 ## Can't suppress syntax errors
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -81,14 +195,14 @@ def test($):  # ty: ignore
     pass
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Can't suppress `revealed-type` diagnostics
 
 ```py
 a = 10
 # revealed: Literal[10]
-# error: [unknown-rule] "Unknown rule `revealed-type`"
+# error: [ignore-comment-unknown-rule] "Unknown rule `revealed-type`"
 reveal_type(a)  # ty: ignore[revealed-type]
 ```
 
@@ -124,14 +238,14 @@ a = 10 / 0  # ty: ignore[*-*]
 
 ## Trailing whitespace
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
-a = 10 / 0  # ty: ignore[division-by-zero]      
+a = 10 / 0  # ty: ignore[division-by-zero]       
             #                               ^^^^^^ trailing whitespace
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Missing comma
 
@@ -164,28 +278,72 @@ a = 4 / 0  # ty: ignore[]
 
 ## File-level suppression comments
 
-File level suppression comments are currently intentionally unsupported because we've yet to decide
-if they should use a different syntax that also supports enabling rules or changing the rule's
-severity: `ty: possibly-undefined-reference=error`
+File level suppression comments suppress all errors in a file with a given code.
 
 ```py
-# error: [unused-ignore-comment]
 # ty: ignore[division-by-zero]
 
-a = 4 / 0  # error: [division-by-zero]
+a = 4 / 0
+b = a + c  # error: [unresolved-reference]
 ```
 
 ## Unknown rule
 
 ```py
-# error: [unknown-rule] "Unknown rule `is-equal-14`"
-a = 10 + 4  # ty: ignore[is-equal-14]
+# snapshot
+a = 10 + 4  # ty: ignore[division-by-zer]
+```
+
+```snapshot
+warning[ignore-comment-unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+ --> src/mdtest_snippet.py:2:26
+  |
+2 | a = 10 + 4  # ty: ignore[division-by-zer]
+  |                          ^^^^^^^^^^^^^^^
+  |
 ```
 
 ## Code with `lint:` prefix
 
 ```py
-# error:[unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
+# error:[ignore-comment-unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
 # error: [division-by-zero]
 a = 10 / 0  # ty: ignore[lint:division-by-zero]
+```
+
+## Suppression of specific diagnostics
+
+In this section, we make sure that specific diagnostics can be suppressed in various forms that
+users might expect to work.
+
+### Invalid assignment
+
+An invalid assignment can be suppressed in the following ways:
+
+```py
+# fmt: off
+
+x1: str = 1 + 2 + 3  # ty: ignore
+
+x2: str = (  # ty: ignore
+    1 + 2 + 3
+)
+
+x4: str = (
+    1 + 2 + 3
+)  # ty: ignore
+```
+
+It can *not* be suppressed by putting the `# ty: ignore` on the inner expression. The range targeted
+by the suppression comment needs to overlap with one of the boundaries of the value range (the outer
+parentheses in this case):
+
+```py
+# fmt: off
+
+# error: [invalid-assignment]
+x4: str = (
+    # error: [unused-ignore-comment]
+    1 + 2 + 3  # ty: ignore
+)
 ```

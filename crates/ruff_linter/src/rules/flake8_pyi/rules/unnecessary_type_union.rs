@@ -32,6 +32,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// Note that while the fix may flatten nested unions into a single top-level union,
 /// the semantics of the annotation will remain unchanged.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct UnnecessaryTypeUnion {
     members: Vec<Name>,
     union_kind: UnionKind,
@@ -134,12 +135,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     })),
                     slice: Box::new(pep_604_union(&elts)),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 });
 
                 if other_exprs.is_empty() {
@@ -159,7 +160,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     })),
                     slice: Box::new(Expr::Subscript(ast::ExprSubscript {
                         value: subscript.value.clone(),
@@ -171,22 +172,22 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                                         id: type_member,
                                         ctx: ExprContext::Load,
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     })),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 });
 
                 if other_exprs.is_empty() {
@@ -202,12 +203,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                             elts: exprs.into_iter().cloned().collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     });
 
                     checker.generator().expr(&union)

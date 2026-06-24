@@ -1,5 +1,5 @@
 //! Rules from [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/).
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub mod types;
@@ -14,7 +14,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     use super::settings::Settings;
     use super::types;
@@ -375,6 +375,22 @@ mod tests {
             },
         )?;
         assert_diagnostics!("PT006_and_PT007", diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::PytestExtraneousScopeFunction, Path::new("PT003.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_pytest_style").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
+        );
         Ok(())
     }
 }

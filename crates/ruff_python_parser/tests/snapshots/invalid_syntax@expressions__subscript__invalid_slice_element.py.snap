@@ -7,20 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/in
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..133,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..10,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..10,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -28,16 +28,16 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 2..9,
                                     lower: Some(
                                         Named(
                                             ExprNamed {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 2..8,
                                                 target: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 2..3,
                                                         id: Name("x"),
                                                         ctx: Store,
@@ -45,7 +45,7 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 7..8,
                                                         value: Int(
                                                             1,
@@ -66,15 +66,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 33..39,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 33..39,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 33..34,
                                     id: Name("x"),
                                     ctx: Load,
@@ -82,16 +82,16 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 35..38,
                                     lower: Some(
                                         Starred(
                                             ExprStarred {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 35..37,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 36..37,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -112,15 +112,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 40..46,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 40..46,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 40..41,
                                     id: Name("x"),
                                     ctx: Load,
@@ -128,17 +128,17 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 42..45,
                                     lower: None,
                                     upper: Some(
                                         Starred(
                                             ExprStarred {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 43..45,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 44..45,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -158,15 +158,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 47..54,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 47..54,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 47..48,
                                     id: Name("x"),
                                     ctx: Load,
@@ -174,18 +174,18 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 49..53,
                                     lower: None,
                                     upper: None,
                                     step: Some(
                                         Starred(
                                             ExprStarred {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 51..53,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 52..53,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -204,15 +204,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 70..73,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 70..73,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 70..71,
                                     id: Name("x"),
                                     ctx: Load,
@@ -220,7 +220,7 @@ Module(
                             ),
                             slice: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 72..73,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -233,15 +233,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 123..133,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 123..133,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 123..124,
                                     id: Name("x"),
                                     ctx: Load,
@@ -249,15 +249,15 @@ Module(
                             ),
                             slice: Named(
                                 ExprNamed {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 125..132,
                                     target: Starred(
                                         ExprStarred {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 125..127,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     range: 126..127,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -268,7 +268,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 131..132,
                                             value: Int(
                                                 1,

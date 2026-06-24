@@ -40,6 +40,7 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// - [Pandas documentation: `loc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html)
 /// - [Pandas documentation: `iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotIx;
 
 impl Violation for PandasUseOfDotIx {
@@ -82,6 +83,7 @@ impl Violation for PandasUseOfDotIx {
 /// - [Pandas documentation: `loc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html)
 /// - [Pandas documentation: `at`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.at.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotAt;
 
 impl Violation for PandasUseOfDotAt {
@@ -133,6 +135,7 @@ impl Violation for PandasUseOfDotAt {
 /// - [Pandas documentation: `iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html)
 /// - [Pandas documentation: `iat`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iat.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotIat;
 
 impl Violation for PandasUseOfDotIat {
@@ -165,16 +168,17 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
     match attr.as_str() {
         // PD007
         "ix" if checker.is_rule_enabled(Rule::PandasUseOfDotIx) => {
-            checker.report_diagnostic(PandasUseOfDotIx, range)
+            let mut diagnostic = checker.report_diagnostic(PandasUseOfDotIx, range);
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         }
         // PD008
         "at" if checker.is_rule_enabled(Rule::PandasUseOfDotAt) => {
-            checker.report_diagnostic(PandasUseOfDotAt, range)
+            checker.report_diagnostic(PandasUseOfDotAt, range);
         }
         // PD009
         "iat" if checker.is_rule_enabled(Rule::PandasUseOfDotIat) => {
-            checker.report_diagnostic(PandasUseOfDotIat, range)
+            checker.report_diagnostic(PandasUseOfDotIat, range);
         }
-        _ => return,
-    };
+        _ => (),
+    }
 }

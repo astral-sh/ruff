@@ -37,6 +37,7 @@ use crate::{
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct SubprocessPopenWithShellEqualsTrue {
     safety: Safety,
     is_exact: bool,
@@ -79,6 +80,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 ///
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct SubprocessWithoutShellEqualsTrue;
 
 impl Violation for SubprocessWithoutShellEqualsTrue {
@@ -108,15 +110,16 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 ///
 /// ## Example
 /// ```python
-/// import subprocess
+/// import my_custom_subprocess
 ///
 /// user_input = input("Enter a command: ")
-/// subprocess.run(user_input, shell=True)
+/// my_custom_subprocess.run(user_input, shell=True)
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct CallWithShellEqualsTrue {
     is_exact: bool,
 }
@@ -169,6 +172,7 @@ impl Violation for CallWithShellEqualsTrue {
 /// ## References
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct StartProcessWithAShell {
     safety: Safety,
 }
@@ -210,6 +214,7 @@ impl Violation for StartProcessWithAShell {
 ///
 /// [S605]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct StartProcessWithNoShell;
 
 impl Violation for StartProcessWithNoShell {
@@ -245,6 +250,7 @@ impl Violation for StartProcessWithNoShell {
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 /// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct StartProcessWithPartialPath;
 
 impl Violation for StartProcessWithPartialPath {
@@ -265,19 +271,20 @@ impl Violation for StartProcessWithPartialPath {
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "*.py"])
+/// subprocess.Popen(["chmod", "777", "*.py"], shell=True)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "main.py"])
+/// subprocess.Popen(["chmod", "777", "main.py"], shell=True)
 /// ```
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct UnixCommandWildcardInjection;
 
 impl Violation for UnixCommandWildcardInjection {
@@ -287,16 +294,27 @@ impl Violation for UnixCommandWildcardInjection {
     }
 }
 
-/// Check if an expression is a trusted input for subprocess.run.
-/// We assume that any str, list[str] or tuple[str] literal can be trusted.
-fn is_trusted_input(arg: &Expr) -> bool {
-    match arg {
+/// Check if a single expression element is trusted input.
+/// String literals and `sys.executable` are considered trusted.
+fn is_trusted_element(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
         Expr::StringLiteral(_) => true,
+        _ => semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|name| matches!(name.segments(), ["sys", "executable"])),
+    }
+}
+
+/// Check if an expression is a trusted input for subprocess calls.
+/// We assume that any str, list[str] or tuple[str] literal can be trusted,
+/// as well as `sys.executable`.
+fn is_trusted_input(arg: &Expr, semantic: &SemanticModel) -> bool {
+    match arg {
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+            elts.iter().all(|elt| is_trusted_element(elt, semantic))
         }
-        Expr::Named(named) => is_trusted_input(&named.value),
-        _ => false,
+        Expr::Named(named) => is_trusted_input(&named.value, semantic),
+        _ => is_trusted_element(arg, semantic),
     }
 }
 
@@ -322,7 +340,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if !is_trusted_input(arg) {
+                    if !is_trusted_input(arg, checker.semantic()) {
                         checker.report_diagnostic_if_enabled(
                             SubprocessWithoutShellEqualsTrue,
                             call.func.range(),
@@ -508,7 +526,9 @@ fn is_full_path(text: &str) -> bool {
 /// partial path.
 fn is_partial_path(expr: &Expr) -> bool {
     let string_literal = match expr {
-        Expr::List(ast::ExprList { elts, .. }) => elts.first().and_then(string_literal),
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.first().and_then(string_literal)
+        }
         _ => string_literal(expr),
     };
     string_literal.is_some_and(|text| !is_full_path(text))

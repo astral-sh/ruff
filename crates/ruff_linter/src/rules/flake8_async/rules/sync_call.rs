@@ -18,12 +18,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// import trio
+///
+///
 /// async def double_sleep(x):
 ///     trio.sleep(2 * x)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import trio
+///
+///
 /// async def double_sleep(x):
 ///     await trio.sleep(2 * x)
 /// ```
@@ -32,6 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as adding an `await` to a function
 /// call changes its semantics and runtime behavior.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct TrioSyncCall {
     method_name: MethodName,
 }

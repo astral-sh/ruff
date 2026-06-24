@@ -24,17 +24,28 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
-/// var: str | "int"
+/// var: "Foo" | None
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// var: str | int
+/// from __future__ import annotations
+///
+/// var: Foo | None
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// Or, extend the quotes to include the entire union:
 /// ```python
-/// var: "str | int"
+/// var: "Foo | None"
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// ## Preview
@@ -52,6 +63,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct RuntimeStringUnion {
     strategy: Option<Strategy>,
 }

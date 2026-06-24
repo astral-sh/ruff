@@ -213,3 +213,159 @@ async def get_id_pydantic_full(
 async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 @app.get("/{my_id}")
 async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+
+@app.get("/things/{ thing_id }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+@app.get("/things/{ thing_id : path }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+@app.get("/things/{ thing_id : str }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+# https://github.com/astral-sh/ruff/issues/20680
+# These should NOT trigger FAST003 because FastAPI doesn't recognize them as path parameters
+
+# Non-ASCII characters in parameter name
+@app.get("/f1/{用户身份}")
+async def f1():
+    return locals()
+
+# Space in parameter name  
+@app.get("/f2/{x: str}")
+async def f2():
+    return locals()
+
+# Non-ASCII converter
+@app.get("/f3/{complex_number:ℂ}")
+async def f3():
+    return locals()
+
+# Mixed non-ASCII characters
+@app.get("/f4/{用户_id}")
+async def f4():
+    return locals()
+
+# Space in parameter name with converter
+@app.get("/f5/{param: int}")
+async def f5():
+    return locals()
+
+# https://github.com/astral-sh/ruff/issues/19831
+# NFKC-equivalent non-ASCII path parameter should not match (would cause infinite loop)
+@app.get("/queries/{𝑞𝑢𝑒𝑟𝑦}")
+async def read_query_nfkc(query: str): ...
+
+# https://github.com/astral-sh/ruff/issues/20941
+@app.get("/imports/{import}")
+async def get_import():
+    ...
+
+@app.get("/debug/{__debug__}")
+async def get_debug():
+    ...
+
+
+# https://github.com/astral-sh/ruff/issues/19831
+
+# Errors: vararg-only and kwarg-only functions
+@app.get("/things/{thing_id}")
+async def read_thing_vararg(*query: str): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_kwarg(**query: str): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_vararg_kwarg(*args, **kwargs): ...
+
+# Errors: positional-only parameter edge cases
+@app.get("/things/{thing_id}")
+async def read_thing_posonly(query: str, /): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_trailing(query: str, /,): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_default(query: str = "", /): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_default_trailing(query: str = "", /,): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
+
+
+# https://github.com/astral-sh/ruff/issues/23526
+
+# Error: `Depends(CallableQuery)` passes the class itself, so FastAPI uses
+# `__init__` (which has no params here), not `__call__`. The path parameter
+# `thing_id` is unused.
+class CallableQuery:
+    def __call__(self, thing_id: int):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
+
+
+# OK: `Depends(CallableQuery())` passes an instance, so FastAPI uses `__call__`,
+# which declares `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_instance(query: Annotated[str, Depends(CallableQuery())]): ...
+
+
+# OK: class with both __init__ and __call__, passed as class reference.
+# FastAPI uses `__init__`, which declares `thing_id`.
+class InitAndCallQuery:
+    def __init__(self, thing_id: int):
+        pass
+
+    def __call__(self, other: str):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_dep(query: Annotated[str, Depends(InitAndCallQuery)]): ...
+
+
+# Error: `Depends(CallableQueryOther)` — class reference, uses `__init__` (no
+# params). `thing_id` is unused.
+class CallableQueryOther:
+    def __call__(self, other: str):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+
+
+# Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
+# `__call__`, which has `other` — not `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
+
+
+# Error: class with no __init__ and no __call__; FastAPI calls __init__ which
+# has no parameters, so `thing_id` is not covered by the dependency.
+class EmptyClass:
+    pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
+
+
+# Same instance patterns as default values (not Annotated).
+# OK: `__call__` declares `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+# Error: `__call__` has `other`, not `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...

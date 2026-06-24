@@ -10,6 +10,8 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::{quote_type_expression, quotes_are_unremovable};
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::token::parenthesized_range;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -47,10 +49,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -86,11 +89,15 @@ impl Violation for UnquotedTypeAlias {
 /// ## Example
 /// Given:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = "int | None"
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = int | None
 /// ```
 ///
@@ -127,6 +134,7 @@ impl Violation for UnquotedTypeAlias {
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.8.1")]
 pub(crate) struct QuotedTypeAlias;
 
 impl AlwaysFixableViolation for QuotedTypeAlias {
@@ -286,7 +294,29 @@ pub(crate) fn quoted_type_alias(
 
     let range = annotation_expr.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
-    let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
+    let fix_string = annotation_expr.value.to_string();
+
+    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
+        && parenthesized_range(
+            // Check for parentheses outside the string ("""...""")
+            annotation_expr.into(),
+            checker.semantic().current_statement().into(),
+            checker.source_tokens(),
+        )
+        .is_none()
+        && parenthesized_range(
+            // Check for parentheses inside the string """(...)"""
+            expr.into(),
+            annotation_expr.into(),
+            checker.tokens(),
+        )
+        .is_none()
+    {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    let edit = Edit::range_replacement(fix_string, range);
     if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {

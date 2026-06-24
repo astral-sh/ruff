@@ -2,11 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use proc_macro2::Span;
 use quote::quote;
-use syn::{Attribute, Ident, Path};
+use syn::{Attribute, Ident};
 
 pub(crate) fn expand<'a>(
     prefix_ident: &Ident,
-    variants: impl Iterator<Item = (&'a str, &'a Path, &'a Vec<Attribute>)>,
+    variants: impl Iterator<Item = (&'a str, &'a Vec<Attribute>)>,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<String>> = BTreeMap::default();

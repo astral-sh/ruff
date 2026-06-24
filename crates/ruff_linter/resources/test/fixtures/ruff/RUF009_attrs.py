@@ -125,3 +125,20 @@ class J:
 class K:
     f: F = F()
     g: G = G()
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19014
+# These are all valid field calls and should not cause diagnostics.
+@attr.define
+class TestAttrField:
+    attr_field_factory: list[int] = attr.field(factory=list)
+    attr_field_default: list[int] = attr.field(default=attr.Factory(list))
+    attr_factory: list[int] = attr.Factory(list)
+    attr_ib: list[int] = attr.ib(factory=list)
+    attr_attr: list[int] = attr.attr(factory=list)
+    attr_attrib: list[int] = attr.attrib(factory=list)
+
+
+@attr.attributes
+class TestAttrAttributes:
+    x: list[int] = list()  # RUF009

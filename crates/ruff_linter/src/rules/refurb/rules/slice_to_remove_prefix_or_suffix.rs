@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
@@ -37,7 +38,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     filename = filename.removesuffix(".txt")
 ///     text = text.removeprefix("pre")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
     affix_kind: AffixKind,
     stmt_or_expression: StmtOrExpr,
@@ -88,11 +93,16 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_expr.start(),
-                if_expr.end(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(if_expr.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::replacement(replacement, if_expr.start(), if_expr.end()),
+                applicability,
+            ));
         }
     }
 }
@@ -121,11 +131,16 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_stmt.start(),
-                if_stmt.end(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(if_stmt.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::replacement(replacement, if_stmt.start(), if_stmt.end()),
+                applicability,
+            ));
         }
     }
 }
@@ -139,7 +154,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>> {
     let ast::ExprIf {
         test,
         body,
@@ -166,7 +181,7 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>> {
     let ast::StmtIf {
         test,
         body,

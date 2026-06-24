@@ -32,11 +32,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// documentation generators, or custom introspection utilities that rely on
 /// specific docstring formatting.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.68")]
 pub(crate) struct UnnecessaryMultilineDocstring;
 
 impl Violation for UnnecessaryMultilineDocstring {

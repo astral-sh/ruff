@@ -14,17 +14,18 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// from xml.etree import cElementTree
+/// from xml.etree import cElementTree as ET
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// from xml.etree import ElementTree
+/// from xml.etree import ElementTree as ET
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.199")]
 pub(crate) struct DeprecatedCElementTree;
 
 impl AlwaysFixableViolation for DeprecatedCElementTree {
@@ -43,6 +44,7 @@ where
     T: Ranged,
 {
     let mut diagnostic = checker.report_diagnostic(DeprecatedCElementTree, node.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     let contents = checker.locator().slice(node);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         contents.replacen("cElementTree", "ElementTree", 1),
@@ -55,6 +57,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
     match stmt {
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {
@@ -69,6 +72,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
             module,
             names,
             level,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {

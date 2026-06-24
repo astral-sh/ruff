@@ -1,7 +1,7 @@
 [package]
 name = "ruff_python_index"
-version = "0.0.0"
-publish = false
+version = "0.0.2"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -15,12 +15,12 @@ doctest = false
 
 [dependencies]
 ruff_python_ast = { workspace = true }
-ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 [dev-dependencies]
+ruff_python_parser = { workspace = true }
 
 [lints]
 workspace = true

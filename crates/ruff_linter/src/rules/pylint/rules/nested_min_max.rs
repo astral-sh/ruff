@@ -36,6 +36,26 @@ pub(crate) enum MinMax {
 /// diff = maximum - minimum
 /// ```
 ///
+/// ## Known issues
+///
+/// The resulting code may be slower and use more memory, especially for nested iterables. For
+/// example, this code:
+///
+/// ```python
+/// iterable = range(3)
+/// min(1, min(iterable))
+/// ```
+///
+/// will be fixed to:
+///
+/// ```python
+/// iterable = range(3)
+/// min(1, *iterable)
+/// ```
+///
+/// At least on current versions of CPython, this allocates a collection for the whole iterable
+/// before calling `min` and could cause performance regressions, at least for large iterables.
+///
 /// ## Fix safety
 ///
 /// This fix is always unsafe and may change the program's behavior for types without full
@@ -49,10 +69,13 @@ pub(crate) enum MinMax {
 /// print(max(1.0, float("nan"), 2.0))  # after fix: 2.0
 /// ```
 ///
+/// The fix will also remove any comments within the outer call.
+///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.266")]
 pub(crate) struct NestedMinMax {
     func: MinMax,
 }
@@ -125,7 +148,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                                 value: Box::new(arg.clone()),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             });
                             new_args.push(new_arg);
                             continue;
@@ -176,25 +199,20 @@ pub(crate) fn nested_min_max(
     }) {
         let mut diagnostic =
             checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
-        if !checker
-            .comment_ranges()
-            .has_comments(expr, checker.source())
-        {
-            let flattened_expr = Expr::Call(ast::ExprCall {
-                func: Box::new(func.clone()),
-                arguments: Arguments {
-                    args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
-                    keywords: Box::from(keywords),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-                },
+        let flattened_expr = Expr::Call(ast::ExprCall {
+            func: Box::new(func.clone()),
+            arguments: Arguments {
+                args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
+                keywords: keywords.iter().cloned().collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-            });
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(&flattened_expr),
-                expr.range(),
-            )));
-        }
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            },
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        });
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(&flattened_expr),
+            expr.range(),
+        )));
     }
 }

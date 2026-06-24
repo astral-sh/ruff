@@ -9,6 +9,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use itertools::Itertools;
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
@@ -36,6 +37,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("whitespace.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
@@ -77,6 +79,82 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001.py"))]
+    #[test_case(&[Rule::TypingOnlyThirdPartyImport], Path::new("TC002.py"))]
+    #[test_case(&[Rule::TypingOnlyStandardLibraryImport], Path::new("TC003.py"))]
+    #[test_case(
+        &[
+            Rule::TypingOnlyFirstPartyImport,
+            Rule::TypingOnlyThirdPartyImport,
+            Rule::TypingOnlyStandardLibraryImport,
+        ],
+        Path::new("TC001-3_future.py")
+    )]
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future.py"))]
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
+    fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
+        let name = rules.iter().map(Rule::noqa_code).join("-");
+        let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                // also enable quoting annotations to check the interaction. the future import
+                // should take precedence.
+                flake8_type_checking: super::settings::Settings {
+                    quote_annotations: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules(rules.iter().copied())
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
+    fn add_future_import_dataclass_kw_only_py313(rule: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "add_future_import_kw_only__{}_{}",
+            rule.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                // The issue in #21121 also didn't trigger on Python 3.14
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_respects_non_strict_mode() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking")
+                .join("TC001-3_future_strict.py")
+                .as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                flake8_type_checking: super::settings::Settings {
+                    strict: false,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::TypingOnlyFirstPartyImport,
+                    Rule::TypingOnlyThirdPartyImport,
+                    Rule::TypingOnlyStandardLibraryImport,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
