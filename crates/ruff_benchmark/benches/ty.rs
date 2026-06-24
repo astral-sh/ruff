@@ -708,6 +708,62 @@ fn benchmark_repeated_str_enum_comparisons(criterion: &mut Criterion) {
     benchmark_enum_comparison(criterion, "ty_micro[repeated_str_enum_comparisons]", &code);
 }
 
+/// Ensure comparison constraints between two large scalar enums do not compare every member pair.
+fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code = "from enum import StrEnum\n\nclass Left(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str("\n\nclass Right(StrEnum):\n");
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str(
+        "\n\ndef compare(left: Left, right: Right):\n    if left != right:\n        return\n    return left == right\n",
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
+}
+
+/// Ensure comparisons of unions spanning several scalar enum classes avoid member-pair expansion.
+fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_CLASSES: usize = 8;
+    const NUM_ENUM_MEMBERS: usize = 32;
+
+    let mut code = "from enum import StrEnum\n".to_string();
+    for side in ["Left", "Right"] {
+        for class_index in 0..NUM_ENUM_CLASSES {
+            writeln!(&mut code, "\nclass {side}{class_index}(StrEnum):").ok();
+            for member_index in 0..NUM_ENUM_MEMBERS {
+                writeln!(
+                    &mut code,
+                    "    VALUE_{member_index} = \"class_{class_index}_value_{member_index}\""
+                )
+                .ok();
+            }
+        }
+    }
+    code.push_str("\ndef compare(left: ");
+    for class_index in 0..NUM_ENUM_CLASSES {
+        if class_index > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Left{class_index}").ok();
+    }
+    code.push_str(", right: ");
+    for class_index in 0..NUM_ENUM_CLASSES {
+        if class_index > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Right{class_index}").ok();
+    }
+    code.push_str("):\n    if left != right:\n        return\n    return left == right\n");
+
+    benchmark_enum_comparison(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -1677,6 +1733,8 @@ criterion_group!(
     benchmark_narrowed_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
+    benchmark_cross_str_enum_comparison,
+    benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_vararg_parameter_type_accumulation,

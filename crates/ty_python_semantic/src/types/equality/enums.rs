@@ -1,4 +1,4 @@
-//! Equality reasoning for values from the same enum class without expanding member unions.
+//! Equality reasoning for enum value domains without expanding member unions.
 
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -13,94 +13,60 @@ use crate::{Db, FxOrderMap, FxOrderSet};
 
 use super::{ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics};
 
-/// Compare two value domains from the same enum without comparing every pair of members.
+/// Compare two enum value domains without comparing every pair of members.
 ///
 /// Any narrowing constraint produced here contains only enum-membership facts. In particular,
 /// equality never transfers gradual or nominal intersection state from one operand to the other.
-pub(super) fn evaluate_same_enum_domains<'db>(
+pub(super) fn evaluate_enum_domains<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let comparison = SameEnumComparison::from_types(db, target, other, operator)?;
-    match comparison.truthiness(db, operator)? {
-        Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
-        Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
-        Truthiness::Ambiguous if !comparison.supports_domain_narrowing() => {
-            Some(ComparisonResult::Ambiguous)
+    EnumDomainComparison::from_types(db, target, other, operator)?.evaluate(db, branch, operator)
+}
+
+/// A comparison of one or more enum domains, using the narrowest applicable representation.
+enum EnumDomainComparison<'db> {
+    SameClass(SameEnumComparison<'db>),
+    Projected(ProjectedEnumComparison<'db>),
+}
+
+impl<'db> EnumDomainComparison<'db> {
+    fn from_types(
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        let left = EnumDomainSet::from_type(db, left)?;
+        let right = EnumDomainSet::from_type(db, right)?;
+        if let (Some(left), Some(right)) = (left.single(), right.single())
+            && left.enum_class == right.enum_class
+        {
+            return Some(Self::SameClass(SameEnumComparison::new(
+                db,
+                left.clone(),
+                right.clone(),
+                operator,
+            )));
         }
-        Truthiness::Ambiguous if operator.condition_expects_equality(branch) => Some(
-            ComparisonResult::CanNarrow(comparison.right.restriction_type(db)),
-        ),
-        Truthiness::Ambiguous => Some(comparison.right.singleton_type(db).map_or(
-            ComparisonResult::Ambiguous,
-            |singleton| {
-                ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
-                        .add_positive(comparison.left.restriction_type(db))
-                        .add_negative(singleton)
-                        .build(),
-                )
-            },
-        )),
-    }
-}
-
-/// The result of comparing two value domains from the same enum.
-pub(in crate::types) enum EnumComparison {
-    /// The comparison method is modeled and has the given truthiness.
-    Known(Truthiness),
-    /// A custom or otherwise unmodeled comparison method must be called directly.
-    Unmodeled,
-}
-
-/// Compare two value domains from the same enum without comparing every pair of members.
-///
-/// `None` means that an operand is not structurally an enum domain.
-pub(in crate::types) fn same_enum_comparison<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-    is_equality: bool,
-) -> Option<EnumComparison> {
-    let operator = if is_equality {
-        ComparisonOperator::Equality
-    } else {
-        ComparisonOperator::Inequality
-    };
-    let comparison = SameEnumComparison::from_types(db, left, right, operator)?;
-    Some(
-        comparison
-            .truthiness(db, operator)
-            .map_or(EnumComparison::Unmodeled, EnumComparison::Known),
-    )
-}
-
-/// Return the constraint established by membership in an exact set of members from the same enum.
-pub(in crate::types) fn enum_membership_constraint<'db>(
-    db: &'db dyn Db,
-    target: Type<'db>,
-    members: Type<'db>,
-    is_positive: bool,
-) -> Option<Type<'db>> {
-    let comparison =
-        SameEnumComparison::from_types(db, target, members, ComparisonOperator::Equality)?;
-    if !comparison.supports_domain_narrowing() {
-        return None;
+        Some(Self::Projected(ProjectedEnumComparison::new(
+            db, left, &right, operator,
+        )?))
     }
 
-    let members = comparison.right.restriction_type(db);
-    if is_positive {
-        Some(members)
-    } else {
-        Some(
-            IntersectionBuilder::new(db)
-                .add_positive(comparison.left.restriction_type(db))
-                .add_negative(members)
-                .build(),
-        )
+    fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> Option<ComparisonResult<'db>> {
+        match self {
+            Self::SameClass(comparison) => comparison.evaluate(db, branch, operator),
+            Self::Projected(comparison) => comparison.evaluate(db, branch, operator),
+        }
     }
 }
 
@@ -111,28 +77,24 @@ pub(in crate::types) fn enum_membership_constraint<'db>(
 struct SameEnumComparison<'db> {
     left: EnumValueSet<'db>,
     right: EnumValueSet<'db>,
-    profile: EnumComparisonProfile,
+    profile: SameEnumComparisonProfile,
 }
 
 impl<'db> SameEnumComparison<'db> {
-    fn from_types(
+    fn new(
         db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
+        left: EnumValueSet<'db>,
+        right: EnumValueSet<'db>,
         operator: ComparisonOperator,
-    ) -> Option<Self> {
-        let left = EnumValueSet::from_type(db, left)?;
-        let right = EnumValueSet::from_type(db, right)?;
-        if left.enum_class != right.enum_class {
-            return None;
-        }
+    ) -> Self {
+        debug_assert_eq!(left.enum_class, right.enum_class);
         let enum_class = left.enum_class;
 
-        Some(Self {
+        Self {
             left,
             right,
-            profile: enum_comparison_profile(db, enum_class, operator),
-        })
+            profile: same_enum_comparison_profile(db, enum_class, operator),
+        }
     }
 
     /// Return `None` only when comparison behavior is custom or otherwise unmodeled.
@@ -142,7 +104,7 @@ impl<'db> SameEnumComparison<'db> {
         let domains_are_closed = self.left.is_closed(members_are_exhaustive)
             && self.right.is_closed(members_are_exhaustive);
         let equality = if domains_are_closed
-            && comparison_keys == EnumComparisonKeys::Distinct
+            && comparison_keys == SameEnumComparisonKeys::Distinct
             && !self.left.overlaps(&self.right, db)
         {
             Truthiness::AlwaysFalse
@@ -158,6 +120,35 @@ impl<'db> SameEnumComparison<'db> {
         Some(equality.negate_if(operator == ComparisonOperator::Inequality))
     }
 
+    fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> Option<ComparisonResult<'db>> {
+        match self.truthiness(db, operator)? {
+            Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
+            Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
+            Truthiness::Ambiguous if !self.supports_domain_narrowing() => {
+                Some(ComparisonResult::Ambiguous)
+            }
+            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
+                Some(ComparisonResult::CanNarrow(self.right.restriction_type(db)))
+            }
+            Truthiness::Ambiguous => Some(self.right.singleton_type(db).map_or(
+                ComparisonResult::Ambiguous,
+                |singleton| {
+                    ComparisonResult::CanNarrow(
+                        IntersectionBuilder::new(db)
+                            .add_positive(self.left.restriction_type(db))
+                            .add_negative(singleton)
+                            .build(),
+                    )
+                },
+            )),
+        }
+    }
+
     /// Return whether equality can soundly transfer the right-hand enum restriction to the left.
     ///
     /// The right domain must be closed, and the left must either be closed as well or use identity
@@ -165,7 +156,7 @@ impl<'db> SameEnumComparison<'db> {
     fn supports_domain_narrowing(&self) -> bool {
         matches!(
             self.profile.comparison_keys,
-            Some(EnumComparisonKeys::Distinct)
+            Some(SameEnumComparisonKeys::Distinct)
         ) && self.right.is_closed(self.profile.members_are_exhaustive)
             && (self.left.is_closed(self.profile.members_are_exhaustive)
                 || self.profile.members_compare_by_identity)
@@ -177,12 +168,14 @@ impl<'db> SameEnumComparison<'db> {
 /// This is an upper bound on the operand's enum values. Gradual and nominal rest components can
 /// make the operand more specific, but they must never be transferred to the other operand by an
 /// equality constraint.
+#[derive(Clone)]
 struct EnumValueSet<'db> {
     enum_class: EnumClassLiteral<'db>,
     members: EnumValueSetMembers<'db>,
 }
 
 /// Compact representation of the member names admitted by an [`EnumValueSet`].
+#[derive(Clone)]
 enum EnumValueSetMembers<'db> {
     /// The entire enum domain, including undeclared runtime values when the enum is open.
     All,
@@ -331,6 +324,20 @@ impl<'db> EnumValueSet<'db> {
         self.member_count(db) == 1 && self.is_closed(members_are_exhaustive)
     }
 
+    fn member_promotability(&self, db: &'db dyn Db, name: &Name) -> Option<bool> {
+        match &self.members {
+            EnumValueSetMembers::All => Some(true),
+            EnumValueSetMembers::One {
+                name: member,
+                promotable,
+            } => (*member == name).then_some(*promotable),
+            EnumValueSetMembers::Included(members) => members.get(name).copied(),
+            EnumValueSetMembers::AllExcept(complement) => {
+                (!complement.excluded_names(db).contains(name)).then_some(true)
+            }
+        }
+    }
+
     fn overlaps(&self, other: &Self, db: &'db dyn Db) -> bool {
         debug_assert_eq!(self.enum_class, other.enum_class);
         match (&self.members, &other.members) {
@@ -436,80 +443,439 @@ impl<'db> EnumValueSet<'db> {
     }
 }
 
+/// One or more enum-class domains represented by an operand.
+struct EnumDomainSet<'db> {
+    domains: Vec<EnumValueSet<'db>>,
+}
+
+impl<'db> EnumDomainSet<'db> {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        fn collect<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            domains: &mut Vec<EnumValueSet<'db>>,
+        ) -> Option<()> {
+            match ty.resolve_type_alias(db) {
+                Type::Union(union) => {
+                    for element in union.elements(db) {
+                        collect(db, *element, domains)?;
+                    }
+                }
+                ty => domains.push(EnumValueSet::from_type(db, ty)?),
+            }
+            Some(())
+        }
+
+        if let Some(domain) = EnumValueSet::from_type(db, ty) {
+            return Some(Self {
+                domains: vec![domain],
+            });
+        }
+
+        let mut domains = Vec::new();
+        collect(db, ty, &mut domains)?;
+        (!domains.is_empty()).then_some(Self { domains })
+    }
+
+    fn single(&self) -> Option<&EnumValueSet<'db>> {
+        let [domain] = self.domains.as_slice() else {
+            return None;
+        };
+        Some(domain)
+    }
+
+    fn key_projection(
+        &self,
+        db: &'db dyn Db,
+        operator: ComparisonOperator,
+    ) -> Option<EnumKeyProjection<'db>> {
+        let mut projection = EnumKeyProjection::default();
+        for domain in &self.domains {
+            domain.add_keys_to_projection(db, operator, &mut projection)?;
+        }
+        Some(projection)
+    }
+
+    fn restriction_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.domains
+            .iter()
+            .fold(UnionBuilder::new(db), |builder, domain| {
+                builder.add(domain.restriction_type(db))
+            })
+            .build()
+    }
+
+    fn restrict_for_equality(
+        &self,
+        db: &'db dyn Db,
+        operator: ComparisonOperator,
+        other: &EnumKeyProjection<'db>,
+    ) -> Option<Type<'db>> {
+        let mut builder = UnionBuilder::new(db);
+        for domain in &self.domains {
+            let mut projection = EnumKeyProjection::default();
+            domain.add_keys_to_projection(db, operator, &mut projection)?;
+            if projection.unknowns_may_overlap(other) {
+                builder = builder.add(domain.restriction_type(db));
+            } else if let Some(retained) = domain.retain_keys(db, operator, &other.keys).ok()? {
+                builder = builder.add(retained.restriction_type(db));
+            }
+        }
+        Some(builder.build())
+    }
+
+    /// Return the known subset of `self` that compares equal to `other`'s single key.
+    fn known_equal_type(
+        &self,
+        db: &'db dyn Db,
+        operator: ComparisonOperator,
+        other: &EnumKeyProjection<'db>,
+    ) -> Option<Type<'db>> {
+        let mut builder = UnionBuilder::new(db);
+        for domain in &self.domains {
+            let mut projection = EnumKeyProjection::default();
+            domain.add_keys_to_projection(db, operator, &mut projection)?;
+            if projection.unknowns_may_overlap(other) {
+                continue;
+            }
+            if let Some(retained) = domain.retain_keys(db, operator, &other.keys).ok()? {
+                builder = builder.add(retained.restriction_type(db));
+            }
+        }
+        Some(builder.build())
+    }
+}
+
+/// A comparison of operands that span more than one enum class.
+struct ProjectedEnumComparison<'db> {
+    left: EnumDomainSet<'db>,
+    left_projection: EnumKeyProjection<'db>,
+    right_projection: EnumKeyProjection<'db>,
+}
+
+impl<'db> ProjectedEnumComparison<'db> {
+    fn new(
+        db: &'db dyn Db,
+        left: EnumDomainSet<'db>,
+        right: &EnumDomainSet<'db>,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        let left_projection = left.key_projection(db, operator)?;
+        let right_projection = right.key_projection(db, operator)?;
+        Some(Self {
+            left,
+            left_projection,
+            right_projection,
+        })
+    }
+
+    fn truthiness(&self, operator: ComparisonOperator) -> Truthiness {
+        let equality = if !self.left_projection.may_overlap(&self.right_projection) {
+            Truthiness::AlwaysFalse
+        } else if self.left_projection.single_key().is_some()
+            && self.left_projection.single_key() == self.right_projection.single_key()
+        {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::Ambiguous
+        };
+        equality.negate_if(operator == ComparisonOperator::Inequality)
+    }
+
+    fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> Option<ComparisonResult<'db>> {
+        match self.truthiness(operator) {
+            Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
+            Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
+            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
+                Some(ComparisonResult::CanNarrow(
+                    self.left
+                        .restrict_for_equality(db, operator, &self.right_projection)?,
+                ))
+            }
+            Truthiness::Ambiguous if self.right_projection.single_key().is_some() => {
+                let equal_left =
+                    self.left
+                        .known_equal_type(db, operator, &self.right_projection)?;
+                Some(ComparisonResult::CanNarrow(
+                    IntersectionBuilder::new(db)
+                        .add_positive(self.left.restriction_type(db))
+                        .add_negative(equal_left)
+                        .build(),
+                ))
+            }
+            Truthiness::Ambiguous => Some(ComparisonResult::Ambiguous),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum EnumComparisonKey<'db> {
+    Object(EnumClassLiteral<'db>, &'db Name),
+    Scalar(LiteralValueTypeKind<'db>),
+}
+
+impl<'db> EnumComparisonKey<'db> {
+    fn domain(self) -> Option<EnumComparisonKeyDomain<'db>> {
+        match self {
+            Self::Object(enum_class, _) => Some(EnumComparisonKeyDomain::Object(enum_class)),
+            Self::Scalar(LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_)) => {
+                Some(EnumComparisonKeyDomain::Int)
+            }
+            Self::Scalar(LiteralValueTypeKind::String(_)) => Some(EnumComparisonKeyDomain::Str),
+            Self::Scalar(LiteralValueTypeKind::Bytes(_)) => Some(EnumComparisonKeyDomain::Bytes),
+            Self::Scalar(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum EnumComparisonKeyDomain<'db> {
+    Object(EnumClassLiteral<'db>),
+    Int,
+    Str,
+    Bytes,
+    Tuple,
+    Dict,
+}
+
+impl<'db> EnumComparisonKeyDomain<'db> {
+    fn new(enum_class: EnumClassLiteral<'db>, semantics: KnownComparisonSemantics) -> Self {
+        match semantics {
+            KnownComparisonSemantics::Object => Self::Object(enum_class),
+            KnownComparisonSemantics::Int => Self::Int,
+            KnownComparisonSemantics::Str => Self::Str,
+            KnownComparisonSemantics::Bytes => Self::Bytes,
+            KnownComparisonSemantics::Tuple => Self::Tuple,
+            KnownComparisonSemantics::Dict => Self::Dict,
+        }
+    }
+
+    const fn unknown_overlaps_known(self) -> bool {
+        !matches!(self, Self::Object(_))
+    }
+}
+
+#[derive(Default)]
+struct EnumKeyProjection<'db> {
+    keys: FxHashSet<EnumComparisonKey<'db>>,
+    known_domains: FxHashSet<EnumComparisonKeyDomain<'db>>,
+    unknown_domains: FxHashSet<EnumComparisonKeyDomain<'db>>,
+}
+
+impl<'db> EnumKeyProjection<'db> {
+    fn may_overlap(&self, other: &Self) -> bool {
+        !self.keys.is_disjoint(&other.keys) || self.unknowns_may_overlap(other)
+    }
+
+    fn unknowns_may_overlap(&self, other: &Self) -> bool {
+        !self.unknown_domains.is_disjoint(&other.unknown_domains)
+            || self.unknown_domains.iter().any(|domain| {
+                domain.unknown_overlaps_known() && other.known_domains.contains(domain)
+            })
+            || other.unknown_domains.iter().any(|domain| {
+                domain.unknown_overlaps_known() && self.known_domains.contains(domain)
+            })
+    }
+
+    fn single_key(&self) -> Option<EnumComparisonKey<'db>> {
+        if self.unknown_domains.is_empty() && self.keys.len() == 1 {
+            self.keys.iter().copied().next()
+        } else {
+            None
+        }
+    }
+}
+
+impl<'db> EnumValueSet<'db> {
+    fn add_keys_to_projection(
+        &self,
+        db: &'db dyn Db,
+        operator: ComparisonOperator,
+        projection: &mut EnumKeyProjection<'db>,
+    ) -> Option<()> {
+        let profile: &'db EnumClassKeyProfile<'db> =
+            enum_class_key_profile(db, self.enum_class, operator);
+        let semantics = profile.semantics?;
+        let key_domain = EnumComparisonKeyDomain::new(self.enum_class, semantics);
+
+        for (name, scalar_key) in &profile.members {
+            if self.member_promotability(db, name).is_none() {
+                continue;
+            }
+            let key = if semantics == KnownComparisonSemantics::Object {
+                Some(EnumComparisonKey::Object(self.enum_class, name))
+            } else {
+                scalar_key.map(EnumComparisonKey::Scalar)
+            };
+            if let Some(key) = key
+                && let Some(domain) = key.domain()
+            {
+                projection.known_domains.insert(domain);
+                projection.keys.insert(key);
+            } else {
+                projection.unknown_domains.insert(key_domain);
+            }
+        }
+
+        if !self.is_closed(profile.members_are_exhaustive) {
+            projection.unknown_domains.insert(key_domain);
+        }
+        Some(())
+    }
+
+    fn retain_keys(
+        &self,
+        db: &'db dyn Db,
+        operator: ComparisonOperator,
+        keys: &FxHashSet<EnumComparisonKey<'db>>,
+    ) -> Result<Option<Self>, ()> {
+        let profile: &'db EnumClassKeyProfile<'db> =
+            enum_class_key_profile(db, self.enum_class, operator);
+        let semantics = profile.semantics.ok_or(())?;
+        let mut included = FxOrderMap::default();
+        for (name, scalar_key) in &profile.members {
+            let Some(promotable) = self.member_promotability(db, name) else {
+                continue;
+            };
+            let key = if semantics == KnownComparisonSemantics::Object {
+                Some(EnumComparisonKey::Object(self.enum_class, name))
+            } else {
+                scalar_key.map(EnumComparisonKey::Scalar)
+            };
+            if key.is_some_and(|key| keys.contains(&key)) {
+                Self::insert_member(&mut included, name, promotable);
+            }
+        }
+        if included.is_empty() {
+            return Ok(None);
+        }
+        if included.len() == self.member_count(db) && self.is_closed(profile.members_are_exhaustive)
+        {
+            return Ok(Some(self.clone()));
+        }
+
+        let members = if included.len() == 1 {
+            let (name, promotable) = included.into_iter().next().ok_or(())?;
+            EnumValueSetMembers::One { name, promotable }
+        } else {
+            EnumValueSetMembers::Included(included)
+        };
+        Ok(Some(Self {
+            enum_class: self.enum_class,
+            members,
+        }))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct EnumClassKeyProfile<'db> {
+    members_are_exhaustive: bool,
+    semantics: Option<KnownComparisonSemantics>,
+    members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]>,
+}
+
+/// Cache each class's modeled comparison keys independently of any particular operand pair.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn enum_class_key_profile<'db>(
+    db: &'db dyn Db,
+    enum_class: EnumClassLiteral<'db>,
+    operator: ComparisonOperator,
+) -> EnumClassKeyProfile<'db> {
+    let semantics = KnownComparisonSemantics::of_instance(
+        db,
+        enum_class.class_literal(db).to_non_generic_instance(db),
+        operator,
+    );
+    let members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]> = enum_class
+        .members(db)
+        .iter()
+        .map(|(name, value)| {
+            (
+                name.clone(),
+                semantics.and_then(|semantics| enum_comparison_key(semantics, *value)),
+            )
+        })
+        .collect();
+    EnumClassKeyProfile {
+        members_are_exhaustive: enum_class.members_are_exhaustive(db),
+        semantics,
+        members,
+    }
+}
+
 /// Whether distinct declared members are known to have distinct runtime comparison keys.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-enum EnumComparisonKeys {
+enum SameEnumComparisonKeys {
     /// Different member names cannot compare equal.
     Distinct,
     /// Values are unknown or repeated, so different member names may compare equal.
     UnknownOrRepeated,
 }
 
-/// Class-wide facts required to compare enum value sets without member expansion.
+/// Same-class facts that are unnecessary when projecting keys across different classes.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct EnumComparisonProfile {
+struct SameEnumComparisonProfile {
     members_are_exhaustive: bool,
-    /// Whether distinct enum members compare by identity, including members created at runtime.
     members_compare_by_identity: bool,
-    /// `None` means comparison behavior is custom or otherwise unmodeled.
-    comparison_keys: Option<EnumComparisonKeys>,
+    comparison_keys: Option<SameEnumComparisonKeys>,
 }
 
-/// Compute and cache the class-wide work needed for repeated comparisons of the same enum.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn enum_comparison_profile<'db>(
+fn same_enum_comparison_profile<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
-) -> EnumComparisonProfile {
-    let semantics = KnownComparisonSemantics::of_instance(
-        db,
-        enum_class.class_literal(db).to_non_generic_instance(db),
-        operator,
-    );
-    let (comparison_keys, members_compare_by_identity) = match semantics {
+) -> SameEnumComparisonProfile {
+    let profile = enum_class_key_profile(db, enum_class, operator);
+    let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),
-        Some(KnownComparisonSemantics::Object) => (Some(EnumComparisonKeys::Distinct), true),
+        Some(KnownComparisonSemantics::Object) => (Some(SameEnumComparisonKeys::Distinct), true),
         Some(
-            semantics @ (KnownComparisonSemantics::Int
+            KnownComparisonSemantics::Int
             | KnownComparisonSemantics::Str
-            | KnownComparisonSemantics::Bytes),
-        ) if enum_members_have_distinct_value_keys(db, enum_class, semantics) => {
-            (Some(EnumComparisonKeys::Distinct), false)
+            | KnownComparisonSemantics::Bytes,
+        ) => {
+            let mut keys = FxHashSet::default();
+            let keys_are_distinct = profile
+                .members
+                .iter()
+                .all(|(_, key)| key.is_some_and(|key| keys.insert(key)));
+            (
+                Some(if keys_are_distinct {
+                    SameEnumComparisonKeys::Distinct
+                } else {
+                    SameEnumComparisonKeys::UnknownOrRepeated
+                }),
+                false,
+            )
         }
-        Some(_) => (Some(EnumComparisonKeys::UnknownOrRepeated), false),
+        Some(_) => (Some(SameEnumComparisonKeys::UnknownOrRepeated), false),
     };
-    EnumComparisonProfile {
-        members_are_exhaustive: enum_class.members_are_exhaustive(db),
+    SameEnumComparisonProfile {
+        members_are_exhaustive: profile.members_are_exhaustive,
         members_compare_by_identity,
         comparison_keys,
     }
 }
 
-/// Return whether every declared member has a unique modeled runtime comparison key.
-///
-/// A value is only used when its literal kind matches the inherited scalar semantics; other values
-/// may be normalized by the scalar constructor before enum alias detection.
-/// Keys exclude literal metadata such as promotability, which does not affect runtime equality.
-/// Boolean keys are normalized to integers because Python considers `False == 0` and `True == 1`.
-fn enum_members_have_distinct_value_keys<'db>(
-    db: &'db dyn Db,
-    enum_class: EnumClassLiteral<'db>,
+fn enum_comparison_key(
     semantics: KnownComparisonSemantics,
-) -> bool {
-    let mut keys = FxHashSet::default();
-    enum_class.members(db).iter().all(|(_, value)| {
-        let key = match (semantics, value.as_literal_value_kind()) {
-            (KnownComparisonSemantics::Int, Some(LiteralValueTypeKind::Bool(value))) => {
-                LiteralValueTypeKind::Int(IntLiteralType::from_i64(i64::from(value)))
-            }
-            (KnownComparisonSemantics::Int, Some(kind @ LiteralValueTypeKind::Int(_)))
-            | (KnownComparisonSemantics::Str, Some(kind @ LiteralValueTypeKind::String(_)))
-            | (KnownComparisonSemantics::Bytes, Some(kind @ LiteralValueTypeKind::Bytes(_))) => {
-                kind
-            }
-            _ => return false,
-        };
-        keys.insert(key)
-    })
+    value: Type<'_>,
+) -> Option<LiteralValueTypeKind<'_>> {
+    match (semantics, value.as_literal_value_kind()) {
+        (KnownComparisonSemantics::Int, Some(LiteralValueTypeKind::Bool(value))) => Some(
+            LiteralValueTypeKind::Int(IntLiteralType::from_i64(i64::from(value))),
+        ),
+        (KnownComparisonSemantics::Int, Some(kind @ LiteralValueTypeKind::Int(_)))
+        | (KnownComparisonSemantics::Str, Some(kind @ LiteralValueTypeKind::String(_)))
+        | (KnownComparisonSemantics::Bytes, Some(kind @ LiteralValueTypeKind::Bytes(_))) => {
+            Some(kind)
+        }
+        _ => None,
+    }
 }

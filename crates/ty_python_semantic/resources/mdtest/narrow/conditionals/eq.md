@@ -383,6 +383,218 @@ def _(value: Foo | Bar):
         reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
 ```
 
+`StrEnum` domains from different classes are compared by their string values. Equality retains the
+members whose values occur in both domains; inequality against a singleton excludes the matching
+member. Exact member comparisons are true or false when both values are known:
+
+```py
+from enum import StrEnum
+from typing import Literal
+
+class Left(StrEnum):
+    A = "a"
+    SHARED = "shared"
+    C = "c"
+
+class Right(StrEnum):
+    SHARED = "shared"
+    B = "b"
+    D = "d"
+
+reveal_type(Left.SHARED == Right.SHARED)  # revealed: Literal[True]
+reveal_type(Left.A == Right.B)  # revealed: Literal[False]
+reveal_type(Left.SHARED != Right.SHARED)  # revealed: Literal[False]
+
+def compare_domains(left: Left, right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Right
+
+    if left != right:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Right
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+
+def compare_singleton(left: Left, right: Literal[Right.SHARED]):
+    if left != right:
+        reveal_type(left)  # revealed: Literal[Left.A, Left.C]
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+
+def compare_subsets(
+    left: Literal[Left.A, Left.SHARED],
+    right: Literal[Right.SHARED, Right.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+```
+
+The same comparison-key projection applies when each operand spans several enum classes. This
+example represents 16 possible values on the left and 20 on the right, so comparing every member
+pair would exceed the finite-comparison budget:
+
+```py
+from enum import IntEnum
+
+class MixedLeft0(IntEnum):
+    A = 0
+    B = 1
+    C = 2
+    D = 3
+
+class MixedLeft1(IntEnum):
+    A = 4
+    B = 5
+    C = 6
+    D = 7
+
+class MixedLeft2(IntEnum):
+    A = 8
+    B = 9
+    C = 10
+    D = 11
+
+class MixedLeft3(IntEnum):
+    A = 12
+    B = 13
+    C = 14
+    D = 15
+
+class MixedRight0(IntEnum):
+    A = 0
+    B = 1
+    C = 2
+    D = 3
+
+class MixedRight1(IntEnum):
+    A = 4
+    B = 5
+    C = 6
+    D = 7
+
+class MixedRight2(IntEnum):
+    A = 8
+    B = 9
+    C = 10
+    D = 11
+
+class MixedRight3(IntEnum):
+    A = 16
+    B = 17
+    C = 18
+    D = 19
+
+class MixedRight4(IntEnum):
+    A = 20
+    B = 21
+    C = 22
+    D = 23
+
+def compare_mixed_domains(
+    left: MixedLeft0 | MixedLeft1 | MixedLeft2 | MixedLeft3,
+    right: MixedRight0 | MixedRight1 | MixedRight2 | MixedRight3 | MixedRight4,
+):
+    if left == right:
+        reveal_type(left)  # revealed: MixedLeft0 | MixedLeft1 | MixedLeft2
+        reveal_type(right)  # revealed: MixedRight0 | MixedRight1 | MixedRight2
+```
+
+An open identity-comparing enum can still be narrowed to all of its declared members. Undeclared
+runtime members are not retained merely because every declared member matches:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class OpenIdentity(Enum):
+    A = "a"
+    B = "b"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "OpenIdentity":
+        raise ValueError
+
+class OtherIdentity(Enum):
+    C = "c"
+
+def compare_open_identity(
+    left: OpenIdentity | OtherIdentity,
+    right: Literal[OpenIdentity.A, OpenIdentity.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[OpenIdentity.A, OpenIdentity.B]
+```
+
+Integer comparison keys normalize booleans in the same way as Python equality:
+
+```py
+from enum import Enum, IntEnum
+
+class BooleanKey(int, Enum):
+    FALSE = False
+
+class IntegerKey(IntEnum):
+    ZERO = 0
+
+reveal_type(BooleanKey.FALSE == IntegerKey.ZERO)  # revealed: Literal[True]
+```
+
+Plain enum members from different classes use identity comparison, even when their declared values
+are equal. Custom comparison methods and open scalar enums remain ambiguous:
+
+```py
+from enum import Enum, StrEnum
+
+class PlainLeft(Enum):
+    MEMBER = "shared"
+
+class PlainRight(Enum):
+    MEMBER = "shared"
+
+reveal_type(PlainLeft.MEMBER == PlainRight.MEMBER)  # revealed: Literal[False]
+
+def compare_plain(left: PlainLeft, right: PlainRight):
+    if left == right:
+        reveal_type(left)  # revealed: Never
+
+class CustomLeft(StrEnum):
+    MEMBER = "shared"
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+class CustomRight(StrEnum):
+    MEMBER = "shared"
+
+reveal_type(CustomLeft.MEMBER == CustomRight.MEMBER)  # revealed: bool
+
+class CustomNeLeft(StrEnum):
+    MEMBER = "shared"
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+reveal_type(CustomNeLeft.MEMBER == CustomRight.MEMBER)  # revealed: Literal[True]
+reveal_type(CustomNeLeft.MEMBER != CustomRight.MEMBER)  # revealed: bool
+
+class OpenLeft(StrEnum):
+    MEMBER = "shared"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "OpenLeft":
+        raise ValueError
+
+def compare_open(left: OpenLeft, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: OpenLeft
+```
+
 The same narrowing applies when comparing enum members directly with their inherited integer or
 string values. The negative constraint excludes both the builtin literal and every enum member known
 to compare equal to it:
@@ -481,6 +693,7 @@ class Other(IntEnum):
     ONE = 1
 
 reveal_type(Generated.ONE.value)  # revealed: int
+reveal_type(Generated.ONE == Other.ONE)  # revealed: bool
 
 def _(value: Generated | Other):
     if value == Generated.ONE:
