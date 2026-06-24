@@ -1893,8 +1893,8 @@ A read-only property on a protocol can be satisfied by a mutable attribute, a re
 read/write property, a `Final` attribute, or a `ClassVar` attribute:
 
 ```py
-from typing import ClassVar, Final, Protocol
-from ty_extensions import is_subtype_of, is_assignable_to, static_assert
+from typing import ClassVar, Final, Protocol, final
+from ty_extensions import is_subtype_of, is_assignable_to, is_disjoint_from, static_assert
 
 class HasXProperty(Protocol):
     @property
@@ -1913,6 +1913,12 @@ class XReadProperty:
 
 static_assert(is_subtype_of(XReadProperty, HasXProperty))
 static_assert(is_assignable_to(XReadProperty, HasXProperty))
+
+@final
+class FinalXReadProperty:
+    @property
+    def x(self) -> int:
+        return 42
 
 class XReadWriteProperty:
     @property
@@ -2069,6 +2075,8 @@ class HasMutableXAttr(Protocol):
     x: int
 
 static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))
+static_assert(not is_disjoint_from(FinalXReadProperty, HasXProperty))
+static_assert(is_disjoint_from(FinalXReadProperty, HasMutableXAttr))
 static_assert(not is_subtype_of(HasFinalX, HasMutableXAttr))
 static_assert(not is_assignable_to(HasFinalX, HasMutableXAttr))
 

@@ -1632,13 +1632,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
-    pub(super) fn protocol_property_write_is_definitely_missing_from_ty(
+    pub(super) fn protocol_member_write_is_definitely_missing_from_ty(
         &self,
         db: &'db dyn Db,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if !member.is_property() || member.capabilities(db).instance.write.is_none() {
+        if member.capabilities(db).instance.write.is_none() {
             return self.never();
         }
 
