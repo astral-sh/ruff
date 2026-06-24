@@ -1685,6 +1685,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
+    /// Returns the implicit `__class__` cell in the current direct method body or
+    /// lazy scope defined directly in a class body.
+    fn dunder_class_cell_type(&self) -> Option<ClassLiteral<'db>> {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let class_definition =
+            if let Some(definition) = self.index.class_definition_of_method(current_scope_id) {
+                definition
+            } else {
+                let current_scope = self.index.scope(current_scope_id);
+                if !matches!(
+                    current_scope.node(),
+                    NodeWithScopeKind::Lambda(_) | NodeWithScopeKind::GeneratorExpression(_)
+                ) {
+                    return None;
+                }
+                let class = self
+                    .index
+                    .parent_scope(current_scope_id)?
+                    .node()
+                    .as_class()?;
+                self.index.expect_single_definition(class)
+            };
+        original_class_type(self.db(), class_definition)
+    }
+
     /// If the current scope is a (non-lambda) function, return that function's AST node.
     ///
     /// If the current scope is not a function (or it is a lambda function), return `None`.
@@ -9545,6 +9570,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // in class bodies, which we already handled above.
             if symbol_resolves_locally {
                 return Place::Undefined.into();
+            }
+
+            if let PlaceExprRef::Symbol(symbol) = place_expr
+                && symbol.name() == "__class__"
+                && let Some(class) = self.dunder_class_cell_type()
+            {
+                return Place::bound(class).into();
             }
 
             for parent_id in place_table.parents(place_expr) {
