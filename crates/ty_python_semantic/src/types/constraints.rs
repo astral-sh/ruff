@@ -1250,17 +1250,17 @@ impl<'db> ConstraintBounds<'db> {
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
-/// An empty `UpperBound` represents no explicit upper clauses, which is semantically equivalent to
-/// `object`. Each stored type is one conjunctive upper clause, and a clause may itself be a union.
-/// This keeps bounds such as `(A | B) & (C | D)` factored instead of immediately converting them
-/// to ty's ordinary DNF [`Type`] representation.
+/// Each stored type is one clause in the conjunction that forms the upper bound. Importantly, each
+/// clause may be a union. This keeps bounds such as `(A | B) & (C | D)` factored in a CNF-like
+/// form instead of immediately converting them to the DNF representation that [`Type`] uses.
 ///
-/// Invariants maintained by [`UpperBound::add_clause`]:
-/// - an `object` clause is preserved if it is the only explicit upper clause;
-/// - an `object` clause is treated as redundant once any narrower clause is present;
-/// - a `Never` clause collapses the whole upper bound to exactly `[Never]`;
-/// - duplicate and redundant supertype clauses are removed;
-/// - clause order remains deterministic based on insertion order after pruning.
+/// An empty `UpperBound` represents a _missing_ upper bound, which (in the absence of other
+/// constraints) we solve to `Unknown`. An upper bound of `object` is treated as an explicit
+/// requeset for "any type" as a solution, so we solve it to `object`.
+///
+/// As an optimization, we will remove redundant clauses as we build up an `UpperBound`. This
+/// reduces the amount of work `IntersectionBuilder` needs to do when producing the solution for
+/// this upper bound.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct UpperBound<'db> {
     clauses: FxOrderSet<Type<'db>>,
