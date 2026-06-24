@@ -12,7 +12,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_text_size::{TextRange, TextSize};
 use ty_combine::Combine;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum ValueSource {
     /// Value loaded from a project's configuration file.
@@ -67,6 +67,17 @@ impl ValueSourceGuard {
     pub fn new(source: ValueSource, is_toml: bool) -> Self {
         let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
         Self { prev_value: prev }
+    }
+
+    pub fn without_spans() -> Self {
+        let source = VALUE_SOURCE.with_borrow(|current| {
+            current
+                .as_ref()
+                .expect("value source to be set before disabling spans")
+                .0
+                .clone()
+        });
+        Self::new(source, false)
     }
 }
 

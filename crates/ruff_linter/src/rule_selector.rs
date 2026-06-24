@@ -1,14 +1,11 @@
-use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::hash::Hash;
 use std::str::FromStr;
-use std::sync::Arc;
 
-use ruff_text_size::{TextRange, TextSize};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use toml::Spanned;
+
+use ruff_ranged_value::{RangedValue, ValueSource};
 
 use crate::codes::RuleIter;
 use crate::codes::{RuleCodePrefix, RuleGroup};
@@ -17,81 +14,14 @@ use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
 use crate::warn_user_once_by_message;
 
-thread_local! {
-    /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
-    /// but we want to associate each deserialized [`UnresolvedRuleSelector`] with the source from
-    /// which it originated. We use a thread local variable to work around this limitation.
-    ///
-    /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
-    /// deserialization code. It ensures that the thread local variable gets cleaned up
-    /// once deserialization is done (once the guard gets dropped).
-    static VALUE_SOURCE: RefCell<Option<(RuleSelectorSource, bool)>> = const { RefCell::new(None) };
-}
-
-/// Guard to safely change the `VALUE_SOURCE` for the current thread.
-#[must_use]
-pub struct RuleSelectorSourceGuard {
-    prev_value: Option<(RuleSelectorSource, bool)>,
-}
-
-impl RuleSelectorSourceGuard {
-    pub fn new(source: RuleSelectorSource, is_toml: bool) -> Self {
-        let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
-        Self { prev_value: prev }
-    }
-
-    pub fn without_spans() -> Self {
-        let source = VALUE_SOURCE.with_borrow(|current| {
-            current
-                .as_ref()
-                .expect("value source to be set before disabling spans")
-                .0
-                .clone()
-        });
-        Self::new(source, false)
-    }
-}
-
-impl Drop for RuleSelectorSourceGuard {
-    fn drop(&mut self) {
-        VALUE_SOURCE.set(self.prev_value.take());
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(transparent)]
-pub struct UnresolvedRuleSelector {
-    selector: String,
-
-    #[serde(skip)]
-    source: RuleSelectorSource,
-
-    /// The byte range of `value` in `source`.
-    ///
-    /// Can be `None` because not all sources support a range.
-    /// For example, arguments provided on the CLI won't have a range attached.
-    #[serde(skip)]
-    range: Option<TextRange>,
-}
-
-impl PartialEq for UnresolvedRuleSelector {
-    fn eq(&self, other: &Self) -> bool {
-        self.selector == other.selector
-    }
-}
-
-impl Eq for UnresolvedRuleSelector {}
-
-impl Hash for UnresolvedRuleSelector {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.selector.hash(state);
-    }
-}
+pub struct UnresolvedRuleSelector(RangedValue<String>);
 
 impl UnresolvedRuleSelector {
     pub fn resolve(&self, _preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
-        RuleSelector::from_str(&self.selector).map_err(|_| {
-            let kind = if matches!(self.selector.as_str(), "PREVIEW" | "NURSERY") {
+        RuleSelector::from_str(self.0.as_str()).map_err(|_| {
+            let kind = if matches!(self.0.as_str(), "PREVIEW" | "NURSERY") {
                 RuleResolutionErrorKind::Removed
             } else {
                 RuleResolutionErrorKind::Unknown
@@ -100,79 +30,16 @@ impl UnresolvedRuleSelector {
         })
     }
 
-    pub fn new(selector: impl Into<String>, source: RuleSelectorSource) -> Self {
-        Self {
-            selector: selector.into(),
-            source,
-            range: None,
-        }
+    pub fn new(selector: impl Into<String>, source: ValueSource) -> Self {
+        Self(RangedValue::new(selector.into(), source))
     }
 
     pub fn cli(selector: impl Into<String>) -> Self {
-        Self::new(selector, RuleSelectorSource::Cli)
+        Self::new(selector, ValueSource::Cli)
     }
 
-    pub fn with_range(
-        selector: impl Into<String>,
-        source: RuleSelectorSource,
-        range: TextRange,
-    ) -> Self {
-        Self {
-            selector: selector.into(),
-            source,
-            range: Some(range),
-        }
-    }
-
-    pub fn source(&self) -> &RuleSelectorSource {
-        &self.source
-    }
-
-    pub fn range(&self) -> Option<TextRange> {
-        self.range
-    }
-}
-
-impl<'de> Deserialize<'de> for UnresolvedRuleSelector {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        VALUE_SOURCE.with_borrow(|source| {
-            let (source, has_span) = source.clone().unwrap();
-
-            if has_span {
-                let spanned: Spanned<String> = Spanned::deserialize(deserializer)?;
-                let span = spanned.span();
-                let range = TextRange::new(
-                    TextSize::try_from(span.start)
-                        .expect("Configuration file to be smaller than 4GB"),
-                    TextSize::try_from(span.end)
-                        .expect("Configuration file to be smaller than 4GB"),
-                );
-
-                Ok(Self::with_range(spanned.into_inner(), source, range))
-            } else {
-                Ok(Self::new(String::deserialize(deserializer)?, source))
-            }
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-pub enum RuleSelectorSource {
-    File(Arc<PathBuf>),
-    Cli,
-    Editor,
-}
-
-impl std::fmt::Display for RuleSelectorSource {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RuleSelectorSource::File(path) => write!(f, "{}", path.display()),
-            RuleSelectorSource::Cli => write!(f, "the CLI"),
-            RuleSelectorSource::Editor => write!(f, "the editor configuration"),
-        }
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
     }
 }
 
@@ -186,16 +53,16 @@ enum RuleResolutionErrorKind {
 pub struct RuleResolutionError {
     selector: String,
     setting: Option<&'static str>,
-    source: RuleSelectorSource,
+    source: ValueSource,
     kind: RuleResolutionErrorKind,
 }
 
 impl RuleResolutionError {
     fn from_selector(unresolved: &UnresolvedRuleSelector, kind: RuleResolutionErrorKind) -> Self {
         Self {
-            selector: unresolved.selector.clone(),
+            selector: unresolved.0.to_string(),
             setting: None,
-            source: unresolved.source.clone(),
+            source: unresolved.0.source().clone(),
             kind,
         }
     }
@@ -222,7 +89,12 @@ impl std::fmt::Display for RuleResolutionError {
         if let Some(setting) = self.setting {
             write!(f, " in `{setting}`")?;
         }
-        write!(f, " from {source}", source = self.source)
+        write!(f, " from ")?;
+        match &self.source {
+            ValueSource::File(path) => write!(f, "{}", path.as_path()),
+            ValueSource::Cli => write!(f, "the CLI"),
+            ValueSource::Editor => write!(f, "the editor configuration"),
+        }
     }
 }
 

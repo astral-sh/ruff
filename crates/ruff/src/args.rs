@@ -19,7 +19,6 @@ use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
-use ruff_linter::rule_selector::{RuleSelectorSource, RuleSelectorSourceGuard};
 use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
@@ -27,6 +26,7 @@ use ruff_linter::settings::types::{
 use ruff_linter::{RuleParser, UnresolvedRuleSelector, UnresolvedRuleSelectorParser};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -982,7 +982,7 @@ impl TypedValueParser for ConfigArgumentParser {
             }
         }
 
-        let _guard = RuleSelectorSourceGuard::new(RuleSelectorSource::Cli, false);
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
 
         let config_parse_error = match toml::Table::from_str(value) {
             Ok(table) => match table.try_into::<Options>() {

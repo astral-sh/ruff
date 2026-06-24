@@ -6,7 +6,8 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
-use ruff_linter::rule_selector::{RuleSelectorSource, RuleSelectorSourceGuard};
+use ruff_db::system::SystemPathBuf;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -46,8 +47,12 @@ impl Pyproject {
 fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
     let path = path.as_ref();
 
-    let _guard =
-        RuleSelectorSourceGuard::new(RuleSelectorSource::File(Arc::new(path.to_path_buf())), true);
+    let _guard = ValueSourceGuard::new(
+        ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
+            path.to_path_buf(),
+        ))),
+        true,
+    );
 
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
@@ -276,28 +281,26 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::path::PathBuf;
     use std::str::FromStr;
     use std::sync::Arc;
 
     use anyhow::{Context, Result};
-    use ruff_linter::rule_selector::RuleSelectorSourceGuard;
+    use ruff_db::system::SystemPathBuf;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
+    use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
     fn deserialize() -> Result<()> {
-        let _guard = RuleSelectorSourceGuard::new(
-            ruff_linter::rule_selector::RuleSelectorSource::File(Arc::new(PathBuf::from(
-                "<filename>",
-            ))),
+        let _guard = ValueSourceGuard::new(
+            ValueSource::File(Arc::new(SystemPathBuf::from("<filename>"))),
             true,
         );
         let pyproject: Pyproject = toml::from_str(r"")?;

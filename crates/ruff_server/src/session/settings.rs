@@ -1,10 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
-use ruff_linter::rule_selector::RuleSelectorSource;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use thiserror::Error;
 
+use ruff_linter::UnresolvedRuleSelector;
 use ruff_linter::line_width::LineLength;
-use ruff_linter::{UnresolvedRuleSelector, rule_selector::RuleSelectorSourceGuard};
 use ruff_workspace::options::Options;
 
 use crate::{
@@ -112,7 +112,7 @@ impl TryFrom<ClientConfiguration> for ResolvedConfiguration {
                 PathBuf::from(shellexpand::full(&path)?.as_ref()),
             )),
             ClientConfiguration::Object(map) => {
-                let _guard = RuleSelectorSourceGuard::new(RuleSelectorSource::Editor, false);
+                let _guard = ValueSourceGuard::new(ValueSource::Editor, false);
                 let options = toml::Table::try_from(map)?.try_into::<Options>()?;
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)

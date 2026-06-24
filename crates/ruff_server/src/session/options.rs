@@ -1,13 +1,12 @@
 use std::path::PathBuf;
 
 use lsp_types::Uri;
+use ruff_ranged_value::ValueSource;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use ruff_linter::{
-    UnresolvedRuleSelector, line_width::LineLength, rule_selector::RuleSelectorSource,
-};
+use ruff_linter::{UnresolvedRuleSelector, line_width::LineLength};
 
 use crate::{
     format::FormatBackend,
@@ -165,7 +164,7 @@ impl ClientOptions {
     fn unresolved_rules(rules: Vec<String>) -> Vec<UnresolvedRuleSelector> {
         rules
             .into_iter()
-            .map(|selector| UnresolvedRuleSelector::new(selector, RuleSelectorSource::Editor))
+            .map(|selector| UnresolvedRuleSelector::new(selector, ValueSource::Editor))
             .collect()
     }
 
@@ -524,7 +523,7 @@ mod tests {
         let settings = options.into_settings().unwrap();
         let selector = &settings.editor_settings.select.unwrap()[0];
 
-        assert_eq!(selector.source(), &RuleSelectorSource::Editor);
+        assert_eq!(selector.source(), &ValueSource::Editor);
         assert_eq!(
             selector
                 .resolve(PreviewMode::Disabled)

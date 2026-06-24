@@ -525,8 +525,8 @@ mod tests {
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::registry::Rule;
-    use ruff_linter::rule_selector::{RuleSelectorSource, RuleSelectorSourceGuard};
     use ruff_python_ast::PythonVersion;
+    use ruff_ranged_value::{ValueSource, ValueSourceGuard};
     use ruff_workspace::options::Options;
 
     use super::*;
@@ -613,7 +613,7 @@ mod tests {
     #[test]
     fn conflicting_editor_settings_fall_back_to_defaults() -> anyhow::Result<()> {
         let root = Path::new("/src/project");
-        let _guard = RuleSelectorSourceGuard::new(RuleSelectorSource::Cli, false);
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
         let configuration = toml::from_str(
             r#"
             [lint.isort]
@@ -624,7 +624,7 @@ mod tests {
             configuration: Some(ResolvedConfiguration::Inline(Box::new(configuration))),
             select: Some(vec![UnresolvedRuleSelector::new(
                 "PYI025",
-                RuleSelectorSource::Editor,
+                ValueSource::Editor,
             )]),
             ..Default::default()
         };
