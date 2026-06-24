@@ -2287,6 +2287,9 @@ from typing_extensions import Self
 class WritableSelfAttr:
     x: Self
 
+class RecursiveWritableSelfAttr(Protocol):
+    x: Self
+
 class HasWritableSelfAttr(Protocol):
     @property
     def x(self) -> WritableSelfAttr: ...
@@ -2298,6 +2301,9 @@ static_assert(is_assignable_to(WritableSelfAttr, HasWritableSelfAttr))
 
 def _(value: WritableSelfAttr) -> None:
     value.x = WritableSelfAttr()
+
+def assign_protocol_member(left: RecursiveWritableSelfAttr, right: RecursiveWritableSelfAttr) -> None:
+    left.x = right
 ```
 
 Property members annotated with `Self` bind it to the implementation type:
