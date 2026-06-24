@@ -326,6 +326,7 @@ mod schema {
     use serde_json::Value;
     use strum::IntoEnumIterator;
 
+    use crate::codes::Rule;
     use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
     use crate::{RuleSelector, UnresolvedRuleSelector};
@@ -379,6 +380,12 @@ mod schema {
                 }
 
                 true
+            })
+            .flat_map(|code| {
+                Rule::from_code(&code)
+                    .map(|rule| rule.name().to_string())
+                    .into_iter()
+                    .chain(std::iter::once(code))
             })
             .sorted()
             .collect();
