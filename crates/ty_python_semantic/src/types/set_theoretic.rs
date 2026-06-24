@@ -771,11 +771,10 @@ impl<'db> IntersectionType<'db> {
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements, while
     /// ensuring that we only expand an intersection of unions within a limited budget.
     ///
-    /// Our `Type` representation is in DNF, which means that the size of an intersection of
-    /// unions is quadratic in the total number of union elements.
-    /// [`from_elements`][Self::from_elements] will blindly calculate that full expansion. This
-    /// method detects when we exceed a fixed budget of work, and if so, returns `None`. (Redundant
-    /// terms do not count toward the budget.)
+    /// Our `Type` representation is in DNF, which means that the size of an intersection of unions
+    /// grows as the product of all of the union sizes. [`from_elements`][Self::from_elements] will
+    /// blindly calculate that full expansion. This method detects when we exceed a fixed budget of
+    /// work, and if so, returns `None`. (Redundant terms do not count toward the budget.)
     ///
     /// Like [`from_elements`][Self::from_elements], a successful result is exact.
     pub(crate) fn bounded_from_elements<I, T>(db: &'db dyn Db, elements: I) -> Option<Type<'db>>
@@ -822,7 +821,7 @@ impl<'db> IntersectionType<'db> {
 
         for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
             // Don't check the budget for the first union clause. That ensures that we have a
-            // chance for pairs of types to "annhilate" each other without contributing to the
+            // chance for pairs of types to "annihilate" each other without contributing to the
             // result. For instance, this allows us to return the precise result for
             // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
             // most of the pairs are disjoint.
