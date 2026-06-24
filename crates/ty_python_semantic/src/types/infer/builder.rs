@@ -1685,30 +1685,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
+    /// Report an undeclared protocol attribute written through an instance-method receiver.
+    ///
+    /// The receiver may be referenced directly, from an eager nested scope, or through a capture
+    /// in a nested function. Writes through classmethod receivers and writes for which the
+    /// original receiver parameter is no longer reachable are excluded.
     fn report_undeclared_protocol_instance_attribute(&self, target: &ast::ExprAttribute) {
         let db = self.db();
         let Some(receiver) = target.value.as_name_expr() else {
             return;
         };
-        let current_scope_id = self.scope().file_scope_id(db);
-        let method_scope_id = if self.is_instance_attribute_assignment(target) {
-            let Some(method_scope_id) =
-                self.index
-                    .ancestor_scopes(current_scope_id)
-                    .find_map(|(scope_id, _)| {
-                        self.index
-                            .class_definition_of_method(scope_id)
-                            .map(|_| scope_id)
-                    })
-            else {
-                return;
-            };
-            method_scope_id
-        } else {
-            let Some(method_scope_id) = self.captured_receiver_method_scope(receiver) else {
-                return;
-            };
-            method_scope_id
+        let Some(method_scope_id) = self.receiver_method_scope(receiver) else {
+            return;
         };
         if !self.is_receiver_parameter_reachable(receiver) {
             return;
@@ -1745,22 +1733,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diagnostic::report_undeclared_protocol_instance_attribute(&self.context, target, protocol);
     }
 
+    /// Return whether the enclosing method's receiver parameter can reach this reference.
+    ///
+    /// The caller must first establish that `receiver` names the enclosing method's first
+    /// parameter. This check then distinguishes an unconditional rebind from a conditional one:
+    ///
+    /// ```python
+    /// if flag:
+    ///     self = other
+    /// self.extra = 1
+    /// ```
+    ///
+    /// The original `self` binding remains reachable in this example. References in nested eager
+    /// or lazy scopes are resolved through their enclosing binding snapshots.
     fn is_receiver_parameter_reachable(&self, receiver: &ast::ExprName) -> bool {
         fn bindings_include_parameter<'db>(
             db: &'db dyn Db,
             bindings: impl Iterator<Item = DefinitionState<'db>>,
         ) -> Option<bool> {
-            let mut saw_definition = false;
-            for binding in bindings {
-                let DefinitionState::Defined(definition) = binding else {
-                    continue;
-                };
-                saw_definition = true;
-                if definition.kind(db).is_parameter_def() {
-                    return Some(true);
-                }
-            }
-            saw_definition.then_some(false)
+            let mut definitions = bindings.filter_map(DefinitionState::definition).peekable();
+            definitions.peek()?;
+            Some(definitions.any(|definition| definition.kind(db).is_parameter_def()))
         }
 
         let db = self.db();
@@ -1776,21 +1769,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let place_table = self.index.place_table(file_scope_id);
-        let Some(receiver_id) = place_table.symbol_id(receiver.id.as_str()) else {
+        let Some(receiver_symbol) = place_table.symbol_by_name(receiver.id.as_str()) else {
             return false;
         };
-        let receiver_place = place_table.symbol(receiver_id).into();
-        for (enclosing_scope_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
-            if let EnclosingSnapshotResult::FoundBindings(bindings) =
-                self.index
+        let receiver_place = receiver_symbol.into();
+        self.index
+            .ancestor_scopes(file_scope_id)
+            .skip(1)
+            .find_map(|(enclosing_scope_id, _)| {
+                let EnclosingSnapshotResult::FoundBindings(bindings) = self
+                    .index
                     .enclosing_snapshot(enclosing_scope_id, receiver_place, file_scope_id)
-                && let Some(is_parameter) =
-                    bindings_include_parameter(db, bindings.map(|binding| binding.binding))
-            {
-                return is_parameter;
-            }
-        }
-        false
+                else {
+                    return None;
+                };
+                bindings_include_parameter(db, bindings.map(|binding| binding.binding))
+            })
+            .unwrap_or(false)
     }
 
     /// Returns the implicit `__class__` cell in the current direct method body or

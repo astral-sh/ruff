@@ -78,6 +78,14 @@ impl<'db> ProtocolClass<'db> {
     }
 
     /// Return whether `name` is declared by this protocol or one of its superclasses.
+    ///
+    /// Unlike [`ProtocolClass::interface`], this includes names deliberately excluded from a
+    /// protocol's runtime interface. This distinction lets callers recognize declarations such as:
+    ///
+    /// ```python
+    /// class P(Protocol):
+    ///     __doc__: str
+    /// ```
     pub(super) fn has_member_declaration(self, db: &'db dyn Db, name: &str) -> bool {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -95,8 +103,7 @@ impl<'db> ProtocolClass<'db> {
                     use_def_map(db, superclass_scope)
                         .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
                 )
-                .into_place_and_conflicting_declarations()
-                .0
+                .ignore_conflicting_declarations()
                 .place
                 .is_undefined()
             })

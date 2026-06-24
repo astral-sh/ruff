@@ -124,14 +124,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let Some(receiver) = target.value.as_name_expr() else {
             return false;
         };
-        self.captured_receiver_method_scope(receiver).is_some()
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        self.receiver_method_scope(receiver)
+            .is_some_and(|receiver_scope_id| receiver_scope_id != current_scope_id)
     }
 
-    /// Resolve the method scope for a receiver captured by the current scope.
-    pub(super) fn captured_receiver_method_scope(
-        &self,
-        receiver: &ast::ExprName,
-    ) -> Option<FileScopeId> {
+    /// Resolve the method scope that defines an implicit receiver referenced by the current scope.
+    ///
+    /// Returns `None` if the name is shadowed, resolves globally, or belongs to a function that is
+    /// not a method with an implicit receiver.
+    ///
+    /// ```python
+    /// class C:
+    ///     def method(self):
+    ///         def inner():
+    ///             self.attribute = 1
+    /// ```
+    pub(super) fn receiver_method_scope(&self, receiver: &ast::ExprName) -> Option<FileScopeId> {
         let receiver_name = receiver.id.as_str();
         let current_scope_id = self.scope().file_scope_id(self.db());
         let (receiver_scope_id, receiver_scope, receiver_symbol) = self
@@ -144,23 +153,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .filter(|symbol| symbol.is_local() || symbol.is_global())
                     .map(|symbol| (scope_id, scope, symbol))
             })?;
-        if receiver_symbol.is_global() || receiver_scope_id == current_scope_id {
+        if receiver_symbol.is_global() {
             return None;
         }
         let function = receiver_scope
             .node()
             .as_function()
             .map(|node| node.node(self.module()))?;
+        self.index.class_definition_of_method(receiver_scope_id)?;
 
-        (self
-            .index
-            .class_definition_of_method(receiver_scope_id)
-            .is_some()
-            && function
-                .parameters
-                .iter_non_variadic_params()
-                .next()
-                .is_some_and(|parameter| parameter.name() == receiver_name)
+        (function
+            .parameters
+            .iter_non_variadic_params()
+            .next()
+            .is_some_and(|parameter| parameter.name() == receiver_name)
             && self
                 .function_type(function)
                 .is_some_and(|function| function.has_implicit_receiver(self.db())))
