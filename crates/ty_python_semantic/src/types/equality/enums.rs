@@ -1,4 +1,4 @@
-//! Compact equality reasoning for values from the same enum class.
+//! Equality reasoning for values from the same enum class without expanding member unions.
 
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -13,7 +13,7 @@ use crate::{Db, FxOrderMap, FxOrderSet};
 
 use super::{ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics};
 
-/// Compare two compact domains from the same enum without expanding their members.
+/// Compare two value domains from the same enum without comparing every pair of members.
 ///
 /// Any narrowing constraint produced here contains only enum-membership facts. In particular,
 /// equality never transfers gradual or nominal intersection state from one operand to the other.
@@ -48,7 +48,7 @@ pub(super) fn evaluate_same_enum_domains<'db>(
     }
 }
 
-/// The result of comparing two compact domains from the same enum.
+/// The result of comparing two value domains from the same enum.
 pub(in crate::types) enum EnumComparison {
     /// The comparison method is modeled and has the given truthiness.
     Known(Truthiness),
@@ -56,10 +56,10 @@ pub(in crate::types) enum EnumComparison {
     Unmodeled,
 }
 
-/// Compare two compact domains from the same enum without expanding either operand.
+/// Compare two value domains from the same enum without comparing every pair of members.
 ///
 /// `None` means that an operand is not structurally an enum domain.
-pub(in crate::types) fn compact_enum_comparison<'db>(
+pub(in crate::types) fn same_enum_comparison<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
@@ -106,8 +106,8 @@ pub(in crate::types) fn enum_membership_constraint<'db>(
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
 ///
-/// Keeping the operands compact avoids constructing and pairwise comparing unions of every
-/// declared member.
+/// This representation avoids constructing and pairwise comparing unions of every declared
+/// member.
 struct SameEnumComparison<'db> {
     left: EnumValueSet<'db>,
     right: EnumValueSet<'db>,

@@ -20,7 +20,7 @@ mod enums;
 
 pub(super) use self::enums::enum_membership_constraint;
 use self::enums::evaluate_same_enum_domains;
-pub(super) use self::enums::{EnumComparison, compact_enum_comparison};
+pub(super) use self::enums::{EnumComparison, same_enum_comparison};
 
 /// The result of evaluating a runtime comparison between two types.
 ///
