@@ -3222,7 +3222,7 @@ impl<'db> CallableBinding<'db> {
         // overload for arity reasons before trying argument expansion.
         let (should_retry_after_provisional_arity, overloads_for_expansion) =
             if self.overloads.len() > 1
-                && self.matching_overload_index().len() < self.overloads.len()
+                && self.matching_overloads().count() < self.overloads.len()
                 && call_arguments.iter().any(|(argument, argument_types)| {
                     matches!(argument, Argument::Variadic)
                         && argument_types
@@ -3985,9 +3985,7 @@ impl<'db> CallableBinding<'db> {
                 // If multiple overloads passed arity check but only one matched types
                 // (possibly with semantic errors), report its errors directly instead
                 // of the generic "no matching overload" message.
-                if let MatchingOverloadIndex::Single(matching_overload_index) =
-                    self.matching_overload_index()
-                {
+                if let Ok((matching_overload_index, _)) = self.matching_overloads().exactly_one() {
                     let callable_description =
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
@@ -4144,16 +4142,6 @@ pub(crate) enum MatchingOverloadIndex {
 
     /// Multiple matching overloads found at the given indexes.
     Multiple(Vec<usize>),
-}
-
-impl MatchingOverloadIndex {
-    pub(crate) fn len(&self) -> usize {
-        match self {
-            MatchingOverloadIndex::None => 0,
-            MatchingOverloadIndex::Single(_) => 1,
-            MatchingOverloadIndex::Multiple(indexes) => indexes.len(),
-        }
-    }
 }
 
 #[derive(Default, Clone, Copy)]
@@ -5444,8 +5432,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             );
         };
 
-        match callable_binding.matching_overload_index() {
-            MatchingOverloadIndex::None => {
+        let mut matching_overloads = callable_binding.matching_overloads();
+        match (matching_overloads.next(), matching_overloads.next()) {
+            (None, _) => {
                 if let [binding] = callable_binding.overloads() {
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
@@ -5461,12 +5450,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     extend_errors(&callable_binding.overloads()[index].errors);
                 }
             }
-            MatchingOverloadIndex::Single(index) => {
+            (Some((_, binding)), None) => {
                 // TODO: We should also update the specialization for the `ParamSpec` to reflect the
                 // matching overload here.
-                extend_errors(&callable_binding.overloads()[index].errors);
+                extend_errors(&binding.errors);
             }
-            MatchingOverloadIndex::Multiple(_) => {
+            (Some(_), Some(_)) => {
                 if !matches!(
                     callable_binding.overload_call_return_type,
                     Some(OverloadCallReturnType::ArgumentTypeExpansion(_))

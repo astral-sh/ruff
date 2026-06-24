@@ -39,7 +39,7 @@ use crate::place::{
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::call::bind::{ArgumentTypeContext, MatchingOverloadIndex};
+use crate::types::call::bind::ArgumentTypeContext;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
@@ -6135,22 +6135,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
             binding: &'a CallableBinding<'db>,
         ) {
-            match binding.matching_overload_index() {
-                MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
-                    overloads_with_binding.extend(
-                        binding
-                            .matching_overloads()
-                            .map(|(_, overload)| (overload, binding)),
-                    );
-                }
-
+            let mut matching_overloads = binding.matching_overloads().peekable();
+            if matching_overloads.peek().is_some() {
+                overloads_with_binding
+                    .extend(matching_overloads.map(|(_, overload)| (overload, binding)));
+            } else if let [overload] = binding.overloads() {
                 // If there is a single overload that does not match, we still infer the argument
                 // types for better diagnostics.
-                MatchingOverloadIndex::None => {
-                    if let [overload] = binding.overloads() {
-                        overloads_with_binding.push((overload, binding));
-                    }
-                }
+                overloads_with_binding.push((overload, binding));
             }
         }
 
