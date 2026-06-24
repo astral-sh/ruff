@@ -197,13 +197,13 @@ fn class_pattern_is_exhaustive(
         return true;
     }
 
-    let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
     if !kind.keywords.iter().all(|keyword| {
         member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
     }) {
         return false;
     }
 
+    let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
     kind.positional
         .iter()
         .zip(positional_sources)
