@@ -23,7 +23,7 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
-        ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericContext,
+        ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
         TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
@@ -499,20 +499,12 @@ impl<'db> ProtocolMemberType<'db> {
     fn resolve(self, db: &'db dyn Db) -> Option<Self> {
         match self.kind {
             ProtocolMemberTypeKind::Value => Some(self),
-            ProtocolMemberTypeKind::PropertyGetter => property_get_member_type(db, self.ty, None),
+            ProtocolMemberTypeKind::PropertyGetter => property_get_member_type(db, self.ty),
             ProtocolMemberTypeKind::PropertySetter => property_set_member_type(db, self.ty),
         }
     }
 
     fn bind_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
-        match self.kind {
-            ProtocolMemberTypeKind::PropertyGetter => {
-                return property_get_member_type(db, self.ty, Some(self_type))
-                    .map(|member| member.ty);
-            }
-            ProtocolMemberTypeKind::Value | ProtocolMemberTypeKind::PropertySetter => {}
-        }
-
         let resolved = self.resolve(db)?;
         if !resolved.ty.contains_self(db) {
             return Some(resolved.ty);
@@ -957,25 +949,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 fn property_get_member_type<'db>(
     db: &'db dyn Db,
     getter: Type<'db>,
-    self_type: Option<Type<'db>>,
 ) -> Option<ProtocolMemberType<'db>> {
     let mut get_types = Vec::new();
     let mut definition = None;
     for callable in &getter.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
-            let return_ty = if let Some(self_type) = self_type
-                && let Some(self_typevar) = signature
-                    .parameters()
-                    .get_positional(0)
-                    .and_then(|parameter| parameter.annotated_type().as_typevar())
-            {
-                let specialization = GenericContext::from_typevar_instances(db, [self_typevar])
-                    .specialize(db, vec![self_type]);
-                signature.return_ty.apply_specialization(db, specialization)
-            } else {
-                signature.return_ty
-            };
-            get_types.push(return_ty);
+            get_types.push(signature.return_ty);
             definition = definition.or(signature.definition());
         }
     }
@@ -1326,11 +1305,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required: ProtocolMemberAccess<'db>,
         instance_access: bool,
     ) -> ConstraintSet<'db, 'c> {
-        if !instance_access && member.is_method() {
-            // The instance-side check is authoritative for a method's signature. Class access
-            // only establishes that the implementation is a method rather than an instance
-            // attribute. Callable types and several callable literal forms do not expose a
-            // useful `__call__` member through their meta-type.
+        if !instance_access
+            && member.is_method()
+            && (member.name == "__call__"
+                || matches!(
+                    ty.class_member(db, member.name.into())
+                        .place
+                        .ignore_possibly_undefined(),
+                    Some(Type::FunctionLiteral(function))
+                        if function.is_classmethod(db) || function.is_staticmethod(db)
+                ))
+        {
+            // The instance-side check is authoritative for the signature of a classmethod or
+            // staticmethod implementation. Class access only establishes that the member is
+            // present. Callable types and several callable literal forms do not expose a useful
+            // `__call__` member through their meta-type.
             return ConstraintSet::from_bool(
                 self.constraints,
                 member.name == "__call__"
