@@ -342,7 +342,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::Parameter, modifiers))
             }
             DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
-            DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
+            DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::Class, modifiers)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
             | DefinitionKind::StarImport(_) => {
@@ -1783,7 +1783,7 @@ result = check(None)
         "int" @ 123..126: Class
         "float" @ 129..134: Class
         "h" @ 139..140: Variable [definition]
-        "U" @ 142..143: TypeParameter
+        "U" @ 142..143: Class
         "#);
     }
 
@@ -2867,7 +2867,7 @@ def f(x: NewAlias, y: OldAlias): ...
         "int" @ 73..76: Class
         "f" @ 81..82: Function [definition]
         "x" @ 83..84: Parameter [definition]
-        "NewAlias" @ 86..94: TypeParameter
+        "NewAlias" @ 86..94: Class
         "y" @ 96..97: Parameter [definition]
         "OldAlias" @ 99..107: Class
         "#);
