@@ -209,6 +209,9 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [ssort](https://pypi.org/project/ssort/)
+    #[prefix = "SS"]
+    SSort,
     /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
