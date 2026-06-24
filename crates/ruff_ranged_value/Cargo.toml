@@ -17,7 +17,6 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true }
 ruff_text_size = { workspace = true }
-ty_combine = { workspace = true }
 
 get-size2 = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }

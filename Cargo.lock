@@ -3575,7 +3575,6 @@ dependencies = [
  "schemars",
  "serde",
  "toml 1.1.2+spec-1.1.0",
- "ty_combine",
 ]
 
 [[package]]
@@ -4580,6 +4579,7 @@ dependencies = [
  "ordermap",
  "ruff_db",
  "ruff_python_ast",
+ "ruff_ranged_value",
 ]
 
 [[package]]

@@ -10,7 +10,6 @@ use toml::Spanned;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_text_size::{TextRange, TextSize};
-use ty_combine::Combine;
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -185,15 +184,6 @@ impl<T> RangedValue<T> {
 
     pub fn into_inner(self) -> T {
         self.value
-    }
-}
-
-impl<T> Combine for RangedValue<T>
-where
-    T: Combine,
-{
-    fn combine_with(&mut self, other: Self) {
-        self.value.combine_with(other.value);
     }
 }
 
