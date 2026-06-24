@@ -40,3 +40,24 @@ def compare(
     reveal_type(left == right)  # revealed: Literal[False]
     reveal_type(left != right)  # revealed: Literal[True]
 ```
+
+When equality semantics are custom, result inference falls back to the corresponding dunder method:
+
+```py
+from enum import Enum
+
+class EqResult: ...
+class NeResult: ...
+
+class CustomEquality(Enum):
+    MEMBER = 1
+
+    def __eq__(self, other: object) -> EqResult:  # error: [invalid-method-override]
+        return EqResult()
+
+    def __ne__(self, other: object) -> NeResult:  # error: [invalid-method-override]
+        return NeResult()
+
+reveal_type(CustomEquality.MEMBER == CustomEquality.MEMBER)  # revealed: EqResult
+reveal_type(CustomEquality.MEMBER != CustomEquality.MEMBER)  # revealed: NeResult
+```

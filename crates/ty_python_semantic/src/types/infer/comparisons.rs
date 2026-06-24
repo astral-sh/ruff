@@ -555,27 +555,6 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     Some(Ok(result))
                 }
 
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::Eq =>
-                {
-                    Some(Ok(
-                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                            Ok(ty) => ty,
-                            Err(_) => Type::bool_literal(literal_1 == literal_2),
-                        },
-                    ))
-                }
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::NotEq =>
-                {
-                    Some(Ok(
-                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                            Ok(ty) => ty,
-                            Err(_) => Type::bool_literal(literal_1 != literal_2),
-                        },
-                    ))
-                }
-
                 _ => None,
             }
         }
