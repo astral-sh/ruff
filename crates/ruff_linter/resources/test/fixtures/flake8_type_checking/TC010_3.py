@@ -21,4 +21,7 @@ type A = Value["Foo" | str]  # OK
 OldS = TypeVar('OldS', int | 'foo.Bar', str)  # TC010
 
 x: ("Foo"  # TC010 (unsafe fix)
-    | str)
+    " | str" | None)
+
+OldT = TypeVar("OldT", ("Foo"  # TC010 (unsafe fix)
+                        " | str" | None))

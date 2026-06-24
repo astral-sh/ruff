@@ -38,9 +38,6 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("whitespace.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
@@ -61,22 +58,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: settings::types::PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -185,6 +166,65 @@ mod tests {
                 unresolved_target_version: PythonVersion::PY39.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
+    fn runtime_string_union(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
+    fn runtime_string_union_pre_py314(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("pre_py314_{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY313),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
+    fn runtime_string_union_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
+    fn runtime_string_union_preview_pre_py314(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview_pre_py314__{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY313),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

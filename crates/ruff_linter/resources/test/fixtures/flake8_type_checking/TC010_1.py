@@ -16,3 +16,9 @@ z: list[str, str | "int"] = []  # OK
 type A = Value["int" | str]  # OK
 
 OldS = TypeVar('OldS', int | 'str', str)  # TC010
+
+x: ("int"  # OK
+    " | str" | None)
+
+OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+                        " | str" | None))

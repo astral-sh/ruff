@@ -1,0 +1,122 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> TC010_2.py:4:4
+  |
+4 | x: "int" | str  # TC010
+  |    ^^^^^
+5 | x: ("int" | str) | "bool"  # TC010
+  |
+help: Remove quotes
+  |
+3 |
+  - x: "int" | str  # TC010
+4 + x: int | str  # TC010
+5 | x: ("int" | str) | "bool"  # TC010
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> TC010_2.py:5:5
+  |
+4 | x: "int" | str  # TC010
+5 | x: ("int" | str) | "bool"  # TC010
+  |     ^^^^^
+  |
+help: Remove quotes
+  |
+4 | x: "int" | str  # TC010
+  - x: ("int" | str) | "bool"  # TC010
+5 + x: (int | str) | "bool"  # TC010
+6 |
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> TC010_2.py:5:20
+  |
+4 | x: "int" | str  # TC010
+5 | x: ("int" | str) | "bool"  # TC010
+  |                    ^^^^^^
+  |
+help: Remove quotes
+  |
+4 | x: "int" | str  # TC010
+  - x: ("int" | str) | "bool"  # TC010
+5 + x: ("int" | str) | bool  # TC010
+6 |
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:12:20
+   |
+12 | z: list[str, str | "int"] = []  # TC010
+   |                    ^^^^^
+13 |
+14 | type A = Value["int" | str]  # OK
+   |
+help: Remove quotes
+   |
+11 |
+   - z: list[str, str | "int"] = []  # TC010
+12 + z: list[str, str | int] = []  # TC010
+13 |
+   |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:16:30
+   |
+14 | type A = Value["int" | str]  # OK
+15 |
+16 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
+   |                              ^^^^^
+17 |
+18 | x: ("int"  # TC010 (unsafe fix)
+   |
+help: Remove quotes
+   |
+15 |
+   - OldS = TypeVar('OldS', int | 'str', str)  # TC010
+16 + OldS = TypeVar('OldS', int | str, str)  # TC010
+17 |
+   |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:18:5
+   |
+16 |   OldS = TypeVar('OldS', int | 'str', str)  # TC010
+17 |
+18 |   x: ("int"  # TC010 (unsafe fix)
+   |  _____^
+19 | |     " | str" | None)
+   | |____________^
+20 |
+21 |   OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+   |
+help: Remove quotes
+   |
+17 |
+   - x: ("int"  # TC010 (unsafe fix)
+   -     " | str" | None)
+18 + x: (int | str | None)
+19 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:21:25
+   |
+19 |       " | str" | None)
+20 |
+21 |   OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+   |  _________________________^
+22 | |                         " | str" | None))
+   | |________________________________^
+   |
+help: Remove quotes
+   |
+20 |
+   - OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+   -                         " | str" | None))
+21 + OldT = TypeVar("OldT", (int | str | None))
+   |
+note: This is an unsafe fix and may change runtime behavior

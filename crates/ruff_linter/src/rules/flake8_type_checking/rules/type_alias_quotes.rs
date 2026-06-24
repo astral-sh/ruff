@@ -10,7 +10,6 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::{quote_type_expression, quotes_are_unremovable};
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::token::parenthesized_range;
 
 /// ## What it does
