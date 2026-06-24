@@ -771,7 +771,7 @@ def builtin_positional_patterns_are_exhaustive(
             return 1
 ```
 
-## Runtime dictionary class patterns
+## `TypedDict` class patterns at runtime
 
 A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapping` patterns always
 match it. The positional `dict` pattern does as well:
@@ -783,17 +783,17 @@ from typing import TypedDict
 class Movie(TypedDict):
     title: str
 
-def typed_dict_argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
+def argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
     match value:
         case dict():
             return 1
 
-def typed_dict_mapping_pattern_is_exhaustive(value: Movie) -> int:
+def mapping_pattern_is_exhaustive(value: Movie) -> int:
     match value:
         case Mapping():
             return 1
 
-def typed_dict_positional_dict_pattern_is_exhaustive(value: Movie) -> int:
+def positional_dict_pattern_is_exhaustive(value: Movie) -> int:
     match value:
         case dict(_):
             return 1
@@ -802,8 +802,8 @@ def typed_dict_positional_dict_pattern_is_exhaustive(value: Movie) -> int:
 ## Required `TypedDict` keys
 
 A mapping pattern is exhaustive for a `TypedDict` when every key in the pattern names a required
-field and every nested pattern accepts the field's complete type. Optional, absent, and non-string
-keys are not guaranteed to be present.
+field and every value pattern matches all values allowed for that field. The negative cases below
+exercise three separate checks: an optional field, an unknown key, and a non-string key.
 
 ```py
 from typing import Literal, TypedDict
@@ -815,7 +815,7 @@ class RequiredPayload(TypedDict):
 class OptionalPayload(TypedDict, total=False):
     value: int
 
-def required_keys_are_exhaustive(value: RequiredPayload) -> int:
+def required_typed_dict_keys_are_exhaustive(value: RequiredPayload) -> int:
     match value:
         case {"tag": "int", "value": int()}:
             return 1
