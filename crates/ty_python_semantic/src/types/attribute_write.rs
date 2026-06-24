@@ -248,9 +248,7 @@ pub(super) fn instance_attribute_write_member_requirement<'db>(
     };
 
     match meta_attr {
-        meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-            InstanceAttributeWriteMember::ClassVar
-        }
+        meta_attr if meta_attr.is_class_var() => InstanceAttributeWriteMember::ClassVar,
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,

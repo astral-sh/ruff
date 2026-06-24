@@ -488,8 +488,6 @@ If users want to read/write to attributes such as `__qualname__`, they need to c
 of the attribute first:
 
 ```py
-from inspect import getattr_static
-
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
