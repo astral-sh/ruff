@@ -4553,7 +4553,7 @@ dependencies = [
 
 [[package]]
 name = "ty_combine"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "ordermap",
  "ruff_db",
@@ -4705,7 +4705,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_core"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -4738,7 +4738,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_semantic"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -4881,7 +4881,7 @@ dependencies = [
 
 [[package]]
 name = "ty_vendored"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "path-slash",
  "ruff_db",
