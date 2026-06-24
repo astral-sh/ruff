@@ -2981,13 +2981,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject_place);
-        let mapping_type = ClassInfoConstraintFunction::IsInstance
-            .generate_constraint(
-                self.db,
-                KnownClass::Mapping.to_class_literal(self.db),
-                is_positive,
-            )?
-            .negate_if(self.db, !is_positive);
+        let mapping_type = ClassInfoConstraintFunction::IsInstance.generate_constraint(
+            self.db,
+            KnownClass::Mapping.to_class_literal(self.db),
+            true,
+        )?;
 
         Some(NarrowingConstraints::from_iter([(
             place,

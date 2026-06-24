@@ -405,10 +405,6 @@ fn mapping_pattern_is_exhaustive(
     entries: &[MappingPatternEntryPredicateKind<'_>],
     subject_ty: Type<'_>,
 ) -> bool {
-    if entries.is_empty() {
-        return subject_ty.is_subtype_of(db, mapping_pattern_type(db));
-    }
-
     let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(db) else {
         return false;
     };
