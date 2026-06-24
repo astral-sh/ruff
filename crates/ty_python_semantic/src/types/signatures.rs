@@ -3038,6 +3038,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
         }
 
+        // TODO: Normalize starred variadic annotations for all signature comparisons. Restricting
+        // expansion to target TypeVarTuple inference means equivalent nested unpackings such as
+        // `*tuple[*tuple[str, ...], bytes]` and `*tuple[str, ...], bytes` are not related correctly.
         let source_parameters = if target_typevartuple.is_some() {
             source.parameters.expand_starred_variadic_annotations(db)
         } else {
