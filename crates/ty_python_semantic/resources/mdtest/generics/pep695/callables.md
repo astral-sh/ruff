@@ -314,10 +314,10 @@ def consume_right(value: B | D | E) -> None: ...
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: B
 ```
 
-## Inferred union upper bound exceeding the solution budget
+## Union without intersection does not consider budget
 
-If the precise inferred solution has more elements than the bounded intersection can retain, the
-type variable remains unsolved rather than using an arbitrary strict subtype of the correct result.
+If the precise inferred solution comes from a single union type, rather than an intersection of
+several unions, we return the precise solution.
 
 ```py
 from typing import Callable, final
@@ -342,7 +342,7 @@ class E: ...
 
 def consume(value: A | B | C | D | E) -> None: ...
 
-reveal_type(infer_from_consumer(consume))  # revealed: Unknown
+reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
 ```
 
 ## Overlapping inferred union upper bounds exceeding the solution budget
@@ -386,8 +386,7 @@ class H: ...
 def consume_left(value: A | B | C | D | E) -> None: ...
 def consume_right(value: A | B | F | G | H) -> None: ...
 
-# TODO: The precise intersection fits within the budget and should be `A | B`.
-reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
 ```
 
 ## Contextual generic return exceeding the solution budget
@@ -405,8 +404,7 @@ def make_list[T](value: T) -> list[T]:
 
 def consume(values: Sequence[Literal["a", "b", "c", "d", "e"]] | None) -> None: ...
 
-# TODO: This is a false positive. Reuse the existing literal union without distributing it.
-consume(make_list("a"))  # error: [invalid-argument-type]
+consume(make_list("a"))
 ```
 
 ## Disjoint inferred union upper bounds
@@ -488,8 +486,7 @@ class J: ...
 def consume_left(value: A | B | C | D | E) -> None: ...
 def consume_right(value: F | G | H | I | J) -> None: ...
 
-# TODO: These upper bounds are disjoint, so the precise solution is `Never`.
-reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
 ```
 
 ## Combining inferred and declared upper bounds

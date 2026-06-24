@@ -788,7 +788,12 @@ impl<'db> IntersectionType<'db> {
         // an optional budget as part of its existing `add_positive` methods.
 
         let elements = elements.into_iter().map(Type::from);
-        if !elements.clone().any(Type::is_union) {
+        let union_count = elements.clone().filter(|ty| ty.is_union()).count();
+        if union_count <= 1 {
+            // If there are no unions, then all we have to do is check for redundant elements. If
+            // there is a single union, the product of all union counts should be reasonable, even
+            // if it exceeds the budget below. In both cases, just return the precise answer
+            // without considering the budget.
             return Some(Self::from_elements(db, elements));
         }
 
@@ -815,12 +820,19 @@ impl<'db> IntersectionType<'db> {
         let mut next = Vec::new();
         insert_candidate(&mut frontier, initial)?;
 
-        for union in elements.filter_map(Type::as_union) {
+        for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
+            // Don't check the budget for the first union clause. That ensures that we have a
+            // chance for pairs of types to "annhilate" each other without contributing to the
+            // result. For instance, this allows us to return the precise result for
+            // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
+            // most of the pairs are disjoint.
+            let skip_budget_check = (idx == 0).then_some(());
+
             next.clear();
             for candidate in &frontier {
-                for alternative in union.elements(db) {
+                for alternative in clause.elements(db) {
                     let refined = Self::from_two_elements(db, *candidate, *alternative);
-                    insert_candidate(&mut next, refined)?;
+                    insert_candidate(&mut next, refined).or(skip_budget_check)?;
                 }
             }
 
