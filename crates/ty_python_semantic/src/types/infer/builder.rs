@@ -3545,15 +3545,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_new_class_deferred(definition, value);
             return;
         }
-        if matches!(
-            known_class,
-            Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
-        ) {
-            if let Some(default) = arguments.find_keyword("default") {
-                self.infer_typevartuple_default(&default.value, None);
-            }
-            return;
-        }
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
             let constraint = self.infer_type_expression(arg);
@@ -3588,6 +3579,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         if let Some(default) = arguments.find_keyword("default") {
             if matches!(
+                known_class,
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+            ) {
+                self.infer_typevartuple_default(&default.value, None);
+            } else if matches!(
                 known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
             ) {
@@ -8873,30 +8869,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
-        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = iterable_type
-            && typevar.is_typevartuple(db)
-            && let Some(bound_typevar) = bind_typevar(
-                db,
-                self.index,
-                self.scope().file_scope_id(db),
-                self.typevar_binding_context,
-                typevar,
-            )
-        {
+        let typevartuple = match iterable_type {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(db) =>
+            {
+                bind_typevar(
+                    db,
+                    self.index,
+                    self.scope().file_scope_id(db),
+                    self.typevar_binding_context,
+                    typevar,
+                )
+            }
+            Type::TypeVar(typevar) if typevar.is_typevartuple(db) => Some(typevar),
+            _ => None,
+        };
+        if let Some(typevartuple) = typevartuple {
             return Type::tuple(TupleType::new(
                 db,
                 &TupleSpecBuilder::with_capacity(0)
-                    .concat_variadic_typevar(db, bound_typevar)
-                    .build(),
-            ));
-        }
-        if let Type::TypeVar(typevar) = iterable_type
-            && typevar.is_typevartuple(db)
-        {
-            return Type::tuple(TupleType::new(
-                db,
-                &TupleSpecBuilder::with_capacity(0)
-                    .concat_variadic_typevar(db, typevar)
+                    .concat_variadic_typevar(db, typevartuple)
                     .build(),
             ));
         }
