@@ -2,6 +2,7 @@ use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
+use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
@@ -9,7 +10,7 @@ use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
+use ty_python_core::{Truthiness, global_scope, place_table, semantic_index, use_def_map};
 
 use super::*;
 
@@ -349,6 +350,72 @@ const MANY_NON_TERMINAL_CALLS: usize = 1_100;
 const FEW_NON_TERMINAL_CALLS: usize = 80;
 
 #[test]
+fn non_terminal_call_worklist_skips_non_reaching_branch() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/test.py",
+        r#"
+        def f(flag: bool) -> None:
+            if flag:
+                print()
+                return
+            len(())
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/test.py").unwrap();
+    db.clear_salsa_events();
+    {
+        let index = semantic_index(&db, file);
+        let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+        let use_def = index.use_def_map(function_scope);
+        assert_eq!(
+            use_def.reachability_constraints().evaluate(
+                &db,
+                use_def.predicates(),
+                use_def.end_of_scope_reachability(),
+            ),
+            Truthiness::Ambiguous,
+        );
+    }
+    let events = db.take_salsa_events();
+
+    let module = parsed_module(&db, file).load(&db);
+    let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+    let if_statement = function.body[0].as_if_stmt().unwrap();
+    let print_call = if_statement.body[0]
+        .as_expr_stmt()
+        .unwrap()
+        .value
+        .as_call_expr()
+        .unwrap();
+    let len_call = function.body[1]
+        .as_expr_stmt()
+        .unwrap()
+        .value
+        .as_call_expr()
+        .unwrap();
+    let index = semantic_index(&db, file);
+    let print_expression = index.expression(print_call.func.as_ref());
+    let len_expression = index.expression(len_call.func.as_ref());
+
+    assert_function_query_was_not_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(print_expression),
+        &events,
+    );
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(len_expression),
+        &events,
+    );
+
+    Ok(())
+}
+
+#[test]
 fn implicit_attribute_after_many_non_terminal_calls() -> anyhow::Result<()> {
     let handle = std::thread::Builder::new()
         .name("implicit-attribute-stack-test".into())
@@ -395,6 +462,69 @@ class Form(Ui):
     def target_widget(self) -> Widget:
         reveal_type(self.target)
         return self.target
+"#,
+                ),
+            ])?;
+
+            assert_revealed_type(&db, "/src/consumer.py", "Widget");
+
+            Ok(())
+        })?;
+
+    handle.join().expect("regression test thread panicked")
+}
+
+#[test]
+fn early_call_reentering_late_implicit_attribute_does_not_overflow_stack() -> anyhow::Result<()> {
+    let handle = std::thread::Builder::new()
+        .name("early-late-implicit-attribute-stack-test".into())
+        .stack_size(ruff_db::STACK_SIZE)
+        .spawn(|| {
+            let mut db = setup_db();
+            let mut ui = String::from(
+                r#"from widgets import Widget
+
+class Ui:
+    def __init__(self):
+        self.target = Widget()
+
+    def setup(self):
+        self.target.configure()
+        self.early = Widget()
+"#,
+            );
+
+            for index in 0..MANY_WIDGETS {
+                ui.push_str(&format!(
+                    concat!(
+                        "        self.widget_{index} = Widget()\n",
+                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure()\n",
+                    ),
+                    index = index,
+                ));
+            }
+            ui.push_str("        self.target = Widget()\n");
+
+            db.write_files([
+                (
+                    "/src/widgets.py",
+                    r#"class Widget:
+    def configure(self) -> None: ...
+"#,
+                ),
+                ("/src/ui.py", &ui),
+                (
+                    "/src/consumer.py",
+                    r#"from typing_extensions import reveal_type
+from ui import Ui
+from widgets import Widget
+
+class Form(Ui):
+    def early_widget(self) -> Widget:
+        reveal_type(self.early)
+        return self.early
 "#,
                 ),
             ])?;

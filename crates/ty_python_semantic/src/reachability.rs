@@ -518,10 +518,6 @@ fn accumulate_constraint<'db>(
     }
 }
 
-std::thread_local! {
-    static ACTIVE_NON_TERMINAL_CALL_PREFIXES: ActiveRecursionDetector<salsa::Id> = ActiveRecursionDetector::default();
-}
-
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
@@ -534,54 +530,91 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     }
 }
 
-/// Infers preceding call predicates in source order.
+std::thread_local! {
+    static ACTIVE_REACHABILITY_EVALUATIONS: ActiveRecursionDetector<salsa::Id> =
+        ActiveRecursionDetector::default();
+}
+
+fn should_recover_non_terminal_call(db: &dyn Db, predicate: &Predicate) -> bool {
+    let scope = predicate_scope(db, predicate).as_id();
+    ACTIVE_REACHABILITY_EVALUATIONS.with(|active| active.visit(&scope, || true, || false))
+}
+
+/// Infers call predicates reachable from one constraint root in source order.
 ///
 /// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
-/// predicates in reverse to reduce their size. Inferring a later call can depend on the
-/// reachability of all preceding calls, which otherwise creates a deeply recursive Salsa query
-/// chain. Inferring the expressions in source order turns that chain into cache lookups while
-/// preserving normal reachability and narrowing during every inference.
-///
-/// Because the prefix is based on predicate indices rather than graph reachability, branch-heavy
-/// code can warm calls from earlier source branches that this evaluation would not otherwise visit.
-/// A demand-driven graph walk could avoid that work, but would require a more complex work list. We
-/// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
-/// typically exercise most of its predicates eventually.
-///
-/// Reentrant analysis of the same predicate graph skips the prefix pass: because the outer pass is
-/// proceeding in source order, any preceding call needed by the current expression has already
-/// been inferred. A different predicate graph performs its own pass, which is necessary when
-/// inferring a call crosses into another large scope.
-fn analyze_non_terminal_call_prefix<'db>(
+/// predicates in reverse to reduce their size. Walking the requested graph and inferring its calls
+/// in source order turns a deeply recursive query chain into cache lookups without analyzing calls
+/// from unrelated control-flow paths.
+fn analyze_non_terminal_call_worklist<'db>(
     db: &'db dyn Db,
+    constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root_predicate: ScopedPredicateId,
+    root: ScopedReachabilityConstraintId,
 ) {
-    let range = 0..=root_predicate.index();
-    if !range.clone().any(|index| {
-        matches!(
-            predicates[ScopedPredicateId::new(index)].node,
+    let mut pending = vec![root];
+    let mut visited = FxHashSet::default();
+    let mut calls = Vec::new();
+
+    while let Some(id) = pending.pop() {
+        if id.is_terminal() || !visited.insert(id) {
+            continue;
+        }
+
+        let node = constraints.get_interior_node(id);
+        if matches!(
+            predicates[node.atom()].node,
             PredicateNode::IsNonTerminalCall(_)
-        )
-    }) {
-        return;
+        ) {
+            calls.push(node.atom());
+        }
+
+        pending.extend([node.if_true(), node.if_ambiguous(), node.if_false()]);
     }
 
-    let key = predicate_scope(db, &predicates[root_predicate]).as_id();
-    ACTIVE_NON_TERMINAL_CALL_PREFIXES.with(|active| {
-        active.visit(
-            &key,
-            || {},
-            || {
-                for index in range {
-                    let predicate = &predicates[ScopedPredicateId::new(index)];
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                        analyze_single(db, predicate);
-                    }
-                }
-            },
-        );
-    });
+    calls.sort_unstable_by_key(|predicate| predicate.index());
+    calls.dedup();
+    for predicate in calls {
+        analyze_single(db, &predicates[predicate]);
+    }
+}
+
+fn evaluate_reachability_constraint<'db>(
+    db: &'db dyn Db,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    mut id: ScopedReachabilityConstraintId,
+    recover_call_cycle: bool,
+) -> Truthiness {
+    type Id = ScopedReachabilityConstraintId;
+
+    loop {
+        let node = match id {
+            Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            Id::AMBIGUOUS => return Truthiness::Ambiguous,
+            Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            _ => constraints.get_interior_node(id),
+        };
+        let predicate = &predicates[node.atom()];
+        let truthiness = if recover_call_cycle
+            && matches!(predicate.node, PredicateNode::IsNonTerminalCall(_))
+        {
+            // Match `analyze_non_terminal_call`'s conservative cycle-initial value. The future
+            // call can affect whether a later implicit-attribute binding is reachable, but it
+            // cannot make the current source position reachable if it was not already. Assuming
+            // that it returns therefore avoids false unreachable results while breaking the
+            // backwards inference cycle.
+            Truthiness::AlwaysTrue.negate_if(!predicate.is_positive)
+        } else {
+            analyze_single(db, predicate)
+        };
+
+        match truthiness {
+            Truthiness::AlwaysTrue => id = node.if_true(),
+            Truthiness::Ambiguous => id = node.if_ambiguous(),
+            Truthiness::AlwaysFalse => id = node.if_false(),
+        }
+    }
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -600,51 +633,29 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        mut id: ScopedReachabilityConstraintId,
+        id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        type Id = ScopedReachabilityConstraintId;
-
-        // Analyze statement-level calls through this root one by one in source order, so any
-        // earlier call needed while inferring a later one is already cached instead of deepening
-        // the Salsa query stack. This avoids growing an excessive stack for deeply nested
-        // reachability queries.
-        //
-        // Without this prefix analysis, given:
-        //
-        //   call_a()  # predicate 0
-        //   call_b()  # predicate 1
-        //   call_c()  # predicate 2
-        //
-        // we'd analyze them backwards:
-        //
-        //   analyze call_c
-        //   └─ analyze call_b
-        //      └─ analyze call_a
-        //
-        // The prefix pass explicitly analyzes them forwards:
-        //
-        //   analyze call_a  → cached
-        //   analyze call_b  → call_a is already cached
-        //   analyze call_c  → call_b is already cached
-        if !id.is_terminal() {
-            let root_predicate = self.get_interior_node(id).atom();
-            analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+        if id.is_terminal() {
+            return evaluate_reachability_constraint(db, self, predicates, id, false);
         }
 
-        loop {
-            let node = match id {
-                Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-                Id::AMBIGUOUS => return Truthiness::Ambiguous,
-                Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.get_interior_node(id),
-            };
-            let predicate = &predicates[node.atom()];
-            match analyze_single(db, predicate) {
-                Truthiness::AlwaysTrue => id = node.if_true(),
-                Truthiness::Ambiguous => id = node.if_ambiguous(),
-                Truthiness::AlwaysFalse => id = node.if_false(),
-            }
-        }
+        let predicate = &predicates[self.get_interior_node(id).atom()];
+        let scope = predicate_scope(db, predicate).as_id();
+        ACTIVE_REACHABILITY_EVALUATIONS.with(|active| {
+            active.visit(
+                &scope,
+                || {
+                    // The outer evaluation is already inferring calls in source order. Reentering
+                    // that work through a later implicit-attribute binding would otherwise
+                    // recreate the reverse query chain that the worklist is meant to avoid.
+                    evaluate_reachability_constraint(db, self, predicates, id, true)
+                },
+                || {
+                    analyze_non_terminal_call_worklist(db, self, predicates, id);
+                    evaluate_reachability_constraint(db, self, predicates, id, false)
+                },
+            )
+        })
     }
 }
 
@@ -965,11 +976,19 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(self.db, &predicate) {
-                        Truthiness::AlwaysTrue => node.if_true,
-                        Truthiness::AlwaysFalse => node.if_false,
-                        Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                    // Call predicates also gate narrowing. Apply the same recovery as reachability
+                    // so projection cannot reenter the active source-order worklist backwards.
+                    let branch = if should_recover_non_terminal_call(self.db, &predicate) {
+                        node.if_true
+                    } else {
+                        match analyze_single(self.db, &predicate) {
+                            Truthiness::AlwaysTrue => node.if_true,
+                            Truthiness::AlwaysFalse => node.if_false,
+                            Truthiness::Ambiguous => {
+                                unreachable!(
+                                    "`IsNonTerminalCall` predicates should never be Ambiguous"
+                                )
+                            }
                         }
                     };
 
