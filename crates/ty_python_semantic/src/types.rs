@@ -4112,7 +4112,7 @@ impl<'db> Type<'db> {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
                             enum_class,
-                            resolved_name.clone(),
+                            resolved_name,
                         )))
                         .into();
                     }

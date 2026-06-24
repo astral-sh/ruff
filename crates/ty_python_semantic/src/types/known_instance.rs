@@ -473,6 +473,7 @@ pub struct FieldInstance<'db> {
     pub kw_only: Option<bool>,
 
     /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
+    #[returns(ref)]
     pub alias: Option<Box<str>>,
 
     /// The converter types for this field, if a `converter` argument was provided.

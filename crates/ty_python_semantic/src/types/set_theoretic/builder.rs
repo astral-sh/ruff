@@ -275,7 +275,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 builder = builder.add_negative(Type::enum_literal(EnumLiteralType::new(
                     db,
                     complement.enum_class_literal(db),
-                    name.clone(),
+                    name,
                 )));
             }
             types[complement_index] = builder.build();
