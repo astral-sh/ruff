@@ -2813,7 +2813,6 @@ pub(crate) fn report_undeclared_protocol_member(
     };
 
     let symbol_name = class_symbol_table.symbol(symbol_id).name();
-    let class_name = protocol_class.name(db);
 
     let mut diagnostic = builder
         .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
@@ -2838,6 +2837,37 @@ pub(crate) fn report_undeclared_protocol_member(
             "`{symbol_name}` is not declared as a protocol member"
         ));
     }
+
+    add_undeclared_protocol_member_context(&mut diagnostic, db, protocol_class, symbol_name);
+}
+
+pub(crate) fn report_undeclared_protocol_instance_attribute(
+    context: &InferContext,
+    target: &ast::ExprAttribute,
+    protocol_class: ProtocolClass,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&AMBIGUOUS_PROTOCOL_MEMBER, target) else {
+        return;
+    };
+
+    let symbol_name = target.attr.as_str();
+    let mut diagnostic = builder
+        .into_diagnostic("Cannot assign to an undeclared instance attribute in a protocol method");
+    diagnostic.set_primary_message(format_args!(
+        "`{symbol_name}` is not declared as a protocol member"
+    ));
+
+    add_undeclared_protocol_member_context(&mut diagnostic, db, protocol_class, symbol_name);
+}
+
+fn add_undeclared_protocol_member_context(
+    diagnostic: &mut Diagnostic,
+    db: &dyn Db,
+    protocol_class: ProtocolClass,
+    symbol_name: &str,
+) {
+    let class_name = protocol_class.name(db);
 
     let mut class_def_diagnostic = SubDiagnostic::new(
         SubDiagnosticSeverity::Info,

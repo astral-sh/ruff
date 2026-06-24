@@ -1011,16 +1011,17 @@ class Foo(Protocol):
     def __init__(self) -> None:
         self.x = 42  # fine
 
-        self.a = 56  # TODO: should emit diagnostic
-        self.b: int = 128  # TODO: should emit diagnostic
+        self.a = 56  # error: [ambiguous-protocol-member]
+        self.b: int = 128  # error: [ambiguous-protocol-member]
+        self.c: int  # error: [ambiguous-protocol-member]
 
     def non_init_method(self) -> None:
-        self.x = 64  # fine
+        self.x: int = 64  # fine
         self.y = "bar"  # fine
 
-        self.c = 72  # TODO: should emit diagnostic
+        self.d = 72  # error: [ambiguous-protocol-member]
 
-# Note: the list of members does not include `a`, `b` or `c`,
+# Note: the list of members does not include `a`, `b`, `c` or `d`,
 # as none of these attributes is declared in the class body.
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
 ```
@@ -1035,8 +1036,37 @@ class Super(Protocol):
 class Sub(Super, Protocol):
     x = 42  # no error here, since it's declared in the superclass
 
+    def method(self) -> None:
+        self.x = 43  # no error here either
+
 reveal_type(get_protocol_members(Super))  # revealed: frozenset[Literal["x"]]
-reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["x"]]
+reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["method", "x"]]
+```
+
+Assignments in static methods, assignments through other parameters, and assignments in concrete
+subclasses of protocols do not implicitly define instance attributes on a protocol:
+
+```py
+class Holder:
+    extra: int
+
+class WithStaticMethod(Protocol):
+    @staticmethod
+    def method(value: Holder) -> None:
+        value.extra = 1  # no error
+
+class WithClassMethod(Protocol):
+    @classmethod
+    def method(cls) -> None:
+        cls.extra = 1  # no error
+
+class WithOtherParameter(Protocol):
+    def method(self, value: Holder) -> None:
+        value.extra = 1  # no error
+
+class ConcreteSubclass(Foo):
+    def method(self) -> None:
+        self.extra = 1  # no error
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types

@@ -1685,6 +1685,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
+    fn report_undeclared_protocol_instance_attribute(
+        &self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+    ) {
+        if !self.is_instance_attribute_assignment(target) {
+            return;
+        }
+
+        let db = self.db();
+        let Some(class) = self.class_context_of_current_method() else {
+            return;
+        };
+        let Some(protocol) = class.into_protocol_class(db) else {
+            return;
+        };
+        if protocol.interface(db).includes_member(db, target.attr.id()) {
+            return;
+        }
+
+        let class_instance_ty = Type::instance(db, class).top_materialization(db);
+        if !object_ty
+            .bind_self_typevars(db, class_instance_ty)
+            .is_subtype_of(db, class_instance_ty)
+        {
+            return;
+        }
+
+        diagnostic::report_undeclared_protocol_instance_attribute(&self.context, target, protocol);
+    }
+
     /// Returns the implicit `__class__` cell in the current direct method body or
     /// lazy scope defined directly in a class body.
     fn dunder_class_cell_type(&self) -> Option<ClassLiteral<'db>> {
@@ -3707,6 +3738,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
             ) => {
                 let object_ty = self.infer_expression(object, TypeContext::default());
+                self.report_undeclared_protocol_instance_attribute(attr_expr, object_ty);
 
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
@@ -4486,6 +4518,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
+            if let ast::Expr::Attribute(target) = target.as_ref() {
+                let object_ty = self.expression_type(&target.value);
+                self.report_undeclared_protocol_instance_attribute(target, object_ty);
+            }
 
             // For annotated assignments like `self.x: Final[int] = 1`, the `Final` qualifier
             // comes from the annotation itself, so we can check it directly rather than
