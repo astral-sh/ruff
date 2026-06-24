@@ -799,11 +799,11 @@ fn add_noqa_inner(
     (count, output)
 }
 
-fn build_noqa_edits_by_diagnostic(
-    comments: Vec<Option<NoqaComment>>,
-    locator: &Locator,
+fn build_noqa_edits_by_diagnostic<'a>(
+    comments: Vec<Option<NoqaComment<'a>>>,
+    locator: &'a Locator,
     line_ending: LineEnding,
-    reason: Option<&str>,
+    reason: Option<&'a str>,
 ) -> Vec<Option<Edit>> {
     let mut edits = Vec::default();
     for comment in comments {
@@ -828,7 +828,7 @@ fn build_noqa_edits_by_diagnostic(
 
 fn build_noqa_edits_by_line<'a>(
     comments: Vec<Option<NoqaComment<'a>>>,
-    locator: &Locator,
+    locator: &'a Locator,
     line_ending: LineEnding,
     reason: Option<&'a str>,
 ) -> BTreeMap<TextSize, NoqaEdit<'a>> {
@@ -960,6 +960,14 @@ struct NoqaEdit<'a> {
     line_ending: LineEnding,
     reason: Option<&'a str>,
     blank_line: bool,
+    /// Trailing text that appears after the existing `# noqa:` directive on the
+    /// same line but before the line ending (e.g. a human-readable reason or a
+    /// second comment such as `# fmt:skip`). Preserved verbatim so that
+    /// `add_noqa` / `add_noqa_inner` do not silently delete it when replacing
+    /// the noqa directive. Empty when there is no existing directive, when
+    /// nothing follows the directive, or when the only thing that follows is
+    /// the line ending itself.
+    trailing: &'a str,
 }
 
 impl NoqaEdit<'_> {
@@ -993,6 +1001,11 @@ impl NoqaEdit<'_> {
         if let Some(reason) = self.reason {
             write!(writer, " {reason}").unwrap();
         }
+        // Preserve any trailing comment text that originally followed the
+        // `# noqa:` directive on the same line (e.g. an explanatory reason
+        // like `# noqa: E501 with a trailing reason` or a second comment such
+        // as `# noqa: F401 # fmt:skip`). See #26287.
+        write!(writer, "{}", self.trailing).unwrap();
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
     }
 }
@@ -1007,7 +1020,7 @@ fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
     noqa_codes: FxHashSet<&'a SecondaryCode>,
-    locator: &Locator,
+    locator: &'a Locator,
     line_ending: LineEnding,
     reason: Option<&'a str>,
 ) -> Option<NoqaEdit<'a>> {
@@ -1016,6 +1029,7 @@ fn generate_noqa_edit<'a>(
     let edit_range;
     let codes;
     let blank_line;
+    let trailing;
 
     // Add codes.
     match directive {
@@ -1024,6 +1038,8 @@ fn generate_noqa_edit<'a>(
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
+            // No existing `# noqa:` directive → nothing to preserve after it.
+            trailing = "";
         }
         Some(Directive::Codes(existing_codes)) => {
             // find trimmed line without the noqa
@@ -1033,6 +1049,14 @@ fn generate_noqa_edit<'a>(
             blank_line = false;
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = Some(existing_codes);
+            // Capture any text that originally followed the `# noqa:` codes
+            // on the same line but before the line ending (e.g. an explanatory
+            // reason like `# noqa: RUF100 with a trailing reason` or a
+            // second comment such as `# noqa: F401 # fmt:skip`). Without this
+            // preservation, `--add-noqa` would silently delete that trailing
+            // text when rewriting the directive. See #26287.
+            let line_end_offset = line_range.end() - TextSize::of(line_ending.as_str());
+            trailing = locator.slice(TextRange::new(existing_codes.end(), line_end_offset));
         }
         Some(Directive::All(_)) => return None,
     }
@@ -1044,6 +1068,7 @@ fn generate_noqa_edit<'a>(
         line_ending,
         reason,
         blank_line,
+        trailing,
     })
 }
 
@@ -2948,6 +2973,100 @@ mod tests {
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/26287>.
+    ///
+    /// `ruff check --add-noqa` previously deleted any text that appeared
+    /// after the `# noqa:` codes on the same line (e.g. a human-readable
+    /// reason like `# noqa: E741 with a trailing reason` or a second
+    /// comment such as `# noqa: E741 # fmt:skip`). Verify that the
+    /// trailing content is now preserved verbatim when `--add-noqa`
+    /// rewrites the directive.
+    #[test]
+    fn add_noqa_preserves_trailing_content() {
+        let path = Path::new("/tmp/foo.txt");
+
+        let make_messages = |contents: &str| {
+            let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+            [
+                AmbiguousVariableName("x".to_string()).into_diagnostic(
+                    TextRange::new(TextSize::from(0), TextSize::from(0)),
+                    &source_file,
+                ),
+                UnusedVariable {
+                    name: "x".to_string(),
+                }
+                .into_diagnostic(
+                    TextRange::new(TextSize::from(0), TextSize::from(0)),
+                    &source_file,
+                ),
+            ]
+        };
+
+        // Case 1: human-readable reason after the codes.
+        let contents = "x = 1  # noqa: E741 with a trailing reason\n";
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(42))]);
+        let (count, output) = add_noqa_inner(
+            path,
+            &make_messages(contents),
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &NoqaMapping::default(),
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        assert_eq!(
+            output, "x = 1  # noqa: E741, F841 with a trailing reason\n",
+            "trailing reason text after `# noqa: E741` must be preserved"
+        );
+
+        // Case 2: second comment (`# fmt:skip`) on the same line after the directive.
+        let contents = "x = 1  # noqa: E741 # fmt:skip\n";
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(30))]);
+        let (count, output) = add_noqa_inner(
+            path,
+            &make_messages(contents),
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &NoqaMapping::default(),
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        assert_eq!(
+            output, "x = 1  # noqa: E741, F841 # fmt:skip\n",
+            "trailing `# fmt:skip` after `# noqa: E741` must be preserved"
+        );
+
+        // Case 3: nothing after the codes — the original behavior must be
+        // preserved exactly so we don't accidentally add whitespace or newlines.
+        let contents = "x = 1  # noqa: E741\n";
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
+        let (count, output) = add_noqa_inner(
+            path,
+            &make_messages(contents),
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &NoqaMapping::default(),
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        assert_eq!(
+            output, "x = 1  # noqa: E741, F841\n",
+            "directive with no trailing content must remain byte-identical to the previous behavior"
+        );
     }
 
     #[test]
