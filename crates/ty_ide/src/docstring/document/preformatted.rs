@@ -44,7 +44,7 @@ impl<'a> MarkdownFence<'a> {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct PreformattedBlockScanner<'a> {
     active_markdown_fence: Option<MarkdownFence<'a>>,
-    active_doctest: bool,
+    active_doctest_indent: Option<TextSize>,
     rest_literal_blocks: RestLiteralBlockScanner,
 }
 
@@ -68,15 +68,19 @@ impl<'a> PreformattedBlockScanner<'a> {
             return true;
         }
 
-        if self.active_doctest {
+        if let Some(doctest_indent) = self.active_doctest_indent {
             if line.trim_start_matches(' ').is_empty() {
-                self.active_doctest = false;
+                self.active_doctest_indent = None;
+                return true;
+            } else if indentation(line) < doctest_indent {
+                self.active_doctest_indent = None;
+            } else {
+                return true;
             }
-            return true;
         }
 
         if Self::line_starts_doctest(line) {
-            self.active_doctest = true;
+            self.active_doctest_indent = Some(indentation(line));
             return true;
         }
 
@@ -276,4 +280,18 @@ enum RestLiteralBlockKind {
 
 fn indentation(line: &str) -> TextSize {
     TextSize::of(leading_indentation(line))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PreformattedBlockScanner;
+
+    #[test]
+    fn doctest_ends_when_indentation_decreases() {
+        let mut scanner = PreformattedBlockScanner::default();
+
+        assert!(scanner.consume_preformatted_line("        >>> identity(1)"));
+        assert!(scanner.consume_preformatted_line("        1"));
+        assert!(!scanner.consume_preformatted_line("    other: Parameter documentation."));
+    }
 }
