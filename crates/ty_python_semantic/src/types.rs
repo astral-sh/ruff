@@ -7052,17 +7052,18 @@ impl<'db> Type<'db> {
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db),
+            Self::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple,
+            ) => Type::SpecialForm(SpecialFormType::Todo).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
             Self::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple
-                | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::UnspecializedTypeVar,
+                DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
             | Self::TypeIs(_)

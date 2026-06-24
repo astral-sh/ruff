@@ -114,6 +114,18 @@ reveal_mro(C)
 u: Unknown[str]
 ```
 
+### Todo type
+
+`Todo` exists only as a documentation and navigation target for ty's internal `@Todo` type. It
+cannot be used in annotations.
+
+```py
+from ty_extensions import Todo
+
+# error: [invalid-type-form]
+value: Todo
+```
+
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 `AlwaysTruthy` and `AlwaysFalsy` represent the sets of all possible objects whose truthiness is

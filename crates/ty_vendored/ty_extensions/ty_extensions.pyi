@@ -23,6 +23,19 @@ fallback after certain type errors. This contrasts with `Any`, which represents 
 annotated dynamic type. Like `Any`, however, it is a dynamic type, so ty allows any operation on it.
 """
 
+Todo: _SpecialForm
+"""
+`@Todo` is a dynamic type inferred due to a known missing feature or incomplete implementation in
+ty.
+
+Like `Any` and `Unknown`, `@Todo` is a dynamic type, so ty allows any operation on it. Unlike `Any`,
+it is not explicitly provided in an annotation; unlike `Unknown`, it specifically indicates a
+limitation in ty. Any message shown in parentheses identifies the missing feature.
+
+It is an internal type used by ty and cannot be used in annotations. These types should disappear
+as ty implements the missing functionality.
+"""
+
 Divergent: _SpecialForm
 """
 `Divergent` is a dynamic type inferred due to type-level recursion that does not converge.
