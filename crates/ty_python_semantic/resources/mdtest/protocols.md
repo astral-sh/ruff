@@ -430,9 +430,7 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    # TODO: add a reveal_type call once it's no longer a `Todo` type
-    # (which plays badly with snapshot testing)
-    x()
+    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
 ```
 
 ## Members of a protocol
@@ -1819,8 +1817,8 @@ static_assert(is_assignable_to(UsesMeta, HasX))  # error: [static-assert-error]
 ## `ClassVar` attribute members
 
 If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
-a readable `x` attribute must be accessible on any inhabitant of `ClassVarX`, and that a readable
-`x` attribute must *also* be accessible on the *type* of that inhabitant:
+the non-callable attribute must be readable with the same type through both an inhabitant of
+`ClassVarX` and the type of that inhabitant:
 
 `classvars.py`:
 
@@ -2998,9 +2996,10 @@ static_assert(not is_assignable_to(PropertyBool, Method))
 static_assert(not is_assignable_to(Attribute, Method))
 ```
 
-A `ClassVar` callable also does not satisfy a method member. Although it is readable through both
-the instance and the class, those reads have the same callable type; a method has a bound instance
-type and a distinct unbound class type:
+The `ClassVar[int]` example above demonstrates that a `ClassVar` member is readable through both the
+instance and the class. That availability alone does not make a callable `ClassVar` a method. Both
+reads of a `ClassVar[Callable[[], bool]]` have the same callable type, whereas a method has a bound
+instance type and a distinct unbound class type:
 
 ```py
 from typing import ClassVar
