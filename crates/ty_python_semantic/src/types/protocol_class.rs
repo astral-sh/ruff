@@ -1199,20 +1199,66 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     return self.check_type_pair(db, value_ty, set_type);
                 }
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    setter_ty
-                        .try_call(
-                            db,
-                            &CallArguments::positional([*descriptor_ty, object_ty, value_ty]),
-                        )
-                        .is_ok(),
+                self.check_descriptor_property_write(
+                    db,
+                    *descriptor_ty,
+                    *setter_ty,
+                    object_ty,
+                    value_ty,
                 )
             }
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
                 self.check_type_pair(db, value_ty, *ty)
             }
         }
+    }
+
+    fn check_descriptor_property_write(
+        &self,
+        db: &'db dyn Db,
+        descriptor_ty: Type<'db>,
+        setter_ty: Type<'db>,
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if setter_ty
+            .try_call(
+                db,
+                &CallArguments::positional([descriptor_ty, object_ty, Type::unknown()]),
+            )
+            .is_err()
+        {
+            return self.never();
+        }
+
+        setter_ty
+            .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
+            .when_some_and(db, self.constraints, |callables| {
+                callables.iter().when_all(db, self.constraints, |callable| {
+                    callable.signatures(db).into_iter().when_any(
+                        db,
+                        self.constraints,
+                        |signature| {
+                            let parameters = signature.parameters();
+                            parameters
+                                .get_positional(2)
+                                .or_else(|| {
+                                    parameters.variadic().and_then(|(index, parameter)| {
+                                        (index <= 2).then_some(parameter)
+                                    })
+                                })
+                                .map(|parameter| {
+                                    parameter
+                                        .annotated_type()
+                                        .bind_self_typevars(db, descriptor_ty)
+                                })
+                                .when_some_and(db, self.constraints, |write_ty| {
+                                    self.check_type_pair(db, value_ty, write_ty)
+                                })
+                        },
+                    )
+                })
+            })
     }
 
     fn check_fallback_property_write(
