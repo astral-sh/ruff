@@ -4,6 +4,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
+use crate::types::infer::nearest_enclosing_function;
 use crate::{
     TypeQualifiers,
     types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
@@ -91,16 +92,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// The `is_instance_attribute` flag computed during semantic indexing checks that the object
     /// expression refers to the first parameter of the enclosing method and has not been shadowed
-    /// in intermediate scopes. We additionally check that the enclosing function has an implicit
-    /// receiver, since static methods still have a first parameter.
+    /// in intermediate scopes. We additionally check that the nearest enclosing function has an
+    /// implicit receiver, since static methods also have a first parameter.
     pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
-        if self
-            .current_function_type()
-            .is_none_or(|function| !function.has_implicit_receiver(self.db()))
-        {
-            return false;
-        }
-
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };
@@ -110,6 +104,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         place_table.member(member_id).is_instance_attribute()
+            && nearest_enclosing_function(self.db(), self.index, self.scope())
+                .is_some_and(|function| function.has_implicit_receiver(self.db()))
     }
 
     /// Check whether an annotated attribute target uses an implicit receiver.

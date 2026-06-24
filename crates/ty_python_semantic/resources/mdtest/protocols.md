@@ -1004,6 +1004,8 @@ the class body are disallowed. This is mandated by [the spec][spec_protocol_memb
 > subtypes, so the interface should not depend on the default implementation.
 
 ```py
+from typing import Any
+
 class Foo(Protocol):
     x: int
     y: str
@@ -1024,6 +1026,35 @@ class Foo(Protocol):
 # Note: the list of members does not include `a`, `b`, `c` or `d`,
 # as none of these attributes is declared in the class body.
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
+
+class AssignmentForms(Protocol):
+    def __getattr__(self, name: str) -> int:
+        return 0
+
+    def gradual_receiver(self: Any) -> None:
+        self.gradual = 1  # error: [ambiguous-protocol-member]
+
+    def eager_scope(self) -> None:
+        [None for self.eager in [1]]  # error: [ambiguous-protocol-member]
+
+    def augmented_assignment(self) -> None:
+        self.augmented += 1  # snapshot: ambiguous-protocol-member
+```
+
+```snapshot
+warning[ambiguous-protocol-member]: Cannot assign to an undeclared instance attribute in a protocol method
+   --> src/mdtest_snippet.py:322:9
+    |
+322 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+    |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
+    |
+info: Assigning to an undeclared instance attribute in a protocol method leads to an ambiguous interface
+   --> src/mdtest_snippet.py:311:7
+    |
+311 | class AssignmentForms(Protocol):
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
+    |
+info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
 ```
 
 If a member is declared in a superclass of a protocol class, it is fine for it to be assigned to in

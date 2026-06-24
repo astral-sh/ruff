@@ -1695,21 +1695,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let Some(class) = self.class_context_of_current_method() else {
-            return;
-        };
-        let Some(protocol) = class.into_protocol_class(db) else {
+        let Some(protocol) = nearest_enclosing_class(db, self.index, self.scope())
+            .and_then(|class| class.into_protocol_class(db))
+        else {
             return;
         };
         if protocol.interface(db).includes_member(db, target.attr.id()) {
             return;
         }
 
-        let class_instance_ty = Type::instance(db, class).top_materialization(db);
-        if !object_ty
-            .bind_self_typevars(db, class_instance_ty)
-            .is_subtype_of(db, class_instance_ty)
-        {
+        // The semantic index marks writes through both instance-method and classmethod receivers.
+        // A classmethod receiver writes to a class object, not a protocol instance.
+        if matches!(
+            object_ty,
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
+        ) {
             return;
         }
 
@@ -4985,6 +4985,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
+                self.report_undeclared_protocol_instance_attribute(attr_expr, object_ty);
                 self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
             }
         }

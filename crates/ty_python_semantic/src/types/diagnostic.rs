@@ -2838,7 +2838,13 @@ pub(crate) fn report_undeclared_protocol_member(
         ));
     }
 
-    add_undeclared_protocol_member_context(&mut diagnostic, db, protocol_class, symbol_name);
+    add_undeclared_protocol_member_context(
+        &mut diagnostic,
+        db,
+        protocol_class,
+        symbol_name,
+        "Assigning to an undeclared variable in a protocol class leads to an ambiguous interface",
+    );
 }
 
 pub(crate) fn report_undeclared_protocol_instance_attribute(
@@ -2858,7 +2864,13 @@ pub(crate) fn report_undeclared_protocol_instance_attribute(
         "`{symbol_name}` is not declared as a protocol member"
     ));
 
-    add_undeclared_protocol_member_context(&mut diagnostic, db, protocol_class, symbol_name);
+    add_undeclared_protocol_member_context(
+        &mut diagnostic,
+        db,
+        protocol_class,
+        symbol_name,
+        "Assigning to an undeclared instance attribute in a protocol method leads to an ambiguous interface",
+    );
 }
 
 fn add_undeclared_protocol_member_context(
@@ -2866,14 +2878,12 @@ fn add_undeclared_protocol_member_context(
     db: &dyn Db,
     protocol_class: ProtocolClass,
     symbol_name: &str,
+    ambiguity_message: &'static str,
 ) {
     let class_name = protocol_class.name(db);
 
-    let mut class_def_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        "Assigning to an undeclared variable in a protocol class \
-    leads to an ambiguous interface",
-    );
+    let mut class_def_diagnostic =
+        SubDiagnostic::new(SubDiagnosticSeverity::Info, ambiguity_message);
     class_def_diagnostic.annotate(
         Annotation::primary(protocol_class.definition_span(db))
             .message(format_args!("`{class_name}` declared as a protocol here")),
