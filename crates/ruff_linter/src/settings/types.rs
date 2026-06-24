@@ -923,8 +923,9 @@ impl CompiledPerFileIgnoreList {
                 negated,
                 data: selectors,
             } = ignore.0;
-            // Rules in preview are included here even if preview mode is disabled; it's safe to
-            // ignore disabled rules.
+            // Rules in preview are included here via `all_rules` even if preview mode is disabled.
+            // This is okay because it's fine to per-file-ignore additional preview rules that are
+            // already ignored by virtue of being in preview when preview is disabled.
             let data: RuleSet = selectors
                 .iter()
                 .filter_map(
