@@ -798,12 +798,12 @@ impl<'db> IntersectionType<'db> {
             if new_ty.is_never()
                 || candidates
                     .iter()
-                    .any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
+                    .any(|old| new_ty.is_redundant_with(db, *old))
             {
                 return Some(());
             }
 
-            candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
+            candidates.retain(|old| !old.is_redundant_with(db, new_ty));
             if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
                 return None;
             }

@@ -432,6 +432,25 @@ def consume_b(value: B) -> None: ...
 infer_with_consumer(A(), consume_b)  # error: [invalid-argument-type]
 ```
 
+## Combined upper bounds uses redundancy
+
+When solving an upper bound involving a union, we should use the same typing relation to look for
+redundant elements as we use for unions in general.
+
+```py
+from typing import Any, Callable, final
+
+def infer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+def callback(value: A | Any) -> None: ...
+
+reveal_type(infer(callback))  # revealed: A | Any
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
