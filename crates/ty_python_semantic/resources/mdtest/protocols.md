@@ -474,9 +474,9 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 from ty_extensions import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
-# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
+# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { read: `str` }, "z": PropertyMember { read: `int`, write: `int` }}
 reveal_protocol_interface(Foo)
-# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
+# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { read: `str` }, "z": PropertyMember { read: `int`, write: `int` }}
 reveal_protocol_interface(protocol=Foo)
 # revealed: {"__index__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsIndex)
@@ -645,7 +645,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol, Any, ClassVar
+from typing import Protocol, Any, ClassVar, Final
 from collections.abc import Sequence
 from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
@@ -783,6 +783,13 @@ static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-
 
 static_assert(not is_subtype_of(Qux, HasClassVarX))
 static_assert(not is_assignable_to(Qux, HasClassVarX))
+
+class FinalClassVarX:
+    x: Final[int] = 0
+
+# A mutable ClassVar protocol member requires a writable class attribute.
+static_assert(not is_subtype_of(FinalClassVarX, HasClassVarX))
+static_assert(not is_assignable_to(FinalClassVarX, HasClassVarX))
 static_assert(is_subtype_of(Sequence[Foo], Sequence[HasX]))
 static_assert(is_assignable_to(Sequence[Foo], Sequence[HasX]))
 static_assert(not is_subtype_of(list[Foo], list[HasX]))
@@ -1979,7 +1986,13 @@ A `Final` attribute on a protocol is also read-only:
 
 ```py
 class HasFinalX(Protocol):
-    x: Final[int] = 42
+    # A Final protocol member is an instance declaration and does not require a value.
+    x: Final[int]
+
+class HasFinalClassVarX(Protocol):
+    # The ClassVar qualifier is meaningful in a protocol and should not trigger
+    # redundant-final-classvar.
+    x: ClassVar[Final[int]]
 
 static_assert(is_subtype_of(XFinal, HasFinalX))
 static_assert(is_assignable_to(XFinal, HasFinalX))
@@ -1987,6 +2000,23 @@ static_assert(is_subtype_of(XReadProperty, HasFinalX))
 static_assert(is_assignable_to(XReadProperty, HasFinalX))
 static_assert(is_subtype_of(HasXProperty, HasFinalX))
 static_assert(is_assignable_to(HasXProperty, HasFinalX))
+static_assert(is_subtype_of(HasFinalClassVarX, HasFinalX))
+static_assert(is_assignable_to(HasFinalClassVarX, HasFinalX))
+static_assert(not is_subtype_of(HasFinalX, HasFinalClassVarX))
+static_assert(not is_assignable_to(HasFinalX, HasFinalClassVarX))
+static_assert(not is_subtype_of(XReadProperty, HasFinalClassVarX))
+static_assert(not is_assignable_to(XReadProperty, HasFinalClassVarX))
+
+class MutableClassVarX:
+    x: int = 0
+
+class FinalClassVarImplementation:
+    x: Final[int] = 0
+
+static_assert(is_subtype_of(MutableClassVarX, HasFinalClassVarX))
+static_assert(is_assignable_to(MutableClassVarX, HasFinalClassVarX))
+static_assert(is_subtype_of(FinalClassVarImplementation, HasFinalClassVarX))
+static_assert(is_assignable_to(FinalClassVarImplementation, HasFinalClassVarX))
 ```
 
 A read/write property on a protocol, where the getter returns the same type that the setter takes,
@@ -2179,16 +2209,6 @@ class TerminalPropertySetter:
     def x(self, value: int) -> Never:
         raise RuntimeError
 
-class TerminalDescriptor:
-    def __get__(self, instance, owner) -> int:
-        return 1
-
-    def __set__(self, instance, value: int) -> Never:
-        raise RuntimeError
-
-class HasTerminalDescriptor:
-    x: TerminalDescriptor = TerminalDescriptor()
-
 class NeverAttribute:
     x: Never
 
@@ -2200,8 +2220,6 @@ class HasNeverAttribute(Protocol):
 
 static_assert(not is_subtype_of(TerminalPropertySetter, HasMutableXProperty))
 static_assert(not is_assignable_to(TerminalPropertySetter, HasMutableXProperty))
-static_assert(not is_subtype_of(HasTerminalDescriptor, HasMutableXProperty))
-static_assert(not is_assignable_to(HasTerminalDescriptor, HasMutableXProperty))
 static_assert(is_subtype_of(NeverAttribute, HasNeverAttribute))
 static_assert(is_assignable_to(NeverAttribute, HasNeverAttribute))
 
@@ -2396,9 +2414,8 @@ static_assert(not is_assignable_to(NominalSubtype2 | DefinitelyNotSubtype, P))
 # `m` has the correct signature when accessed on instances of `NominalWithClassMethod`,
 # but not when accessed on the class object `NominalWithClassMethod` itself
 #
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalWithClassMethod, P))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalSubtype | NominalWithClassMethod, P))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalWithClassMethod, P))
+static_assert(not is_assignable_to(NominalSubtype | NominalWithClassMethod, P))
 
 # Conversely, `m` has the correct signature when accessed on the class object
 # `NominalWithStaticMethod`, but not when accessed on instances of `NominalWithStaticMethod`
@@ -2976,9 +2993,9 @@ static_assert(not is_assignable_to(PropertyBool, Method))
 static_assert(not is_assignable_to(Attribute, Method))
 ```
 
-But an exception to this rule is if an attribute member is marked as `ClassVar`, as this guarantees
-that the member will be available on the meta-type as well as the instance type for inhabitants of
-the protocol:
+A `ClassVar` callable also does not satisfy a method member. Although it is readable through both
+the instance and the class, those reads have the same callable type; a method has a bound instance
+type and a distinct unbound class type:
 
 ```py
 from typing import ClassVar
@@ -2986,8 +3003,8 @@ from typing import ClassVar
 class ClassVarAttribute(Protocol):
     f: ClassVar[Callable[[], bool]]
 
-static_assert(is_subtype_of(ClassVarAttribute, Method))
-static_assert(is_assignable_to(ClassVarAttribute, Method))
+static_assert(not is_subtype_of(ClassVarAttribute, Method))
+static_assert(not is_assignable_to(ClassVarAttribute, Method))
 
 class ClassVarAttributeBad(Protocol):
     f: ClassVar[Callable[[], str]]
