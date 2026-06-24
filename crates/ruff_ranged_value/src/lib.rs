@@ -56,7 +56,7 @@ thread_local! {
     static VALUE_SOURCE: RefCell<Option<(ValueSource, bool)>> = const { RefCell::new(None) };
 }
 
-/// Guard to safely change the [`VALUE_SOURCE`] for the current thread.
+/// Guard to safely change the [`ValueSource`] for the current thread.
 #[must_use]
 pub struct ValueSourceGuard {
     prev_value: Option<(ValueSource, bool)>,
