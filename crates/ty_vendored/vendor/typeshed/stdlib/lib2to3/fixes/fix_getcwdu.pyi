@@ -1,7 +1,3 @@
-"""
-Fixer that changes os.getcwdu() to os.getcwd().
-"""
-
 from typing import ClassVar, Literal
 
 from .. import fixer_base
