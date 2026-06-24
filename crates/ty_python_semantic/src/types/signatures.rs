@@ -2288,10 +2288,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
-                    let source_parameters = source
-                        .parameters
-                        .clone()
-                        .expand_starred_variadic_annotations(db);
+                    let source_parameters =
+                        source.parameters.expand_starred_variadic_annotations(db);
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
@@ -2802,10 +2800,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let source_parameters = if target_typevartuple.is_some() {
-            source
-                .parameters
-                .clone()
-                .expand_starred_variadic_annotations(db)
+            source.parameters.expand_starred_variadic_annotations(db)
         } else {
             source.parameters.clone()
         };
@@ -3921,14 +3916,14 @@ impl<'db> Parameters<'db> {
     }
 
     /// Expands an unpacked `*args` annotation into its logical callable parameters.
-    fn expand_starred_variadic_annotations(self, db: &'db dyn Db) -> Self {
+    fn expand_starred_variadic_annotations(&self, db: &'db dyn Db) -> Self {
         if !self
             .data
             .value
             .iter()
             .any(|parameter| parameter.is_variadic() && parameter.has_starred_annotation())
         {
-            return self;
+            return self.clone();
         }
 
         let mut expanded = false;
@@ -3975,7 +3970,7 @@ impl<'db> Parameters<'db> {
         if expanded {
             Self::new(db, parameters)
         } else {
-            self
+            self.clone()
         }
     }
 
