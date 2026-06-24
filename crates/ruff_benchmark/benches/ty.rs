@@ -654,7 +654,7 @@ fn benchmark_enum_comparison(criterion: &mut Criterion, name: &str, code: &str) 
 }
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3830>.
-fn benchmark_str_enum_comparison_after_truthiness_narrowing(criterion: &mut Criterion) {
+fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
     let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
@@ -665,11 +665,7 @@ fn benchmark_str_enum_comparison_after_truthiness_narrowing(criterion: &mut Crit
         "\n\ndef compare(left: LargeEnum, right: LargeEnum):\n    if right and left != right:\n        return\n    return left == right\n",
     );
 
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[str_enum_comparison_after_truthiness_narrowing]",
-        &code,
-    );
+    benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
 }
 
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
@@ -1678,7 +1674,7 @@ criterion_group!(
     benchmark_gradual_vararg_call,
     benchmark_large_enum_membership,
     benchmark_many_enum_members,
-    benchmark_str_enum_comparison_after_truthiness_narrowing,
+    benchmark_narrowed_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
     benchmark_many_enum_members_2,
