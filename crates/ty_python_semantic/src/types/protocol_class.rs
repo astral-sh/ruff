@@ -1139,13 +1139,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             InstanceAttributeWriteMember::Instance(fallback) => {
                 self.check_fallback_property_write(db, fallback, value_ty)
             }
-            InstanceAttributeWriteMember::SetAttr => ConstraintSet::from_bool(
-                self.constraints,
-                matches!(
+            InstanceAttributeWriteMember::SetAttr => {
+                if !matches!(
                     setattr_result,
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
-                ),
-            ),
+                ) {
+                    return self.never();
+                }
+                self.check_setattr_property_write(db, object_ty, value_ty)
+            }
         }
     }
 
@@ -1231,7 +1233,39 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
-        setter_ty
+        self.check_callable_write_parameter(db, setter_ty, 2, descriptor_ty, value_ty)
+    }
+
+    fn check_setattr_property_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let Place::Defined(DefinedPlace { ty: setattr_ty, .. }) = object_ty
+            .member_lookup_with_policy(
+                db,
+                "__setattr__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        else {
+            return self.never();
+        };
+
+        self.check_callable_write_parameter(db, setattr_ty, 1, object_ty, value_ty)
+    }
+
+    fn check_callable_write_parameter(
+        &self,
+        db: &'db dyn Db,
+        callable_ty: Type<'db>,
+        parameter_index: usize,
+        self_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        callable_ty
             .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
             .when_some_and(db, self.constraints, |callables| {
                 callables.iter().when_all(db, self.constraints, |callable| {
@@ -1241,16 +1275,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         |signature| {
                             let parameters = signature.parameters();
                             parameters
-                                .get_positional(2)
+                                .get_positional(parameter_index)
                                 .or_else(|| {
                                     parameters.variadic().and_then(|(index, parameter)| {
-                                        (index <= 2).then_some(parameter)
+                                        (index <= parameter_index).then_some(parameter)
                                     })
                                 })
                                 .map(|parameter| {
-                                    parameter
-                                        .annotated_type()
-                                        .bind_self_typevars(db, descriptor_ty)
+                                    parameter.annotated_type().bind_self_typevars(db, self_ty)
                                 })
                                 .when_some_and(db, self.constraints, |write_ty| {
                                     self.check_type_pair(db, value_ty, write_ty)
