@@ -1302,11 +1302,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required: ProtocolMemberAccess<'db>,
         instance_access: bool,
     ) -> ConstraintSet<'db, 'c> {
-        // Callable types and several callable literal forms do not expose a useful
-        // `__call__` member through their meta-type. The instance-side callable check
-        // above is the authoritative signature check for this special method.
-        if !instance_access && member.is_method() && member.name == "__call__" {
-            return self.always();
+        if !instance_access && member.is_method() {
+            // The instance-side check is authoritative for a method's signature. Class access
+            // only establishes that the implementation is a method rather than an instance
+            // attribute. Callable types and several callable literal forms do not expose a
+            // useful `__call__` member through their meta-type.
+            return ConstraintSet::from_bool(
+                self.constraints,
+                member.name == "__call__"
+                    || protocol_member_read_type(db, ty, receiver_ty, member, false).is_some(),
+            );
         }
 
         let read_result = required.read.map_or_else(
