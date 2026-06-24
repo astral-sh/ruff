@@ -89,18 +89,14 @@ impl Hash for UnresolvedRuleSelector {
 }
 
 impl UnresolvedRuleSelector {
-    pub fn resolve(
-        &self,
-        setting: &'static str,
-        _preview: PreviewMode,
-    ) -> Result<RuleSelector, RuleResolutionError> {
+    pub fn resolve(&self, _preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
         RuleSelector::from_str(&self.selector).map_err(|_| {
             let kind = if matches!(self.selector.as_str(), "PREVIEW" | "NURSERY") {
                 RuleResolutionErrorKind::Removed
             } else {
                 RuleResolutionErrorKind::Unknown
             };
-            RuleResolutionError::from_selector(self, setting, kind)
+            RuleResolutionError::from_selector(self, kind)
         })
     }
 
@@ -189,23 +185,26 @@ enum RuleResolutionErrorKind {
 #[derive(Debug)]
 pub struct RuleResolutionError {
     selector: String,
-    setting: &'static str,
+    setting: Option<&'static str>,
     source: RuleSelectorSource,
     kind: RuleResolutionErrorKind,
 }
 
 impl RuleResolutionError {
-    fn from_selector(
-        unresolved: &UnresolvedRuleSelector,
-        setting: &'static str,
-        kind: RuleResolutionErrorKind,
-    ) -> Self {
+    fn from_selector(unresolved: &UnresolvedRuleSelector, kind: RuleResolutionErrorKind) -> Self {
         Self {
             selector: unresolved.selector.clone(),
-            setting,
+            setting: None,
             source: unresolved.source.clone(),
             kind,
         }
+    }
+
+    /// Attach the configuration option where the error occurred.
+    #[must_use]
+    pub fn with_setting(mut self, setting: &'static str) -> Self {
+        self.setting = Some(setting);
+        self
     }
 
     pub fn log_warning(&self) {
@@ -219,13 +218,11 @@ impl std::fmt::Display for RuleResolutionError {
             RuleResolutionErrorKind::Removed => "Removed",
             RuleResolutionErrorKind::Unknown => "Unknown rule",
         };
-        write!(
-            f,
-            "{kind} selector `{selector}` in `{setting}` from {source}",
-            selector = self.selector,
-            setting = self.setting,
-            source = self.source,
-        )
+        write!(f, "{kind} selector `{selector}`", selector = self.selector)?;
+        if let Some(setting) = self.setting {
+            write!(f, " in `{setting}`")?;
+        }
+        write!(f, " from {source}", source = self.source)
     }
 }
 

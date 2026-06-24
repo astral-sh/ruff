@@ -102,9 +102,10 @@ impl RuleSelection {
         ) -> Result<Vec<RuleSelector>, RuleResolutionError> {
             selectors
                 .iter()
-                .filter_map(|selector| match selector.resolve(setting, preview) {
+                .filter_map(|selector| match selector.resolve(preview) {
                     Ok(selector) => Some(Ok(selector)),
-                    Err(err) => {
+                    Err(mut err) => {
+                        err = err.with_setting(setting);
                         if is_warn_on_unknown_selectors_enabled(preview) {
                             err.log_warning();
                             None
