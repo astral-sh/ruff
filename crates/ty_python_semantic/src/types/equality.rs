@@ -217,27 +217,12 @@ pub(crate) fn equality_truthiness<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    comparison_truthiness(db, left, right, ComparisonOperator::Equality)
-}
-
-/// Return the truthiness of `left != right` when it is known for every represented runtime value.
-///
-/// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
-pub(super) fn inequality_truthiness<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> Truthiness {
-    comparison_truthiness(db, left, right, ComparisonOperator::Inequality)
-}
-
-fn comparison_truthiness<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-    operator: ComparisonOperator,
-) -> Truthiness {
-    match ComparisonEvaluator::new(db).evaluate(left, right, ComparisonBranch::Positive, operator) {
+    match ComparisonEvaluator::new(db).evaluate(
+        left,
+        right,
+        ComparisonBranch::Positive,
+        ComparisonOperator::Equality,
+    ) {
         ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
         ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
         ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => Truthiness::Ambiguous,
