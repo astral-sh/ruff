@@ -205,11 +205,6 @@ pub(crate) enum TypeRelation {
     ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
     ///   will return true!)
     SubtypingAssuming,
-
-    /// A placeholder for the new assignability relation that uses constraint sets to encode
-    /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
-    /// to start using the new relation in a controlled manner in some places.
-    ConstraintSetAssignability,
 }
 
 /// Determines when comparisons involving type variables are evaluated.
@@ -227,14 +222,7 @@ pub(crate) enum TypeVarEvaluation {
 
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
-        matches!(
-            self,
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability
-        )
-    }
-
-    pub(crate) const fn is_constraint_set_assignability(self) -> bool {
-        matches!(self, TypeRelation::ConstraintSetAssignability)
+        matches!(self, TypeRelation::Assignability)
     }
 
     pub(crate) const fn is_subtyping(self) -> bool {
@@ -243,9 +231,7 @@ impl TypeRelation {
 
     pub(crate) const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
         match self {
-            TypeRelation::Assignability
-            | TypeRelation::ConstraintSetAssignability
-            | TypeRelation::Redundancy { .. } => true,
+            TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                 ty.subtyping_is_always_reflexive()
             }
@@ -1360,7 +1346,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.constraints,
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Assignability => true,
                     TypeRelation::Redundancy { .. } => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
@@ -1372,7 +1358,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.constraints,
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Assignability => true,
                     TypeRelation::Redundancy { .. } => match source {
                         Type::Dynamic(_) => true,
                         Type::Intersection(intersection) => {
@@ -1408,6 +1394,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             {
                 self.always()
             }
+
             (Type::Intersection(intersection), _)
                 if self.is_eager_assignability()
                     && intersection.positive(db).iter().any(Type::is_dynamic) =>
@@ -1702,9 +1689,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy { .. }
                         | TypeRelation::SubtypingAssuming => source,
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                            source.bottom_materialization(db)
-                        }
+                        TypeRelation::Assignability => source.bottom_materialization(db),
                     };
                     intersection
                         .negative(db)
@@ -1714,10 +1699,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 TypeRelation::Subtyping
                                 | TypeRelation::Redundancy { .. }
                                 | TypeRelation::SubtypingAssuming => neg_ty,
-                                TypeRelation::Assignability
-                                | TypeRelation::ConstraintSetAssignability => {
-                                    neg_ty.bottom_materialization(db)
-                                }
+                                TypeRelation::Assignability => neg_ty.bottom_materialization(db),
                             };
                             self.as_disjointness_checker()
                                 .check_type_pair(db, source_ty, neg_ty)
@@ -1846,11 +1828,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_partial)),
                 Type::FunctionLiteral(target_function),
-            ) if matches!(
-                self.relation,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability
-            ) =>
-            {
+            ) if matches!(self.relation, TypeRelation::Assignability) => {
                 self.with_recursion_guard(source, target, || {
                     self.check_callable_signature_pair(
                         db,

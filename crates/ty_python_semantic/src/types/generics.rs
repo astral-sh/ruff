@@ -1622,28 +1622,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 MaterializationKind::Bottom,
             ),
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
-            (
-                None,
-                Some(target_mat),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                MaterializationKind::Bottom,
-                target_type,
-                target_mat,
-            ),
-            (
-                Some(source_mat),
-                None,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                source_mat,
-                target_type,
-                MaterializationKind::Top,
-            ),
+            (None, Some(target_mat), TypeRelation::Assignability) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    MaterializationKind::Bottom,
+                    target_type,
+                    target_mat,
+                ),
+            (Some(source_mat), None, TypeRelation::Assignability) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    source_mat,
+                    target_type,
+                    MaterializationKind::Top,
+                ),
         }
     }
 

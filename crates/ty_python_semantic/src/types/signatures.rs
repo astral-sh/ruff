@@ -2738,7 +2738,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
                     ),
                 ),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
+                TypeRelation::Assignability => result,
             };
         }
 

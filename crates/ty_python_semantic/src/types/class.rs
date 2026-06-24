@@ -2245,7 +2245,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     | TypeRelation::SubtypingAssuming => {
                         ConstraintSet::from_bool(self.constraints, target.is_object(db))
                     }
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                    TypeRelation::Assignability => {
                         ConstraintSet::from_bool(self.constraints, !target.is_final(db))
                     }
                 },
