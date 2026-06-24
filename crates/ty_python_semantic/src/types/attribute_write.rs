@@ -1,3 +1,12 @@
+//! Attribute-write resolution shared by assignment inference and protocol compatibility.
+//!
+//! This module resolves the Python lookup semantics for `object.attribute = value` into an
+//! [`AttributeWriteRequirement`]. The requirement retains alternatives such as union elements,
+//! descriptors, instance fallbacks, and `__setattr__` instead of deciding whether a particular
+//! value type is valid. Assignment inference can therefore provide contextual inference and
+//! diagnostics, while protocol checking can evaluate the same lookup result using its active type
+//! relation and constraint set.
+
 use ty_module_resolver::KnownModule;
 
 use super::call::CallArguments;
@@ -27,46 +36,81 @@ pub(super) enum AttributeWriteRequirement<'db> {
     Unconstrained,
     /// The object type does not permit writes at all.
     CannotAssign,
+    /// A module symbol, with its declared type when the symbol is known.
+    ///
+    /// `None` represents an unresolved module attribute rather than an unconstrained write.
     Module(Option<Type<'db>>),
-    /// The effective instance-write type of a declared protocol member, if it is writable.
+    /// The effective instance-write type of a declared protocol member.
+    ///
+    /// `write_ty` is `None` for a read-only member. Qualifiers are retained so assignment
+    /// inference can distinguish `Final` and `ClassVar` diagnostics from other non-writable
+    /// members.
     ProtocolMember {
         write_ty: Option<Type<'db>>,
         qualifiers: TypeQualifiers,
     },
+    /// An instance write that still requires descriptor, instance-member, and `__setattr__`
+    /// resolution.
     Instance(Type<'db>),
+    /// A write through a class object, resolved against its metaclass and class attributes.
     Class {
         object_ty: Type<'db>,
         member: ClassAttributeWriteMember<'db>,
     },
 }
 
+/// The member that governs a write through an instance.
+///
+/// A declared class member takes precedence over an instance fallback. A custom `__setattr__` is
+/// used only when neither lookup produces a declared write target; callers separately account for
+/// a terminal `__setattr__` that blocks every write.
 pub(super) enum InstanceAttributeWriteMember<'db> {
+    /// The resolved declaration is a `ClassVar`, which cannot be assigned through an instance.
     ClassVar,
+    /// A class or MRO member governs the write.
+    ///
+    /// The fallback is also required when the explicit member is only possibly defined.
     Explicit {
         member: ExplicitAttributeWriteRequirement<'db>,
         fallback: Option<FallbackAttributeWriteRequirement<'db>>,
     },
+    /// No class member governs the write, but an instance declaration does.
     Instance(FallbackAttributeWriteRequirement<'db>),
+    /// No declared member was found, so the write is governed by `__setattr__`.
     SetAttr,
 }
 
+/// The member that governs a write through a class object.
+///
+/// The primary lookup is on the metaclass. If that lookup is absent or possibly undefined, the
+/// class object's own attributes form the fallback.
 pub(super) enum ClassAttributeWriteMember<'db> {
+    /// A metaclass member governs the write, optionally alongside a class-attribute fallback.
     Explicit {
         member: ExplicitAttributeWriteRequirement<'db>,
         fallback: Option<FallbackAttributeWriteRequirement<'db>>,
     },
+    /// No metaclass member governs the write, but a class attribute does.
     ClassAttribute(FallbackAttributeWriteRequirement<'db>),
-    Unresolved {
-        has_instance_attribute: bool,
-    },
+    /// Neither lookup found a writable declaration.
+    ///
+    /// `has_instance_attribute` distinguishes assigning an instance-only declaration through the
+    /// class from assigning a wholly unknown attribute.
+    Unresolved { has_instance_attribute: bool },
 }
 
+/// How an explicitly resolved member accepts a write.
 pub(super) enum ExplicitAttributeWriteRequirement<'db> {
+    /// Invoke a concrete descriptor's `__set__` method.
+    ///
+    /// `setter_ty` is the unbound method and is called with `descriptor_ty`, the object, and the
+    /// assigned value.
     Descriptor {
         descriptor_ty: Type<'db>,
         setter_ty: Type<'db>,
         qualifiers: TypeQualifiers,
     },
+    /// Check the assigned value directly against the member's effective write type.
     AssignableTo {
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
@@ -83,16 +127,23 @@ impl ExplicitAttributeWriteRequirement<'_> {
     }
 }
 
+/// A write target found through a possibly absent fallback lookup.
 pub(super) enum FallbackAttributeWriteRequirement<'db> {
+    /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
         possibly_missing: bool,
     },
+    /// The fallback may exist, but lookup did not produce a usable write type.
     PossiblyMissing,
 }
 
-/// Resolve what writing `object_ty.attribute` would require.
+/// Resolve the receiver-level requirements for writing `object_ty.attribute`.
+///
+/// This expands aliases, preserves the all-arms rule for unions and the any-positive-arm rule for
+/// intersections, and dispatches instance and class-object writes to their respective lookup
+/// paths. It does not compare the assigned value with the resulting types.
 pub(super) fn attribute_write_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -181,6 +232,11 @@ pub(super) fn attribute_write_requirement<'db>(
     }
 }
 
+/// Resolve the declared member that governs an instance attribute write.
+///
+/// The returned requirement preserves a possibly-defined class member and its instance fallback,
+/// because both runtime paths must accept the write. If neither exists, the caller must evaluate
+/// `__setattr__`.
 pub(super) fn instance_attribute_write_member_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -227,6 +283,10 @@ pub(super) fn instance_attribute_write_member_requirement<'db>(
     }
 }
 
+/// Resolve a class-object write against the metaclass and then the class object's attributes.
+///
+/// The receiver must be convertible to an instance type so that `Self` in class-attribute
+/// declarations can be bound consistently with normal class-object member lookup.
 fn class_attribute_write_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -277,6 +337,11 @@ fn class_attribute_write_requirement<'db>(
     AttributeWriteRequirement::Class { object_ty, member }
 }
 
+/// Convert an explicitly resolved member into either a descriptor call or a direct type check.
+///
+/// Descriptor behavior is used only when `__set__` is found with
+/// [`MemberLookupPolicy::REQUIRE_CONCRETE`]. An `Any` or `Unknown` base therefore does not cause an
+/// ordinary attribute to be treated as a data descriptor.
 fn explicit_attribute_write_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -301,6 +366,10 @@ fn explicit_attribute_write_requirement<'db>(
     }
 }
 
+/// Convert an instance fallback into a write type, binding `Self` to the receiver.
+///
+/// This also applies dataclass converter semantics and preserves possible undefinedness for the
+/// assignment diagnostic layer.
 fn instance_fallback_write_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -324,6 +393,7 @@ fn instance_fallback_write_requirement<'db>(
     }
 }
 
+/// Convert a class-attribute fallback into a write type, binding `Self` to the class instance.
 fn class_fallback_write_requirement<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -355,10 +425,11 @@ fn class_fallback_write_requirement<'db>(
     }
 }
 
-/// Return the accepted type for writes to an explicitly declared attribute.
+/// Return the accepted type for writes to a declared attribute.
 ///
 /// A dataclass field with a converter accepts the converter's input type, not
-/// the field's post-conversion type.
+/// the field's post-conversion type. For example, a field declared as `int` with a
+/// `(str) -> int` converter is read as `int` but accepts `str` assignments.
 fn effective_write_type<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -376,6 +447,22 @@ fn effective_write_type<'db>(
     }
 }
 
+/// Return whether a property setter is terminal for this receiver and value type.
+///
+/// This is intentionally specific to `property`: other descriptors are governed by the result of
+/// their concrete `__set__` call. Both successful and failed call bindings retain the declared
+/// return type, so either can establish that the selected setter returns `Never`/`NoReturn`.
+///
+/// ```python
+/// from typing import Never
+///
+/// class Model:
+///     @property
+///     def value(self) -> int: ...
+///
+///     @value.setter
+///     def value(self, value: int) -> Never: ...
+/// ```
 pub(super) fn property_setter_returns_never<'db>(
     db: &'db dyn Db,
     property_ty: Type<'db>,
@@ -392,6 +479,15 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
+/// Return the primary and optional fallback members considered by attribute assignment.
+///
+/// The primary member comes from class-member lookup. The fallback is queried only when that
+/// member is absent or possibly undefined, and is an instance member for ordinary receivers or a
+/// class-object member for class receivers. Composite and dynamic receiver types return `None`;
+/// their callers either decompose them before this point or handle them without member lookup.
+///
+/// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
+/// protocol compatibility, and `Final` validation share exactly the same lookup precedence.
 pub(super) fn assignment_attribute_members<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
