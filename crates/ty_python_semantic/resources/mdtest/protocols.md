@@ -2191,6 +2191,18 @@ class XCustomDescriptor:
 
 static_assert(is_subtype_of(XCustomDescriptor, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XCustomDescriptor, HasAsymmetricXProperty))
+
+class AnySetterDescriptor:
+    def __get__(self, instance, owner) -> object:
+        return object()
+
+    def __set__(self, instance, value: Any) -> None: ...
+
+class ObjectReadAnyWriteDescriptor:
+    x: AnySetterDescriptor = AnySetterDescriptor()
+
+static_assert(not is_subtype_of(ObjectReadAnyWriteDescriptor, HasObjectReadIntWriteProperty))
+static_assert(is_assignable_to(ObjectReadAnyWriteDescriptor, HasObjectReadIntWriteProperty))
 ```
 
 A property's setter return type does not affect whether it satisfies a writable protocol member.
