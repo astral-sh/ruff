@@ -2400,6 +2400,10 @@ class NominalWithStaticMethod:
     @staticmethod
     def m(_, x: int) -> None: ...
 
+class NominalWithStaticMethodGood:
+    @staticmethod
+    def m(x: int) -> None: ...
+
 class DefinitelyNotSubtype:
     m = None
 
@@ -2411,14 +2415,15 @@ static_assert(not is_assignable_to(NotSubtype, P))
 static_assert(not is_assignable_to(NominalSubtype | NotSubtype, P))
 static_assert(not is_assignable_to(NominalSubtype2 | DefinitelyNotSubtype, P))
 
-# `m` has the correct signature when accessed on instances of `NominalWithClassMethod`,
-# but not when accessed on the class object `NominalWithClassMethod` itself
-#
-static_assert(not is_assignable_to(NominalWithClassMethod, P))
-static_assert(not is_assignable_to(NominalSubtype | NominalWithClassMethod, P))
+# A classmethod or staticmethod can satisfy a regular method member if it has the correct
+# signature when accessed on an instance. The class-side check only establishes that the member
+# is present on the class.
+static_assert(is_assignable_to(NominalWithClassMethod, P))
+static_assert(is_assignable_to(NominalWithStaticMethodGood, P))
+static_assert(is_assignable_to(NominalSubtype | NominalWithClassMethod, P))
+static_assert(is_assignable_to(NominalSubtype | NominalWithStaticMethodGood, P))
 
-# Conversely, `m` has the correct signature when accessed on the class object
-# `NominalWithStaticMethod`, but not when accessed on instances of `NominalWithStaticMethod`
+# This staticmethod has an extra parameter when accessed on an instance.
 static_assert(not is_assignable_to(NominalWithStaticMethod, P))
 static_assert(not is_assignable_to(NominalSubtype | NominalWithStaticMethod, P))
 ```
