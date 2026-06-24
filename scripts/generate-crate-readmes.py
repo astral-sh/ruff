@@ -10,6 +10,8 @@ import pathlib
 import subprocess
 
 GENERATED_HEADER = "<!-- This file is generated. DO NOT EDIT -->"
+GENERATED_SECTION_START = "<!-- BEGIN GENERATED CRATE VERSIONING -->"
+GENERATED_SECTION_END = "<!-- END GENERATED CRATE VERSIONING -->"
 
 RUFF_TEMPLATE = """{GENERATED_HEADER}
 
@@ -36,10 +38,7 @@ details on versioning.
 """
 
 
-MEMBER_TEMPLATE = """{GENERATED_HEADER}
-
-# {name}
-
+MEMBER_VERSIONING_TEMPLATE = """\
 This crate is an internal component of [Ruff](https://crates.io/crates/ruff). The Rust API exposed
 here is unstable and will have frequent breaking changes.
 
@@ -50,9 +49,31 @@ See Ruff's [crate versioning policy](https://docs.astral.sh/ruff/versioning/#cra
 details on versioning.
 """
 
+MEMBER_TEMPLATE = """{GENERATED_HEADER}
+
+# {name}
+
+{versioning}"""
+
 
 REPO_URL = "https://github.com/astral-sh/ruff"
 PRETTIER_VERSION = "3.8.3"
+
+
+def replace_generated_section(readme: str, generated_content: str) -> str:
+    start = readme.find(GENERATED_SECTION_START)
+    end = readme.find(GENERATED_SECTION_END, start)
+    if start == -1 or end == -1:
+        raise ValueError("README has an incomplete generated crate versioning section")
+
+    content_start = start + len(GENERATED_SECTION_START)
+    return (
+        readme[:content_start]
+        + "\n\n"
+        + generated_content.strip()
+        + "\n\n"
+        + readme[end:]
+    )
 
 
 def main() -> None:
@@ -124,26 +145,40 @@ def main() -> None:
         crate_dir = manifest_path.parent
         member_readme_path = crate_dir / "README.md"
 
-        # Preserve hand-written crate READMEs.
+        handwritten_readme = None
+        # Preserve hand-written crate READMEs unless they opt in to a generated versioning section.
         if member_readme_path.exists():
             existing_content = member_readme_path.read_text()
             if not existing_content.startswith(GENERATED_HEADER):
-                print(f"Skipping {name}: existing README without generated header")
-                continue
+                if (
+                    GENERATED_SECTION_START not in existing_content
+                    and GENERATED_SECTION_END not in existing_content
+                ):
+                    print(f"Skipping {name}: existing README without generated header")
+                    continue
+                handwritten_readme = existing_content
 
         crate_version = package["version"]
         relative_crate_path = crate_dir.relative_to(workspace_root)
         source_url = f"{REPO_URL}/blob/{ruff_version}/{relative_crate_path}"
 
         ruff_crates_io_url = f"https://crates.io/crates/ruff/{ruff_version}"
-        member_readme_content = MEMBER_TEMPLATE.format(
-            GENERATED_HEADER=GENERATED_HEADER,
-            name=name,
+        member_versioning_content = MEMBER_VERSIONING_TEMPLATE.format(
             crate_version=crate_version,
             ruff_version=ruff_version,
             ruff_crates_io_url=ruff_crates_io_url,
             source_url=source_url,
         )
+        if handwritten_readme is None:
+            member_readme_content = MEMBER_TEMPLATE.format(
+                GENERATED_HEADER=GENERATED_HEADER,
+                name=name,
+                versioning=member_versioning_content,
+            )
+        else:
+            member_readme_content = replace_generated_section(
+                handwritten_readme, member_versioning_content
+            )
         member_readme_path.write_text(member_readme_content)
         generated_paths.append(member_readme_path)
 
