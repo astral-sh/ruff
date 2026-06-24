@@ -1200,61 +1200,76 @@ fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481_preview() -> Re
 }
 
 #[test]
-fn rule_names_in_cli_require_preview() -> Result<()> {
-    let fixture = CliTest::new()?;
+fn rule_name_selector_cli_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
 
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .args(["--select", "unused-import", "-"])
-        .pass_stdin("import os\n"), @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "unused-import"]), @"
+    success: false
+    exit_code: 2
     ----- stdout -----
-    All checks passed!
 
     ----- stderr -----
-    warning: Selection `unused-import` has no effect because preview is not enabled.
+    ruff failed
+      Cause: Rule name `unused-import` used as selector with preview disabled in `select` from the CLI
     ");
 
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .args(["--select", "unused-import", "--preview", "-"])
-        .pass_stdin("import os\n"), @"
+    Ok(())
+}
+
+#[test]
+fn rule_name_selector_cli_preview_enabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "unused-import", "--preview"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:8: unused-import: [*] `os` imported but unused
+    test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
 
-    fixture.write_file("test.py", "import os\n")?;
+    Ok(())
+}
 
-    for args in [
-        ["--extend-select", "unused-import"],
-        ["--ignore", "unused-import"],
-        ["--fixable", "unused-import"],
-        ["--extend-fixable", "unused-import"],
-        ["--unfixable", "unused-import"],
-        ["--config", "lint.extend-safe-fixes=['unused-import']"],
-        ["--config", "lint.extend-unsafe-fixes=['unused-import']"],
-        ["--per-file-ignores", "test.py:unused-import"],
-        ["--extend-per-file-ignores", "test.py:unused-import"],
-    ] {
-        let output = fixture
-            .check_command()
-            .args(["--select", "F401"])
-            .args(args)
-            .arg("test.py")
-            .output()?;
-        assert_eq!(
-            str::from_utf8(&output.stderr)?,
-            "warning: Selection `unused-import` has no effect because preview is not enabled.\n",
-            "arguments: {args:?}"
-        );
-    }
+#[test]
+fn rule_name_selector_config_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file("ruff.toml", r#"lint = { select = ["unused-import"] }"#)?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Rule name `unused-import` used as selector with preview disabled in `select` from [TMP]/ruff.toml
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_name_selector_config_preview_enabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, select = ["unused-import"] }"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

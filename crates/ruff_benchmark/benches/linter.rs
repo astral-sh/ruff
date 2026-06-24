@@ -137,7 +137,7 @@ fn benchmark_all_rules(criterion: &mut Criterion) {
 }
 
 fn benchmark_preview_rules(criterion: &mut Criterion) {
-    let mut rules: RuleTable = RuleSelector::All.all_rules(PreviewMode::Enabled).collect();
+    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
 
     disable_io_rules(&mut rules);
 
