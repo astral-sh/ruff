@@ -2337,6 +2337,23 @@ class WritableSelfProperty:
 
 static_assert(is_subtype_of(WritableSelfProperty, HasWritableSelfProperty))
 static_assert(is_assignable_to(WritableSelfProperty, HasWritableSelfProperty))
+
+class PropertyWithSelfSetter:
+    @property
+    def x(self) -> object:
+        return self
+
+    @x.setter
+    def x(self, value: Self) -> None: ...
+
+class HasConcretePropertySetter(Protocol):
+    @property
+    def x(self) -> object: ...
+    @x.setter
+    def x(self, value: PropertyWithSelfSetter) -> None: ...
+
+static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
+static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
 ## Variance of generic protocols with `Final` members
