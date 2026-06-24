@@ -3549,6 +3549,25 @@ impl<'db> Type<'db> {
             policy: MemberLookupPolicy,
             receiver: Option<Type<'db>>,
         ) -> PlaceAndQualifiers<'db> {
+            fn promote_inferred_attribute_class_literals<'db>(
+                db: &'db dyn Db,
+                result: PlaceAndQualifiers<'db>,
+            ) -> PlaceAndQualifiers<'db> {
+                let should_promote = matches!(
+                    result.place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Inferred,
+                        ..
+                    })
+                ) && !result.qualifiers.contains(TypeQualifiers::FINAL);
+
+                if should_promote {
+                    result.map_type(|ty| ty.promote_class_literals(db))
+                } else {
+                    result
+                }
+            }
+
             fn instance_like_member_lookup<'db>(
                 db: &'db dyn Db,
                 this: Type<'db>,
@@ -3598,23 +3617,8 @@ impl<'db> Type<'db> {
                 let result = this.fallback_to_getattr(db, name, result, policy);
                 // An inferred attribute accessed through an instance can resolve to an override
                 // on a subclass, so an exact class object is not a safe public type here.
-                let should_promote_class_literals =
-                    matches!(
-                        result.place,
-                        Place::Defined(DefinedPlace {
-                            origin: TypeOrigin::Inferred,
-                            ..
-                        })
-                    ) && !result.qualifiers.contains(TypeQualifiers::FINAL);
-
-                result.map_type(|ty| {
-                    let ty = ty.bind_self_typevars(db, receiver);
-                    if should_promote_class_literals {
-                        ty.promote_class_literals(db)
-                    } else {
-                        ty
-                    }
-                })
+                let result = result.map_type(|ty| ty.bind_self_typevars(db, receiver));
+                promote_inferred_attribute_class_literals(db, result)
             }
 
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);
@@ -4099,6 +4103,15 @@ impl<'db> Type<'db> {
                     // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                     // lookup to hit the catch-all that only checks the meta-type (the metaclass).
                     let result = this.fallback_to_getattr(db, &name, result, policy);
+                    // Unlike a specific class literal, `type[C]` can represent any subclass of
+                    // `C`, unless a `TypeVar` upper bound normalizes to a final class.
+                    let result = if let Type::SubclassOf(subclass_of) = this
+                        && subclass_of.exact_typevar_upper_bound(db).is_none()
+                    {
+                        promote_inferred_attribute_class_literals(db, result)
+                    } else {
+                        result
+                    };
 
                     // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
                     // (which is at least `type`). Attributes resolved via `type`'s descriptors

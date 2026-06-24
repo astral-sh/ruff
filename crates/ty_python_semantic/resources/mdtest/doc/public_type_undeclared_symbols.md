@@ -27,7 +27,8 @@ subclass can override an undeclared class attribute, so a method that accesses t
 class object remains exact:
 
 ```py
-from typing import Final
+from typing import Final, NewType, TypeVar, final
+from typing_extensions import assert_never
 
 class Response: ...
 class HtmlResponse(Response): ...
@@ -42,6 +43,46 @@ class TestHtmlResponse(TestResponse):
     response_class = HtmlResponse
 
 reveal_type(TestResponse.response_class)  # revealed: <class 'Response'>
+
+def check_type(response: type[TestResponse]) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+T = TypeVar("T", bound=TestResponse)
+
+def check_typevar(response: T) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+TClass = TypeVar("TClass", bound=type[TestResponse])
+
+def check_typevar_class(response: TClass) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+@final
+class FinalTestResponse:
+    response_class = Response
+
+    @classmethod
+    def check(cls) -> None:
+        if cls.response_class is not Response:
+            assert_never(cls.response_class)
+
+TFinal = TypeVar("TFinal", bound=FinalTestResponse)
+
+def check_final_typevar(response: type[TFinal]) -> None:
+    reveal_type(response.response_class)  # revealed: <class 'Response'>
+
+NewTestResponse = NewType("NewTestResponse", TestResponse)
+
+def check_newtype(response: NewTestResponse) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+class ResponseMeta(type):
+    response_class = Response
+
+NewResponseMeta = NewType("NewResponseMeta", ResponseMeta)
+
+def check_newtype_class(response: NewResponseMeta) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
 
 class AnnotatedResponse:
     response_class: type[Response] = Response
