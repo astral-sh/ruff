@@ -92,6 +92,35 @@ while isinstance(x, B):
 class A: ...
 ```
 
+## Literal widening during cycle recovery
+
+Once a recursively growing group of integer literals widens to `int`, later iterations must not
+reintroduce individual literals. Otherwise, the inferred type continues changing and the cycle never
+converges. This is a reduced regression test from SciPy's iterative sparse solvers.
+
+```py
+def solve(maxiter, a, b, c, d, e):
+    iteration = 0
+    stop = 0
+    while iteration < maxiter:
+        iteration = iteration + 1
+        if iteration >= maxiter:
+            stop = 7
+        if a:
+            stop = 6
+        if b:
+            stop = 5
+        if c:
+            stop = 4
+        if d:
+            stop = 3
+        if e:
+            stop = 2
+        if stop > 0:
+            break
+    return stop
+```
+
 ## Self-referential bare type alias
 
 ```toml

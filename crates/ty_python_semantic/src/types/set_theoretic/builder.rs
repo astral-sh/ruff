@@ -381,7 +381,8 @@ impl<'db> UnionElement<'db> {
         cycle_recovery: bool,
     ) -> ReduceResult<'db> {
         if cycle_recovery {
-            // Preserve literal widening using exact class identity without running relation queries.
+            // A widened literal group must absorb matching literals from later iterations for
+            // recovery to converge. Preserve that exact fallback reduction without relation queries.
             return match self {
                 UnionElement::Type(existing) => ReduceResult::Type(*existing),
                 UnionElement::IntLiterals(_) => {
@@ -982,7 +983,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Adding `object` to a union results in `object`.
-            ty if ty.is_object() => self.collapse_to_object(),
+            ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
             _ => self.push_type(ty, seen_aliases),
         }
     }
@@ -1028,7 +1029,7 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // `object` already contains every possible union element.
-            if element_type == Type::object() {
+            if !self.cycle_recovery && element_type == Type::object() {
                 return;
             }
 
@@ -1045,10 +1046,11 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if element_type
-                .as_literal_value_kind()
-                .zip(bool_pair(ty))
-                .is_some_and(|(element, pair)| element == pair)
+            if !self.cycle_recovery
+                && element_type
+                    .as_literal_value_kind()
+                    .zip(bool_pair(ty))
+                    .is_some_and(|(element, pair)| element == pair)
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
                 return;
@@ -2008,6 +2010,29 @@ mod tests {
             enum_literal,
             enum_literal.expect_enum_literal().enum_class_instance(&db),
         );
+    }
+
+    #[test]
+    fn cycle_recovery_skips_other_redundancy_simplification() {
+        let db = setup_db();
+
+        for (left, right) in [
+            (Type::string_literal(&db, "literal"), Type::literal_string()),
+            (Type::bool_literal(true), KnownClass::Bool.to_instance(&db)),
+            (Type::int_literal(1), Type::object()),
+            (Type::bool_literal(true), Type::bool_literal(false)),
+        ] {
+            for (first, second) in [(left, right), (right, left)] {
+                let union = UnionBuilder::new(&db)
+                    .cycle_recovery(true)
+                    .add(first)
+                    .add(second)
+                    .build()
+                    .expect_union();
+                assert!(union.elements(&db).contains(&left));
+                assert!(union.elements(&db).contains(&right));
+            }
+        }
     }
 
     #[test]
