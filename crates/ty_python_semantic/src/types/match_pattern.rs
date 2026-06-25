@@ -15,7 +15,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionType, binding_type, equality_truthiness,
+    TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
 
@@ -50,30 +50,39 @@ fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> boo
         .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
 }
 
-/// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-fn is_typed_dict_pattern_domain(db: &dyn Db, ty: Type<'_>) -> bool {
+/// Return whether every value in `ty` belongs to a `TypedDict` domain accepted by `predicate`.
+fn typed_dict_pattern_domain_satisfies<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    predicate: &impl Fn(TypedDictType<'db>) -> bool,
+) -> bool {
     match ty.resolve_type_alias(db) {
-        Type::TypedDict(_) => true,
+        Type::TypedDict(typed_dict) => predicate(typed_dict),
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                is_typed_dict_pattern_domain(db, bound)
+                typed_dict_pattern_domain_satisfies(db, bound, predicate)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                 .elements(db)
                 .iter()
-                .all(|constraint| is_typed_dict_pattern_domain(db, *constraint)),
+                .all(|constraint| typed_dict_pattern_domain_satisfies(db, *constraint, predicate)),
             None => false,
         },
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| is_typed_dict_pattern_domain(db, *element)),
+            .all(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| is_typed_dict_pattern_domain(db, *element)),
+            .any(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
         _ => false,
     }
+}
+
+/// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
+fn is_typed_dict_pattern_domain(db: &dyn Db, ty: Type<'_>) -> bool {
+    typed_dict_pattern_domain_satisfies(db, ty, &|_| true)
 }
 
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
@@ -432,18 +441,16 @@ fn mapping_pattern_is_exhaustive(
     entries: &[MappingPatternEntryPredicateKind<'_>],
     subject_ty: Type<'_>,
 ) -> bool {
-    let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(db) else {
-        return false;
-    };
-
-    entries.iter().all(|entry| {
-        let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
-        let Some(key) = key_ty.as_string_literal() else {
-            return false;
-        };
-        typed_dict.item(db, key.value(db)).is_some_and(|field| {
-            field.is_required()
-                && pattern_is_exhaustive_for_subject(db, &entry.pattern, field.declared_ty)
+    typed_dict_pattern_domain_satisfies(db, subject_ty, &|typed_dict| {
+        entries.iter().all(|entry| {
+            let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
+            let Some(key) = key_ty.as_string_literal() else {
+                return false;
+            };
+            typed_dict.item(db, key.value(db)).is_some_and(|field| {
+                field.is_required()
+                    && pattern_is_exhaustive_for_subject(db, &entry.pattern, field.declared_ty)
+            })
         })
     })
 }

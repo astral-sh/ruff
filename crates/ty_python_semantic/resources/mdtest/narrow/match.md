@@ -833,8 +833,8 @@ field and every value pattern matches all values allowed for that field. The neg
 exercise three separate checks: an optional field, an unknown key, and a non-string key.
 
 ```py
-from typing import Any, Literal, TypedDict
-from ty_extensions import Unknown
+from typing import Any, Literal, Protocol, TypeVar, TypedDict
+from ty_extensions import Intersection, Unknown
 
 class RequiredPayload(TypedDict):
     tag: Literal["int"]
@@ -847,6 +847,16 @@ class DynamicPayload(TypedDict):
     any_value: Any
     unknown_value: Unknown
 
+class AlternatePayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class Marker(Protocol):
+    marker: int
+
+P = TypeVar("P", bound=RequiredPayload)
+Q = TypeVar("Q", RequiredPayload, AlternatePayload)
+
 def required_typed_dict_keys_are_exhaustive(value: RequiredPayload) -> int:
     match value:
         case {"tag": "int", "value": int()}:
@@ -855,6 +865,23 @@ def required_typed_dict_keys_are_exhaustive(value: RequiredPayload) -> int:
 def universal_nested_patterns_are_exhaustive(value: DynamicPayload) -> int:
     match value:
         case {"any_value": object(), "unknown_value": object()}:
+            return 1
+
+def bounded_typed_dict_mapping_is_exhaustive(value: P) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def constrained_typed_dict_mapping_is_exhaustive(value: Q) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def intersected_typed_dict_mapping_is_exhaustive(
+    value: Intersection[RequiredPayload, Marker],
+) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
             return 1
 
 def optional_key_is_not_exhaustive(
