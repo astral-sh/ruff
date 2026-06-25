@@ -88,6 +88,33 @@ def describe_two(value: LaterInvalid) -> None:
             pass
 ```
 
+## Alternate finite `__match_args__` limits
+
+```py
+from typing import Literal
+
+flag: bool = bool()
+
+class UnionArgs:
+    __match_args__: tuple[Literal["x"]] | tuple[Literal["x"], Literal["y"]] = ("x",) if flag else ("x", "y")
+
+def describe_union(value: UnionArgs) -> None:
+    match value:
+        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'UnionArgs'>`: expected 2, got 3"
+        case UnionArgs(_, _, _):
+            pass
+
+def describe_conditional(flag: bool) -> None:
+    class ConditionalArgs:
+        if flag:
+            __match_args__ = ("x",)
+
+    match ConditionalArgs():
+        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'ConditionalArgs'>`: expected 1, got 2"
+        case ConditionalArgs(_, _):
+            pass
+```
+
 ## Unknown `__match_args__` tuple length (no error)
 
 ```py

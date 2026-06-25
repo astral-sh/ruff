@@ -280,8 +280,8 @@ enum ClassMatchArgs<'db> {
     Undefined,
     /// `__match_args__` is definitely bound with this type.
     Defined(Type<'db>),
-    /// `__match_args__` is defined along some control-flow paths but not others.
-    PossiblyUndefined,
+    /// `__match_args__` has this type along some control-flow paths and is undefined along others.
+    PossiblyUndefined(Type<'db>),
 }
 
 /// The value supplied to one positional subpattern in a class pattern.
@@ -309,7 +309,7 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
                 provenance,
                 ..
             },
-        ) if place.is_definitely_defined() => {
+        ) => {
             if origin.is_declared()
                 && provenance.definition().is_some_and(|definition| {
                     let file = definition.file(db);
@@ -322,25 +322,29 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
             {
                 ClassMatchArgs::Undefined
             } else {
-                ClassMatchArgs::Defined(if origin.is_declared() {
+                let ty = if origin.is_declared() {
                     ty
                 } else {
                     provenance
                         .definition()
                         .map_or(ty, |definition| binding_type(db, definition))
-                })
+                };
+                if place.is_definitely_defined() {
+                    ClassMatchArgs::Defined(ty)
+                } else {
+                    ClassMatchArgs::PossiblyUndefined(ty)
+                }
             }
         }
-        Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
         Place::Undefined => ClassMatchArgs::Undefined,
     }
 }
 
 /// Return whether `class` inherits Python's special match-self class-pattern behavior.
 ///
-/// Callers must first establish that `__match_args__` is statically absent. A definite definition
-/// overrides match-self behavior, while a conditional definition makes it runtime-dependent;
-/// neither case should consult this flag.
+/// Callers use this only for runtime states in which `__match_args__` is absent. A definite
+/// definition overrides match-self behavior, while a conditional definition only enables it on
+/// paths where the member is not bound.
 fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
     class
         .iter_mro(db)
@@ -376,7 +380,7 @@ pub(crate) enum ClassPatternPositionalResult {
 /// Validate the positional subpatterns accepted by `class`.
 ///
 /// `None` means that the result cannot be determined statically, as for a valid variable-length
-/// `__match_args__` tuple or a conditionally defined `__match_args__` member.
+/// `__match_args__` tuple or alternate states without one finite positional limit.
 pub(crate) fn class_pattern_positional_result(
     db: &dyn Db,
     class: ClassLiteral<'_>,
@@ -388,30 +392,59 @@ pub(crate) fn class_pattern_positional_result(
         }
         ClassMatchArgs::Undefined => Some(ClassPatternPositionalResult::Limit(0)),
         ClassMatchArgs::Defined(match_args) => {
-            let match_args = match_args.resolve_type_alias(db);
-            if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
-                let tuple = tuple.as_fixed_length()?;
-                if let Some(index) = tuple
-                    .elements_slice()
-                    .iter()
-                    .take(positional_count)
-                    .position(|element| {
-                        element.is_disjoint_from(db, KnownClass::Str.to_instance(db))
-                    })
-                {
-                    Some(ClassPatternPositionalResult::InvalidElement(index))
-                } else {
-                    Some(ClassPatternPositionalResult::Limit(tuple.len()))
-                }
-            } else if match_args.tuple_instance_spec(db).is_some()
-                || match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
-            {
-                Some(ClassPatternPositionalResult::Limit(0))
-            } else {
-                None
-            }
+            match_args_positional_result(db, match_args, positional_count)
         }
-        ClassMatchArgs::PossiblyUndefined => None,
+        ClassMatchArgs::PossiblyUndefined(match_args) => {
+            let ClassPatternPositionalResult::Limit(defined_limit) =
+                match_args_positional_result(db, match_args, positional_count)?
+            else {
+                return None;
+            };
+            let undefined_limit = usize::from(class_has_match_self_flag(db, class));
+            Some(ClassPatternPositionalResult::Limit(
+                defined_limit.max(undefined_limit),
+            ))
+        }
+    }
+}
+
+fn match_args_positional_result(
+    db: &dyn Db,
+    match_args: Type<'_>,
+    positional_count: usize,
+) -> Option<ClassPatternPositionalResult> {
+    let match_args = match_args.resolve_type_alias(db);
+    if let Type::Union(union) = match_args {
+        return union
+            .elements(db)
+            .iter()
+            .try_fold(0, |maximum, element| {
+                match match_args_positional_result(db, *element, positional_count)? {
+                    ClassPatternPositionalResult::Limit(limit) => Some(maximum.max(limit)),
+                    ClassPatternPositionalResult::InvalidElement(_) => None,
+                }
+            })
+            .map(ClassPatternPositionalResult::Limit);
+    }
+
+    if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
+        let tuple = tuple.as_fixed_length()?;
+        if let Some(index) = tuple
+            .elements_slice()
+            .iter()
+            .take(positional_count)
+            .position(|element| element.is_disjoint_from(db, KnownClass::Str.to_instance(db)))
+        {
+            Some(ClassPatternPositionalResult::InvalidElement(index))
+        } else {
+            Some(ClassPatternPositionalResult::Limit(tuple.len()))
+        }
+    } else if match_args.tuple_instance_spec(db).is_some()
+        || match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+    {
+        Some(ClassPatternPositionalResult::Limit(0))
+    } else {
+        None
     }
 }
 
@@ -455,7 +488,7 @@ pub(crate) fn class_pattern_positional_sources(
         ClassMatchArgs::Defined(match_args) => match_args
             .exact_tuple_instance_spec(db)
             .and_then(|tuple| tuple.as_fixed_length().cloned()),
-        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
+        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined(_) => None,
     };
 
     (0..positional_count)
