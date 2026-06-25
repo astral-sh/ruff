@@ -984,6 +984,12 @@ struct NoqaEdit<'a> {
     line_ending: LineEnding,
     reason: Option<&'a str>,
     blank_line: bool,
+    /// When true the edit range ends right after the last noqa code (not at
+    /// the line end), so trailing content (e.g. `# fmt:skip` or a reason
+    /// string) is left in place by the surrounding `add_noqa_inner` loop.
+    /// In that case `write` must not emit a line ending because the original
+    /// newline is already preserved past the edit range.
+    suppress_line_ending: bool,
 }
 
 impl NoqaEdit<'_> {
@@ -1017,7 +1023,9 @@ impl NoqaEdit<'_> {
         if let Some(reason) = self.reason {
             write!(writer, " {reason}").unwrap();
         }
-        write!(writer, "{}", self.line_ending.as_str()).unwrap();
+        if !self.suppress_line_ending {
+            write!(writer, "{}", self.line_ending.as_str()).unwrap();
+        }
     }
 }
 
@@ -1040,6 +1048,7 @@ fn generate_noqa_edit<'a>(
     let edit_range;
     let codes;
     let blank_line;
+    let suppress_line_ending;
 
     // Add codes.
     match directive {
@@ -1048,6 +1057,7 @@ fn generate_noqa_edit<'a>(
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
+            suppress_line_ending = false;
         }
         Some(Directive::Codes(existing_codes)) => {
             // find trimmed line without the noqa
@@ -1055,8 +1065,18 @@ fn generate_noqa_edit<'a>(
                 .slice(TextRange::new(line_range.start(), existing_codes.start()))
                 .trim_end();
             blank_line = false;
-            edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+            // End the edit range at the end of the existing codes, not at the
+            // end of the line. Any trailing content after the noqa directive
+            // (e.g. `# fmt:skip` or a human-written reason string) is
+            // preserved by the add_noqa_inner loop which copies from
+            // `edit.end()` to the next edit (or EOF). Since that copy already
+            // includes the original newline we must not emit one ourselves.
+            edit_range = TextRange::new(
+                TextSize::of(trimmed_line),
+                existing_codes.end() - line_range.start(),
+            ) + line_range.start();
             codes = Some(existing_codes);
+            suppress_line_ending = true;
         }
         Some(Directive::All(_)) => return None,
     }
@@ -1068,6 +1088,7 @@ fn generate_noqa_edit<'a>(
         line_ending,
         reason,
         blank_line,
+        suppress_line_ending,
     })
 }
 
@@ -1281,7 +1302,7 @@ mod tests {
         lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
-    use crate::rules::pyflakes::rules::UnusedVariable;
+    use crate::rules::pyflakes::rules::{UnusedImport, UnusedVariable};
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
     use crate::suppression::Suppressions;
     use crate::{Edit, Violation};
@@ -2972,6 +2993,87 @@ mod tests {
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
+    }
+
+    #[test]
+    fn add_noqa_preserves_trailing_reason_after_existing_codes() {
+        // `--add-noqa` on a line with an existing `# noqa: RUF100 with a trailing reason`
+        // must keep the trailing text; previously it was silently deleted.
+        let path = Path::new("/tmp/foo.txt");
+        // "import math  # noqa: E741 with a trailing reason\n"
+        //  0123456789012345678901234567890123456789012345678901
+        //  0         1         2         3         4         5
+        // comment range: 13..25 ("# noqa: E741")
+        let contents = "import math  # noqa: E741 with a trailing reason\n";
+        let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(13), TextSize::from(25))]);
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = [UnusedImport {
+            name: "math".to_string(),
+            context: None,
+            multiple: false,
+        }
+        .into_diagnostic(
+            TextRange::new(TextSize::from(0), TextSize::from(0)),
+            &source_file,
+        )];
+        let (count, output) = add_noqa_inner(
+            path,
+            &messages,
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        // F401 is added; trailing text is preserved.
+        assert_eq!(
+            output,
+            "import math  # noqa: E741, F401 with a trailing reason\n"
+        );
+    }
+
+    #[test]
+    fn add_noqa_preserves_fmt_skip_after_existing_codes() {
+        // `--add-noqa` on a line that already has `# noqa: RUF100 # fmt:skip`
+        // must not drop the `# fmt:skip` pragma.
+        let path = Path::new("/tmp/foo.txt");
+        // "import sys  # noqa: E741 # fmt:skip\n"
+        //  0          1         2         3
+        //  0123456789012345678901234567890123456
+        // comment range: 12..25 ("# noqa: E741")
+        let contents = "import sys  # noqa: E741 # fmt:skip\n";
+        let noqa_line_for = NoqaMapping::default();
+        let comment_ranges =
+            CommentRanges::new(vec![TextRange::new(TextSize::from(12), TextSize::from(24))]);
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = [UnusedImport {
+            name: "sys".to_string(),
+            context: None,
+            multiple: false,
+        }
+        .into_diagnostic(
+            TextRange::new(TextSize::from(0), TextSize::from(0)),
+            &source_file,
+        )];
+        let (count, output) = add_noqa_inner(
+            path,
+            &messages,
+            &Locator::new(contents),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+            None,
+            &Suppressions::default(),
+        );
+        assert_eq!(count, 1);
+        // F401 is added; `# fmt:skip` pragma is preserved.
+        assert_eq!(output, "import sys  # noqa: E741, F401 # fmt:skip\n");
     }
 
     #[test]
