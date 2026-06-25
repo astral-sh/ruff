@@ -236,6 +236,13 @@ def broad_element_type_with_unknown(values: dict[str, int]):
 
 ## Correlated constrained type variables
 
+Membership in a tuple containing a constrained type variable can preserve the relationship between
+that type variable and a broader subject type. In the first example, a successful membership test
+proves that `x` has the same enum-literal constraint as `y`, so returning `x` as `T` is valid.
+Equality compatibility alone is not enough to establish that relationship: `AlwaysEqual` can compare
+equal to every `U`, but it does not become a `U`, so the return in the second example remains
+invalid.
+
 ```py
 from enum import Enum
 from typing import Literal, TypeVar
@@ -388,8 +395,10 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
 ## Custom containment methods
 
 Python uses `__contains__` when a class defines it. The method can return `True` for values that the
-class would never produce during iteration, but membership tests are currently narrowed from the
-iterable element type. The result below is therefore too narrow and documents a known limitation:
+class would never produce during iteration. We don't yet model this distinction. Instead, we
+determine possible membership matches from the class's iterable element type. The inferred type
+below therefore excludes `Payload`, even though `__contains__` returns `True` for it. This documents
+a known limitation:
 
 ```py
 from typing import Literal, TypedDict
