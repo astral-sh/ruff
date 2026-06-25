@@ -23,8 +23,8 @@ use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, default_lint_registry,
-    lint::RuleSelection,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, SemanticSettings,
+    default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -39,6 +39,7 @@ struct TestDb {
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
     analysis_settings: Arc<AnalysisSettings>,
+    semantic_settings: Arc<SemanticSettings>,
 }
 
 impl TestDb {
@@ -54,6 +55,7 @@ impl TestDb {
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
             analysis_settings: AnalysisSettings::default().into(),
+            semantic_settings: SemanticSettings::default().into(),
         }
     }
 }
@@ -117,6 +119,10 @@ impl SemanticDb for TestDb {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
+    }
+
+    fn semantic_settings(&self, _file: File) -> &SemanticSettings {
+        &self.semantic_settings
     }
 
     fn lint_registry(&self) -> &LintRegistry {
