@@ -5132,7 +5132,6 @@
         "pytest-erroneous-use-fixtures-on-fixture",
         "pytest-extraneous-scope-function",
         "pytest-fail-without-message",
-        "pytest-fixture-autouse",
         "pytest-fixture-finalizer-callback",
         "pytest-fixture-incorrect-parentheses-style",
         "pytest-fixture-param-without-value",
