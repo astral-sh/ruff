@@ -397,6 +397,23 @@ def describe(n: NoMatch) -> None:
             pass
 ```
 
+## Dataclass synthesis after an annotation-only `__match_args__`
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar, Literal
+
+@dataclass
+class Point:
+    __match_args__: ClassVar[tuple[Literal["x"]]]
+    x: int
+
+def describe(point: Point) -> None:
+    match point:
+        case Point(_):
+            pass
+```
+
 ## Built-in match-self classes
 
 ```python

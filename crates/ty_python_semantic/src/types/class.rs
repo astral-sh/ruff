@@ -1884,6 +1884,14 @@ impl<'db> ClassType<'db> {
         }
 
         if place_table(db, body_scope).symbol_id(name).is_some() {
+            if let Some(synthesized_member) = class_literal.own_synthesized_member(
+                db,
+                specialization,
+                inherited_generic_context,
+                name,
+            ) {
+                return Member::definitely_declared(synthesized_member);
+            }
             Member::unbound()
         } else {
             self.own_class_member(db, inherited_generic_context, name)
