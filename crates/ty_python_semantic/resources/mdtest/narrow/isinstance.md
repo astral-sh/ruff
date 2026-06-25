@@ -937,6 +937,20 @@ def _(xs: OpenItem | list[OpenItem]):
         reveal_type(xs)  # revealed: (OpenItem & ~list[Unknown]) | (list[OpenItem] & ~list[Unknown])
 ```
 
+#### Exhaustiveness checking
+
+In relaxed mode, exhaustiveness checking is harder to achieve:
+
+```py
+# TODO
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
+def _(xs: list[str] | set[str]) -> str:
+    if isinstance(xs, list):
+        return "it's a list!"
+    elif isinstance(xs, set):
+        return "it's a set!"
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
