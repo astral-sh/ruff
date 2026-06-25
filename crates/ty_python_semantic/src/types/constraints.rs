@@ -5049,20 +5049,46 @@ impl SequentMap {
 
     /// Merges the sequents from another sequent map into this one.
     fn merge(&mut self, other: &Self) {
-        self.single_tautologies.extend(&other.single_tautologies);
-        self.pair_impossibilities
-            .extend(&other.pair_impossibilities);
-        for ((ante1, ante2), post) in &other.pair_implications {
-            self.pair_implications
-                .entry(Self::pair_key(*ante1, *ante2))
-                .or_default()
-                .extend(post);
+        if !other.single_tautologies.is_empty() {
+            if self.single_tautologies.is_empty() {
+                self.single_tautologies
+                    .clone_from(&other.single_tautologies);
+            } else {
+                self.single_tautologies.extend(&other.single_tautologies);
+            }
         }
-        for (ante, post) in &other.single_implications {
+
+        if !other.pair_impossibilities.is_empty() {
+            if self.pair_impossibilities.is_empty() {
+                self.pair_impossibilities
+                    .clone_from(&other.pair_impossibilities);
+            } else {
+                self.pair_impossibilities
+                    .extend(&other.pair_impossibilities);
+            }
+        }
+
+        if !other.pair_implications.is_empty() && self.pair_implications.is_empty() {
+            self.pair_implications.clone_from(&other.pair_implications);
+        } else if !other.pair_implications.is_empty() {
+            for ((ante1, ante2), post) in &other.pair_implications {
+                self.pair_implications
+                    .entry(Self::pair_key(*ante1, *ante2))
+                    .or_default()
+                    .extend(post);
+            }
+        }
+
+        if !other.single_implications.is_empty() && self.single_implications.is_empty() {
             self.single_implications
-                .entry(*ante)
-                .or_default()
-                .extend(post);
+                .clone_from(&other.single_implications);
+        } else if !other.single_implications.is_empty() {
+            for (ante, post) in &other.single_implications {
+                self.single_implications
+                    .entry(*ante)
+                    .or_default()
+                    .extend(post);
+            }
         }
     }
 
