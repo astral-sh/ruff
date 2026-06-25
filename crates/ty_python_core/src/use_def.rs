@@ -631,20 +631,22 @@ enum RetainedDefinitionState<'db> {
     Defined(Definition<'db>),
     DefinedUsed(Definition<'db>),
     Undefined,
-    UndefinedUsed,
     Deleted,
-    DeletedUsed,
 }
 
 impl<'db> RetainedDefinitionState<'db> {
     fn new(state: DefinitionState<'db>, used: bool) -> Self {
-        match (state, used) {
-            (DefinitionState::Defined(definition), false) => Self::Defined(definition),
-            (DefinitionState::Defined(definition), true) => Self::DefinedUsed(definition),
-            (DefinitionState::Undefined, false) => Self::Undefined,
-            (DefinitionState::Undefined, true) => Self::UndefinedUsed,
-            (DefinitionState::Deleted, false) => Self::Deleted,
-            (DefinitionState::Deleted, true) => Self::DeletedUsed,
+        match state {
+            DefinitionState::Defined(definition) if used => Self::DefinedUsed(definition),
+            DefinitionState::Defined(definition) => Self::Defined(definition),
+            DefinitionState::Undefined => {
+                debug_assert!(!used);
+                Self::Undefined
+            }
+            DefinitionState::Deleted => {
+                debug_assert!(!used);
+                Self::Deleted
+            }
         }
     }
 
@@ -653,16 +655,13 @@ impl<'db> RetainedDefinitionState<'db> {
             Self::Defined(definition) | Self::DefinedUsed(definition) => {
                 DefinitionState::Defined(definition)
             }
-            Self::Undefined | Self::UndefinedUsed => DefinitionState::Undefined,
-            Self::Deleted | Self::DeletedUsed => DefinitionState::Deleted,
+            Self::Undefined => DefinitionState::Undefined,
+            Self::Deleted => DefinitionState::Deleted,
         }
     }
 
     fn is_used(self) -> bool {
-        matches!(
-            self,
-            Self::DefinedUsed(_) | Self::UndefinedUsed | Self::DeletedUsed
-        )
+        matches!(self, Self::DefinedUsed(_))
     }
 }
 
