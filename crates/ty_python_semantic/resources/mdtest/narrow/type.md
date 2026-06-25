@@ -451,6 +451,25 @@ if type(custom_module) is CustomModule:
     reveal_type(custom_module)  # revealed: <module 'custom_module'> & CustomModule
 ```
 
+Narrowing a module to exactly `ModuleType` should retain the module literal's known members.
+`ModuleType`'s gradual `__getattr__` fallback must not make arbitrary missing members valid:
+
+`plain_module.py`:
+
+```py
+value = 1
+```
+
+`check_members.py`:
+
+```py
+from types import ModuleType
+import plain_module
+
+assert type(plain_module) is ModuleType
+plain_module.deprecated_name  # error: [unresolved-attribute]
+```
+
 ## Assignment expressions
 
 ```py

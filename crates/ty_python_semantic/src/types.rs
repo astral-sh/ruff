@@ -3621,7 +3621,26 @@ impl<'db> Type<'db> {
                         enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
+                        let has_module_literal = intersection
+                            .positive(db)
+                            .iter()
+                            .any(|element| matches!(element, Type::ModuleLiteral(_)));
                         intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                            // A module literal already includes the real `ModuleType` members that
+                            // apply to that module. Do not also consult the exact `ModuleType` arm:
+                            // typeshed gives it a gradual `__getattr__` that direct module-literal
+                            // lookup intentionally excludes.
+                            if has_module_literal
+                                && matches!(
+                                    elem,
+                                    Type::NominalInstance(instance)
+                                        if instance.is_exact()
+                                            && instance.has_known_class(db, KnownClass::ModuleType)
+                                )
+                            {
+                                return Place::Undefined.into();
+                            }
+
                             elem.member_lookup_with_policy_and_receiver(
                                 db,
                                 name_str.into(),
