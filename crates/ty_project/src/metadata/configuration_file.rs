@@ -80,12 +80,12 @@ impl ConfigurationFile {
 
 #[derive(Debug, Error)]
 pub enum ConfigurationFileError {
-    #[error("{path} is not a valid `ty.toml`: {source}")]
+    #[error("{path} is not a valid `ty.toml`")]
     InvalidTyToml {
         source: Box<TyTomlError>,
         path: SystemPathBuf,
     },
-    #[error("Failed to read `{path}`: {source}")]
+    #[error("Failed to read `{path}`")]
     FileReadError {
         #[source]
         source: std::io::Error,
