@@ -118,7 +118,7 @@ pub(crate) fn check_noqa(
     }
 
     // Diagnostics for unused/invalid range suppressions
-    suppressions.check_suppressions(context, locator);
+    suppressions.check_suppressions(context, locator, analyze_directives);
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.

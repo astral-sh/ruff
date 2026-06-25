@@ -2743,6 +2743,33 @@ fn add_ignore_multiple_codes() -> Result<()> {
 }
 
 #[test]
+fn unused_ignore_with_syntax_error() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        "value = 1  # ruff:ignore[unused-variable]\nbroken =\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:9: invalid-syntax: Expected an expression
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_multiline_diagnostic() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(

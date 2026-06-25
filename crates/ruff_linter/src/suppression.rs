@@ -398,7 +398,12 @@ impl Suppressions {
         }
     }
 
-    pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+    pub(crate) fn check_suppressions(
+        &self,
+        context: &LintContext,
+        locator: &Locator,
+        analyze_directives: bool,
+    ) {
         fn process_pending_diagnostics(
             key: Option<TextRange>,
             grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
@@ -488,7 +493,7 @@ impl Suppressions {
                 continue;
             }
 
-            if !suppression.used.get() {
+            if analyze_directives && !suppression.used.get() {
                 // UnusedNOQA
                 let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
