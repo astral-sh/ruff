@@ -6,9 +6,7 @@ use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
-use crate::types::equality::{
-    ComparisonOperator as EqualityOperator, EqualityInference, equality_inference,
-};
+use crate::types::equality::{ComparisonOperator as EqualityOperator, equality_result_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, LiteralValueType,
@@ -109,49 +107,18 @@ enum NonEqualityOperator {
     IsNot,
 }
 
-impl From<NonEqualityOperator> for ast::CmpOp {
-    fn from(value: NonEqualityOperator) -> Self {
-        match value {
-            NonEqualityOperator::Lt => ast::CmpOp::Lt,
-            NonEqualityOperator::LtE => ast::CmpOp::LtE,
-            NonEqualityOperator::Gt => ast::CmpOp::Gt,
-            NonEqualityOperator::GtE => ast::CmpOp::GtE,
-            NonEqualityOperator::In => ast::CmpOp::In,
-            NonEqualityOperator::NotIn => ast::CmpOp::NotIn,
-            NonEqualityOperator::Is => ast::CmpOp::Is,
-            NonEqualityOperator::IsNot => ast::CmpOp::IsNot,
-        }
-    }
-}
-
-/// Routes equality through its dedicated evaluator while sharing structural type dispatch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BinaryComparisonOperator {
-    Equality(EqualityOperator),
-    NonEquality(NonEqualityOperator),
-}
-
-impl BinaryComparisonOperator {
-    const fn from_ast(operator: ast::CmpOp) -> Self {
+impl NonEqualityOperator {
+    const fn from_ast(operator: ast::CmpOp) -> Option<Self> {
         match operator {
-            ast::CmpOp::Eq => BinaryComparisonOperator::Equality(EqualityOperator::Equality),
-            ast::CmpOp::NotEq => BinaryComparisonOperator::Equality(EqualityOperator::Inequality),
-            ast::CmpOp::Lt => BinaryComparisonOperator::NonEquality(NonEqualityOperator::Lt),
-            ast::CmpOp::LtE => BinaryComparisonOperator::NonEquality(NonEqualityOperator::LtE),
-            ast::CmpOp::Gt => BinaryComparisonOperator::NonEquality(NonEqualityOperator::Gt),
-            ast::CmpOp::GtE => BinaryComparisonOperator::NonEquality(NonEqualityOperator::GtE),
-            ast::CmpOp::In => BinaryComparisonOperator::NonEquality(NonEqualityOperator::In),
-            ast::CmpOp::NotIn => BinaryComparisonOperator::NonEquality(NonEqualityOperator::NotIn),
-            ast::CmpOp::Is => BinaryComparisonOperator::NonEquality(NonEqualityOperator::Is),
-            ast::CmpOp::IsNot => BinaryComparisonOperator::NonEquality(NonEqualityOperator::IsNot),
-        }
-    }
-
-    fn as_ast(self) -> ast::CmpOp {
-        match self {
-            BinaryComparisonOperator::Equality(EqualityOperator::Equality) => ast::CmpOp::Eq,
-            BinaryComparisonOperator::Equality(EqualityOperator::Inequality) => ast::CmpOp::NotEq,
-            BinaryComparisonOperator::NonEquality(operator) => operator.into(),
+            ast::CmpOp::Eq | ast::CmpOp::NotEq => None,
+            ast::CmpOp::Lt => Some(Self::Lt),
+            ast::CmpOp::LtE => Some(Self::LtE),
+            ast::CmpOp::Gt => Some(Self::Gt),
+            ast::CmpOp::GtE => Some(Self::GtE),
+            ast::CmpOp::In => Some(Self::In),
+            ast::CmpOp::NotIn => Some(Self::NotIn),
+            ast::CmpOp::Is => Some(Self::Is),
+            ast::CmpOp::IsNot => Some(Self::IsNot),
         }
     }
 }
@@ -183,31 +150,12 @@ pub(crate) struct UnsupportedComparisonError<'db> {
 pub(super) fn infer_binary_type_comparison<'db>(
     context: &InferContext<'db, '_>,
     left: Type<'db>,
-    operator: ast::CmpOp,
-    right: Type<'db>,
-    range: TextRange,
-    visitor: &BinaryComparisonVisitor<'db>,
-) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-    infer_binary_type_comparison_inner(
-        context,
-        left,
-        BinaryComparisonOperator::from_ast(operator),
-        right,
-        range,
-        visitor,
-    )
-}
-
-fn infer_binary_type_comparison_inner<'db>(
-    context: &InferContext<'db, '_>,
-    left: Type<'db>,
-    operator: BinaryComparisonOperator,
+    op: ast::CmpOp,
     right: Type<'db>,
     range: TextRange,
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let op = operator.as_ast();
 
     // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
     // language spec.
@@ -219,32 +167,18 @@ fn infer_binary_type_comparison_inner<'db>(
             infer_membership_test_comparison(context, left, right, op, range)
         };
 
-        match operator {
-            BinaryComparisonOperator::Equality(EqualityOperator::Equality) => {
-                rich_comparison(RichCompareOperator::Eq)
-            }
-            BinaryComparisonOperator::Equality(EqualityOperator::Inequality) => {
-                rich_comparison(RichCompareOperator::Ne)
-            }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::Lt) => {
-                rich_comparison(RichCompareOperator::Lt)
-            }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::LtE) => {
-                rich_comparison(RichCompareOperator::Le)
-            }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::Gt) => {
-                rich_comparison(RichCompareOperator::Gt)
-            }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::GtE) => {
-                rich_comparison(RichCompareOperator::Ge)
-            }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::In) => {
-                membership_test_comparison(MembershipTestCompareOperator::In, range)
-            }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::NotIn) => {
+        match op {
+            ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
+            ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
+            ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
+            ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
+            ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
+            ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
+            ast::CmpOp::In => membership_test_comparison(MembershipTestCompareOperator::In, range),
+            ast::CmpOp::NotIn => {
                 membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
             }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::Is) => {
+            ast::CmpOp::Is => {
                 if left.is_disjoint_from(db, right) {
                     Ok(Type::bool_literal(false))
                 } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
@@ -253,7 +187,7 @@ fn infer_binary_type_comparison_inner<'db>(
                     Ok(KnownClass::Bool.to_instance(db))
                 }
             }
-            BinaryComparisonOperator::NonEquality(NonEqualityOperator::IsNot) => {
+            ast::CmpOp::IsNot => {
                 if left.is_disjoint_from(db, right) {
                     Ok(Type::bool_literal(true))
                 } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
@@ -265,13 +199,15 @@ fn infer_binary_type_comparison_inner<'db>(
         }
     };
 
-    if let BinaryComparisonOperator::Equality(operator) = operator {
-        match equality_inference(db, left, right, operator) {
-            EqualityInference::AlwaysTrue => return Ok(Type::bool_literal(true)),
-            EqualityInference::AlwaysFalse => return Ok(Type::bool_literal(false)),
-            EqualityInference::AmbiguousBoolean => return Ok(KnownClass::Bool.to_instance(db)),
-            EqualityInference::NeedsResultInference => {}
-        }
+    let equality_operator = match op {
+        ast::CmpOp::Eq => Some(EqualityOperator::Equality),
+        ast::CmpOp::NotEq => Some(EqualityOperator::Inequality),
+        _ => None,
+    };
+    if let Some(operator) = equality_operator
+        && let Some(truthiness) = equality_result_truthiness(db, left, right, operator)
+    {
+        return Ok(Type::from_truthiness(db, truthiness));
     }
 
     let comparison_result = match (left, right) {
@@ -498,9 +434,8 @@ fn infer_binary_type_comparison_inner<'db>(
             }
         }
 
-        (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => match operator {
-            BinaryComparisonOperator::Equality(_) => None,
-            BinaryComparisonOperator::NonEquality(operator) => match (
+        (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
+            NonEqualityOperator::from_ast(op).and_then(|operator| match (
                 left_literal.kind(),
                 right_literal.kind(),
             ) {
@@ -654,8 +589,8 @@ fn infer_binary_type_comparison_inner<'db>(
                 }
 
                 _ => None,
-            },
-        },
+            })
+        }
 
         (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2)) => nominal1
             .tuple_spec(db)
@@ -669,29 +604,14 @@ fn infer_binary_type_comparison_inner<'db>(
                     })
                 };
 
-                match operator {
-                    BinaryComparisonOperator::Equality(EqualityOperator::Equality) => {
-                        tuple_rich_comparison(RichCompareOperator::Eq)
-                    }
-                    BinaryComparisonOperator::Equality(EqualityOperator::Inequality) => {
-                        tuple_rich_comparison(RichCompareOperator::Ne)
-                    }
-                    BinaryComparisonOperator::NonEquality(NonEqualityOperator::Lt) => {
-                        tuple_rich_comparison(RichCompareOperator::Lt)
-                    }
-                    BinaryComparisonOperator::NonEquality(NonEqualityOperator::LtE) => {
-                        tuple_rich_comparison(RichCompareOperator::Le)
-                    }
-                    BinaryComparisonOperator::NonEquality(NonEqualityOperator::Gt) => {
-                        tuple_rich_comparison(RichCompareOperator::Gt)
-                    }
-                    BinaryComparisonOperator::NonEquality(NonEqualityOperator::GtE) => {
-                        tuple_rich_comparison(RichCompareOperator::Ge)
-                    }
-                    BinaryComparisonOperator::NonEquality(
-                        membership @ (NonEqualityOperator::In
-                        | NonEqualityOperator::NotIn),
-                    ) => {
+                match op {
+                    ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
+                    ast::CmpOp::NotEq => tuple_rich_comparison(RichCompareOperator::Ne),
+                    ast::CmpOp::Lt => tuple_rich_comparison(RichCompareOperator::Lt),
+                    ast::CmpOp::LtE => tuple_rich_comparison(RichCompareOperator::Le),
+                    ast::CmpOp::Gt => tuple_rich_comparison(RichCompareOperator::Gt),
+                    ast::CmpOp::GtE => tuple_rich_comparison(RichCompareOperator::Ge),
+                    ast::CmpOp::In | ast::CmpOp::NotIn => {
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 
@@ -720,22 +640,14 @@ fn infer_binary_type_comparison_inner<'db>(
                         }
 
                         if any_eq {
-                            Ok(Type::bool_literal(
-                                membership == NonEqualityOperator::In,
-                            ))
+                            Ok(Type::bool_literal(op.is_in()))
                         } else if !any_ambiguous {
-                            Ok(Type::bool_literal(
-                                membership == NonEqualityOperator::NotIn,
-                            ))
+                            Ok(Type::bool_literal(op.is_not_in()))
                         } else {
                             Ok(KnownClass::Bool.to_instance(db))
                         }
                     }
-                    BinaryComparisonOperator::NonEquality(
-                        operator
-                        @ (NonEqualityOperator::Is
-                        | NonEqualityOperator::IsNot),
-                    ) => {
+                    ast::CmpOp::Is | ast::CmpOp::IsNot => {
                         // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                         // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
                         let eq_result =
@@ -749,9 +661,7 @@ fn infer_binary_type_comparison_inner<'db>(
                             // for `is` and `is not` comparisons. This is an implementation detail
                             // for how we determine the truthiness of a type.
                             ty => match ty.bool(db) {
-                                Truthiness::AlwaysFalse => Type::bool_literal(
-                                    operator == NonEqualityOperator::IsNot,
-                                ),
+                                Truthiness::AlwaysFalse => Type::bool_literal(op.is_is_not()),
                                 _ => KnownClass::Bool.to_instance(db),
                             },
                         })
