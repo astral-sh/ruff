@@ -358,6 +358,29 @@ def describe(derived: Derived, from_meta: FromMeta) -> None:
             pass
 ```
 
+## Runtime `TYPE_CHECKING` reachability
+
+```py
+from typing import TYPE_CHECKING
+
+class RuntimeOnly:
+    if not TYPE_CHECKING:
+        __match_args__ = ("value",)
+
+class CheckingOnly:
+    if TYPE_CHECKING:
+        __match_args__ = ("value",)
+
+def describe(runtime: RuntimeOnly, checking: CheckingOnly) -> None:
+    match runtime:
+        case RuntimeOnly(_):
+            pass
+
+    match checking:
+        case CheckingOnly(_):  # error: [invalid-match-pattern]
+            pass
+```
+
 ## Dataclass with `match_args=False`
 
 ```python

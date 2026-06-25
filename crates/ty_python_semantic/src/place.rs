@@ -8,7 +8,8 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
+    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_runtime,
+    evaluate_reachability_with_cache,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
@@ -676,6 +677,20 @@ pub(super) fn place_from_bindings<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         None,
+        BindingReachability::Typing,
+    )
+}
+
+pub(super) fn place_from_runtime_bindings<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl(
+        db,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        None,
+        BindingReachability::Runtime,
     )
 }
 
@@ -689,6 +704,7 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
+        BindingReachability::Typing,
     )
 }
 
@@ -1017,9 +1033,15 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, None)
-            .place
-            .with_qualifiers(qualifiers);
+        return place_from_bindings_impl(
+            db,
+            bindings,
+            requires_explicit_reexport,
+            None,
+            BindingReachability::Typing,
+        )
+        .place
+        .with_qualifiers(qualifiers);
     }
 
     match declared {
@@ -1037,7 +1059,15 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
+            match place_from_bindings_impl(
+                db,
+                bindings,
+                requires_explicit_reexport,
+                None,
+                BindingReachability::Typing,
+            )
+            .place
+            {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1085,7 +1115,13 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let inferred = place_from_bindings_impl(
+                db,
+                bindings,
+                requires_explicit_reexport,
+                None,
+                BindingReachability::Typing,
+            );
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1130,8 +1166,14 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place;
+            let mut inferred = place_from_bindings_impl(
+                db,
+                bindings,
+                requires_explicit_reexport,
+                None,
+                BindingReachability::Typing,
+            )
+            .place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1463,13 +1505,39 @@ pub(crate) struct ReachableLoopBinding<'db> {
 /// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
-/// This function gets called cross-module. It, therefore, shouldn't
-/// access any AST nodes from the file containing the declarations.
+/// The typing lookup gets called cross-module, so it shouldn't access any AST nodes from the file
+/// containing the declarations. The runtime lookup may inspect predicate AST, and its callers must
+/// therefore isolate it behind tracked queries.
+#[derive(Clone, Copy)]
+enum BindingReachability {
+    Typing,
+    Runtime,
+}
+
+impl BindingReachability {
+    fn evaluate<'db>(
+        self,
+        db: &'db dyn Db,
+        cache: Option<&ReachabilityEvaluationCache<'db>>,
+        constraints: &ReachabilityConstraints,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        match self {
+            Self::Typing => {
+                evaluate_reachability_with_cache(db, cache, constraints, predicates, id)
+            }
+            Self::Runtime => evaluate_reachability_runtime(db, constraints, predicates, id),
+        }
+    }
+}
+
 fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+    binding_reachability: BindingReachability,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1495,7 +1563,7 @@ fn place_from_bindings_impl<'db>(
     // expressions, which is extra work and can lead to cycles.
     let unbound_visibility = || {
         unbound_reachability_constraint.map(|reachability_constraint| {
-            evaluate_reachability_with_cache(
+            binding_reachability.evaluate(
                 db,
                 reachability_cache,
                 reachability_constraints,
@@ -1532,7 +1600,7 @@ fn place_from_bindings_impl<'db>(
                 }
                 DefinitionState::Deleted => {
                     deleted_reachability = deleted_reachability.or_else(|| {
-                        evaluate_reachability_with_cache(
+                        binding_reachability.evaluate(
                             db,
                             reachability_cache,
                             reachability_constraints,
@@ -1548,7 +1616,7 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
-            let static_reachability = evaluate_reachability_with_cache(
+            let static_reachability = binding_reachability.evaluate(
                 db,
                 reachability_cache,
                 reachability_constraints,

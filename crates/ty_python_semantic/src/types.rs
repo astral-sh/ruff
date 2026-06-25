@@ -2817,11 +2817,10 @@ impl<'db> Type<'db> {
             _ => self.to_class_type(db),
         };
         let own_class_attr = own_class.map(|class| {
-            let member = class.own_class_member(db, None, name);
             if policy.require_runtime_bound() {
-                member.require_runtime_bound(db).inner
+                class.own_runtime_class_member(db, None, name).inner
             } else {
-                member.inner
+                class.own_class_member(db, None, name).inner
             }
         });
 

@@ -1,11 +1,12 @@
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::name::Name;
 use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 use crate::Db;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
-    TypeOrigin, place_by_id, place_from_bindings,
+    TypeOrigin, place_by_id, place_from_bindings, place_from_runtime_bindings,
 };
 use crate::types::Type;
 
@@ -50,49 +51,6 @@ impl<'db> Member<'db> {
     pub(super) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             inner: self.inner.map_type(f),
-        }
-    }
-
-    /// Require a runtime binding for a declared member.
-    pub(super) fn require_runtime_bound(self, db: &'db dyn Db) -> Self {
-        let Place::Defined(
-            declared @ DefinedPlace {
-                origin: TypeOrigin::Declared,
-                provenance,
-                ..
-            },
-        ) = self.inner.place
-        else {
-            return self;
-        };
-        let Some(definition) = provenance.definition() else {
-            return self;
-        };
-        if definition_is_runtime_binding(db, definition) {
-            return self;
-        }
-
-        let binding_place =
-            definition
-                .place(db)
-                .as_symbol()
-                .map_or(Place::Undefined, |symbol_id| {
-                    place_from_bindings(
-                        db,
-                        use_def_map(db, definition.scope(db))
-                            .end_of_scope_symbol_bindings(symbol_id),
-                    )
-                    .place
-                });
-        let place = match binding_place {
-            Place::Defined(binding) => Place::Defined(DefinedPlace {
-                definedness: binding.definedness,
-                ..declared
-            }),
-            Place::Undefined => Place::Undefined,
-        };
-        Self {
-            inner: place.with_qualifiers(self.inner.qualifiers),
         }
     }
 }
@@ -161,4 +119,50 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             }
         })
         .unwrap_or_default()
+}
+
+#[salsa::tracked]
+pub(super) fn runtime_class_member<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: Name,
+) -> Member<'db> {
+    let name = String::from(name);
+    let member = class_member(db, scope, &name);
+    let Some(symbol_id) = place_table(db, scope).symbol_id(&name) else {
+        return member;
+    };
+    let runtime = place_from_runtime_bindings(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_bindings(symbol_id),
+    )
+    .place;
+
+    let qualifiers = member.inner.qualifiers;
+    let place = match (member.inner.place, runtime) {
+        (
+            Place::Defined(
+                declared @ DefinedPlace {
+                    origin: TypeOrigin::Declared,
+                    ..
+                },
+            ),
+            Place::Defined(runtime),
+        ) => Place::Defined(DefinedPlace {
+            definedness: runtime.definedness,
+            ..declared
+        }),
+        (Place::Defined(declared), Place::Undefined)
+            if declared.provenance.definition().is_some_and(|definition| {
+                definition.file(db).is_stub(db) && definition_is_runtime_binding(db, definition)
+            }) =>
+        {
+            Place::Defined(declared)
+        }
+        (_, runtime) => runtime,
+    };
+
+    Member {
+        inner: place.with_qualifiers(qualifiers),
+    }
 }

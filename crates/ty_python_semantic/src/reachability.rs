@@ -208,8 +208,9 @@ use crate::{
         pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
+use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, helpers::is_dotted_name, name::Name};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
@@ -594,6 +595,14 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
+
+    /// Analyze reachability using the runtime value of `TYPE_CHECKING`.
+    fn evaluate_runtime(
+        &self,
+        db: &'db dyn Db,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness;
 }
 
 impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
@@ -602,51 +611,118 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        mut id: ScopedReachabilityConstraintId,
+        id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        type Id = ScopedReachabilityConstraintId;
+        evaluate_with(self, db, predicates, id, |predicate| {
+            analyze_single(db, predicate)
+        })
+    }
 
-        // Analyze statement-level calls through this root one by one in source order, so any
-        // earlier call needed while inferring a later one is already cached instead of deepening
-        // the Salsa query stack. This avoids growing an excessive stack for deeply nested
-        // reachability queries.
-        //
-        // Without this prefix analysis, given:
-        //
-        //   call_a()  # predicate 0
-        //   call_b()  # predicate 1
-        //   call_c()  # predicate 2
-        //
-        // we'd analyze them backwards:
-        //
-        //   analyze call_c
-        //   └─ analyze call_b
-        //      └─ analyze call_a
-        //
-        // The prefix pass explicitly analyzes them forwards:
-        //
-        //   analyze call_a  → cached
-        //   analyze call_b  → call_a is already cached
-        //   analyze call_c  → call_b is already cached
-        if !id.is_terminal() {
-            let root_predicate = self.get_interior_node(id).atom();
-            analyze_non_terminal_call_prefix(db, predicates, root_predicate);
-        }
+    fn evaluate_runtime(
+        &self,
+        db: &'db dyn Db,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        evaluate_with(self, db, predicates, id, |predicate| {
+            analyze_single_runtime(db, predicate)
+        })
+    }
+}
 
-        loop {
-            let node = match id {
-                Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-                Id::AMBIGUOUS => return Truthiness::Ambiguous,
-                Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.get_interior_node(id),
-            };
-            let predicate = &predicates[node.atom()];
-            match analyze_single(db, predicate) {
-                Truthiness::AlwaysTrue => id = node.if_true(),
-                Truthiness::Ambiguous => id = node.if_ambiguous(),
-                Truthiness::AlwaysFalse => id = node.if_false(),
-            }
+fn evaluate_with<'db>(
+    constraints: &ReachabilityConstraints,
+    db: &'db dyn Db,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    mut id: ScopedReachabilityConstraintId,
+    mut analyze: impl FnMut(&Predicate<'db>) -> Truthiness,
+) -> Truthiness {
+    type Id = ScopedReachabilityConstraintId;
+
+    // Analyze statement-level calls through this root one by one in source order, so any
+    // earlier call needed while inferring a later one is already cached instead of deepening
+    // the Salsa query stack. This avoids growing an excessive stack for deeply nested
+    // reachability queries.
+    //
+    // Without this prefix analysis, given:
+    //
+    //   call_a()  # predicate 0
+    //   call_b()  # predicate 1
+    //   call_c()  # predicate 2
+    //
+    // we'd analyze them backwards:
+    //
+    //   analyze call_c
+    //   └─ analyze call_b
+    //      └─ analyze call_a
+    //
+    // The prefix pass explicitly analyzes them forwards:
+    //
+    //   analyze call_a  → cached
+    //   analyze call_b  → call_a is already cached
+    //   analyze call_c  → call_b is already cached
+    if !id.is_terminal() {
+        let root_predicate = constraints.get_interior_node(id).atom();
+        analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+    }
+
+    loop {
+        let node = match id {
+            Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            Id::AMBIGUOUS => return Truthiness::Ambiguous,
+            Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            _ => constraints.get_interior_node(id),
+        };
+        let predicate = &predicates[node.atom()];
+        match analyze(predicate) {
+            Truthiness::AlwaysTrue => id = node.if_true(),
+            Truthiness::Ambiguous => id = node.if_ambiguous(),
+            Truthiness::AlwaysFalse => id = node.if_false(),
         }
+    }
+}
+
+fn analyze_single_runtime(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+    if let PredicateNode::Expression(expression) = predicate.node
+        && let Some(value) = type_checking_expression_value(db, expression, false)
+    {
+        return Truthiness::from(value).negate_if(!predicate.is_positive);
+    }
+    analyze_single(db, predicate)
+}
+
+#[salsa::tracked]
+fn type_checking_expression_value<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    type_checking_value: bool,
+) -> Option<bool> {
+    let module = parsed_module(db, expression.file(db)).load(db);
+    match expression.node_ref(db).node(&module) {
+        ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => {
+            Some(type_checking_value)
+        }
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+            if attr == "TYPE_CHECKING" && is_dotted_name(value) =>
+        {
+            Some(type_checking_value)
+        }
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) if matches!(
+            operand.as_ref(),
+            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
+        ) || matches!(
+            operand.as_ref(),
+            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+                if attr == "TYPE_CHECKING" && is_dotted_name(value)
+        ) =>
+        {
+            Some(!type_checking_value)
+        }
+        _ => None,
     }
 }
 
@@ -1324,6 +1400,9 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
+            if let Some(value) = type_checking_expression_value(db, test_expr, true) {
+                return Truthiness::from(value).negate_if(!predicate.is_positive);
+            }
             infer_same_file_expression_type(db, test_expr, TypeContext::default())
                 .bool(db)
                 .negate_if(!predicate.is_positive)
@@ -1426,6 +1505,15 @@ pub(crate) fn evaluate_reachability(
     use_def
         .reachability_constraints()
         .evaluate(db, use_def.predicates(), reachability)
+}
+
+pub(crate) fn evaluate_reachability_runtime<'db>(
+    db: &'db dyn Db,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    reachability: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    constraints.evaluate_runtime(db, predicates, reachability)
 }
 
 /// Inference-local cache for static reachability evaluations.
