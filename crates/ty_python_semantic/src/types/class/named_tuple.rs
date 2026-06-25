@@ -1,10 +1,10 @@
-use ruff_db::{diagnostic::Span, parsed::parsed_module};
+use ruff_db::{diagnostic::Span, parsed::parsed_module_versioned};
 use ruff_python_ast as ast;
 use ruff_python_ast::{NodeIndex, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
-    Db, Program,
+    Db,
     place::{Place, PlaceAndQualifiers},
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
@@ -28,6 +28,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     instance_ty: Type<'db>,
     fields: impl Iterator<Item = NamedTupleField<'db>>,
     inherited_generic_context: Option<GenericContext<'db>>,
+    python_version: PythonVersion,
 ) -> Option<Type<'db>> {
     match name {
         "__new__" => {
@@ -63,7 +64,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             Some(Type::function_like_callable(db, signature))
         }
         "__match_args__" => {
-            if Program::get(db).python_version(db) < PythonVersion::PY310 {
+            if python_version < PythonVersion::PY310 {
                 return None;
             }
 
@@ -81,7 +82,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             Some(Type::empty_tuple(db))
         }
         "_replace" | "__replace__" => {
-            if name == "__replace__" && Program::get(db).python_version(db) < PythonVersion::PY313 {
+            if name == "__replace__" && python_version < PythonVersion::PY313 {
                 return None;
             }
 
@@ -205,8 +206,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// Returns the range of the namedtuple call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module =
+            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
@@ -414,6 +415,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             instance_ty,
             self.fields(db).iter().cloned(),
             None,
+            self.scope(db)
+                .analysis_file(db)
+                .program(db)
+                .python_version(db),
         );
         // For fallback members from NamedTupleFallback, apply type mapping to handle
         // `Self` types. The explicitly synthesized members (__new__, _fields, _replace,
@@ -442,7 +447,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             heap_size=ruff_memory_usage::heap_size
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let module =
+                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                    .load(db);
             let node = definition
                 .kind(db)
                 .value(&module)

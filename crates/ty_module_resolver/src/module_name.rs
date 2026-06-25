@@ -9,7 +9,8 @@ use ruff_python_ast as ast;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::db::Db;
-use crate::resolve::file_to_module;
+use crate::program::{ProgramFile, ResolverProgram};
+use crate::resolve::file_to_module_in_program;
 
 /// A module name, e.g. `foo.bar`.
 ///
@@ -322,6 +323,18 @@ impl ModuleName {
         importing_file: File,
         node: &'db ast::StmtImportFrom,
     ) -> Result<Self, ModuleNameResolutionError> {
+        Self::from_import_statement_in_program(
+            db,
+            ProgramFile::new(db, ResolverProgram::get(db), importing_file),
+            node,
+        )
+    }
+
+    pub fn from_import_statement_in_program<'db>(
+        db: &'db dyn Db,
+        importing_file: ProgramFile<'db>,
+        node: &'db ast::StmtImportFrom,
+    ) -> Result<Self, ModuleNameResolutionError> {
         let ast::StmtImportFrom {
             module,
             level,
@@ -330,13 +343,27 @@ impl ModuleName {
             range: _,
             node_index: _,
         } = node;
-        Self::from_identifier_parts(db, importing_file, module.as_deref(), *level)
+        Self::from_identifier_parts_in_program(db, importing_file, module.as_deref(), *level)
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`
     pub fn from_identifier_parts(
         db: &dyn Db,
         importing_file: File,
+        module: Option<&str>,
+        level: u32,
+    ) -> Result<Self, ModuleNameResolutionError> {
+        Self::from_identifier_parts_in_program(
+            db,
+            ProgramFile::new(db, ResolverProgram::get(db), importing_file),
+            module,
+            level,
+        )
+    }
+
+    pub fn from_identifier_parts_in_program(
+        db: &dyn Db,
+        importing_file: ProgramFile<'_>,
         module: Option<&str>,
         level: u32,
     ) -> Result<Self, ModuleNameResolutionError> {
@@ -357,6 +384,13 @@ impl ModuleName {
         importing_file: File,
     ) -> Result<Self, ModuleNameResolutionError> {
         Self::from_identifier_parts(db, importing_file, None, 1)
+    }
+
+    pub fn package_for_file_in_program(
+        db: &dyn Db,
+        importing_file: ProgramFile<'_>,
+    ) -> Result<Self, ModuleNameResolutionError> {
+        Self::from_identifier_parts_in_program(db, importing_file, None, 1)
     }
 
     /// Returns `true` if the module name given appears to be a test module.
@@ -488,11 +522,11 @@ impl std::fmt::Display for ModuleName {
 ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
 fn relative_module_name(
     db: &dyn Db,
-    importing_file: File,
+    importing_file: ProgramFile<'_>,
     tail: Option<&str>,
     level: NonZeroU32,
 ) -> Result<ModuleName, ModuleNameResolutionError> {
-    let module = file_to_module(db, importing_file)
+    let module = file_to_module_in_program(db, importing_file)
         .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
     let mut level = level.get();
 

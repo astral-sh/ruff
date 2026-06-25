@@ -1,4 +1,4 @@
-use ruff_db::{diagnostic::Span, parsed::parsed_module};
+use ruff_db::{diagnostic::Span, parsed::parsed_module_versioned};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -197,7 +197,9 @@ impl<'db> DynamicClassLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let module =
+                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                    .load(db);
 
             let value = definition
                 .kind(db)
@@ -236,8 +238,8 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns the range of the `type()` call expression that created this class.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module =
+            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => {

@@ -15,12 +15,12 @@ use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
-use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
+use ty_module_resolver::{KnownModule, Module, ModuleName};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
@@ -56,7 +56,7 @@ pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
-    builtins_module_scope, imported_symbol, known_module_symbol,
+    builtins_module_scope, imported_symbol_in_environment, known_module_symbol,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -101,7 +101,7 @@ pub use crate::types::typevar::{
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -114,7 +114,7 @@ pub(crate) use special_form::TypedDictModule;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{Truthiness, place_table, semantic_index};
+use ty_python_core::{Truthiness, place_table, semantic_index_in_environment};
 
 mod bool;
 mod bound_super;
@@ -172,12 +172,23 @@ mod property_tests;
 mod subscript;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+    check_types_in_environment(
+        db,
+        ty_python_core::environment::AnalysisFile::from_default(db, file),
+    )
+}
+
+pub fn check_types_in_environment(
+    db: &dyn Db,
+    analysis_file: ty_python_core::environment::AnalysisFile<'_>,
+) -> Vec<Diagnostic> {
+    let file = analysis_file.file(db);
     let _span = tracing::trace_span!("check_types", ?file).entered();
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let start = Instant::now();
 
-    let index = semantic_index(db, file);
+    let index = ty_python_core::semantic_index_in_environment(db, analysis_file);
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
@@ -240,10 +251,10 @@ fn definition_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.file(db);
-    let index = semantic_index(db, file);
+    let analysis_file = definition.analysis_file(db);
+    let index = ty_python_core::semantic_index_in_environment(db, analysis_file);
     let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
+    let scope = file_scope.to_scope_id(db, analysis_file);
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
@@ -267,10 +278,10 @@ fn definition_expression_annotation<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeAndQualifiers<'db> {
-    let file = definition.file(db);
-    let index = semantic_index(db, file);
+    let analysis_file = definition.analysis_file(db);
+    let index = ty_python_core::semantic_index_in_environment(db, analysis_file);
     let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
+    let scope = file_scope.to_scope_id(db, analysis_file);
     if scope == definition.scope(db) {
         let inference = infer_deferred_types(db, definition);
         TypeAndQualifiers::new(
@@ -1650,13 +1661,17 @@ impl<'db> Type<'db> {
 
     pub(crate) fn module_literal(
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: ty_python_core::environment::AnalysisFile<'db>,
         submodule: Module<'db>,
     ) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(
             db,
             submodule,
-            submodule.kind(db).is_package().then_some(importing_file),
+            importing_file.environment(db),
+            submodule
+                .kind(db)
+                .is_package()
+                .then_some(importing_file.file(db)),
         ))
     }
 
@@ -3807,7 +3822,9 @@ impl<'db> Type<'db> {
                     if matches!(name.as_str(), "major" | "minor")
                         && instance.is_sys_version_info() =>
                 {
-                    let python_version = Program::get(db).python_version(db);
+                    let python_version = instance
+                        .sys_version_info_version()
+                        .expect("checked above that this is sys.version_info");
                     let segment = if name == "major" {
                         python_version.major
                     } else {
@@ -4379,6 +4396,11 @@ impl<'db> Type<'db> {
                 .into(),
 
                 Some(KnownFunction::Dataclass) => {
+                    let python_version = function_type
+                        .definition(db)
+                        .analysis_file(db)
+                        .program(db)
+                        .python_version(db);
                     let bool_parameter = |name: &'static str, default: bool| {
                         Parameter::keyword_only(Name::new_static(name))
                             .with_annotated_type(KnownClass::Bool.to_instance(db))
@@ -4394,7 +4416,7 @@ impl<'db> Type<'db> {
                         bool_parameter("frozen", false),
                     ];
 
-                    if Program::get(db).python_version(db) >= ast::PythonVersion::PY310 {
+                    if python_version >= ast::PythonVersion::PY310 {
                         decorator_factory_parameters.extend([
                             bool_parameter("match_args", true),
                             bool_parameter("kw_only", false),
@@ -4402,7 +4424,7 @@ impl<'db> Type<'db> {
                         ]);
                     }
 
-                    if Program::get(db).python_version(db) >= ast::PythonVersion::PY311 {
+                    if python_version >= ast::PythonVersion::PY311 {
                         decorator_factory_parameters.push(bool_parameter("weakref_slot", false));
                     }
 
@@ -5794,7 +5816,7 @@ impl<'db> Type<'db> {
                             fallback_type: Type::unknown(),
                         });
                     }
-                    let index = semantic_index(db, scope_id.file(db));
+                    let index = semantic_index_in_environment(db, scope_id.analysis_file(db));
                     Ok(bind_typevar(
                         db,
                         index,
@@ -8127,7 +8149,7 @@ impl<'db> InvalidTypeExpression<'db> {
             && function_body_scope
                 .scope(db)
                 .parent()
-                .map(|parent| parent.to_scope_id(db, function_body_scope.file(db)))
+                .map(|parent| parent.to_scope_id(db, function_body_scope.analysis_file(db)))
                 == builtins_module_scope(db)
         {
             diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
@@ -8194,7 +8216,11 @@ impl<'db> AwaitError<'db> {
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
                 if let Some(definition) = attribute_provenance.definition() {
-                    let module = parsed_module(db, definition.file(db)).load(db);
+                    let module = parsed_module_versioned(
+                        db,
+                        definition.analysis_file(db).versioned_file(db),
+                    )
+                    .load(db);
                     diag.annotate(
                         Annotation::secondary(definition.focus_range(db, &module).into())
                             .message("attribute defined here"),
@@ -8252,6 +8278,8 @@ pub struct ModuleLiteralType<'db> {
     /// The imported module.
     pub module: Module<'db>,
 
+    pub environment: ty_python_core::environment::InferenceEnvironment,
+
     /// The file in which this module was imported.
     ///
     /// If the module is a module that could have submodules (a package),
@@ -8275,6 +8303,24 @@ impl<'db> ModuleLiteralType<'db> {
             self.module(db).kind(db).is_package()
         );
         self._importing_file(db)
+    }
+
+    fn importing_analysis_file(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<ty_python_core::environment::AnalysisFile<'db>> {
+        self.importing_file(db).map(|file| {
+            ty_python_core::environment::AnalysisFile::new(db, self.environment(db), file)
+        })
+    }
+
+    fn module_analysis_file(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<ty_python_core::environment::AnalysisFile<'db>> {
+        self.module(db).file(db).map(|file| {
+            ty_python_core::environment::AnalysisFile::new(db, self.environment(db), file)
+        })
     }
 
     /// Get the submodule attributes we believe to be defined on this module.
@@ -8329,27 +8375,38 @@ impl<'db> ModuleLiteralType<'db> {
     /// We instead prefer handling most other import effects as definitions in the scope of
     /// the current file (i.e. `ty_python_core::definition::ImportFromDefinitionNodeRef`).
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
-        self.importing_file(db)
+        self.importing_analysis_file(db)
             .into_iter()
-            .flat_map(|file| semantic_index(db, file).imported_modules())
+            .flat_map(|file| {
+                ty_python_core::semantic_index_in_environment(db, file).imported_modules()
+            })
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
-        let importing_file = self.importing_file(db)?;
+        let importing_file = self.importing_analysis_file(db)?;
         let relative_submodule_name = ModuleName::new(name)?;
         let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
-        let submodule = resolve_module(db, importing_file, &absolute_submodule_name)?;
+        let submodule = ty_module_resolver::resolve_module_in_program(
+            db,
+            importing_file.program_file(db),
+            &absolute_submodule_name,
+        )?;
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
     fn try_module_getattr(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
-        if let Some(file) = self.module(db).file(db) {
-            let getattr_symbol = imported_symbol(db, Some(file), "__getattr__", None);
+        if self.module(db).file(db).is_some() {
+            let getattr_symbol = imported_symbol_in_environment(
+                db,
+                self.module_analysis_file(db),
+                "__getattr__",
+                None,
+            );
             // If we found a __getattr__ function, try to call it with the name argument
             if let Place::Defined(place) = getattr_symbol.place
                 && let Ok(outcome) = place.ty.try_call(
@@ -8396,7 +8453,8 @@ impl<'db> ModuleLiteralType<'db> {
             return Place::bound(submodule).into();
         }
 
-        let place_and_qualifiers = imported_symbol(db, self.module(db).file(db), name, None);
+        let place_and_qualifiers =
+            imported_symbol_in_environment(db, self.module_analysis_file(db), name, None);
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {

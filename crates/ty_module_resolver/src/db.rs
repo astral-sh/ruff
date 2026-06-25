@@ -68,7 +68,11 @@ pub(crate) mod tests {
 
         pub(crate) fn set_search_paths(&mut self, search_paths: SearchPaths) {
             search_paths.try_register_static_roots(self);
-            self.search_paths = Arc::new(search_paths);
+            self.search_paths = Arc::new(search_paths.clone());
+            if let Some(program) = crate::program::ResolverProgram::try_get(self) {
+                let python_version = self.python_version;
+                program.update(self, python_version, search_paths);
+            }
         }
 
         /// Takes the salsa events.

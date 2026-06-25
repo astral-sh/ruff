@@ -1,6 +1,6 @@
 use crate::Db;
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
 use ty_module_resolver::Module;
@@ -33,7 +33,9 @@ impl TypeDefinition<'_> {
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
             | Self::EnumMember(definition) => {
-                let module = parsed_module(db, definition.file(db)).load(db);
+                let module =
+                    parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                        .load(db);
                 Some(definition.focus_range(db, &module))
             }
         }
@@ -54,7 +56,9 @@ impl TypeDefinition<'_> {
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
             | Self::EnumMember(definition) => {
-                let module = parsed_module(db, definition.file(db)).load(db);
+                let module =
+                    parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                        .load(db);
                 Some(definition.full_range(db, &module))
             }
         }

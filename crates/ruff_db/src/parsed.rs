@@ -5,7 +5,7 @@ use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
 use ruff_python_ast::{
     AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, NodeIndexError,
-    StringLiteral,
+    PythonVersion, StringLiteral,
 };
 use ruff_python_parser::{
     ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
@@ -30,24 +30,46 @@ use crate::source::source_text;
 /// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
 /// instead it's a wild guess that it should be unlikely that incremental changes involve
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct VersionedFile<'db> {
+    pub file: File,
+    pub python_version: PythonVersion,
+}
+
+/// Returns the parsed AST for a physical file at the database's default Python version.
+///
+/// New multi-environment callers should prefer [`parsed_module_versioned`] so that the target
+/// version is part of the Salsa key. This compatibility wrapper remains for callers that only
+/// have one Python environment.
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", ?file).entered();
+    parsed_module_versioned(db, VersionedFile::new(db, file, db.python_version())).clone()
+}
+
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
+pub fn parsed_module_versioned(db: &dyn Db, file: VersionedFile<'_>) -> ParsedModule {
+    let source_file = file.file(db);
+    let _span = tracing::trace_span!(
+        "parsed_module",
+        ?source_file,
+        python_version = %file.python_version(db)
+    )
+    .entered();
 
     let parsed = parsed_module_impl(db, file);
 
-    ParsedModule::new(file, parsed)
+    ParsedModule::new(db, file, parsed)
 }
 
 pub(super) fn disable_lru(db: &mut dyn Db) {
-    parsed_module::set_lru_capacity(db, 0);
+    parsed_module_versioned::set_lru_capacity(db, 0);
 }
 
-pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
-    let source = source_text(db, file);
-    let ty = file.source_type(db);
+pub fn parsed_module_impl(db: &dyn Db, file: VersionedFile<'_>) -> Parsed<ModModule> {
+    let source_file = file.file(db);
+    let source = source_text(db, source_file);
+    let ty = source_file.source_type(db);
 
-    let target_version = db.python_version();
+    let target_version = file.python_version(db);
     let options = ParseOptions::from(ty).with_target_version(target_version);
     parse_unchecked(&source, options)
         .try_into_module()
@@ -101,14 +123,16 @@ pub fn parsed_string_annotation(
 #[derive(Clone, get_size2::GetSize)]
 pub struct ParsedModule {
     file: File,
+    python_version: PythonVersion,
     #[get_size(size_fn = arc_swap_size)]
     inner: Arc<ArcSwapOption<indexed::IndexedModule>>,
 }
 
 impl ParsedModule {
-    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    pub fn new(db: &dyn Db, versioned_file: VersionedFile<'_>, parsed: Parsed<ModModule>) -> Self {
         Self {
-            file,
+            file: versioned_file.file(db),
+            python_version: versioned_file.python_version(db),
             inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(
                 parsed,
             )))),
@@ -123,7 +147,8 @@ impl ParsedModule {
             Some(parsed) => parsed,
             None => {
                 // Re-parse the file.
-                let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
+                let versioned_file = VersionedFile::new(db, self.file, self.python_version);
+                let parsed = indexed::IndexedModule::new(parsed_module_impl(db, versioned_file));
                 tracing::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
@@ -857,6 +882,7 @@ mod tests {
     use crate::Db;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
+    use crate::parsed::{VersionedFile, parsed_module_versioned};
     use crate::system::{
         DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
     };
@@ -955,5 +981,32 @@ else:
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+    }
+
+    #[test]
+    fn same_file_at_different_python_versions() -> crate::system::Result<()> {
+        use ruff_python_ast::PythonVersion;
+
+        let mut db = TestDb::new();
+        db.write_file("test.py", "type Alias = int")?;
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        let py311 = VersionedFile::new(&db, file, PythonVersion::PY311);
+        let py312 = VersionedFile::new(&db, file, PythonVersion::PY312);
+
+        assert!(
+            !parsed_module_versioned(&db, py311)
+                .load(&db)
+                .unsupported_syntax_errors()
+                .is_empty()
+        );
+        assert!(
+            parsed_module_versioned(&db, py312)
+                .load(&db)
+                .unsupported_syntax_errors()
+                .is_empty()
+        );
+
+        Ok(())
     }
 }

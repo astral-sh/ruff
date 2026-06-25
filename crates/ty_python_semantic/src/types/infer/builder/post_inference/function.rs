@@ -18,7 +18,7 @@ use crate::{
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Span},
-    parsed::parsed_module,
+    parsed::parsed_module_versioned,
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
@@ -272,11 +272,12 @@ fn check_legacy_typevar_defaults<'db>(
         }
 
         if let Some(typevar_definition) = typevar.definition(db) {
-            let file = typevar_definition.file(db);
+            let analysis_file = typevar_definition.analysis_file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(typevar_definition.full_range(
+                    db,
+                    &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                )))
                 .message(format_args!("`{typevar_name}` defined here")),
             );
         }
@@ -413,11 +414,12 @@ fn check_legacy_typevar_ordering<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
+        let analysis_file = definition.analysis_file(db);
         diagnostic.annotate(
-            Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
-            ))
+            Annotation::secondary(Span::from(definition.full_range(
+                db,
+                &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+            )))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
     }

@@ -1,5 +1,4 @@
 use crate::{
-    Program,
     reachability::is_reachable,
     types::{
         BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
@@ -24,7 +23,7 @@ use crate::{
 };
 use ruff_db::{
     diagnostic::{Annotation, Span},
-    parsed::parsed_module,
+    parsed::parsed_module_versioned,
 };
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
@@ -241,11 +240,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Annotate the diagnostic with the definition span of the default TypeVar.
             let annotate_default_definition = |diagnostic: &mut LintDiagnosticGuard<'_, '_>| {
                 if let Some(definition) = default_typevar.definition(db) {
-                    let file = definition.file(db);
+                    let analysis_file = definition.analysis_file(db);
                     diagnostic.annotate(
-                        Annotation::secondary(Span::from(
-                            definition.full_range(db, &parsed_module(db, file).load(db)),
-                        ))
+                        Annotation::secondary(Span::from(definition.full_range(
+                            db,
+                            &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                        )))
                         .message(format_args!("`{default_name}` defined here")),
                     );
                 }
@@ -519,11 +519,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 outer-scope type parameter `{outer_name}` as its default"
         ));
         if let Some(definition) = outer_typevar.definition(db) {
-            let file = definition.file(db);
+            let analysis_file = definition.analysis_file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(definition.full_range(
+                    db,
+                    &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                )))
                 .message(format_args!("`{outer_name}` defined here")),
             );
         }
@@ -700,7 +701,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let arguments = &call_expr.arguments;
         let is_typing_extensions = known_class == KnownClass::ExtensionsParamSpec;
         let assume_all_features = self.in_stub() || is_typing_extensions;
-        let python_version = Program::get(db).python_version(db);
+        let python_version = self.analysis_file().program(db).python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
 
@@ -947,7 +948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let arguments = &call_expr.arguments;
         let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVar;
         let assume_all_features = self.in_stub() || is_typing_extensions;
-        let python_version = Program::get(db).python_version(db);
+        let python_version = self.analysis_file().program(db).python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
 

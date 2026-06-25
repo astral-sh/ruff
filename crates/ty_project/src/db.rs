@@ -15,8 +15,9 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
+use ty_python_core::environment::{InferenceEnvironment, InferenceEnvironments, InferenceSettings};
 use ty_python_core::program::{
-    FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
+    FallibleStrategy, MisconfigurationStrategy, Program, Programs, UseDefaultStrategy,
 };
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
@@ -44,6 +45,8 @@ pub struct ProjectDatabase {
     // Structural reloads must update the existing `Project` in place via salsa
     // setters instead of swapping in a freshly constructed handle.
     project: Option<Project>,
+    programs: Programs,
+    inference_environments: InferenceEnvironments,
     files: Files,
 
     // IMPORTANT: Never return clones of `system` outside `ProjectDatabase` (only return references)
@@ -100,6 +103,8 @@ impl ProjectDatabase {
     {
         let mut db = Self {
             project: None,
+            programs: Programs::default(),
+            inference_environments: InferenceEnvironments::default(),
             storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
                 Some(Box::new({
                     move |event: Event| {
@@ -134,7 +139,8 @@ impl ProjectDatabase {
         // all project files having HIGH durability.
         project_metadata.try_add_project_root(&db);
 
-        Program::from_settings(&db, program_settings);
+        let program = db.programs.acquire(&db, program_settings);
+        Program::set_default(&mut db, program);
 
         let (settings, settings_diagnostics) = strategy.map_err(
             project_metadata
@@ -142,6 +148,15 @@ impl ProjectDatabase {
                 .to_settings(&db, project_metadata.root(), strategy),
             |error| anyhow::anyhow!("{}", error.pretty(&db)),
         )?;
+
+        let inference_environment = db.inference_environments.acquire(
+            &db,
+            program,
+            InferenceSettings {
+                replace_imports_with_any: settings.analysis().replace_imports_with_any.clone(),
+            },
+        );
+        InferenceEnvironment::set_default(&mut db, inference_environment);
 
         db.project = Some(Project::from_metadata(
             &db,
@@ -163,6 +178,15 @@ impl ProjectDatabase {
         let mut collector = CollectReporter::default();
         self.project().check(self, &mut collector);
         collector.into_sorted(self)
+    }
+
+    /// Returns the registry of Python environments stored in this database.
+    pub fn programs(&self) -> &Programs {
+        &self.programs
+    }
+
+    pub fn inference_environments(&self) -> &InferenceEnvironments {
+        &self.inference_environments
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.

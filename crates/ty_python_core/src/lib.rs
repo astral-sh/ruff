@@ -7,7 +7,9 @@ use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
+#[cfg(test)]
 use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{VersionedFile, parsed_module_versioned};
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
@@ -25,6 +27,7 @@ use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
+use environment::AnalysisFile;
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
@@ -44,6 +47,7 @@ pub mod ast_node_ref;
 mod builder;
 mod db;
 pub mod definition;
+pub mod environment;
 pub mod expression;
 pub mod frozen;
 pub(crate) mod member;
@@ -66,13 +70,43 @@ pub mod program;
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
+pub fn semantic_index(db: &dyn Db, file: File) -> &SemanticIndex<'_> {
+    semantic_index_in_environment(db, AnalysisFile::from_default(db, file))
+}
+
+/// Returns the semantic index for a file in one inference environment.
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
-pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
+pub fn semantic_index_in_environment<'db>(
+    db: &'db dyn Db,
+    analysis_file: AnalysisFile<'db>,
+) -> SemanticIndex<'db> {
+    let versioned_file = analysis_file.versioned_file(db);
+    let file = versioned_file.file(db);
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module_versioned(db, versioned_file).load(db);
 
-    SemanticIndexBuilder::new(db, file, &module).build()
+    SemanticIndexBuilder::new(
+        db,
+        analysis_file,
+        &module,
+        versioned_file.python_version(db),
+    )
+    .build()
+}
+
+/// Compatibility entry point for callers that explicitly select a version but use the default
+/// inference environment.
+pub fn semantic_index_versioned<'db>(
+    db: &'db dyn Db,
+    versioned_file: VersionedFile<'db>,
+) -> &'db SemanticIndex<'db> {
+    let analysis_file = AnalysisFile::from_default(db, versioned_file.file(db));
+    debug_assert_eq!(
+        analysis_file.program(db).python_version(db),
+        versioned_file.python_version(db)
+    );
+    semantic_index_in_environment(db, analysis_file)
 }
 
 /// Returns the place table for a specific `scope`.
@@ -84,7 +118,7 @@ pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
-    let index = semantic_index(db, file);
+    let index = semantic_index_in_environment(db, scope.analysis_file(db));
     Arc::clone(&index.place_tables[scope.file_scope_id(db)])
 }
 
@@ -97,7 +131,7 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
 pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
-    let index = semantic_index(db, file);
+    let index = semantic_index_in_environment(db, scope.analysis_file(db));
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
 }
 
@@ -172,8 +206,7 @@ pub fn attribute_scopes<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + 'db {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index = semantic_index_in_environment(db, class_body_scope.analysis_file(db));
     let class_scope_id = class_body_scope.file_scope_id(db);
     ChildrenIter::new(&index.scopes, class_scope_id)
         .filter_map(move |(child_scope_id, scope)| {
@@ -221,8 +254,12 @@ pub fn attribute_scopes<'db>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
+    global_scope_in_environment(db, AnalysisFile::from_default(db, file))
+}
+
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+pub fn global_scope_in_environment<'db>(db: &'db dyn Db, file: AnalysisFile<'db>) -> ScopeId<'db> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
     FileScopeId::global().to_scope_id(db, file)

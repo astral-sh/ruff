@@ -14,10 +14,10 @@ use crate::{
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
     scope::ScopeId,
-    semantic_index,
+    semantic_index_in_environment,
 };
 
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
@@ -47,7 +47,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
+        semantic_index_in_environment(db, scope.analysis_file(db))
+            .expect_single_definition(type_alias_stmt_node)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
@@ -66,7 +67,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let module = parsed_module(db, scope.file(db)).load(db);
+        let module =
+            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
@@ -131,8 +133,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let file = scope.file(db);
-        let parsed = parsed_module(db, file).load(db);
+        let parsed =
+            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -140,7 +142,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index(db, scope.file(db));
+                let index = semantic_index_in_environment(db, scope.analysis_file(db));
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
@@ -184,8 +186,8 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     )]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
-        let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module =
+            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return Type::unknown();
         };

@@ -54,14 +54,14 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::{ParsedModuleRef, parsed_module_versioned};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
-use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module_in_program};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
@@ -98,7 +98,7 @@ use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
+use ty_python_core::{FileScopeId, SemanticIndex, semantic_index_in_environment};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct RecursiveTypeNormalizationKey {
@@ -374,17 +374,21 @@ impl<'db> OverloadLiteral<'db> {
     ) -> Option<Span> {
         let definition = self.definition(db);
         let file = definition.file(db);
-        self.node(db, file, &parsed_module(db, file).load(db))
-            .decorator_list
-            .iter()
-            .find(|decorator| {
-                predicate(definition_expression_type(
-                    db,
-                    definition,
-                    &decorator.expression,
-                ))
-            })
-            .map(|decorator| Span::from(file).with_range(decorator.range))
+        self.node(
+            db,
+            file,
+            &parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db),
+        )
+        .decorator_list
+        .iter()
+        .find(|decorator| {
+            predicate(definition_expression_type(
+                db,
+                definition,
+                &decorator.expression,
+            ))
+        })
+        .map(|decorator| Span::from(file).with_range(decorator.range))
     }
 
     /// Iterate through the decorators on this function, returning the span of the first one
@@ -423,7 +427,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.file(db));
+        let index = semantic_index_in_environment(db, body_scope.analysis_file(db));
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
@@ -432,16 +436,19 @@ impl<'db> OverloadLiteral<'db> {
     fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
-        let scope = self.definition(db).scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let definition = self.definition(db);
+        let analysis_file = definition.analysis_file(db);
+        let scope = definition.scope(db);
+        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let use_def =
+            semantic_index_in_environment(db, analysis_file).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
             .node(db)
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, self.file(db));
+            .scoped_use_id(db, analysis_file);
 
         let Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(previous_type),
@@ -485,9 +492,10 @@ impl<'db> OverloadLiteral<'db> {
         let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
         let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let analysis_file = scope.analysis_file(db);
+        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
-        let index = semantic_index(db, scope.file(db));
+        let index = semantic_index_in_environment(db, analysis_file);
         let file_scope_id = scope.file_scope_id(db);
         let is_generator = file_scope_id.is_generator_function(index);
 
@@ -570,10 +578,11 @@ impl<'db> OverloadLiteral<'db> {
         }
 
         let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let analysis_file = scope.analysis_file(db);
+        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
-        let index = semantic_index(db, scope.file(db));
+        let index = semantic_index_in_environment(db, analysis_file);
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
@@ -637,7 +646,7 @@ impl<'db> OverloadLiteral<'db> {
             if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.file(db));
+                let index = semantic_index_in_environment(db, scope_id.analysis_file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
@@ -678,7 +687,9 @@ impl<'db> OverloadLiteral<'db> {
     ) -> (Span, Span) {
         let file = self.file(db);
         let span = Span::from(file);
-        let module = parsed_module(db, file).load(db);
+        let module =
+            parsed_module_versioned(db, self.body_scope(db).analysis_file(db).versioned_file(db))
+                .load(db);
         let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
@@ -697,7 +708,9 @@ impl<'db> OverloadLiteral<'db> {
     pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         let file = self.file(db);
         let span = Span::from(file);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let module =
+            parsed_module_versioned(db, self.body_scope(db).analysis_file(db).versioned_file(db))
+                .load(db);
         let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
@@ -923,7 +936,9 @@ impl<'db> FunctionLiteral<'db> {
         ) -> FunctionBodyKind {
             let definition = implementation.definition(db);
             let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module =
+                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                    .load(db);
             let node = implementation.node(db, file, &module);
             function_body_kind(db, node, |expr| {
                 definition_expression_type(db, definition, expr)
@@ -2107,7 +2122,10 @@ impl KnownFunction {
 
         let candidate = Self::from_str(name).ok()?;
         candidate
-            .check_module(file_to_module(db, definition.file(db))?.known(db)?)
+            .check_module(
+                file_to_module_in_program(db, definition.analysis_file(db).program_file(db))?
+                    .known(db)?,
+            )
             .then_some(candidate)
     }
 
@@ -2586,11 +2604,15 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, file, &module_name) else {
+                let Some(module) = ty_module_resolver::resolve_module_in_program(
+                    db,
+                    context.analysis_file().program_file(db),
+                    &module_name,
+                ) else {
                     return;
                 };
 
-                overload.set_return_type(Type::module_literal(db, file, module));
+                overload.set_return_type(Type::module_literal(db, context.analysis_file(), module));
             }
 
             KnownFunction::TotalOrdering => {

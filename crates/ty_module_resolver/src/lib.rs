@@ -7,9 +7,13 @@ pub use module::KnownModule;
 pub use module::Module;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
+pub use program::{ProgramFile, ResolverProgram};
 pub use resolve::{
-    SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
-    resolve_real_module_confident, resolve_real_shadowable_module,
+    SearchPaths, file_to_module, file_to_module_in_program, resolve_module,
+    resolve_module_confident, resolve_module_confident_in_program, resolve_module_in_program,
+    resolve_real_module, resolve_real_module_confident, resolve_real_module_confident_in_program,
+    resolve_real_module_in_program, resolve_real_shadowable_module,
+    resolve_real_shadowable_module_in_program,
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
@@ -17,9 +21,9 @@ pub use typeshed::{
     PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
 };
 
-pub use list::{all_modules, list_modules};
+pub use list::{all_modules, all_modules_in_program, list_modules, list_modules_in_program};
 pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, ModuleNameMatch};
-pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
+pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths, search_paths_in_program};
 
 mod db;
 mod list;
@@ -27,6 +31,7 @@ mod module;
 mod module_glob;
 mod module_name;
 mod path;
+mod program;
 mod resolve;
 mod settings;
 mod strategy;

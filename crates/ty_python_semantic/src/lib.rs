@@ -6,15 +6,16 @@ use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
     IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
-use crate::types::check_types;
 pub use db::Db;
 pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
 };
+pub use environment::{AnalysisFile, InferenceEnvironment, InferenceSettings, TypingContext};
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
@@ -33,7 +34,6 @@ use ty_python_core::program::Program;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
-    semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -59,6 +59,7 @@ mod suppression;
 pub mod types;
 
 mod diagnostic;
+mod environment;
 #[cfg(feature = "testing")]
 pub mod pull_types;
 
@@ -123,8 +124,8 @@ pub(crate) fn attribute_assignments<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index =
+        ty_python_core::semantic_index_in_environment(db, class_body_scope.analysis_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -144,8 +145,8 @@ pub(crate) fn attribute_declarations<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index =
+        ty_python_core::semantic_index_in_environment(db, class_body_scope.analysis_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -172,6 +173,14 @@ pub fn check_file_unwrap(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 }
 
 pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    check_file_in_environment(db, AnalysisFile::from_default(db, file))
+}
+
+pub fn check_file_in_environment(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let file = analysis_file.file(db);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
@@ -185,7 +194,7 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
         .to_diagnostic());
     }
 
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module_versioned(db, analysis_file.versioned_file(db));
 
     let parsed_ref = parsed.load(db);
     diagnostics.extend(
@@ -201,7 +210,7 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
         error
     }));
 
-    diagnostics.extend(check_types(db, file));
+    diagnostics.extend(types::check_types_in_environment(db, analysis_file));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

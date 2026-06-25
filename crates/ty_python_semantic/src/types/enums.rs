@@ -1,4 +1,4 @@
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1046,7 +1046,13 @@ pub(crate) fn enum_metadata<'db>(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(assignment)
                                 if assignment
-                                    .value(&parsed_module(db, declaration.file(db)).load(db))
+                                    .value(
+                                        &parsed_module_versioned(
+                                            db,
+                                            declaration.analysis_file(db).versioned_file(db),
+                                        )
+                                        .load(db),
+                                    )
                                     .is_some()
                         )
                     })
@@ -1308,11 +1314,13 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> bool {
+    let environment = class.definition(db).analysis_file(db).environment(db);
+    let context = crate::TypingContext::new(db, environment);
     Type::ClassLiteral(ClassLiteral::Static(class))
-        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+        .is_subtype_of(db, KnownClass::Enum.to_subclass_of_in_context(context))
         || class
             .metaclass(db)
-            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
+            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of_in_context(context))
 }
 
 /// Extracts the inner value type from an `enum.nonmember()` wrapper.

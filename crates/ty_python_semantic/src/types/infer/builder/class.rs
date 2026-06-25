@@ -14,7 +14,7 @@ use crate::types::{
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
-use ty_module_resolver::{KnownModule, file_to_module};
+use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -105,11 +105,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
-            .to_scope_id(db, self.file());
+            .to_scope_id(db, self.analysis_file());
 
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.file(), name);
+        let maybe_known_class =
+            KnownClass::try_from_analysis_file_and_name(db, self.analysis_file(), name);
 
-        let known_module = || file_to_module(db, self.file()).and_then(|module| module.known(db));
+        let known_module = || {
+            ty_module_resolver::file_to_module_in_program(db, self.analysis_file().program_file(db))
+                .and_then(|module| module.known(db))
+        };
         let in_typing_module = || {
             matches!(
                 known_module(),

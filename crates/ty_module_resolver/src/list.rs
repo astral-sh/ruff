@@ -7,11 +7,18 @@ use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
-use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
+use crate::program::ResolverProgram;
+use crate::resolve::{
+    ModuleResolveMode, ResolverContext, resolve_file_module, search_paths_in_program,
+};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut modules = list_modules(db).to_vec();
+    all_modules_in_program(db, ResolverProgram::get(db))
+}
+
+pub fn all_modules_in_program(db: &dyn Db, program: ResolverProgram) -> Vec<Module<'_>> {
+    let mut modules = list_modules_in_program(db, program).to_vec();
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
@@ -24,11 +31,19 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 }
 
 /// List all available top-level modules.
-#[salsa::tracked(returns(deref))]
 pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
+    list_modules_in_program(db, ResolverProgram::get(db)).into()
+}
+
+/// List all available top-level modules in one resolver program.
+#[salsa::tracked(returns(deref))]
+pub fn list_modules_in_program(db: &dyn Db, program: ResolverProgram) -> Box<[Module<'_>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+    for search_path in search_paths_in_program(db, program, ModuleResolveMode::StubsAllowed) {
+        for &new in list_modules_in(
+            db,
+            SearchPathIngredient::new(db, program, search_path.clone()),
+        ) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
                     entry.insert(new);
@@ -64,6 +79,7 @@ pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 struct SearchPathIngredient<'db> {
+    program: ResolverProgram,
     #[returns(ref)]
     path: SearchPath,
 }
@@ -75,7 +91,7 @@ fn list_modules_in<'db>(
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<ListedModule<'db>> {
     tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
-    let mut lister = Lister::new(db, search_path.path(db));
+    let mut lister = Lister::new(db, search_path.program(db), search_path.path(db));
     match search_path.path(db).as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
             let Ok(listing) = directory_listing(db, system_search_path) else {
@@ -113,6 +129,7 @@ impl get_size2::GetSize for ListedModule<'_> {}
 /// in the same directory).
 struct Lister<'db> {
     db: &'db dyn Db,
+    program: ResolverProgram,
     search_path: &'db SearchPath,
     modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
@@ -120,9 +137,10 @@ struct Lister<'db> {
 impl<'db> Lister<'db> {
     /// Create new state that can accumulate modules from a list
     /// of file paths.
-    fn new(db: &'db dyn Db, search_path: &'db SearchPath) -> Lister<'db> {
+    fn new(db: &'db dyn Db, program: ResolverProgram, search_path: &'db SearchPath) -> Lister<'db> {
         Lister {
             db,
+            program,
             search_path,
             modules: BTreeMap::new(),
         }
@@ -173,8 +191,9 @@ impl<'db> Lister<'db> {
                 if let Some(file) = resolve_file_module(&module_path, &self.context()) {
                     self.add_module(
                         &module_path,
-                        Module::file_module(
+                        Module::file_module_in_program(
                             self.db,
+                            self.program,
                             module_name,
                             ModuleKind::Package,
                             self.search_path.clone(),
@@ -219,7 +238,7 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package(self.db, module_name),
+                        Module::namespace_package_in_program(self.db, self.program, module_name),
                     );
                 }
                 return;
@@ -245,8 +264,9 @@ impl<'db> Lister<'db> {
         };
         self.add_module(
             &module_path,
-            Module::file_module(
+            Module::file_module_in_program(
                 self.db,
+                self.program,
                 module_name,
                 ModuleKind::Module,
                 self.search_path.clone(),
@@ -325,7 +345,7 @@ impl<'db> Lister<'db> {
     /// Returns the Python version we want to perform module resolution
     /// with.
     fn python_version(&self) -> PythonVersion {
-        self.db.python_version()
+        self.program.python_version(self.db)
     }
 
     /// Constructs a resolver context for use with some APIs that require it.
@@ -1438,7 +1458,11 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(
+                &db,
+                crate::program::ResolverProgram::get(&db),
+                ModuleResolveMode::StubsAllowed,
+            ),
             &events,
         );
     }

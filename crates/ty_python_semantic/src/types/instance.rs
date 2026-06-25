@@ -3,8 +3,8 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use ruff_python_ast::name::Name;
-use ty_module_resolver::{ModuleName, file_to_module};
+use ruff_python_ast::{PythonVersion, name::Name};
+use ty_module_resolver::{ModuleName, file_to_module_in_program};
 
 use super::protocol_class::ProtocolInterface;
 use super::{
@@ -119,11 +119,13 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
-    pub(crate) const fn sys_version_info() -> Self {
+    pub(crate) const fn sys_version_info(version: PythonVersion) -> Self {
         // Keep construction query-free: resolving the backing typeshed class here is on the hot
         // path for projects with many version guards. Resolve it lazily when class behavior is
         // actually needed instead.
-        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::SysVersionInfo))
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::SysVersionInfo(
+            version,
+        )))
     }
 
     pub(crate) const fn is_nominal_instance(self) -> bool {
@@ -185,7 +187,7 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
         }
         NominalInstanceInner::Object => {}
         NominalInstanceInner::NonTuple(class) => visitor.visit_type(db, class.class(db).into()),
-        NominalInstanceInner::SysVersionInfo => {}
+        NominalInstanceInner::SysVersionInfo(_) => {}
     }
 }
 
@@ -226,15 +228,16 @@ impl<'db> NominalInstanceType<'db> {
     /// repo, but is exposed as a public API for external users of
     /// `ty_python_semantic`.
     pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
-        let file = self.class(db).class_literal(db).file(db);
-        file_to_module(db, file).map(|module| module.name(db))
+        let class = self.class(db).class_literal(db).as_static()?;
+        file_to_module_in_program(db, class.definition(db).analysis_file(db).program_file(db))
+            .map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class.class(db),
-            NominalInstanceInner::SysVersionInfo => {
+            NominalInstanceInner::SysVersionInfo(_) => {
                 sys_version_info_class(db).unwrap_or_else(|| ClassType::object(db))
             }
             NominalInstanceInner::Object => ClassType::object(db),
@@ -252,13 +255,20 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => Some(KnownClass::Tuple),
             NominalInstanceInner::NonTuple(class) => class.class(db).known(db),
-            NominalInstanceInner::SysVersionInfo => Some(KnownClass::VersionInfo),
+            NominalInstanceInner::SysVersionInfo(_) => Some(KnownClass::VersionInfo),
             NominalInstanceInner::Object => Some(KnownClass::Object),
         }
     }
 
     pub(super) const fn is_sys_version_info(self) -> bool {
-        matches!(self.0, NominalInstanceInner::SysVersionInfo)
+        matches!(self.0, NominalInstanceInner::SysVersionInfo(_))
+    }
+
+    pub(super) const fn sys_version_info_version(self) -> Option<PythonVersion> {
+        match self.0 {
+            NominalInstanceInner::SysVersionInfo(version) => Some(version),
+            _ => None,
+        }
     }
 
     /// Returns whether this is a nominal instance of a particular [`KnownClass`].
@@ -273,8 +283,8 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
-            NominalInstanceInner::SysVersionInfo => {
-                Some(Cow::Owned(TupleSpec::version_info_spec(db)))
+            NominalInstanceInner::SysVersionInfo(version) => {
+                Some(Cow::Owned(TupleSpec::version_info_spec(db, version)))
             }
             NominalInstanceInner::Object => None,
             NominalInstanceInner::NonTuple(class) => {
@@ -314,7 +324,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => true,
-            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
+            NominalInstanceInner::SysVersionInfo(_) | NominalInstanceInner::Object => false,
             NominalInstanceInner::NonTuple(class) => class.class(db).is_generic(),
         }
     }
@@ -333,7 +343,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(_)
-            | NominalInstanceInner::SysVersionInfo
+            | NominalInstanceInner::SysVersionInfo(_)
             | NominalInstanceInner::Object => None,
         }
     }
@@ -347,7 +357,7 @@ impl<'db> NominalInstanceType<'db> {
         let class = match self.0 {
             NominalInstanceInner::NonTuple(class) => class.class(db),
             NominalInstanceInner::ExactTuple(_)
-            | NominalInstanceInner::SysVersionInfo
+            | NominalInstanceInner::SysVersionInfo(_)
             | NominalInstanceInner::Object => return None,
         };
         let (class_literal, specialization) = class.static_class_literal(db)?;
@@ -391,8 +401,8 @@ impl<'db> NominalInstanceType<'db> {
                     tuple.recursive_type_normalized_impl(db, div, nested)?,
                 )))
             }
-            NominalInstanceInner::SysVersionInfo => {
-                Some(Self(NominalInstanceInner::SysVersionInfo))
+            NominalInstanceInner::SysVersionInfo(version) => {
+                Some(Self(NominalInstanceInner::SysVersionInfo(version)))
             }
             NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
             NominalInstanceInner::NonTuple(class) => {
@@ -414,7 +424,7 @@ impl<'db> NominalInstanceType<'db> {
             // See:
             // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
             NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::Object => false,
-            NominalInstanceInner::SysVersionInfo => true,
+            NominalInstanceInner::SysVersionInfo(_) => true,
             NominalInstanceInner::NonTuple(class) => class
                 .class(db)
                 .known(db)
@@ -427,7 +437,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
             NominalInstanceInner::Object => false,
-            NominalInstanceInner::SysVersionInfo => true,
+            NominalInstanceInner::SysVersionInfo(_) => true,
             NominalInstanceInner::NonTuple(class) => class
                 .class(db)
                 .known(db)
@@ -452,7 +462,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            NominalInstanceInner::SysVersionInfo => Type::NominalInstance(self),
+            NominalInstanceInner::SysVersionInfo(_) => Type::NominalInstance(self),
             NominalInstanceInner::Object => Type::object(),
             NominalInstanceInner::NonTuple(class) => {
                 let transformed =
@@ -477,7 +487,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
-            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => {}
+            NominalInstanceInner::SysVersionInfo(_) | NominalInstanceInner::Object => {}
             NominalInstanceInner::NonTuple(class) => {
                 class
                     .class(db)
@@ -713,7 +723,7 @@ enum NominalInstanceInner<'db> {
     /// because they represent "all instances of a class that is a tuple subclass".
     NonTuple(NominalInstanceClass<'db>),
     /// The singleton `sys.version_info` value.
-    SysVersionInfo,
+    SysVersionInfo(PythonVersion),
 }
 
 fn sys_version_info_class(db: &dyn Db) -> Option<ClassType<'_>> {

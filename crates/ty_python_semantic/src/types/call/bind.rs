@@ -66,10 +66,10 @@ use crate::types::{
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, FxOrderSet, Program};
+use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
-use ty_python_core::semantic_index;
+use ty_python_core::semantic_index_in_environment;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -1390,7 +1390,20 @@ impl<'db> Bindings<'db> {
                                     Some("__default__") => {
                                         overload.set_return_type(
                                             typevar.default_type(db).unwrap_or_else(|| {
-                                                KnownClass::NoDefaultType.to_instance(db)
+                                                typevar.definition(db).map_or_else(
+                                                    || KnownClass::NoDefaultType.to_instance(db),
+                                                    |definition| {
+                                                        KnownClass::NoDefaultType
+                                                            .to_instance_in_context(
+                                                                crate::TypingContext::new(
+                                                                    db,
+                                                                    definition
+                                                                        .analysis_file(db)
+                                                                        .environment(db),
+                                                                ),
+                                                            )
+                                                    },
+                                                )
                                             }),
                                         );
                                     }
@@ -1684,9 +1697,14 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    function @ Type::FunctionLiteral(_)
+                    function @ Type::FunctionLiteral(function_type)
                         if dataclass_field_specifiers.contains(&function) =>
                     {
+                        let python_version = function_type
+                            .definition(db)
+                            .analysis_file(db)
+                            .program(db)
+                            .python_version(db);
                         // Helper to get the type of a keyword argument by name. We first try to get it from
                         // the parameter binding (for explicit parameters), and then fall back to checking the
                         // call site arguments (for field-specifier functions that use a `**kwargs` parameter,
@@ -1731,8 +1749,7 @@ impl<'db> Bindings<'db> {
                             .map(|init| !init.bool(db).is_always_false())
                             .unwrap_or(true);
 
-                        let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
-                        {
+                        let kw_only = if python_version >= PythonVersion::PY310 {
                             match kw_only.and_then(Type::as_literal_value_kind) {
                                 // We are more conservative here when turning the type for `kw_only`
                                 // into a bool, because a field specifier in a stub might use
@@ -2038,8 +2055,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(match ty {
                                     Type::ModuleLiteral(module_literal) => {
                                         let all_names = module_literal
-                                            .module(db)
-                                            .file(db)
+                                            .module_analysis_file(db)
                                             .map(|file| dunder_all_names(db, file))
                                             .unwrap_or_default();
                                         match all_names {
@@ -2391,9 +2407,17 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let return_type = parse_struct_format(db, format_literal.value(db))
-                                .map(|elements| Type::heterogeneous_tuple(db, elements))
-                                .unwrap_or_else(|| Type::homogeneous_tuple(db, Type::unknown()));
+                            let python_version = function_type
+                                .definition(db)
+                                .analysis_file(db)
+                                .program(db)
+                                .python_version(db);
+                            let return_type =
+                                parse_struct_format(db, python_version, format_literal.value(db))
+                                    .map(|elements| Type::heterogeneous_tuple(db, elements))
+                                    .unwrap_or_else(|| {
+                                        Type::homogeneous_tuple(db, Type::unknown())
+                                    });
 
                             overload.set_return_type(return_type);
                         }
@@ -6692,8 +6716,8 @@ impl<'db> CallableDescription<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> Cow<'db, str> {
-            let file = function.file(db);
-            let semantic_index = semantic_index(db, file);
+            let definition = function.definition(db);
+            let semantic_index = semantic_index_in_environment(db, definition.analysis_file(db));
             let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
             if let Some(class_node) = enclosing_scope.node().as_class()
                 && let Some(class) =
@@ -7847,7 +7871,11 @@ const STRUCT_FORMAT_MAX_REPETITION: usize = 32;
 ///
 /// Returns `None` if the format contains unsupported specifiers or
 /// repetition counts exceed the limit, indicating a fallback to `tuple[Unknown, ...]`.
-fn parse_struct_format<'db>(db: &'db dyn Db, format_string: &str) -> Option<Vec<Type<'db>>> {
+fn parse_struct_format<'db>(
+    db: &'db dyn Db,
+    python_version: PythonVersion,
+    format_string: &str,
+) -> Option<Vec<Type<'db>>> {
     // Strip the byte order/size/alignment prefix
     let format = format_string.trim_start_matches(['@', '=', '<', '>', '!']);
     let mut chars = format.chars().peekable();
@@ -7882,7 +7910,7 @@ fn parse_struct_format<'db>(db: &'db dyn Db, format_string: &str) -> Option<Vec<
             }
             '?' => (KnownClass::Bool.to_instance(db), count),
             'e' | 'f' | 'd' => (KnownClass::Float.to_instance(db), count),
-            'F' | 'D' if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
+            'F' | 'D' if python_version >= PythonVersion::PY314 => {
                 (KnownClass::Complex.to_instance(db), count)
             }
             _ => return None,

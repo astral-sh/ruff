@@ -10,6 +10,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
+use ty_python_core::environment::{InferenceEnvironment, InferenceSettings};
 use ty_python_core::program::{FallibleStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
@@ -283,7 +284,9 @@ impl ProjectDatabase {
                     ) {
                         Ok((program_settings, diagnostics)) => {
                             let program = Program::get(self);
-                            program.update_from_settings(self, program_settings);
+                            let programs = self.programs.clone();
+                            let program = programs.reconfigure(self, program, program_settings);
+                            Program::set_default(self, program);
                             diagnostics
                         }
                         Err(error) => {
@@ -309,6 +312,28 @@ impl ProjectDatabase {
                     };
 
                     tracing::debug!("Reloading project after structural change");
+                    let inference_settings = InferenceSettings {
+                        replace_imports_with_any: settings.as_ref().map_or_else(
+                            || {
+                                project
+                                    .settings(self)
+                                    .analysis()
+                                    .replace_imports_with_any
+                                    .clone()
+                            },
+                            |settings| settings.analysis().replace_imports_with_any.clone(),
+                        ),
+                    };
+                    let inference_environments = self.inference_environments.clone();
+                    let current_inference_environment = InferenceEnvironment::get(self);
+                    let program = Program::get(self);
+                    let inference_environment = inference_environments.reconfigure(
+                        self,
+                        current_inference_environment,
+                        program,
+                        inference_settings,
+                    );
+                    InferenceEnvironment::set_default(self, inference_environment);
                     match project.reload(
                         self,
                         metadata,

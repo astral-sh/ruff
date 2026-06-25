@@ -1,9 +1,9 @@
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
 use ruff_text_size::Ranged;
-use ty_module_resolver::file_to_module;
+use ty_module_resolver::file_to_module_in_program;
 
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
@@ -529,7 +529,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
             let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module =
+                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                    .load(db);
             let range = definition.focus_range(db, &module).range();
             diagnostic.annotate(
                 Annotation::secondary(Span::from(file).with_range(range))
@@ -719,7 +721,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     continue;
                                 };
                                 let file = definition.file(db);
-                                let module = parsed_module(db, file).load(db);
+                                let module = parsed_module_versioned(
+                                    db,
+                                    definition.analysis_file(db).versioned_file(db),
+                                )
+                                .load(db);
                                 let range = definition.focus_range(db, &module).range();
                                 diagnostic.annotate(
                                     Annotation::secondary(Span::from(file).with_range(range))
@@ -1718,7 +1724,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .as_nominal_instance()
                                 .and_then(|instance| instance.class(db).static_class_literal(db))
                                 .and_then(|(class_literal, _)| {
-                                    file_to_module(db, class_literal.file(db))
+                                    file_to_module_in_program(
+                                        db,
+                                        class_literal
+                                            .definition(db)
+                                            .analysis_file(db)
+                                            .program_file(db),
+                                    )
                                 })
                                 .and_then(|module| module.search_path(db))
                                 .is_some_and(ty_module_resolver::SearchPath::is_first_party)

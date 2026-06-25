@@ -2,14 +2,23 @@ use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, check_types, check_types_in_environment};
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
+use ruff_db::parsed::parsed_module;
 use ruff_db::system::DbWithWritableSystem as _;
+use ruff_db::system::SystemPathBuf;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_python_ast::PythonVersion;
+use ty_module_resolver::SearchPathSettings;
 use ty_python_core::definition::Definition;
+use ty_python_core::environment::{AnalysisFile, InferenceEnvironment, InferenceSettings};
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
 
@@ -70,6 +79,222 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
     );
+}
+
+#[test]
+fn one_file_can_be_analyzed_for_multiple_platforms() -> anyhow::Result<()> {
+    let db = crate::db::tests::TestDbBuilder::new()
+        .with_file(
+            "/src/main.py",
+            "import os\nimport sys\nreveal_type(sys.platform)\nreveal_type(os.name)\n",
+        )
+        .build()?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let default = Program::get(&db);
+
+    let program = |platform: &str| {
+        Program::create(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: default.python_version(&db),
+                    source: PythonVersionSource::Default,
+                },
+                python_platform: PythonPlatform::Identifier(platform.to_string()),
+                search_paths: default.search_paths(&db).clone(),
+            },
+        )
+    };
+    let diagnostics = |platform| {
+        let environment =
+            InferenceEnvironment::create(&db, program(platform), InferenceSettings::default());
+        check_types_in_environment(&db, AnalysisFile::new(&db, environment, file))
+    };
+
+    let linux = diagnostics("linux");
+    let windows = diagnostics("win32");
+    let messages = |diagnostics: &[Diagnostic]| {
+        diagnostics
+            .iter()
+            .filter_map(|diagnostic| {
+                diagnostic
+                    .primary_annotation()?
+                    .get_message()
+                    .map(str::to_owned)
+            })
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        messages(&linux),
+        ["`Literal[\"linux\"]`", "`Literal[\"posix\"]`"]
+    );
+    assert_eq!(
+        messages(&windows),
+        ["`Literal[\"win32\"]`", "`Literal[\"nt\"]`"]
+    );
+    Ok(())
+}
+
+#[test]
+fn one_file_can_be_analyzed_for_multiple_python_versions() -> anyhow::Result<()> {
+    let db = crate::db::tests::TestDbBuilder::new()
+        .with_file(
+            "/src/main.py",
+            "import sys\nif sys.version_info >= (3, 12):\n    value = 1\nelse:\n    value = 'old'\nreveal_type(value)\n",
+        )
+        .build()?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let default = Program::get(&db);
+    let revealed = |version| {
+        let program = Program::create(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version,
+                    source: PythonVersionSource::Default,
+                },
+                python_platform: default.python_platform(&db).clone(),
+                search_paths: default.search_paths(&db).clone(),
+            },
+        );
+        let environment = InferenceEnvironment::create(&db, program, InferenceSettings::default());
+        let diagnostics =
+            check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
+        diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
+            .unwrap_or_else(|| panic!("missing reveal diagnostic: {diagnostics:#?}"))
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message())
+            .unwrap()
+            .to_owned()
+    };
+
+    assert_eq!(revealed(PythonVersion::PY311), "`Literal[\"old\"]`");
+    assert_eq!(revealed(PythonVersion::PY312), "`Literal[1]`");
+    Ok(())
+}
+
+#[test]
+fn known_classes_are_looked_up_in_the_selected_python_version() {
+    let db = setup_db();
+    let default = Program::get(&db);
+    let class_name = |version| {
+        let program = Program::create(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version,
+                    source: PythonVersionSource::Default,
+                },
+                python_platform: default.python_platform(&db).clone(),
+                search_paths: default.search_paths(&db).clone(),
+            },
+        );
+        let environment = InferenceEnvironment::create(&db, program, InferenceSettings::default());
+        let class = KnownClass::EnumType
+            .try_to_class_literal_in_context(crate::TypingContext::new(&db, environment))
+            .unwrap();
+        assert_eq!(
+            class.definition(&db).analysis_file(&db).environment(&db),
+            environment
+        );
+        class.name(&db).to_string()
+    };
+
+    assert_eq!(class_name(PythonVersion::PY310), "EnumMeta");
+    // Typeshed models `EnumType` as an alias to the class still named `EnumMeta`.
+    assert_eq!(class_name(PythonVersion::PY311), "EnumMeta");
+}
+
+#[test]
+fn imported_files_inherit_the_importers_search_paths() -> anyhow::Result<()> {
+    let mut db = crate::db::tests::TestDbBuilder::new()
+        .with_file(
+            "/src/main.py",
+            "from dependency import value\nreveal_type(value)\n",
+        )
+        .build()?;
+    db.write_file("/first/dependency.py", "value = 1\n")?;
+    db.write_file("/second/dependency.py", "value = 'second'\n")?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let default = Program::get(&db);
+
+    let revealed = |root: &str| -> anyhow::Result<String> {
+        let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from(root)])
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)?;
+        let program = Program::create(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: default.python_version(&db),
+                    source: PythonVersionSource::Default,
+                },
+                python_platform: default.python_platform(&db).clone(),
+                search_paths,
+            },
+        );
+        let environment = InferenceEnvironment::create(&db, program, InferenceSettings::default());
+        let diagnostics =
+            check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
+        Ok(diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
+            .unwrap_or_else(|| panic!("missing reveal diagnostic: {diagnostics:#?}"))
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message())
+            .unwrap()
+            .to_owned())
+    };
+
+    assert_eq!(revealed("/first")?, "`Literal[1]`");
+    assert_eq!(revealed("/second")?, "`Literal[\"second\"]`");
+    Ok(())
+}
+
+#[test]
+fn replace_imports_with_any_forks_inference_environments() -> anyhow::Result<()> {
+    let db = crate::db::tests::TestDbBuilder::new()
+        .with_file(
+            "/src/main.py",
+            "from dependency import value\nreveal_type(value)\n",
+        )
+        .with_file("/src/dependency.py", "value = 1\n")
+        .build()?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+
+    let revealed = |replace_imports_with_any| {
+        let environment = InferenceEnvironment::create(
+            &db,
+            Program::get(&db),
+            InferenceSettings {
+                replace_imports_with_any,
+            },
+        );
+        let diagnostics =
+            check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
+        diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
+            .unwrap_or_else(|| panic!("missing reveal diagnostic: {diagnostics:#?}"))
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message())
+            .unwrap()
+            .to_owned()
+    };
+
+    assert_eq!(
+        revealed(ty_module_resolver::ModuleGlobSet::empty()),
+        "`Literal[1]`"
+    );
+    assert_eq!(
+        revealed(ty_module_resolver::ModuleGlobSet::from_patterns([
+            "dependency"
+        ])?),
+        "`Any`"
+    );
+    Ok(())
 }
 
 #[test]

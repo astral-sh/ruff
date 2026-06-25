@@ -1,5 +1,5 @@
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -12,7 +12,7 @@ use crate::{
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::semantic_index;
+use ty_python_core::semantic_index_in_environment;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
@@ -23,7 +23,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let file = declaration.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module =
+            parsed_module_versioned(db, declaration.analysis_file(db).versioned_file(db)).load(db);
         let range = match declaration.kind(db) {
             DefinitionKind::AnnotatedAssignment(assignment) => {
                 assignment.annotation(&module).range()
@@ -59,7 +60,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.file(db));
+            let class_index = semantic_index_in_environment(db, class_body_scope.analysis_file(db));
             let place_table = class_index.place_table(class_scope_id);
             let Some(symbol_id) = place_table.symbol_id(attribute) else {
                 continue;
@@ -247,7 +248,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.file(db));
+            let class_index = semantic_index_in_environment(db, class_body_scope.analysis_file(db));
             let pt = class_index.place_table(class_scope_id);
 
             if let Some(symbol) = pt.symbol_by_name(attribute)

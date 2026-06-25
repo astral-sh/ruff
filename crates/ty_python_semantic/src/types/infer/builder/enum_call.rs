@@ -5,7 +5,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
 use crate::{
-    Db, Program,
+    Db,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
@@ -315,7 +315,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = &call_expr.arguments;
 
         let base_name = base_class.name(db);
-        let python_version = Program::get(db).python_version(db);
+        let python_version = self.analysis_file().program(db).python_version(db);
 
         for kw in keywords {
             if let Some(name) = &kw.arg

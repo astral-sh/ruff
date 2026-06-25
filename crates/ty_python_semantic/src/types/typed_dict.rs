@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
@@ -253,8 +253,10 @@ impl<'db> TypedDictType<'db> {
                 }
             };
 
-            let module = parsed_module(db, static_class.file(db)).load(db);
             let class_definition = static_class.definition(db);
+            let module =
+                parsed_module_versioned(db, class_definition.analysis_file(db).versioned_file(db))
+                    .load(db);
             let class_stmt = class_definition
                 .kind(db)
                 .as_class()
@@ -1256,7 +1258,8 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
-    let module = parsed_module(db, definition.file(db)).load(db);
+    let module =
+        parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1317,7 +1320,8 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
-    let module = parsed_module(db, definition.file(db)).load(db);
+    let module =
+        parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1538,7 +1542,9 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
     ) {
         if let Some(declaration) = item.first_declaration() {
             let file = declaration.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module =
+                parsed_module_versioned(db, declaration.analysis_file(db).versioned_file(db))
+                    .load(db);
 
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Item declaration");
             sub.annotate(

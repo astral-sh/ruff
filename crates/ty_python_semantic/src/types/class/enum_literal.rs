@@ -1,5 +1,5 @@
 use ruff_db::diagnostic::Span;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
@@ -162,8 +162,8 @@ impl<'db> DynamicEnumLiteral<'db> {
 
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module =
+            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
         match self.anchor(db) {
             DynamicEnumAnchor::Definition { definition, .. } => definition
                 .kind(db)
@@ -189,9 +189,11 @@ impl<'db> DynamicEnumLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    #[expect(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        KnownClass::EnumType.to_class_literal(db)
+        KnownClass::EnumType.to_class_literal_in_context(crate::TypingContext::new(
+            db,
+            self.scope(db).analysis_file(db).environment(db),
+        ))
     }
 
     #[salsa::tracked(

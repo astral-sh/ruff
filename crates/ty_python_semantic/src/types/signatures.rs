@@ -17,7 +17,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
+use super::{DynamicType, Type, TypeVarVariance, UnionType};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -41,6 +41,7 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::Definition;
+use ty_python_core::semantic_index_in_environment;
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
@@ -65,10 +66,10 @@ fn function_signature_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.file(db);
-    let index = semantic_index(db, file);
+    let analysis_file = definition.analysis_file(db);
+    let index = ty_python_core::semantic_index_in_environment(db, analysis_file);
     let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
+    let scope = file_scope.to_scope_id(db, analysis_file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
         infer_deferred_types(db, definition).expression_type(expression)
@@ -83,10 +84,10 @@ fn function_signature_type_expression_flags<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeExpressionFlags {
-    let file = definition.file(db);
-    let index = semantic_index(db, file);
+    let analysis_file = definition.analysis_file(db);
+    let index = ty_python_core::semantic_index_in_environment(db, analysis_file);
     let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
+    let scope = file_scope.to_scope_id(db, analysis_file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
         infer_deferred_types(db, definition).type_expression_flags(expression)
@@ -4050,7 +4051,7 @@ impl<'db> Parameter<'db> {
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let index = semantic_index(db, function_definition.file(db));
+        let index = semantic_index_in_environment(db, function_definition.analysis_file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
         let (annotated_type, inferred_annotation, has_starred_annotation) =

@@ -23,7 +23,7 @@ use crate::{
 };
 use ty_python_core::{
     attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
-    semantic_index, use_def_map,
+    semantic_index_in_environment, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -504,8 +504,7 @@ impl<'db> AllMembers<'db> {
         class_literal: StaticClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
-        let file = class_body_scope.file(db);
-        let index = semantic_index(db, file);
+        let index = semantic_index_in_environment(db, class_body_scope.analysis_file(db));
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {

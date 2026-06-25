@@ -1814,7 +1814,12 @@ mod resolve_definition {
                             definition_path_component_for_node(&real_ref, scope_node)
                         {
                             if real_component == component {
-                                scopes.push(child_scope_id.to_scope_id(db, real_file));
+                                scopes.push(child_scope_id.to_scope_id(
+                                    db,
+                                    ty_python_core::environment::AnalysisFile::from_default(
+                                        db, real_file,
+                                    ),
+                                ));
                             }
                         }
                         scope.node(db);

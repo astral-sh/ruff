@@ -26,7 +26,7 @@ use crate::types::{
     TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
     any_over_type, todo_type,
 };
-use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
+use crate::{FxOrderSet, add_inferred_python_version_hint_to_diagnostic};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -317,8 +317,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         accessed",
                                     ),
                                     _ => {
-                                        let python_version =
-                                            Program::get(self.db()).python_version(self.db());
+                                        let python_version = self
+                                            .analysis_file()
+                                            .program(self.db())
+                                            .python_version(self.db());
 
                                         if python_version < PythonVersion::PY314 {
                                             diagnostic.info(format_args!(

@@ -17,7 +17,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
-use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
+use ty_module_resolver::{KnownModule, ModuleName};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
@@ -31,9 +31,10 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope_in_environment,
+    builtins_symbol_in_environment, class_body_implicit_symbol_in_environment,
+    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol_in_environment, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
 };
@@ -110,7 +111,7 @@ use crate::types::{
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::{Db, FxIndexSet};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -630,6 +631,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context.file()
     }
 
+    fn analysis_file(&self) -> ty_python_core::environment::AnalysisFile<'db> {
+        self.context.analysis_file()
+    }
+
     fn module(&self) -> &'ast ParsedModuleRef {
         self.context.module()
     }
@@ -656,8 +661,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
     }
 
-    fn settings(&self) -> &AnalysisSettings {
-        self.db().analysis_settings(self.file())
+    fn replace_imports_with_any(&self) -> &ty_module_resolver::ModuleGlobSet {
+        let environment = self.analysis_file().environment(self.db());
+        if environment == ty_python_core::environment::InferenceEnvironment::get(self.db()) {
+            // Compatibility for project/check entry points whose per-file
+            // overrides still live on `Db`. Explicit scroll environments do
+            // not consult this singleton policy.
+            &self
+                .db()
+                .analysis_settings(self.file())
+                .replace_imports_with_any
+        } else {
+            &environment.settings(self.db()).replace_imports_with_any
+        }
+    }
+
+    fn allowed_unresolved_imports(&self) -> &ty_module_resolver::ModuleGlobSet {
+        &self
+            .db()
+            .analysis_settings(self.file())
+            .allowed_unresolved_imports
     }
 
     fn is_in_type_checking_block(&self, scope: ScopeId<'db>, node: impl Ranged) -> bool {
@@ -720,7 +743,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn defer_annotations(&self) -> bool {
         self.index.has_future_annotations()
             || self.in_stub()
-            || Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY314
+            || self
+                .analysis_file()
+                .program(self.db())
+                .python_version(self.db())
+                >= PythonVersion::PY314
     }
 
     /// Are we currently in a context where name resolution should be deferred
@@ -830,7 +857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// already in progress for that scope (further up the stack).
     fn file_expression_type(&self, expression: &ast::Expr) -> Type<'db> {
         let file_scope = self.index.expression_scope_id(expression);
-        let expr_scope = file_scope.to_scope_id(self.db(), self.file());
+        let expr_scope = file_scope.to_scope_id(self.db(), self.analysis_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
@@ -842,7 +869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Get metadata for a type expression from any scope in the same file.
     fn file_type_expression_flags(&self, expression: &ast::Expr) -> TypeExpressionFlags {
         let file_scope = self.index.expression_scope_id(expression);
-        let expr_scope = file_scope.to_scope_id(self.db(), self.file());
+        let expr_scope = file_scope.to_scope_id(self.db(), self.analysis_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.type_expression_flags(expression)
@@ -1477,7 +1504,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let PlaceExprRef::Symbol(symbol) = &place
                 && scope.is_global()
             {
-                module_type_implicit_global_symbol(self.db(), symbol.name())
+                module_type_implicit_global_symbol_in_environment(
+                    self.db(),
+                    self.analysis_file().environment(self.db()),
+                    symbol.name(),
+                )
             } else {
                 Place::Undefined.into()
             }
@@ -1533,7 +1564,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let place = place_table.place(definition.place(self.db()));
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
-                        .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
+                        .map(|symbol| {
+                            module_type_implicit_global_symbol_in_environment(
+                                self.db(),
+                                self.analysis_file().environment(self.db()),
+                                symbol.name(),
+                            )
+                        })
                         .and_then(|place| place.place.ignore_possibly_undefined())
                     {
                         let declared_type = declared_ty.inner_type();
@@ -1896,7 +1933,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let rhs_scope = self
             .index
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
-            .to_scope_id(self.db(), self.file());
+            .to_scope_id(self.db(), self.analysis_file());
 
         let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
             TypeAliasType::PEP695(PEP695TypeAliasType::new(
@@ -3438,7 +3475,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .known(db)
                     .is_some_and(KnownModule::is_builtins)
                 {
-                    builtins_symbol(db, attribute)
+                    builtins_symbol_in_environment(
+                        db,
+                        self.analysis_file().environment(db),
+                        attribute,
+                    )
                 } else {
                     module.static_member(db, attribute)
                 };
@@ -3989,7 +4030,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if let Some(special_form) = target.as_name_expr().and_then(|name| {
-            SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name.id)
+            SpecialFormType::try_from_analysis_file_and_name(
+                self.db(),
+                self.analysis_file(),
+                &name.id,
+            )
         }) {
             target_ty = Type::SpecialForm(special_form);
         }
@@ -4871,8 +4916,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr()
-            && let Some(special_form) =
-                SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name_expr.id)
+            && let Some(special_form) = SpecialFormType::try_from_analysis_file_and_name(
+                self.db(),
+                self.analysis_file(),
+                &name_expr.id,
+            )
         {
             declared.inner = Type::SpecialForm(special_form);
         }
@@ -5464,9 +5512,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol(self.db(), name)
-                .place
-                .is_undefined()
+            if !module_type_implicit_global_symbol_in_environment(
+                self.db(),
+                self.analysis_file().environment(self.db()),
+                name,
+            )
+            .place
+            .is_undefined()
             {
                 // This name is an implicit global like `__file__` (but not a built-in like `int`).
                 continue;
@@ -5489,8 +5541,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db(), self.file(), module_name)
-            .map(|module| Type::module_literal(self.db(), self.file(), module))
+        ty_module_resolver::resolve_module_in_program(
+            self.db(),
+            self.analysis_file().program_file(self.db()),
+            module_name,
+        )
+        .map(|module| Type::module_literal(self.db(), self.analysis_file(), module))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -7685,7 +7741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let scope = scope_id.to_scope_id(self.db(), self.analysis_file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
         self.extend_scope(inference);
         let yield_type = self.comprehension_element_type(elt, inference);
@@ -7758,7 +7814,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let scope = scope_id.to_scope_id(self.db(), self.analysis_file());
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
@@ -7792,7 +7848,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let scope = scope_id.to_scope_id(self.db(), self.analysis_file());
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
@@ -7827,7 +7883,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let scope = scope_id.to_scope_id(self.db(), self.analysis_file());
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
 
@@ -8263,7 +8319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
 
-        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let scope = scope_id.to_scope_id(self.db(), self.analysis_file());
 
         // If we have a direct `Callable` type context, we can infer the body with the annotated
         // return type as type context.
@@ -8332,7 +8388,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
 
-        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.file())) {
+        for bindings in
+            use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.analysis_file()))
+        {
             let place = place_from_bindings_with_reachability_cache(
                 db,
                 bindings.clone(),
@@ -9552,7 +9610,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, || {
-                module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
+                module_type_implicit_global_symbol_in_environment(
+                    db,
+                    self.analysis_file().environment(db),
+                    symbol_name,
+                )
+                .map_type(|ty| {
                     self.narrow_place_with_applicable_constraints(
                         PlaceExprRef::from(&expr),
                         ty,
@@ -9563,10 +9626,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Not found in globals? Fallback to builtins
             // (without infinite recursion if we're already in builtins.)
             .or_fall_back_to(db, || {
-                if Some(self.scope()) == builtins_module_scope(db) {
+                if Some(self.scope())
+                    == builtins_module_scope_in_environment(
+                        db,
+                        self.analysis_file().environment(db),
+                    )
+                {
                     Place::Undefined.into()
                 } else {
-                    builtins_symbol(db, symbol_name)
+                    builtins_symbol_in_environment(
+                        db,
+                        self.analysis_file().environment(db),
+                        symbol_name,
+                    )
                 }
             })
             // Still not found? It might be `reveal_type`...
@@ -9649,7 +9721,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return (place, None);
             }
 
-            let use_id = expr_ref.scoped_use_id(db, self.file());
+            let use_id = expr_ref.scoped_use_id(db, self.analysis_file());
             let place = place_from_bindings_with_reachability_cache(
                 db,
                 use_def.bindings_at_use(use_id),
@@ -9989,7 +10061,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // We've reached the defining scope of the variable. Infer its public type.
                 debug_assert!(enclosing_place.is_bound() || enclosing_place.is_declared());
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                let enclosing_scope_id =
+                    enclosing_scope_file_id.to_scope_id(db, self.analysis_file());
                 return eagerly_resolved_place.unwrap_or_else(|| {
                     place_by_id(
                         db,
@@ -10015,7 +10088,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if scope.node(db).scope_kind().is_class()
                         && let Some(symbol) = place_expr.as_symbol()
                     {
-                        let implicit = class_body_implicit_symbol(db, symbol.name());
+                        let implicit = class_body_implicit_symbol_in_environment(
+                            db,
+                            self.analysis_file().environment(db),
+                            symbol.name(),
+                        );
                         if implicit.place.is_definitely_bound() {
                             return implicit.map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
@@ -10079,7 +10156,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // ===
         // We don't need to check for typing_extensions.Type,
         // because it's already caught by typing.Type.
-        if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
+        if self
+            .analysis_file()
+            .program(self.db())
+            .python_version(self.db())
+            >= PythonVersion::PY39
+        {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
                 diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
             }
@@ -10270,7 +10352,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let mut maybe_submodule_name = module_name.clone();
                             maybe_submodule_name.extend(&relative_submodule);
-                            if resolve_module(db, self.file(), &maybe_submodule_name).is_some() {
+                            if ty_module_resolver::resolve_module_in_program(
+                                db,
+                                self.analysis_file().program_file(db),
+                                &maybe_submodule_name,
+                            )
+                            .is_some()
+                            {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&POSSIBLY_MISSING_SUBMODULE, attribute)

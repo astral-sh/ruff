@@ -55,7 +55,8 @@ use crate::{
 };
 use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{
-    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
+    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId,
+    semantic_index_in_environment,
 };
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
@@ -1047,7 +1048,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
     {
         let body_scope = metaclass.body_scope(db);
-        let metaclass_index = semantic_index(db, body_scope.file(db));
+        let metaclass_index = semantic_index_in_environment(db, body_scope.analysis_file(db));
         let body_scope = body_scope.file_scope_id(db);
         let metaclass_table = metaclass_index.place_table(body_scope);
         let metaclass_use_def = metaclass_index.use_def_map(body_scope);

@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
@@ -24,7 +24,7 @@ use crate::{
 };
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    semantic_index,
+    semantic_index_in_environment,
 };
 
 impl<'db> Type<'db> {
@@ -470,7 +470,8 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let module =
+            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -508,7 +509,8 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let module =
+            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let constraints = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -606,7 +608,8 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let definition = self.definition(db)?;
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let module =
+            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -673,7 +676,7 @@ impl<'db> TypeVarInstance<'db> {
             return None;
         }
         let typevar_definition = self.definition(db)?;
-        let index = semantic_index(db, typevar_definition.file(db));
+        let index = semantic_index_in_environment(db, typevar_definition.analysis_file(db));
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;

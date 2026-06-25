@@ -1,5 +1,5 @@
 use ruff_db::files::{File, FilePath};
-use ruff_db::parsed::{parsed_module, parsed_string_annotation};
+use ruff_db::parsed::{parsed_module_versioned, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
@@ -9,7 +9,8 @@ use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
-    KnownModule, Module, ModuleName, list_modules, resolve_module, resolve_real_shadowable_module,
+    KnownModule, Module, ModuleName, list_modules_in_program,
+    resolve_real_shadowable_module_in_program,
 };
 
 use crate::Db;
@@ -21,9 +22,10 @@ use crate::types::{
     inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::environment::AnalysisFile;
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
-use ty_python_core::semantic_index;
+use ty_python_core::semantic_index_in_environment;
 use ty_python_core::symbol::Symbol;
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
@@ -39,6 +41,7 @@ use ty_python_core::symbol::Symbol;
 /// methods will automatically handle using the string literal's AST node when necessary.
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
+    analysis_file: AnalysisFile<'db>,
     file: File,
     /// If `Some` then this `SemanticModel` is for analyzing the sub-AST of a string annotation.
     /// This expression will be used as a witness to the scope/location we're analyzing.
@@ -47,9 +50,14 @@ pub struct SemanticModel<'db> {
 
 impl<'db> SemanticModel<'db> {
     pub fn new(db: &'db dyn Db, file: File) -> Self {
+        Self::new_in_environment(db, AnalysisFile::from_default(db, file))
+    }
+
+    pub fn new_in_environment(db: &'db dyn Db, analysis_file: AnalysisFile<'db>) -> Self {
         Self {
             db,
-            file,
+            analysis_file,
+            file: analysis_file.file(db),
             in_string_annotation_expr: None,
         }
     }
@@ -80,7 +88,7 @@ impl<'db> SemanticModel<'db> {
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let mut members = FxHashMap::default();
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         let Some(file_scope) = self.scope(node) else {
             return members;
         };
@@ -92,7 +100,7 @@ impl<'db> SemanticModel<'db> {
             .rev()
         {
             for memberdef in
-                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
+                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.analysis_file))
             {
                 members.insert(
                     memberdef.member.name,
@@ -109,42 +117,63 @@ impl<'db> SemanticModel<'db> {
     /// Resolve the given import made in this file to a Type
     pub fn resolve_module_type(&self, module: Option<&str>, level: u32) -> Option<Type<'db>> {
         let module = self.resolve_module(module, level)?;
-        Some(Type::module_literal(self.db, self.file, module))
+        Some(Type::module_literal(self.db, self.analysis_file, module))
     }
 
     /// Resolve the given import made in this file to a Module
     pub fn resolve_module(&self, module: Option<&str>, level: u32) -> Option<Module<'db>> {
-        let module_name =
-            ModuleName::from_identifier_parts(self.db, self.file, module, level).ok()?;
-        resolve_module(self.db, self.file, &module_name)
+        let module_name = ModuleName::from_identifier_parts_in_program(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            module,
+            level,
+        )
+        .ok()?;
+        ty_module_resolver::resolve_module_in_program(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            &module_name,
+        )
     }
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
         let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
         let is_typing_extensions_available = self.file.is_stub(self.db)
-            || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
-        list_modules(self.db)
-            .iter()
-            .copied()
-            .filter(|module| {
-                is_typing_extensions_available || module.name(self.db) != &typing_extensions
-            })
-            .map(|module| {
-                let builtin = module.is_known(self.db, KnownModule::Builtins);
-                let ty = Type::module_literal(self.db, self.file, module);
-                Completion {
-                    name: Name::new(module.name(self.db).as_str()),
-                    ty: Some(ty),
-                    builtin,
-                }
-            })
-            .collect()
+            || resolve_real_shadowable_module_in_program(
+                self.db,
+                self.analysis_file.program_file(self.db),
+                &typing_extensions,
+            )
+            .is_some();
+        list_modules_in_program(
+            self.db,
+            self.analysis_file.program(self.db).resolver(self.db),
+        )
+        .iter()
+        .copied()
+        .filter(|module| {
+            is_typing_extensions_available || module.name(self.db) != &typing_extensions
+        })
+        .map(|module| {
+            let builtin = module.is_known(self.db, KnownModule::Builtins);
+            let ty = Type::module_literal(self.db, self.analysis_file, module);
+            Completion {
+                name: Name::new(module.name(self.db).as_str()),
+                ty: Some(ty),
+                builtin,
+            }
+        })
+        .collect()
     }
 
     /// Returns completions for symbols available in a `from module import <CURSOR>` context.
     pub fn from_import_completions(&self, import: &ast::StmtImportFrom) -> Vec<Completion<'db>> {
-        let module_name = match ModuleName::from_import_statement(self.db, self.file, import) {
+        let module_name = match ModuleName::from_import_statement_in_program(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            import,
+        ) {
             Ok(module_name) => module_name,
             Err(err) => {
                 tracing::debug!(
@@ -163,7 +192,11 @@ impl<'db> SemanticModel<'db> {
         &self,
         module_name: &ModuleName,
     ) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, self.file, module_name) else {
+        let Some(module) = ty_module_resolver::resolve_module_in_program(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            module_name,
+        ) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
@@ -173,11 +206,15 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, self.file, module_name) else {
+        let Some(module) = ty_module_resolver::resolve_module_in_program(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            module_name,
+        ) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
-        let ty = Type::module_literal(self.db, self.file, module);
+        let ty = Type::module_literal(self.db, self.analysis_file, module);
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
@@ -202,7 +239,7 @@ impl<'db> SemanticModel<'db> {
 
         let mut completions = vec![];
         for submodule in module.all_submodules(self.db) {
-            let ty = Type::module_literal(self.db, self.file, *submodule);
+            let ty = Type::module_literal(self.db, self.analysis_file, *submodule);
             let base = submodule.name(self.db).last_component();
             completions.push(Completion {
                 name: Name::new(base),
@@ -235,20 +272,19 @@ impl<'db> SemanticModel<'db> {
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
-                    |memberdef| Completion {
+                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.analysis_file))
+                    .map(|memberdef| Completion {
                         name: memberdef.member.name,
                         ty: Some(memberdef.member.ty),
                         builtin: false,
-                    },
-                ),
+                    }),
             );
         }
 
@@ -257,11 +293,13 @@ impl<'db> SemanticModel<'db> {
         // keeps the correct types (e.g., `__file__` is `str` for the current module,
         // not `str | None`).
         completions.extend(
-            all_implicit_module_globals(self.db).map(|(name, ty)| Completion {
-                name,
-                ty: Some(ty),
-                builtin: true,
-            }),
+            all_implicit_module_globals(self.db, self.analysis_file.environment(self.db)).map(
+                |(name, ty)| Completion {
+                    name,
+                    ty: Some(ty),
+                    builtin: true,
+                },
+            ),
         );
 
         // Builtins are available in all scopes.
@@ -278,7 +316,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns `true` if the given class definition's name was previously
     /// bound in the same scope (i.e., the class definition is a re-assignment).
     pub fn is_class_name_reassigned(&self, class_def: &ast::StmtClassDef) -> bool {
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         let definition = index.expect_single_definition(class_def);
         let scope = definition.scope(self.db);
         let table = place_table(self.db, scope);
@@ -288,7 +326,7 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns the scope in which `node` is defined (handles string annotations).
     pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         match self.node_in_ast(node) {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
 
@@ -342,7 +380,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         self.scope(node)
             .into_iter()
             .flat_map(move |scope| index.ancestor_scopes(scope))
@@ -360,8 +398,9 @@ impl<'db> SemanticModel<'db> {
         &self,
         covering_node: &CoveringNode<'_>,
     ) -> Option<Definition<'db>> {
-        let index = semantic_index(self.db, self.file);
-        let parsed = parsed_module(self.db, self.file).load(self.db);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
+        let parsed = parsed_module_versioned(self.db, self.analysis_file.versioned_file(self.db))
+            .load(self.db);
         let target_range = covering_node.node().range();
 
         for node in covering_node.ancestors() {
@@ -431,11 +470,11 @@ impl<'db> SemanticModel<'db> {
     ) -> Option<(Parsed<ModExpression>, Self)> {
         // Ask the inference engine whether this is actually a string annotation
         let expr = ExprRef::StringLiteral(string_expr);
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         // When looking up scopes, use the expr in the top-level AST
         // (we might be trying to enter a sub-sub-AST, so this isn't silly)
         let file_scope = index.expression_scope_id(&self.expr_ref_in_ast(expr));
-        let scope = file_scope.to_scope_id(self.db, self.file);
+        let scope = file_scope.to_scope_id(self.db, self.analysis_file);
         // When querying whether the expr is a string annotation, we do however use the actual expr
         // (the inference engine should record this information even for sub-nodes)
         if !infer_complete_scope_types(self.db, scope).is_string_annotation(expr) {
@@ -452,6 +491,7 @@ impl<'db> SemanticModel<'db> {
         let ast = parsed_string_annotation(source.as_str(), string_literal).ok()?;
         let model = Self {
             db: self.db,
+            analysis_file: self.analysis_file,
             file: self.file,
             // Use expr_in_ast here because we might be entering a sub-sub-AST
             in_string_annotation_expr: Some(Box::new(
@@ -475,7 +515,10 @@ impl<'db> SemanticModel<'db> {
         match definition.kind(self.db) {
             DefinitionKind::TypeAlias(_) => true,
             DefinitionKind::AnnotatedAssignment(assignment) => {
-                let parsed = parsed_module(self.db, definition.file(self.db));
+                let parsed = parsed_module_versioned(
+                    self.db,
+                    definition.analysis_file(self.db).versioned_file(self.db),
+                );
                 let model = Self::new(self.db, definition.file(self.db));
                 model.is_type_alias_annotation(assignment.annotation(&parsed.load(self.db)))
             }
@@ -494,7 +537,11 @@ impl<'db> SemanticModel<'db> {
                     return TypeQualifiers::empty();
                 };
                 let definition_file = definition.file(self.db);
-                let module = parsed_module(self.db, definition_file).load(self.db);
+                let module = parsed_module_versioned(
+                    self.db,
+                    definition.analysis_file(self.db).versioned_file(self.db),
+                )
+                .load(self.db);
                 if !definition
                     .kind(self.db)
                     .category(definition_file.is_stub(self.db), &module)
@@ -588,9 +635,9 @@ impl<'db> SemanticModel<'db> {
         string_expr: &ast::ExprStringLiteral,
     ) -> Option<Type<'db>> {
         let expr = ast::ExprRef::from(string_expr);
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index_in_environment(self.db, self.analysis_file);
         let file_scope = index.try_expression_scope_id(&self.expr_ref_in_ast(expr))?;
-        let scope = file_scope.to_scope_id(self.db, self.file);
+        let scope = file_scope.to_scope_id(self.db, self.analysis_file);
 
         infer_complete_scope_types(self.db, scope).try_expected_type(expr)
     }
@@ -689,13 +736,13 @@ pub trait HasOptionalDefinition {
 
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-        let index = semantic_index(model.db, model.file);
+        let index = semantic_index_in_environment(model.db, model.analysis_file);
         // TODO(#1637): semantic tokens is making this crash even with
         // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
         // The problematic input is `x: "float` (with a dangling quote). I imagine the issue
         // is we're too eagerly setting `is_string_annotation` in inference.
         let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
-        let scope = file_scope.to_scope_id(model.db, model.file);
+        let scope = file_scope.to_scope_id(model.db, model.analysis_file);
 
         infer_complete_scope_types(model.db, scope).try_expression_type(*self)
     }
@@ -792,7 +839,7 @@ macro_rules! impl_binding_has_ty_def {
         impl HasDefinition for $ty {
             #[inline]
             fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
-                let index = semantic_index(model.db, model.file);
+                let index = semantic_index_in_environment(model.db, model.analysis_file);
                 index.expect_single_definition(self)
             }
         }
@@ -821,7 +868,7 @@ impl HasType for ast::Alias {
         if &self.name == "*" {
             return Some(Type::Never);
         }
-        let index = semantic_index(model.db, model.file);
+        let index = semantic_index_in_environment(model.db, model.analysis_file);
         Some(binding_type(model.db, index.expect_single_definition(self)))
     }
 }
@@ -830,7 +877,7 @@ impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
     fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
         self.name.as_ref()?;
 
-        let index = semantic_index(model.db, model.file);
+        let index = semantic_index_in_environment(model.db, model.analysis_file);
         Some(index.expect_single_definition(self))
     }
 }

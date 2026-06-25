@@ -198,7 +198,9 @@ use std::cell::RefCell;
 use crate::{
     Db,
     dunder_all::dunder_all_names,
-    place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
+    place::{
+        DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol_in_environment,
+    },
     types::{
         ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
         KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
@@ -1354,7 +1356,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                         tracing::trace!(
                             "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                             symbol.name(),
-                            referenced_file.path(db)
+                            referenced_file.file(db).path(db)
                         );
                         return Truthiness::AlwaysFalse;
                     }
@@ -1362,7 +1364,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 None => None,
             };
 
-            match imported_symbol(
+            match imported_symbol_in_environment(
                 db,
                 Some(referenced_file),
                 symbol.name(),

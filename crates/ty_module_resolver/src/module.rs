@@ -10,6 +10,7 @@ use salsa::plumbing::AsId;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::path::{SearchPath, SystemOrVendoredPathRef};
+use crate::program::ResolverProgram;
 
 /// Representation of a Python module.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
@@ -23,8 +24,9 @@ impl get_size2::GetSize for Module<'_> {}
 
 #[salsa::tracked]
 impl<'db> Module<'db> {
-    pub(crate) fn file_module(
+    pub(crate) fn file_module_in_program(
         db: &'db dyn Db,
+        program: ResolverProgram,
         name: ModuleName,
         kind: ModuleKind,
         search_path: SearchPath,
@@ -32,11 +34,30 @@ impl<'db> Module<'db> {
     ) -> Self {
         let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
 
-        Self::File(FileModule::new(db, name, kind, search_path, file, known))
+        Self::File(FileModule::new(
+            db,
+            program,
+            name,
+            kind,
+            search_path,
+            file,
+            known,
+        ))
     }
 
-    pub(crate) fn namespace_package(db: &'db dyn Db, name: ModuleName) -> Self {
-        Self::Namespace(NamespacePackage::new(db, name))
+    pub(crate) fn namespace_package_in_program(
+        db: &'db dyn Db,
+        program: ResolverProgram,
+        name: ModuleName,
+    ) -> Self {
+        Self::Namespace(NamespacePackage::new(db, program, name))
+    }
+
+    pub fn program(self, db: &'db dyn Database) -> ResolverProgram {
+        match self {
+            Module::File(module) => module.program(db),
+            Module::Namespace(package) => package.program(db),
+        }
     }
 
     /// The absolute name of the module (e.g. `foo.bar`)
@@ -202,8 +223,9 @@ fn all_submodule_names_for_package<'db>(
                         let file = system_path_to_file(db, &path).ok()?;
                         (ModuleKind::Module, file)
                     };
-                    Some(Module::file_module(
+                    Some(Module::file_module_in_program(
                         db,
+                        module.program(db),
                         name,
                         kind,
                         module.search_path(db).clone(),
@@ -239,8 +261,9 @@ fn all_submodule_names_for_package<'db>(
                     let file = vendored_path_to_file(db, entry.path()).ok()?;
                     (ModuleKind::Module, file)
                 };
-                Some(Module::file_module(
+                Some(Module::file_module_in_program(
                     db,
+                    module.program(db),
                     name,
                     kind,
                     module.search_path(db).clone(),
@@ -254,6 +277,7 @@ fn all_submodule_names_for_package<'db>(
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
+    pub(super) program: ResolverProgram,
     #[returns(ref)]
     pub(super) name: ModuleName,
     pub(super) kind: ModuleKind,
@@ -269,6 +293,7 @@ pub struct FileModule<'db> {
 /// multiple possible paths and they have no corresponding code file.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
+    pub(super) program: ResolverProgram,
     #[returns(ref)]
     pub(super) name: ModuleName,
 }

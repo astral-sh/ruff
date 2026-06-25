@@ -21,6 +21,7 @@ use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
 
 use itertools::{Either, EitherOrBoth, Itertools};
+use ruff_python_ast::PythonVersion;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::subscript::{
@@ -34,7 +35,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
@@ -2267,8 +2268,10 @@ impl<'db> Tuple<Type<'db>> {
     }
 
     /// Return the `TupleSpec` for the singleton `sys.version_info`
-    pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
-        let python_version = Program::get(db).python_version(db);
+    pub(crate) fn version_info_spec(
+        db: &'db dyn Db,
+        python_version: PythonVersion,
+    ) -> TupleSpec<'db> {
         let int_instance_ty = KnownClass::Int.to_instance(db);
 
         // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)

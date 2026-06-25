@@ -38,7 +38,7 @@ use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
-use ty_python_core::{SemanticIndex, semantic_index};
+use ty_python_core::{SemanticIndex, semantic_index_in_environment};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -155,12 +155,11 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    scope_id: ScopeId,
+    scope_id: ScopeId<'db>,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    let file = scope_id.file(db);
-    let index = semantic_index(db, file);
+    let index = semantic_index_in_environment(db, scope_id.analysis_file(db));
 
     let identity = TypeVarIdentity::new(
         db,

@@ -10,16 +10,16 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use ruff_db::files::File;
 use strum_macros::EnumString;
-use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_module_resolver::{KnownModule, file_to_module_in_program, resolve_module_confident};
 use ty_python_core::{
     FileScopeId,
     definition::{Definition, DefinitionKind},
+    environment::AnalysisFile,
     place::ScopedPlaceId,
     place_table,
     scope::ScopeId,
-    semantic_index, use_def_map,
+    semantic_index_in_environment, use_def_map,
 };
 
 /// Enumeration of specific runtime symbols that are special enough
@@ -266,14 +266,14 @@ impl SpecialFormType {
         self.class().is_subclass_of(db, class)
     }
 
-    pub(super) fn try_from_file_and_name(
+    pub(super) fn try_from_analysis_file_and_name(
         db: &dyn Db,
-        file: File,
+        analysis_file: AnalysisFile<'_>,
         symbol_name: &str,
     ) -> Option<Self> {
         let candidate = Self::from_name(symbol_name)?;
         candidate
-            .check_module(file_to_module(db, file)?.known(db)?)
+            .check_module(file_to_module_in_program(db, analysis_file.program_file(db))?.known(db)?)
             .then_some(candidate)
     }
 
@@ -769,7 +769,10 @@ impl SpecialFormType {
             .iter()
             .find_map(|module| {
                 let file = resolve_module_confident(db, &module.name())?.file(db)?;
-                let scope = FileScopeId::global().to_scope_id(db, file);
+                let scope = FileScopeId::global().to_scope_id(
+                    db,
+                    ty_python_core::environment::AnalysisFile::from_default(db, file),
+                );
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
                 use_def_map(db, scope)
@@ -821,7 +824,7 @@ impl SpecialFormType {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }
 
-                let index = semantic_index(db, scope_id.file(db));
+                let index = semantic_index_in_environment(db, scope_id.analysis_file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(
                         Type::SpecialForm(self),
