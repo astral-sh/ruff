@@ -136,19 +136,6 @@ impl<'db> ComparisonResult<'db> {
     }
 }
 
-/// The information expression inference can reuse from equality evaluation.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum EqualityInference {
-    /// The comparison always returns true.
-    AlwaysTrue,
-    /// The comparison always returns false.
-    AlwaysFalse,
-    /// The comparison has ambiguous truthiness but is known to return `bool`.
-    AmbiguousBoolean,
-    /// Expression inference must inspect the comparison methods' actual return types.
-    NeedsResultInference,
-}
-
 /// Return a constraint for `left` in a branch where `left == right` has the given truthiness.
 ///
 /// Returns `None` when the comparison behavior of either operand is not precise enough to safely
@@ -274,40 +261,30 @@ pub(crate) fn equality_truthiness<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    equality_inference(db, left, right, ComparisonOperator::Equality).truthiness()
+    equality_result_truthiness(db, left, right, ComparisonOperator::Equality)
+        .unwrap_or(Truthiness::Ambiguous)
 }
 
-/// Evaluate equality or inequality for expression result inference.
-pub(super) fn equality_inference<'db>(
+/// Return the result truthiness when equality or inequality is known to return `bool`.
+///
+/// Returns `None` when expression inference must inspect the comparison methods' actual return
+/// types.
+pub(super) fn equality_result_truthiness<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
-) -> EqualityInference {
+) -> Option<Truthiness> {
     match ComparisonEvaluator::for_truthiness(db).evaluate(
         left,
         right,
         ComparisonBranch::Positive,
         operator,
     ) {
-        ComparisonResult::AlwaysTrue => EqualityInference::AlwaysTrue,
-        ComparisonResult::AlwaysFalse => EqualityInference::AlwaysFalse,
-        ComparisonResult::AmbiguousBoolean => EqualityInference::AmbiguousBoolean,
-        ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
-            EqualityInference::NeedsResultInference
-        }
-    }
-}
-
-impl EqualityInference {
-    fn truthiness(self) -> Truthiness {
-        match self {
-            EqualityInference::AlwaysTrue => Truthiness::AlwaysTrue,
-            EqualityInference::AlwaysFalse => Truthiness::AlwaysFalse,
-            EqualityInference::AmbiguousBoolean | EqualityInference::NeedsResultInference => {
-                Truthiness::Ambiguous
-            }
-        }
+        ComparisonResult::AlwaysTrue => Some(Truthiness::AlwaysTrue),
+        ComparisonResult::AlwaysFalse => Some(Truthiness::AlwaysFalse),
+        ComparisonResult::AmbiguousBoolean => Some(Truthiness::Ambiguous),
+        ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => None,
     }
 }
 
