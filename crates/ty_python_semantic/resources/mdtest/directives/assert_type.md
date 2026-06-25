@@ -81,6 +81,35 @@ def _(a: type[int]):
     assert_type(a, Type[int])  # fine
 ```
 
+## Internal exact collection refinements
+
+Exact runtime-class and cardinality information used internally for collection analysis does not
+affect the standard, spellable type checked by `assert_type`. This also applies to refinements
+nested inside another collection.
+
+```py
+from typing_extensions import assert_type
+
+empty_list: list[int] = []
+non_empty_list: list[int] = [1]
+nested_list: list[list[int]] = [[]]
+empty_set: set[int] = set()
+non_empty_set: set[int] = {1}
+
+assert_type(empty_list, list[int])
+assert_type(non_empty_list, list[int])
+assert_type(nested_list, list[list[int]])
+assert_type(empty_set, set[int])
+assert_type(non_empty_set, set[int])
+
+assert_type(list[int](), list[int])
+assert_type(set[int](), set[int])
+
+def narrowed(value: list[int] | tuple[int, ...]):
+    if type(value) is list:
+        assert_type(value, list[int])
+```
+
 ## Unspellable types
 
 If the actual type is an unspellable subtype, we emit `assert-type-unspellable-subtype` instead of

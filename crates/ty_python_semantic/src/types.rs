@@ -6481,6 +6481,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::ForgetCollectionCardinality |
+                TypeMapping::ForgetExactness |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(
@@ -6501,6 +6502,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::ForgetCollectionCardinality |
+                TypeMapping::ForgetExactness |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -7565,6 +7567,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Erase definite cardinality refinements from mutable builtin collections.
     ForgetCollectionCardinality,
 
+    /// Erase exact runtime-class refinements.
+    ForgetExactness,
+
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
@@ -7612,6 +7617,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::ForgetCollectionCardinality
+            | TypeMapping::ForgetExactness
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7659,6 +7665,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::ForgetCollectionCardinality
+            | TypeMapping::ForgetExactness
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }

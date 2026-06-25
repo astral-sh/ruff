@@ -25,6 +25,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -212,6 +213,15 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => Type::NominalInstance(instance.forget_exactness(db)),
             _ => self,
         }
+    }
+
+    /// Recursively erase exact runtime-class information while preserving nominal specializations.
+    pub(crate) fn forget_exactness_recursively(self, db: &'db dyn Db) -> Self {
+        if !any_over_type(db, self, false, Type::is_exact_instance) {
+            return self;
+        }
+
+        self.apply_type_mapping(db, &TypeMapping::ForgetExactness, TypeContext::default())
     }
 
     /// Return whether this type consists of instances of one exact runtime class.
@@ -718,10 +728,12 @@ impl<'db> NominalInstanceType<'db> {
                         .class(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                 let class = class.with_class(db, transformed);
-                let class = if matches!(type_mapping, TypeMapping::ForgetCollectionCardinality) {
-                    class.forget_collection_cardinality(db)
-                } else {
-                    class
+                let class = match type_mapping {
+                    TypeMapping::ForgetCollectionCardinality => {
+                        class.forget_collection_cardinality(db)
+                    }
+                    TypeMapping::ForgetExactness => class.forget_exactness(db),
+                    _ => class,
                 };
                 Type::NominalInstance(Self(NominalInstanceInner::NonTuple(class)))
             }
