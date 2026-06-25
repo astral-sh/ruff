@@ -603,6 +603,8 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
+        type Id = ScopedReachabilityConstraintId;
+
         // Analyze statement-level calls through this root one by one in source order, so any
         // earlier call needed while inferring a later one is already cached instead of deepening
         // the Salsa query stack. This avoids growing an excessive stack for deeply nested
@@ -629,8 +631,6 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             let root_predicate = self.get_interior_node(id).atom();
             analyze_non_terminal_call_prefix(db, predicates, root_predicate);
         }
-
-        type Id = ScopedReachabilityConstraintId;
 
         loop {
             let node = match id {
