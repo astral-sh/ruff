@@ -387,11 +387,11 @@ pub(crate) fn class_pattern_positional_result<'db>(
         }
         ClassMatchArgs::Undefined => Some(ClassPatternPositionalResult::Limit(0)),
         ClassMatchArgs::Defined(match_args) => {
-            match_args_positional_result(db, match_args, positional_count)
+            match_args_positional_result(db, class, match_args, positional_count)
         }
         ClassMatchArgs::PossiblyUndefined(match_args) => {
             let ClassPatternPositionalResult::Limit(defined_limit) =
-                match_args_positional_result(db, match_args, positional_count)?
+                match_args_positional_result(db, class, match_args, positional_count)?
             else {
                 return None;
             };
@@ -405,6 +405,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
 
 fn match_args_positional_result<'db>(
     db: &'db dyn Db,
+    class: ClassLiteral<'db>,
     match_args: Type<'db>,
     positional_count: usize,
 ) -> Option<ClassPatternPositionalResult<'db>> {
@@ -413,7 +414,7 @@ fn match_args_positional_result<'db>(
         let mut results = union
             .elements(db)
             .iter()
-            .map(|element| match_args_positional_result(db, *element, positional_count));
+            .map(|element| match_args_positional_result(db, class, *element, positional_count));
         let first = results.next()??;
         return results.try_fold(first, |combined, result| match (combined, result?) {
             (
@@ -439,11 +440,12 @@ fn match_args_positional_result<'db>(
             if positional_count > tuple.len() {
                 return Some(ClassPatternPositionalResult::Limit(tuple.len()));
             }
-            if let Some(index) = tuple
-                .elements_slice()
+            let elements = tuple.elements_slice();
+            if let Some(index) = elements
                 .iter()
                 .take(positional_count)
                 .position(|element| match_args_element_is_not_exact_string(db, *element))
+                && preceding_match_args_lookups_are_reachable(db, class, elements, index)
             {
                 Some(ClassPatternPositionalResult::InvalidElement(index))
             } else {
@@ -466,6 +468,37 @@ fn match_args_positional_result<'db>(
     } else {
         None
     }
+}
+
+/// Return whether runtime matching is guaranteed to inspect the element at `index`.
+///
+/// Before inspecting each `__match_args__` element, Python looks up the attribute named by every
+/// preceding element. A missing attribute silently fails the match, and a duplicate name raises a
+/// different error, so neither path reaches a later invalid element.
+fn preceding_match_args_lookups_are_reachable(
+    db: &dyn Db,
+    class: ClassLiteral<'_>,
+    elements: &[Type<'_>],
+    index: usize,
+) -> bool {
+    let instance = class.to_non_generic_instance(db);
+    let mut names = Vec::with_capacity(index);
+    elements.iter().take(index).all(|element| {
+        let Some(literal) = element.resolve_type_alias(db).as_string_literal() else {
+            return false;
+        };
+        let name = Name::new(literal.value(db));
+        if names.contains(&name)
+            || !instance
+                .member(db, name.as_str())
+                .place
+                .is_definitely_bound()
+        {
+            return false;
+        }
+        names.push(name);
+        true
+    })
 }
 
 fn match_args_element_is_not_exact_string(db: &dyn Db, element: Type<'_>) -> bool {

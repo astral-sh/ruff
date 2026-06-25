@@ -72,6 +72,9 @@ class LaterInvalid:
     __match_args__ = ("value", 1)
     value: int = 0
 
+class MissingBeforeInvalid:
+    __match_args__ = ("missing", 1)
+
 def describe_first(value: FirstInvalid) -> None:
     match value:
         case FirstInvalid(_):  # error: [invalid-match-pattern]
@@ -85,6 +88,11 @@ def describe_one(value: LaterInvalid) -> None:
 def describe_two(value: LaterInvalid) -> None:
     match value:
         case LaterInvalid(_, _):  # error: [invalid-match-pattern]
+            pass
+
+def describe_missing(value: MissingBeforeInvalid) -> None:
+    match value:
+        case MissingBeforeInvalid(_, _):
             pass
 ```
 
