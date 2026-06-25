@@ -903,6 +903,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: NominalInstanceType<'db>,
         right: NominalInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let contains_inferable_typevar = |instance| {
+            any_over_type(
+                db,
+                Type::NominalInstance(instance),
+                false,
+                |ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_inferable(db, self.inferable)),
+            )
+        };
+
         let mut result = self.never();
         if left.is_object() || right.is_object() {
             return result;
@@ -934,6 +943,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         // runtime class does not prove disjointness in the one-exact case.
         if left.is_exact()
             && !left.inherits_from_explicit_any(db)
+            && !contains_inferable_typevar(right)
             && left.class_literal(db) != right.class_literal(db)
             && !left.class(db).is_subclass_of(db, right.class(db))
         {
@@ -941,6 +951,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         }
         if right.is_exact()
             && !right.inherits_from_explicit_any(db)
+            && !contains_inferable_typevar(left)
             && right.class_literal(db) != left.class_literal(db)
             && !right.class(db).is_subclass_of(db, left.class(db))
         {

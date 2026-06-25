@@ -6075,8 +6075,22 @@ impl<'db> Type<'db> {
         // cycle guard.
         if matches!(
             self,
-            Type::TypeAlias(_) | Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_)
+            Type::TypeAlias(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::EnumComplement(_)
+                | Type::ProtocolInstance(_)
         ) {
+            return None;
+        }
+
+        // An ordinary nominal instance can inhabit a subclass, and an implicit protocol
+        // implementation need not have the protocol class anywhere in its MRO.
+        if let Type::NominalInstance(instance) = self
+            && !instance.is_exact()
+            && instance.own_tuple_spec(db).is_none()
+            && !instance.class(db).is_final(db)
+        {
             return None;
         }
 
