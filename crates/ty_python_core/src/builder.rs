@@ -2910,22 +2910,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.seen_submodule_imports
                             .insert(direct_submodule.to_owned());
 
-                        let direct_submodule_name = Name::new(direct_submodule);
-                        let symbol = self.add_symbol(direct_submodule_name);
+                        let is_immediately_shadowed = node.names.iter().any(|alias| {
+                            if &alias.name == "*" {
+                                return false;
+                            }
 
-                        let module_index = if node.level == 0 {
-                            // "whatever.thispackage.x.y" we want `x`
-                            thispackage.components().count()
-                        } else {
-                            // ".x.y" we want `x` (level 1 => index 0)
-                            // "..x.y" we want `y` (level 2 => index 1)
-                            // (The Identifier doesn't include the prefix dots)
-                            node.level as usize - 1
-                        };
-                        self.add_definition(
-                            symbol.into(),
-                            ImportFromSubmoduleDefinitionNodeRef { node, module_index },
-                        );
+                            let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
+                            bound_name.id.as_str() == direct_submodule
+                        });
+
+                        if !is_immediately_shadowed {
+                            let direct_submodule_name = Name::new(direct_submodule);
+                            let symbol = self.add_symbol(direct_submodule_name);
+
+                            let module_index = if node.level == 0 {
+                                // "whatever.thispackage.x.y" we want `x`
+                                thispackage.components().count()
+                            } else {
+                                // ".x.y" we want `x` (level 1 => index 0)
+                                // "..x.y" we want `y` (level 2 => index 1)
+                                // (The Identifier doesn't include the prefix dots)
+                                node.level as usize - 1
+                            };
+                            self.add_definition(
+                                symbol.into(),
+                                ImportFromSubmoduleDefinitionNodeRef { node, module_index },
+                            );
+                        }
                     }
                 }
 
