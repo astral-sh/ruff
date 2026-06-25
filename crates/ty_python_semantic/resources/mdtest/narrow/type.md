@@ -390,6 +390,26 @@ def _(x: DynamicBase):
             reveal_type(x)  # revealed: DynamicBase & Unrelated
 ```
 
+`TypedDict` values also have one exact runtime class, `dict`, but `TypedDict` is represented
+separately from nominal `dict` types and is deliberately not assignable to mutable `dict` types.
+Consequently, runtime-class narrowing does not yet preserve `TypedDict` arms. This existing
+limitation is tracked by [ty#1130](https://github.com/astral-sh/ty/issues/1130) and implemented in
+draft [ruff#25851](https://github.com/astral-sh/ruff/pull/25851). The assertions below deliberately
+record the current behavior; the desired types are `ExactDictTD` and `list[int]`, respectively.
+
+```py
+from typing import TypedDict
+
+class ExactDictTD(TypedDict):
+    value: int
+
+def _(x: ExactDictTD | list[int]):
+    if type(x) is dict:
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: ExactDictTD | list[int]
+```
+
 Literal and singleton types also have one exact runtime class. The exact-class constraint uses that
 information rather than widening them to their nominal fallback:
 
