@@ -185,7 +185,7 @@ impl Files {
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
-                .permissions_durability(Durability::HIGH)
+                .permissions_durability(Durability::NEVER_CHANGE)
                 .new(db),
         );
         self.inner
