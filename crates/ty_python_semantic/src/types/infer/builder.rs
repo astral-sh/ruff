@@ -1585,7 +1585,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.declarations.insert(definition, declared_ty);
-        self.bindings.insert(definition, inferred_ty);
+        self.insert_binding(definition, inferred_ty);
+    }
+
+    /// Insert a binding while discarding cardinality facts that mutation could invalidate.
+    ///
+    /// Exact runtime class is stable for builtin collections, but cardinality is not: the value
+    /// can be mutated through this place or an alias. Cardinality remains available on the fresh
+    /// expression that produced the value.
+    fn insert_binding(&mut self, definition: Definition<'db>, ty: Type<'db>) {
+        let ty = ty.forget_collection_cardinality(self.db());
+        self.bindings.insert(definition, ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -2273,7 +2283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if use_def.reachability_constraints().used_interiors().len()
             > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
         {
-            self.bindings.insert(definition, Type::unknown());
+            self.insert_binding(definition, Type::unknown());
             return;
         }
 
@@ -2290,7 +2300,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(narrowed_ty);
         }
 
-        self.bindings.insert(definition, union.build());
+        self.insert_binding(definition, union.build());
     }
 
     fn infer_nested_bindings_definition(
@@ -2368,7 +2378,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // As with loop header definitions above, use a reachability cutoff to avoid excessive
             // perf costs in complicated projects like `isort`.
-            self.bindings.insert(definition, Type::unknown());
+            self.insert_binding(definition, Type::unknown());
             return;
         }
 
@@ -2394,7 +2404,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             union.add_in_place(ty);
         }
-        self.bindings.insert(definition, union.build());
+        self.insert_binding(definition, union.build());
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -12127,12 +12137,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        // Exact runtime class is stable for builtin collections, but cardinality is not: the value
-        // can be mutated through this place or an alias. Keep cardinality on the fresh RHS
-        // expression, and erase it before the value enters mutable storage.
-        builder
-            .bindings
-            .insert(self.binding, bound_ty.forget_collection_cardinality(db));
+        builder.insert_binding(self.binding, bound_ty);
 
         inferred_ty
     }

@@ -39,6 +39,10 @@ reveal_type(bool(empty))  # revealed: bool
 
 nested = [[]]
 reveal_type(bool(nested[0]))  # revealed: bool
+
+annotated: list[int] = []
+annotated.append(1)
+reveal_type(bool(annotated))  # revealed: bool
 ```
 
 ## List of tuples
