@@ -628,8 +628,8 @@ static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 enum RetainedDefinitionState<'db> {
-    Defined(Definition<'db>),
-    DefinedUsed(Definition<'db>),
+    Unused(Definition<'db>),
+    Used(Definition<'db>),
     Undefined,
     Deleted,
 }
@@ -637,8 +637,8 @@ enum RetainedDefinitionState<'db> {
 impl<'db> RetainedDefinitionState<'db> {
     fn new(state: DefinitionState<'db>, used: bool) -> Self {
         match state {
-            DefinitionState::Defined(definition) if used => Self::DefinedUsed(definition),
-            DefinitionState::Defined(definition) => Self::Defined(definition),
+            DefinitionState::Defined(definition) if used => Self::Used(definition),
+            DefinitionState::Defined(definition) => Self::Unused(definition),
             DefinitionState::Undefined => {
                 debug_assert!(!used);
                 Self::Undefined
@@ -652,7 +652,7 @@ impl<'db> RetainedDefinitionState<'db> {
 
     fn state(self) -> DefinitionState<'db> {
         match self {
-            Self::Defined(definition) | Self::DefinedUsed(definition) => {
+            Self::Unused(definition) | Self::Used(definition) => {
                 DefinitionState::Defined(definition)
             }
             Self::Undefined => DefinitionState::Undefined,
@@ -661,7 +661,7 @@ impl<'db> RetainedDefinitionState<'db> {
     }
 
     fn is_used(self) -> bool {
-        matches!(self, Self::DefinedUsed(_))
+        matches!(self, Self::Used(_))
     }
 }
 
