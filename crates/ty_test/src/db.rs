@@ -64,6 +64,7 @@ impl Db {
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
                 allowed_unresolved_imports: allowed_unresolved_imports_default,
                 replace_imports_with_any: replace_imports_with_any_default,
+                generic_narrowing: generic_narrowing_default,
             } = AnalysisSettings::default();
 
             let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
@@ -103,6 +104,9 @@ impl Db {
                     .unwrap_or(respect_type_ignore_comments_default),
                 allowed_unresolved_imports,
                 replace_imports_with_any,
+                generic_narrowing: options
+                    .generic_narrowing
+                    .unwrap_or(generic_narrowing_default),
             }
         } else {
             AnalysisSettings::default()

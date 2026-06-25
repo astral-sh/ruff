@@ -37,8 +37,8 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
+    AnalysisSettings, GenericNarrowing, PythonEnvironment, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
     inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
@@ -1596,6 +1596,28 @@ pub struct AnalysisOptions {
         "#
     )]
     pub replace_imports_with_any: Option<Vec<RangedValue<String>>>,
+
+    /// Controls how ty narrows to unspecialized generic classes in `isinstance()` and
+    /// `issubclass()` checks.
+    ///
+    /// With `strict`, ty narrows to the top materialization of the class. For example,
+    /// `isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
+    /// representing the (infinite) union of all possible `list` specializations. Iterating
+    /// over the list would yield values of type `object`.
+    ///
+    /// With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
+    /// check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
+    /// would yield values of type `Unknown`, which is more permissive than `object`.
+    ///
+    /// Defaults to `relaxed`.
+    #[option(
+        default = "relaxed",
+        value_type = "strict | relaxed",
+        example = r#"
+            generic-narrowing = "strict"
+        "#
+    )]
+    pub generic_narrowing: Option<RangedValue<GenericNarrowing>>,
 }
 
 impl AnalysisOptions {
@@ -1609,6 +1631,7 @@ impl AnalysisOptions {
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
+            generic_narrowing,
         } = self;
 
         let AnalysisSettings {
@@ -1616,6 +1639,7 @@ impl AnalysisOptions {
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
+            generic_narrowing: generic_narrowing_default,
         } = AnalysisSettings::default();
 
         let allowed_unresolved_imports =
@@ -1647,6 +1671,10 @@ impl AnalysisOptions {
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
             replace_imports_with_any,
+            generic_narrowing: generic_narrowing
+                .as_deref()
+                .copied()
+                .unwrap_or(generic_narrowing_default),
         }
     }
 }
