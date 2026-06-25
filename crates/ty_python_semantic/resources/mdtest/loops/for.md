@@ -296,6 +296,10 @@ async def _():
     # error: [not-iterable]
     async for x in ["a", "b"]:
         reveal_type(x)  # revealed: Unknown
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ## With non-callable iterator

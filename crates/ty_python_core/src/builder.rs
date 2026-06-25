@@ -3471,7 +3471,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for_stmt @ ast::StmtFor {
                     range: _,
                     node_index: _,
-                    is_async: _,
+                    is_async,
                     target,
                     iter,
                     body,
@@ -3483,8 +3483,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let non_empty_iterable_constraint = if let Some(is_non_empty) =
-                    literal_iterable_truthiness(iter).into_bool()
+                let non_empty_iterable_constraint = if !*is_async
+                    && let Some(is_non_empty) = literal_iterable_truthiness(iter).into_bool()
                 {
                     let after_iter = self.flow_snapshot();
                     let constraint = self
