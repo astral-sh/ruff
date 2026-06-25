@@ -99,6 +99,17 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Return the identity of this base for method-resolution-order construction.
+    ///
+    /// The `TypedDict` module affects member lookup, but both special forms represent the same
+    /// pseudo-base when detecting duplicate or conflicting bases.
+    pub(super) const fn mro_identity(self) -> Self {
+        match self {
+            Self::TypedDict(_) => Self::TypedDict(TypedDictModule::Typing),
+            _ => self,
+        }
+    }
+
     /// Return whether this is an explicit `Any` base.
     pub(super) const fn is_explicit_any_base(self) -> bool {
         matches!(self, ClassBase::Any)

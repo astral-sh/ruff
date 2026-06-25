@@ -2810,6 +2810,16 @@ def combine(p: Person, e: Employee):
     reveal_type(e | p)  # revealed: Person
 ```
 
+The `TypedDict` special forms from `typing` and `typing_extensions` cannot both appear in the same
+bases list:
+
+```py
+from typing import TypedDict as TypingTypedDict
+from typing_extensions import TypedDict as TypingExtensionsTypedDict
+
+class MixedTypedDict(TypingTypedDict, TypingExtensionsTypedDict): ...  # error: [duplicate-base]
+```
+
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
 original requirement status, while new fields follow the child class's `total` setting:
 
