@@ -6,7 +6,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::super::helpers::is_sys;
+use crate::rules::flake8_2020::helpers::is_sys;
 
 /// ## What it does
 /// Checks for comparisons that test `sys.version` against string literals,
@@ -41,6 +41,7 @@ use super::super::helpers::is_sys;
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionCmpStr3;
 
 impl Violation for SysVersionCmpStr3 {
@@ -91,6 +92,7 @@ impl Violation for SysVersionCmpStr3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionInfo0Eq3 {
     eq: bool,
 }
@@ -137,6 +139,7 @@ impl Violation for SysVersionInfo0Eq3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionInfo1CmpInt;
 
 impl Violation for SysVersionInfo1CmpInt {
@@ -179,6 +182,7 @@ impl Violation for SysVersionInfo1CmpInt {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionInfoMinorCmpInt;
 
 impl Violation for SysVersionInfoMinorCmpInt {
@@ -222,6 +226,7 @@ impl Violation for SysVersionInfoMinorCmpInt {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionCmpStr10;
 
 impl Violation for SysVersionCmpStr10 {
@@ -253,7 +258,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                         ],
                     ) = (ops, comparators)
                     {
-                        if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
+                        if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(
                                 SysVersionInfo0Eq3 {
                                     eq: matches!(*operator, CmpOp::Eq),
@@ -273,9 +278,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                         ],
                     ) = (ops, comparators)
                     {
-                        if checker.enabled(Rule::SysVersionInfo1CmpInt) {
-                            checker.report_diagnostic(SysVersionInfo1CmpInt, left.range());
-                        }
+                        checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                     }
                 }
             }
@@ -294,9 +297,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                 ],
             ) = (ops, comparators)
             {
-                if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {
-                    checker.report_diagnostic(SysVersionInfoMinorCmpInt, left.range());
-                }
+                checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
             }
         }
 
@@ -310,11 +311,9 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         ) = (ops, comparators)
         {
             if value.len() == 1 {
-                if checker.enabled(Rule::SysVersionCmpStr10) {
-                    checker.report_diagnostic(SysVersionCmpStr10, left.range());
-                }
-            } else if checker.enabled(Rule::SysVersionCmpStr3) {
-                checker.report_diagnostic(SysVersionCmpStr3, left.range());
+                checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
+            } else {
+                checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
             }
         }
     }

@@ -50,6 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// np.round(arr2)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct Numpy2Deprecation {
     existing: String,
     migration_guide: Option<String>,
@@ -68,7 +69,7 @@ impl Violation for Numpy2Deprecation {
         } = self;
         match migration_guide {
             Some(migration_guide) => {
-                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}",)
+                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}")
             }
             None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0"),
         }
@@ -322,10 +323,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "in1d"] => Replacement {
             existing: "in1d",
-            details: Details::AutoImport {
-                path: "numpy",
-                name: "isin",
-                compatibility: Compatibility::BackwardsCompatible,
+            details: Details::Manual {
+                guideline: Some(
+                    "Use `np.isin` instead. Unlike `np.in1d`, `np.isin` preserves the shape of its input, so `np.in1d(ar1, ar2)` is equivalent to `np.isin(ar1, ar2).ravel()`.",
+                ),
             },
         },
         ["numpy", "INF"] => Replacement {

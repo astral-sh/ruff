@@ -1,0 +1,197 @@
+use std::fmt;
+
+use ruff_python_ast::helpers::{is_const_true, map_callable};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
+use ruff_python_trivia::PythonWhitespace;
+
+use crate::checkers::ast::Checker;
+use crate::preview::is_pytest_asyncio_enabled;
+
+pub(super) fn get_mark_decorators<'a>(
+    decorators: &'a [Decorator],
+    semantic: &'a SemanticModel,
+) -> impl Iterator<Item = (&'a Decorator, &'a str)> + 'a {
+    decorators.iter().filter_map(move |decorator| {
+        let expr = map_callable(&decorator.expression);
+        let qualified_name = semantic.resolve_qualified_name(expr)?;
+        match qualified_name.segments() {
+            ["pytest", "mark", marker] => Some((decorator, *marker)),
+            _ => None,
+        }
+    })
+}
+
+pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(call)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
+}
+
+pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> bool {
+    checker
+        .semantic()
+        .resolve_qualified_name(map_callable(&decorator.expression))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "fixture"])
+                || matches!(
+                    qualified_name.segments(),
+                    ["pytest_asyncio", "fixture"]
+                        if is_pytest_asyncio_enabled(checker.settings())
+                )
+        })
+}
+
+pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(map_callable(&decorator.expression))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "yield_fixture"])
+        })
+}
+
+pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
+        })
+}
+
+/// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or
+/// `@pytest.hookimpl(hookwrapper=True)`.
+///
+/// These hook wrappers intentionally use `return` in generator functions as part of the
+/// pytest hook wrapper protocol.
+///
+/// See: <https://docs.pytest.org/en/stable/how-to/writing_hook_functions.html#hook-wrappers-executing-around-other-hooks>
+pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    let Expr::Call(call) = &decorator.expression else {
+        return false;
+    };
+
+    // Check if it's pytest.hookimpl
+    let is_hookimpl = semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|name| matches!(name.segments(), ["pytest", "hookimpl"]));
+
+    if !is_hookimpl {
+        return false;
+    }
+
+    let wrapper = call.arguments.find_argument_value("wrapper", 6);
+    let hookwrapper = call.arguments.find_argument_value("hookwrapper", 1);
+
+    wrapper.or(hookwrapper).is_some_and(is_const_true)
+}
+
+/// Whether the currently checked `func` is likely to be a Pytest test.
+///
+/// A normal Pytest test function is one whose name starts with `test` and is either:
+///
+/// * Placed at module-level, or
+/// * Placed within a class whose name starts with `Test` and does not have an `__init__` method.
+///
+/// During test discovery, Pytest respects a few settings which we do not have access to.
+/// This function is thus prone to both false positives and false negatives.
+///
+/// References:
+/// - [`pytest` documentation: Conventions for Python test discovery](https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery)
+/// - [`pytest` documentation: Changing naming conventions](https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions)
+pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -> bool {
+    let semantic = checker.semantic();
+
+    if !func.name.starts_with("test") {
+        return false;
+    }
+
+    if semantic.scope_id.is_global() {
+        return true;
+    }
+
+    let ScopeKind::Class(class) = semantic.current_scope().kind else {
+        return false;
+    };
+
+    if !class.name.starts_with("Test") {
+        return false;
+    }
+
+    class.body.iter().all(|stmt| {
+        let Stmt::FunctionDef(function) = stmt else {
+            return true;
+        };
+
+        !visibility::is_init(&function.name)
+    })
+}
+
+pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &keyword.value {
+        value == literal
+    } else {
+        false
+    }
+}
+
+pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+        Expr::NoneLiteral(_) => true,
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.iter().all(|f_string_part| match f_string_part {
+                ast::FStringPart::Literal(literal) => literal.is_empty(),
+                ast::FStringPart::FString(f_string) => f_string
+                    .elements
+                    .iter()
+                    .all(is_empty_or_null_interpolated_string_element),
+            })
+        }
+        _ => false,
+    }
+}
+
+fn is_empty_or_null_interpolated_string_element(element: &ast::InterpolatedStringElement) -> bool {
+    match element {
+        ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+            value,
+            ..
+        }) => value.is_empty(),
+        ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
+            expression,
+            ..
+        }) => is_empty_or_null_string(expression),
+    }
+}
+
+pub(super) fn split_names(names: &str) -> Vec<&str> {
+    // Match the following pytest code:
+    //    [x.strip() for x in argnames.split(",") if x.strip()]
+    names
+        .split(',')
+        .filter_map(|s| {
+            let trimmed = s.trim_whitespace();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        })
+        .collect::<Vec<&str>>()
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(super) enum Parentheses {
+    None,
+    Empty,
+}
+
+impl fmt::Display for Parentheses {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Parentheses::None => fmt.write_str(""),
+            Parentheses::Empty => fmt.write_str("()"),
+        }
+    }
+}

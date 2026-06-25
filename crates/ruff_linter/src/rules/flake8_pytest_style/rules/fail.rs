@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{is_empty_or_null_string, is_pytest_fail};
+use crate::rules::flake8_pytest_style::helpers::{is_empty_or_null_string, is_pytest_fail};
 
 /// ## What it does
 /// Checks for `pytest.fail` calls without a message.
@@ -46,6 +46,7 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestFailWithoutMessage;
 
 impl Violation for PytestFailWithoutMessage {
@@ -55,6 +56,7 @@ impl Violation for PytestFailWithoutMessage {
     }
 }
 
+/// PT016
 pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_fail(&call.func, checker.semantic()) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or

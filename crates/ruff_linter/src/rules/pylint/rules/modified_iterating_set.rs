@@ -46,6 +46,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.5")]
 pub(crate) struct ModifiedIteratingSet {
     name: Name,
 }
@@ -54,7 +55,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ModifiedIteratingSet { name } = self;
-        format!("Iterated set `{name}` is modified within the `for` loop",)
+        format!("Iterated set `{name}` is modified within the `for` loop")
     }
 
     fn fix_title(&self) -> String {
@@ -76,7 +77,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
         return;
     }
 
-    let is_modified = any_over_body(&for_stmt.body, &|expr| {
+    let is_modified = any_over_body(&for_stmt.body, |expr| {
         let Some(func) = expr.as_call_expr().map(|call| &call.func) else {
             return false;
         };

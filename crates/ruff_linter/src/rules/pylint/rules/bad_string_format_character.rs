@@ -27,6 +27,7 @@ use crate::checkers::ast::Checker;
 /// print("{:z}".format("1"))
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct BadStringFormatCharacter {
     format_char: char,
 }
@@ -92,6 +93,7 @@ pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
 pub(crate) fn percent(checker: &Checker, expr: &Expr, format_string: &ExprStringLiteral) {
     for StringLiteral {
         value: _,
+        node_index: _,
         range,
         flags,
     } in &format_string.value

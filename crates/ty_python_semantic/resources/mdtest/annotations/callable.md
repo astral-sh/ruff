@@ -4,7 +4,7 @@ References:
 
 - <https://typing.python.org/en/latest/spec/callables.html#callable>
 
-Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
+Note that `typing.Callable` is deprecated at runtime, in favor of `collections.abc.Callable` (see:
 <https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
 `typing.Callable` is not currently planned, and the canonical location of the stub for the symbol in
 typeshed is still `typing.pyi`.
@@ -20,10 +20,13 @@ is the return type. Here, we explore various invalid forms.
 A bare `Callable` without any type arguments:
 
 ```py
-from typing import Callable
+from typing import Callable, Any
+from ty_extensions import is_equivalent_to, static_assert
 
-def _(c: Callable):
+def _(c: Callable):  # error: [missing-type-argument]
     reveal_type(c)  # revealed: (...) -> Unknown
+
+static_assert(is_equivalent_to(Callable, Callable[..., Any]))  # error: [missing-type-argument]
 ```
 
 ### Invalid parameter type argument
@@ -49,11 +52,26 @@ def _(c: Callable[42, str]):
 Or, when one of the parameter type is invalid in the list:
 
 ```py
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+# error: [invalid-type-form] "Boolean literals are not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, 42, str, False], None]):
     # revealed: (int, Unknown, str, Unknown, /) -> None
     reveal_type(c)
+```
+
+Or, when an ellipsis literal is used as a parameter type in the list (note that the valid gradual
+form uses `...` as the entire first argument, not inside a list):
+
+```py
+# error: [invalid-type-form] "`[...]` is not a valid parameter list for `Callable`: Did you mean `Callable[..., int]`?"
+def _(c: Callable[[...], int]):
+    reveal_type(c)  # revealed: (...) -> int
+```
+
+```py
+# error: [invalid-type-form] "`...` is not allowed in this context in a parameter annotation"
+def _(c: Callable[[int, ...], int]):
+    reveal_type(c)  # revealed: (int, Unknown, /) -> int
 ```
 
 ### Missing return type
@@ -63,7 +81,7 @@ Using a parameter list:
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -71,7 +89,7 @@ def _(c: Callable[[int, str]]):
 Or, an ellipsis:
 
 ```py
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[...]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -81,8 +99,23 @@ Or something else that's invalid in a type expression generally:
 ```py
 # fmt: off
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### Invalid parameters and return type
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+            {1, 2}, 2  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -96,7 +129,7 @@ which argument corresponds to either the parameters or the return type.
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -110,7 +143,22 @@ from typing import Callable
 
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
-            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### Tuple as the second argument
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -121,7 +169,7 @@ def _(c: Callable[
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
 def _(c: Callable[[int], [str]]):
     reveal_type(c)  # revealed: (int, /) -> Unknown
 ```
@@ -134,10 +182,10 @@ from typing import Callable
 # fmt: off
 
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             [int],
-            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
+            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -152,6 +200,100 @@ from typing import Callable
 
 def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
+```
+
+## Overloaded callable assignability
+
+An overloaded callable should be assignable to a non-overloaded callable type when the overload set
+as a whole is compatible with the target callable.
+
+```py
+from typing import Callable, overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def expects(c: Callable[[int | str], str]) -> None:
+    pass
+
+expects(foo)
+```
+
+```py
+from typing import overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def errors() -> None:
+    for x in map(foo, range(1, 10)):
+        print(x)
+```
+
+```py
+from typing import Callable, overload
+
+@overload
+def converter(x: int) -> str: ...
+@overload
+def converter(x: bytes) -> bytes: ...
+def converter(x: int | bytes) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x
+
+def expects_int_str(c: Callable[[int], str]) -> None:
+    pass
+
+expects_int_str(converter)
+```
+
+The overload set must cover the full target parameter domain.
+
+```py
+from typing import Callable, overload
+
+@overload
+def partial_converter(x: int) -> str: ...
+@overload
+def partial_converter(x: bytes) -> str: ...
+def partial_converter(x: int | bytes) -> str:
+    return str(x)
+
+def expects_int_or_str(c: Callable[[int | str], str]) -> None:
+    pass
+
+# error: [invalid-argument-type]
+expects_int_or_str(partial_converter)
+```
+
+Even when the parameter domain is covered, return compatibility must still hold.
+
+```py
+from typing import Callable, overload
+
+@overload
+def wide_return_converter(x: int) -> str: ...
+@overload
+def wide_return_converter(x: str) -> bytes: ...
+def wide_return_converter(x: int | str) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x.encode()
+
+def expects_str_return(c: Callable[[int | str], str]) -> None:
+    pass
+
+# error: [invalid-argument-type]
+expects_str_return(wide_return_converter)
 ```
 
 ## Union
@@ -175,16 +317,18 @@ def _(
 from typing import Callable, Union
 from ty_extensions import Intersection, Not
 
+class Foo: ...
+
 def _(
     c: Intersection[Callable[[Union[int, str]], int], int],
     d: Intersection[int, Callable[[Union[int, str]], int]],
-    e: Intersection[int, Callable[[Union[int, str]], int], str],
-    f: Intersection[Not[Callable[[int, str], Intersection[int, str]]]],
+    e: Intersection[int, Callable[[Union[int, str]], int], Foo],
+    f: Intersection[Not[Callable[[int, str], Intersection[int, Foo]]]],
 ):
     reveal_type(c)  # revealed: ((int | str, /) -> int) & int
     reveal_type(d)  # revealed: int & ((int | str, /) -> int)
-    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
-    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
+    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & Foo
+    reveal_type(f)  # revealed: ~((int, str, /) -> int & Foo)
 ```
 
 ## Nested
@@ -202,7 +346,7 @@ And, as the return type:
 
 ```py
 def _(c: Callable[[int, str], Callable[[int], int]]):
-    reveal_type(c)  # revealed: (int, str, /) -> (int, /) -> int
+    reveal_type(c)  # revealed: (int, str, /) -> ((int, /) -> int)
 ```
 
 ## Gradual form
@@ -225,16 +369,31 @@ Using `Concatenate` as the first argument to `Callable`:
 from typing_extensions import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> int
 ```
 
-And, as one of the parameter types:
+Other type expressions can be nested inside `Concatenate`:
 
 ```py
-def _(c: Callable[[Concatenate[int, str, ...], int], int]):
-    # TODO: Should reveal the correct signature
+def _(c: Callable[Concatenate[int | str, type[str], ...], int]):
+    reveal_type(c)  # revealed: (int | str, type[str], /, *args: Any, **kwargs: Any) -> int
+```
+
+But providing fewer than 2 arguments to `Concatenate` is an error:
+
+```py
+# fmt: off
+
+def _(
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
+):
     reveal_type(c)  # revealed: (...) -> int
+    reveal_type(d)  # revealed: (...) -> int
+    reveal_type(e)  # revealed: (...) -> int
+
+# fmt: on
 ```
 
 ## Using `typing.ParamSpec`
@@ -250,11 +409,10 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpec)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpec)
+    reveal_type(P1.args)  # revealed: P1@_.args
+    reveal_type(P1.kwargs)  # revealed: P1@_.kwargs
 
-    # TODO: Signature should be (**P1) -> int
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P1@_) -> int
 ```
 
 And, using the legacy syntax:
@@ -264,9 +422,8 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P2@_) -> int
 ```
 
 ## Using `typing.Unpack`
@@ -299,7 +456,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: def __init__(self) -> None
+    reveal_type(c.__init__)  # revealed: bound method object.__init__() -> None
     reveal_type(c.__class__)  # revealed: type
     reveal_type(c.__call__)  # revealed: (int, /) -> int
 ```
@@ -309,10 +466,10 @@ on function-like callables:
 
 ```py
 def f_wrong(c: Callable[[], None]):
-    # error: [unresolved-attribute] "Type `() -> None` has no attribute `__qualname__`"
+    # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
-    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
+    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`"
     c.__qualname__ = "my_callable"
 ```
 
@@ -327,14 +484,124 @@ class MyCallable:
 f_wrong(MyCallable())  # raises `AttributeError` at runtime
 ```
 
-If users want to write to attributes such as `__qualname__`, they need to check the existence of the
-attribute first:
+If users want to read/write to attributes such as `__qualname__`, they need to check the existence
+of the attribute first:
 
 ```py
+from inspect import getattr_static
+
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
-        c.__qualname__  # okay
-        c.__qualname__ = "my_callable"  # also okay
+        reveal_type(c.__qualname__)  # revealed: object
+
+        # TODO: should be `property`
+        # (or complain that we don't know that `type(c)` has the attribute at all!)
+        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+
+        # `hasattr` only guarantees that an attribute is readable.
+        #
+        # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
+        c.__qualname__ = "my_callable"
+
+        result = getattr_static(c, "__qualname__")
+        reveal_type(result)  # revealed: property
+        if isinstance(result, property) and result.fset:
+            c.__qualname__ = "my_callable"  # okay
+```
+
+## From a class
+
+### Subclasses should return themselves, not superclass
+
+```py
+from ty_extensions import into_regular_callable
+
+class Base:
+    def __init__(self) -> None:
+        pass
+
+class A(Base):
+    pass
+
+# revealed: () -> A
+reveal_type(into_regular_callable(A))
+```
+
+## Nested callable relations still reach the leaf mismatch
+
+```py
+from typing import Callable
+
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(
+    not is_assignable_to(
+        Callable[[], Callable[[], int]],
+        Callable[[], Callable[[], str]],
+    )
+)
+```
+
+## `typing.Callable` and `collections.abc.Callable` parity
+
+`typing.Callable` is a deprecated alias for `collections.abc.Callable`. Internally we model them as
+distinct `SpecialFormType` variants so that we can support usage of the latter in `match`
+statements, while disallowing the former, but otherwise they should be interchangeable in type
+expressions.
+
+### Bare form
+
+```py
+from typing import Any
+import typing
+import collections.abc
+
+# error: [missing-type-argument]
+def _(c1: typing.Callable, c2: collections.abc.Callable):  # error: [missing-type-argument]
+    reveal_type(c1)  # revealed: (...) -> Unknown
+    reveal_type(c2)  # revealed: (...) -> Unknown
+```
+
+### Parameterized form
+
+```py
+import typing
+import collections.abc
+
+def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str]):
+    reveal_type(c1)  # revealed: (int, /) -> str
+    reveal_type(c2)  # revealed: (int, /) -> str
+```
+
+### Equivalence
+
+```py
+import typing
+import collections.abc
+from ty_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
+# error: [missing-type-argument]
+static_assert(is_equivalent_to(typing.Callable, collections.abc.Callable))  # error: [missing-type-argument]
+```
+
+### Inside `type[...]`
+
+`type[Callable[...]]` is not a valid type expression (the argument to `type[...]` must be a class
+object), but both modules' `Callable` should produce the same diagnostic and resolved type.
+
+```py
+import typing
+import collections.abc
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c1: type[typing.Callable[[int], str]],
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c2: type[collections.abc.Callable[[int], str]],
+):
+    reveal_type(c1)  # revealed: type[Unknown]
+    reveal_type(c2)  # revealed: type[Unknown]
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

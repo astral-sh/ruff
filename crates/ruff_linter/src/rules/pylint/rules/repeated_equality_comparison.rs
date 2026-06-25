@@ -5,7 +5,7 @@ use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -32,6 +32,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
 ///
+/// ## Fix safety
+/// This rule is always unsafe since literal sets and tuples
+/// evaluate their members eagerly whereas `or` comparisons
+/// are short-circuited. It is therefore possible that a fix
+/// will change behavior in the presence of side-effects.
+///
 /// ## Example
 /// ```python
 /// foo == "bar" or foo == "baz" or foo == "qux"
@@ -47,6 +53,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
@@ -133,6 +140,18 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 continue;
             }
 
+            if let Some((&first, rest)) = comparators.split_first() {
+                let first_comparable = ComparableExpr::from(first);
+
+                if rest
+                    .iter()
+                    .all(|&c| ComparableExpr::from(c) == first_comparable)
+                {
+                    // Do not flag if all members are identical
+                    continue;
+                }
+            }
+
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
             let all_hashable = comparators
@@ -164,11 +183,13 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 Expr::Set(ast::ExprSet {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: true,
                 })
@@ -186,10 +207,12 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                             },
                             comparators: Box::from([comparator]),
                             range: bool_op.range(),
+                            node_index: AtomicNodeIndex::NONE,
                         })))
                         .chain(after)
                         .collect(),
                     range: bool_op.range(),
+                    node_index: AtomicNodeIndex::NONE,
                 })),
                 bool_op.range(),
             )));
@@ -241,7 +264,7 @@ fn to_allowed_value<'a>(
 
     // Ignore `sys.version_info` and `sys.platform` comparisons, which are only
     // respected by type checkers when enforced via equality.
-    if any_over_expr(value, &|expr| {
+    if any_over_expr(value, |expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {
@@ -277,8 +300,8 @@ fn merged_membership_test(
         .join(", ");
 
     if all_hashable {
-        return format!("{left} {op} {{{members}}}",);
+        return format!("{left} {op} {{{members}}}");
     }
 
-    format!("{left} {op} ({members})",)
+    format!("{left} {op} ({members})")
 }

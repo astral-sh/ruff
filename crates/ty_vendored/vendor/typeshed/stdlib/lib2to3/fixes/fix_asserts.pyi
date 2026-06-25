@@ -1,3 +1,5 @@
+"""Fixer that replaces deprecated unittest method names."""
+
 from typing import ClassVar, Final, Literal
 
 from ..fixer_base import BaseFix

@@ -7,7 +7,12 @@ use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, Member
 pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&ast::ExprStringLiteral> {
     let stmt = suite.first()?;
     // Require the docstring to be a standalone expression.
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return None;
     };
     // Only match strings.

@@ -358,7 +358,10 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing<T>(&self, node: T) -> LeadingDanglingTrailingComments
+    pub(crate) fn leading_dangling_trailing<T>(
+        &self,
+        node: T,
+    ) -> LeadingDanglingTrailingComments<'_>
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -540,7 +543,7 @@ mod tests {
             }
         }
 
-        fn to_comments(&self) -> Comments {
+        fn to_comments(&self) -> Comments<'_> {
             Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }
@@ -1033,6 +1036,35 @@ else: # trailing comment
     pass
 ";
 
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_else_indented_comment_between_branches() {
+        let source = r"while True: pass
+    # comment
+else:
+    pass
+";
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_else_very_indented_comment_between_branches() {
+        let source = r"while True:
+    pass
+        # comment
+else:
+    pass
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();

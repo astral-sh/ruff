@@ -3,6 +3,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::renamer::ShadowedKind;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -35,9 +36,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     return x
 /// ```
 ///
+/// ## See also
+///
+/// This rule applies only to unpacked assignments. For regular assignments, see
+/// [`unused-variable`][F841].
+///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [F841]: https://docs.astral.sh/ruff/rules/unused-variable/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct UnusedUnpackedVariable {
     pub name: String,
 }
@@ -63,7 +72,12 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 
     let name = binding.name(checker.source());
     let renamed = format!("_{name}");
-    if checker.settings.dummy_variable_rgx.is_match(&renamed) {
+
+    if ShadowedKind::new(binding, &renamed, checker).shadows_any() {
+        return None;
+    }
+
+    if checker.settings().dummy_variable_rgx.is_match(&renamed) {
         let edit = Edit::range_replacement(renamed, binding.range());
 
         return Some(Fix::unsafe_edit(edit).isolate(isolation));
@@ -87,4 +101,6 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
+    // Add Unnecessary tag for unused unpacked variables
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

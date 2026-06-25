@@ -1,9 +1,11 @@
 use ast::{ExprAttribute, ExprName, Identifier};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 
@@ -29,9 +31,13 @@ use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 ///     print(f"{country}'s flag has {stars} stars.")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct ZipDictKeysAndValues {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -77,13 +83,18 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     let [arg1, arg2] = &args[..] else {
         return;
     };
-    let Some((var1, attr1)) = get_var_attr(arg1) else {
+    let Some((var1, attr1, args1)) = get_var_attr_args(arg1) else {
         return;
     };
-    let Some((var2, attr2)) = get_var_attr(arg2) else {
+    let Some((var2, attr2, args2)) = get_var_attr_args(arg2) else {
         return;
     };
-    if var1.id != var2.id || attr1 != "keys" || attr2 != "values" {
+    if var1.id != var2.id
+        || attr1 != "keys"
+        || attr2 != "values"
+        || !args1.is_empty()
+        || !args2.is_empty()
+    {
         return;
     }
     if !checker.semantic().match_builtin_expr(func, "zip") {
@@ -92,7 +103,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
 
     let Some(binding) = checker
         .semantic()
-        .only_binding(var1)
+        .resolve_name(var1)
         .map(|id| checker.semantic().binding(id))
     else {
         return;
@@ -101,7 +112,11 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         return;
     }
 
-    let expected = format!("{}.items()", checker.locator().slice(var1));
+    let expected = edits::pad(
+        format!("{}.items()", checker.locator().slice(var1)),
+        expr.range(),
+        checker.locator(),
+    );
     let actual = checker.locator().slice(expr);
 
     let mut diagnostic = checker.report_diagnostic(
@@ -111,14 +126,24 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
+
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }
 
-fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
         return None;
     };
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() else {
@@ -127,5 +152,5 @@ fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {
     let Expr::Name(var_name) = value.as_ref() else {
         return None;
     };
-    Some((var_name, attr))
+    Some((var_name, attr, arguments))
 }

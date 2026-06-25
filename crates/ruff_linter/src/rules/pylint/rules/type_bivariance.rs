@@ -54,6 +54,7 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 483 – The Theory of Type Hints: Covariance and Contravariance](https://peps.python.org/pep-0483/#covariance-and-contravariance)
 /// - [PEP 484 – Type Hints: Covariance and contravariance](https://peps.python.org/pep-0484/#covariance-and-contravariance)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct TypeBivariance {
     kind: VarKind,
     param_name: Option<String>,
@@ -66,7 +67,7 @@ impl Violation for TypeBivariance {
         match param_name {
             None => format!("`{kind}` cannot be both covariant and contravariant"),
             Some(param_name) => {
-                format!("`{kind}` \"{param_name}\" cannot be both covariant and contravariant",)
+                format!("`{kind}` \"{param_name}\" cannot be both covariant and contravariant")
             }
         }
     }

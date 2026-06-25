@@ -10,6 +10,7 @@ impl FormatNodeRule<Keyword> for FormatKeyword {
     fn fmt_fields(&self, item: &Keyword, f: &mut PyFormatter) -> FormatResult<()> {
         let Keyword {
             range: _,
+            node_index: _,
             arg,
             value,
         } = item;

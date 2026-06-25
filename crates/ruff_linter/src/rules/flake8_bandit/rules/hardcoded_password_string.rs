@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::{matches_password_name, string_literal};
+use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
 /// Checks for potential uses of hardcoded passwords in strings.
@@ -34,6 +34,7 @@ use super::super::helpers::{matches_password_name, string_literal};
 /// ## References
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.116")]
 pub(crate) struct HardcodedPasswordString {
     name: String,
 }
@@ -95,8 +96,8 @@ pub(crate) fn compare_to_hardcoded_password_string(
 /// S105
 pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, targets: &[Expr]) {
     if string_literal(value)
-        .filter(|string| !string.is_empty())
-        .is_some()
+        .as_ref()
+        .is_some_and(|string| !string.is_empty())
     {
         for target in targets {
             if let Some(name) = password_target(target) {

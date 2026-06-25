@@ -52,6 +52,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
         let Comprehension {
             range: _,
+            node_index: _,
             target,
             iter,
             ifs,

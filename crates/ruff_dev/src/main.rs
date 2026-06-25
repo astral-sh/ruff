@@ -18,6 +18,7 @@ mod generate_json_schema;
 mod generate_options;
 mod generate_rules_table;
 mod generate_ty_cli_reference;
+mod generate_ty_env_vars_reference;
 mod generate_ty_options;
 mod generate_ty_rules;
 mod generate_ty_schema;
@@ -53,6 +54,8 @@ enum Command {
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions,
     GenerateTyOptions(generate_ty_options::Args),
+    /// Generate environment variables reference for ty.
+    GenerateTyEnvVarsReference(generate_ty_env_vars_reference::Args),
     /// Generate CLI help.
     GenerateCliHelp(generate_cli_help::Args),
     /// Generate Markdown docs.
@@ -98,6 +101,7 @@ fn main() -> Result<ExitCode> {
         Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
         Command::GenerateTyOptions(args) => generate_ty_options::main(&args)?,
+        Command::GenerateTyEnvVarsReference(args) => generate_ty_env_vars_reference::main(&args)?,
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
         Command::GenerateDocs(args) => generate_docs::main(&args)?,
         Command::PrintAST(args) => print_ast::main(&args)?,

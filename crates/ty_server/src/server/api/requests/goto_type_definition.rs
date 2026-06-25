@@ -1,45 +1,53 @@
 use std::borrow::Cow;
 
-use lsp_types::request::{GotoTypeDefinition, GotoTypeDefinitionParams};
-use lsp_types::{GotoDefinitionResponse, Url};
-use ruff_db::source::{line_index, source_text};
+use lsp_types::{TypeDefinitionParams, TypeDefinitionRequest};
+use lsp_types::{TypeDefinitionResponse, Uri};
 use ty_ide::goto_type_definition;
 use ty_project::ProjectDatabase;
 
-use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToLink};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
 
 impl RequestHandler for GotoTypeDefinitionRequestHandler {
-    type RequestType = GotoTypeDefinition;
+    type RequestType = TypeDefinitionRequest;
 }
 
 impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
-    fn document_url(params: &GotoTypeDefinitionParams) -> Cow<Url> {
+    fn document_uri(params: &TypeDefinitionParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: GotoTypeDefinitionParams,
-    ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
-        let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
+        params: TypeDefinitionParams,
+    ) -> crate::server::Result<Option<TypeDefinitionResponse>> {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
+            return Ok(None);
+        }
+
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position_params.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
+            db,
+            file,
+            snapshot.uri(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(ranged) = goto_type_definition(db, file, offset) else {
             return Ok(None);
@@ -47,7 +55,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
 
         if snapshot
             .resolved_client_capabilities()
-            .type_definition_link_support
+            .supports_type_definition_link()
         {
             let src = Some(ranged.range);
             let links: Vec<_> = ranged
@@ -55,14 +63,16 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
                 .filter_map(|target| target.to_link(db, src, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Link(links)))
+            Ok(Some(links.into()))
         } else {
             let locations: Vec<_> = ranged
                 .into_iter()
                 .filter_map(|target| target.to_location(db, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Array(locations)))
+            Ok(Some(TypeDefinitionResponse::Definition(locations.into())))
         }
     }
 }
+
+impl RetriableRequestHandler for GotoTypeDefinitionRequestHandler {}

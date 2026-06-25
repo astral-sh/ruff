@@ -46,7 +46,16 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///         original_speak = super().speak()  # Correct: `super().speak()`
 ///         return f"{original_speak} But as a dog, it barks!"
 /// ```
+///
+/// ## Options
+///
+/// This rule applies to regular, static, and class methods. You can customize how Ruff categorizes
+/// methods with the following options:
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct SuperWithoutBrackets;
 
 impl AlwaysFixableViolation for SuperWithoutBrackets {
@@ -96,8 +105,8 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
         &function_def.decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(
         classification,

@@ -1,11 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -31,6 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct TooFewSpacesBeforeInlineComment;
 
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
@@ -67,6 +68,7 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct NoSpaceAfterInlineComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
@@ -104,6 +106,7 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct NoSpaceAfterBlockComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
@@ -150,6 +153,7 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MultipleLeadingHashesForBlockComment;
 
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
@@ -167,7 +171,7 @@ impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
 pub(crate) fn whitespace_before_comment(
     line: &LogicalLine,
     locator: &Locator,
-    context: &mut LogicalLinesContext,
+    context: &LintContext,
 ) {
     let mut prev_end = TextSize::default();
     for token in line.tokens() {
@@ -185,7 +189,7 @@ pub(crate) fn whitespace_before_comment(
             let is_inline_comment = !line_text.trim_whitespace().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
-                    if let Some(mut diagnostic) = context.report_diagnostic(
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                         TooFewSpacesBeforeInlineComment,
                         TextRange::new(prev_end, range.start()),
                     ) {
@@ -211,7 +215,7 @@ pub(crate) fn whitespace_before_comment(
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().is_some_and(char::is_whitespace) {
                     if let Some(mut diagnostic) =
-                        context.report_diagnostic(NoSpaceAfterInlineComment, range)
+                        context.report_diagnostic_if_enabled(NoSpaceAfterInlineComment, range)
                     {
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             format_leading_space(token_text),
@@ -223,7 +227,7 @@ pub(crate) fn whitespace_before_comment(
                 if bad_prefix != '!' || !line.is_start_of_file() {
                     if bad_prefix != '#' {
                         if let Some(mut diagnostic) =
-                            context.report_diagnostic(NoSpaceAfterBlockComment, range)
+                            context.report_diagnostic_if_enabled(NoSpaceAfterBlockComment, range)
                         {
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 format_leading_space(token_text),
@@ -231,9 +235,10 @@ pub(crate) fn whitespace_before_comment(
                             )));
                         }
                     } else if !comment.is_empty() {
-                        if let Some(mut diagnostic) =
-                            context.report_diagnostic(MultipleLeadingHashesForBlockComment, range)
-                        {
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                            MultipleLeadingHashesForBlockComment,
+                            range,
+                        ) {
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 format_leading_hashes(token_text),
                                 range,

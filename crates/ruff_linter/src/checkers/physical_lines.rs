@@ -26,15 +26,16 @@ pub(crate) fn check_physical_lines(
     settings: &LinterSettings,
     context: &LintContext,
 ) {
-    let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
-    let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
-    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
-    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
-    let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
-    let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
+    let enforce_doc_line_too_long = context.is_rule_enabled(Rule::DocLineTooLong);
+    let enforce_line_too_long = context.is_rule_enabled(Rule::LineTooLong);
+    let enforce_no_newline_at_end_of_file =
+        context.is_rule_enabled(Rule::MissingNewlineAtEndOfFile);
+    let enforce_mixed_spaces_and_tabs = context.is_rule_enabled(Rule::MixedSpacesAndTabs);
+    let enforce_bidirectional_unicode = context.is_rule_enabled(Rule::BidirectionalUnicode);
+    let enforce_trailing_whitespace = context.is_rule_enabled(Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
-        settings.rules.enabled(Rule::BlankLineWithWhitespace);
-    let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
+        context.is_rule_enabled(Rule::BlankLineWithWhitespace);
+    let enforce_copyright_notice = context.is_rule_enabled(Rule::MissingCopyrightNotice);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
     let comment_ranges = indexer.comment_ranges();
@@ -62,10 +63,10 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            trailing_whitespace(&line, locator, indexer, settings, context);
+            trailing_whitespace(&line, locator, indexer, context);
         }
 
-        if settings.rules.enabled(Rule::IndentedFormFeed) {
+        if context.is_rule_enabled(Rule::IndentedFormFeed) {
             indented_form_feed(&line, context);
         }
     }
@@ -81,10 +82,11 @@ pub(crate) fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
-    use ruff_source_file::SourceFileBuilder;
 
     use crate::Locator;
     use crate::checkers::ast::LintContext;
@@ -104,23 +106,16 @@ mod tests {
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
         let check_with_max_line_length = |line_length: LineLength| {
-            let source_file = SourceFileBuilder::new("<filename>", line).finish();
-            let diagnostics = LintContext::new(&source_file);
-            check_physical_lines(
-                &locator,
-                &stylist,
-                &indexer,
-                &[],
-                &LinterSettings {
-                    pycodestyle: pycodestyle::settings::Settings {
-                        max_line_length: line_length,
-                        ..pycodestyle::settings::Settings::default()
-                    },
-                    ..LinterSettings::for_rule(Rule::LineTooLong)
+            let settings = LinterSettings {
+                pycodestyle: pycodestyle::settings::Settings {
+                    max_line_length: line_length,
+                    ..pycodestyle::settings::Settings::default()
                 },
-                &diagnostics,
-            );
-            diagnostics.into_diagnostics()
+                ..LinterSettings::for_rule(Rule::LineTooLong)
+            };
+            let diagnostics = LintContext::new(Path::new("<filename>"), line, &settings);
+            check_physical_lines(&locator, &stylist, &indexer, &[], &settings, &diagnostics);
+            diagnostics.into_parts().0
         };
         let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);

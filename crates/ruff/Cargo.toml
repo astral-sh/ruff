@@ -1,7 +1,7 @@
 [package]
 name = "ruff"
-version = "0.11.12"
-publish = true
+version = "0.15.19"
+description = "An extremely fast Python linter and code formatter"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -9,8 +9,15 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-readme = "../../README.md"
+readme = "README.md"
 default-run = "ruff"
+
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["jiff"]
+
+[package.metadata.dist]
+dist = true
 
 [dependencies]
 ruff_cache = { workspace = true }
@@ -19,11 +26,13 @@ ruff_diagnostics = { workspace = true }
 ruff_graph = { workspace = true, features = ["serde", "clap"] }
 ruff_linter = { workspace = true, features = ["clap"] }
 ruff_macros = { workspace = true }
+ruff_markdown = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_options_metadata = { workspace = true, features = ["serde"] }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ruff_server = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -41,6 +50,7 @@ colored = { workspace = true }
 filetime = { workspace = true }
 globwalk = { workspace = true }
 ignore = { workspace = true }
+indexmap = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 jiff = { workspace = true }
@@ -61,6 +71,12 @@ tracing = { workspace = true, features = ["log"] }
 walkdir = { workspace = true }
 wild = { workspace = true }
 
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+tikv-jemallocator = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+mimalloc = { workspace = true }
+
 [dev-dependencies]
 # Enable test rules during development
 ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
@@ -68,24 +84,16 @@ ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 assert_fs = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"] }
+dunce = { workspace = true }
 indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
+ruff_python_trivia = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
 
-[package.metadata.cargo-shear]
-# Used via macro expansion.
-ignored = ["jiff"]
-
-[package.metadata.dist]
-dist = true
-
-[target.'cfg(target_os = "windows")'.dependencies]
-mimalloc = { workspace = true }
-
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
-tikv-jemallocator = { workspace = true }
-
 [lints]
 workspace = true
+
+[lib]
+doctest = false

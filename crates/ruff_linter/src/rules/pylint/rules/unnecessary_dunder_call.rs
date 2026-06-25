@@ -4,6 +4,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -62,8 +63,8 @@ use ruff_python_ast::PythonVersion;
 /// def is_greater_than_two(x: int) -> bool:
 ///     return x > 2
 /// ```
-///
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.12")]
 pub(crate) struct UnnecessaryDunderCall {
     method: String,
     replacement: Option<String>,
@@ -233,7 +234,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            fixed,
+            edits::pad(fixed, call.range(), checker.locator()),
             call.range(),
         )));
     }
@@ -351,6 +352,11 @@ impl DunderReplacement {
                 "Use `<<=` operator",
                 OperatorPrecedence::Assign,
             )),
+            "__imatmul__" => Some(Self::Operator(
+                "@=",
+                "Use `@=` operator",
+                OperatorPrecedence::Assign,
+            )),
             "__imod__" => Some(Self::Operator(
                 "%=",
                 "Use `%=` operator",
@@ -416,6 +422,11 @@ impl DunderReplacement {
                 "Use `*` operator",
                 OperatorPrecedence::MulDivRemain,
             )),
+            "__matmul__" => Some(Self::Operator(
+                "@",
+                "Use `@` operator",
+                OperatorPrecedence::MulDivRemain,
+            )),
             "__ne__" => Some(Self::Operator(
                 "!=",
                 "Use `!=` operator",
@@ -466,6 +477,11 @@ impl DunderReplacement {
                 "<<",
                 "Use `<<` operator",
                 OperatorPrecedence::LeftRightShift,
+            )),
+            "__rmatmul__" => Some(Self::ROperator(
+                "@",
+                "Use `@` operator",
+                OperatorPrecedence::MulDivRemain,
             )),
             "__rmod__" => Some(Self::ROperator(
                 "%",
@@ -530,6 +546,7 @@ impl DunderReplacement {
             "__delattr__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
+            "__floor__" => Some(Self::MessageOnly("Use `math.floor()` function")),
             "__format__" => Some(Self::MessageOnly(
                 "Use `format` builtin, format string method, or f-string",
             )),
@@ -544,6 +561,7 @@ impl DunderReplacement {
             "__init__" => Some(Self::MessageOnly("Instantiate class directly")),
             "__instancecheck__" => Some(Self::MessageOnly("Use `isinstance()` builtin")),
             "__invert__" => Some(Self::MessageOnly("Use `~` operator")),
+            "__length_hint__" => Some(Self::MessageOnly("Use `operator.length_hint()` function")),
             "__neg__" => Some(Self::MessageOnly("Multiply by -1 instead")),
             "__pos__" => Some(Self::MessageOnly("Multiply by +1 instead")),
             "__pow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
@@ -553,7 +571,7 @@ impl DunderReplacement {
                 "Mutate attribute directly or use setattr built-in function",
             )),
             "__setitem__" => Some(Self::MessageOnly("Use subscript assignment")),
-            "__truncate__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
+            "__trunc__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
 
             _ => None,
         }

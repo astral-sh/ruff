@@ -2,22 +2,19 @@ use crate::TextDocument;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
-use lsp_types as types;
-use lsp_types::notification as notif;
+use crate::session::{Client, Session};
+use lsp_types::{self as types, DidOpenTextDocumentNotification};
 
 pub(crate) struct DidOpen;
 
 impl super::NotificationHandler for DidOpen {
-    type NotificationType = notif::DidOpenTextDocument;
+    type NotificationType = DidOpenTextDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidOpen {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {
@@ -28,7 +25,7 @@ impl super::SyncNotificationHandler for DidOpen {
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let document = TextDocument::new(text, version).with_language_id(&language_id);
+        let document = TextDocument::new(text, version).with_language_id(language_id);
 
         session.open_text_document(uri.clone(), document);
 
@@ -37,10 +34,10 @@ impl super::SyncNotificationHandler for DidOpen {
             let snapshot = session
                 .take_snapshot(uri.clone())
                 .ok_or_else(|| {
-                    anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
+                    anyhow::anyhow!("Unable to take snapshot for document with URI {uri}")
                 })
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-            publish_diagnostics_for_document(&snapshot, &notifier)?;
+            publish_diagnostics_for_document(&snapshot, client)?;
         }
 
         Ok(())

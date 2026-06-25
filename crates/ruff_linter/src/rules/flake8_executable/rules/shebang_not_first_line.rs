@@ -33,6 +33,7 @@ use crate::checkers::ast::LintContext;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct ShebangNotFirstLine;
 
 impl Violation for ShebangNotFirstLine {
@@ -58,5 +59,5 @@ pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator, contex
         return;
     }
 
-    context.report_diagnostic(ShebangNotFirstLine, range);
+    context.report_diagnostic_if_enabled(ShebangNotFirstLine, range);
 }

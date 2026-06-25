@@ -1,0 +1,13 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI041 Use `float` instead of `int | float`
+ --> PYI041_2.py:7:23
+  |
+5 | # fix must not yield runtime `None | None | ...` (TypeError)
+6 | class Issue18298:
+7 |     def f1(self, arg: None | int | None | float = None) -> None:
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |         pass
+  |
+help: Remove redundant type

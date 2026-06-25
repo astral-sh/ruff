@@ -33,6 +33,7 @@ use crate::registry::Rule;
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct UnrecognizedVersionInfoCheck;
 
 impl Violation for UnrecognizedVersionInfoCheck {
@@ -72,6 +73,7 @@ impl Violation for UnrecognizedVersionInfoCheck {
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct PatchVersionComparison;
 
 impl Violation for PatchVersionComparison {
@@ -108,6 +110,7 @@ impl Violation for PatchVersionComparison {
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct WrongTupleLengthVersionComparison {
     expected_length: usize,
 }
@@ -147,9 +150,7 @@ pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
     if let Some(expected) = ExpectedComparator::try_from(left) {
         version_check(checker, expected, test, *op, comparator);
     } else {
-        if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-            checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
-        }
+        checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
     }
 }
 
@@ -163,36 +164,28 @@ fn version_check(
     // Single digit comparison, e.g., `sys.version_info[0] == 2`.
     if expected == ExpectedComparator::MajorDigit {
         if !is_int_constant(comparator) {
-            if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-                checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
-            }
+            checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
         }
         return;
     }
 
     // Tuple comparison, e.g., `sys.version_info == (3, 4)`.
     let Expr::Tuple(tuple) = comparator else {
-        if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-            checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
-        }
+        checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
         return;
     };
 
     if !tuple.iter().all(is_int_constant) {
         // All tuple elements must be integers, e.g., `sys.version_info == (3, 4)` instead of
         // `sys.version_info == (3.0, 4)`.
-        if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
-            checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
-        }
+        checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
     } else if tuple.len() > 2 {
         // Must compare against major and minor version only, e.g., `sys.version_info == (3, 4)`
         // instead of `sys.version_info == (3, 4, 0)`.
-        if checker.enabled(Rule::PatchVersionComparison) {
-            checker.report_diagnostic(PatchVersionComparison, test.range());
-        }
+        checker.report_diagnostic_if_enabled(PatchVersionComparison, test.range());
     }
 
-    if checker.enabled(Rule::WrongTupleLengthVersionComparison) {
+    if checker.is_rule_enabled(Rule::WrongTupleLengthVersionComparison) {
         if op == CmpOp::Eq || op == CmpOp::NotEq {
             let expected_length = match expected {
                 ExpectedComparator::MajorTuple => 1,

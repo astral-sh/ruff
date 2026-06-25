@@ -6,7 +6,6 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::registry::Rule;
-use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -26,8 +25,14 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// spam(1)\n#
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked unsafe if the whitespace is inside a multiline string,
+/// as removing it changes the string's content.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct TrailingWhitespace;
 
 impl AlwaysFixableViolation for TrailingWhitespace {
@@ -58,8 +63,14 @@ impl AlwaysFixableViolation for TrailingWhitespace {
 /// class Foo(object):\n\n    bang = 12
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked unsafe if the whitespace is inside a multiline string,
+/// as removing it changes the string's content.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct BlankLineWithWhitespace;
 
 impl AlwaysFixableViolation for BlankLineWithWhitespace {
@@ -78,7 +89,6 @@ pub(crate) fn trailing_whitespace(
     line: &Line,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
     context: &LintContext,
 ) {
     let whitespace_len: TextSize = line
@@ -96,7 +106,7 @@ pub(crate) fn trailing_whitespace(
             Applicability::Safe
         };
         if range == line.range() {
-            if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
+            if context.is_rule_enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = context.report_diagnostic(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
@@ -110,7 +120,7 @@ pub(crate) fn trailing_whitespace(
                     applicability,
                 ));
             }
-        } else if settings.rules.enabled(Rule::TrailingWhitespace) {
+        } else if context.is_rule_enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = context.report_diagnostic(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),

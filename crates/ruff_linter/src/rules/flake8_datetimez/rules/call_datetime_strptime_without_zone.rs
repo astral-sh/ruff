@@ -5,7 +5,7 @@ use ruff_python_semantic::Modules;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::DatetimeModuleAntipattern;
+use crate::rules::flake8_datetimez::helpers::DatetimeModuleAntipattern;
 
 /// ## What it does
 /// Checks for uses of `datetime.datetime.strptime()` that lead to naive
@@ -51,6 +51,7 @@ use super::helpers::DatetimeModuleAntipattern;
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 /// - [Python documentation: `strftime()` and `strptime()` Behavior](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDatetimeStrptimeWithoutZone(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeStrptimeWithoutZone {
@@ -105,10 +106,10 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
     // Does the `strptime` call contain a format string with a timezone specifier?
     if let Some(expr) = call.arguments.args.get(1) {
         match expr {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                if value.to_str().contains("%z") {
-                    return;
-                }
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                if value.to_str().contains("%z") =>
+            {
+                return;
             }
             Expr::FString(ast::ExprFString { value, .. }) => {
                 for f_string_part in value {

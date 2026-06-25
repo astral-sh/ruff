@@ -52,10 +52,22 @@ while x != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
 
     while x != 2:
-        # TODO: this should be Literal[1, 3]; Literal[3] is only correct
-        # in the first loop iteration
-        reveal_type(x)  # revealed: Literal[3]
+        reveal_type(x)  # revealed: Literal[3, 1]
         x = next_item()
 
     x = next_item()
+```
+
+## With `break` statements
+
+```py
+def next_item() -> int | None:
+    return 1
+
+while True:
+    x = next_item()
+    if x is not None:
+        break
+
+reveal_type(x)  # revealed: int
 ```

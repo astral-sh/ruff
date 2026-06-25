@@ -1,0 +1,75 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: basic.md - Exception Handling - Special-cased diagnostics for `NotImplemented`
+mdtest path: crates/ty_python_semantic/resources/mdtest/exception/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | try:
+ 2 |     # error: [invalid-raise]
+ 3 |     # error: [invalid-raise]
+ 4 |     raise NotImplemented from NotImplemented
+ 5 | # error: [invalid-exception-caught]
+ 6 | except NotImplemented:
+ 7 |     pass
+ 8 | # error: [invalid-exception-caught]
+ 9 | except (TypeError, NotImplemented):
+10 |     pass
+```
+
+# Diagnostics
+
+```
+error[invalid-raise]: Cannot raise `NotImplemented`
+ --> src/mdtest_snippet.py:4:11
+  |
+4 |     raise NotImplemented from NotImplemented
+  |           ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+  |
+info: Can only raise an instance or subclass of `BaseException`
+
+```
+
+```
+error[invalid-raise]: Cannot use `NotImplemented` as an exception cause
+ --> src/mdtest_snippet.py:4:31
+  |
+4 |     raise NotImplemented from NotImplemented
+  |                               ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+  |
+info: An exception cause must be an instance of `BaseException`, subclass of `BaseException`, or `None`
+
+```
+
+```
+error[invalid-exception-caught]: Cannot catch `NotImplemented` in an exception handler
+ --> src/mdtest_snippet.py:6:8
+  |
+6 | except NotImplemented:
+  |        ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+  |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+
+```
+
+```
+error[invalid-exception-caught]: Invalid tuple caught in an exception handler
+ --> src/mdtest_snippet.py:9:8
+  |
+9 | except (TypeError, NotImplemented):
+  |        ^^^^^^^^^^^^--------------^
+  |                    |
+  |                    Invalid element of type `NotImplementedType`
+  |                    Did you mean `NotImplementedError`?
+  |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+
+```

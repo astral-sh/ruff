@@ -11,7 +11,11 @@ pub struct FormatModModule;
 
 impl FormatNodeRule<ModModule> for FormatModModule {
     fn fmt_fields(&self, item: &ModModule, f: &mut PyFormatter) -> FormatResult<()> {
-        let ModModule { range, body } = item;
+        let ModModule {
+            range,
+            body,
+            node_index: _,
+        } = item;
 
         if body.is_empty() {
             // Only preserve an empty line if the source contains an empty line too.

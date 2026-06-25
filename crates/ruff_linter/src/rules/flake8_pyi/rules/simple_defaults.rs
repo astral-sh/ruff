@@ -41,6 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct TypedArgumentDefaultInStub;
 
 impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
@@ -75,7 +76,7 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// ## Example
 ///
 /// ```pyi
-/// def foo(arg=[]) -> None: ...
+/// def foo(arg=bar()) -> None: ...
 /// ```
 ///
 /// Use instead:
@@ -87,6 +88,7 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct ArgumentDefaultInStub;
 
 impl AlwaysFixableViolation for ArgumentDefaultInStub {
@@ -120,7 +122,7 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 ///
 /// ## Example
 /// ```pyi
-/// foo: str = "..."
+/// foo: str = bar()
 /// ```
 ///
 /// Use instead:
@@ -131,6 +133,7 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.260")]
 pub(crate) struct AssignmentDefaultInStub;
 
 impl AlwaysFixableViolation for AssignmentDefaultInStub {
@@ -151,6 +154,7 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
 /// Stub files exist to provide type hints, and are never executed. As such,
 /// all assignments in stub files should be annotated with a type.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct UnannotatedAssignmentInStub {
     name: String,
 }
@@ -182,6 +186,7 @@ impl Violation for UnannotatedAssignmentInStub {
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct UnassignedSpecialVariableInStub {
     name: String,
 }
@@ -230,6 +235,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct TypeAliasWithoutAnnotation {
     module: TypingModule,
     name: String,
@@ -300,7 +306,11 @@ fn is_valid_default_value_with_annotation(
         }
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, range: _ }) => {
+        | Expr::Set(ast::ExprSet {
+            elts,
+            range: _,
+            node_index: _,
+        }) => {
             return allow_container
                 && elts.len() <= 10
                 && elts
@@ -320,19 +330,19 @@ fn is_valid_default_value_with_annotation(
             op: UnaryOp::USub,
             operand,
             range: _,
+            node_index: _,
         }) => {
             match operand.as_ref() {
                 // Ex) `-1`, `-3.14`, `2j`
                 Expr::NumberLiteral(_) => return true,
                 // Ex) `-math.inf`, `-math.pi`, etc.
-                Expr::Attribute(_) => {
+                Expr::Attribute(_)
                     if semantic
                         .resolve_qualified_name(operand)
                         .as_ref()
-                        .is_some_and(is_allowed_negated_math_attribute)
-                    {
-                        return true;
-                    }
+                        .is_some_and(is_allowed_negated_math_attribute) =>
+                {
+                    return true;
                 }
                 _ => {}
             }
@@ -342,6 +352,7 @@ fn is_valid_default_value_with_annotation(
             op: Operator::Add | Operator::Sub,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
             if let Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -360,6 +371,7 @@ fn is_valid_default_value_with_annotation(
                     op: UnaryOp::USub,
                     operand,
                     range: _,
+                    node_index: _,
                 }) = left.as_ref()
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
@@ -374,14 +386,13 @@ fn is_valid_default_value_with_annotation(
             }
         }
         // Ex) `math.inf`, `sys.stdin`, etc.
-        Expr::Attribute(_) => {
+        Expr::Attribute(_)
             if semantic
                 .resolve_qualified_name(default)
                 .as_ref()
-                .is_some_and(is_allowed_math_attribute)
-            {
-                return true;
-            }
+                .is_some_and(is_allowed_math_attribute) =>
+        {
+            return true;
         }
         _ => {}
     }
@@ -398,6 +409,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
                 op: Operator::BitOr,
                 right,
                 range: _,
+                node_index: _,
             }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
             Expr::Name(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::NoneLiteral(_) => true,
             _ => false,
@@ -410,6 +422,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
         op: Operator::BitOr,
         right,
         range: _,
+        node_index: _,
     }) = annotation
     else {
         return false;

@@ -1,0 +1,37 @@
+src/black/__init__.py:1018:13: error[unresolved-attribute] Attribute `detach` is not defined on `AnsiToWin32` in union `TextIOWrapper[_WrappedBuffer] | AnsiToWin32`
+src/black/__init__.py:1072:9: error[unresolved-attribute] Attribute `detach` is not defined on `AnsiToWin32` in union `TextIOWrapper[BinaryIO | Any] | TextIOWrapper[_WrappedBuffer] | AnsiToWin32`
+src/black/files.py:104:12: warning[possibly-unresolved-reference] Name `directory` used when possibly not defined
+src/black/handle_ipynb_magics.py:108:10: error[unresolved-import] Cannot resolve imported module `tokenize_rt`
+src/black/handle_ipynb_magics.py:132:10: error[unresolved-import] Cannot resolve imported module `tokenize_rt`
+src/black/handle_ipynb_magics.py:173:10: error[unresolved-import] Cannot resolve imported module `IPython.core.inputtransformer2`
+src/black/linegen.py:930:12: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
+src/black/linegen.py:930:36: warning[possibly-unresolved-reference] Name `tail_leaves` used when possibly not defined
+src/black/linegen.py:934:9: warning[possibly-unresolved-reference] Name `head_leaves` used when possibly not defined
+src/black/linegen.py:934:28: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
+src/black/linegen.py:937:9: warning[possibly-unresolved-reference] Name `body_leaves` used when possibly not defined
+src/black/linegen.py:937:28: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
+src/black/linegen.py:940:9: warning[possibly-unresolved-reference] Name `tail_leaves` used when possibly not defined
+src/black/linegen.py:940:28: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
+src/black/ranges.py:404:28: error[invalid-argument-type] Argument to function `first_leaf` is incorrect: Expected `Leaf | Node`, found `object`
+src/black/ranges.py:405:26: error[invalid-argument-type] Argument to function `last_leaf` is incorrect: Expected `Leaf | Node`, found `object`
+src/black/trans.py:301:20: error[invalid-raise] Cannot use object of type `object` as an exception cause
+src/black/trans.py:310:24: error[invalid-raise] Cannot use object of type `object` as an exception cause
+src/black/trans.py:485:47: error[invalid-argument-type] Argument to bound method `StringMerger._merge_string_group` is incorrect: Expected `Line`, found `object`
+src/black/trans.py:497:13: error[unresolved-attribute] Unresolved attribute `__cause__` on type `object`
+src/black/trans.py:498:13: error[invalid-assignment] Object of type `object` is not assignable to attribute `__cause__` of type `BaseException | None`
+src/black/trans.py:502:19: error[invalid-yield] Yield type `Ok[object]` does not match annotated yield type `Ok[Line] | Err[CannotTransform]`
+src/black/trans.py:850:39: warning[invalid-ignore-comment] Invalid `type: ignore` comment: no whitespace after `ignore`
+src/black/trans.py:1062:42: warning[possibly-unresolved-reference] Name `idx` used when possibly not defined
+src/black/trans.py:1128:20: error[invalid-return-type] Return type does not match returned value: expected `Ok[list[int]] | Err[CannotTransform]`, found `(Ok[None] & Top[Err[Unknown]]) | Err[CannotTransform]`
+src/black/trans.py:1665:25: warning[possibly-unresolved-reference] Name `csplit` used when possibly not defined
+src/blib2to3/pgen2/conv.py:77:34: error[unresolved-attribute] Attribute `groups` is not defined on `None` in union `Match[str] | None`
+src/blib2to3/pgen2/driver.py:76:20: warning[possibly-unresolved-reference] Name `token` used when possibly not defined
+src/blib2to3/pgen2/driver.py:169:26: warning[possibly-unresolved-reference] Name `_prefix` used when possibly not defined
+src/blib2to3/pgen2/grammar.py:109:38: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/blib2to3/pytree.py:144:9: error[invalid-assignment] Object of type `list[object]` is not assignable to attribute `children` of type `list[Node | Leaf]`
+src/blib2to3/pytree.py:148:13: error[unresolved-attribute] Unresolved attribute `parent` on type `object`
+src/blib2to3/pytree.py:364:18: warning[possibly-unresolved-reference] Name `current` used when possibly not defined
+src/blib2to3/pytree.py:669:24: warning[possibly-unresolved-reference] Name `newcontent` used when possibly not defined
+src/blib2to3/pytree.py:755:24: warning[possibly-unresolved-reference] Name `wrapped_content` used when possibly not defined
+src/blib2to3/pytree.py:846:34: warning[possibly-unresolved-reference] Name `save_stderr` used when possibly not defined
+Found 36 diagnostics

@@ -28,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.221")]
 pub(crate) struct ComparisonOfConstant {
     left_constant: String,
     op: CmpOp,

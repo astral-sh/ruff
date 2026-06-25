@@ -18,9 +18,16 @@ use crate::checkers::ast::Checker;
 ///     bar: int
 /// ```
 ///
+/// ## Options
+///
+/// This rule ignores dummy variables, as determined by:
+///
+/// - `lint.dummy-variable-rgx`
+///
 /// ## References
 /// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.172")]
 pub(crate) struct UnusedAnnotation {
     name: String,
 }
@@ -39,7 +46,7 @@ pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
         let binding = checker.semantic().binding(binding_id);
         if binding.kind.is_annotation()
             && binding.is_unused()
-            && !checker.settings.dummy_variable_rgx.is_match(name)
+            && !checker.settings().dummy_variable_rgx.is_match(name)
         {
             Some((name.to_string(), binding.range()))
         } else {

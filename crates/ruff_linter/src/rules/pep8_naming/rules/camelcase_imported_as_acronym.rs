@@ -42,6 +42,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.82")]
 pub(crate) struct CamelcaseImportedAsAcronym {
     name: String,
     asname: String,
@@ -68,7 +69,7 @@ pub(crate) fn camelcase_imported_as_acronym(
         && str::is_cased_uppercase(asname)
         && helpers::is_acronym(name, asname)
     {
-        let ignore_names = &checker.settings.pep8_naming.ignore_names;
+        let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
@@ -114,7 +115,7 @@ fn is_ignored_because_of_import_convention(
 
     // Ignore names that follow a community-agreed import convention.
     checker
-        .settings
+        .settings()
         .flake8_import_conventions
         .aliases
         .get(&*full_name)

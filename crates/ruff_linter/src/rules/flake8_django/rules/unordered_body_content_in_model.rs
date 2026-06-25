@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks for the order of Model's inner classes, methods, and fields as per
@@ -63,6 +63,7 @@ use super::helpers;
 ///
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct DjangoUnorderedBodyContentInModel {
     element_type: ContentType,
     prev_element_type: ContentType,

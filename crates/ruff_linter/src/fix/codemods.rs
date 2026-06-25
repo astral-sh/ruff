@@ -14,6 +14,7 @@ use unicode_normalization::UnicodeNormalization;
 use ruff_python_ast::Stmt;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_codegen::Stylist;
+use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::cst::matchers::match_statement;
@@ -64,7 +65,7 @@ pub(crate) fn remove_imports<'a>(
                     if member == "*" {
                         found_star = true;
                     } else {
-                        bail!("Expected \"*\" for unused import (got: \"{}\")", member);
+                        bail!("Expected \"*\" for unused import (got: \"{member}\")");
                     }
                 }
                 if !found_star {
@@ -127,10 +128,10 @@ pub(crate) fn remove_imports<'a>(
 pub(crate) fn retain_imports(
     member_names: &[&str],
     stmt: &Stmt,
-    locator: &Locator,
+    contents: &str,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt);
+    let module_text = &contents[stmt.range()];
     let mut tree = match_statement(module_text)?;
 
     let Statement::Simple(body) = &mut tree else {

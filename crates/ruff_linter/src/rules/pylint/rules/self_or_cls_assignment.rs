@@ -45,7 +45,13 @@ use crate::checkers::ast::Checker;
 ///         supercls = cls.__mro__[-1]
 ///         return supercls
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct SelfOrClsAssignment {
     method_type: MethodType,
 }
@@ -66,7 +72,7 @@ impl Violation for SelfOrClsAssignment {
     }
 }
 
-/// PLW0127
+/// PLW0642
 pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
@@ -98,8 +104,8 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     let method_type = match (function_type, self_or_cls.name().as_str()) {

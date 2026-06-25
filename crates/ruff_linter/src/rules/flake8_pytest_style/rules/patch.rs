@@ -42,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
 /// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestPatchWithLambda;
 
 impl Violation for PytestPatchWithLambda {
@@ -84,6 +85,7 @@ fn check_patch_call(checker: &Checker, call: &ast::ExprCall, index: usize) {
         parameters,
         body,
         range: _,
+        node_index: _,
     }) = call
         .arguments
         .find_argument_value("new", index)

@@ -36,7 +36,12 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 ///     logging.error("%s error occurred: %s", type(e), e)
 ///     raise
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooFewArgs;
 
 impl Violation for LoggingTooFewArgs {
@@ -73,7 +78,12 @@ impl Violation for LoggingTooFewArgs {
 ///     logging.error("%s error occurred: %s", type(e), e)
 ///     raise
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooManyArgs;
 
 impl Violation for LoggingTooManyArgs {
@@ -109,7 +119,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
-                &checker.settings.logger_objects,
+                &checker.settings().logger_objects,
             ) {
                 return;
             }
@@ -152,13 +162,13 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     let num_message_args = call.arguments.args.len() - 1;
     let num_keywords = call.arguments.keywords.len();
 
-    if checker.enabled(Rule::LoggingTooManyArgs) {
+    if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
             checker.report_diagnostic(LoggingTooManyArgs, call.func.range());
         }
     }
 
-    if checker.enabled(Rule::LoggingTooFewArgs) {
+    if checker.is_rule_enabled(Rule::LoggingTooFewArgs) {
         if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
             checker.report_diagnostic(LoggingTooFewArgs, call.func.range());
         }

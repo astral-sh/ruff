@@ -3,19 +3,19 @@ use anyhow::{Result, bail};
 use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
     FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,
-    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, Name,
-    SmallStatement, Statement, Suite, Tuple, With,
+    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, SmallStatement,
+    Statement, Suite, Tuple, With,
 };
 use ruff_python_codegen::Stylist;
 
-pub(crate) fn match_module(module_text: &str) -> Result<Module> {
+pub(crate) fn match_module(module_text: &str) -> Result<Module<'_>> {
     match libcst_native::parse_module(module_text, None) {
         Ok(module) => Ok(module),
         Err(_) => bail!("Failed to extract CST from source"),
     }
 }
 
-pub(crate) fn match_statement(statement_text: &str) -> Result<Statement> {
+pub(crate) fn match_statement(statement_text: &str) -> Result<Statement<'_>> {
     match libcst_native::parse_statement(statement_text) {
         Ok(statement) => Ok(statement),
         Err(_) => bail!("Failed to extract statement from source"),
@@ -101,14 +101,6 @@ pub(crate) fn match_attribute<'a, 'b>(
         Ok(attribute)
     } else {
         bail!("Expected Expression::Attribute")
-    }
-}
-
-pub(crate) fn match_name<'a, 'b>(expression: &'a Expression<'b>) -> Result<&'a Name<'b>> {
-    if let Expression::Name(name) = expression {
-        Ok(name)
-    } else {
-        bail!("Expected Expression::Name")
     }
 }
 
@@ -228,7 +220,7 @@ pub(crate) fn match_if<'a, 'b>(statement: &'a mut Statement<'b>) -> Result<&'a m
 ///
 /// If the expression is not guaranteed to be valid as a standalone expression (e.g., if it may
 /// span multiple lines and/or require parentheses), use [`transform_expression`] instead.
-pub(crate) fn match_expression(expression_text: &str) -> Result<Expression> {
+pub(crate) fn match_expression(expression_text: &str) -> Result<Expression<'_>> {
     match libcst_native::parse_expression(expression_text) {
         Ok(expression) => Ok(expression),
         Err(_) => bail!("Failed to extract expression from source"),

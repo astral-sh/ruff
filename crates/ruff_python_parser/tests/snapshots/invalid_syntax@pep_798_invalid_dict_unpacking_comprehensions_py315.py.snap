@@ -1,0 +1,354 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/pep_798_invalid_dict_unpacking_comprehensions_py315.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..150,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..69,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 44..69,
+                            key: Some(
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 45..47,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 46..47,
+                                                id: Name("k"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 49..50,
+                                    id: Name("v"),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 51..68,
+                                    node_index: NodeIndex(None),
+                                    target: Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 55..59,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 55..56,
+                                                        id: Name("k"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 58..59,
+                                                        id: Name("v"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 63..68,
+                                            id: Name("items"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 70..95,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 70..95,
+                            key: Some(
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 71..72,
+                                        id: Name("k"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            value: Starred(
+                                ExprStarred {
+                                    node_index: NodeIndex(None),
+                                    range: 74..76,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 75..76,
+                                            id: Name("v"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 77..94,
+                                    node_index: NodeIndex(None),
+                                    target: Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 81..85,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 81..82,
+                                                        id: Name("k"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 84..85,
+                                                        id: Name("v"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 89..94,
+                                            id: Name("items"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 96..122,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 96..122,
+                            key: Some(
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 99..100,
+                                        id: Name("k"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 102..103,
+                                    id: Name("v"),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 104..121,
+                                    node_index: NodeIndex(None),
+                                    target: Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 108..112,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 108..109,
+                                                        id: Name("k"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 111..112,
+                                                        id: Name("v"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 116..121,
+                                            id: Name("items"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 123..149,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 123..149,
+                            key: Some(
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 124..125,
+                                        id: Name("k"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 129..130,
+                                    id: Name("v"),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 131..148,
+                                    node_index: NodeIndex(None),
+                                    target: Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 135..139,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 135..136,
+                                                        id: Name("k"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 138..139,
+                                                        id: Name("v"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 143..148,
+                                            id: Name("items"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.15"}
+2 | {*k: v for k, v in items}
+  |  ^^ Syntax Error: Starred expression cannot be used here
+3 | {k: *v for k, v in items}
+4 | {**k: v for k, v in items}
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.15"}
+2 | {*k: v for k, v in items}
+3 | {k: *v for k, v in items}
+  |     ^^ Syntax Error: Starred expression cannot be used here
+4 | {**k: v for k, v in items}
+5 | {k: **v for k, v in items}
+  |
+
+
+  |
+2 | {*k: v for k, v in items}
+3 | {k: *v for k, v in items}
+4 | {**k: v for k, v in items}
+  |  ^^^ Syntax Error: Starred expression cannot be used here
+5 | {k: **v for k, v in items}
+  |
+
+
+  |
+3 | {k: *v for k, v in items}
+4 | {**k: v for k, v in items}
+5 | {k: **v for k, v in items}
+  |     ^^^ Syntax Error: Starred expression cannot be used here
+  |

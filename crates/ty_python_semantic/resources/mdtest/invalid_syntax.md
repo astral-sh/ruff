@@ -92,6 +92,22 @@ for x in foo.pass:
     pass
 ```
 
+## Invalid assignment expression target
+
+Parser recovery can produce a named expression target that is not a name. If that named expression
+is used as part of a member expression, we should report the syntax error without treating it as a
+valid place.
+
+```py
+obj = 1
+
+# error: [invalid-syntax] "Assignment expression target must be an identifier"
+out = (obj.attr := obj).attr
+
+# error: [invalid-syntax] "Assignment expression target must be an identifier"
+out = (obj[0] := obj).attr
+```
+
 ## Invalid annotation
 
 ### `typing.Callable`
@@ -100,7 +116,44 @@ for x in foo.pass:
 from typing import Callable
 
 # error: [invalid-syntax] "Expected index or slice expression"
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[]):
     reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### `typing.Tuple`
+
+```py
+from typing import Tuple
+
+# error: [invalid-syntax] "Expected index or slice expression"
+InvalidEmptyTuple = Tuple[]
+
+def _(t: InvalidEmptyTuple):
+    reveal_type(t)  # revealed: tuple[Unknown]
+```
+
+### `typing.Union`
+
+```py
+from typing import Union
+
+# error: [invalid-syntax] "Expected index or slice expression"
+InvalidEmptyUnion = Union[]
+
+def _(u: InvalidEmptyUnion):
+    reveal_type(u)  # revealed: Unknown
+```
+
+### `typing.Annotated`
+
+```py
+from typing import Annotated
+
+# error: [invalid-syntax] "Expected index or slice expression"
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+InvalidEmptyAnnotated = Annotated[]
+
+def _(a: InvalidEmptyAnnotated):
+    reveal_type(a)  # revealed: Unknown
 ```

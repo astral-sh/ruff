@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_django::rules::helpers::is_model_form;
+use crate::rules::flake8_django::helpers::is_model_form;
 
 /// ## What it does
 /// Checks for the use of `exclude` in Django `ModelForm` classes.
@@ -36,6 +36,7 @@ use crate::rules::flake8_django::rules::helpers::is_model_form;
 ///         fields = ["title", "content"]
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct DjangoExcludeWithModelForm;
 
 impl Violation for DjangoExcludeWithModelForm {

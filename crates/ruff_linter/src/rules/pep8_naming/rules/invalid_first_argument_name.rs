@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::registry::Rule;
-use crate::renamer::Renamer;
+use crate::renamer::{Renamer, ShadowedKind};
 use crate::{Fix, Violation};
 
 /// ## What it does
@@ -59,6 +59,7 @@ use crate::{Fix, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidFirstArgumentNameForMethod {
     argument_name: String,
 }
@@ -129,6 +130,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
     // Whether the method is `__new__`
@@ -141,7 +143,6 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
     #[derive_message_formats]
     // The first string below is what shows up in the documentation
     // in the rule table, and it is the more common case.
-    #[expect(clippy::if_not_else)]
     fn message(&self) -> String {
         if !self.is_new {
             "First argument of a class method should be named `cls`".to_string()
@@ -226,8 +227,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent_scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     ) {
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
@@ -243,7 +244,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
             return;
         }
     };
-    if !checker.enabled(function_type.rule()) {
+    if !checker.is_rule_enabled(function_type.rule()) {
         return;
     }
 
@@ -260,7 +261,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
 
     if &self_or_cls.name == function_type.valid_first_argument_name()
         || checker
-            .settings
+            .settings()
             .pep8_naming
             .ignore_names
             .matches(&self_or_cls.name)
@@ -272,6 +273,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         function_type.diagnostic_kind(checker, self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
+            checker,
             scope,
             self_or_cls,
             parameters,
@@ -284,6 +286,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
 
 /// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.
 fn rename_parameter(
+    checker: &Checker,
     scope: &Scope<'_>,
     self_or_cls: &ast::Parameter,
     parameters: &ast::Parameters,
@@ -296,6 +299,16 @@ fn rename_parameter(
         .iter()
         .skip(1)
         .any(|parameter| parameter.name() == function_type.valid_first_argument_name())
+    {
+        return Ok(None);
+    }
+    let binding = scope
+        .get(&self_or_cls.name)
+        .map(|binding_id| semantic.binding(binding_id))
+        .unwrap();
+
+    // Don't provide autofix if `self` or `cls` is already defined in the scope.
+    if ShadowedKind::new(binding, function_type.valid_first_argument_name(), checker).shadows_any()
     {
         return Ok(None);
     }

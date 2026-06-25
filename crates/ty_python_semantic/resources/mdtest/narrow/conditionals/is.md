@@ -3,9 +3,9 @@
 ## `is None`
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if x is None:
         reveal_type(x)  # revealed: None
     else:
@@ -17,11 +17,9 @@ def _(flag: bool):
 ## `is` for other types
 
 ```py
-def _(flag: bool):
-    class A: ...
-    x = A()
-    y = x if flag else None
+class A: ...
 
+def _(x: A, y: A | None):
     if y is x:
         reveal_type(y)  # revealed: A
     else:
@@ -33,13 +31,7 @@ def _(flag: bool):
 ## `is` in chained comparisons
 
 ```py
-def _(x_flag: bool, y_flag: bool):
-    x = True if x_flag else False
-    y = True if y_flag else False
-
-    reveal_type(x)  # revealed: bool
-    reveal_type(y)  # revealed: bool
-
+def _(x: bool, y: bool):
     if y is x is False:  # Interpreted as `(y is x) and (x is False)`
         reveal_type(x)  # revealed: Literal[False]
         reveal_type(y)  # revealed: bool
@@ -53,10 +45,9 @@ def _(x_flag: bool, y_flag: bool):
 ## `is` in elif clause
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = None if flag1 else (1 if flag2 else True)
+from typing import Literal
 
-    reveal_type(x)  # revealed: None | Literal[1, True]
+def _(x: None | Literal[1, True]):
     if x is None:
         reveal_type(x)  # revealed: None
     elif x is True:
@@ -65,12 +56,38 @@ def _(flag1: bool, flag2: bool):
         reveal_type(x)  # revealed: Literal[1]
 ```
 
-## `is` for `EllipsisType` (Python 3.10+)
+## `is` for enums
 
-```toml
-[environment]
-python-version = "3.10"
+```py
+from enum import Enum
+from typing import Literal
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    if answer is Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+    else:
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x is Single.VALUE:
+        reveal_type(x)  # revealed: Single
+    else:
+        reveal_type(x)  # revealed: int
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x is Answer.NO:
+        return
+    reveal_type(x)  # revealed: list[int]
 ```
+
+## `is` for `EllipsisType`
 
 ```py
 from types import EllipsisType
@@ -80,25 +97,6 @@ def _(x: int | EllipsisType):
         reveal_type(x)  # revealed: EllipsisType
     else:
         reveal_type(x)  # revealed: int
-```
-
-## `is` for `EllipsisType` (Python 3.9 and below)
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-def _(flag: bool):
-    x = ... if flag else 42
-
-    reveal_type(x)  # revealed: ellipsis | Literal[42]
-
-    if x is ...:
-        reveal_type(x)  # revealed: ellipsis
-    else:
-        reveal_type(x)  # revealed: Literal[42]
 ```
 
 ## Assignment expressions
@@ -112,4 +110,144 @@ if (x := f()) is None:
     reveal_type(x)  # revealed: None
 else:
     reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+## `is` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+from typing import Literal
+
+def _(t: Literal[True], tn: Literal[True] | None):
+    if tn is t:
+        reveal_type(tn)  # revealed: Literal[True]
+    if t is tn:
+        reveal_type(tn)  # revealed: Literal[True]
+```
+
+Both operands should also be narrowed in chained comparisons:
+
+```py
+from typing import Literal
+
+def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
+    if a is b is c:
+        reveal_type(b)  # revealed: Literal[1]
+        reveal_type(c)  # revealed: Literal[1]
+```
+
+When a generic class object is compared with an exact class object, the exact class object is not
+widened to the generic type. The intersection is retained because it preserves the relationship
+between the class object and `T`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Y:
+    def __init__(self) -> None: ...
+
+class Z(Y):
+    def __init__(self, x: int) -> None: ...
+
+def narrow[T: (Y, Z)](klass: type[T]) -> None:
+    if klass is Y:
+        reveal_type(klass)  # revealed: type[T@narrow] & <class 'Y'>
+        reveal_type(Y)  # revealed: <class 'Y'> & type[T@narrow]
+
+    if klass is Z:
+        reveal_type(klass)  # revealed: <class 'Z'>
+        reveal_type(Z)  # revealed: <class 'Z'>
+
+def construct[T: (Y, Z)](klass: type[T]) -> T:
+    if klass is Y:
+        return Y()
+    raise AssertionError
+
+class Generic[T]: ...
+class Specialized(Generic[int]): ...
+
+def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None:
+    if klass is Generic[int]:
+        reveal_type(klass)  # revealed: type[T@narrow_generic_alias] & <class 'Generic[int]'>
+        reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
+```
+
+## `is` where the other operand is a call expression
+
+```py
+from typing import Literal, final
+
+def foo() -> Literal[42]:
+    return 42
+
+def f(x: object):
+    if x is foo():
+        reveal_type(x)  # revealed: Literal[42]
+    else:
+        reveal_type(x)  # revealed: object
+
+    if x is not foo():
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: Literal[42]
+
+    if foo() is x:
+        reveal_type(x)  # revealed: Literal[42]
+    else:
+        reveal_type(x)  # revealed: object
+
+    if foo() is not x:
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: Literal[42]
+
+def bar() -> int:
+    return 42
+
+def g(x: object):
+    if x is bar():
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: object
+
+    if x is not bar():
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: int
+
+@final
+class FinalClass: ...
+
+def baz() -> FinalClass:
+    return FinalClass()
+
+def h(x: object):
+    if x is baz():
+        reveal_type(x)  # revealed: FinalClass
+    else:
+        reveal_type(x)  # revealed: object
+
+    if x is not baz():
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: FinalClass
+
+def spam() -> None:
+    return None
+
+def h(x: object):
+    if x is spam():
+        reveal_type(x)  # revealed: None
+    else:
+        # `else` narrowing can occur because `spam()` returns a singleton type
+        reveal_type(x)  # revealed: ~None
+
+    if x is not spam():
+        reveal_type(x)  # revealed: ~None
+    else:
+        reveal_type(x)  # revealed: None
 ```

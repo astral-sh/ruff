@@ -1,5 +1,5 @@
 use ruff_python_ast::Stmt;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;

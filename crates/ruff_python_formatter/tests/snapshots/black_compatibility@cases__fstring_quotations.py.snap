@@ -1,0 +1,126 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/fstring_quotations.py
+---
+## Input
+
+```python
+# Regression tests for long f-strings, including examples from issue #3623
+
+a = (
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = (
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+)
+
+a = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + \
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+
+a = f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"' + \
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+
+a = (
+    f'bbbbbbb"{"b"}"'
+    'aaaaaaaa'
+)
+
+a = (
+    f'"{"b"}"'
+)
+
+a = (
+    f'\"{"b"}\"'
+)
+
+a = (
+    r'\"{"b"}\"'
+)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -20,7 +20,7 @@
+     + f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+ )
+ 
+-a = f'bbbbbbb"{"b"}"' "aaaaaaaa"
++a = f'bbbbbbb"{"b"}"aaaaaaaa'
+ 
+ a = f'"{"b"}"'
+ 
+```
+
+## Ruff Output
+
+```python
+# Regression tests for long f-strings, including examples from issue #3623
+
+a = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = (
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
+
+a = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    + f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = (
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+    + f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = f'bbbbbbb"{"b"}"aaaaaaaa'
+
+a = f'"{"b"}"'
+
+a = f'"{"b"}"'
+
+a = r'\"{"b"}\"'
+```
+
+## Black Output
+
+```python
+# Regression tests for long f-strings, including examples from issue #3623
+
+a = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = (
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+)
+
+a = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    + f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = (
+    f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+    + f'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"{"b"}"'
+)
+
+a = f'bbbbbbb"{"b"}"' "aaaaaaaa"
+
+a = f'"{"b"}"'
+
+a = f'"{"b"}"'
+
+a = r'\"{"b"}\"'
+```

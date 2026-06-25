@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools as _;
 use pretty_assertions::StrComparison;
+use regex::{Captures, Regex};
 
 use crate::ROOT_DIR;
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
@@ -52,7 +53,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 }
 
 fn generate_markdown() -> String {
-    let registry = &*ty_project::DEFAULT_LINT_REGISTRY;
+    let registry = ty_python_semantic::default_lint_registry();
 
     let mut output = String::new();
 
@@ -63,70 +64,88 @@ fn generate_markdown() -> String {
     let _ = writeln!(&mut output, "# Rules\n");
 
     let mut lints: Vec<_> = registry.lints().iter().collect();
-    lints.sort_by(|a, b| {
-        a.default_level()
-            .cmp(&b.default_level())
-            .reverse()
-            .then_with(|| a.name().cmp(&b.name()))
-    });
+    lints.sort_by_key(|a| a.name());
+
+    // Replace `rule-name` with [`rule-name`](url) for any known rule names,
+    // turning them into inline links automatically.
+    let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
 
     for lint in lints {
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
 
-        // Increase the header-level by one
+        // Reformat headers as bold text
+        let mut in_code_fence = false;
         let documentation = lint
             .documentation_lines()
             .map(|line| {
-                if line.starts_with('#') {
-                    Cow::Owned(format!("#{line}"))
+                // Toggle the code fence state if we encounter a boundary
+                if line.starts_with("```") {
+                    in_code_fence = !in_code_fence;
+                }
+                if !in_code_fence {
+                    if line.starts_with('#') {
+                        Cow::Owned(format!(
+                            "**{line}**\n",
+                            line = line.trim_start_matches('#').trim_start()
+                        ))
+                    } else {
+                        rule_link_re.replace_all(line, |caps: &Captures| {
+                            let name = &caps[1];
+                            if registry.get(name).is_ok() {
+                                format!("[`{name}`](#{name})")
+                            } else {
+                                caps[0].to_string()
+                            }
+                        })
+                    }
                 } else {
                     Cow::Borrowed(line)
                 }
             })
             .join("\n");
 
+        let status_text = match lint.status() {
+            ty_python_semantic::lint::LintStatus::Stable { since } => {
+                format!(
+                    r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Preview { since } => {
+                format!(
+                    r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
+                format!(
+                    r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Removed { since, .. } => {
+                format!(
+                    r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+        };
+
         let _ = writeln!(
             &mut output,
-            r#"**Default level**: {level}
+            r#"<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
+{status_text} ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22{encoded_name}%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
+</small>
 
-<details>
-<summary>{summary}</summary>
 
 {documentation}
-
-### Links
-* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name})
-* [View source](https://github.com/astral-sh/ruff/blob/main/{file}#L{line})
-</details>
 "#,
             level = lint.default_level(),
-            // GitHub doesn't support markdown in `summary` headers
-            summary = replace_inline_code(lint.summary()),
             encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
                 .collect::<String>(),
             file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
                 .collect::<String>(),
             line = lint.line(),
         );
-    }
-
-    output
-}
-
-/// Replaces inline code blocks (`code`) with `<code>code</code>`
-fn replace_inline_code(input: &str) -> String {
-    let mut output = String::new();
-    let mut parts = input.split('`');
-
-    while let Some(before) = parts.next() {
-        if let Some(between) = parts.next() {
-            output.push_str(before);
-            output.push_str("<code>");
-            output.push_str(between);
-            output.push_str("</code>");
-        } else {
-            output.push_str(before);
-        }
     }
 
     output

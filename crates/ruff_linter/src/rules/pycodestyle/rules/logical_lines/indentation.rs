@@ -1,10 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
-use crate::settings::LinterSettings;
 
 use super::LogicalLine;
 
@@ -39,6 +38,7 @@ use super::LogicalLine;
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct IndentationWithInvalidMultiple {
     indent_width: usize,
 }
@@ -61,12 +61,14 @@ impl Violation for IndentationWithInvalidMultiple {
 /// ```python
 /// if True:
 ///    # a = 1
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if True:
 ///     # a = 1
+///     ...
 /// ```
 ///
 /// ## Formatter compatibility
@@ -82,6 +84,7 @@ impl Violation for IndentationWithInvalidMultiple {
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct IndentationWithInvalidMultipleComment {
     indent_width: usize,
 }
@@ -115,6 +118,7 @@ impl Violation for IndentationWithInvalidMultipleComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct NoIndentedBlock;
 
 impl Violation for NoIndentedBlock {
@@ -147,6 +151,7 @@ impl Violation for NoIndentedBlock {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct NoIndentedBlockComment;
 
 impl Violation for NoIndentedBlockComment {
@@ -176,6 +181,7 @@ impl Violation for NoIndentedBlockComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct UnexpectedIndentation;
 
 impl Violation for UnexpectedIndentation {
@@ -205,6 +211,7 @@ impl Violation for UnexpectedIndentation {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct UnexpectedIndentationComment;
 
 impl Violation for UnexpectedIndentationComment {
@@ -241,6 +248,7 @@ impl Violation for UnexpectedIndentationComment {
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct OverIndented {
     is_comment: bool,
 }
@@ -267,16 +275,14 @@ pub(crate) fn indentation(
     indent_size: usize,
     range: TextRange,
     context: &LintContext,
-    settings: &LinterSettings,
 ) {
-    if indent_level % indent_size != 0 {
+    if !indent_level.is_multiple_of(indent_size) {
         if logical_line.is_comment_only() {
             context.report_diagnostic_if_enabled(
                 IndentationWithInvalidMultipleComment {
                     indent_width: indent_size,
                 },
                 range,
-                settings,
             );
         } else {
             context.report_diagnostic_if_enabled(
@@ -284,7 +290,6 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
-                settings,
             );
         }
     }
@@ -294,17 +299,17 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         if logical_line.is_comment_only() {
-            context.report_diagnostic_if_enabled(NoIndentedBlockComment, range, settings);
+            context.report_diagnostic_if_enabled(NoIndentedBlockComment, range);
         } else {
-            context.report_diagnostic_if_enabled(NoIndentedBlock, range, settings);
+            context.report_diagnostic_if_enabled(NoIndentedBlock, range);
         }
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         if logical_line.is_comment_only() {
-            context.report_diagnostic_if_enabled(UnexpectedIndentationComment, range, settings);
+            context.report_diagnostic_if_enabled(UnexpectedIndentationComment, range);
         } else {
-            context.report_diagnostic_if_enabled(UnexpectedIndentation, range, settings);
+            context.report_diagnostic_if_enabled(UnexpectedIndentation, range);
         }
     }
     if indent_expect {
@@ -316,7 +321,6 @@ pub(crate) fn indentation(
                     is_comment: logical_line.is_comment_only(),
                 },
                 range,
-                settings,
             );
         }
     }

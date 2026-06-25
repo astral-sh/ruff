@@ -47,6 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Format String Syntax](https://docs.python.org/3/library/string.html#format-string-syntax)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct FormatLiterals;
 
 impl Violation for FormatLiterals {
@@ -124,10 +125,20 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
-// An opening curly brace, followed by any integer, followed by any text,
-// followed by a closing brace.
-static FORMAT_SPECIFIER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
+static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+            (?P<prefix>
+                ^|[^{]|(?:\{{2})+  # preceded by nothing, a non-brace, or an even number of braces
+            )
+            \{                     # opening curly brace
+                (?P<int>\d+)       # followed by any integer
+                (?P<fmt>.*?)       # followed by any text
+            }                      # followed by a closing brace
+        ",
+    )
+    .unwrap()
+});
 
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
@@ -135,7 +146,7 @@ fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Are
         Expression::SimpleString(expr) => {
             expr.value = arena.alloc(
                 FORMAT_SPECIFIER
-                    .replace_all(expr.value, "{$fmt}")
+                    .replace_all(expr.value, "$prefix{$fmt}")
                     .to_string(),
             );
         }
@@ -146,7 +157,7 @@ fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Are
                     libcst_native::String::Simple(string) => {
                         string.value = arena.alloc(
                             FORMAT_SPECIFIER
-                                .replace_all(string.value, "{$fmt}")
+                                .replace_all(string.value, "$prefix{$fmt}")
                                 .to_string(),
                         );
                     }
@@ -154,7 +165,7 @@ fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Are
                         stack.push(&mut string.left);
                         stack.push(&mut string.right);
                     }
-                    libcst_native::String::Formatted(_) => {}
+                    libcst_native::String::Formatted(_) | libcst_native::String::Templated(_) => {}
                 }
             }
         }

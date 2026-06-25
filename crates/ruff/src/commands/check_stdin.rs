@@ -1,10 +1,11 @@
 use std::path::Path;
 
 use anyhow::Result;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
-use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, python_file_at_path};
+use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
 
 use crate::args::ConfigArguments;
 use crate::diagnostics::{Diagnostics, lint_stdin};
@@ -22,7 +23,7 @@ pub(crate) fn check_stdin(
 
     if resolver.force_exclude() {
         if let Some(filename) = filename {
-            if !python_file_at_path(filename, &mut resolver, overrides)? {
+            if !project_file_at_path(filename, &mut resolver, overrides)? {
                 if fix_mode.is_apply() {
                     parrot_stdin()?;
                 }
@@ -52,6 +53,8 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    diagnostics.messages.sort_unstable();
+    diagnostics
+        .inner
+        .sort_unstable_by(Diagnostic::ruff_start_ordering);
     Ok(diagnostics)
 }

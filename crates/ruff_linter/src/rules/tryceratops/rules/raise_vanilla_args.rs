@@ -44,6 +44,7 @@ use crate::checkers::ast::Checker;
 ///         raise CantBeNegative(x)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct RaiseVanillaArgs;
 
 impl Violation for RaiseVanillaArgs {
@@ -104,10 +105,10 @@ fn contains_message(expr: &Expr) -> bool {
                 }
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            if value.chars().any(char::is_whitespace) {
-                return true;
-            }
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+            if value.chars().any(char::is_whitespace) =>
+        {
+            return true;
         }
         _ => {}
     }

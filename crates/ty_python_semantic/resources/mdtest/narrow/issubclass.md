@@ -131,6 +131,201 @@ def _(flag1: bool, flag2: bool):
         reveal_type(t)  # revealed: <class 'str'>
 ```
 
+## `classinfo` is a PEP-604 union of types
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def f(x: type[int | str | bytes | range]):
+    if issubclass(x, int | str):
+        reveal_type(x)  # revealed: type[int | str]
+    elif issubclass(x, bytes | memoryview):
+        reveal_type(x)  # revealed: type[bytes]
+    else:
+        reveal_type(x)  # revealed: <class 'range'>
+```
+
+Although `issubclass()` usually only works if all elements in the `UnionType` are class objects, at
+runtime a special exception is made for `None` so that `issubclass(x, int | None)` can work:
+
+```py
+def _(x: type):
+    if issubclass(x, int | str | None):
+        reveal_type(x)  # revealed: type[int | str] | <class 'NoneType'>
+    else:
+        reveal_type(x)  # revealed: type & ~type[int] & ~type[str] & ~<class 'NoneType'>
+```
+
+## `classinfo` is an invalid PEP-604 union of types
+
+Except for the `None` special case mentioned above, narrowing can only take place if all elements in
+the PEP-604 union are class literals. If any elements are generic aliases or other types, the
+`issubclass()` call may fail at runtime, so no narrowing can take place:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
+    # snapshot: invalid-argument-type
+    if issubclass(x, int | list[int]):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+ --> src/mdtest_snippet.py:3:8
+  |
+3 |     if issubclass(x, int | list[int]):
+  |        ^^^^^^^^^^^^^^---------------^
+  |                      |
+  |                      This `UnionType` instance contains non-class elements
+  |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
+The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+
+```py
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
+    # snapshot: invalid-argument-type
+    if issubclass(x, (int, list[int] | bytes)):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+ --> src/mdtest_snippet.py:9:8
+  |
+9 |     if issubclass(x, (int, list[int] | bytes)):
+  |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+  |                            |
+  |                            This `UnionType` instance contains non-class elements
+  |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
+Including nested tuples:
+
+```py
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
+    # snapshot: invalid-argument-type
+    if issubclass(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+  --> src/mdtest_snippet.py:15:8
+   |
+15 |     if issubclass(x, (int, (str, list[int] | bytes))):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
+   |                                  |
+   |                                  This `UnionType` instance contains non-class elements
+   |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
+And non-literal tuples:
+
+```py
+classes = (int, list[int] | bytes)
+
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
+    # snapshot: invalid-argument-type
+    if issubclass(x, classes):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+  --> src/mdtest_snippet.py:23:8
+   |
+23 |     if issubclass(x, classes):
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
+```
+
+## `classinfo` is a `types.UnionType`
+
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `issubclass()`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+
+def f(x: type[int | str | bytes | range]):
+    if issubclass(x, IntOrStr):
+        reveal_type(x)  # revealed: type[int | str]
+    elif issubclass(x, Union[bytes, memoryview]):
+        reveal_type(x)  # revealed: type[bytes]
+    else:
+        reveal_type(x)  # revealed: <class 'range'>
+```
+
+## `classinfo` is a generic final class
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When we check a generic `@final` class against `type[GenericFinal]`, we can conclude that the check
+always succeeds:
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    x: T  # invariant
+
+def f(x: type[GenericFinal]):  # error: [missing-type-argument]
+    reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
+
+    if issubclass(x, GenericFinal):
+        reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
+This also works if the typevar has an upper bound:
+
+```py
+@final
+class BoundedGenericFinal[T: int]:
+    x: T  # invariant
+
+def g(x: type[BoundedGenericFinal]):  # error: [missing-type-argument]
+    reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
+
+    if issubclass(x, BoundedGenericFinal):
+        reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
 ## Special cases
 
 ### Emit a diagnostic if the first argument is of wrong type
@@ -214,8 +409,7 @@ def flag() -> bool:
 
 t = int if flag() else str
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["str"]"
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 
@@ -277,4 +471,83 @@ def _(x: type[UsesMeta1], y: type[UsesMeta2]):
         reveal_type(y)  # revealed: Never
     else:
         reveal_type(y)  # revealed: type[UsesMeta2]
+```
+
+## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
+
+If an intersection with only positive members is used as the second argument, and all positive
+members of the intersection are valid arguments for the second argument to `isinstance()`, we
+intersect with each positive member of the intersection:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, ClassVar
+from ty_extensions import Intersection
+
+class Foo: ...
+
+class Bar:
+    attribute: ClassVar[int]
+
+class Baz:
+    attribute: ClassVar[str]
+
+def f(x: type[Foo], y: Intersection[type[Bar], type[Baz]], z: type[Any]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[Foo] & type[Bar] & type[Baz]
+
+    if issubclass(x, z):
+        reveal_type(x)  # revealed: type[Foo] & Any
+```
+
+The same if a union type is used:
+
+```py
+def g(x: type[Foo], y: type[Bar | Baz]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: (type[Foo] & type[Bar]) | (type[Foo] & type[Baz])
+```
+
+And even if a `TypeVar` is used, providing it has valid upper bounds/constraints:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=type[Bar])
+
+def h_old_syntax(x: type[Foo], y: T) -> T:
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[Foo] & type[Bar]
+        reveal_type(x.attribute)  # revealed: int
+
+    return y
+
+def h[U: type[Bar | Baz]](x: type[Foo], y: U) -> U:
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: (type[Foo] & type[Bar]) | (type[Foo] & type[Baz])
+        reveal_type(x.attribute)  # revealed: int | str
+
+    return y
+```
+
+Or even a tuple of tuple of typevars that have intersection bounds...
+
+```py
+from ty_extensions import Intersection
+
+class Spam: ...
+class Eggs: ...
+class Ham: ...
+class Mushrooms: ...
+
+def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: type[Foo], y: T, z: U) -> tuple[T, U]:
+    if issubclass(x, (y, (z, Mushrooms))):
+        # revealed: (type[Foo] & type[Bar] & type[Baz]) | (type[Foo] & type[Bar] & type[Spam]) | (type[Foo] & type[Eggs]) | (type[Foo] & type[Ham]) | (type[Foo] & type[Mushrooms])
+        reveal_type(x)
+
+    return (y, z)
 ```

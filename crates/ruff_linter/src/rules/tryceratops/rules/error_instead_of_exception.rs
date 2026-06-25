@@ -49,9 +49,14 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// `logger.error`), since the rule is prone to false positives when detecting
 /// logger-like calls outside of the `logging` module.
 ///
+/// ## Options
+///
+/// - `lint.logger-objects`
+///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct ErrorInsteadOfException;
 
 impl Violation for ErrorInsteadOfException {
@@ -73,7 +78,7 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         let calls = {
             let mut visitor =
-                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings().logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };

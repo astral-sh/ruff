@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -26,6 +26,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct WhitespaceBeforeParameters {
     bracket: TokenKind,
 }
@@ -54,7 +55,7 @@ impl AlwaysFixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &LintContext) {
     let previous = line.tokens().first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;
@@ -77,7 +78,7 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut Log
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
 
             if let Some(mut diagnostic) =
-                context.report_diagnostic(kind, TextRange::new(start, end))
+                context.report_diagnostic_if_enabled(kind, TextRange::new(start, end))
             {
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
             }

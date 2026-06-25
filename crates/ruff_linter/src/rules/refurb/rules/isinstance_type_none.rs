@@ -32,10 +32,11 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct IsinstanceTypeNone;
 
 impl Violation for IsinstanceTypeNone {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -100,7 +101,9 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false, semantic)),
+            Expr::Tuple(tuple) => {
+                !tuple.is_empty() && tuple.iter().all(|element| inner(element, false, semantic))
+            }
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {
@@ -125,7 +128,8 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
 
                 match slice.as_ref() {
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        elts.iter().all(|element| inner(element, true, semantic))
+                        !elts.is_empty()
+                            && elts.iter().all(|element| inner(element, true, semantic))
                     }
                     slice => inner(slice, true, semantic),
                 }

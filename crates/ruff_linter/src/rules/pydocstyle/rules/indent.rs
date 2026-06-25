@@ -44,6 +44,10 @@ use crate::{Edit, Fix};
 /// The rule is also incompatible with the [formatter] when using
 /// `format.indent-style="tab"`.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -52,6 +56,7 @@ use crate::{Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.75")]
 pub(crate) struct DocstringTabIndentation;
 
 impl Violation for DocstringTabIndentation {
@@ -92,6 +97,10 @@ impl Violation for DocstringTabIndentation {
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -100,6 +109,7 @@ impl Violation for DocstringTabIndentation {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.75")]
 pub(crate) struct UnderIndentation;
 
 impl AlwaysFixableViolation for UnderIndentation {
@@ -144,6 +154,10 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -152,6 +166,7 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.75")]
 pub(crate) struct OverIndentation;
 
 impl AlwaysFixableViolation for OverIndentation {
@@ -220,7 +235,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.enabled(Rule::UnderIndentation) {
+        if checker.is_rule_enabled(Rule::UnderIndentation) {
             // We report under-indentation on every line. This isn't great, but enables
             // fix.
             if (is_last || !is_blank) && line_indent_size < docstring_indent_size {
@@ -264,13 +279,13 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         current = lines.next();
     }
 
-    if checker.enabled(Rule::DocstringTabIndentation) {
+    if checker.is_rule_enabled(Rule::DocstringTabIndentation) {
         if has_seen_tab {
             checker.report_diagnostic(DocstringTabIndentation, docstring.range());
         }
     }
 
-    if checker.enabled(Rule::OverIndentation) {
+    if checker.is_rule_enabled(Rule::OverIndentation) {
         // If every line (except the last) is over-indented...
         if let Some(smallest_over_indent_size) = smallest_over_indent_size {
             for line in over_indented_lines {

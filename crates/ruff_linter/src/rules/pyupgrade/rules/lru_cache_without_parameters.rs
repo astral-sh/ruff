@@ -39,6 +39,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `@functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Let lru_cache be used as a decorator with no arguments](https://github.com/python/cpython/issues/80953)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct LRUCacheWithoutParameters;
 
 impl AlwaysFixableViolation for LRUCacheWithoutParameters {
@@ -59,6 +60,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
             func,
             arguments,
             range: _,
+            node_index: _,
         }) = &decorator.expression
         else {
             continue;

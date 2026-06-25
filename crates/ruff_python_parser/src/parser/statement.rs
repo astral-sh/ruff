@@ -2,19 +2,20 @@ use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
-    WithItem,
+    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
+    Operator, PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
-use crate::parser::expression::{EXPR_SET, ParsedExpr};
+use crate::parser::expression::{ArgumentsContext, EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
+    FunctionKind, IpyEscapeContext, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
+    helpers,
 };
-use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -116,8 +117,12 @@ impl<'src> Parser<'src> {
             TokenKind::If => Stmt::If(self.parse_if_statement()),
             TokenKind::For => Stmt::For(self.parse_for_statement(start)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(vec![], start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(vec![], start)),
+            TokenKind::Def => {
+                Stmt::FunctionDef(self.parse_function_definition(DecoratorList::new(), start))
+            }
+            TokenKind::Class => {
+                Stmt::ClassDef(self.parse_class_definition(DecoratorList::new(), start))
+            }
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
@@ -189,8 +194,8 @@ impl<'src> Parser<'src> {
     /// Matches the `simple_stmts` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_statements(&mut self) -> Vec<Stmt> {
-        let mut stmts = vec![];
+    fn parse_simple_statements(&mut self) -> Suite {
+        let mut stmts = Suite::with_capacity(1);
         let mut progress = ParserProgress::default();
 
         loop {
@@ -253,6 +258,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
+        stmts.shrink_to_fit();
         stmts
     }
 
@@ -262,8 +268,14 @@ impl<'src> Parser<'src> {
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
-            TokenKind::Import => Stmt::Import(self.parse_import_statement()),
-            TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
+            TokenKind::Import => {
+                let start = self.node_start();
+                Stmt::Import(self.parse_import_statement(start, false))
+            }
+            TokenKind::From => {
+                let start = self.node_start();
+                Stmt::ImportFrom(self.parse_from_import_statement(start, false))
+            }
             TokenKind::Pass => Stmt::Pass(self.parse_pass_statement()),
             TokenKind::Continue => Stmt::Continue(self.parse_continue_statement()),
             TokenKind::Break => Stmt::Break(self.parse_break_statement()),
@@ -276,6 +288,59 @@ impl<'src> Parser<'src> {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
             token => {
+                if token == TokenKind::Lazy {
+                    let start = self.node_start();
+                    let lazy_range = self.current_token_range();
+
+                    match self.peek() {
+                        // test_ok lazy_import_stmt_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy import foo
+                        // lazy import foo as bar
+                        // lazy from bar import baz
+                        // lazy from sys import x as y
+                        // lazy = 1
+                        // import foo as lazy
+                        // from lazy import qux
+
+                        // test_ok lazy_import_relative_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy from . import basic2
+                        // lazy from .basic2 import x, f
+                        // lazy from . import b, x
+
+                        // test_ok lazy_import_soft_keyword_split_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy
+                        // import os
+                        //
+                        // lazy  # comment
+                        // from sys import path
+
+                        // test_err lazy_import_stmt_py314
+                        // # parse_options: {"target-version": "3.14"}
+                        // lazy import foo
+                        // lazy from bar import baz
+                        TokenKind::Import => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::Import(self.parse_import_statement(start, true));
+                        }
+                        TokenKind::From => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::ImportFrom(self.parse_from_import_statement(start, true));
+                        }
+                        _ => {}
+                    }
+                }
+
                 if token == TokenKind::Type {
                     // Type is considered a soft keyword, so we will treat it as an identifier if
                     // it's followed by an unexpected token.
@@ -289,6 +354,12 @@ impl<'src> Parser<'src> {
                 }
 
                 let start = self.node_start();
+
+                // test_err yield_after_comma
+                // def f(): 1, yield 1
+
+                // test_ok yield_after_comma_parenthesized
+                // def f(): 1, (yield 1)
 
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
                 let parsed_expr =
@@ -312,6 +383,7 @@ impl<'src> Parser<'src> {
                     Stmt::Expr(ast::StmtExpr {
                         range: self.node_range(start),
                         value: Box::new(parsed_expr.expr),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             }
@@ -367,6 +439,7 @@ impl<'src> Parser<'src> {
         ast::StmtDelete {
             targets,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -415,6 +488,7 @@ impl<'src> Parser<'src> {
         ast::StmtReturn {
             range: self.node_range(start),
             value,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -520,6 +594,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             exc,
             cause,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -530,8 +605,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `import` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
-    fn parse_import_statement(&mut self) -> ast::StmtImport {
-        let start = self.node_start();
+    fn parse_import_statement(&mut self, start: TextSize, is_lazy: bool) -> ast::StmtImport {
         self.bump(TokenKind::Import);
 
         // test_err import_stmt_parenthesized_names
@@ -546,10 +620,11 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let names = self
-            .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
-                p.parse_alias(ImportStyle::Import)
-            });
+        let mut names = self.parse_comma_separated_list_into_vec_with_capacity(
+            RecoveryContextKind::ImportNames,
+            |p| p.parse_alias(ImportStyle::Import),
+            1,
+        );
 
         if names.is_empty() {
             // test_err import_stmt_empty
@@ -557,9 +632,13 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
 
+        names.shrink_to_fit();
+
         ast::StmtImport {
-            range: self.node_range(start),
             names,
+            is_lazy,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -570,8 +649,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `from` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
-    fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
-        let start = self.node_start();
+    fn parse_from_import_statement(
+        &mut self,
+        start: TextSize,
+        is_lazy: bool,
+    ) -> ast::StmtImportFrom {
         self.bump(TokenKind::From);
 
         let mut leading_dots = 0;
@@ -594,6 +676,7 @@ impl<'src> Parser<'src> {
             // from match import pattern
             // from type import bar
             // from case import pattern
+            // from lazy import qux
             // from match.type.case import foo
             Some(self.parse_dotted_name())
         } else {
@@ -615,7 +698,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let names_start = self.node_start();
-        let mut names = vec![];
+        let mut names = Vec::new();
         let mut seen_star_import = false;
 
         let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
@@ -645,6 +728,15 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
 
+        if seen_star_import && parenthesized.is_yes() {
+            // test_err from_import_parenthesized_star
+            // from x import (*)
+            self.add_error(
+                ParseErrorType::OtherError("Star import cannot be parenthesized".to_string()),
+                self.node_range(names_start),
+            );
+        }
+
         if seen_star_import && names.len() > 1 {
             // test_err from_import_star_with_other_names
             // from x import *, a
@@ -666,11 +758,15 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
+        names.shrink_to_fit();
+
         ast::StmtImportFrom {
             module,
             names,
             level: leading_dots,
+            is_lazy,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -687,9 +783,11 @@ impl<'src> Parser<'src> {
                 name: ast::Identifier {
                     id: Name::new_static("*"),
                     range,
+                    node_index: AtomicNodeIndex::NONE,
                 },
                 asname: None,
                 range,
+                node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -704,6 +802,7 @@ impl<'src> Parser<'src> {
                 // import foo as match
                 // import bar as case
                 // import baz as type
+                // import qux as lazy
                 Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname
@@ -722,6 +821,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             asname,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -750,6 +850,7 @@ impl<'src> Parser<'src> {
         ast::Identifier {
             id: Name::from(dotted_name),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -765,6 +866,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Pass);
         ast::StmtPass {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -780,6 +882,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Continue);
         ast::StmtContinue {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -795,6 +898,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Break);
         ast::StmtBreak {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -844,6 +948,7 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             msg,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -882,6 +987,7 @@ impl<'src> Parser<'src> {
         ast::StmtGlobal {
             range: self.node_range(start),
             names,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -927,6 +1033,7 @@ impl<'src> Parser<'src> {
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -955,7 +1062,7 @@ impl<'src> Parser<'src> {
             type_range,
         );
 
-        let mut name = Expr::Name(self.parse_name());
+        let mut name = Expr::Name(self.parse_name(ExpressionContext::default()));
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
 
         let type_params = self.try_parse_type_params();
@@ -979,6 +1086,7 @@ impl<'src> Parser<'src> {
             type_params: type_params.map(Box::new),
             value: Box::new(value.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -990,18 +1098,19 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
 
-        let TokenValue::IpyEscapeCommand { value, kind } =
-            self.bump_value(TokenKind::IpyEscapeCommand)
-        else {
-            unreachable!()
-        };
+        let (value, kind) = self.bump_ipython_escape_command(IpyEscapeContext::LogicalLineStart);
 
         let range = self.node_range(start);
         if self.options.mode != Mode::Ipython {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, range);
         }
 
-        ast::StmtIpyEscapeCommand { range, kind, value }
+        ast::StmtIpyEscapeCommand {
+            range,
+            kind,
+            value,
+            node_index: AtomicNodeIndex::NONE,
+        }
     }
 
     /// Parses an IPython help end escape command at the statement level.
@@ -1097,6 +1206,7 @@ impl<'src> Parser<'src> {
             value: value.into_boxed_str(),
             kind,
             range: self.node_range(parsed_expr.start()),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1164,6 +1274,7 @@ impl<'src> Parser<'src> {
             targets,
             value: Box::new(value.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1243,6 +1354,7 @@ impl<'src> Parser<'src> {
             value,
             simple,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1297,6 +1409,7 @@ impl<'src> Parser<'src> {
             op,
             value: Box::new(value.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1344,14 +1457,20 @@ impl<'src> Parser<'src> {
         });
 
         if self.at(TokenKind::Else) {
+            if elif_else_clauses.is_empty() {
+                elif_else_clauses.reserve_exact(1);
+            }
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
         }
+
+        elif_else_clauses.shrink_to_fit();
 
         ast::StmtIf {
             test: Box::new(test.expr),
             body,
             elif_else_clauses,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1395,6 +1514,7 @@ impl<'src> Parser<'src> {
             test,
             body,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1440,7 +1560,7 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let handlers = self.parse_clauses(Clause::Except, |p| {
+        let mut handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
                 p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
@@ -1452,6 +1572,8 @@ impl<'src> Parser<'src> {
             }
             handler
         });
+        handlers.shrink_to_fit();
+
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
         for handler_err_range in mixed_except_ranges {
@@ -1483,14 +1605,14 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
             (self.parse_body(Clause::Finally), true)
         } else {
-            (vec![], false)
+            (Suite::new(), false)
         };
 
         if !has_except && !has_finally {
@@ -1544,6 +1666,7 @@ impl<'src> Parser<'src> {
             finalbody,
             is_star,
             range: self.node_range(try_start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1693,6 +1816,7 @@ impl<'src> Parser<'src> {
                 name,
                 body: except_body,
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
             }),
             block_kind,
         )
@@ -1794,7 +1918,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         ast::StmtFor {
@@ -1804,6 +1928,7 @@ impl<'src> Parser<'src> {
             body,
             orelse,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1843,7 +1968,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         ast::StmtWhile {
@@ -1851,6 +1976,7 @@ impl<'src> Parser<'src> {
             body,
             orelse,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1868,7 +1994,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: Vec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtFunctionDef {
         self.bump(TokenKind::Def);
@@ -1980,6 +2106,7 @@ impl<'src> Parser<'src> {
             is_async: false,
             returns,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1995,7 +2122,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: Vec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtClassDef {
         self.bump(TokenKind::Class);
@@ -2030,9 +2157,14 @@ impl<'src> Parser<'src> {
         // test_ok class_def_arguments
         // class Foo: ...
         // class Foo(): ...
+        // class Foo((base for base in bases)): ...
+        // class Foo(*(base for base in bases)): ...
+
+        // test_err class_def_unparenthesized_generator_argument
+        // class Foo(base for base in bases): ...
         let arguments = self
             .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments()));
+            .then(|| Box::new(self.parse_arguments(ArgumentsContext::ClassDefinition)));
 
         self.expect(TokenKind::Colon);
 
@@ -2049,6 +2181,7 @@ impl<'src> Parser<'src> {
             type_params: type_params.map(Box::new),
             arguments,
             body,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2065,7 +2198,9 @@ impl<'src> Parser<'src> {
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
-        let items = self.parse_with_items();
+        let mut items = self.parse_with_items();
+        items.shrink_to_fit();
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::With);
@@ -2075,6 +2210,7 @@ impl<'src> Parser<'src> {
             body,
             is_async: false,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2095,7 +2231,7 @@ impl<'src> Parser<'src> {
         let open_paren_range = self.current_token_range();
 
         if self.at(TokenKind::Lpar) {
-            if let Some(items) = self.try_parse_parenthesized_with_items() {
+            if let (Some(items), has_trailing_comma) = self.try_parse_parenthesized_with_items() {
                 // test_ok tuple_context_manager_py38
                 // # parse_options: {"target-version": "3.8"}
                 // with (
@@ -2104,14 +2240,19 @@ impl<'src> Parser<'src> {
                 //   baz,
                 // ) as tup: ...
 
+                // test_ok single_parenthesized_item_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (
+                //   open('foo.txt')) as foo: ...
+                // with (
+                //   open('foo.txt')): ...
+
                 // test_err tuple_context_manager_py38
                 // # parse_options: {"target-version": "3.8"}
                 // # these cases are _syntactically_ valid before Python 3.9 because the `with` item
                 // # is parsed as a tuple, but this will always cause a runtime error, so we flag it
                 // # anyway
                 // with (foo, bar): ...
-                // with (
-                //   open('foo.txt')) as foo: ...
                 // with (
                 //   foo,
                 //   bar,
@@ -2130,10 +2271,12 @@ impl<'src> Parser<'src> {
                 // with (foo as x, bar as y): ...
                 // with (foo, bar as y): ...
                 // with (foo as x, bar): ...
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
-                    open_paren_range,
-                );
+                if items.len() > 1 || has_trailing_comma {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                        open_paren_range,
+                    );
+                }
 
                 self.expect(TokenKind::Rpar);
                 items
@@ -2155,15 +2298,17 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_comma_separated_list_into_vec(
+                self.parse_comma_separated_list_into_vec_with_capacity(
                     RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
                     |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                    1,
                 )
             }
         } else {
-            self.parse_comma_separated_list_into_vec(
+            self.parse_comma_separated_list_into_vec_with_capacity(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                1,
             )
         }
     }
@@ -2193,7 +2338,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
-    fn try_parse_parenthesized_with_items(&mut self) -> Option<Vec<WithItem>> {
+    fn try_parse_parenthesized_with_items(&mut self) -> (Option<Vec<WithItem>>, bool) {
         let checkpoint = self.checkpoint();
 
         // We'll start with the assumption that the with items are parenthesized.
@@ -2201,7 +2346,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut parsed_with_items = vec![];
+        let mut parsed_with_items = Vec::with_capacity(1);
         let mut has_optional_vars = false;
 
         // test_err with_items_parenthesized_missing_comma
@@ -2210,11 +2355,12 @@ impl<'src> Parser<'src> {
         // with (item1, item2 item3, item4): ...
         // with (item1, item2 as f1 item3, item4): ...
         // with (item1, item2: ...
-        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
-            let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
-            has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
-            parsed_with_items.push(parsed_with_item);
-        });
+        let has_trailing_comma =
+            self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
+                let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
+                has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
+                parsed_with_items.push(parsed_with_item);
+            });
 
         // Check if our assumption is incorrect and it's actually a parenthesized expression.
         if has_optional_vars {
@@ -2284,18 +2430,20 @@ impl<'src> Parser<'src> {
             with_item_kind = WithItemKind::ParenthesizedExpression;
         }
 
-        if with_item_kind.is_parenthesized() {
-            Some(
-                parsed_with_items
-                    .into_iter()
-                    .map(|parsed_with_item| parsed_with_item.item)
-                    .collect(),
-            )
+        let with_items = if with_item_kind.is_parenthesized() {
+            let with_items: Vec<_> = parsed_with_items
+                .into_iter()
+                .map(|parsed_with_item| parsed_with_item.item)
+                .collect();
+
+            Some(with_items)
         } else {
             self.rewind(checkpoint);
 
             None
-        }
+        };
+
+        (with_items, has_trailing_comma)
     }
 
     /// Parses a single `with` item.
@@ -2343,6 +2491,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 context_expr: context_expr.expr,
                 optional_vars,
+                node_index: AtomicNodeIndex::NONE,
             },
         }
     }
@@ -2401,8 +2550,13 @@ impl<'src> Parser<'src> {
         let subject = self.parse_match_subject_expression();
 
         match self.current_token_kind() {
-            TokenKind::Colon => {
-                // `match` is a keyword
+            // test_ok match_annotated_assignment
+            // match[0]: int
+            // match [x, y, z]: dict
+            TokenKind::Colon if self.peek() == TokenKind::Newline => {
+                // `match` is a keyword — colon followed by newline confirms
+                // this is a match statement, not an annotated assignment like
+                // `match [x, y, z]: {dict}` or `match[0]: int`.
                 self.bump(TokenKind::Colon);
 
                 let cases = self.parse_match_body();
@@ -2411,6 +2565,7 @@ impl<'src> Parser<'src> {
                     subject: Box::new(subject),
                     cases,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
@@ -2433,6 +2588,7 @@ impl<'src> Parser<'src> {
                     subject: Box::new(subject),
                     cases,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             _ => {
@@ -2480,6 +2636,7 @@ impl<'src> Parser<'src> {
             subject: Box::new(subject),
             cases,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2658,6 +2815,7 @@ impl<'src> Parser<'src> {
             guard,
             body,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2679,7 +2837,7 @@ impl<'src> Parser<'src> {
             // async def foo(): ...
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
-                ..self.parse_function_definition(vec![], async_start)
+                ..self.parse_function_definition(DecoratorList::new(), async_start)
             }),
 
             // test_ok async_with_statement
@@ -2710,8 +2868,24 @@ impl<'src> Parser<'src> {
                 );
 
                 // Although this statement is not a valid `async` statement,
-                // we still parse it.
-                self.parse_statement()
+                // we still parse it. Guard the recursive recovery path so
+                // `async async async ...` cannot overflow the parser stack.
+                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
+                    stmt
+                } else {
+                    let range = self.node_range(async_start);
+                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
+                    Stmt::Expr(ast::StmtExpr {
+                        range,
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            range,
+                            id: Name::new_static("async"),
+                            ctx: ExprContext::Invalid,
+                            node_index: AtomicNodeIndex::NONE,
+                        })),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                }
             }
         }
     }
@@ -2722,7 +2896,7 @@ impl<'src> Parser<'src> {
     fn parse_decorators(&mut self) -> Stmt {
         let start = self.node_start();
 
-        let mut decorators = vec![];
+        let mut decorators = DecoratorList::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression
@@ -2731,13 +2905,20 @@ impl<'src> Parser<'src> {
         // def foo(): ...
         // @@
         // def foo(): ...
+        // @test
+        // @
+        // class Test
         while self.at(TokenKind::At) {
             progress.assert_progressing(self);
 
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+            let parsed_expr = if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
+                Expr::Name(self.parse_missing_name()).into()
+            } else {
+                self.parse_named_expression_or_higher(ExpressionContext::default())
+            };
 
             if self.options.target_version < PythonVersion::PY39 {
                 // test_ok decorator_expression_dotted_ident_py38
@@ -2826,6 +3007,7 @@ impl<'src> Parser<'src> {
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
                 range: self.node_range(decorator_start),
+                node_index: AtomicNodeIndex::NONE,
             });
 
             // test_err decorator_missing_newline
@@ -2834,6 +3016,8 @@ impl<'src> Parser<'src> {
             // @x class Foo: ...
             self.expect(TokenKind::Newline);
         }
+
+        decorators.shrink_to_fit();
 
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
@@ -2862,21 +3046,27 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
-                // TODO(dhruvmanila): It seems that this recovery drops all the parsed
-                // decorators. Maybe we could convert them into statement expression
-                // with a flag indicating that this expression is part of a decorator.
-                // It's only possible to keep them if it's a function or class definition.
-                // We could possibly keep them if there's indentation error:
-                //
-                // ```python
-                // @decorator
-                //   @decorator
-                // def foo(): ...
-                // ```
-                //
-                // Or, parse it as a binary expression where the left side is missing.
-                // We would need to convert each decorator into a binary expression.
-                self.parse_statement()
+                let range = self.node_range(start);
+
+                ast::StmtFunctionDef {
+                    node_index: AtomicNodeIndex::default(),
+                    range,
+                    is_async: false,
+                    decorator_list: decorators,
+                    name: ast::Identifier {
+                        id: Name::empty(),
+                        range: self.missing_node_range(),
+                        node_index: AtomicNodeIndex::NONE,
+                    },
+                    type_params: None,
+                    parameters: Box::new(ast::Parameters {
+                        range: self.missing_node_range(),
+                        ..ast::Parameters::default()
+                    }),
+                    returns: None,
+                    body: Suite::new(),
+                }
+                .into()
             }
         }
     }
@@ -2885,7 +3075,7 @@ impl<'src> Parser<'src> {
     ///
     /// This could either be a single statement that's on the same line as the
     /// clause header or an indented block.
-    fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
+    fn parse_body(&mut self, parent_clause: Clause) -> Suite {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
 
@@ -2923,7 +3113,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        Vec::new()
+        Suite::new()
     }
 
     /// Parses a block of statements.
@@ -2931,11 +3121,20 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `Indent` token.
-    fn parse_block(&mut self) -> Vec<Stmt> {
+    fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements =
-            self.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement);
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            parser.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Parser::parse_statement,
+            )
+        }) {
+            statements
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            Suite::new()
+        };
 
         self.expect(TokenKind::Dedent);
 
@@ -3039,6 +3238,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             annotation,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -3088,6 +3288,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             parameter,
             default,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -3120,8 +3321,6 @@ impl<'src> Parser<'src> {
             let param_start = parser.node_start();
 
             if parameters.kwarg.is_some() {
-                // TODO(dhruvmanila): This fails AST validation in tests because
-                // of the pre-order visit
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(
@@ -3363,6 +3562,10 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
+        parameters.args.shrink_to_fit();
+        parameters.kwonlyargs.shrink_to_fit();
+        parameters.posonlyargs.shrink_to_fit();
+
         parameters.range = self.node_range(start);
 
         parameters
@@ -3405,6 +3608,7 @@ impl<'src> Parser<'src> {
         ast::TypeParams {
             range: self.node_range(start),
             type_params,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -3467,6 +3671,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 default,
+                node_index: AtomicNodeIndex::NONE,
             })
 
         // test_ok type_param_param_spec
@@ -3506,6 +3711,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 default,
+                node_index: AtomicNodeIndex::NONE,
             })
             // test_ok type_param_type_var
             // type X[T] = int
@@ -3589,6 +3795,7 @@ impl<'src> Parser<'src> {
                 name,
                 bound,
                 default,
+                node_index: AtomicNodeIndex::NONE,
             })
         }
     }
@@ -3769,12 +3976,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
+    /// Parses a sequence of clauses.
     ///
-    /// The difference is that the parser only continues parsing for as long as it sees the token
-    /// indicating the start of the specific clause. This is different from
-    /// [`Parser::parse_list_into_vec`] that performs error recovery when the next token is not a
-    /// list terminator or the start of a list element.
+    /// The parser only continues for as long as it sees the token indicating the start of the
+    /// specific clause. Unlike [`Parser::parse_list`], this method does not perform error recovery
+    /// when the next token is not a list terminator or the start of a list element.
     ///
     /// The special method is necessary because Python uses indentation over explicit delimiters to
     /// indicate the end of a clause.
@@ -3816,6 +4022,9 @@ impl<'src> Parser<'src> {
         while recovery_kind.is_list_element(self) {
             progress.assert_progressing(self);
 
+            if clauses.is_empty() {
+                clauses.reserve_exact(1);
+            }
             clauses.push(parse_clause(self));
         }
 

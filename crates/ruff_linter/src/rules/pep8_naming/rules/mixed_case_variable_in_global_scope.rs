@@ -1,7 +1,5 @@
-use ruff_python_ast::Expr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -18,8 +16,8 @@ use crate::rules::pep8_naming::helpers;
 /// > (Let’s hope that these variables are meant for use inside one module
 /// > only.) The conventions are about the same as those for functions.
 /// >
-/// > Modules that are designed for use via from M import * should use the
-/// > __all__ mechanism to prevent exporting globals, or use the older
+/// > Modules that are designed for use via `from M import *` should use the
+/// > `__all__` mechanism to prevent exporting globals, or use the older
 /// > convention of prefixing such globals with an underscore (which you might
 /// > want to do to indicate these globals are “module non-public”).
 /// >
@@ -52,6 +50,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#global-variable-names
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.89")]
 pub(crate) struct MixedCaseVariableInGlobalScope {
     name: String,
 }
@@ -65,7 +64,7 @@ impl Violation for MixedCaseVariableInGlobalScope {
 }
 
 /// N816
-pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr, name: &str) {
+pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, range: TextRange, name: &str) {
     if !helpers::is_mixed_case(name) {
         return;
     }
@@ -75,7 +74,7 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr
         return;
     }
 
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 
@@ -83,6 +82,6 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr
         MixedCaseVariableInGlobalScope {
             name: name.to_string(),
         },
-        expr.range(),
+        range,
     );
 }

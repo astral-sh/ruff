@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for membership tests against single-item containers.
@@ -27,24 +27,28 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
+/// The fix is always marked as unsafe.
 ///
-/// When the right-hand side is a string, the fix is marked as unsafe.
-/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
-/// so the fix can change the behavior of your program in these cases.
+/// When the right-hand side is a string, this fix can change the behavior of your program.
+/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string.
 ///
-/// Additionally, if there are comments within the fix's range,
-/// it will also be marked as unsafe.
+/// Additionally, converting `in`/`not in` against a single-item container to `==`/`!=` can
+/// change runtime behavior: `in` may consider identity (e.g., `NaN`) and always
+/// yields a `bool`.
+///
+/// Comments within the replacement range will also be removed.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct SingleItemMembershipTest {
     membership_test: MembershipTest,
 }
 
 impl Violation for SingleItemMembershipTest {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -89,9 +93,9 @@ pub(crate) fn single_item_membership_test(
             generate_comparison(
                 left,
                 &[membership_test.replacement_op()],
-                &[item.clone()],
+                std::slice::from_ref(item),
                 expr.into(),
-                checker.comment_ranges(),
+                checker.tokens(),
                 checker.source(),
             ),
             expr.range(),
@@ -100,14 +104,8 @@ pub(crate) fn single_item_membership_test(
         expr.range(),
     );
 
-    let applicability =
-        if right.is_string_literal_expr() || checker.comment_ranges().intersects(expr.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
-
-    let fix = Fix::applicable_edit(edit, applicability);
+    // All supported cases can change runtime behavior; mark as unsafe.
+    let fix = Fix::unsafe_edit(edit);
 
     checker
         .report_diagnostic(SingleItemMembershipTest { membership_test }, expr.range())
@@ -129,6 +127,7 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
             func,
             arguments,
             range: _,
+            node_index: _,
         }) => {
             if arguments.len() != 1 || !is_set_method(func, semantic) {
                 return None;

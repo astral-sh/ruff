@@ -38,6 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.ruff.parenthesize-tuple-in-subscript`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
 }
@@ -63,7 +64,7 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
 
 /// RUF031
 pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &ExprSubscript) {
-    let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_subscript;
+    let prefer_parentheses = checker.settings().ruff.parenthesize_tuple_in_subscript;
 
     let Expr::Tuple(tuple_subscript) = &*subscript.slice else {
         return;

@@ -53,7 +53,7 @@ class ClassWithNormalDunder:
     def __getitem__(self, key: int) -> str:
         return str(key)
 
-# error: [non-subscriptable]
+# error: [not-subscriptable]
 ClassWithNormalDunder[0]
 ```
 
@@ -85,14 +85,14 @@ class ThisFails:
 
 this_fails = ThisFails()
 
-# error: [non-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
 reveal_type(this_fails[0])  # revealed: Unknown
 ```
 
 However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
+reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: str
 ```
 
 The instance-level method is also not called when the class-level method is present:
@@ -110,18 +110,22 @@ def _(flag: bool):
             __getitem__ = external_getitem1
 
         def __init__(self):
+            # error: [invalid-assignment] "Object of type `def external_getitem2(key) -> int` is not assignable to attribute `__getitem__` of type `(instance, key) -> str`"
             self.__getitem__ = external_getitem2
 
     this_fails = ThisFails()
 
-    # error: [possibly-unbound-implicit-call]
-    reveal_type(this_fails[0])  # revealed: Unknown | str
+    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
+    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
+    # that the cause of the error was a possibly missing `__getitem__` method
+    #
+    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `ThisFails` may be missing"
+    reveal_type(this_fails[0])  # revealed: str
 ```
 
 ### Dunder methods as class-level annotations with no value
 
-Class-level annotations with no value assigned are considered instance-only, and aren't available as
-dunder methods:
+Class-level annotations with no value assigned are considered to be accessible on the class:
 
 ```py
 from typing import Callable
@@ -129,10 +133,8 @@ from typing import Callable
 class C:
     __call__: Callable[..., None]
 
-# error: [call-non-callable]
 C()()
 
-# error: [invalid-assignment]
 _: Callable[..., None] = C()
 ```
 
@@ -193,7 +195,7 @@ class_with_descriptor_dunder = ClassWithDescriptorDunder()
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ```
 
-## Dunders can not be overwritten on instances
+## Dunders cannot be overwritten on instances
 
 If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
 implicit dunder calls:
@@ -204,7 +206,7 @@ class C:
         return str(key)
 
     def f(self):
-        # TODO: This should emit an `invalid-assignment` diagnostic once we understand the type of `self`
+        # error: [invalid-assignment]
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class
@@ -219,6 +221,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, key: int) -> str:
                 return str(key)
+
         else:
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
@@ -258,7 +261,8 @@ class NotSubscriptable2:
         self.__getitem__ = external_getitem
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
-    # error: [non-subscriptable]
+    # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
     union[0]
 ```
 
@@ -272,6 +276,11 @@ def _(flag: bool):
                 return str(key)
 
     c = C()
-    # error: [possibly-unbound-implicit-call]
+
+    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
+    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
+    # that the cause of the error was a possibly missing `__getitem__` method
+    #
+    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `C` may be missing"
     reveal_type(c[0])  # revealed: str
 ```

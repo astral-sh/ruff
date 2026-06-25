@@ -3,10 +3,10 @@
 # See the README.md file in this directory for more information.
 
 import sys
-from collections.abc import Awaitable, Callable, Iterable, Sequence, Set as AbstractSet, Sized
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Sequence, Set as AbstractSet, Sized
 from dataclasses import Field
 from os import PathLike
-from types import FrameType, TracebackType
+from types import FrameType, NoneType as NoneType, TracebackType
 from typing import (
     Any,
     AnyStr,
@@ -18,11 +18,11 @@ from typing import (
     SupportsFloat,
     SupportsIndex,
     SupportsInt,
+    TypeAlias,
     TypeVar,
-    final,
     overload,
 )
-from typing_extensions import Buffer, LiteralString, Self as _Self, TypeAlias
+from typing_extensions import Buffer, LiteralString, Self as _Self
 
 _KT = TypeVar("_KT")
 _KT_co = TypeVar("_KT_co", covariant=True)
@@ -54,7 +54,8 @@ Unused: TypeAlias = object  # stable
 
 # Marker for return types that include None, but where forcing the user to
 # check for None can be detrimental. Sometimes called "the Any trick". See
-# CONTRIBUTING.md for more information.
+# https://typing.python.org/en/latest/guides/writing_stubs.html#the-any-trick
+# for more information.
 MaybeNone: TypeAlias = Any  # stable
 
 # Used to mark arguments that default to a sentinel value. This prevents
@@ -65,10 +66,10 @@ MaybeNone: TypeAlias = Any  # stable
 # In cases where the sentinel object is exported and can be used by user code,
 # a construct like this is better:
 #
-# _SentinelType = NewType("_SentinelType", object)
-# sentinel: _SentinelType
+# _SentinelType = NewType("_SentinelType", object)  # does not exist at runtime
+# sentinel: Final[_SentinelType]
 # def foo(x: int | None | _SentinelType = ...) -> None: ...
-sentinel: Any
+sentinel: Any  # stable
 
 # stable
 class IdentityFunction(Protocol):
@@ -82,19 +83,21 @@ class SupportsNext(Protocol[_T_co]):
 class SupportsAnext(Protocol[_T_co]):
     def __anext__(self) -> Awaitable[_T_co]: ...
 
-# Comparison protocols
+class SupportsBool(Protocol):
+    def __bool__(self) -> bool: ...
 
+# Comparison protocols
 class SupportsDunderLT(Protocol[_T_contra]):
-    def __lt__(self, other: _T_contra, /) -> bool: ...
+    def __lt__(self, other: _T_contra, /) -> SupportsBool: ...
 
 class SupportsDunderGT(Protocol[_T_contra]):
-    def __gt__(self, other: _T_contra, /) -> bool: ...
+    def __gt__(self, other: _T_contra, /) -> SupportsBool: ...
 
 class SupportsDunderLE(Protocol[_T_contra]):
-    def __le__(self, other: _T_contra, /) -> bool: ...
+    def __le__(self, other: _T_contra, /) -> SupportsBool: ...
 
 class SupportsDunderGE(Protocol[_T_contra]):
-    def __ge__(self, other: _T_contra, /) -> bool: ...
+    def __ge__(self, other: _T_contra, /) -> SupportsBool: ...
 
 class SupportsAllComparisons(
     SupportsDunderLT[Any], SupportsDunderGT[Any], SupportsDunderLE[Any], SupportsDunderGE[Any], Protocol
@@ -123,6 +126,12 @@ class SupportsMul(Protocol[_T_contra, _T_co]):
 class SupportsRMul(Protocol[_T_contra, _T_co]):
     def __rmul__(self, x: _T_contra, /) -> _T_co: ...
 
+class SupportsMod(Protocol[_T_contra, _T_co]):
+    def __mod__(self, other: _T_contra, /) -> _T_co: ...
+
+class SupportsRMod(Protocol[_T_contra, _T_co]):
+    def __rmod__(self, other: _T_contra, /) -> _T_co: ...
+
 class SupportsDivMod(Protocol[_T_contra, _T_co]):
     def __divmod__(self, other: _T_contra, /) -> _T_co: ...
 
@@ -138,6 +147,9 @@ class SupportsIter(Protocol[_T_co]):
 # generic over the type that is iterated over.
 class SupportsAiter(Protocol[_T_co]):
     def __aiter__(self) -> _T_co: ...
+
+class SupportsLen(Protocol):
+    def __len__(self) -> int: ...
 
 class SupportsLenAndGetItem(Protocol[_T_co]):
     def __len__(self) -> int: ...
@@ -273,6 +285,16 @@ class SupportsWrite(Protocol[_T_contra]):
 class SupportsFlush(Protocol):
     def flush(self) -> object: ...
 
+# Suitable for dictionary view objects
+class Viewable(Protocol[_T_co]):
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[_T_co]: ...
+
+class SupportsGetItemViewable(Protocol[_KT, _VT_co]):
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[_KT]: ...
+    def __getitem__(self, key: _KT, /) -> _VT_co: ...
+
 # Unfortunately PEP 688 does not allow us to distinguish read-only
 # from writable buffers. We use these aliases for readability for now.
 # Perhaps a future extension of the buffer protocol will allow us to
@@ -284,15 +306,16 @@ WriteableBuffer: TypeAlias = Buffer
 ReadableBuffer: TypeAlias = Buffer  # stable
 
 class SliceableBuffer(Buffer, Protocol):
-    def __getitem__(self, slice: slice, /) -> Sequence[int]: ...
+    def __getitem__(self, slice: slice[SupportsIndex | None], /) -> Sequence[int]: ...
 
 class IndexableBuffer(Buffer, Protocol):
     def __getitem__(self, i: int, /) -> int: ...
 
 class SupportsGetItemBuffer(SliceableBuffer, IndexableBuffer, Protocol):
     def __contains__(self, x: Any, /) -> bool: ...
+
     @overload
-    def __getitem__(self, slice: slice, /) -> Sequence[int]: ...
+    def __getitem__(self, slice: slice[SupportsIndex | None], /) -> Sequence[int]: ...
     @overload
     def __getitem__(self, i: int, /) -> int: ...
 
@@ -300,15 +323,6 @@ class SizedBuffer(Sized, Buffer, Protocol): ...
 
 ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
 OptExcInfo: TypeAlias = ExcInfo | tuple[None, None, None]
-
-# stable
-if sys.version_info >= (3, 10):
-    from types import NoneType as NoneType
-else:
-    # Used by type checkers for checks involving None (does not exist at runtime)
-    @final
-    class NoneType:
-        def __bool__(self) -> Literal[False]: ...
 
 # This is an internal CPython type that is like, but subtly different from, a NamedTuple
 # Subclasses of this type are found in multiple modules.
@@ -337,10 +351,12 @@ AnyOrLiteralStr = TypeVar("AnyOrLiteralStr", str, bytes, LiteralString)  # noqa:
 StrOrLiteralStr = TypeVar("StrOrLiteralStr", LiteralString, str)  # noqa: Y001
 
 # Objects suitable to be passed to sys.setprofile, threading.setprofile, and similar
-ProfileFunction: TypeAlias = Callable[[FrameType, str, Any], object]
+ProfileFunction: TypeAlias = Callable[[FrameType, Literal["call", "return", "c_call", "c_return", "c_exception"], Any], object]
 
 # Objects suitable to be passed to sys.settrace, threading.settrace, and similar
-TraceFunction: TypeAlias = Callable[[FrameType, str, Any], TraceFunction | None]
+TraceFunction: TypeAlias = Callable[
+    [FrameType, Literal["call", "line", "return", "exception", "opcode"], Any], TraceFunction | None
+]
 
 # experimental
 # Might not work as expected for pyright, see

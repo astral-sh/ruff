@@ -1,0 +1,544 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/nested_string_quote_style.py
+---
+## Input
+```python
+# Nested string literals inside interpolated string expressions follow either
+# alternating or preferred quote normalization depending on
+# nested-string-quote-style.
+
+# Nested string literals.
+f'{ "nested" }'
+t'{ "nested" }'
+
+# Multiple levels of nested interpolated strings.
+f'level 1 {f"level 2"}'
+t'level 1 {f"level 2"}'
+f'''level 1 {f"level 2 {f'level 3'}"}'''
+t'''level 1 {f"level 2 {f'level 3'}"}'''
+f'level 1 {f"level 2 {f'level 3'}"}'  # syntax error pre-3.12
+f'level 1 {f"level 2 {f'level 3 {f"level 4"}'}"}'  # syntax error pre-3.12
+
+# Nested string literals with equal specifiers (debug expressions).
+f'{ "nested" = }'
+t'{ "nested" = }'
+f"{10 + len('bar')=}"
+t"{10 + len('bar')=}"
+
+# Escape minimization.
+f'"double" quotes and {"nested string"}'
+t'"double" quotes and {"nested string"}'
+f"'single' quotes and {'nested string'}"
+t"'single' quotes and {'nested string'}"
+f'"double" quotes and {"nested string with \"double\" quotes"}'  # syntax error pre-3.12
+t'"double" quotes and {"nested string with \"double\" quotes"}'
+f"'single' quotes and {'nested string with \'single\' quotes'}'"  # syntax error pre-3.12
+t"'single' quotes and {'nested string with \'single\' quotes'}'"
+f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+t'"double" quotes and {"nested string with 'single' quotes"}'
+f"'single' quotes and {'nested string with "double" quotes'}'"  # syntax error pre-3.12
+t"'single' quotes and {'nested string with "double" quotes'}'"
+
+# Nested strings in lists and dictionaries.
+f'{ ["1", "2"] }'
+t'{ ["1", "2"] }'
+f'{ {"key": [{"inner": "value"}]} }'
+t'{ {"key": [{"inner": "value"}]} }'
+
+# Triple quotes and escaped quotes.
+f'''{ "'single'" }'''
+t'''{ "'single'" }'''
+f'''{ '"double"' }'''
+t'''{ '"double"' }'''
+f''''single' { "'single'" }'''
+t''''single' { "'single'" }'''
+f'''"double" { '"double"' }'''
+t'''"double" { '"double"' }'''
+f''''single' { '"double"' }'''
+t''''single' { '"double"' }'''
+f'''"double" { "'single'" }'''
+t'''"double" { "'single'" }'''
+
+# Triple quotes and nested f-strings.
+f"{f'''{'nested'} inner'''} outer"
+t"{t'''{'nested'} inner'''} outer"
+
+# Outer implicit concatenation.
+f'{ "implicit " }' f'{ "concatenation" }'
+t'{ "implicit " }' t'{ "concatenation" }'
+
+# Outer implicit concatenation with escaped quotes.
+f'"double" quotes and { "implicit " }' f'{ "concatenation" } with "double" quotes'
+t'"double" quotes and { "implicit " }' t'{ "concatenation" } with "double" quotes'
+f'\'single\' quotes and { "implicit " }' f'{ "concatenation" } with "double" quotes'
+t'\'single\' quotes and { "implicit " }' t'{ "concatenation" } with "double" quotes'
+f'"double" quotes and { "implicit " }' f'{ "concatenation" } with \'single\' quotes'
+t'"double" quotes and { "implicit " }' t'{ "concatenation" } with \'single\' quotes'
+f'\'single\' quotes and { "implicit " }' f'{ "concatenation" } with \'single\' quotes'
+t'\'single\' quotes and { "implicit " }' t'{ "concatenation" } with \'single\' quotes'
+
+# Inner implicit concatenation.
+f'{ ("implicit " "concatenation", ["more", "strings"]) }'
+t'{ ("implicit " "concatenation", ["more", "strings"]) }'
+
+# Inner implicit concatenation with escaped quotes.
+f'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
+t'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.14
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+# Nested string literals inside interpolated string expressions follow either
+# alternating or preferred quote normalization depending on
+# nested-string-quote-style.
+
+# Nested string literals.
+f"{'nested'}"
+t"{'nested'}"
+
+# Multiple levels of nested interpolated strings.
+f"level 1 {f'level 2'}"
+t"level 1 {f'level 2'}"
+f"""level 1 {f"level 2 {f'level 3'}"}"""
+t"""level 1 {f"level 2 {f'level 3'}"}"""
+f"level 1 {f'level 2 {f"level 3"}'}"  # syntax error pre-3.12
+f"level 1 {f'level 2 {f"level 3 {f'level 4'}"}'}"  # syntax error pre-3.12
+
+# Nested string literals with equal specifiers (debug expressions).
+f"{ "nested" = }"
+t"{ "nested" = }"
+f"{10 + len('bar')=}"
+t"{10 + len('bar')=}"
+
+# Escape minimization.
+f'"double" quotes and {"nested string"}'
+t'"double" quotes and {"nested string"}'
+f"'single' quotes and {'nested string'}"
+t"'single' quotes and {'nested string'}"
+f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+t'"double" quotes and {'nested string with "double" quotes'}'
+f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+t"'single' quotes and {"nested string with 'single' quotes"}'"
+f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+t'"double" quotes and {"nested string with 'single' quotes"}'
+f"'single' quotes and {'nested string with "double" quotes'}'"  # syntax error pre-3.12
+t"'single' quotes and {'nested string with "double" quotes'}'"
+
+# Nested strings in lists and dictionaries.
+f"{['1', '2']}"
+t"{['1', '2']}"
+f"{ {'key': [{'inner': 'value'}]} }"
+t"{ {'key': [{'inner': 'value'}]} }"
+
+# Triple quotes and escaped quotes.
+f"""{"'single'"}"""
+t"""{"'single'"}"""
+f"""{'"double"'}"""
+t"""{'"double"'}"""
+f"""'single' {"'single'"}"""
+t"""'single' {"'single'"}"""
+f""""double" {'"double"'}"""
+t""""double" {'"double"'}"""
+f"""'single' {'"double"'}"""
+t"""'single' {'"double"'}"""
+f""""double" {"'single'"}"""
+t""""double" {"'single'"}"""
+
+# Triple quotes and nested f-strings.
+f"{f'''{"nested"} inner'''} outer"
+t"{t'''{"nested"} inner'''} outer"
+
+# Outer implicit concatenation.
+f"{'implicit '}{'concatenation'}"
+t"{'implicit '}{'concatenation'}"
+
+# Outer implicit concatenation with escaped quotes.
+f'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+t'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+f"'single' quotes and {'implicit '}{'concatenation'} with \"double\" quotes"
+t"'single' quotes and {'implicit '}{'concatenation'} with \"double\" quotes"
+f"\"double\" quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+t"\"double\" quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+f"'single' quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+t"'single' quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+
+# Inner implicit concatenation.
+f"{('implicit concatenation', ['more', 'strings'])}"
+t"{('implicit concatenation', ['more', 'strings'])}"
+
+# Inner implicit concatenation with escaped quotes.
+f"{('implicit concatenation', ["'single'", '"double"'])}"
+t"{('implicit concatenation', ["'single'", '"double"'])}"
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.14
+source_type                = Python
+nested-string-quote-style  = preferred
+```
+
+```python
+# Nested string literals inside interpolated string expressions follow either
+# alternating or preferred quote normalization depending on
+# nested-string-quote-style.
+
+# Nested string literals.
+f"{"nested"}"
+t"{"nested"}"
+
+# Multiple levels of nested interpolated strings.
+f"level 1 {f"level 2"}"
+t"level 1 {f"level 2"}"
+f"""level 1 {f"level 2 {f"level 3"}"}"""
+t"""level 1 {f"level 2 {f"level 3"}"}"""
+f"level 1 {f"level 2 {f"level 3"}"}"  # syntax error pre-3.12
+f"level 1 {f"level 2 {f"level 3 {f"level 4"}"}"}"  # syntax error pre-3.12
+
+# Nested string literals with equal specifiers (debug expressions).
+f"{ "nested" = }"
+t"{ "nested" = }"
+f"{10 + len('bar')=}"
+t"{10 + len('bar')=}"
+
+# Escape minimization.
+f'"double" quotes and {"nested string"}'
+t'"double" quotes and {"nested string"}'
+f"'single' quotes and {"nested string"}"
+t"'single' quotes and {"nested string"}"
+f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+t'"double" quotes and {'nested string with "double" quotes'}'
+f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+t"'single' quotes and {"nested string with 'single' quotes"}'"
+f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+t'"double" quotes and {"nested string with 'single' quotes"}'
+f"'single' quotes and {'nested string with "double" quotes'}'"  # syntax error pre-3.12
+t"'single' quotes and {'nested string with "double" quotes'}'"
+
+# Nested strings in lists and dictionaries.
+f"{["1", "2"]}"
+t"{["1", "2"]}"
+f"{ {"key": [{"inner": "value"}]} }"
+t"{ {"key": [{"inner": "value"}]} }"
+
+# Triple quotes and escaped quotes.
+f"""{"'single'"}"""
+t"""{"'single'"}"""
+f"""{'"double"'}"""
+t"""{'"double"'}"""
+f"""'single' {"'single'"}"""
+t"""'single' {"'single'"}"""
+f""""double" {'"double"'}"""
+t""""double" {'"double"'}"""
+f"""'single' {'"double"'}"""
+t"""'single' {'"double"'}"""
+f""""double" {"'single'"}"""
+t""""double" {"'single'"}"""
+
+# Triple quotes and nested f-strings.
+f"{f"""{"nested"} inner"""} outer"
+t"{t"""{"nested"} inner"""} outer"
+
+# Outer implicit concatenation.
+f"{"implicit "}{"concatenation"}"
+t"{"implicit "}{"concatenation"}"
+
+# Outer implicit concatenation with escaped quotes.
+f'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+t'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+f"'single' quotes and {"implicit "}{"concatenation"} with \"double\" quotes"
+t"'single' quotes and {"implicit "}{"concatenation"} with \"double\" quotes"
+f"\"double\" quotes and {"implicit "}{"concatenation"} with 'single' quotes"
+t"\"double\" quotes and {"implicit "}{"concatenation"} with 'single' quotes"
+f"'single' quotes and {"implicit "}{"concatenation"} with 'single' quotes"
+t"'single' quotes and {"implicit "}{"concatenation"} with 'single' quotes"
+
+# Inner implicit concatenation.
+f"{("implicit concatenation", ["more", "strings"])}"
+t"{("implicit concatenation", ["more", "strings"])}"
+
+# Inner implicit concatenation with escaped quotes.
+f"{("implicit concatenation", ["'single'", '"double"'])}"
+t"{("implicit concatenation", ["'single'", '"double"'])}"
+```
+
+
+### Output 3
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+# Nested string literals inside interpolated string expressions follow either
+# alternating or preferred quote normalization depending on
+# nested-string-quote-style.
+
+# Nested string literals.
+f"{'nested'}"
+t"{'nested'}"
+
+# Multiple levels of nested interpolated strings.
+f"level 1 {f'level 2'}"
+t"level 1 {f'level 2'}"
+f"""level 1 {f"level 2 {f'level 3'}"}"""
+t"""level 1 {f"level 2 {f'level 3'}"}"""
+f"level 1 {f'level 2 {f'level 3'}'}"  # syntax error pre-3.12
+f"level 1 {f'level 2 {f'level 3 {f"level 4"}'}'}"  # syntax error pre-3.12
+
+# Nested string literals with equal specifiers (debug expressions).
+f'{ "nested" = }'
+t"{ "nested" = }"
+f"{10 + len('bar')=}"
+t"{10 + len('bar')=}"
+
+# Escape minimization.
+f'"double" quotes and {"nested string"}'
+t'"double" quotes and {"nested string"}'
+f"'single' quotes and {'nested string'}"
+t"'single' quotes and {'nested string'}"
+f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+t'"double" quotes and {'nested string with "double" quotes'}'
+f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+t"'single' quotes and {"nested string with 'single' quotes"}'"
+f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+t'"double" quotes and {"nested string with 'single' quotes"}'
+f"'single' quotes and {'nested string with "double" quotes'}'"  # syntax error pre-3.12
+t"'single' quotes and {'nested string with "double" quotes'}'"
+
+# Nested strings in lists and dictionaries.
+f"{['1', '2']}"
+t"{['1', '2']}"
+f"{ {'key': [{'inner': 'value'}]} }"
+t"{ {'key': [{'inner': 'value'}]} }"
+
+# Triple quotes and escaped quotes.
+f"""{"'single'"}"""
+t"""{"'single'"}"""
+f"""{'"double"'}"""
+t"""{'"double"'}"""
+f"""'single' {"'single'"}"""
+t"""'single' {"'single'"}"""
+f""""double" {'"double"'}"""
+t""""double" {'"double"'}"""
+f"""'single' {'"double"'}"""
+t"""'single' {'"double"'}"""
+f""""double" {"'single'"}"""
+t""""double" {"'single'"}"""
+
+# Triple quotes and nested f-strings.
+f"{f'''{'nested'} inner'''} outer"
+t"{t'''{'nested'} inner'''} outer"
+
+# Outer implicit concatenation.
+f"{'implicit '}{'concatenation'}"
+t"{'implicit '}{'concatenation'}"
+
+# Outer implicit concatenation with escaped quotes.
+f'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+t'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+f"'single' quotes and {'implicit '}{'concatenation'} with \"double\" quotes"
+t"'single' quotes and {'implicit '}{'concatenation'} with \"double\" quotes"
+f"\"double\" quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+t"\"double\" quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+f"'single' quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+t"'single' quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+
+# Inner implicit concatenation.
+f"{('implicit concatenation', ['more', 'strings'])}"
+t"{('implicit concatenation', ['more', 'strings'])}"
+
+# Inner implicit concatenation with escaped quotes.
+f"{('implicit concatenation', ["'single'", '"double"'])}"
+t"{('implicit concatenation', ["'single'", '"double"'])}"
+```
+
+
+### Unsupported Syntax Errors
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  --> nested_string_quote_style.py:28:24
+   |
+26 | f"'single' quotes and {'nested string'}"
+27 | t"'single' quotes and {'nested string'}"
+28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+   |                        ^
+29 | t'"double" quotes and {'nested string with "double" quotes'}'
+30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  --> nested_string_quote_style.py:30:24
+   |
+28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+29 | t'"double" quotes and {'nested string with "double" quotes'}'
+30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |                        ^
+31 | t"'single' quotes and {"nested string with 'single' quotes"}'"
+32 | f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+   |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+
+### Output 4
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = preferred
+```
+
+```python
+# Nested string literals inside interpolated string expressions follow either
+# alternating or preferred quote normalization depending on
+# nested-string-quote-style.
+
+# Nested string literals.
+f"{'nested'}"
+t"{'nested'}"
+
+# Multiple levels of nested interpolated strings.
+f"level 1 {f'level 2'}"
+t"level 1 {f'level 2'}"
+f"""level 1 {f"level 2 {f'level 3'}"}"""
+t"""level 1 {f"level 2 {f'level 3'}"}"""
+f"level 1 {f'level 2 {f'level 3'}'}"  # syntax error pre-3.12
+f"level 1 {f'level 2 {f'level 3 {f"level 4"}'}'}"  # syntax error pre-3.12
+
+# Nested string literals with equal specifiers (debug expressions).
+f'{ "nested" = }'
+t"{ "nested" = }"
+f"{10 + len('bar')=}"
+t"{10 + len('bar')=}"
+
+# Escape minimization.
+f'"double" quotes and {"nested string"}'
+t'"double" quotes and {"nested string"}'
+f"'single' quotes and {'nested string'}"
+t"'single' quotes and {'nested string'}"
+f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+t'"double" quotes and {'nested string with "double" quotes'}'
+f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+t"'single' quotes and {"nested string with 'single' quotes"}'"
+f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+t'"double" quotes and {"nested string with 'single' quotes"}'
+f"'single' quotes and {'nested string with "double" quotes'}'"  # syntax error pre-3.12
+t"'single' quotes and {'nested string with "double" quotes'}'"
+
+# Nested strings in lists and dictionaries.
+f"{['1', '2']}"
+t"{['1', '2']}"
+f"{ {'key': [{'inner': 'value'}]} }"
+t"{ {'key': [{'inner': 'value'}]} }"
+
+# Triple quotes and escaped quotes.
+f"""{"'single'"}"""
+t"""{"'single'"}"""
+f"""{'"double"'}"""
+t"""{'"double"'}"""
+f"""'single' {"'single'"}"""
+t"""'single' {"'single'"}"""
+f""""double" {'"double"'}"""
+t""""double" {'"double"'}"""
+f"""'single' {'"double"'}"""
+t"""'single' {'"double"'}"""
+f""""double" {"'single'"}"""
+t""""double" {"'single'"}"""
+
+# Triple quotes and nested f-strings.
+f"{f'''{'nested'} inner'''} outer"
+t"{t'''{'nested'} inner'''} outer"
+
+# Outer implicit concatenation.
+f"{'implicit '}{'concatenation'}"
+t"{'implicit '}{'concatenation'}"
+
+# Outer implicit concatenation with escaped quotes.
+f'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+t'"double" quotes and {"implicit "}{"concatenation"} with "double" quotes'
+f"'single' quotes and {'implicit '}{'concatenation'} with \"double\" quotes"
+t"'single' quotes and {'implicit '}{'concatenation'} with \"double\" quotes"
+f"\"double\" quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+t"\"double\" quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+f"'single' quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+t"'single' quotes and {'implicit '}{'concatenation'} with 'single' quotes"
+
+# Inner implicit concatenation.
+f"{('implicit concatenation', ['more', 'strings'])}"
+t"{('implicit concatenation', ['more', 'strings'])}"
+
+# Inner implicit concatenation with escaped quotes.
+f"{('implicit concatenation', ["'single'", '"double"'])}"
+t"{('implicit concatenation', ["'single'", '"double"'])}"
+```
+
+
+### Unsupported Syntax Errors
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  --> nested_string_quote_style.py:28:24
+   |
+26 | f"'single' quotes and {'nested string'}"
+27 | t"'single' quotes and {'nested string'}"
+28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+   |                        ^
+29 | t'"double" quotes and {'nested string with "double" quotes'}'
+30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  --> nested_string_quote_style.py:30:24
+   |
+28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+29 | t'"double" quotes and {'nested string with "double" quotes'}'
+30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |                        ^
+31 | t"'single' quotes and {"nested string with 'single' quotes"}'"
+32 | f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
+   |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.

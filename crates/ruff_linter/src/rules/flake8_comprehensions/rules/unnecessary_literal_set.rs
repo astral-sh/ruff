@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `set()` calls that take unnecessary list or tuple literals
@@ -34,6 +34,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.61")]
 pub(crate) struct UnnecessaryLiteralSet {
     kind: UnnecessaryLiteral,
 }

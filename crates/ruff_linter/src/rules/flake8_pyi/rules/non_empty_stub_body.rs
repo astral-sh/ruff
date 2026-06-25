@@ -28,6 +28,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct NonEmptyStubBody;
 
 impl AlwaysFixableViolation for NonEmptyStubBody {
@@ -59,7 +60,12 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
     }
 
     // Ignore `...` (the desired case).
-    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
+    if let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         if value.is_ellipsis_literal_expr() {
             return;
         }

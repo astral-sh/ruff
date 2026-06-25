@@ -9,10 +9,9 @@ Similarly, in `and` expressions, the right-hand side is evaluated only if the le
 ## Narrowing in `or`
 
 ```py
-def _(flag: bool):
-    class A: ...
-    x: A | None = A() if flag else None
+class A: ...
 
+def _(x: A | None):
     isinstance(x, A) or reveal_type(x)  # revealed: None
     x is None or reveal_type(x)  # revealed: A
     reveal_type(x)  # revealed: A | None
@@ -21,37 +20,45 @@ def _(flag: bool):
 ## Narrowing in `and`
 
 ```py
-def _(flag: bool):
-    class A: ...
-    x: A | None = A() if flag else None
+from typing import final
 
+class A: ...
+
+def _(x: A | None):
     isinstance(x, A) and reveal_type(x)  # revealed: A
     x is None and reveal_type(x)  # revealed: None
     reveal_type(x)  # revealed: A | None
+
+@final
+class FinalClass: ...
+
+# We know that no subclass of `FinalClass` can exist,
+# therefore no subtype of `FinalClass` can define `__bool__`
+# or `__len__`, therefore `FinalClass` can safely be considered
+# always-truthy, therefore this always resolves to `None`
+reveal_type(FinalClass() and None)  # revealed: None
 ```
 
 ## Multiple `and` arms
 
 ```py
-def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
-    class A: ...
-    x: A | None = A() if flag1 else None
+class A: ...
 
-    flag2 and isinstance(x, A) and reveal_type(x)  # revealed: A
-    isinstance(x, A) and flag2 and reveal_type(x)  # revealed: A
-    reveal_type(x) and isinstance(x, A) and flag3  # revealed: A | None
+def _(x: A | None, flag1: bool, flag2: bool):
+    flag1 and isinstance(x, A) and reveal_type(x)  # revealed: A
+    isinstance(x, A) and flag1 and reveal_type(x)  # revealed: A
+    reveal_type(x) and isinstance(x, A) and flag2  # revealed: A | None
 ```
 
 ## Multiple `or` arms
 
 ```py
-def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
-    class A: ...
-    x: A | None = A() if flag1 else None
+class A: ...
 
-    flag2 or isinstance(x, A) or reveal_type(x)  # revealed: None
-    isinstance(x, A) or flag3 or reveal_type(x)  # revealed: None
-    reveal_type(x) or isinstance(x, A) or flag4  # revealed: A | None
+def _(x: A | None, flag1: bool, flag2: bool, flag3: bool):
+    flag1 or isinstance(x, A) or reveal_type(x)  # revealed: None
+    isinstance(x, A) or flag2 or reveal_type(x)  # revealed: None
+    reveal_type(x) or isinstance(x, A) or flag3  # revealed: A | None
 ```
 
 ## Multiple predicates
@@ -59,10 +66,9 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
 ```py
 from typing import Literal
 
-def _(flag1: bool, flag2: bool):
-    class A: ...
-    x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
+class A: ...
 
+def _(x: A | None | Literal[1]):
     x is None or isinstance(x, A) or reveal_type(x)  # revealed: Literal[1]
 ```
 
@@ -71,9 +77,8 @@ def _(flag1: bool, flag2: bool):
 ```py
 from typing import Literal
 
-def _(flag1: bool, flag2: bool):
-    class A: ...
-    x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
+class A: ...
 
+def _(x: A | None | Literal[1]):
     isinstance(x, A) or x is not None and reveal_type(x)  # revealed: Literal[1]
 ```

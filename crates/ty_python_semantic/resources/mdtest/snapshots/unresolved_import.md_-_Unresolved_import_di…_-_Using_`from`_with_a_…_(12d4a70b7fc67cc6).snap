@@ -1,7 +1,8 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unresolved_import.md - Unresolved import diagnostics - Using `from` with a resolvable module but unresolvable item
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_import.md
@@ -31,6 +32,5 @@ error[unresolved-import]: Module `a` has no member `does_not_exist`
 1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
   |                            ^^^^^^^^^^^^^^
   |
-info: rule `unresolved-import` is enabled by default
 
 ```

@@ -41,12 +41,18 @@ use crate::checkers::ast::Checker;
 /// the same key. However, `min(data, key=itemgetter(0))` will return the _first_
 /// "minimum" element in the list in the same scenario.
 ///
-/// As such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
+/// The fix also changes which exception is raised for an empty sequence:
+/// `sorted([])[0]` raises `IndexError`, but `min([])` and `max([])` raise
+/// `ValueError`. Code that catches one specific exception type will need to
+/// be updated after the fix is applied.
+///
+/// As such, this rule's fix is marked as unsafe.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.4.2")]
 pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }
@@ -192,11 +198,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
             };
 
             let replacement = Edit::range_replacement(replacement, subscript.range());
-            if is_reversed {
-                Fix::unsafe_edit(replacement)
-            } else {
-                Fix::safe_edit(replacement)
-            }
+            Fix::unsafe_edit(replacement)
         });
     }
 }

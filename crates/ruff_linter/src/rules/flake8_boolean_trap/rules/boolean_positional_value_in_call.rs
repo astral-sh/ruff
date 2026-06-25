@@ -42,6 +42,7 @@ use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanPositionalValueInCall;
 
 impl Violation for BooleanPositionalValueInCall {
@@ -51,6 +52,7 @@ impl Violation for BooleanPositionalValueInCall {
     }
 }
 
+/// FBT003
 pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::ExprCall) {
     if allow_boolean_trap(call, checker) {
         return;

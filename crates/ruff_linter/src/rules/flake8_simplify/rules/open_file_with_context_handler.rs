@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.219")]
 pub(crate) struct OpenFileWithContextHandler;
 
 impl Violation for OpenFileWithContextHandler {
@@ -49,7 +50,12 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
-    let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
+    let Expr::Await(ast::ExprAwait {
+        value,
+        range: _,
+        node_index: _,
+    }) = expr
+    else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {

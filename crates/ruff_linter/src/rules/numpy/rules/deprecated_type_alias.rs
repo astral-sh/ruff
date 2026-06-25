@@ -31,6 +31,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// int
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.247")]
 pub(crate) struct NumpyDeprecatedTypeAlias {
     type_name: String,
 }
@@ -80,6 +81,7 @@ pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
             },
             expr.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         let type_name = match type_name {
             "unicode" => "str",
             _ => type_name,

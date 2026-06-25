@@ -59,6 +59,7 @@ just ensuring that we get test coverage for each of the possible diagnostic mess
 
 ```py
 from inspect import getattr_static
+from typing import overload
 
 def f1() -> int:
     return 0
@@ -72,11 +73,19 @@ def f3(a: int, b: int) -> int:
 def f4[T: str](x: T) -> int:
     return 0
 
-class OverloadExample:
-    def f(self, x: str) -> int:
-        return 0
+@overload
+def f5() -> None: ...
+@overload
+def f5(x: str) -> str: ...
+def f5(x: str | None = None) -> str | None:
+    return x
 
-f5 = getattr_static(OverloadExample, "f").__get__
+@overload
+def f6() -> None: ...
+@overload
+def f6(x: str, y: str) -> str: ...
+def f6(x: str | None = None, y: str | None = None) -> str | None:
+    return x + y if x and y else None
 
 def _(n: int):
     class PossiblyNotCallable:
@@ -96,15 +105,18 @@ def _(n: int):
         f = 5
     elif n == 5:
         f = f5
+    elif n == 6:
+        f = f6
     else:
         f = PossiblyNotCallable()
     # error: [too-many-positional-arguments]
     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [missing-argument]
-    # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
+    # error: [no-matching-overload] "No overload of function `f6` matches arguments"
     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-    # error: [no-matching-overload]
-    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
     x = f(3)
 ```
 
@@ -125,4 +137,69 @@ def _(n: int):
     # error: [parameter-already-assigned]
     # error: [unknown-argument]
     y = f("foo", name="bar", unknown="quux")
+```
+
+### Truncation for long unions and literals
+
+This test demonstrates a call where the expected type is a large mixed union. The diagnostic must
+therefore truncate the long expected union type to avoid overwhelming output.
+
+```py
+from typing import Literal, Union
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
+    return 0
+
+def _(n: int):
+    x = n
+    # error: [invalid-argument-type]
+    f1(x)
+```
+
+### Attribute access on a typevar with multiple bounds
+
+```py
+from typing import TypeVar, Self
+
+class A:
+    def foo(self, x: int) -> Self:
+        return self
+
+class B:
+    def foo(self, x: str) -> Self:
+        return self
+
+T = TypeVar("T", A, B)
+
+def _(x: T, y: int) -> T:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    return x.foo(y)
+```
+
+## Union with overloaded method and incompatible variant
+
+When calling a method on a union type where:
+
+- One variant has the method with compatible arguments (`str.split`)
+- Another variant has the method but with incompatible arguments (`bytes.split` expects `Buffer`,
+    not `str`)
+- Other variants don't have the method at all (contributing `Unknown` to the callable)
+
+We should only report the specific error for the incompatible variant (`invalid-argument-type` for
+`bytes.split`), not a spurious `no-matching-overload` for the compatible variant.
+
+```py
+def _(x: bytes | str | int):
+    # error: [invalid-argument-type]
+    # error: [unresolved-attribute]
+    x.split(" ")
 ```

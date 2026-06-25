@@ -1,34 +1,38 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI049.pyi:6:7: PYI049 Private TypedDict `_UnusedTypedDict` is never used
+PYI049 Private TypedDict `_UnusedTypedDict` is never used
+ --> PYI049.pyi:6:7
   |
 6 | class _UnusedTypedDict(TypedDict):
-  |       ^^^^^^^^^^^^^^^^ PYI049
+  |       ^^^^^^^^^^^^^^^^
 7 |     foo: str
   |
 
-PYI049.pyi:10:7: PYI049 Private TypedDict `_UnusedTypedDict2` is never used
+PYI049 Private TypedDict `_UnusedTypedDict2` is never used
+  --> PYI049.pyi:10:7
    |
 10 | class _UnusedTypedDict2(typing.TypedDict):
-   |       ^^^^^^^^^^^^^^^^^ PYI049
+   |       ^^^^^^^^^^^^^^^^^
 11 |     bar: int
    |
 
-PYI049.pyi:34:1: PYI049 Private TypedDict `_UnusedTypedDict3` is never used
+PYI049 Private TypedDict `_UnusedTypedDict3` is never used
+  --> PYI049.pyi:34:1
    |
 32 |    bar: list[int]
 33 |
 34 | _UnusedTypedDict3 = TypedDict("_UnusedTypedDict3", {"foo": int})
-   | ^^^^^^^^^^^^^^^^^ PYI049
+   | ^^^^^^^^^^^^^^^^^
 35 | _UsedTypedDict3 = TypedDict("_UsedTypedDict3", {"bar": bytes})
    |
 
-PYI049.pyi:43:11: PYI049 Private TypedDict `_UnusedTypeDict4` is never used
+PYI049 Private TypedDict `_UnusedTypeDict4` is never used
+  --> PYI049.pyi:43:11
    |
 41 | # scope (unlike in `.py` files).
 42 | class _CustomClass3:
 43 |     class _UnusedTypeDict4(TypedDict):
-   |           ^^^^^^^^^^^^^^^^ PYI049
+   |           ^^^^^^^^^^^^^^^^
 44 |         pass
    |

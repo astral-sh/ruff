@@ -1,0 +1,24 @@
+[package]
+name = "ty_combine"
+version = "0.0.1"
+description = "This is an internal component crate of Ruff"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_ranged_value = { workspace = true }
+
+ordermap = { workspace = true }
+
+[lints]
+workspace = true

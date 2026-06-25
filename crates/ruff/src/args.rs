@@ -7,8 +7,10 @@ use std::sync::Arc;
 
 use crate::commands::completions::config::{OptionString, OptionStringParser};
 use anyhow::bail;
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{Parser, Subcommand, command};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
@@ -21,9 +23,10 @@ use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
 };
-use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, UnresolvedRuleSelector, UnresolvedRuleSelectorParser};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -41,7 +44,8 @@ pub struct GlobalConfigArgs {
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair
     /// (such as you might find in a `ruff.toml` configuration file)
-    /// overriding a specific configuration option.
+    /// overriding a specific configuration option
+    /// (e.g., `--config "lint.line-length = 100"` or `--config "format.quote-style = 'single'"`).
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
@@ -65,6 +69,15 @@ pub struct GlobalConfigArgs {
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Global options", global = true)]
     pub isolated: bool,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        global = true
+    )]
+    pub(crate) color: Option<TerminalColor>,
 }
 
 impl GlobalConfigArgs {
@@ -78,6 +91,27 @@ impl GlobalConfigArgs {
     }
 }
 
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Display colors if the output goes to an interactive terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors.
+    Always,
+
+    /// Never display colors.
+    Never,
+}
+
+// Configures Clap v3-style help menu colors
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
+
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -86,6 +120,7 @@ impl GlobalConfigArgs {
     after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
+#[command(styles = STYLES)]
 pub struct Args {
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -157,6 +192,7 @@ pub enum AnalyzeCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct AnalyzeGraphCommand {
     /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
@@ -169,6 +205,9 @@ pub struct AnalyzeGraphCommand {
     /// Attempt to detect imports from string literals.
     #[clap(long)]
     detect_string_imports: bool,
+    /// The minimum number of dots in a string import to consider it a valid import.
+    #[clap(long)]
+    min_dots: Option<usize>,
     /// Enable preview mode. Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
@@ -180,6 +219,12 @@ pub struct AnalyzeGraphCommand {
     /// Path to a virtual environment to use for resolving additional dependencies
     #[arg(long)]
     python: Option<PathBuf>,
+    /// Include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// Use `--no-type-checking-imports` to exclude imports that are only used for type checking.
+    #[arg(long, overrides_with("no_type_checking_imports"))]
+    type_checking_imports: bool,
+    #[arg(long, overrides_with("type_checking_imports"), hide = true)]
+    no_type_checking_imports: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -187,7 +232,7 @@ pub struct AnalyzeGraphCommand {
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
-    #[clap(help = "List of files or directories to check [default: .]")]
+    #[clap(help = "List of files or directories to check, or `-` to read from stdin [default: .]")]
     pub files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
@@ -246,41 +291,41 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    pub select: Option<Vec<UnresolvedRuleSelector>>,
     /// Comma-separated list of rule codes to disable.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --select, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_select: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --ignore. (Deprecated: You can just use --ignore instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
+    pub extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
     /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
@@ -308,41 +353,41 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub fixable: Option<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<UnresolvedRuleSelector>>,
     /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub unfixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --fixable, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
+    pub extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    pub extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -402,8 +447,13 @@ pub struct CheckCommand {
     )]
     pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
+    /// Optionally provide a reason to append after the codes.
     #[arg(
         long,
+        value_name = "REASON",
+        default_missing_value = "",
+        num_args = 0..=1,
+        require_equals = true,
         // conflicts_with = "add_noqa",
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
@@ -413,8 +463,9 @@ pub struct CheckCommand {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
         conflicts_with = "fix",
+        conflicts_with = "diff",
     )]
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     /// See the files Ruff will be run against with the current settings.
     #[arg(
         long,
@@ -449,7 +500,9 @@ pub struct CheckCommand {
 #[expect(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.
-    #[clap(help = "List of files or directories to format [default: .]")]
+    #[clap(
+        help = "List of files or directories to format, or `-` to read from stdin [default: .]"
+    )]
     pub files: Vec<PathBuf>,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
     /// files would have been modified, and zero otherwise.
@@ -534,6 +587,14 @@ pub struct FormatCommand {
     /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
     #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
     pub exit_non_zero_on_format: bool,
+
+    /// Output serialization format for violations, when used with `--check`.
+    /// The default serialization format is "full".
+    ///
+    /// Note that this option is currently only respected in preview mode. A warning will be emitted
+    /// if this flag is used on stable.
+    #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
+    pub output_format: Option<OutputFormat>,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
@@ -781,6 +842,7 @@ impl FormatCommand {
             target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
+            output_format: self.output_format,
             ..ExplicitConfigOverrides::default()
         };
 
@@ -808,8 +870,13 @@ impl AnalyzeGraphCommand {
             } else {
                 None
             },
+            string_imports_min_dots: self.min_dots,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             target_version: self.target_version.map(ast::PythonVersion::from),
+            type_checking_imports: resolve_bool_arg(
+                self.type_checking_imports,
+                self.no_type_checking_imports,
+            ),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -914,6 +981,8 @@ impl TypedValueParser for ConfigArgumentParser {
                 return Ok(SingleConfigArgument::FilePath(path_to_config_file));
             }
         }
+
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
 
         let config_parse_error = match toml::Table::from_str(value) {
             Ok(table) => match table.try_into::<Options>() {
@@ -1033,7 +1102,7 @@ Possible choices:
 /// etc.).
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     pub diff: bool,
     pub exit_non_zero_on_fix: bool,
     pub exit_zero: bool,
@@ -1281,20 +1350,20 @@ struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
     extend_exclude: Option<Vec<FilePattern>>,
-    extend_fixable: Option<Vec<RuleSelector>>,
-    extend_ignore: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
-    fixable: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
     line_length: Option<LineLength>,
     per_file_ignores: Option<Vec<PatternPrefixPair>>,
     extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
-    select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     target_version: Option<ast::PythonVersion>,
-    unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,
     fix: Option<bool>,
@@ -1305,6 +1374,8 @@ struct ExplicitConfigOverrides {
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
     detect_string_imports: Option<bool>,
+    string_imports_min_dots: Option<usize>,
+    type_checking_imports: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1392,6 +1463,12 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         if let Some(detect_string_imports) = &self.detect_string_imports {
             config.analyze.detect_string_imports = Some(*detect_string_imports);
         }
+        if let Some(string_imports_min_dots) = &self.string_imports_min_dots {
+            config.analyze.string_imports_min_dots = Some(*string_imports_min_dots);
+        }
+        if let Some(type_checking_imports) = &self.type_checking_imports {
+            config.analyze.type_checking_imports = Some(*type_checking_imports);
+        }
 
         config
     }
@@ -1399,7 +1476,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();
+    let mut per_file_ignores: FxHashMap<String, Vec<UnresolvedRuleSelector>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
@@ -1408,6 +1485,6 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes, None))
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, None))
         .collect()
 }

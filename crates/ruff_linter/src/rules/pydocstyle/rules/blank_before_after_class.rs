@@ -38,11 +38,18 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     """Metadata about a photo."""
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter removes blank lines before class docstrings, which conflicts
+/// with this rule's requirement to include them.
+///
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct IncorrectBlankLineBeforeClass;
 
 impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
@@ -95,6 +102,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct IncorrectBlankLineAfterClass;
 
 impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
@@ -142,6 +150,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
 ///
 /// [D203]: https://docs.astral.sh/ruff/rules/incorrect-blank-line-before-class
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct BlankLineBeforeClass;
 
 impl AlwaysFixableViolation for BlankLineBeforeClass {
@@ -170,8 +179,8 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         return;
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineBeforeClass)
-        || checker.enabled(Rule::BlankLineBeforeClass)
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass)
+        || checker.is_rule_enabled(Rule::BlankLineBeforeClass)
     {
         let mut lines = UniversalNewlineIterator::with_offset(
             checker.locator().slice(between_range),
@@ -191,7 +200,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
             }
         }
 
-        if checker.enabled(Rule::BlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
                 let mut diagnostic =
                     checker.report_diagnostic(BlankLineBeforeClass, docstring.range());
@@ -202,7 +211,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 )));
             }
         }
-        if checker.enabled(Rule::IncorrectBlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass) {
             if blank_lines_before != 1 {
                 let mut diagnostic =
                     checker.report_diagnostic(IncorrectBlankLineBeforeClass, docstring.range());
@@ -216,7 +225,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         }
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineAfterClass) {
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineAfterClass) {
         let class_after_docstring_range = TextRange::new(docstring.end(), class.end());
         let class_after_docstring = checker.locator().slice(class_after_docstring_range);
         let mut lines = UniversalNewlineIterator::with_offset(

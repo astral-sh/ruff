@@ -28,11 +28,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// num = Decimal("1.2345")
 /// ```
 ///
-/// ## Fix Safety
+/// ## Fix safety
 /// This rule's fix is marked as unsafe because it changes the underlying value
 /// of the `Decimal` instance that is constructed. This can lead to unexpected
 /// behavior if your program relies on the previous value (whether deliberately or not).
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct DecimalFromFloatLiteral;
 
 impl AlwaysFixableViolation for DecimalFromFloatLiteral {

@@ -1,0 +1,350 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF050 [*] Empty `if` statement
+ --> RUF050.py:4:1
+  |
+3 |   # Simple if with pass
+4 | / if True:
+5 | |     pass
+  | |________^
+6 |
+7 |   # Simple if with ellipsis
+  |
+help: Remove the `if` statement
+  |
+3 | # Simple if with pass
+  - if True:
+  -     pass
+4 |
+  |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:8:1
+   |
+ 7 |   # Simple if with ellipsis
+ 8 | / if True:
+ 9 | |     ...
+   | |_______^
+10 |
+11 |   # Side-effect-free condition (comparison)
+   |
+help: Remove the `if` statement
+  |
+7 | # Simple if with ellipsis
+  - if True:
+  -     ...
+8 |
+  |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:13:1
+   |
+11 |   # Side-effect-free condition (comparison)
+12 |   import sys
+13 | / if sys.version_info >= (3, 11):
+14 | |     pass
+   | |________^
+15 |
+16 |   # Side-effect-free condition (boolean operator)
+   |
+help: Remove the `if` statement
+   |
+12 | import sys
+   - if sys.version_info >= (3, 11):
+   -     pass
+13 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:17:1
+   |
+16 |   # Side-effect-free condition (boolean operator)
+17 | / if x and y:
+18 | |     pass
+   | |________^
+19 |
+20 |   # Nested in function
+   |
+help: Remove the `if` statement
+   |
+16 | # Side-effect-free condition (boolean operator)
+   - if x and y:
+   -     pass
+17 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:22:5
+   |
+20 |   # Nested in function
+21 |   def nested():
+22 | /     if a:
+23 | |         pass
+   | |____________^
+24 |
+25 |   # Single-line form (pass)
+   |
+help: Remove the `if` statement
+   |
+21 | def nested():
+   -     if a:
+   -         pass
+22 +     pass
+23 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:26:1
+   |
+25 | # Single-line form (pass)
+26 | if True: pass
+   | ^^^^^^^^^^^^^
+27 |
+28 | # Single-line form (ellipsis)
+   |
+help: Remove the `if` statement
+   |
+25 | # Single-line form (pass)
+   - if True: pass
+26 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:29:1
+   |
+28 | # Single-line form (ellipsis)
+29 | if True: ...
+   | ^^^^^^^^^^^^
+30 |
+31 | # Multiple pass statements
+   |
+help: Remove the `if` statement
+   |
+28 | # Single-line form (ellipsis)
+   - if True: ...
+29 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:32:1
+   |
+31 |   # Multiple pass statements
+32 | / if True:
+33 | |     pass
+34 | |     pass
+   | |________^
+35 |
+36 |   # Mixed pass and ellipsis
+   |
+help: Remove the `if` statement
+   |
+31 | # Multiple pass statements
+   - if True:
+   -     pass
+   -     pass
+32 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:37:1
+   |
+36 |   # Mixed pass and ellipsis
+37 | / if True:
+38 | |     pass
+39 | |     ...
+   | |_______^
+40 |
+41 |   # Only statement in a with block
+   |
+help: Remove the `if` statement
+   |
+36 | # Mixed pass and ellipsis
+   - if True:
+   -     pass
+   -     ...
+37 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:43:5
+   |
+41 |   # Only statement in a with block
+42 |   with pytest.raises(ValueError, match=msg):
+43 | /     if obj1:
+44 | |         pass
+   | |____________^
+   |
+help: Remove the `if` statement
+   |
+42 | with pytest.raises(ValueError, match=msg):
+   -     if obj1:
+   -         pass
+43 +     pass
+44 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:50:1
+   |
+49 |   # Function call
+50 | / if foo():
+51 | |     pass
+   | |________^
+52 |
+53 |   # Method call
+   |
+help: Remove the `if` statement
+   |
+49 | # Function call
+   - if foo():
+   -     pass
+50 + foo()
+51 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:54:1
+   |
+53 |   # Method call
+54 | / if bar.baz():
+55 | |     pass
+   | |________^
+56 |
+57 |   # Nested call in boolean operator
+   |
+help: Remove the `if` statement
+   |
+53 | # Method call
+   - if bar.baz():
+   -     pass
+54 + bar.baz()
+55 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:58:1
+   |
+57 |   # Nested call in boolean operator
+58 | / if x and foo():
+59 | |     pass
+   | |________^
+60 |
+61 |   # Multiline expression that needs outer parentheses
+   |
+help: Remove the `if` statement
+   |
+57 | # Nested call in boolean operator
+   - if x and foo():
+   -     pass
+58 + x and foo()
+59 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:62:1
+   |
+61 |   # Multiline expression that needs outer parentheses
+62 | / if (
+63 | |     id(0)
+64 | |     + 0
+65 | | ):
+66 | |     pass
+   | |________^
+67 |
+68 |   # Multiline call stays a single expression statement
+   |
+help: Remove the `if` statement
+   |
+61 | # Multiline expression that needs outer parentheses
+   - if (
+62 + (
+63 |     id(0)
+64 |     + 0
+   - ):
+   -     pass
+65 + )
+66 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:69:1
+   |
+68 |   # Multiline call stays a single expression statement
+69 | / if foo(
+70 | |     1,
+71 | |     2,
+72 | | ):
+73 | |     pass
+   | |________^
+74 |
+75 |   # Walrus operator with call
+   |
+help: Remove the `if` statement
+   |
+68 | # Multiline call stays a single expression statement
+   - if foo(
+69 + foo(
+70 |     1,
+71 |     2,
+   - ):
+   -     pass
+72 + )
+73 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:76:1
+   |
+75 |   # Walrus operator with call
+76 | / if (x := foo()):
+77 | |     pass
+   | |________^
+78 |
+79 |   # Walrus operator without call
+   |
+help: Remove the `if` statement
+   |
+75 | # Walrus operator with call
+   - if (x := foo()):
+   -     pass
+76 + (x := foo())
+77 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:80:1
+   |
+79 |   # Walrus operator without call
+80 | / if (x := y):
+81 | |     pass
+   | |________^
+82 |
+83 |   # Only statement in a suite
+   |
+help: Remove the `if` statement
+   |
+79 | # Walrus operator without call
+   - if (x := y):
+   -     pass
+80 + (x := y)
+81 |
+   |
+
+RUF050 [*] Empty `if` statement
+  --> RUF050.py:85:5
+   |
+83 |   # Only statement in a suite
+84 |   class Foo:
+85 | /     if foo():
+86 | |         pass
+   | |____________^
+   |
+help: Remove the `if` statement
+   |
+84 | class Foo:
+   -     if foo():
+   -         pass
+85 +     foo()
+86 |
+   |

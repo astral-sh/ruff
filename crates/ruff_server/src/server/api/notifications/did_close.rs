@@ -1,35 +1,32 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::clear_diagnostics_for_document;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
-use lsp_types as types;
-use lsp_types::notification as notif;
+use crate::session::{Client, Session};
+use lsp_types::{self as types, DidCloseTextDocumentNotification};
 
 pub(crate) struct DidClose;
 
 impl super::NotificationHandler for DidClose {
-    type NotificationType = notif::DidCloseTextDocument;
+    type NotificationType = DidCloseTextDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidClose {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         types::DidCloseTextDocumentParams {
             text_document: types::TextDocumentIdentifier { uri },
         }: types::DidCloseTextDocumentParams,
     ) -> Result<()> {
-        let key = session.key_from_url(uri);
+        let key = session.key_from_uri(uri);
         // Publish an empty diagnostic report for the document. This will de-register any existing diagnostics.
-        let Some(snapshot) = session.take_snapshot(key.clone().into_url()) else {
+        let Some(snapshot) = session.take_snapshot(key.clone().into_uri()) else {
             tracing::debug!(
                 "Unable to close document with key {key} - the snapshot was unavailable"
             );
             return Ok(());
         };
-        clear_diagnostics_for_document(snapshot.query(), &notifier)?;
+        clear_diagnostics_for_document(snapshot.query(), client)?;
 
         session
             .close_document(&key)

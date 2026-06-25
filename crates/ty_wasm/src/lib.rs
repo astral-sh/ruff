@@ -1,26 +1,33 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use ruff_db::Upcast;
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{File, FileRange, system_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
+use ruff_db::vendored::VendoredPath;
+use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
+use ruff_ranged_value::ValueSource;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
-use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
-use ty_project::ProjectMetadata;
+use ty_ide::{
+    CompletionCapabilities, Hint as IdeHint, InlayHintSettings, MarkupKind, RangedValue,
+    can_rename, document_highlights, find_references, goto_declaration, goto_definition,
+    goto_type_definition, hover, inlay_hints, rename,
+};
+use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::Program;
+use ty_python_core::program::{FallibleStrategy, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -31,9 +38,30 @@ pub fn version() -> String {
         .to_string()
 }
 
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
+    before_main();
+
+    ruff_db::set_program_version(version()).unwrap();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -43,8 +71,38 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// ## Panics
+/// If this function is called more than once.
+#[wasm_bindgen(js_name = "initLogging")]
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("`initLogging` to only be called at most once.");
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -70,10 +128,19 @@ impl Workspace {
 
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
-            .map_err(into_error)?;
+        let project = ProjectMetadata::from_options(
+            options,
+            SystemPathBuf::from(root),
+            None,
+            &FallibleStrategy,
+        )
+        .map_err(into_error)?;
 
-        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
+
+        // By default, it will check all files in the project but we only want to check the open
+        // files in the playground.
+        db.set_check_mode(CheckMode::OpenFiles);
 
         Ok(Self {
             db,
@@ -94,15 +161,26 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
+            &FallibleStrategy,
         )
         .map_err(into_error)?;
 
-        let program_settings = project.to_program_settings(&self.system);
-        Program::get(&self.db)
-            .update_from_settings(&mut self.db, program_settings)
+        let (program_settings, program_settings_diagnostics) = project
+            .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
+            .map_err(into_error)?;
+        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
+
+        let (settings, settings_diagnostics) = project
+            .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
 
-        self.db.project().reload(&mut self.db, project);
+        self.db.project().reload(
+            &mut self.db,
+            project,
+            Some(settings),
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
         Ok(())
     }
@@ -117,7 +195,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![ChangeEvent::Created {
+            &[ChangeEvent::Created {
                 path: path.clone(),
                 kind: CreatedKind::File,
             }],
@@ -128,28 +206,35 @@ impl Workspace {
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle { path, file })
+        Ok(FileHandle {
+            path: path.into(),
+            file,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
     pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
-        if !self.system.fs.exists(&file_id.path) {
+        let system_path = file_id.path.as_system_path().ok_or_else(|| {
+            Error::new("Cannot update non-system files (vendored files are read-only)")
+        })?;
+
+        if !self.system.fs.exists(system_path) {
             return Err(Error::new("File does not exist"));
         }
 
         self.system
             .fs
-            .write_file(&file_id.path, contents)
+            .write_file(system_path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![
+            &[
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
                 },
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileMetadata,
                 },
             ],
@@ -168,18 +253,22 @@ impl Workspace {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
-        self.system
-            .fs
-            .remove_file(&file_id.path)
-            .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Deleted {
-                path: file_id.path.to_path_buf(),
-                kind: DeletedKind::File,
-            }],
-            None,
-        );
+        // Only close system files (vendored files can't be closed/deleted)
+        if let Some(system_path) = file_id.path.as_system_path() {
+            self.system
+                .fs
+                .remove_file(system_path)
+                .map_err(into_error)?;
+
+            self.db.apply_changes(
+                &[ChangeEvent::Deleted {
+                    path: system_path.to_path_buf(),
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
 
         Ok(())
     }
@@ -192,6 +281,14 @@ impl Workspace {
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
+    #[wasm_bindgen(js_name = "hints")]
+    pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
+        Ok(hints(&self.db, file_id.file)
+            .into_iter()
+            .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
+            .collect())
+    }
+
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
         let result = self.db.check();
@@ -201,7 +298,7 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
@@ -212,7 +309,7 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }
@@ -239,32 +336,157 @@ impl Workspace {
             return Ok(Vec::new());
         };
 
-        let source_range = Range::from_text_range(
-            targets.file_range().range(),
-            &index,
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
             &source,
+            &index,
             self.position_encoding,
-        );
+        ))
+    }
 
-        let links: Vec<_> = targets
+    #[wasm_bindgen(js_name = "gotoDeclaration")]
+    pub fn goto_declaration(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoDefinition")]
+    pub fn goto_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoReferences")]
+    pub fn goto_references(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
             .into_iter()
             .map(|target| LocationLink {
                 path: target.file().path(&self.db).to_string(),
                 full_range: Range::from_file_range(
                     &self.db,
-                    FileRange::new(target.file(), target.full_range()),
+                    target.file_range(),
                     self.position_encoding,
                 ),
                 selection_range: Some(Range::from_file_range(
                     &self.db,
-                    FileRange::new(target.file(), target.focus_range()),
+                    target.file_range(),
                     self.position_encoding,
                 )),
-                origin_selection_range: Some(source_range),
+                origin_selection_range: Some(Range::from_text_range(
+                    ruff_text_size::TextRange::new(offset, offset),
+                    &index,
+                    &source,
+                    self.position_encoding,
+                )),
             })
-            .collect();
+            .collect())
+    }
 
-        Ok(links)
+    #[wasm_bindgen(js_name = "prepareRename")]
+    pub fn prepare_rename(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<Range>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(range) = can_rename(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        Ok(Some(Range::from_text_range(
+            range,
+            &index,
+            &source,
+            self.position_encoding,
+        )))
+    }
+
+    #[wasm_bindgen]
+    pub fn rename(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+        new_name: &str,
+    ) -> Result<Vec<RenameEdit>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        if can_rename(&self.db, file_id.file, offset).is_none() {
+            return Ok(Vec::new());
+        }
+
+        let Some(rename_results) = rename(&self.db, file_id.file, offset, new_name) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(rename_results
+            .into_iter()
+            .map(|target| RenameEdit {
+                path: target.file().path(&self.db).to_string(),
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                new_text: new_name.to_string(),
+            })
+            .collect())
     }
 
     #[wasm_bindgen]
@@ -304,12 +526,44 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+        let settings = ty_ide::CompletionSettings::default();
+        let completions = ty_ide::completion(
+            &self.db,
+            &settings,
+            CompletionCapabilities::default(),
+            file_id.file,
+            offset,
+        );
 
         Ok(completions
             .into_iter()
-            .map(|completion| Completion {
-                label: completion.label,
+            .map(|comp| {
+                let name = comp.label.to_string();
+                let kind = comp.kind.map(CompletionKind::from);
+                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range = Range::from_text_range(
+                        edit.range(),
+                        &index,
+                        &source,
+                        self.position_encoding,
+                    );
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
+                Completion {
+                    name,
+                    kind,
+                    detail: type_display,
+                    module_name: comp.module_name.map(ToString::to_string),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
+                }
             })
             .collect())
     }
@@ -323,20 +577,236 @@ impl Workspace {
             &self.db,
             file_id.file,
             range.to_text_range(&index, &source, self.position_encoding)?,
+            // TODO: Provide a way to configure this
+            &InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+            },
         );
 
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display(&self.db).to_string(),
+                label: hint
+                    .label
+                    .into_parts()
+                    .into_iter()
+                    .map(|part| InlayHintLabelPart {
+                        location: part.target().map(|target| {
+                            location_link_from_navigation_target(
+                                target,
+                                &self.db,
+                                self.position_encoding,
+                                None,
+                            )
+                        }),
+                        label: part.into_text(),
+                    })
+                    .collect(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
                     &source,
                     self.position_encoding,
                 ),
+                kind: hint.kind.into(),
+                text_edits: hint
+                    .text_edits
+                    .into_iter()
+                    .map(|edit| TextEdit {
+                        range: Range::from_text_range(
+                            edit.range,
+                            &index,
+                            &source,
+                            self.position_encoding,
+                        ),
+                        new_text: edit.new_text,
+                    })
+                    .collect(),
             })
             .collect())
+    }
+
+    #[wasm_bindgen(js_name = "semanticTokens")]
+    pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "semanticTokensInRange")]
+    pub fn semantic_tokens_in_range(
+        &self,
+        file_id: &FileHandle,
+        range: Range,
+    ) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(
+            &self.db,
+            file_id.file,
+            Some(range.to_text_range(&index, &source, self.position_encoding)?),
+        );
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "codeActions")]
+    pub fn code_actions(
+        &self,
+        file_id: &FileHandle,
+        diagnostic: &Diagnostic,
+    ) -> Option<Vec<CodeAction>> {
+        // If the diagnostic includes fixes, offer those up as options.
+        let mut actions = Vec::new();
+        if let Some(action) = diagnostic.code_action(self) {
+            actions.push(action);
+        }
+
+        // Try to find other applicable actions.
+        //
+        // This is only for actions that are messy to compute at the time of the diagnostic.
+        // For instance, suggesting imports requires finding symbols for the entire project,
+        // which is dubious when you're in the middle of resolving symbols.
+        if let Some(range) = diagnostic.inner.range() {
+            actions.extend(
+                ty_ide::code_actions(
+                    &self.db,
+                    file_id.file,
+                    range,
+                    diagnostic.inner.id().as_str(),
+                )
+                .into_iter()
+                .map(|action| CodeAction {
+                    title: action.title,
+                    preferred: action.preferred,
+                    edits: action
+                        .edits
+                        .into_iter()
+                        .map(|edit| edit_to_text_edit(self, file_id.file, &edit))
+                        .collect(),
+                }),
+            );
+        }
+
+        if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        }
+    }
+
+    #[wasm_bindgen(js_name = "signatureHelp")]
+    pub fn signature_help(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<SignatureHelp>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(signature_help_info) = signature_help(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let signatures = signature_help_info
+            .signatures
+            .into_iter()
+            .map(|sig| {
+                let parameters = sig
+                    .parameters
+                    .into_iter()
+                    .map(|param| ParameterInformation {
+                        label: param.label,
+                        documentation: param.documentation,
+                    })
+                    .collect();
+
+                SignatureInformation {
+                    label: sig.label,
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
+                    parameters,
+                    active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
+                }
+            })
+            .collect();
+
+        Ok(Some(SignatureHelp {
+            signatures,
+            active_signature: signature_help_info
+                .active_signature
+                .and_then(|s| u32::try_from(s).ok()),
+        }))
+    }
+
+    #[wasm_bindgen(js_name = "documentHighlights")]
+    pub fn document_highlights(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<DocumentHighlight>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .map(|target| DocumentHighlight {
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                kind: target.kind().into(),
+            })
+            .collect())
+    }
+
+    /// Gets a file handle for a vendored file by its path.
+    /// This allows vendored files to participate in LSP features like hover, completions, etc.
+    #[wasm_bindgen(js_name = "getVendoredFile")]
+    pub fn get_vendored_file(&self, path: &str) -> Result<FileHandle, Error> {
+        let vendored_path = VendoredPath::new(path);
+
+        // Try to get the vendored file as a File
+        let file = vendored_path_to_file(&self.db, vendored_path)
+            .map_err(|err| Error::new(&format!("Vendored file not found: {path}: {err}")))?;
+
+        Ok(FileHandle {
+            file,
+            path: vendored_path.to_path_buf().into(),
+        })
     }
 }
 
@@ -344,10 +814,32 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
 }
 
+fn map_targets_to_links(
+    db: &dyn Db,
+    targets: RangedValue<NavigationTargets>,
+    source: &SourceText,
+    index: &LineIndex,
+    position_encoding: PositionEncoding,
+) -> Vec<LocationLink> {
+    let source_range = Range::from_text_range(
+        targets.file_range().range(),
+        index,
+        source,
+        position_encoding,
+    );
+
+    targets
+        .into_iter()
+        .map(|target| {
+            location_link_from_navigation_target(&target, db, position_encoding, Some(source_range))
+        })
+        .collect()
+}
+
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: SystemPathBuf,
+    path: FilePath,
     file: File,
 }
 
@@ -365,8 +857,34 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Diagnostic {
-    #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hint {
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    pub range: Range,
+}
+
+impl Hint {
+    fn from_ide_hint(
+        db: &dyn Db,
+        file: File,
+        position_encoding: PositionEncoding,
+        hint: &IdeHint,
+    ) -> Self {
+        Self {
+            message: hint.message(),
+            range: Range::from_text_range(
+                hint.range,
+                &line_index(db, file),
+                &source_text(db, file),
+                position_encoding,
+            ),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -381,6 +899,36 @@ impl Diagnostic {
     }
 
     #[wasm_bindgen]
+    pub fn annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
+        self.inner
+            .annotations()
+            .iter()
+            .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name = "subDiagnostics")]
+    pub fn sub_diagnostics(&self, workspace: &Workspace) -> Vec<SubDiagnostic> {
+        self.inner
+            .sub_diagnostics()
+            .iter()
+            .map(|sub_diagnostic| {
+                let annotations = sub_diagnostic
+                    .annotations()
+                    .iter()
+                    .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+                    .collect();
+
+                SubDiagnostic {
+                    severity: sub_diagnostic.severity().into(),
+                    message: sub_diagnostic.primary_message().to_string(),
+                    annotations,
+                }
+            })
+            .collect()
+    }
+
+    #[wasm_bindgen]
     pub fn id(&self) -> JsString {
         JsString::from(self.inner.id().to_string())
     }
@@ -388,6 +936,16 @@ impl Diagnostic {
     #[wasm_bindgen]
     pub fn severity(&self) -> Severity {
         Severity::from(self.inner.severity())
+    }
+
+    #[wasm_bindgen]
+    pub fn tags(&self) -> Vec<DiagnosticTag> {
+        self.inner
+            .primary_tags()
+            .unwrap_or_default()
+            .iter()
+            .map(DiagnosticTag::from)
+            .collect()
     }
 
     #[wasm_bindgen(js_name = "textRange")]
@@ -410,12 +968,112 @@ impl Diagnostic {
 
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
-        let config = DisplayDiagnosticConfig::default().color(false);
+        let config = DisplayDiagnosticConfig::new("ty").color(false);
         self.inner
-            .display(&workspace.db.upcast(), &config)
+            .display(&workspace.db, &config)
             .to_string()
             .into()
     }
+
+    /// Returns the code action for this diagnostic, if it has a fix.
+    #[wasm_bindgen(js_name = "codeAction")]
+    pub fn code_action(&self, workspace: &Workspace) -> Option<CodeAction> {
+        let fix = self
+            .inner
+            .fix()
+            .filter(|fix| fix.applies(Applicability::Unsafe))?;
+
+        let primary_span = self.inner.primary_span()?;
+        let file = primary_span.expect_ty_file();
+
+        let edits: Vec<TextEdit> = fix
+            .edits()
+            .iter()
+            .map(|edit| edit_to_text_edit(workspace, file, edit))
+            .collect();
+
+        let title = self
+            .inner
+            .first_help_text()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("Fix {}", self.inner.id()));
+
+        Some(CodeAction {
+            title,
+            edits,
+            preferred: true,
+        })
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubDiagnostic {
+    pub severity: SubDiagnosticSeverity,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub annotations: Vec<DiagnosticAnnotation>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticAnnotation {
+    pub primary: bool,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<Location>,
+}
+
+impl DiagnosticAnnotation {
+    fn from_db(workspace: &Workspace, annotation: &diagnostic::Annotation) -> Self {
+        let location = FileRange::try_from(annotation.get_span())
+            .ok()
+            .map(|file_range| Location {
+                path: file_range.file().path(&workspace.db).to_string(),
+                range: Range::from_file_range(
+                    &workspace.db,
+                    file_range,
+                    workspace.position_encoding,
+                ),
+            });
+
+        Self {
+            primary: annotation.is_primary(),
+            message: annotation.get_message().map(ToOwned::to_owned),
+            location,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
+}
+
+fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
+    let source = source_text(&workspace.db, file);
+    let index = line_index(&workspace.db, file);
+
+    TextEdit {
+        range: Range::from_text_range(edit.range(), &index, &source, workspace.position_encoding),
+        new_text: edit.content().unwrap_or_default().to_string(),
+    }
+}
+
+/// A code action that can be applied to fix a diagnostic.
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeAction {
+    #[wasm_bindgen(getter_with_clone)]
+    pub title: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub edits: Vec<TextEdit>,
+    pub preferred: bool,
 }
 
 #[wasm_bindgen]
@@ -439,8 +1097,8 @@ impl Range {
         file_range: FileRange,
         position_encoding: PositionEncoding,
     ) -> Self {
-        let index = line_index(db.upcast(), file_range.file());
-        let source = source_text(db.upcast(), file_range.file());
+        let index = line_index(db, file_range.file());
+        let source = source_text(db, file_range.file());
 
         Self::from_text_range(file_range.range(), &index, &source, position_encoding)
     }
@@ -559,6 +1217,44 @@ impl From<diagnostic::Severity> for Severity {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for DiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
 pub struct TextRange {
     pub start: u32,
     pub end: u32,
@@ -593,6 +1289,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct LocationLink {
     /// The target file path
     #[wasm_bindgen(getter_with_clone)]
@@ -604,6 +1301,24 @@ pub struct LocationLink {
     pub selection_range: Option<Range>,
     /// The range of the origin.
     pub origin_selection_range: Option<Range>,
+}
+
+fn location_link_from_navigation_target(
+    target: &NavigationTarget,
+    db: &dyn Db,
+    position_encoding: PositionEncoding,
+    source_range: Option<Range>,
+) -> LocationLink {
+    LocationLink {
+        path: target.file().path(db).to_string(),
+        full_range: Range::from_file_range(db, target.full_file_range(), position_encoding),
+        selection_range: Some(Range::from_file_range(
+            db,
+            FileRange::new(target.file(), target.focus_range()),
+            position_encoding,
+        )),
+        origin_selection_range: source_range,
+    }
 }
 
 #[wasm_bindgen]
@@ -619,16 +1334,261 @@ pub struct Hover {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
-    pub label: String,
+    pub name: String,
+    pub kind: Option<CompletionKind>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub insert_text: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub additional_text_edits: Option<Vec<TextEdit>>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub detail: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub module_name: Option<String>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+impl From<ty_ide::CompletionKind> for CompletionKind {
+    fn from(value: ty_ide::CompletionKind) -> Self {
+        match value {
+            ty_ide::CompletionKind::Text => Self::Text,
+            ty_ide::CompletionKind::Method => Self::Method,
+            ty_ide::CompletionKind::Function => Self::Function,
+            ty_ide::CompletionKind::Constructor => Self::Constructor,
+            ty_ide::CompletionKind::Field => Self::Field,
+            ty_ide::CompletionKind::Variable => Self::Variable,
+            ty_ide::CompletionKind::Class => Self::Class,
+            ty_ide::CompletionKind::Interface => Self::Interface,
+            ty_ide::CompletionKind::Module => Self::Module,
+            ty_ide::CompletionKind::Property => Self::Property,
+            ty_ide::CompletionKind::Unit => Self::Unit,
+            ty_ide::CompletionKind::Value => Self::Value,
+            ty_ide::CompletionKind::Enum => Self::Enum,
+            ty_ide::CompletionKind::Keyword => Self::Keyword,
+            ty_ide::CompletionKind::Snippet => Self::Snippet,
+            ty_ide::CompletionKind::Color => Self::Color,
+            ty_ide::CompletionKind::File => Self::File,
+            ty_ide::CompletionKind::Reference => Self::Reference,
+            ty_ide::CompletionKind::Folder => Self::Folder,
+            ty_ide::CompletionKind::EnumMember => Self::EnumMember,
+            ty_ide::CompletionKind::Constant => Self::Constant,
+            ty_ide::CompletionKind::Struct => Self::Struct,
+            ty_ide::CompletionKind::Event => Self::Event,
+            ty_ide::CompletionKind::Operator => Self::Operator,
+            ty_ide::CompletionKind::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    pub range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    pub new_text: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameEdit {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    pub new_text: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+impl From<ty_ide::InlayHintKind> for InlayHintKind {
+    fn from(kind: ty_ide::InlayHintKind) -> Self {
+        match kind {
+            ty_ide::InlayHintKind::Type => Self::Type,
+            ty_ide::InlayHintKind::CallArgumentName => Self::Parameter,
+        }
+    }
+}
+
+#[wasm_bindgen]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
-    pub markdown: String,
+    pub label: Vec<InlayHintLabelPart>,
 
     pub position: Position,
+
+    pub kind: InlayHintKind,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub text_edits: Vec<TextEdit>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct InlayHintLabelPart {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<LocationLink>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticToken {
+    pub kind: SemanticTokenKind,
+    pub modifiers: u32,
+    pub range: Range,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SignatureHelp {
+    #[wasm_bindgen(getter_with_clone)]
+    pub signatures: Vec<SignatureInformation>,
+    pub active_signature: Option<u32>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SignatureInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub parameters: Vec<ParameterInformation>,
+    pub active_parameter: Option<u32>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct ParameterInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+}
+
+#[wasm_bindgen]
+pub struct DocumentHighlight {
+    #[wasm_bindgen(readonly)]
+    pub range: Range,
+
+    #[wasm_bindgen(readonly)]
+    pub kind: DocumentHighlightKind,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum DocumentHighlightKind {
+    Text = 1,
+    Read = 2,
+    Write = 3,
+}
+
+impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
+    fn from(kind: ty_ide::ReferenceKind) -> Self {
+        match kind {
+            ty_ide::ReferenceKind::Read => DocumentHighlightKind::Read,
+            ty_ide::ReferenceKind::Write => DocumentHighlightKind::Write,
+            ty_ide::ReferenceKind::Other => DocumentHighlightKind::Text,
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl SemanticToken {
+    pub fn kinds() -> Vec<String> {
+        ty_ide::SemanticTokenType::all()
+            .iter()
+            .map(|ty| ty.as_lsp_concept().to_string())
+            .collect()
+    }
+
+    pub fn modifiers() -> Vec<String> {
+        ty_ide::SemanticTokenModifier::all_names()
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum SemanticTokenKind {
+    Namespace,
+    Class,
+    Parameter,
+    SelfParameter,
+    ClsParameter,
+    Variable,
+    Property,
+    Function,
+    Method,
+    Keyword,
+    String,
+    Number,
+    Decorator,
+    BuiltinConstant,
+    TypeParameter,
+}
+
+impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
+    fn from(value: ty_ide::SemanticTokenType) -> Self {
+        match value {
+            ty_ide::SemanticTokenType::Namespace => Self::Namespace,
+            ty_ide::SemanticTokenType::Class => Self::Class,
+            ty_ide::SemanticTokenType::Parameter => Self::Parameter,
+            ty_ide::SemanticTokenType::SelfParameter => Self::SelfParameter,
+            ty_ide::SemanticTokenType::ClsParameter => Self::ClsParameter,
+            ty_ide::SemanticTokenType::Variable => Self::Variable,
+            ty_ide::SemanticTokenType::Property => Self::Property,
+            ty_ide::SemanticTokenType::Function => Self::Function,
+            ty_ide::SemanticTokenType::Method => Self::Method,
+            ty_ide::SemanticTokenType::Keyword => Self::Keyword,
+            ty_ide::SemanticTokenType::String => Self::String,
+            ty_ide::SemanticTokenType::Number => Self::Number,
+            ty_ide::SemanticTokenType::Decorator => Self::Decorator,
+            ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
+            ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -651,6 +1611,16 @@ impl System for WasmSystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> ruff_db::system::Result<SystemPathBuf> {
         self.fs.canonicalize(path)
+    }
+
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
@@ -679,12 +1649,8 @@ impl System for WasmSystem {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -692,6 +1658,10 @@ impl System for WasmSystem {
     }
 
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
         None
     }
 
@@ -708,11 +1678,8 @@ impl System for WasmSystem {
         self.fs.walk_directory(path)
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
-        Ok(Box::new(self.fs.glob(pattern)?))
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        None
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -721,6 +1688,10 @@ impl System for WasmSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 

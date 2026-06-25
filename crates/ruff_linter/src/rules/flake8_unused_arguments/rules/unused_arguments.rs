@@ -36,6 +36,7 @@ use crate::registry::Rule;
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedFunctionArgument {
     name: String,
 }
@@ -59,6 +60,16 @@ impl Violation for UnusedFunctionArgument {
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method (or changing a parameter's
+/// name) may cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused arguments on such methods.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -75,7 +86,10 @@ impl Violation for UnusedFunctionArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedMethodArgument {
     name: String,
 }
@@ -99,6 +113,16 @@ impl Violation for UnusedMethodArgument {
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method (or changing a parameter's
+/// name) may cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused arguments on such methods.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -117,7 +141,10 @@ impl Violation for UnusedMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedClassMethodArgument {
     name: String,
 }
@@ -141,6 +168,16 @@ impl Violation for UnusedClassMethodArgument {
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method (or changing a parameter's
+/// name) may cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method, and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused arguments on such methods.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -159,7 +196,10 @@ impl Violation for UnusedClassMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedStaticMethodArgument {
     name: String,
 }
@@ -199,6 +239,7 @@ impl Violation for UnusedStaticMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedLambdaArgument {
     name: String,
 }
@@ -223,7 +264,7 @@ enum Argumentable {
 
 impl Argumentable {
     fn check_for(self, checker: &Checker, name: String, range: TextRange) {
-        match self {
+        let mut diagnostic = match self {
             Self::Function => checker.report_diagnostic(UnusedFunctionArgument { name }, range),
             Self::Method => checker.report_diagnostic(UnusedMethodArgument { name }, range),
             Self::ClassMethod => {
@@ -234,6 +275,7 @@ impl Argumentable {
             }
             Self::Lambda => checker.report_diagnostic(UnusedLambdaArgument { name }, range),
         };
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 
     const fn rule_code(self) -> Rule {
@@ -250,7 +292,7 @@ impl Argumentable {
 /// Check a plain function for unused arguments.
 fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
     let ignore_variadic_names = checker
-        .settings
+        .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
@@ -276,7 +318,7 @@ fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, 
 /// Check a method for unused arguments.
 fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
     let ignore_variadic_names = checker
-        .settings
+        .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
@@ -307,7 +349,7 @@ fn call<'a>(
     checker: &Checker,
 ) {
     let semantic = checker.semantic();
-    let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
+    let dummy_variable_rgx = &checker.settings().dummy_variable_rgx;
     for arg in parameters {
         let Some(binding) = scope
             .get(arg.name())
@@ -408,11 +450,11 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 decorator_list,
                 parent,
                 checker.semantic(),
-                &checker.settings.pep8_naming.classmethod_decorators,
-                &checker.settings.pep8_naming.staticmethod_decorators,
+                &checker.settings().pep8_naming.classmethod_decorators,
+                &checker.settings().pep8_naming.staticmethod_decorators,
             ) {
                 function_type::FunctionType::Function => {
-                    if checker.enabled(Argumentable::Function.rule_code())
+                    if checker.is_rule_enabled(Argumentable::Function.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
@@ -421,7 +463,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::Method => {
-                    if checker.enabled(Argumentable::Method.rule_code())
+                    if checker.is_rule_enabled(Argumentable::Method.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -435,7 +477,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::ClassMethod => {
-                    if checker.enabled(Argumentable::ClassMethod.rule_code())
+                    if checker.is_rule_enabled(Argumentable::ClassMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -449,7 +491,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::StaticMethod => {
-                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -463,7 +505,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::NewMethod => {
-                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_abstract(decorator_list, checker.semantic())
@@ -479,7 +521,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
         }
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
-                if checker.enabled(Argumentable::Lambda.rule_code()) {
+                if checker.is_rule_enabled(Argumentable::Lambda.rule_code()) {
                     function(Argumentable::Lambda, parameters, scope, checker);
                 }
             }

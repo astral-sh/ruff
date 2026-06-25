@@ -1,5 +1,7 @@
+use std::fs;
+
 pub use project_watcher::ProjectWatcher;
-use ruff_db::system::{SystemPath, SystemPathBuf, SystemVirtualPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPathBuf};
 pub use watcher::{EventHandler, Watcher, directory_watcher};
 
 mod project_watcher;
@@ -130,4 +132,44 @@ pub enum DeletedKind {
     File,
     Directory,
     Any,
+}
+
+/// Best-effort classification of a path at the time a file-watcher event is handled.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ExistingPathKind {
+    File,
+    Directory,
+    Any,
+}
+
+impl ExistingPathKind {
+    pub fn from_system(system: &dyn System, path: &SystemPath) -> Self {
+        match system.path_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_file() => Self::File,
+            Ok(metadata) if metadata.file_type().is_directory() => Self::Directory,
+            Ok(_) | Err(_) => Self::Any,
+        }
+    }
+
+    pub fn from_io_metadata(metadata: &std::io::Result<fs::Metadata>) -> Self {
+        match metadata {
+            Ok(metadata) if metadata.is_file() => Self::File,
+            Ok(metadata) if metadata.is_dir() => Self::Directory,
+            Ok(_) | Err(_) => Self::Any,
+        }
+    }
+
+    pub const fn is_file(self) -> bool {
+        matches!(self, Self::File)
+    }
+}
+
+impl From<ExistingPathKind> for CreatedKind {
+    fn from(value: ExistingPathKind) -> Self {
+        match value {
+            ExistingPathKind::File => Self::File,
+            ExistingPathKind::Directory => Self::Directory,
+            ExistingPathKind::Any => Self::Any,
+        }
+    }
 }

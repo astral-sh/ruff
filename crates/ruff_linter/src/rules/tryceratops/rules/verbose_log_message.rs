@@ -33,7 +33,12 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// except ValueError:
 ///     logger.exception("Found an error")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.250")]
 pub(crate) struct VerboseLogMessage;
 
 impl Violation for VerboseLogMessage {
@@ -51,7 +56,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
         // Find all calls to `logging.exception`.
         let calls = {
             let mut visitor =
-                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings().logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };

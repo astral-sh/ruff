@@ -17,6 +17,7 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
             target,
             value,
             range: _,
+            node_index: _,
         } = item;
 
         // This context, a dangling comment is a comment between the `:=` and the value.
@@ -65,6 +66,7 @@ impl NeedsParentheses for ExprNamed {
             || parent.is_stmt_delete()
             || parent.is_stmt_for()
             || parent.is_stmt_function_def()
+            || parent.is_expr_lambda()
         {
             OptionalParentheses::Always
         } else {

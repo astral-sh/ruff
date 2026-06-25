@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use ruff_db::diagnostic::LintName;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -300,7 +301,7 @@ impl Rule {
             | Rule::TooManyBlankLines
             | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingCommaOnBareTuple
-            | Rule::TypeCommentInStub
+            | Rule::LegacyTypeComment
             | Rule::UselessSemicolon
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
@@ -348,9 +349,18 @@ impl Rule {
 
     /// Return the URL for the rule documentation, if it exists.
     pub fn url(&self) -> Option<String> {
-        self.explanation()
-            .is_some()
-            .then(|| format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.as_ref()))
+        self.explanation().is_some().then(|| {
+            format!(
+                "{}/rules/{name}",
+                env!("CARGO_PKG_HOMEPAGE"),
+                name = self.name()
+            )
+        })
+    }
+
+    pub fn name(&self) -> LintName {
+        let name: &'static str = self.into();
+        LintName::of(name)
     }
 }
 
@@ -372,13 +382,29 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(feature = "clap")]
 pub mod clap_completion {
-    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use clap::builder::{
+        PossibleValue, PossibleValuesParser, TypedValueParser, ValueParserFactory,
+    };
+    use clap::error::ContextKind;
     use strum::IntoEnumIterator;
 
     use crate::registry::Rule;
 
     #[derive(Clone)]
     pub struct RuleParser;
+
+    impl RuleParser {
+        fn values() -> impl Iterator<Item = PossibleValue> {
+            Rule::iter().flat_map(|rule| {
+                let code = rule.noqa_code().to_string();
+                let name = rule.name().as_str();
+                [
+                    PossibleValue::new(&code).help(name),
+                    PossibleValue::new(name).help(code),
+                ]
+            })
+        }
+    }
 
     impl ValueParserFactory for Rule {
         type Parser = RuleParser;
@@ -397,33 +423,17 @@ pub mod clap_completion {
             arg: Option<&clap::Arg>,
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
-            let value = value
-                .to_str()
-                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
-
-            Rule::from_code(value).map_err(|_| {
-                let mut error =
-                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-                if let Some(arg) = arg {
-                    error.insert(
-                        clap::error::ContextKind::InvalidArg,
-                        clap::error::ContextValue::String(arg.to_string()),
-                    );
-                }
-                error.insert(
-                    clap::error::ContextKind::InvalidValue,
-                    clap::error::ContextValue::String(value.to_string()),
-                );
-                error
-            })
+            PossibleValuesParser::new(Self::values())
+                .try_map(|value| Rule::from_code(&value).or_else(|_| Rule::from_name(&value)))
+                .parse_ref(cmd, arg, value)
+                .map_err(|mut error| {
+                    error.remove(ContextKind::ValidValue);
+                    error
+                })
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-            Some(Box::new(Rule::iter().map(|rule| {
-                let name = rule.noqa_code().to_string();
-                let help = rule.as_ref().to_string();
-                PossibleValue::new(name).help(help)
-            })))
+            Some(Box::new(Self::values()))
         }
     }
 }
@@ -443,7 +453,7 @@ mod tests {
             assert!(
                 rule.explanation().is_some(),
                 "Rule {} is missing documentation",
-                rule.as_ref()
+                rule.name()
             );
         }
     }
@@ -460,10 +470,10 @@ mod tests {
             .collect();
 
         for rule in Rule::iter() {
-            let rule_name = rule.as_ref();
+            let rule_name = rule.name();
             for pattern in &patterns {
                 assert!(
-                    !pattern.matches(rule_name),
+                    !pattern.matches(&rule_name),
                     "{rule_name} does not match naming convention, see CONTRIBUTING.md"
                 );
             }

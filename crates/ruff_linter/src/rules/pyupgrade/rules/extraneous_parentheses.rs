@@ -1,7 +1,7 @@
 use std::slice::Iter;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
@@ -25,6 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// print("Hello, world")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.228")]
 pub(crate) struct ExtraneousParentheses;
 
 impl AlwaysFixableViolation for ExtraneousParentheses {
@@ -126,15 +127,16 @@ pub(crate) fn extraneous_parentheses(context: &LintContext, tokens: &Tokens, loc
             continue;
         };
 
-        let mut diagnostic = context.report_diagnostic(
+        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
             ExtraneousParentheses,
             TextRange::new(start_range.start(), end_range.end()),
-        );
-        let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
-        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-            contents[1..contents.len() - 1].to_string(),
-            start_range.start(),
-            end_range.end(),
-        )));
+        ) {
+            let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                contents[1..contents.len() - 1].to_string(),
+                start_range.start(),
+                end_range.end(),
+            )));
+        }
     }
 }

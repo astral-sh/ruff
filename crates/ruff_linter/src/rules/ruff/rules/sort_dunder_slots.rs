@@ -83,6 +83,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// `__slots__` definition occurs, in which case this rule's fix could
 /// theoretically cause breakage.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct UnsortedDunderSlots {
     class_name: ast::name::Name,
 }
@@ -105,6 +106,7 @@ impl Violation for UnsortedDunderSlots {
 
 const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 
+/// RUF023
 /// Sort a tuple, list, dict or set that defines `__slots__` in a class scope.
 ///
 /// This routine checks whether the display is sorted, and emits a
@@ -223,7 +225,11 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Set(ast::ExprSet { elts, range }) => {
+            ast::Expr::Set(ast::ExprSet {
+                elts,
+                range,
+                node_index: _,
+            }) => {
                 let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),

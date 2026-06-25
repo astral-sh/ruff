@@ -5,7 +5,7 @@ use ruff_macros::CacheKey;
 
 use crate::registry::Rule;
 
-const RULESET_SIZE: usize = 15;
+const RULESET_SIZE: usize = 16;
 
 /// A set of [`Rule`]s.
 ///
@@ -302,9 +302,8 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                let name = rule.as_ref();
                 let code = rule.noqa_code();
-                writeln!(f, "\t{name} ({code}),")?;
+                writeln!(f, "\t{name} ({code}),", name = rule.name())?;
             }
             write!(f, "]")?;
         }

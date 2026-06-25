@@ -62,6 +62,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.102")]
 pub(crate) struct FunctionCallInDefaultArgument {
     name: Option<String>,
 }
@@ -132,7 +133,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()

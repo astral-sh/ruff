@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_strings__regression.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -559,6 +558,7 @@ a_dict = {
 }
 
 # Regression test for https://github.com/psf/black/issues/3506.
+# Regressed again by https://github.com/psf/black/pull/4498
 s = (
     "With single quote: ' "
     f" {my_dict['foo']}"
@@ -684,7 +684,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                (
 +                    "xxxxxxxxxx xxxx xx xxxxxx(%x) xx %x xxxx xx xxx %x.xx"
 +                    % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
-                 )
++                )
 +                + (
 +                    " %.3f (%s) to %.3f (%s).\n"
 +                    % (
@@ -693,7 +693,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                        x,
 +                        xxxx.xxxxxxxxxxxxxx(xx),
 +                    )
-+                )
+                 )
              )
  
  
@@ -1171,13 +1171,21 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # Regression test for https://github.com/psf/black/issues/3455.
-@@ -674,7 +621,4 @@
+@@ -673,14 +620,6 @@
+ 
  # Regression test for https://github.com/psf/black/issues/3506.
- s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
+ # Regressed again by https://github.com/psf/black/pull/4498
+-s = (
+-    "With single quote: ' "
+-    f" {my_dict['foo']}"
+-    ' With double quote: " '
+-    f' {my_dict["bar"]}'
+-)
++s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
  
 -s = (
 -    "Lorem Ipsum is simply dummy text of the printing and typesetting"
--    f" industry:'{my_dict['foo']}'"
+-    f' industry:\'{my_dict["foo"]}\''
 -)
 +s = f"Lorem Ipsum is simply dummy text of the printing and typesetting industry:'{my_dict['foo']}'"
 ```
@@ -1806,6 +1814,7 @@ a_dict = {
 }
 
 # Regression test for https://github.com/psf/black/issues/3506.
+# Regressed again by https://github.com/psf/black/pull/4498
 s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
 
 s = f"Lorem Ipsum is simply dummy text of the printing and typesetting industry:'{my_dict['foo']}'"
@@ -2488,10 +2497,16 @@ a_dict = {
 }
 
 # Regression test for https://github.com/psf/black/issues/3506.
-s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
+# Regressed again by https://github.com/psf/black/pull/4498
+s = (
+    "With single quote: ' "
+    f" {my_dict['foo']}"
+    ' With double quote: " '
+    f' {my_dict["bar"]}'
+)
 
 s = (
     "Lorem Ipsum is simply dummy text of the printing and typesetting"
-    f" industry:'{my_dict['foo']}'"
+    f' industry:\'{my_dict["foo"]}\''
 )
 ```

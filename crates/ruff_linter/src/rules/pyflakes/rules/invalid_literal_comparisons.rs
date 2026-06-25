@@ -2,8 +2,8 @@ use anyhow::{Error, bail};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{CmpOp, Expr};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -51,6 +51,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.39")]
 pub(crate) struct IsLiteral {
     cmp_op: IsCmpOp,
 }
@@ -155,11 +156,7 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     // Track the nesting level.
     let mut nesting = 0u32;
 
-    loop {
-        let Some(token) = tok_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = tok_iter.next() {
         match token.kind() {
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
                 nesting = nesting.saturating_add(1);

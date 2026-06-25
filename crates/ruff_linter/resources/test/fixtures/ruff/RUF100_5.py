@@ -19,3 +19,11 @@ def f():
     data = 1
     # line below should autofix to `return data`
     return data  # noqa: RET504 - intentional incorrect noqa, will be removed
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25386
+# )
+# )  # noqa: ERA001
+
+# (
+# (  # noqa: ERA001

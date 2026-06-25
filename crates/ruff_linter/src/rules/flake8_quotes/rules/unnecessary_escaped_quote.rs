@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::super::helpers::{contains_escaped_quote, raw_contents, unescape_string};
+use crate::rules::flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 
 /// ## What it does
 /// Checks for strings that include unnecessarily escaped quotes.
@@ -33,6 +33,7 @@ use super::super::helpers::{contains_escaped_quote, raw_contents, unescape_strin
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryEscapedQuote;
 
 impl AlwaysFixableViolation for UnnecessaryEscapedQuote {
@@ -67,6 +68,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
             ast::StringLikePart::FString(ast::FString {
                 elements,
                 range,
+                node_index: _,
                 flags,
             }) => {
                 check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);
@@ -74,6 +76,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
             ast::StringLikePart::TString(ast::TString {
                 elements,
                 range,
+                node_index: _,
                 flags,
             }) => {
                 check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);

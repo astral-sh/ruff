@@ -3,12 +3,12 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -75,6 +75,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {
@@ -231,7 +232,12 @@ fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
 fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let Expr::Dict(ast::ExprDict { items, range: _ }) = &right {
+    if let Expr::Dict(ast::ExprDict {
+        items,
+        range: _,
+        node_index: _,
+    }) = &right
+    {
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;

@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-379](https://cwe.mitre.org/data/definitions/379.html)
 /// - [Python documentation: `tempfile`](https://docs.python.org/3/library/tempfile.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct HardcodedTempFile {
     string: String,
 }
@@ -84,7 +85,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
 
 fn check(checker: &Checker, value: &str, range: TextRange) {
     if !checker
-        .settings
+        .settings()
         .flake8_bandit
         .hardcoded_tmp_directory
         .iter()

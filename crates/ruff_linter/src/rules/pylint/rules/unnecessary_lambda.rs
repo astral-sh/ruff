@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDef
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `lambda` definitions that consist of a single function call
@@ -38,22 +38,34 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// change the argument names, which can lead to a change in behavior when
 /// callers pass arguments by name.
 ///
-/// For example, replacing `foo = lambda x, y: func(x, y)` with `foo = func`,
-/// where `func` is defined as `def func(a, b): return a + b`, would be a
-/// breaking change for callers that execute the lambda by passing arguments by
-/// name, as in: `foo(x=1, y=2)`. Since `func` does not define the arguments
-/// `x` and `y`, unlike the lambda, the call would raise a `TypeError`.
+/// For example:
+///
+/// ```python
+/// def func(a, b):
+///     return a + b
+///
+///
+/// foo = lambda x, y: func(x, y)
+/// ```
+///
+/// Replacing the assignment to `foo` with `foo = func` would be a breaking
+/// change for callers that execute the lambda by passing arguments by name, as
+/// in: `foo(x=1, y=2)`. Since `func` does not define the arguments `x` and `y`,
+/// unlike the lambda, the call would raise a `TypeError`.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct UnnecessaryLambda;
 
-impl AlwaysFixableViolation for UnnecessaryLambda {
+impl Violation for UnnecessaryLambda {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Lambda may be unnecessary; consider inlining inner function".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Inline function call".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Inline function call".to_string())
     }
 }
 
@@ -63,6 +75,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         parameters,
         body,
         range: _,
+        node_index: _,
     } = lambda;
 
     // The lambda should consist of a single function call.
@@ -198,7 +211,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         finder.names
     };
 
-    for name in names {
+    for name in &names {
         if let Some(binding_id) = checker.semantic().resolve_name(name) {
             let binding = checker.semantic().binding(binding_id);
             if checker.semantic().is_current_scope(binding.scope) {
@@ -208,13 +221,33 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryLambda, lambda.range());
-    diagnostic.set_fix(Fix::applicable_edit(
-        Edit::range_replacement(
-            checker.locator().slice(func.as_ref()).to_string(),
-            lambda.range(),
-        ),
-        Applicability::Unsafe,
-    ));
+    // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.
+    // This is necessary to avoid introducing a change in the behavior of the program.
+    for name in names {
+        if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()) {
+            let binding = checker.semantic().binding(binding_id);
+            if checker
+                .semantic()
+                .current_scope()
+                .shadowed_binding(binding_id)
+                .is_some()
+                && binding
+                    .expression(checker.semantic())
+                    .is_some_and(Expr::is_named_expr)
+            {
+                return;
+            }
+        }
+    }
+
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        if func.is_named_expr() {
+            format!("({})", checker.locator().slice(func.as_ref()))
+        } else {
+            checker.locator().slice(func.as_ref()).to_string()
+        },
+        lambda.range(),
+    )));
 }
 
 /// Identify all `Expr::Name` nodes in an AST.

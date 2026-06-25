@@ -1,10 +1,10 @@
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
-
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -37,9 +37,13 @@ use crate::{Edit, Fix};
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the exception handler contains comments.
+///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.67")]
 pub(crate) struct DuplicateTryBlockException {
     name: String,
     is_star: bool,
@@ -87,6 +91,7 @@ impl Violation for DuplicateTryBlockException {
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.67")]
 pub(crate) struct DuplicateHandlerException {
     pub names: Vec<String>,
 }
@@ -113,6 +118,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
         elts: elts.into_iter().cloned().collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         parenthesized: true,
     }
     .into()
@@ -138,7 +144,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker.enabled(Rule::DuplicateHandlerException) {
+    if checker.is_rule_enabled(Rule::DuplicateHandlerException) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = checker.report_diagnostic(
@@ -151,22 +157,32 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 expr.range(),
             );
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                // Single exceptions don't require parentheses, but since we're _removing_
-                // parentheses, insert whitespace as needed.
-                if let [elt] = unique_elts.as_slice() {
-                    pad(
-                        checker.generator().expr(elt),
-                        expr.range(),
-                        checker.locator(),
-                    )
-                } else {
-                    // Multiple exceptions must always be parenthesized. This is done
-                    // manually as the generator never parenthesizes lone tuples.
-                    format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
-                },
-                expr.range(),
-            )));
+
+            let applicability = if checker.comment_ranges().intersects(expr.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(
+                    // Single exceptions don't require parentheses, but since we're _removing_
+                    // parentheses, insert whitespace as needed.
+                    if let [elt] = unique_elts.as_slice() {
+                        pad(
+                            checker.generator().expr(elt),
+                            expr.range(),
+                            checker.locator(),
+                        )
+                    } else {
+                        // Multiple exceptions must always be parenthesized. This is done
+                        // manually as the generator never parenthesizes lone tuples.
+                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
+                    },
+                    expr.range(),
+                ),
+                applicability,
+            ));
         }
     }
 
@@ -196,6 +212,10 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                 }
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "each distinct exception name updates independent set and map entries"
+                )]
                 for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(expr);
@@ -208,7 +228,11 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
         }
     }
 
-    if checker.enabled(Rule::DuplicateTryBlockException) {
+    if checker.is_rule_enabled(Rule::DuplicateTryBlockException) {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "iteration order does not affect the diagnostics produced"
+        )]
         for (name, exprs) in duplicates {
             for expr in exprs {
                 let is_star = checker

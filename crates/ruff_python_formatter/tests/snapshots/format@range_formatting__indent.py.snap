@@ -67,6 +67,12 @@ def test6 ():
     print("Format" )
     print(3 +  4)<RANGE_END>
     print("Format to fix indentation" )
+
+
+def test7 ():
+    <RANGE_START>print("Format" )
+    print(3 +  4)<RANGE_END>
+    print("Format to fix indentation" )
 ```
 
 ## Outputs
@@ -81,8 +87,9 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = 3.9
+target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -143,6 +150,13 @@ def test5 ():
 
 
 def test6 ():
+
+    print("Format")
+    print(3 + 4)
+    print("Format to fix indentation" )
+
+
+def test7 ():
     print("Format")
     print(3 + 4)
     print("Format to fix indentation" )
@@ -160,8 +174,9 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = 3.9
+target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -222,6 +237,13 @@ def test5 ():
 
 
 def test6 ():
+
+	print("Format")
+	print(3 + 4)
+	print("Format to fix indentation")
+
+
+def test7 ():
 	print("Format")
 	print(3 + 4)
 	print("Format to fix indentation")
@@ -239,8 +261,9 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = 3.9
+target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -301,6 +324,13 @@ def test5 ():
 
 
 def test6 ():
+
+  print("Format")
+  print(3 + 4)
+  print("Format to fix indentation")
+
+
+def test7 ():
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")

@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ipython_help_escape_command_error_recovery_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..52,
+        body: [
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 37..49,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 43..44,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 43..44,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 47..48,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 47..48,
+                                    id: Name("b"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [],
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    node_index: NodeIndex(None),
+                    range: 50..51,
+                    kind: Help,
+                    value: "",
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with (a, ?b)
+  |          ^ Syntax Error: Expected `,`, found `?`
+3 | ?
+  |
+
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with (a, ?b)
+  |             ^ Syntax Error: Expected `:`, found newline
+3 | ?
+  |
+
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with (a, ?b)
+3 | ?
+  | ^ Syntax Error: Expected an indented block after `with` statement
+  |

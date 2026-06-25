@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// When initializing an Airflow Operator, for consistency, the variable
 /// name should match the `task_id` value. This makes it easier to
-/// follow the flow of the DAG.
+/// follow the flow of the Dag.
 ///
 /// ## Example
 /// ```python
@@ -32,6 +32,7 @@ use crate::checkers::ast::Checker;
 /// my_task = PythonOperator(task_id="my_task")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct AirflowVariableNameTaskIdMismatch {
     task_id: String,
 }

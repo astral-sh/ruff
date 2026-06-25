@@ -48,6 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.207")]
 pub(crate) struct YodaConditions {
     suggestion: Option<SourceCodeSnippet>,
 }
@@ -116,6 +117,7 @@ impl From<&Expr> for ConstantLikelihood {
                 op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
                 operand,
                 range: _,
+                node_index: _,
             }) => ConstantLikelihood::from(&**operand),
             _ => ConstantLikelihood::Unlikely,
         }
@@ -144,7 +146,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
         let left = (*comparison.left).clone();
 
         // Copy the right side to the left side.
-        comparison.left = Box::new(comparison.comparisons[0].comparator.clone());
+        *comparison.left = comparison.comparisons[0].comparator.clone();
 
         // Copy the left side to the right side.
         comparison.comparisons[0].comparator = left;

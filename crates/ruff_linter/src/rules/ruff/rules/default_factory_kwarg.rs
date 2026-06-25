@@ -3,6 +3,7 @@ use anyhow::Result;
 use ast::Keyword;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_constant;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -50,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// defaultdict(list)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }
@@ -106,7 +108,8 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
         },
         call.range(),
     );
-    diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
+    diagnostic
+        .try_set_fix(|| convert_to_positional(call, keyword, checker.locator(), checker.tokens()));
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).
@@ -120,7 +123,8 @@ fn is_non_callable_value(value: &Expr) -> bool {
             | Expr::SetComp(_)
             | Expr::DictComp(_)
             | Expr::Generator(_)
-            | Expr::FString(_))
+            | Expr::FString(_)
+            | Expr::TString(_))
 }
 
 /// Generate an [`Expr`] to replace `defaultdict(default_factory=callable)` with
@@ -131,6 +135,7 @@ fn convert_to_positional(
     call: &ast::ExprCall,
     default_factory: &Keyword,
     locator: &Locator,
+    tokens: &Tokens,
 ) -> Result<Fix> {
     if call.arguments.len() == 1 {
         // Ex) `defaultdict(default_factory=list)`
@@ -147,13 +152,14 @@ fn convert_to_positional(
             &call.arguments,
             Parentheses::Preserve,
             locator.contents(),
+            tokens,
         )?;
 
         // Second, insert the value as the first positional argument.
         let insertion_edit = Edit::insertion(
             format!("{}, ", locator.slice(&default_factory.value)),
             call.arguments
-                .arguments_source_order()
+                .iter_source_order()
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("`default_factory` keyword argument not found"))?
                 .start(),

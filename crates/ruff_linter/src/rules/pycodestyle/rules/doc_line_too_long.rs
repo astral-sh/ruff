@@ -72,6 +72,7 @@ use crate::settings::LinterSettings;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.219")]
 pub(crate) struct DocLineTooLong(usize, usize);
 
 impl Violation for DocLineTooLong {
@@ -103,6 +104,7 @@ pub(crate) fn doc_line_too_long(
             &[]
         },
         settings.tab_size,
+        settings.preview,
     ) {
         context.report_diagnostic(
             DocLineTooLong(overlong.width(), limit.value() as usize),

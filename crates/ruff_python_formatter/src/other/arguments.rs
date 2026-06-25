@@ -19,6 +19,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             range,
             args,
             keywords,
+            node_index: _,
         } = item;
         // We have a case with `f()` without any argument, which is a special case because we can
         // have a comment with no node attachment inside:
@@ -60,7 +61,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                     };
                 }
                 _ => {
-                    for arg_or_keyword in item.arguments_source_order() {
+                    for arg_or_keyword in item.iter_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
                                 joiner.entry(arg, &arg.format());

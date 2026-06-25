@@ -25,7 +25,7 @@ def _(
 ):
     def foo(): ...
     def invalid(
-        a_: a,  # error: [invalid-type-form] "Variable of type `type[int]` is not allowed in a type expression"
+        a_: a,  # error: [invalid-type-form] "Variable of type `type[int]` is not allowed in a parameter annotation"
         b_: b,  # error: [invalid-type-form]
         c_: c,  # error: [invalid-type-form]
         d_: d,  # error: [invalid-type-form]
@@ -35,8 +35,8 @@ def _(
         h_: h,  # error: [invalid-type-form]
         i_: typing,  # error: [invalid-type-form]
         j_: foo,  # error: [invalid-type-form]
-        k_: i,  # error: [invalid-type-form] "Variable of type `int` is not allowed in a type expression"
-        l_: j,  # error: [invalid-type-form] "Variable of type `A` is not allowed in a type expression"
+        k_: i,  # error: [invalid-type-form] "Variable of type `int` is not allowed in a parameter annotation"
+        l_: j,  # error: [invalid-type-form] "Variable of type `A` is not allowed in a parameter annotation"
     ):
         reveal_type(a_)  # revealed: Unknown
         reveal_type(b_)  # revealed: Unknown
@@ -48,34 +48,70 @@ def _(
         reveal_type(h_)  # revealed: Unknown
         reveal_type(i_)  # revealed: Unknown
         reveal_type(j_)  # revealed: Unknown
+
+# Inspired by the conformance test suite at
+# https://github.com/python/typing/blob/d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc/conformance/tests/aliases_implicit.py#L88-L122
+B = [x for x in range(42)]
+C = {x for x in range(42)}
+D = {x: y for x, y in enumerate(range(42))}
+E = (x for x in range(42))
+
+def _(
+    b: B,  # error: [invalid-type-form]
+    c: C,  # error: [invalid-type-form]
+    d: D,  # error: [invalid-type-form]
+    e: E,  # error: [invalid-type-form]
+):
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
 ```
 
 ## Invalid AST nodes
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 def bar() -> None:
     return None
 
-async def outer():  # avoid unrelated syntax errors on yield, yield from, and await
+def outer_sync():  # `yield` from is only valid syntax inside a synchronous function
     def _(
-        a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-        b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
-        c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
-        d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
-        e: int | b"foo",  # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
-        f: 1 and 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
-        g: 1 or 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
-        h: (foo := 1),  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
-        i: not 1,  # error: [invalid-type-form] "Unary operations are not allowed in type expressions"
-        j: lambda: 1,  # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
-        k: 1 if True else 2,  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
-        l: await 1,  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
-        m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
-        n: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
-        o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
-        p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-        r: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        a: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in parameter annotations"
+    ): ...
+
+async def baz(): ...
+async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
+    def _(
+        a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+        b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in parameter annotations"
+        c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in parameter annotations"
+        d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a parameter annotation"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
+        e: int | b"foo",
+        f: 1 and 2,  # error: [invalid-type-form] "Boolean operations are not allowed in parameter annotations"
+        g: 1 or 2,  # error: [invalid-type-form] "Boolean operations are not allowed in parameter annotations"
+        h: (foo := 1),  # error: [invalid-type-form] "Named expressions are not allowed in parameter annotations"
+        i: not 1,  # error: [invalid-type-form] "Unary operations are not allowed in parameter annotations"
+        j: lambda: 1,  # error: [invalid-type-form] "`lambda` expressions are not allowed in parameter annotations"
+        k: 1 if True else 2,  # error: [invalid-type-form] "`if` expressions are not allowed in parameter annotations"
+        l: await baz(),  # error: [invalid-type-form] "`await` expressions are not allowed in parameter annotations"
+        m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in parameter annotations"
+        n: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in parameter annotations"
+        o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in parameter annotations"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "F-strings are not allowed in parameter annotations"
+        p: int | f"foo",
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
+        q: [1, 2, 3][1:2],
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
+        r: list[T][int],
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
+        s: list[list[T][int]],
     ):
         reveal_type(a)  # revealed: Unknown
         reveal_type(b)  # revealed: Unknown
@@ -88,22 +124,37 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         reveal_type(i)  # revealed: Unknown
         reveal_type(j)  # revealed: Unknown
         reveal_type(k)  # revealed: Unknown
-        reveal_type(p)  # revealed: Unknown
-        reveal_type(q)  # revealed: int | Unknown
-        reveal_type(r)  # revealed: @Todo(unknown type subscript)
-```
+        reveal_type(l)  # revealed: Unknown
+        reveal_type(m)  # revealed: Unknown
+        reveal_type(n)  # revealed: Unknown
+        reveal_type(o)  # revealed: Unknown
+        reveal_type(p)  # revealed: int | Unknown
+        reveal_type(q)  # revealed: Unknown
 
-## Invalid Collection based AST nodes
+class Mat:
+    def __init__(self, value: int):
+        self.value = value
 
-```py
-def _(
-    a: {1: 2},  # error: [invalid-type-form] "Dict literals are not allowed in type expressions"
-    b: {1, 2},  # error: [invalid-type-form] "Set literals are not allowed in type expressions"
-    c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dict comprehensions are not allowed in type expressions"
-    d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
-    e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
-    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
-    g: [int, str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+    def __matmul__(self, other) -> int:
+        return 42
+
+def invalid_binary_operators(
+    a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in type annotation"
+    b: 3 - 5.0,  # error: [invalid-type-form] "Invalid binary operator `-` in type annotation"
+    c: 4 * -2,  # error: [invalid-type-form] "Invalid binary operator `*` in type annotation"
+    d: Mat(4) @ Mat(2),  # error: [invalid-type-form] "Invalid binary operator `@` in type annotation"
+    e: 10 / 2,  # error: [invalid-type-form] "Invalid binary operator `/` in type annotation"
+    f: 10 % 3,  # error: [invalid-type-form] "Invalid binary operator `%` in type annotation"
+    g: 2**-0.5,  # error: [invalid-type-form] "Invalid binary operator `**` in type annotation"
+    h: 10 // 3,  # error: [invalid-type-form] "Invalid binary operator `//` in type annotation"
+    i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
+    j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
+    k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    l: 5 & 3,
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    m: ~3,
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -112,6 +163,196 @@ def _(
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
     reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
+    reveal_type(i)  # revealed: Unknown
+    reveal_type(j)  # revealed: Unknown
+    reveal_type(k)  # revealed: Unknown
+    reveal_type(l)  # revealed: Unknown
+    reveal_type(m)  # revealed: Unknown
+```
+
+## Error recovery upon encountering invalid AST nodes
+
+Upon encountering an invalid-in-type-expression AST node, we try to avoid cascading diagnostics. For
+example, in this snippet, we only report the the outer list literal is invalid, and ignore the fact
+that there is also an invalid list literal inside the outer list literal node:
+
+```py
+# error: [invalid-type-form]
+x: [[int]]
+```
+
+However, runtime errors inside invalid AST nodes are still reported -- these errors are more serious
+than just "typing spec pedantry":
+
+```py
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [unresolved-reference] "Name `foo` used when not defined"
+x: [[foo]]
+```
+
+But we avoid false-positive diagnostics regarding unresolved references inside string annotations if
+we detect that the string annotation is an invalid type form. These diagnostics would just add
+noise, since stringized annotations are never executed at runtime. The following snippet causes us
+to emit `invalid-type-form`, but we ignore that `foo` is an "unresolved reference" inside the string
+annotation:
+
+```py
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+x: "[[foo]]"
+```
+
+## Multiple starred expressions in a `tuple` specialization
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def f(
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x: tuple[*tuple[int, ...], *tuple[str, ...]],
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
+    y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
+    y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
+    # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
+    z: tuple[*tuple[int, ...], *tuple[str]],
+    z2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str]]],
+):
+    reveal_type(x)  # revealed: tuple[int | str, ...]
+    reveal_type(x2)  # revealed: tuple[int | str, ...]
+    reveal_type(y)  # revealed: tuple[str | int, ...]
+    reveal_type(y2)  # revealed: tuple[str | int, ...]
+    reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(z2)  # revealed: tuple[*tuple[int, ...], str]
+
+T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
+
+def func3(t: tuple[*Ts]):
+    t5: tuple[*tuple[str], *Ts]  # OK
+    t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
+```
+
+## Ellipses in the wrong place in a `tuple` specialization
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+t1: tuple[int, ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t2: tuple[int, int, ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t3: tuple[...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t4: tuple[..., int]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t5: tuple[int, ..., int]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+t6: tuple[*tuple[str], ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+t7: tuple[*tuple[str, ...], ...]
+```
+
+## Invalid AST nodes in string annotations
+
+Invalid AST nodes should also be rejected when they appear in string annotations:
+
+```py
+def bar() -> None:
+    return None
+
+async def baz(): ...
+async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
+    def _(
+        a: "1",  # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+        b: "2.3",  # error: [invalid-type-form] "Float literals are not allowed in parameter annotations"
+        c: "4j",  # error: [invalid-type-form] "Complex literals are not allowed in parameter annotations"
+        d: "True",  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a parameter annotation"
+        e: "1 and 2",  # error: [invalid-type-form] "Boolean operations are not allowed in parameter annotations"
+        f: "1 or 2",  # error: [invalid-type-form] "Boolean operations are not allowed in parameter annotations"
+        g: "(foo := 1)",  # error: [invalid-type-form] "Named expressions are not allowed in parameter annotations"
+        h: "not 1",  # error: [invalid-type-form] "Unary operations are not allowed in parameter annotations"
+        i: "lambda: 1",  # error: [invalid-type-form] "`lambda` expressions are not allowed in parameter annotations"
+        j: "1 if True else 2",  # error: [invalid-type-form] "`if` expressions are not allowed in parameter annotations"
+        k: "await baz()",  # error: [invalid-type-form] "`await` expressions are not allowed in parameter annotations"
+        l: "(yield 1)",  # error: [invalid-type-form] "`yield` expressions are not allowed in parameter annotations"
+        m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in parameter annotations"
+        n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in parameter annotations"
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
+        o: "[1, 2, 3][1:2]",
+        # error: [invalid-type-form] "Only simple names, dotted names and subscripts can be used in parameter annotations"
+        p: list[int].append,
+        # error: [invalid-type-form] "Only simple names, dotted names and subscripts can be used in parameter annotations"
+        q: list[list[int].append],
+    ):
+        reveal_type(a)  # revealed: Unknown
+        reveal_type(b)  # revealed: Unknown
+        reveal_type(c)  # revealed: Unknown
+        reveal_type(d)  # revealed: Unknown
+        reveal_type(e)  # revealed: Unknown
+        reveal_type(f)  # revealed: Unknown
+        reveal_type(g)  # revealed: Unknown
+        reveal_type(h)  # revealed: Unknown
+        reveal_type(i)  # revealed: Unknown
+        reveal_type(j)  # revealed: Unknown
+        reveal_type(k)  # revealed: Unknown
+        reveal_type(l)  # revealed: Unknown
+        reveal_type(m)  # revealed: Unknown
+        reveal_type(n)  # revealed: Unknown
+        reveal_type(o)  # revealed: Unknown
+        reveal_type(p)  # revealed: Unknown
+        reveal_type(q)  # revealed: list[Unknown]
+```
+
+## Invalid Collection based AST nodes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def _(
+    a: {1: 2},  # error: [invalid-type-form] "Dict literals are not allowed in parameter annotations"
+    b: {1, 2},  # error: [invalid-type-form] "Set literals are not allowed in parameter annotations"
+    c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dict comprehensions are not allowed in parameter annotations"
+    d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in parameter annotations"
+    e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in parameter annotations"
+    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in parameter annotations"
+    # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
+    g: [int, str],
+    # error: [invalid-type-form] "Tuple literals are not allowed in this context in a parameter annotation: Did you mean `tuple[int, str]`?"
+    h: (int, str),
+    i: (),  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a parameter annotation: Did you mean `tuple[()]`?"
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
+    reveal_type(i)  # revealed: Unknown
+
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `list[int]`?"
+class name_0[name_2: [int]]:
+    pass
+
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+class name_4[name_1: [{}]]:
+    pass
 ```
 
 ## Diagnostics for common errors
@@ -144,4 +385,75 @@ class Image: ...
 from PIL import Image
 
 def g(x: Image): ...  # error: [invalid-type-form]
+```
+
+### List-literal used when you meant to use a list
+
+```py
+def _(
+    x: [int],  # error: [invalid-type-form]
+) -> [int]:  # error: [invalid-type-form]
+    return x
+
+# No special hints for these: it's unclear what the user meant:
+def _(
+    x: [int, str],  # error: [invalid-type-form]
+) -> [int, str]:  # error: [invalid-type-form]
+    return x
+```
+
+### Tuple-literal used when you meant to use a tuple
+
+```py
+def _(
+    x: (),  # error: [invalid-type-form]
+) -> ():  # error: [invalid-type-form]
+    return x
+```
+
+```py
+def _(
+    x: (int,),  # error: [invalid-type-form]
+) -> (int,):  # error: [invalid-type-form]
+    return x
+```
+
+```py
+def _(
+    x: (int, str),  # error: [invalid-type-form]
+) -> (int, str):  # error: [invalid-type-form]
+    return x
+```
+
+### Dict-literal or set-literal when you meant to use `dict[]`/`set[]`
+
+```py
+def _(
+    x: {int: str},  # error: [invalid-type-form]
+    y: {str},  # error: [invalid-type-form]
+): ...
+```
+
+### Special-cased diagnostic for `callable` used in a type expression
+
+```py
+# error: [invalid-type-form]
+# error: [invalid-type-form]
+def decorator(fn: callable) -> callable:
+    return fn
+```
+
+### AST nodes that are only valid inside `Literal`
+
+```py
+def bad(
+    # error: [invalid-type-form]
+    a: 42,
+    # error: [invalid-type-form]
+    b: b"42",
+    # error: [invalid-type-form]
+    c: True,
+    # error: [invalid-syntax-in-forward-annotation]
+    d: "invalid syntax",
+): ...
 ```

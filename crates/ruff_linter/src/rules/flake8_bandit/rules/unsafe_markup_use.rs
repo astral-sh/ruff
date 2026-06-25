@@ -12,7 +12,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// Checks for non-literal strings being passed to [`markupsafe.Markup`][markupsafe-markup].
 ///
 /// ## Why is this bad?
-/// [`markupsafe.Markup`] does not perform any escaping, so passing dynamic
+/// [`markupsafe.Markup`][markupsafe-markup] does not perform any escaping, so passing dynamic
 /// content, like f-strings, variables or interpolated strings will potentially
 /// lead to XSS vulnerabilities.
 ///
@@ -75,6 +75,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// [markupsafe-markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnsafeMarkupUse {
     name: String,
 }
@@ -90,7 +91,7 @@ impl Violation for UnsafeMarkupUse {
 /// S704
 pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
     if checker
-        .settings
+        .settings()
         .flake8_bandit
         .extend_markup_names
         .is_empty()
@@ -100,7 +101,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if !is_unsafe_call(call, checker.semantic(), checker.settings) {
+    if !is_unsafe_call(call, checker.semantic(), checker.settings()) {
         return;
     }
 
@@ -108,7 +109,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if !is_markup_call(&qualified_name, checker.settings) {
+    if !is_markup_call(&qualified_name, checker.settings()) {
         return;
     }
 

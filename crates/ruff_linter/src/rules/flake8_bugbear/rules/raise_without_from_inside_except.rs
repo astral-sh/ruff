@@ -18,9 +18,11 @@ use crate::checkers::ast::Checker;
 /// printing the stack trace, chained exceptions are displayed in such a way
 /// so as make it easier to trace the exception back to its root cause.
 ///
-/// When raising an exception from within an `except` clause, always include a
-/// `from` clause to facilitate exception chaining. If the exception is not
-/// chained, it will be difficult to trace the exception back to its root cause.
+/// When raising a new exception from within an `except` clause, it's recommended to
+/// include a `from` clause to explicitly set the exception's cause. Without it,
+/// Python will implicitly chain from the current exception (setting `__context__`),
+/// but the `__cause__` attribute won't be set, which may make debugging slightly
+/// more difficult.
 ///
 /// ## Example
 /// ```python
@@ -47,6 +49,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.138")]
 pub(crate) struct RaiseWithoutFromInsideExcept {
     is_star: bool,
 }

@@ -1,15 +1,20 @@
 # `Never`
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 `Never` represents the empty set of values.
 
 ## `Never` is a subtype of every type
 
 The `Never` type is the bottom type of Python's type system. It is a subtype of every type, but no
-type is a subtype of `Never`, except for `Never` itself.
+type is a subtype of `Never`, except for `Never` itself or type variables with upper bound `Never`.
 
 ```py
 from ty_extensions import static_assert, is_subtype_of
-from typing_extensions import Never
+from typing_extensions import Never, TypeVar
 
 class C: ...
 
@@ -19,6 +24,11 @@ static_assert(is_subtype_of(Never, C))
 static_assert(is_subtype_of(Never, Never))
 
 static_assert(not is_subtype_of(int, Never))
+
+T = TypeVar("T", bound=Never)
+
+def _(t: T):
+    static_assert(is_subtype_of(T, Never))
 ```
 
 ## `Never` is assignable to every type
@@ -111,14 +121,14 @@ static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 
 Intersecting with `Never` results in `Never`:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, Intersection
+```pyi
+from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
 class P: ...
 class Q: ...
 
-static_assert(is_equivalent_to(Intersection[P, Never, Q], Never))
+static_assert(is_equivalent_to(P & Never & Q, Never))
 ```
 
 ## `Never` is the complement of `object`
@@ -126,12 +136,12 @@ static_assert(is_equivalent_to(Intersection[P, Never, Q], Never))
 `object` describes the set of all possible values, while `Never` describes the empty set. The two
 types are complements of each other:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, Not
+```pyi
+from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(Not[object], Never))
-static_assert(is_equivalent_to(Not[Never], object))
+static_assert(is_equivalent_to(~object, Never))
+static_assert(is_equivalent_to(~Never, object))
 ```
 
 This duality is also reflected in other facts:

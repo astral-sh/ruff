@@ -19,12 +19,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// foo = 'bar\'s'
+/// foo = "bar\"s"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo = "bar's"
+/// foo = 'bar"s'
 /// ```
 ///
 /// ## Formatter compatibility
@@ -32,8 +32,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// formatter automatically removes unnecessary escapes, making the rule
 /// redundant.
 ///
+/// ## Options
+///
+/// - `lint.flake8-quotes.inline-quotes`
+///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.88")]
 pub(crate) struct AvoidableEscapedQuote;
 
 impl AlwaysFixableViolation for AvoidableEscapedQuote {
@@ -86,7 +91,7 @@ impl<'a, 'b> AvoidableEscapedQuoteChecker<'a, 'b> {
     fn new(checker: &'a Checker<'b>, target_version: PythonVersion) -> Self {
         Self {
             checker,
-            quotes_settings: &checker.settings.flake8_quotes,
+            quotes_settings: &checker.settings().flake8_quotes,
             supports_pep701: target_version.supports_pep_701(),
         }
     }

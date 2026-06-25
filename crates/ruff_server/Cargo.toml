@@ -1,7 +1,7 @@
 [package]
 name = "ruff_server"
-version = "0.2.2"
-publish = false
+version = "0.0.2"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -10,18 +10,19 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-
 [dependencies]
+ruff_db = { workspace = true }
 ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true }
+ruff_markdown = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }
@@ -32,7 +33,7 @@ ignore = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
-regex = { workspace = true }
+memchr = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -43,11 +44,22 @@ tracing = { workspace = true }
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
 
-[dev-dependencies]
-insta = { workspace = true }
-
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }
 
+[dev-dependencies]
+insta = { workspace = true, features = ["filters", "json"] }
+ruff_linter = { workspace = true, features = ["test-rules"] }
+dunce = { workspace = true }
+regex = { workspace = true }
+smallvec = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+test-uv = []
+
 [lints]
 workspace = true
+
+[lib]
+doctest = false

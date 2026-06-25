@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::fs;
 use std::iter;
 use std::path::{Path, PathBuf};
 
@@ -10,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
+use crate::settings::types::IdentifierPattern;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
@@ -64,7 +64,7 @@ pub enum ImportSection {
 impl fmt::Display for ImportSection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}",),
+            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}"),
             Self::UserDefined(string) => fmt::Debug::fmt(string, f),
         }
     }
@@ -101,7 +101,6 @@ pub(crate) fn categorize<'a>(
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,
-    match_source_strategy: MatchSourceStrategy,
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (mut import_type, mut reason) = {
@@ -129,7 +128,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
             )
-        } else if let Some(src) = match_sources(src, module_name, match_source_strategy) {
+        } else if let Some(src) = match_sources(src, module_name) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
@@ -161,61 +160,29 @@ fn same_package(package: Option<PackageRoot<'_>>, module_base: &str) -> bool {
 /// Returns the source path with respect to which the module `name`
 /// should be considered first party, or `None` if no path is found.
 ///
-/// The [`MatchSourceStrategy`] is the criterion used to decide whether
-/// the module path matches a given source directory.
-///
 /// # Examples
 ///
-/// - The module named `foo` will match `[SRC]` if `[SRC]/foo` is a directory,
-///   no matter the strategy.
+/// - The module named `foo` will match `[SRC]` if `[SRC]/foo` is a directory
 ///
-/// - With `match_source_strategy == MatchSourceStrategy::Root`, the module
-///   named `foo.baz` will match `[SRC]` if `[SRC]/foo` is a
-///   directory or `[SRC]/foo.py` exists.
-///
-/// - With `match_source_stratgy == MatchSourceStrategy::FullPath`, the module
-///   named `foo.baz` will match `[SRC]` only if `[SRC]/foo/baz` is a directory,
-///   or `[SRC]/foo/baz.py` exists or `[SRC]/foo/baz.pyi` exists.
-fn match_sources<'a>(
-    paths: &'a [PathBuf],
-    name: &str,
-    match_source_strategy: MatchSourceStrategy,
-) -> Option<&'a Path> {
-    match match_source_strategy {
-        MatchSourceStrategy::Root => {
-            let base = name.split('.').next()?;
-            for path in paths {
-                if let Ok(metadata) = fs::metadata(path.join(base)) {
-                    if metadata.is_dir() {
-                        return Some(path);
-                    }
-                }
-                if let Ok(metadata) = fs::metadata(path.join(format!("{base}.py"))) {
-                    if metadata.is_file() {
-                        return Some(path);
-                    }
-                }
-            }
-            None
+/// - The module named `foo.baz` will match `[SRC]` only if `[SRC]/foo/baz`
+///   is a directory, or `[SRC]/foo/baz.py` exists,
+///   or `[SRC]/foo/baz.pyi` exists.
+fn match_sources<'a>(paths: &'a [PathBuf], name: &str) -> Option<&'a Path> {
+    let relative_path: PathBuf = name.split('.').collect();
+    relative_path.components().next()?;
+    for root in paths {
+        let candidate = root.join(&relative_path);
+        if candidate.is_dir() {
+            return Some(root);
         }
-        MatchSourceStrategy::FullPath => {
-            let relative_path: PathBuf = name.split('.').collect();
-            relative_path.components().next()?;
-            for root in paths {
-                let candidate = root.join(&relative_path);
-                if candidate.is_dir() {
-                    return Some(root);
-                }
-                if ["py", "pyi"]
-                    .into_iter()
-                    .any(|extension| candidate.with_extension(extension).is_file())
-                {
-                    return Some(root);
-                }
-            }
-            None
+        if ["py", "pyi"]
+            .into_iter()
+            .any(|extension| candidate.with_extension(extension).is_file())
+        {
+            return Some(root);
         }
     }
+    None
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -229,10 +196,13 @@ pub(crate) fn categorize_imports<'a>(
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,
-    match_source_strategy: MatchSourceStrategy,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
@@ -245,7 +215,6 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
-            match_source_strategy,
         );
         block_by_type
             .entry(import_type)
@@ -254,6 +223,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert(alias, comments);
     }
     // Categorize `Stmt::ImportFrom` (without re-export).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_name(),
@@ -266,7 +239,6 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
-            match_source_strategy,
         );
         block_by_type
             .entry(classification)
@@ -275,6 +247,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert(import_from, aliases);
     }
     // Categorize `Stmt::ImportFrom` (with re-export).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_name(),
@@ -287,7 +263,6 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
-            match_source_strategy,
         );
         block_by_type
             .entry(classification)
@@ -296,6 +271,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert((import_from, alias), aliases);
     }
     // Categorize `Stmt::ImportFrom` (with star).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
             &import_from.module_name(),
@@ -308,7 +287,6 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
-            match_source_strategy,
         );
         block_by_type
             .entry(classification)
@@ -322,20 +300,20 @@ pub(crate) fn categorize_imports<'a>(
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: Vec<(glob::Pattern, ImportSection)>,
+    known: Vec<(IdentifierPattern, ImportSection)>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
 
 impl KnownModules {
     pub fn new(
-        first_party: Vec<glob::Pattern>,
-        third_party: Vec<glob::Pattern>,
-        local_folder: Vec<glob::Pattern>,
-        standard_library: Vec<glob::Pattern>,
-        user_defined: FxHashMap<String, Vec<glob::Pattern>>,
+        first_party: Vec<IdentifierPattern>,
+        third_party: Vec<IdentifierPattern>,
+        local_folder: Vec<IdentifierPattern>,
+        standard_library: Vec<IdentifierPattern>,
+        user_defined: FxHashMap<String, Vec<IdentifierPattern>>,
     ) -> Self {
-        let known: Vec<(glob::Pattern, ImportSection)> = user_defined
+        let known: Vec<(IdentifierPattern, ImportSection)> = user_defined
             .into_iter()
             .flat_map(|(section, modules)| {
                 modules
@@ -388,7 +366,7 @@ impl KnownModules {
 
     /// Return the [`ImportSection`] for a given module, if it's been categorized as a known module
     /// by the user.
-    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason)> {
+    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason<'_>)> {
         if self.has_submodules {
             // Check all module prefixes from the longest to the shortest (e.g., given
             // `foo.bar.baz`, check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first,
@@ -412,7 +390,7 @@ impl KnownModules {
         }
     }
 
-    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
+    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason<'_>)> {
         let section = self.known.iter().find_map(|(pattern, section)| {
             if pattern.matches(submodule) {
                 Some(section)
@@ -434,8 +412,8 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
-        let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();
+    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&IdentifierPattern>> {
+        let mut user_defined: FxHashMap<&str, Vec<&IdentifierPattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined
@@ -463,25 +441,9 @@ impl fmt::Display for KnownModules {
     }
 }
 
-/// Rule to determine whether a module path matches
-/// a relative path from a source directory.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum MatchSourceStrategy {
-    /// Matches if first term in module path is found in file system
-    ///
-    /// # Example
-    /// Module is `foo.bar.baz` and `[SRC]/foo` exists
-    Root,
-    /// Matches only if full module path is reflected in file system
-    ///
-    /// # Example
-    /// Module is `foo.bar.baz` and `[SRC]/foo/bar/baz` exists
-    FullPath,
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::rules::isort::categorize::{MatchSourceStrategy, match_sources};
+    use crate::rules::isort::categorize::match_sources;
 
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -522,49 +484,17 @@ mod tests {
 
         let paths = vec![project_dir.clone()];
 
-        // Test with Root strategy
-
         assert_eq!(
-            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            match_sources(&paths, "mypackage"),
             Some(project_dir.as_path())
         );
 
         assert_eq!(
-            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::Root),
+            match_sources(&paths, "mypackage.module1"),
             Some(project_dir.as_path())
         );
 
-        assert_eq!(
-            match_sources(&paths, "mypackage.nonexistent", MatchSourceStrategy::Root),
-            Some(project_dir.as_path())
-        );
-
-        assert_eq!(
-            match_sources(&paths, "nonexistent", MatchSourceStrategy::Root),
-            None
-        );
-
-        // Test with FullPath strategy
-
-        assert_eq!(
-            match_sources(&paths, "mypackage", MatchSourceStrategy::FullPath),
-            Some(project_dir.as_path())
-        );
-
-        assert_eq!(
-            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::FullPath),
-            Some(project_dir.as_path())
-        );
-
-        // Differs in behavior from [`MatchSourceStrategy::Root`]
-        assert_eq!(
-            match_sources(
-                &paths,
-                "mypackage.nonexistent",
-                MatchSourceStrategy::FullPath
-            ),
-            None
-        );
+        assert_eq!(match_sources(&paths, "mypackage.nonexistent",), None);
     }
 
     /// Tests a src-based Python package layout:
@@ -588,39 +518,12 @@ mod tests {
 
         let paths = vec![src_dir.clone()];
 
-        // Test with Root strategy
-
         assert_eq!(
-            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            match_sources(&paths, "mypackage.module1"),
             Some(src_dir.as_path())
         );
 
-        assert_eq!(
-            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::Root),
-            Some(src_dir.as_path())
-        );
-
-        assert_eq!(
-            match_sources(&paths, "mypackage.nonexistent", MatchSourceStrategy::Root),
-            Some(src_dir.as_path())
-        );
-
-        // Test with FullPath strategy
-
-        assert_eq!(
-            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::FullPath),
-            Some(src_dir.as_path())
-        );
-
-        // Differs in behavior from [`MatchSourceStrategy::Root`]
-        assert_eq!(
-            match_sources(
-                &paths,
-                "mypackage.nonexistent",
-                MatchSourceStrategy::FullPath
-            ),
-            None
-        );
+        assert_eq!(match_sources(&paths, "mypackage.nonexistent"), None);
     }
 
     /// Tests a nested package layout:
@@ -647,35 +550,13 @@ mod tests {
 
         let paths = vec![project_dir.clone()];
 
-        // Test with Root strategy
         assert_eq!(
-            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            match_sources(&paths, "mypackage.subpackage.module2"),
             Some(project_dir.as_path())
         );
 
         assert_eq!(
-            match_sources(&paths, "mypackage.subpackage", MatchSourceStrategy::Root),
-            Some(project_dir.as_path())
-        );
-
-        // Test with FullPath strategy
-
-        assert_eq!(
-            match_sources(
-                &paths,
-                "mypackage.subpackage.module2",
-                MatchSourceStrategy::FullPath
-            ),
-            Some(project_dir.as_path())
-        );
-
-        // Differs in behavior from [`MatchSourceStrategy::Root`]
-        assert_eq!(
-            match_sources(
-                &paths,
-                "mypackage.subpackage.nonexistent",
-                MatchSourceStrategy::FullPath
-            ),
+            match_sources(&paths, "mypackage.subpackage.nonexistent"),
             None
         );
     }
@@ -699,52 +580,17 @@ mod tests {
         create_file(project_dir.join("namespace/package1/module1.py"));
 
         let paths = vec![project_dir.clone()];
-        // Test with Root strategy
-
         assert_eq!(
-            match_sources(&paths, "namespace", MatchSourceStrategy::Root),
+            match_sources(&paths, "namespace.package1"),
             Some(project_dir.as_path())
         );
 
         assert_eq!(
-            match_sources(&paths, "namespace.package1", MatchSourceStrategy::Root),
+            match_sources(&paths, "namespace.package1.module1"),
             Some(project_dir.as_path())
         );
 
-        assert_eq!(
-            match_sources(
-                &paths,
-                "namespace.package2.module1",
-                MatchSourceStrategy::Root
-            ),
-            Some(project_dir.as_path())
-        );
-
-        // Test with FullPath strategy
-
-        assert_eq!(
-            match_sources(&paths, "namespace.package1", MatchSourceStrategy::FullPath),
-            Some(project_dir.as_path())
-        );
-
-        assert_eq!(
-            match_sources(
-                &paths,
-                "namespace.package1.module1",
-                MatchSourceStrategy::FullPath
-            ),
-            Some(project_dir.as_path())
-        );
-
-        // Differs in behavior from [`MatchSourceStrategy::Root`]
-        assert_eq!(
-            match_sources(
-                &paths,
-                "namespace.package2.module1",
-                MatchSourceStrategy::FullPath
-            ),
-            None
-        );
+        assert_eq!(match_sources(&paths, "namespace.package2.module1"), None);
     }
 
     /// Tests a package with type stubs (.pyi files):
@@ -764,12 +610,11 @@ mod tests {
         create_file(project_dir.join("mypackage/__init__.py"));
         create_file(project_dir.join("mypackage/module1.pyi")); // Only create .pyi file, not .py
 
-        // Test with FullPath strategy
         let paths = vec![project_dir.clone()];
 
         // Module "mypackage.module1" should match project_dir using .pyi file
         assert_eq!(
-            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::FullPath),
+            match_sources(&paths, "mypackage.module1"),
             Some(project_dir.as_path())
         );
     }
@@ -796,30 +641,17 @@ mod tests {
         create_file(project_dir.join("mypackage/feature/__init__.py"));
         create_file(project_dir.join("mypackage/feature/submodule.py"));
 
-        // Test with Root strategy
         let paths = vec![project_dir.clone()];
-
-        // Module "mypackage.feature" should match project_dir (matches the file first)
-        assert_eq!(
-            match_sources(&paths, "mypackage.feature", MatchSourceStrategy::Root),
-            Some(project_dir.as_path())
-        );
-
-        // Test with FullPath strategy
 
         // Module "mypackage.feature" should match project_dir
         assert_eq!(
-            match_sources(&paths, "mypackage.feature", MatchSourceStrategy::FullPath),
+            match_sources(&paths, "mypackage.feature"),
             Some(project_dir.as_path())
         );
 
         // Module "mypackage.feature.submodule" should match project_dir
         assert_eq!(
-            match_sources(
-                &paths,
-                "mypackage.feature.submodule",
-                MatchSourceStrategy::FullPath
-            ),
+            match_sources(&paths, "mypackage.feature.submodule"),
             Some(project_dir.as_path())
         );
     }
@@ -857,13 +689,13 @@ mod tests {
 
         // Module "package1" should match project1_dir
         assert_eq!(
-            match_sources(&paths, "package1", MatchSourceStrategy::Root),
+            match_sources(&paths, "package1"),
             Some(project1_dir.as_path())
         );
 
         // Module "package2" should match project2_dir
         assert_eq!(
-            match_sources(&paths, "package2", MatchSourceStrategy::Root),
+            match_sources(&paths, "package2"),
             Some(project2_dir.as_path())
         );
 
@@ -872,7 +704,7 @@ mod tests {
 
         // Module "package1" should still match project1_dir
         assert_eq!(
-            match_sources(&paths_reversed, "package1", MatchSourceStrategy::Root),
+            match_sources(&paths_reversed, "package1"),
             Some(project1_dir.as_path())
         );
     }
@@ -885,8 +717,7 @@ mod tests {
     ///
     /// In theory this should never happen since we expect
     /// module names to have been normalized by the time we
-    /// call `match_sources`. But it is worth noting that the
-    /// behavior is different depending on the [`MatchSourceStrategy`]
+    /// call `match_sources`.
     #[test]
     fn test_empty_module_name() {
         let temp_dir = tempdir().unwrap();
@@ -894,16 +725,9 @@ mod tests {
 
         create_dir(project_dir.join("mypackage"));
 
-        let paths = vec![project_dir.clone()];
+        let paths = vec![project_dir];
 
-        assert_eq!(
-            match_sources(&paths, "", MatchSourceStrategy::Root),
-            Some(project_dir.as_path())
-        );
-        assert_eq!(
-            match_sources(&paths, "", MatchSourceStrategy::FullPath),
-            None
-        );
+        assert_eq!(match_sources(&paths, ""), None);
     }
 
     /// Tests behavior with an empty list of source paths
@@ -911,14 +735,6 @@ mod tests {
     fn test_empty_paths() {
         let paths: Vec<PathBuf> = vec![];
 
-        // Empty paths should return None
-        assert_eq!(
-            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
-            None
-        );
-        assert_eq!(
-            match_sources(&paths, "mypackage", MatchSourceStrategy::FullPath),
-            None
-        );
+        assert_eq!(match_sources(&paths, "mypackage"), None);
     }
 }

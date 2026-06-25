@@ -29,7 +29,7 @@ It is invalid to parameterize `Annotated` with less than two arguments.
 ```py
 from typing_extensions import Annotated
 
-# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
+# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a parameter annotation"
 def _(x: Annotated):
     reveal_type(x)  # revealed: Unknown
 
@@ -39,17 +39,19 @@ def _(flag: bool):
     else:
         X = bool
 
-    # error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
+    # error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a parameter annotation"
     def f(y: X):
         reveal_type(y)  # revealed: Unknown | bool
 
-# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
+# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a parameter annotation"
 def _(x: Annotated | bool):
     reveal_type(x)  # revealed: Unknown | bool
 
-# error: [invalid-type-form]
-def _(x: Annotated[()]):
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+def _(x: Annotated[()], y: list[Annotated[()]]):
     reveal_type(x)  # revealed: Unknown
+    reveal_type(y)  # revealed: list[Unknown]
 
 # error: [invalid-type-form]
 def _(x: Annotated[int]):
@@ -71,22 +73,39 @@ def _(x: Annotated[(int,)]):
 Inheriting from `Annotated[T, ...]` is equivalent to inheriting from `T` itself.
 
 ```py
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Any
+from ty_extensions import reveal_mro
 
 class C(Annotated[int, "foo"]): ...
 
-# TODO: Should be `tuple[Literal[C], Literal[int], Literal[object]]`
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, @Todo(Inference of subscript on special form), <class 'object'>]
+# revealed: (<class 'C'>, <class 'int'>, <class 'object'>)
+reveal_mro(C)
+
+class D(Annotated[list[str], "foo"]): ...
+
+# revealed: (<class 'D'>, <class 'list[str]'>, <class 'MutableSequence[str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(D)
+
+class E(Annotated[list["E"], "metadata"]): ...
+
+# error: [revealed-type] "Revealed MRO: (<class 'E'>, <class 'list[E]'>, <class 'MutableSequence[E]'>, <class 'Sequence[E]'>, <class 'Reversible[E]'>, <class 'Collection[E]'>, <class 'Iterable[E]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)"
+reveal_mro(E)
+
+class F(Annotated[Any, "metadata"]): ...
+
+# revealed: (<class 'F'>, Any, <class 'object'>)
+reveal_mro(F)
 ```
 
 ### Not parameterized
 
 ```py
 from typing_extensions import Annotated
+from ty_extensions import reveal_mro
 
 # At runtime, this is an error.
 # error: [invalid-base]
 class C(Annotated): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 ```

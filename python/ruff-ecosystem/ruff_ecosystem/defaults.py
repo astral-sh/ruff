@@ -23,6 +23,12 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
+        config_overrides={
+            # Broken symlink
+            "exclude": [
+                "task-sdk/src/airflow/sdk/_shared/AGENTS.md",
+            ]
+        },
     ),
     Project(
         repo=Repository(owner="apache", name="superset", ref="master"),
@@ -129,6 +135,14 @@ DEFAULT_TARGETS = [
                 "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb",
             ],
         },
+        format_options=FormatOptions(
+            exclude=(
+                "examples/mcp/databricks_mcp_cookbook.ipynb,"
+                "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb,"
+                "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb,"
+                "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb,"
+            )
+        ),
     ),
     Project(repo=Repository(owner="agronholm", name="anyio", ref="master")),
     Project(repo=Repository(owner="python-trio", name="trio", ref="main")),
@@ -143,4 +157,5 @@ DEFAULT_TARGETS = [
     ),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
     Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
+    Project(repo=Repository(owner="home-assistant", name="core", ref="dev")),
 ]

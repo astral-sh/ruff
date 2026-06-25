@@ -56,3 +56,45 @@ class A6(abc.ABC):
 class A7(B0, abc.ABC, B1):
     @abstractmethod
     def foo(self): pass
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/17162
+class A8(abc.ABC, metaclass=ABCMeta):  # FURB180
+    @abstractmethod
+    def foo(self):
+        pass
+
+
+def a9():
+    from abc import ABC
+
+    class A9(ABC, metaclass=ABCMeta):  # FURB180
+        @abstractmethod
+        def foo(self):
+            pass
+
+
+def a10():
+    from abc import ABC as ABCAlternativeName
+
+    class A10(ABCAlternativeName, metaclass=ABCMeta):  # FURB180
+        @abstractmethod
+        def foo(self):
+            pass
+
+
+class MyMetaClass(abc.ABC): ...
+
+
+class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
+    @abstractmethod
+    def foo(self):
+        pass
+
+
+class A12(
+    keyword_argument=1,
+    # comment
+    metaclass=abc.ABCMeta,
+):  # FURB180
+    pass

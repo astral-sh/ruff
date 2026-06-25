@@ -9,7 +9,7 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
@@ -27,10 +27,11 @@ mod tests {
             Path::new("perflint").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY310),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
+    #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
     // TODO: remove this test case when the fixes for `perf401` and `perf403` are stabilized
     #[test_case(Rule::ManualDictComprehension, Path::new("PERF403.py"))]
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
@@ -48,7 +49,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
-use super::super::settings::Quote;
+use crate::rules::flake8_quotes::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,
@@ -37,6 +37,7 @@ use super::super::settings::Quote;
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.88")]
 pub(crate) struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
@@ -94,6 +95,7 @@ impl Violation for BadQuotesInlineString {
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.88")]
 pub(crate) struct BadQuotesMultilineString {
     preferred_quote: Quote,
 }
@@ -149,6 +151,7 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.88")]
 pub(crate) struct BadQuotesDocstring {
     preferred_quote: Quote,
 }
@@ -251,7 +254,7 @@ fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool
 
 /// Q002
 fn docstring(checker: &Checker, range: TextRange) {
-    let quotes_settings = &checker.settings.flake8_quotes;
+    let quotes_settings = &checker.settings().flake8_quotes;
     let locator = checker.locator();
 
     let text = locator.slice(range);
@@ -302,7 +305,7 @@ fn docstring(checker: &Checker, range: TextRange) {
 
 /// Q000, Q001
 fn strings(checker: &Checker, sequence: &[TextRange]) {
-    let quotes_settings = &checker.settings.flake8_quotes;
+    let quotes_settings = &checker.settings().flake8_quotes;
     let locator = checker.locator();
 
     let trivia = sequence
@@ -332,7 +335,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
     for (range, trivia) in sequence.iter().zip(trivia) {
         if trivia.is_multiline {
             // If multiline strings aren't enforced, ignore it.
-            if !checker.enabled(Rule::BadQuotesMultilineString) {
+            if !checker.is_rule_enabled(Rule::BadQuotesMultilineString) {
                 continue;
             }
 
@@ -377,7 +380,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
             && !relax_quote
         {
             // If inline strings aren't enforced, ignore it.
-            if !checker.enabled(Rule::BadQuotesInlineString) {
+            if !checker.is_rule_enabled(Rule::BadQuotesInlineString) {
                 continue;
             }
 
@@ -454,13 +457,14 @@ pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     let ranges: Vec<_> = string_like.parts().map(|part| part.range()).collect();
 
     if checker.semantic().in_pep_257_docstring() {
-        if checker.enabled(Rule::BadQuotesDocstring) {
+        if checker.is_rule_enabled(Rule::BadQuotesDocstring) {
             for range in ranges {
                 docstring(checker, range);
             }
         }
     } else {
-        if checker.any_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString]) {
+        if checker.any_rule_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString])
+        {
             strings(checker, &ranges);
         }
     }

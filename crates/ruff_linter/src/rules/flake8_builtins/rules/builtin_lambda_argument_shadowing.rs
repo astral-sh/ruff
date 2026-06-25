@@ -21,6 +21,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## Options
 /// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct BuiltinLambdaArgumentShadowing {
     name: String,
 }
@@ -43,7 +44,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
         if shadows_builtin(
             name,
             checker.source_type,
-            &checker.settings.flake8_builtins.ignorelist,
+            &checker.settings().flake8_builtins.ignorelist,
             checker.target_version(),
         ) {
             checker.report_diagnostic(

@@ -110,3 +110,28 @@ class ShouldMatchB008RuleOfImmutableTypeAnnotationIgnored:
     # ignored
     this_is_fine: int = f()
 
+
+# Test for:
+# https://github.com/astral-sh/ruff/issues/17424
+@dataclass(frozen=True)
+class C:
+    foo: int = 1
+
+
+@dataclass
+class D:
+    c: C = C()
+
+
+@dataclass
+class E:
+    c: C = C()
+
+# https://github.com/astral-sh/ruff/issues/20266
+@dataclass(frozen=True)
+class C:
+    @dataclass(frozen=True)
+    class D:
+        foo: int = 1
+
+    d: D = D() # OK

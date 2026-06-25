@@ -31,10 +31,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.191")]
 pub(crate) struct MultipleImportsOnOneLine;
 
 impl Violation for MultipleImportsOnOneLine {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -75,6 +76,7 @@ fn split_imports(
             .map(|alias| {
                 let Alias {
                     range: _,
+                    node_index: _,
                     name,
                     asname,
                 } = alias;
@@ -99,6 +101,7 @@ fn split_imports(
             .map(|alias| {
                 let Alias {
                     range: _,
+                    node_index: _,
                     name,
                     asname,
                 } = alias;

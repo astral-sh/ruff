@@ -7,7 +7,7 @@ use ruff_python_semantic::{Modules, SemanticModel, analyze};
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks that a `__str__` method is defined in Django models.
@@ -41,6 +41,7 @@ use super::helpers;
 ///         return f"{self.field}"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.246")]
 pub(crate) struct DjangoModelWithoutDunderStr;
 
 impl Violation for DjangoModelWithoutDunderStr {
@@ -69,7 +70,7 @@ pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtC
 
 /// Returns `true` if the class has `__str__` method.
 fn has_dunder_method(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_super_class(class_def, semantic, &|class_def| {
+    analyze::class::any_super_class(class_def, semantic, |class_def| {
         class_def.body.iter().any(|val| match val {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name == "__str__",
             _ => false,
@@ -96,22 +97,42 @@ fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
             continue;
         }
         for element in body {
-            let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = element else {
-                continue;
-            };
-            for target in targets {
-                let Expr::Name(ast::ExprName { id, .. }) = target else {
-                    continue;
-                };
-                if id != "abstract" {
-                    continue;
+            match element {
+                Stmt::Assign(ast::StmtAssign { targets, value, .. })
+                    if targets
+                        .iter()
+                        .any(|target| is_abstract_true_assignment(target, Some(value))) =>
+                {
+                    return true;
                 }
-                if !is_const_true(value) {
-                    continue;
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. })
+                    if is_abstract_true_assignment(target, value.as_deref()) =>
+                {
+                    return true;
                 }
-                return true;
+                _ => {}
             }
         }
     }
     false
+}
+
+fn is_abstract_true_assignment(target: &Expr, value: Option<&Expr>) -> bool {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return false;
+    };
+
+    if id != "abstract" {
+        return false;
+    }
+
+    let Some(value) = value else {
+        return false;
+    };
+
+    if !is_const_true(value) {
+        return false;
+    }
+
+    true
 }

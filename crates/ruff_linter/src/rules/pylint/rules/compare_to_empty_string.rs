@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [#4282]: https://github.com/astral-sh/ruff/issues/4282
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.255")]
 pub(crate) struct CompareToEmptyString {
     existing: String,
     replacement: String,
@@ -53,7 +54,7 @@ impl Violation for CompareToEmptyString {
             existing,
             replacement,
         } = self;
-        format!("`{existing}` can be simplified to `{replacement}` as an empty string is falsey",)
+        format!("`{existing}` can be simplified to `{replacement}` as an empty string is falsey")
     }
 }
 

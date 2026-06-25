@@ -1,0 +1,26 @@
+{
+  "enabledPlugins": {
+    "ty-skills@ruff-agent-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "ruff-agent-skills": {
+      "source": {
+        "source": "directory",
+        "path": ".agents"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -6,7 +6,7 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_slots::rules::helpers::has_slots;
+use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does
 /// Checks for subclasses of `collections.namedtuple` or `typing.NamedTuple`
@@ -47,6 +47,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 
 impl Violation for NoSlotsInNamedtupleSubclass {

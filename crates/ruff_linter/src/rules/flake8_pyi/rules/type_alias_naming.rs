@@ -14,14 +14,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// type_alias_name: TypeAlias = int
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.265")]
 pub(crate) struct SnakeCaseTypeAlias {
     name: String,
 }
@@ -61,6 +66,7 @@ impl Violation for SnakeCaseTypeAlias {
 /// ## References
 /// - [PEP 484: Type Aliases](https://peps.python.org/pep-0484/#type-aliases)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.265")]
 pub(crate) struct TSuffixedTypeAlias {
     name: String,
 }

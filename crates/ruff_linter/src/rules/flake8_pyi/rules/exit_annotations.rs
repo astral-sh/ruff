@@ -47,6 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     ) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct BadExitAnnotation {
     func_kind: FuncKind,
     error_kind: ErrorKind,
@@ -347,6 +348,7 @@ fn check_positional_args_for_overloaded_method(
         // If any overloads have any variadic arguments, don't do any checking
         let Parameters {
             range: _,
+            node_index: _,
             posonlyargs,
             args,
             vararg: None,

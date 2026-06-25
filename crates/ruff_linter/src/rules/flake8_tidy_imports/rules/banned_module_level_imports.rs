@@ -43,6 +43,7 @@ use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, 
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-module-level-imports`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct BannedModuleLevelImports {
     name: String,
 }
@@ -64,7 +65,7 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
     for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
         if let Some(banned_module) = policy.find(
             checker
-                .settings
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {

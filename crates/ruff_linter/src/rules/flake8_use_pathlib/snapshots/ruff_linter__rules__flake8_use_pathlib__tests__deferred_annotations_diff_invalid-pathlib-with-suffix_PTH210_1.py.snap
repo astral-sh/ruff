@@ -1,0 +1,88 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.14
+
+--- Summary ---
+Removed: 6
+Added: 0
+
+--- Removed ---
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210_1.py:13:5
+   |
+11 | def test_path(p: Path) -> None:
+12 |     ## Errors
+13 |     p.with_suffix(".")
+   |     ^^^^^^^^^^^^^^^^^^
+14 |     p.with_suffix("py")
+15 |     p.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210_1.py:31:5
+   |
+29 | def test_posix_path(p: PosixPath) -> None:
+30 |     ## Errors
+31 |     p.with_suffix(".")
+   |     ^^^^^^^^^^^^^^^^^^
+32 |     p.with_suffix("py")
+33 |     p.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210_1.py:49:5
+   |
+47 | def test_pure_path(p: PurePath) -> None:
+48 |     ## Errors
+49 |     p.with_suffix(".")
+   |     ^^^^^^^^^^^^^^^^^^
+50 |     p.with_suffix("py")
+51 |     p.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210_1.py:67:5
+   |
+65 | def test_pure_posix_path(p: PurePosixPath) -> None:
+66 |     ## Errors
+67 |     p.with_suffix(".")
+   |     ^^^^^^^^^^^^^^^^^^
+68 |     p.with_suffix("py")
+69 |     p.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210_1.py:85:5
+   |
+83 | def test_pure_windows_path(p: PureWindowsPath) -> None:
+84 |     ## Errors
+85 |     p.with_suffix(".")
+   |     ^^^^^^^^^^^^^^^^^^
+86 |     p.with_suffix("py")
+87 |     p.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+   --> PTH210_1.py:103:5
+    |
+101 | def test_windows_path(p: WindowsPath) -> None:
+102 |     ## Errors
+103 |     p.with_suffix(".")
+    |     ^^^^^^^^^^^^^^^^^^
+104 |     p.with_suffix("py")
+105 |     p.with_suffix(r"s")
+    |
+help: Remove "." or extend to valid suffix

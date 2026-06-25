@@ -7,3 +7,11 @@ from io import open
 
 with open("f.txt") as f:
     print(f.read())
+
+
+with (
+    io  # text
+    # text
+    .open("file.txt") as f
+):
+    ...

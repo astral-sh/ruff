@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.116")]
 pub(crate) struct FStringDocstring;
 
 impl Violation for FStringDocstring {
@@ -45,7 +46,12 @@ pub(crate) fn f_string_docstring(checker: &Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return;
     };
     if !value.is_f_string_expr() {

@@ -19,16 +19,23 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import time
+///
+///
 /// async def fetch():
 ///     time.sleep(1)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def fetch():
 ///     await asyncio.sleep(1)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BlockingSleepInAsyncFunction;
 
 impl Violation for BlockingSleepInAsyncFunction {

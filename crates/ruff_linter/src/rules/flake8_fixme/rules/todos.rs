@@ -23,6 +23,7 @@ use crate::directives::{TodoComment, TodoDirectiveKind};
 ///     return f"Hello, {name}!"  # TODO: Add support for custom greetings.
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.272")]
 pub(crate) struct LineContainsTodo;
 impl Violation for LineContainsTodo {
     #[derive_message_formats]
@@ -49,6 +50,7 @@ impl Violation for LineContainsTodo {
 ///     return distance / time  # FIXME: Raises ZeroDivisionError for time = 0.
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.272")]
 pub(crate) struct LineContainsFixme;
 impl Violation for LineContainsFixme {
     #[derive_message_formats]
@@ -72,6 +74,7 @@ impl Violation for LineContainsFixme {
 ///     return distance / time  # XXX: Raises ZeroDivisionError for time = 0.
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.272")]
 pub(crate) struct LineContainsXxx;
 impl Violation for LineContainsXxx {
     #[derive_message_formats]
@@ -107,6 +110,7 @@ impl Violation for LineContainsXxx {
 ///         return False
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.272")]
 pub(crate) struct LineContainsHack;
 impl Violation for LineContainsHack {
     #[derive_message_formats]
@@ -120,19 +124,19 @@ pub(crate) fn todos(context: &LintContext, directive_ranges: &[TodoComment]) {
         match directive.kind {
             // FIX001
             TodoDirectiveKind::Fixme => {
-                context.report_diagnostic(LineContainsFixme, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsFixme, directive.range);
             }
             // FIX002
             TodoDirectiveKind::Hack => {
-                context.report_diagnostic(LineContainsHack, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsHack, directive.range);
             }
             // FIX003
             TodoDirectiveKind::Todo => {
-                context.report_diagnostic(LineContainsTodo, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsTodo, directive.range);
             }
             // FIX004
             TodoDirectiveKind::Xxx => {
-                context.report_diagnostic(LineContainsXxx, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsXxx, directive.range);
             }
         }
     }

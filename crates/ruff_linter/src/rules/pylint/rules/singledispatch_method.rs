@@ -42,7 +42,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as migrating from `@singledispatch` to
 /// `@singledispatchmethod` may change the behavior of the code.
+///
+/// ## Options
+///
+/// This rule applies to regular, static, and class methods. You can customize how Ruff categorizes
+/// methods with the following options:
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct SingledispatchMethod;
 
 impl Violation for SingledispatchMethod {
@@ -58,7 +67,7 @@ impl Violation for SingledispatchMethod {
     }
 }
 
-/// E1519
+/// PLE1519
 pub(crate) fn singledispatch_method(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
@@ -79,8 +88,8 @@ pub(crate) fn singledispatch_method(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(
         type_,

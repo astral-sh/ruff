@@ -31,6 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct ShebangLeadingWhitespace;
 
 impl AlwaysFixableViolation for ShebangLeadingWhitespace {
@@ -65,7 +66,9 @@ pub(crate) fn shebang_leading_whitespace(
     }
 
     let prefix = TextRange::up_to(range.start());
-    context
-        .report_diagnostic(ShebangLeadingWhitespace, prefix)
-        .set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
+    if let Some(mut diagnostic) =
+        context.report_diagnostic_if_enabled(ShebangLeadingWhitespace, prefix)
+    {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
+    }
 }

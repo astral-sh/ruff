@@ -1,5 +1,8 @@
 use std::string::ToString;
 
+use ruff_diagnostics::Applicability;
+use ruff_python_ast::helpers::contains_effect;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -10,12 +13,12 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Fix, FixAvailability, Violation};
 
-use super::super::cformat::CFormatSummary;
-use super::super::fixes::{
+use crate::rules::pyflakes::cformat::CFormatSummary;
+use crate::rules::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
     remove_unused_positional_arguments_from_format_call,
 };
-use super::super::format::FormatSummary;
+use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does
 /// Checks for invalid `printf`-style format strings.
@@ -37,6 +40,7 @@ use super::super::format::FormatSummary;
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatInvalidFormat {
     pub(crate) message: String,
 }
@@ -76,6 +80,7 @@ impl Violation for PercentFormatInvalidFormat {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatExpectedMapping;
 
 impl Violation for PercentFormatExpectedMapping {
@@ -112,6 +117,7 @@ impl Violation for PercentFormatExpectedMapping {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatExpectedSequence;
 
 impl Violation for PercentFormatExpectedSequence {
@@ -138,9 +144,20 @@ impl Violation for PercentFormatExpectedSequence {
 /// "Hello, %(name)s" % {"name": "World"}
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe for mapping key
+/// containing function calls with potential side effects,
+/// because removing such arguments could change the behavior of the code.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
+/// ```
+///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
 }
@@ -181,6 +198,7 @@ impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatMissingArgument {
     missing: Vec<String>,
 }
@@ -221,6 +239,7 @@ impl Violation for PercentFormatMissingArgument {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatMixedPositionalAndNamed;
 
 impl Violation for PercentFormatMixedPositionalAndNamed {
@@ -251,6 +270,7 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatPositionalCountMismatch {
     wanted: usize,
     got: usize,
@@ -289,6 +309,7 @@ impl Violation for PercentFormatPositionalCountMismatch {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatStarRequiresSequence;
 
 impl Violation for PercentFormatStarRequiresSequence {
@@ -319,6 +340,7 @@ impl Violation for PercentFormatStarRequiresSequence {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.142")]
 pub(crate) struct PercentFormatUnsupportedFormatCharacter {
     pub(crate) char: char,
 }
@@ -350,6 +372,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.138")]
 pub(crate) struct StringDotFormatInvalidFormat {
     pub(crate) message: String,
 }
@@ -379,9 +402,20 @@ impl Violation for StringDotFormatInvalidFormat {
 /// "Hello, {name}".format(name="World")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if the unused keyword argument
+/// contains a function call with potential side effects,
+/// because removing such arguments could change the behavior of the code.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, {name}".format(greeting=print(1), name="World")
+/// ```
+///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatExtraNamedArguments {
     missing: Vec<Name>,
 }
@@ -420,9 +454,20 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// "Hello, {0}".format("world")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if the unused positional argument
+/// contains a function call with potential side effects,
+/// because removing such arguments could change the behavior of the code.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, {0}".format("world", print(1))
+/// ```
+///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
 }
@@ -466,6 +511,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatMissingArguments {
     missing: Vec<String>,
 }
@@ -504,6 +550,7 @@ impl Violation for StringDotFormatMissingArguments {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct StringDotFormatMixingAutomatic;
 
 impl Violation for StringDotFormatMixingAutomatic {
@@ -603,15 +650,24 @@ pub(crate) fn percent_format_extra_named_arguments(
         PercentFormatExtraNamedArguments { missing: names },
         location,
     );
-    let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+
     diagnostic.try_set_fix(|| {
+        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
         let edit = remove_unused_format_arguments_from_dict(
             &indexes,
             dict,
             checker.locator(),
             checker.stylist(),
         )?;
-        Ok(Fix::safe_edit(edit))
+        Ok(Fix::applicable_edit(
+            edit,
+            // Mark fix as unsafe if `dict` contains a call with side effect
+            if contains_effect(right, |id| checker.semantic().has_builtin_binding(id)) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ))
     });
 }
 
@@ -702,6 +758,28 @@ pub(crate) fn percent_format_positional_count_mismatch(
                 location,
             );
         }
+    } else if let ResolvedPythonType::Atom(resolved_type) = ResolvedPythonType::from(right) {
+        // If we can infer a concrete non-tuple type for the RHS, it's always
+        // a single positional argument. Variables, attribute accesses, calls,
+        // etc. resolve to `Unknown` and are not flagged because they could be
+        // tuples at runtime.
+        if resolved_type != PythonType::Tuple && summary.num_positional != 1 {
+            checker.report_diagnostic(
+                PercentFormatPositionalCountMismatch {
+                    wanted: summary.num_positional,
+                    got: 1,
+                },
+                location,
+            );
+        }
+    } else if summary.num_positional == 0 {
+        // When the format string has no placeholders, only `()` or `{}` would
+        // succeed at runtime. The chance that this is intentional is very low,
+        // so flag any RHS that isn't an empty tuple or empty dict literal.
+        checker.report_diagnostic(
+            PercentFormatPositionalCountMismatch { wanted: 0, got: 1 },
+            location,
+        );
     }
 }
 
@@ -734,16 +812,19 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let keywords = keywords
+    let keyword_names = keywords
         .iter()
-        .filter_map(|Keyword { arg, .. }| arg.as_ref());
+        .filter_map(|Keyword { arg, value, .. }| Some((arg.as_ref()?, value)));
 
-    let missing: Vec<(usize, &Name)> = keywords
+    let mut side_effects = false;
+    let missing: Vec<(usize, &Name)> = keyword_names
         .enumerate()
-        .filter_map(|(index, keyword)| {
+        .filter_map(|(index, (keyword, value))| {
             if summary.keywords.contains(keyword.id()) {
                 None
             } else {
+                side_effects |=
+                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id));
                 Some((index, &keyword.id))
             }
         })
@@ -758,7 +839,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
     );
-    let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+    let indexes: Vec<usize> = missing.into_iter().map(|(index, _)| index).collect();
     diagnostic.try_set_fix(|| {
         let edit = remove_unused_keyword_arguments_from_format_call(
             &indexes,
@@ -766,7 +847,16 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             checker.locator(),
             checker.stylist(),
         )?;
-        Ok(Fix::safe_edit(edit))
+
+        Ok(Fix::applicable_edit(
+            edit,
+            // Mark fix as unsafe if the `format` call contains an argument with side effect
+            if side_effects {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ))
     });
 }
 
@@ -802,13 +892,17 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         true
     }
 
+    let mut side_effects = false;
     let missing: Vec<usize> = args
         .iter()
         .enumerate()
         .filter(|(i, arg)| {
             !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
         })
-        .map(|(i, _)| i)
+        .map(|(i, arg)| {
+            side_effects |= contains_effect(arg, |id| checker.semantic().has_builtin_binding(id));
+            i
+        })
         .collect();
 
     if missing.is_empty() {
@@ -833,7 +927,15 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 checker.locator(),
                 checker.stylist(),
             )?;
-            Ok(Fix::safe_edit(edit))
+            Ok(Fix::applicable_edit(
+                edit,
+                // Mark fix as unsafe if the `format` call contains an argument with side effect
+                if side_effects {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ))
         });
     }
 }

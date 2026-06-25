@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Path::new("COM81.py"))]
     #[test_case(Path::new("COM81_syntax_error.py"))]
@@ -24,7 +24,7 @@ mod tests {
                 Rule::ProhibitedTrailingComma,
             ]),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

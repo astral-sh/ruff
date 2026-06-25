@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
@@ -37,7 +38,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     filename = filename.removesuffix(".txt")
 ///     text = text.removeprefix("pre")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
     affix_kind: AffixKind,
     stmt_or_expression: StmtOrExpr,
@@ -88,11 +93,16 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_expr.start(),
-                if_expr.end(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(if_expr.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::replacement(replacement, if_expr.start(), if_expr.end()),
+                applicability,
+            ));
         }
     }
 }
@@ -121,11 +131,16 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_stmt.start(),
-                if_stmt.end(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(if_stmt.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::replacement(replacement, if_stmt.start(), if_stmt.end()),
+                applicability,
+            ));
         }
     }
 }
@@ -139,12 +154,13 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>> {
     let ast::ExprIf {
         test,
         body,
         orelse,
         range: _,
+        node_index: _,
     } = if_expr;
 
     let ast::ExprSubscript { value, slice, .. } = body.as_subscript_expr()?;
@@ -165,12 +181,13 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>> {
     let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
         range: _,
+        node_index: _,
     } = if_stmt;
 
     // Cannot safely transform, e.g.,
@@ -203,6 +220,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
         value,
         targets,
         range: _,
+        node_index: _,
     } = statement.as_assign_stmt()?;
     let [target] = targets.as_slice() else {
         return None;
@@ -325,9 +343,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: num,
                 range: _,
+                node_index: _,
             }),
             ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 range: _,
+                node_index: _,
                 value: string_val,
             }),
         ) => num
@@ -339,6 +359,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
                 range: _,
+                node_index: _,
                 func,
                 arguments,
             }),
@@ -358,9 +379,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 op: ast::UnaryOp::USub,
                 operand,
                 range: _,
+                node_index: _,
             }),
             ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 range: _,
+                node_index: _,
                 value: string_val,
             }),
         ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
@@ -378,11 +401,13 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 op: ast::UnaryOp::USub,
                 operand,
                 range: _,
+                node_index: _,
             }),
             _,
         ) => operand.as_call_expr().is_some_and(
             |ast::ExprCall {
                  range: _,
+                 node_index: _,
                  func,
                  arguments,
              }| {

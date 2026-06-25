@@ -11,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Path::new("G_argparse_parser_error_ok.py"))]
     #[test_case(Path::new("G_extra_ok.py"))]
@@ -22,6 +22,8 @@ mod tests {
     #[test_case(Path::new("G002.py"))]
     #[test_case(Path::new("G003.py"))]
     #[test_case(Path::new("G004.py"))]
+    #[test_case(Path::new("G004_arg_order.py"))]
+    #[test_case(Path::new("G004_implicit_concat.py"))]
     #[test_case(Path::new("G010.py"))]
     #[test_case(Path::new("G101_1.py"))]
     #[test_case(Path::new("G101_2.py"))]
@@ -45,7 +47,28 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::LoggingFString, Path::new("G004.py"))]
+    #[test_case(Rule::LoggingFString, Path::new("G004_arg_order.py"))]
+    #[test_case(Rule::LoggingFString, Path::new("G004_implicit_concat.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_logging_format").join(path).as_path(),
+            &settings::LinterSettings {
+                logger_objects: vec!["logging_setup.logger".to_string()],
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

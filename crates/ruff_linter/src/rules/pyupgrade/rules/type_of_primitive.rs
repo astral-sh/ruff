@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::types::Primitive;
+use crate::rules::pyupgrade::types::Primitive;
 
 /// ## What it does
 /// Checks for uses of `type` that take a primitive as an argument.
@@ -30,6 +30,7 @@ use super::super::types::Primitive;
 /// - [Python documentation: `type()`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Built-in types](https://docs.python.org/3/library/stdtypes.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct TypeOfPrimitive {
     primitive: Primitive,
 }

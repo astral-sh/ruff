@@ -1,0 +1,40 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - `__await__` definition with explicit invalid return type
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class InvalidAwaitReturn:
+2 |     def __await__(self) -> int:
+3 |         return 5
+4 | 
+5 | async def main() -> None:
+6 |     await InvalidAwaitReturn()  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `InvalidAwaitReturn` is not awaitable
+ --> src/mdtest_snippet.py:6:11
+  |
+6 |     await InvalidAwaitReturn()  # error: [invalid-await]
+  |           ^^^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/mdtest_snippet.py:2:9
+  |
+2 |     def __await__(self) -> int:
+  |         ---------------------- method defined here
+  |
+info: `__await__` returns `int`, which is not a valid iterator
+
+```

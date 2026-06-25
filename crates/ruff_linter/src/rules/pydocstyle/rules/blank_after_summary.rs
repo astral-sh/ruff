@@ -34,6 +34,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     """
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -41,6 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.68")]
 pub(crate) struct MissingBlankLineAfterSummary {
     num_lines: usize,
 }

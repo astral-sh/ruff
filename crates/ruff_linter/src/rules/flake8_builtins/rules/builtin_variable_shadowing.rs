@@ -44,6 +44,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## References
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.48")]
 pub(crate) struct BuiltinVariableShadowing {
     name: String,
 }
@@ -70,7 +71,7 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
     if shadows_builtin(
         name,
         checker.source_type,
-        &checker.settings.flake8_builtins.ignorelist,
+        &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         checker.report_diagnostic(

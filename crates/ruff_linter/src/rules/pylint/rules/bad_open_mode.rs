@@ -24,18 +24,20 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// with open("file", "rwx") as f:
-///     return f.read()
+///     content = f.read()
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// with open("file", "r") as f:
-///     return f.read()
+///     content = f.read()
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BadOpenMode {
     mode: String,
 }

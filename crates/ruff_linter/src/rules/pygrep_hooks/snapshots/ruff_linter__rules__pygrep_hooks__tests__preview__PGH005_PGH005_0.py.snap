@@ -1,0 +1,210 @@
+---
+source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 17
+
+--- Added ---
+PGH005 Non-existent mock method: `not_called`
+  --> PGH005_0.py:15:1
+   |
+14 | # Standalone
+15 | my_mock.not_called()
+   | ^^^^^^^^^^^^^^^^^^^^
+16 | my_mock.called_once()
+17 | my_mock.called_once_with()
+   |
+
+
+PGH005 Non-existent mock method: `called_once`
+  --> PGH005_0.py:16:1
+   |
+14 | # Standalone
+15 | my_mock.not_called()
+16 | my_mock.called_once()
+   | ^^^^^^^^^^^^^^^^^^^^^
+17 | my_mock.called_once_with()
+18 | my_mock.called_with()
+   |
+
+
+PGH005 Non-existent mock method: `called_once_with`
+  --> PGH005_0.py:17:1
+   |
+15 | my_mock.not_called()
+16 | my_mock.called_once()
+17 | my_mock.called_once_with()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | my_mock.called_with()
+19 | my_mock.has_calls()
+   |
+
+
+PGH005 Non-existent mock method: `called_with`
+  --> PGH005_0.py:18:1
+   |
+16 | my_mock.called_once()
+17 | my_mock.called_once_with()
+18 | my_mock.called_with()
+   | ^^^^^^^^^^^^^^^^^^^^^
+19 | my_mock.has_calls()
+20 | my_mock.any_call()
+   |
+
+
+PGH005 Non-existent mock method: `has_calls`
+  --> PGH005_0.py:19:1
+   |
+17 | my_mock.called_once_with()
+18 | my_mock.called_with()
+19 | my_mock.has_calls()
+   | ^^^^^^^^^^^^^^^^^^^
+20 | my_mock.any_call()
+21 | my_mock.not_called
+   |
+
+
+PGH005 Non-existent mock method: `any_call`
+  --> PGH005_0.py:20:1
+   |
+18 | my_mock.called_with()
+19 | my_mock.has_calls()
+20 | my_mock.any_call()
+   | ^^^^^^^^^^^^^^^^^^
+21 | my_mock.not_called
+22 | my_mock.called_once
+   |
+
+
+PGH005 Non-existent mock method: `not_called`
+  --> PGH005_0.py:21:1
+   |
+19 | my_mock.has_calls()
+20 | my_mock.any_call()
+21 | my_mock.not_called
+   | ^^^^^^^^^^^^^^^^^^
+22 | my_mock.called_once
+   |
+
+
+PGH005 Non-existent mock method: `called_once`
+  --> PGH005_0.py:22:1
+   |
+20 | my_mock.any_call()
+21 | my_mock.not_called
+22 | my_mock.called_once
+   | ^^^^^^^^^^^^^^^^^^^
+23 |
+24 | # OK
+   |
+
+
+PGH005 Non-existent mock method: `not_awaited`
+  --> PGH005_0.py:48:1
+   |
+47 | # Standalone
+48 | my_mock.not_awaited()
+   | ^^^^^^^^^^^^^^^^^^^^^
+49 | my_mock.awaited()
+50 | my_mock.awaited_once()
+   |
+
+
+PGH005 Non-existent mock method: `awaited`
+  --> PGH005_0.py:49:1
+   |
+47 | # Standalone
+48 | my_mock.not_awaited()
+49 | my_mock.awaited()
+   | ^^^^^^^^^^^^^^^^^
+50 | my_mock.awaited_once()
+51 | my_mock.awaited_with()
+   |
+
+
+PGH005 Non-existent mock method: `awaited_once`
+  --> PGH005_0.py:50:1
+   |
+48 | my_mock.not_awaited()
+49 | my_mock.awaited()
+50 | my_mock.awaited_once()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+51 | my_mock.awaited_with()
+52 | my_mock.awaited_once_with()
+   |
+
+
+PGH005 Non-existent mock method: `awaited_with`
+  --> PGH005_0.py:51:1
+   |
+49 | my_mock.awaited()
+50 | my_mock.awaited_once()
+51 | my_mock.awaited_with()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+52 | my_mock.awaited_once_with()
+53 | my_mock.any_await()
+   |
+
+
+PGH005 Non-existent mock method: `awaited_once_with`
+  --> PGH005_0.py:52:1
+   |
+50 | my_mock.awaited_once()
+51 | my_mock.awaited_with()
+52 | my_mock.awaited_once_with()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | my_mock.any_await()
+54 | my_mock.has_awaits()
+   |
+
+
+PGH005 Non-existent mock method: `any_await`
+  --> PGH005_0.py:53:1
+   |
+51 | my_mock.awaited_with()
+52 | my_mock.awaited_once_with()
+53 | my_mock.any_await()
+   | ^^^^^^^^^^^^^^^^^^^
+54 | my_mock.has_awaits()
+55 | my_mock.not_awaited
+   |
+
+
+PGH005 Non-existent mock method: `has_awaits`
+  --> PGH005_0.py:54:1
+   |
+52 | my_mock.awaited_once_with()
+53 | my_mock.any_await()
+54 | my_mock.has_awaits()
+   | ^^^^^^^^^^^^^^^^^^^^
+55 | my_mock.not_awaited
+56 | my_mock.awaited
+   |
+
+
+PGH005 Non-existent mock method: `not_awaited`
+  --> PGH005_0.py:55:1
+   |
+53 | my_mock.any_await()
+54 | my_mock.has_awaits()
+55 | my_mock.not_awaited
+   | ^^^^^^^^^^^^^^^^^^^
+56 | my_mock.awaited
+   |
+
+
+PGH005 Non-existent mock method: `awaited`
+  --> PGH005_0.py:56:1
+   |
+54 | my_mock.has_awaits()
+55 | my_mock.not_awaited
+56 | my_mock.awaited
+   | ^^^^^^^^^^^^^^^
+57 |
+58 | # OK
+   |

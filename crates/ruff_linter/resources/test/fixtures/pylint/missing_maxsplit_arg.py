@@ -54,8 +54,13 @@ Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
 Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
 Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-## Test unpacked dict literal kwargs 
+## Test unpacked dict literal kwargs
 "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+
+## Test chained splits
+SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
 
 
 # OK
@@ -182,3 +187,13 @@ kwargs_with_maxsplit = {"maxsplit": 1}
 "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+
+
+## Test unpacked list literal args (starred expressions)
+# Errors
+"1,2,3".split(",", *[-1])[0]
+
+## Test unpacked list variable args
+# Errors
+args_list = [-1]
+"1,2,3".split(",", *args_list)[0]

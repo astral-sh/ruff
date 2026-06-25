@@ -183,3 +183,12 @@ for val in range(3):
 
 
     funcs.append(make_func())
+
+
+# OK because the lambda is immediately invoked (IIFE pattern).
+# The closure is consumed right away, so late-binding is not a concern.
+for i in range(3):
+    (lambda: i)()
+    (lambda x=i: x)()
+    print((lambda: i)())
+    result = (lambda i=i: i * 2)()

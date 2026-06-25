@@ -21,7 +21,9 @@ use crate::registry::Rule;
 ///
 /// ## Example
 /// ```pyi
-/// if sys.platform.startswith("linux"):
+/// import sys
+///
+/// if sys.platform == "xunil"[::-1]:
 ///     # Linux specific definitions
 ///     ...
 /// else:
@@ -31,6 +33,8 @@ use crate::registry::Rule;
 ///
 /// Instead, use a simple string comparison, such as `==` or `!=`:
 /// ```pyi
+/// import sys
+///
 /// if sys.platform == "linux":
 ///     # Linux specific definitions
 ///     ...
@@ -42,6 +46,7 @@ use crate::registry::Rule;
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.246")]
 pub(crate) struct UnrecognizedPlatformCheck;
 
 impl Violation for UnrecognizedPlatformCheck {
@@ -65,17 +70,22 @@ impl Violation for UnrecognizedPlatformCheck {
 ///
 /// ## Example
 /// ```pyi
+/// import sys
+///
 /// if sys.platform == "linus": ...
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// import sys
+///
 /// if sys.platform == "linux": ...
 /// ```
 ///
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.246")]
 pub(crate) struct UnrecognizedPlatformName {
     platform: String,
 }
@@ -114,16 +124,14 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
 
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
-        if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(UnrecognizedPlatformCheck, test.range());
-        }
+        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
         return;
     }
 
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = right {
         // Other values are possible but we don't need them right now.
         // This protects against typos.
-        if checker.enabled(Rule::UnrecognizedPlatformName) {
+        if checker.is_rule_enabled(Rule::UnrecognizedPlatformName) {
             if !matches!(value.to_str(), "linux" | "win32" | "cygwin" | "darwin") {
                 checker.report_diagnostic(
                     UnrecognizedPlatformName {
@@ -134,8 +142,6 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
             }
         }
     } else {
-        if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-            checker.report_diagnostic(UnrecognizedPlatformCheck, test.range());
-        }
+        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
     }
 }

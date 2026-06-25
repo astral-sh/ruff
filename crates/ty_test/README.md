@@ -8,8 +8,9 @@ under a certain directory as test suites.
 
 A Markdown test suite can contain any number of tests. A test consists of one or more embedded
 "files", each defined by a triple-backticks fenced code block. The code block must have a tag string
-specifying its language. We currently support `py` (Python files) and `pyi` (type stub files), as
-well as [typeshed `VERSIONS`] files and `toml` for configuration.
+specifying its language. We currently support `py` (Python files), `pyi` (type stub files), and
+`ipynb` (Jupyter notebook files), as well as [typeshed `VERSIONS`] files and `toml` for
+configuration.
 
 The simplest possible test suite consists of just a single test, with a single embedded file:
 
@@ -33,19 +34,6 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 
 See actual example mdtest suites in
 [`crates/ty_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/ty_python_semantic/resources/mdtest).
-
-> [!NOTE]
-> If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
-> as with the example in `crates/ty_python_semantic/tests/mdtest.rs`,
-> you will likely want to also make sure that the crate the tests are in is rebuilt every time a
-> Markdown file is added or removed from the directory. See
-> [`crates/ty_python_semantic/build.rs`](https://github.com/astral-sh/ruff/tree/main/crates/ty_python_semantic/build.rs)
-> for an example of how to do this.
->
-> This is because these macros generate their tests at build time rather than at runtime.
-> Without the `build.rs` file to force a rebuild when a Markdown file is added or removed,
-> a new Markdown test suite might not be run unless some other change in the crate caused a rebuild
-> following the addition of the new test file.
 
 ## Assertions
 
@@ -154,31 +142,67 @@ f(2)  # error: [invalid-argument-type]
 
 ## Diagnostic Snapshotting
 
-In addition to inline assertions, one can also snapshot the full diagnostic
-output of a test. This is done by adding a `<!-- snapshot-diagnostics -->` directive
-in the corresponding section. For example:
+Inline snapshots store the rendered diagnostics directly in the Markdown file.
+
+Add `# snapshot: <code?>` to the lines you want to snapshot, then add a fenced
+`snapshot` block after the corresponding `py` / `pyi` file block:
 
 ````markdown
-## Unresolvable module import
-
-<!-- snapshot-diagnostics -->
-
 ```py
-import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+x: int = "a"  # snapshot: [invalid-assignment]
+y: int = "b"  # snapshot
+
+reveal_type(x)  # snapshot: revealed-type
+```
+
+Some explanatory prose can go here.
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | x: int = "a"  # error: [invalid-assignment]
+  |          ^^^
+
+info: Revealed type is `int`
+ --> src/mdtest_snippet.py:5:13
+  |
+5 | reveal_type(x)  # revealed: int
+  |             ^
 ```
 ````
 
-The `snapshot-diagnostics` directive must appear before anything else in
-the section.
+`# snapshot:` follows the same placement rules as other inline assertions.
 
-This will use `insta` to manage an external file snapshot of all diagnostic
-output generated.
+To insert or rewrite inline snapshots automatically, run mdtest with
+`MDTEST_UPDATE_SNAPSHOTS=1` set. For example:
 
-Inline assertions, as described above, may be used in conjunction with diagnostic
-snapshotting.
+```sh
+MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- diagnostics/missing_argument.md
+```
 
-At present, there is no way to do inline snapshotting or to request more granular
-snapshotting of specific diagnostics.
+Or with a test-name filter:
+
+```sh
+MDTEST_UPDATE_SNAPSHOTS=1 MDTEST_TEST_FILTER="Missing argument diagnostics" cargo test -p ty_python_semantic --test mdtest
+```
+
+External `<!-- snapshot-diagnostics -->` snapshots are still supported, but
+inline snapshots are generally preferred for new tests.
+
+## Expected panics
+
+It is possible to write tests that expect the type checker to panic during checking. Ideally, we'd fix those panics
+but being able to add regression tests even before is useful.
+
+To mark a test as expecting a panic, add an HTML comment like this:
+
+```markdown
+<!-- expect-panic: assertion `left == right` failed: Can't merge cycle heads -->
+```
+
+The text after `expect-panic:` is a substring that must appear in the panic message. The message is optional;
+but it is recommended to avoid false positives.
 
 ## Multi-file tests
 
@@ -302,6 +326,63 @@ To enable logging in an mdtest, set `log = true` at the top level of the TOML bl
 See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs)
 for the full list of supported configuration options.
 
+### Testing with external dependencies
+
+Tests can specify external Python dependencies using a `[project]` section in the TOML configuration.
+This allows testing code that uses third-party libraries like `pydantic`, `numpy`, etc.
+
+It is recommended to specify exact versions of packages to ensure reproducibility. The specified
+Python version and platform are required for tests with external dependencies, as they are used
+during package resolution.
+
+````markdown
+```toml
+[environment]
+python-version = "3.13"
+python-platform = "linux"
+
+[project]
+dependencies = ["pydantic==2.12.2"]
+```
+
+```py
+import pydantic
+
+# use pydantic in the test
+```
+````
+
+When a test has dependencies:
+
+1. The test framework creates a `pyproject.toml` in a temporary directory.
+1. The lockfile (e.g., `pydantic.lock`) is copied to the temporary directory.
+1. Runs `uv sync --locked` to install the dependencies.
+1. Copies the installed packages from the virtual environment's `site-packages` directory into the test's
+    in-memory filesystem.
+1. Configures the type checker to use these packages.
+
+**Note**: This feature requires `uv` to be installed and available in your `PATH`. The dependencies
+are installed fresh for each test that specifies them, so tests with many dependencies may be slower
+to run.
+
+#### Lockfiles
+
+Each `.md` file with external dependencies has a corresponding `.lock` file of the same name.
+This ensures reproducible test results across different environments and CI runs.
+
+When adding new tests or if you need to update dependency versions, regenerate the lockfiles
+with either of the following commands:
+
+```bash
+# Using the Python runner:
+uv run crates/ty_python_semantic/mdtest.py -e external/
+
+# Using `cargo`:
+MDTEST_EXTERNAL=1 MDTEST_UPGRADE_LOCKFILES=1 cargo test -p ty_python_semantic --test mdtest mdtest__external
+```
+
+After regenerating, commit the updated lockfiles to the repository.
+
 ### Specifying a custom typeshed
 
 Some tests will need to override the default typeshed with custom files. The `[environment]`
@@ -365,11 +446,11 @@ x: int = "foo"  # error: [invalid-assignment]
 
 ## Running the tests
 
-All Markdown-based tests are executed in a normal `cargo test` / `cargo run nextest` run. If you want to run the Markdown tests
-*only*, you can filter the tests using `mdtest__`:
+All Markdown-based tests are executed in a normal `cargo test` / `cargo nextest run` invocation. If you want to run the Markdown tests
+*only*, you can filter the tests using `mdtest`:
 
 ```bash
-cargo test -p ty_python_semantic -- mdtest__
+cargo test -p ty_python_semantic -- mdtest
 ```
 
 Alternatively, you can use the `mdtest.py` runner which has a watch mode that will re-run corresponding tests when Markdown files change, and recompile automatically when Rust code changes:

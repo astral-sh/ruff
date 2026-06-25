@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
@@ -29,6 +29,7 @@ use crate::{Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct MultipleStatementsOnOneLineColon;
 
 impl Violation for MultipleStatementsOnOneLineColon {
@@ -59,6 +60,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct MultipleStatementsOnOneLineSemicolon;
 
 impl Violation for MultipleStatementsOnOneLineSemicolon {
@@ -84,6 +86,7 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 /// do_four()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.245")]
 pub(crate) struct UselessSemicolon;
 
 impl AlwaysFixableViolation for UselessSemicolon {
@@ -132,17 +135,11 @@ pub(crate) fn compound_statements(
     // Use an iterator to allow passing it around.
     let mut token_iter = tokens.iter_with_context();
 
-    loop {
-        let Some(token) = token_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = token_iter.next() {
         match token.kind() {
-            TokenKind::Ellipsis => {
-                if allow_ellipsis {
-                    allow_ellipsis = false;
-                    continue;
-                }
+            TokenKind::Ellipsis if allow_ellipsis => {
+                allow_ellipsis = false;
+                continue;
             }
             TokenKind::Indent => {
                 indent = indent.saturating_add(1);
@@ -168,14 +165,16 @@ pub(crate) fn compound_statements(
                                 !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        context
-                            .report_diagnostic(UselessSemicolon, range)
-                            .set_fix(Fix::safe_edit(Edit::deletion(
+                        if let Some(mut diagnostic) =
+                            context.report_diagnostic_if_enabled(UselessSemicolon, range)
+                        {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                                 indexer
                                     .preceded_by_continuations(range.start(), locator.contents())
                                     .unwrap_or(range.start()),
                                 range.end(),
                             )));
+                        }
                     }
                 }
 
@@ -225,7 +224,8 @@ pub(crate) fn compound_statements(
             | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some(range) = semi {
-                    context.report_diagnostic(MultipleStatementsOnOneLineSemicolon, range);
+                    context
+                        .report_diagnostic_if_enabled(MultipleStatementsOnOneLineSemicolon, range);
 
                     // Reset.
                     semi = None;
@@ -233,7 +233,7 @@ pub(crate) fn compound_statements(
                 }
 
                 if let Some(range) = colon {
-                    context.report_diagnostic(MultipleStatementsOnOneLineColon, range);
+                    context.report_diagnostic_if_enabled(MultipleStatementsOnOneLineColon, range);
 
                     // Reset.
                     colon = None;

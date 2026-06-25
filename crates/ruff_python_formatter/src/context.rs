@@ -3,11 +3,11 @@ use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
-use ruff_python_parser::Tokens;
+use ruff_python_ast::token::Tokens;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
-use crate::other::interpolated_string_element::InterpolatedElementContext;
+use crate::other::interpolated_string::InterpolatedStringContext;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -121,7 +121,7 @@ impl FormatContext for PyFormatContext<'_> {
         &self.options
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         SourceCode::new(self.contents)
     }
 }
@@ -143,7 +143,13 @@ pub(crate) enum InterpolatedStringState {
     /// curly brace in `f"foo {x}"`.
     ///
     /// The containing `FStringContext` is the surrounding f-string context.
-    InsideInterpolatedElement(InterpolatedElementContext),
+    InsideInterpolatedElement(InterpolatedStringContext),
+    /// The formatter is inside more than one nested f-string, such as in `nested` in:
+    ///
+    /// ```py
+    /// f"{f'''{'nested'} inner'''} outer"
+    /// ```
+    NestedInterpolatedElement(InterpolatedStringContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,
@@ -152,11 +158,17 @@ pub(crate) enum InterpolatedStringState {
 impl InterpolatedStringState {
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
-            InterpolatedStringState::InsideInterpolatedElement(context) => {
-                Some(context.can_contain_line_breaks())
+            InterpolatedStringState::InsideInterpolatedElement(context)
+            | InterpolatedStringState::NestedInterpolatedElement(context) => {
+                Some(context.is_multiline())
             }
             InterpolatedStringState::Outside => None,
         }
+    }
+
+    /// Returns `true` if the interpolated string state is [`Self::NestedInterpolatedElement`].
+    pub(crate) fn is_nested(self) -> bool {
+        matches!(self, Self::NestedInterpolatedElement(..))
     }
 }
 

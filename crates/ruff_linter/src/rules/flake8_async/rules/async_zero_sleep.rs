@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::Modules;
@@ -26,13 +27,29 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// Use instead:
 /// ```python
-/// import trio
+/// import trio.lowlevel
 ///
 ///
 /// async def func():
 ///     await trio.lowlevel.checkpoint()
 /// ```
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `trio.sleep(0)` expression, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// import trio
+///
+///
+/// async def func():
+///     await trio.sleep(  # comment
+///         # comment
+///         0
+///     )
+/// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct AsyncZeroSleep {
     module: AsyncModule,
 }
@@ -111,15 +128,28 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
 
         let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range());
         diagnostic.try_set_fix(|| {
+            // `anyio.lowlevel` is a submodule, so we need `import anyio.lowlevel`
+            // rather than `from anyio import lowlevel`.
+            let full_module_name = format!("{module}.lowlevel");
+
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(&module.to_string(), "lowlevel"),
+                &ImportRequest::import(&full_module_name, "checkpoint"),
                 call.func.start(),
                 checker.semantic(),
             )?;
-            let reference_edit =
-                Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
+
+            let reference_edit = Edit::range_replacement(binding, call.func.range());
+
             let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-            Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
+            Ok(Fix::applicable_edits(
+                import_edit,
+                [reference_edit, arg_edit],
+                if checker.comment_ranges().intersects(call.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ))
         });
     }
 }

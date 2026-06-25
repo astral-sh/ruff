@@ -5,14 +5,14 @@ use std::path::PathBuf;
 use annotate::annotate_imports;
 use block::{Block, Trailer};
 pub(crate) use categorize::categorize;
+use categorize::categorize_imports;
 pub use categorize::{ImportSection, ImportType};
-use categorize::{MatchSourceStrategy, categorize_imports};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::Tokens;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::Tokens;
 use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, ImportBlock, TrailingComma};
@@ -56,6 +56,7 @@ pub(crate) enum AnnotatedImport<'a> {
         module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
         level: u32,
+        is_lazy: bool,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
         trailing: Vec<Comment<'a>>,
@@ -76,7 +77,6 @@ pub(crate) fn format_imports(
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
-    match_source_strategy: MatchSourceStrategy,
     tokens: &Tokens,
 ) -> String {
     let trailer = &block.trailer;
@@ -104,7 +104,6 @@ pub(crate) fn format_imports(
             package,
             target_version,
             settings,
-            match_source_strategy,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -161,7 +160,6 @@ fn format_import_block(
     package: Option<PackageRoot<'_>>,
     target_version: PythonVersion,
     settings: &Settings,
-    match_source_strategy: MatchSourceStrategy,
 ) -> String {
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     enum LineInsertion {
@@ -182,7 +180,6 @@ fn format_import_block(
         settings.no_sections,
         &settings.section_order,
         &settings.default_section,
-        match_source_strategy,
     );
 
     let mut output = String::new();
@@ -200,7 +197,26 @@ fn format_import_block(
             continue;
         };
 
-        let imports = order_imports(import_block, import_section, settings);
+        let mut imports = order_imports(import_block, import_section, settings);
+
+        // Strip any heading comments from all imports in the section,
+        // as they will be re-added in the correct position.
+        // Heading comments may be on any import (not just the first) since
+        // sorting may have reordered them.
+        if !settings.import_headings.is_empty() {
+            for import in &mut imports {
+                let atop = match import {
+                    Import((_, comments)) => &mut comments.atop,
+                    ImportFrom((_, comments, _, _)) => &mut comments.atop,
+                };
+                atop.retain(|comment| {
+                    !settings
+                        .import_headings
+                        .values()
+                        .any(|heading| comment == heading)
+                });
+            }
+        }
 
         // Add a blank line between every section.
         if is_first_block {
@@ -209,6 +225,12 @@ fn format_import_block(
         } else if pending_lines_before {
             output.push_str(&stylist.line_ending());
             pending_lines_before = false;
+        }
+
+        // Insert heading comment for this section, if configured.
+        if let Some(heading) = settings.import_headings.get(import_section) {
+            output.push_str(heading);
+            output.push_str(&stylist.line_ending());
         }
 
         let mut line_insertion = None;
@@ -290,12 +312,12 @@ mod tests {
     use test_case::test_case;
 
     use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
-    use ruff_text_size::Ranged;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::LinterSettings;
+    use crate::settings::types::IdentifierPattern;
     use crate::test::{test_path, test_resource_path};
 
     use super::categorize::ImportType;
@@ -321,6 +343,7 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("isort_skip_file.py"))]
+    #[test_case(Path::new("lazy_imports.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("match_case.py"))]
@@ -363,12 +386,12 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
-    fn pattern(pattern: &str) -> glob::Pattern {
-        glob::Pattern::new(pattern).unwrap()
+    fn pattern(pattern: &str) -> IdentifierPattern {
+        IdentifierPattern::new(pattern).unwrap()
     }
 
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
@@ -391,7 +414,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -415,7 +438,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -439,7 +462,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -454,7 +477,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        crate::assert_messages!(snapshot, diagnostics);
+        crate::assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -478,7 +501,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -503,7 +526,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -521,7 +544,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -545,7 +568,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -563,7 +586,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -582,7 +605,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -600,7 +623,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -622,7 +645,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -640,14 +663,14 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("order_by_type.py"))]
     fn order_by_type(path: &Path) -> Result<()> {
         let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -658,8 +681,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -669,7 +691,7 @@ mod tests {
             "order_by_type_with_custom_classes_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -686,8 +708,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -697,7 +718,7 @@ mod tests {
             "order_by_type_with_custom_constants_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -716,8 +737,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -727,7 +747,7 @@ mod tests {
             "order_by_type_with_custom_variables_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -744,17 +764,17 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("force_sort_within_sections.py"))]
+    #[test_case(Path::new("lazy_force_sort_within_sections.py"))]
     #[test_case(Path::new("force_sort_within_sections_with_as_names.py"))]
     #[test_case(Path::new("force_sort_within_sections_future.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -766,15 +786,14 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("force_sort_within_sections_lines_between.py"))]
     fn force_sort_within_sections_lines_between(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -786,8 +805,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -795,13 +813,16 @@ mod tests {
     #[test_case(Path::new("comments_and_newlines.py"))]
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
+    #[test_case(Path::new("docstring_followed_by_continuation.py"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("docstring_with_continuation.py"))]
+    #[test_case(Path::new("docstring_with_multiple_continuations.py"))]
     #[test_case(Path::new("docstring_with_semicolon.py"))]
     #[test_case(Path::new("empty.py"))]
     #[test_case(Path::new("existing_import.py"))]
     #[test_case(Path::new("multiline_docstring.py"))]
     #[test_case(Path::new("off.py"))]
+    #[test_case(Path::new("whitespace.py"))]
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -820,7 +841,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -828,8 +849,10 @@ mod tests {
     #[test_case(Path::new("comments_and_newlines.py"))]
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
+    #[test_case(Path::new("docstring_followed_by_continuation.py"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("docstring_with_continuation.py"))]
+    #[test_case(Path::new("docstring_with_multiple_continuations.py"))]
     #[test_case(Path::new("docstring_with_semicolon.py"))]
     #[test_case(Path::new("empty.py"))]
     #[test_case(Path::new("existing_import.py"))]
@@ -854,7 +877,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -882,7 +905,7 @@ mod tests {
             },
         )?;
 
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -905,7 +928,7 @@ mod tests {
                 ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UselessImportAlias])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -913,6 +936,7 @@ mod tests {
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
+    #[test_case(Path::new("multiple_strings.py"))]
     fn required_imports(path: &Path) -> Result<()> {
         let snapshot = format!("required_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -935,7 +959,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -958,7 +982,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -992,11 +1016,59 @@ mod tests {
                 ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UnusedImport])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("plr0402_skip.py"))]
+    fn plr0402_skips_required_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("plr0402_skips_required_imports_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::Import(
+                        ModuleNameImport::alias(
+                            "concurrent.futures".to_string(),
+                            "futures".to_string(),
+                        ),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::ManualFromImport])
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("future_import.py"))]
+    #[test_case(Path::new("docstring_future_import.py"))]
+    fn required_import_with_future_import(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "required_import_with_future_import_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::Import(
+                        ModuleNameImport::module("this".to_string()),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("from_first.py"))]
+    #[test_case(Path::new("lazy_from_first.py"))]
     fn from_first(path: &Path) -> Result<()> {
         let snapshot = format!("from_first_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -1011,7 +1083,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1029,7 +1101,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1047,7 +1119,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1082,7 +1154,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1106,14 +1178,14 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("no_lines_before.py"))]
     fn no_lines_before(path: &Path) -> Result<()> {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -1130,8 +1202,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1141,7 +1212,7 @@ mod tests {
             "no_lines_before_with_empty_sections.py_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -1155,8 +1226,199 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Helper to create a standard `import_headings` map for all sections.
+    fn all_section_headings() -> FxHashMap<ImportSection, String> {
+        FxHashMap::from_iter([
+            (
+                ImportSection::Known(ImportType::Future),
+                "# Future imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::StandardLibrary),
+                "# Standard library imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::ThirdParty),
+                "# Third party imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::FirstParty),
+                "# First party imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::LocalFolder),
+                "# Local folder imports".to_string(),
+            ),
+        ])
+    }
+
+    /// Helper to create a standard isort Settings with all section headings
+    /// and `known_modules` configured for `my_first_party`.
+    fn isort_settings_with_all_headings() -> super::settings::Settings {
+        super::settings::Settings {
+            import_headings: all_section_headings(),
+            known_modules: KnownModules::new(
+                vec![pattern("my_first_party")],
+                vec![],
+                vec![],
+                vec![],
+                FxHashMap::default(),
+            ),
+            ..super::settings::Settings::default()
+        }
+    }
+
+    #[test_case(Path::new("import_heading.py"))]
+    #[test_case(Path::new("import_heading_already_present.py"))]
+    #[test_case(Path::new("import_heading_unsorted.py"))]
+    #[test_case(Path::new("import_heading_already_correct.py"))]
+    #[test_case(Path::new("import_heading_duplicate.py"))]
+    fn import_heading(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: isort_settings_with_all_headings(),
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_with_no_lines_before.py"))]
+    fn import_heading_with_no_lines_before(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "import_heading_with_no_lines_before_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    no_lines_before: FxHashSet::from_iter([ImportSection::Known(
+                        ImportType::LocalFolder,
+                    )]),
+                    ..isort_settings_with_all_headings()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_partial.py"))]
+    fn import_heading_partial(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_partial_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    import_headings: FxHashMap::from_iter([
+                        (
+                            ImportSection::Known(ImportType::StandardLibrary),
+                            "# Standard library imports".to_string(),
+                        ),
+                        (
+                            ImportSection::Known(ImportType::ThirdParty),
+                            "# Third party imports".to_string(),
+                        ),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_wrong_heading.py"))]
+    fn import_heading_wrong_heading(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_wrong_heading_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    import_headings: FxHashMap::from_iter([
+                        (
+                            ImportSection::Known(ImportType::StandardLibrary),
+                            "# Standard library imports".to_string(),
+                        ),
+                        (
+                            ImportSection::Known(ImportType::ThirdParty),
+                            "# Third party imports".to_string(),
+                        ),
+                        (
+                            ImportSection::Known(ImportType::FirstParty),
+                            "# First party imports".to_string(),
+                        ),
+                    ]),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_single_section.py"))]
+    fn import_heading_single_section(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_single_section_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    import_headings: FxHashMap::from_iter([(
+                        ImportSection::Known(ImportType::ThirdParty),
+                        "# Third party imports".to_string(),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Test heading with `force_sort_within_sections`.
+    #[test_case(Path::new("import_heading_force_sort_within_sections.py"))]
+    fn import_heading_force_sort_within_sections(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "import_heading_force_sort_within_sections_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    force_sort_within_sections: true,
+                    ..isort_settings_with_all_headings()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1166,7 +1428,7 @@ mod tests {
     #[test_case(Path::new("lines_after_imports_class_after.py"))]
     fn lines_after_imports(path: &Path) -> Result<()> {
         let snapshot = format!("lines_after_imports_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -1177,8 +1439,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1187,7 +1448,7 @@ mod tests {
     #[test_case(Path::new("lines_after_imports_class_after.py"))]
     fn lines_after_imports_default_settings(path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy();
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
@@ -1198,15 +1459,14 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(&*snapshot, diagnostics);
+        assert_diagnostics!(&*snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("lines_between_types.py"))]
     fn lines_between_types(path: &Path) -> Result<()> {
         let snapshot = format!("lines_between_types{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
@@ -1217,8 +1477,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1241,7 +1500,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1274,7 +1533,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1306,7 +1565,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1330,7 +1589,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1347,7 +1606,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -1364,7 +1623,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -1387,7 +1646,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1407,7 +1666,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

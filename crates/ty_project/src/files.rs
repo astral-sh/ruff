@@ -5,10 +5,11 @@ use std::sync::Arc;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 
+use crate::Project;
 use crate::db::Db;
-use crate::{IOErrorDiagnostic, Project};
 
 /// The indexed files of a project.
 ///
@@ -18,9 +19,9 @@ use crate::{IOErrorDiagnostic, Project};
 /// The implementation uses internal mutability to transition between the lazy and indexed state
 /// without triggering a new salsa revision. This is safe because the initial indexing happens on first access,
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
-/// the indexed files must go through `IndexedMut`, which uses the Salsa setter `package.set_file_set` to
+/// the indexed files must go through `IndexedMut`, which uses the Salsa setter `project.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
-#[derive(Debug)]
+#[derive(Debug, get_size2::GetSize)]
 pub struct IndexedFiles {
     state: std::sync::Mutex<State>,
 }
@@ -38,7 +39,7 @@ impl IndexedFiles {
         }
     }
 
-    pub(super) fn get(&self) -> Index {
+    pub(super) fn get(&self) -> Index<'_> {
         let state = self.state.lock().unwrap();
 
         match &*state {
@@ -57,18 +58,17 @@ impl IndexedFiles {
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.
-    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut> {
-        // Calling `zalsa_mut` cancels all pending salsa queries. This ensures that there are no pending
-        // reads to the file set.
-        // TODO: Use a non-internal API instead https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
-        let _ = db.as_dyn_database_mut().zalsa_mut();
+    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut<'_>> {
+        // Calling `trigger_cancellation` cancels all pending salsa queries. This ensures that there are no pending
+        // reads to the file set (this `db` is the only alive db).
+        db.trigger_cancellation();
 
         // Replace the state with lazy. The `IndexedMut` guard restores the state
         // to `State::Indexed`  or sets a new `PackageFiles` when it gets dropped to ensure the state
         // is restored to how it has been before replacing the value.
         //
         // It isn't necessary to hold on to the lock after this point:
-        // * The above call to `zalsa_mut` guarantees that there's exactly **one** DB reference.
+        // * The above call to `trigger_cancellation` guarantees that there's exactly **one** DB reference.
         // * `Indexed` has a `'db` lifetime, and this method requires a `&mut db`.
         //   This means that there can't be any pending reference to `Indexed` because Rust
         //   doesn't allow borrowing `db` as mutable (to call this method) and immutable (`Indexed<'db>`) at the same time.
@@ -103,7 +103,7 @@ impl Default for IndexedFiles {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, get_size2::GetSize)]
 enum State {
     /// The files of a package haven't been indexed yet.
     Lazy,
@@ -129,7 +129,7 @@ impl<'db> LazyFiles<'db> {
     pub(super) fn set(
         mut self,
         files: FxHashSet<File>,
-        diagnostics: Vec<IOErrorDiagnostic>,
+        diagnostics: Vec<Diagnostic>,
     ) -> Indexed<'db> {
         let files = Indexed {
             inner: Arc::new(IndexedInner { files, diagnostics }),
@@ -151,14 +151,14 @@ pub struct Indexed<'db> {
     _lifetime: PhantomData<&'db ()>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
     files: FxHashSet<File>,
-    diagnostics: Vec<IOErrorDiagnostic>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl Indexed<'_> {
-    pub(super) fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+    pub(super) fn diagnostics(&self) -> &[Diagnostic] {
         &self.inner.diagnostics
     }
 
@@ -189,7 +189,8 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
 /// A Mutable view of a project's indexed files.
 ///
 /// Allows in-place mutation of the files without deep cloning the hash set.
-/// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
+/// The changes are written back when the mutable view is dropped or by calling
+/// [`Self::set_diagnostics`] manually.
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
     project: Project,
@@ -216,7 +217,7 @@ impl IndexedMut<'_> {
         }
     }
 
-    pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<IOErrorDiagnostic>) {
+    pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>) {
         self.inner_mut().diagnostics = diagnostics;
     }
 
@@ -256,7 +257,7 @@ mod tests {
 
     use crate::ProjectMetadata;
     use crate::db::Db;
-    use crate::db::tests::TestDb;
+    use crate::db::testing::TestDb;
     use crate::files::Index;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
@@ -280,7 +281,7 @@ mod tests {
 
         // Calling files a second time should not dead-lock.
         // This can e.g. happen when `check_file` iterates over all files and
-        // `is_file_open` queries the open files.
+        // `should_check_file` queries the open files.
         let files_2 = project.file_set(&db).get();
 
         match files_2 {

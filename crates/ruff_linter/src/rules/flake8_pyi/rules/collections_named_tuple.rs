@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// from collections import namedtuple
 ///
-/// person = namedtuple("Person", ["name", "age"])
+/// Person = namedtuple("Person", ["name", "age"])
 /// ```
 ///
 /// Use instead:
@@ -36,6 +36,7 @@ use crate::checkers::ast::Checker;
 ///     age: int
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct CollectionsNamedTuple;
 
 impl Violation for CollectionsNamedTuple {

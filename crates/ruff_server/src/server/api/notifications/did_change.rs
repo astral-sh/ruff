@@ -1,33 +1,30 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use lsp_server::ErrorCode;
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidChangeTextDocumentNotification, TextDocumentIdentifier};
 
 pub(crate) struct DidChange;
 
 impl super::NotificationHandler for DidChange {
-    type NotificationType = notif::DidChangeTextDocument;
+    type NotificationType = DidChangeTextDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidChange {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         types::DidChangeTextDocumentParams {
             text_document:
                 types::VersionedTextDocumentIdentifier {
-                    uri,
+                    text_document_identifier: TextDocumentIdentifier { uri },
                     version: new_version,
                 },
             content_changes,
         }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let key = session.key_from_url(uri);
+        let key = session.key_from_uri(uri);
 
         session
             .update_text_document(&key, content_changes, new_version)
@@ -35,8 +32,8 @@ impl super::SyncNotificationHandler for DidChange {
 
         // Publish diagnostics if the client doesn't support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
-            let snapshot = session.take_snapshot(key.into_url()).unwrap();
-            publish_diagnostics_for_document(&snapshot, &notifier)?;
+            let snapshot = session.take_snapshot(key.into_uri()).unwrap();
+            publish_diagnostics_for_document(&snapshot, client)?;
         }
 
         Ok(())

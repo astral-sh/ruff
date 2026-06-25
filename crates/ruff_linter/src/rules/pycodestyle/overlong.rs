@@ -1,10 +1,12 @@
 use std::ops::Deref;
 
-use ruff_python_trivia::{CommentRanges, is_pragma_comment};
+use ruff_python_trivia::{CommentRanges, find_trailing_pragma_offset, is_pragma_comment};
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
+use crate::preview::is_trailing_pragma_in_line_length_enabled;
+use crate::settings::types::PreviewMode;
 
 #[derive(Debug)]
 pub(super) struct Overlong {
@@ -21,6 +23,7 @@ impl Overlong {
         limit: LineLength,
         task_tags: &[String],
         tab_size: IndentWidth,
+        preview: PreviewMode,
     ) -> Option<Self> {
         // The maximum width of the line is the number of bytes multiplied by the tab size (the
         // worst-case scenario is that the line is all tabs). If the maximum width is less than the
@@ -37,7 +40,7 @@ impl Overlong {
         }
 
         // Strip trailing comments and re-measure the line, if needed.
-        let line = StrippedLine::from_line(line, comment_ranges, task_tags);
+        let line = StrippedLine::from_line(line, comment_ranges, task_tags, preview);
         let width = match &line {
             StrippedLine::WithoutPragma(line) => {
                 let width = measure(line.as_str(), tab_size);
@@ -116,7 +119,12 @@ enum StrippedLine<'a> {
 impl<'a> StrippedLine<'a> {
     /// Strip trailing comments from a [`Line`], if the line ends with a pragma comment (like
     /// `# type: ignore`) or, if necessary, a task comment (like `# TODO`).
-    fn from_line(line: &'a Line<'a>, comment_ranges: &CommentRanges, task_tags: &[String]) -> Self {
+    fn from_line(
+        line: &'a Line<'a>,
+        comment_ranges: &CommentRanges,
+        task_tags: &[String],
+        preview: PreviewMode,
+    ) -> Self {
         let [comment_range] = comment_ranges.comments_in_range(line.range()) else {
             return Self::Unchanged(line);
         };
@@ -125,9 +133,18 @@ impl<'a> StrippedLine<'a> {
         let comment_range = comment_range - line.start();
         let comment = &line.as_str()[comment_range];
 
-        // Ex) `# type: ignore`
-        if is_pragma_comment(comment) {
-            // Remove the pragma from the line.
+        // Ex) `# type: ignore` or (in preview) `# some comment # noqa: F401`
+        if is_trailing_pragma_in_line_length_enabled(preview) {
+            if let Some(offset) = find_trailing_pragma_offset(comment) {
+                // Strip only the pragma suffix from the comment, preserving any
+                // preceding non-pragma comment text.
+                let pragma_start = usize::from(comment_range.start()) + offset;
+                let prefix = line[..pragma_start].trim_end();
+                return Self::WithoutPragma(Line::new(prefix, line.start()));
+            }
+        }
+        // Stable behavior: only strip when the entire comment is a pragma.
+        else if is_pragma_comment(comment) {
             let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
         }

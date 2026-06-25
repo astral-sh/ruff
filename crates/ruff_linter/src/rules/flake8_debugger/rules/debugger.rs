@@ -31,6 +31,7 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 /// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.141")]
 pub(crate) struct Debugger {
     using_type: DebuggerUsingType,
 }
@@ -46,6 +47,7 @@ impl Violation for Debugger {
     }
 }
 
+/// T100
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     if let Some(using_type) =
@@ -64,6 +66,7 @@ pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     }
 }
 
+/// T100
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(checker: &Checker, stmt: &Stmt, module: Option<&str>, name: &str) {
     if let Some(module) = module {

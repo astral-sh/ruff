@@ -1,6 +1,8 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
 use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -31,10 +33,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// def func() -> int: ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the union type contains comments.
+///
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
@@ -67,13 +73,20 @@ impl Violation for NeverUnion {
 
 /// RUF020
 pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     match expr {
         // Ex) `typing.NoReturn | int`
-        Expr::BinOp(ast::ExprBinOp {
+        Expr::BinOp(ExprBinOp {
             op: Operator::BitOr,
             left,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Analyze the left-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
@@ -90,10 +103,13 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                 // as `Union[None, None]` is valid Python.
                 // See https://github.com/astral-sh/ruff/issues/14567.
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        checker.locator().slice(right.as_ref()).to_string(),
-                        expr.range(),
-                    )));
+                    diagnostic.set_fix(Fix::applicable_edit(
+                        Edit::range_replacement(
+                            checker.locator().slice(right.as_ref()).to_string(),
+                            expr.range(),
+                        ),
+                        applicability,
+                    ));
                 }
             }
 
@@ -107,10 +123,13 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                     right.range(),
                 );
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        checker.locator().slice(left.as_ref()).to_string(),
-                        expr.range(),
-                    )));
+                    diagnostic.set_fix(Fix::applicable_edit(
+                        Edit::range_replacement(
+                            checker.locator().slice(left.as_ref()).to_string(),
+                            expr.range(),
+                        ),
+                        applicability,
+                    ));
                 }
             }
         }
@@ -121,6 +140,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
             slice,
             ctx: _,
             range: _,
+            node_index: _,
         }) if checker.semantic().match_typing_expr(value, "Union") => {
             let Expr::Tuple(tuple_slice) = &**slice else {
                 return;
@@ -148,28 +168,39 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         },
                         elt.range(),
                     );
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        if let [only] = rest.as_slice() {
-                            // Ex) `typing.Union[typing.NoReturn, int]` -> `int`
-                            checker.locator().slice(only).to_string()
-                        } else {
-                            // Ex) `typing.Union[typing.NoReturn, int, str]` -> `typing.Union[int, str]`
-                            checker
-                                .generator()
-                                .expr(&Expr::Subscript(ast::ExprSubscript {
-                                    value: value.clone(),
-                                    slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                                        elts: rest,
+
+                    diagnostic.set_fix(Fix::applicable_edit(
+                        Edit::range_replacement(
+                            if let [only] = rest.as_slice() {
+                                // Ex) `typing.Union[typing.NoReturn, int]` -> `int`
+                                let inner = checker.locator().slice(only);
+                                if checker.locator().contains_line_break(only.range()) {
+                                    format!("({inner})")
+                                } else {
+                                    inner.to_string()
+                                }
+                            } else {
+                                // Ex) `typing.Union[typing.NoReturn, int, str]` -> `typing.Union[int, str]`
+                                checker
+                                    .generator()
+                                    .expr(&Expr::Subscript(ast::ExprSubscript {
+                                        value: value.clone(),
+                                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                                            elts: rest,
+                                            ctx: ast::ExprContext::Load,
+                                            range: TextRange::default(),
+                                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                            parenthesized: true,
+                                        })),
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
-                                        parenthesized: true,
-                                    })),
-                                    ctx: ast::ExprContext::Load,
-                                    range: TextRange::default(),
-                                }))
-                        },
-                        expr.range(),
-                    )));
+                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                    }))
+                            },
+                            expr.range(),
+                        ),
+                        applicability,
+                    ));
                 }
             }
         }
@@ -195,7 +226,7 @@ enum NeverLike {
 }
 
 impl NeverLike {
-    fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
+    fn from_expr(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(expr)?;
         if semantic.match_typing_qualified_name(&qualified_name, "NoReturn") {
             Some(NeverLike::NoReturn)

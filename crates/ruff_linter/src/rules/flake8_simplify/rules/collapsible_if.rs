@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability::{Safe, Unsafe};
 use std::borrow::Cow;
 
 use anyhow::{Result, bail};
@@ -18,6 +19,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
+use crate::preview::is_collapsible_if_fix_safe_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -41,11 +43,27 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// if foo and bar:
 ///     ...
 /// ```
+/// ## Preview and Fix Safety
+/// When [preview] is enabled, the fix for this rule is considered
+/// as safe. When [preview] is not enabled, the fix is always
+/// considered unsafe.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+///
+/// ## Options
+///
+/// The rule will consult these two settings when deciding if a fix can be provided:
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
+/// Lines that would exceed the configured line length will not be fixed automatically.
 ///
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
@@ -111,8 +129,8 @@ pub(crate) fn nested_if_statements(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );
-    // The fixer preserves comments in the nested body, but removes comments between
-    // the outer and inner if statements.
+    // We skip the fix if there are comments between the outer and inner if
+    // statements.
     if !checker.comment_ranges().intersects(TextRange::new(
         nested_if.start(),
         nested_if.body()[0].start(),
@@ -125,11 +143,18 @@ pub(crate) fn nested_if_statements(
                             content,
                             (&nested_if).into(),
                             checker.locator(),
-                            checker.settings.pycodestyle.max_line_length,
-                            checker.settings.tab_size,
+                            checker.settings().pycodestyle.max_line_length,
+                            checker.settings().tab_size,
                         )
                     }) {
-                        Ok(Some(Fix::unsafe_edit(edit)))
+                        Ok(Some(Fix::applicable_edit(
+                            edit,
+                            if is_collapsible_if_fix_safe_enabled(checker.settings()) {
+                                Safe
+                            } else {
+                                Unsafe
+                            },
+                        )))
                     } else {
                         Ok(None)
                     }
@@ -178,7 +203,7 @@ impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
+fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
     let ast::StmtIf {
         test,
         body,

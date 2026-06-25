@@ -1,3 +1,5 @@
+"""C decimal arithmetic module"""
+
 import sys
 from decimal import (
     Clamped as Clamped,
@@ -19,13 +21,14 @@ from decimal import (
     Underflow as Underflow,
     _ContextManager,
 )
-from typing import Final
-from typing_extensions import TypeAlias
+from typing import Final, TypeAlias
 
 _TrapType: TypeAlias = type[DecimalException]
 
 __version__: Final[str]
 __libmpdec_version__: Final[str]
+if sys.version_info >= (3, 15):
+    SPEC_VERSION: Final[str]
 
 ROUND_DOWN: Final = "ROUND_DOWN"
 ROUND_HALF_UP: Final = "ROUND_HALF_UP"
@@ -44,28 +47,49 @@ MIN_ETINY: Final[int]
 if sys.version_info >= (3, 14):
     IEEE_CONTEXT_MAX_BITS: Final[int]
 
-def setcontext(context: Context, /) -> None: ...
-def getcontext() -> Context: ...
+def setcontext(context: Context, /) -> None:
+    """Set a new default context."""
+
+def getcontext() -> Context:
+    """Get the current default context."""
 
 if sys.version_info >= (3, 11):
     def localcontext(
         ctx: Context | None = None,
         *,
-        prec: int | None = ...,
-        rounding: str | None = ...,
-        Emin: int | None = ...,
-        Emax: int | None = ...,
-        capitals: int | None = ...,
-        clamp: int | None = ...,
-        traps: dict[_TrapType, bool] | None = ...,
-        flags: dict[_TrapType, bool] | None = ...,
-    ) -> _ContextManager: ...
+        prec: int | None = None,
+        rounding: str | None = None,
+        Emin: int | None = None,
+        Emax: int | None = None,
+        capitals: int | None = None,
+        clamp: int | None = None,
+        traps: dict[_TrapType, bool] | None = None,
+        flags: dict[_TrapType, bool] | None = None,
+    ) -> _ContextManager:
+        """Return a context manager for a copy of the supplied context.
+
+        That will set the default context to a copy of ctx on entry to the
+        with-statement and restore the previous default context when exiting
+        the with-statement. If no context is specified, a copy of the current
+        default context is used.
+        """
 
 else:
-    def localcontext(ctx: Context | None = None) -> _ContextManager: ...
+    def localcontext(ctx: Context | None = None) -> _ContextManager:
+        """Return a context manager that will set the default context to a copy of ctx
+        on entry to the with-statement and restore the previous default context when
+        exiting the with-statement. If no context is specified, a copy of the current
+        default context is used.
+
+        """
 
 if sys.version_info >= (3, 14):
-    def IEEEContext(bits: int, /) -> Context: ...
+    def IEEEContext(bits: int, /) -> Context:
+        """Return a context, initialized as one of the IEEE interchange formats.
+
+        The argument must be a multiple of 32 and less than
+        IEEE_CONTEXT_MAX_BITS.
+        """
 
 DefaultContext: Context
 BasicContext: Context

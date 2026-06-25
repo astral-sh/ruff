@@ -1,16 +1,65 @@
 name: Sync typeshed
 
+# How this works:
+#
+# 1. A Linux worker:
+#    a. Checks out Ruff and typeshed
+#    b. Deletes the vendored typeshed stdlib stubs from Ruff
+#    c. Copies the latest versions of the stubs from typeshed
+#    d. Uses docstring-adder to sync all docstrings available on Linux
+#    e. Creates a new branch on the upstream astral-sh/ruff repository
+#    f. Commits the changes it's made and pushes them to the new upstream branch
+# 2. Once the Linux worker is done, a Windows worker:
+#    a. Checks out the branch created by the Linux worker
+#    b. Syncs all docstrings available on Windows that are not available on Linux
+#    c. Commits the changes and pushes them to the same upstream branch
+# 3. Once the Windows worker is done, a MacOS worker:
+#    a. Checks out the branch created by the Linux worker
+#    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
+#    c. Formats the code again and pushes the completed sync
+#    d. Applies the typeshed patches in a standalone commit and pushes it
+# 4. A second Linux worker attempts to update and push any snapshots that changed
+#    (this step is allowed to fail)
+# 5. Once the snapshot update finishes, fails, or times out, a third Linux worker creates a PR
+#    against the `main` branch as long as step 3 succeeded
+# 6. If any required step failed, an issue is created in the `astral-sh/ruff` repository
+
 on:
   workflow_dispatch:
   schedule:
     # Run on the 1st and the 15th of every month:
     - cron: "0 0 1,15 * *"
 
+defaults:
+  run:
+    shell: bash
+
+permissions: {}
+
 env:
-  FORCE_COLOR: 1
+  # Don't set this flag globally for the workflow: it does strange things
+  # to the snapshots in the `cargo insta test --accept` step in the snapshot job.
+  #
+  # FORCE_COLOR: 1
+
+  CARGO_NET_RETRY: 10
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_TERM_COLOR: always
+  NEXTEST_PROFILE: "ci"
+  RUSTUP_MAX_RETRIES: 10
   GH_TOKEN: ${{ github.token }}
 
+  # The name of the upstream branch that the first worker creates,
+  # and which the later jobs update.
+  UPSTREAM_BRANCH: typeshedbot/sync-typeshed
+
+  # The path to the directory that contains the vendored typeshed stubs,
+  # relative to the root of the Ruff repository.
+  VENDORED_TYPESHED: crates/ty_vendored/vendor/typeshed
+
 jobs:
+  # Sync typeshed stubs, and sync all docstrings available on Linux.
+  # Push the changes to a new branch on the upstream repository.
   sync:
     name: Sync typeshed
     runs-on: ubuntu-latest
@@ -18,15 +67,14 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           path: ruff
           persist-credentials: true
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout typeshed
         with:
           repository: python/typeshed
@@ -36,41 +84,248 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - name: Sync typeshed
-        id: sync
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "0.11.24"
+      - name: Sync typeshed stubs
         run: |
-          rm -rf ruff/crates/ty_vendored/vendor/typeshed
-          mkdir ruff/crates/ty_vendored/vendor/typeshed
-          cp typeshed/README.md ruff/crates/ty_vendored/vendor/typeshed
-          cp typeshed/LICENSE ruff/crates/ty_vendored/vendor/typeshed
-          cp -r typeshed/stdlib ruff/crates/ty_vendored/vendor/typeshed/stdlib
-          rm -rf ruff/crates/ty_vendored/vendor/typeshed/stdlib/@tests
-          git -C typeshed rev-parse HEAD > ruff/crates/ty_vendored/vendor/typeshed/source_commit.txt
-      - name: Commit the changes
-        id: commit
-        if: ${{ steps.sync.outcome == 'success' }}
-        run: |
+          rm -rf "ruff/${VENDORED_TYPESHED}"
+          mkdir "ruff/${VENDORED_TYPESHED}"
+          cp typeshed/README.md "ruff/${VENDORED_TYPESHED}"
+          cp typeshed/LICENSE "ruff/${VENDORED_TYPESHED}"
+
+          # The pyproject.toml file is needed by a later job for the black configuration.
+          # It's deleted before creating the PR.
+          cp typeshed/pyproject.toml "ruff/${VENDORED_TYPESHED}"
+
+          cp -r typeshed/stdlib "ruff/${VENDORED_TYPESHED}/stdlib"
+          rm -rf "ruff/${VENDORED_TYPESHED}/stdlib/@tests"
+          git -C typeshed rev-parse HEAD > "ruff/${VENDORED_TYPESHED}/source_commit.txt"
           cd ruff
-          git checkout -b typeshedbot/sync-typeshed
+          git checkout -b "${UPSTREAM_BRANCH}"
           git add .
-          git diff --staged --quiet || git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)"
-      - name: Create a PR
-        if: ${{ steps.sync.outcome == 'success' && steps.commit.outcome == 'success' }}
+          git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)" --allow-empty
+      - name: Sync Linux docstrings
+        if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
         run: |
           cd ruff
-          git push --force origin typeshedbot/sync-typeshed
-          gh pr list --repo "$GITHUB_REPOSITORY" --head typeshedbot/sync-typeshed --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
-          gh pr create --title "Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "internal"
+          ./scripts/codemod_docstrings.sh
+          git commit -am "Sync Linux docstrings" --allow-empty
+      - name: Push the changes
+        id: commit
+        if: ${{ success() }}
+        run: git -C ruff push --force --set-upstream origin "${UPSTREAM_BRANCH}"
+
+  # Checkout the branch created by the sync job,
+  # and sync all docstrings available on Windows that are not available on Linux.
+  # Commit the changes and push them to the same branch.
+  docstrings-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: [sync]
+
+    # Don't run the cron job on forks.
+    # The job will also be skipped if the sync job failed, because it's specified in `needs` above,
+    # and we haven't used `always()` in the `if` condition here
+    # (https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-requiring-successful-dependent-jobs)
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+
+    permissions:
+      contents: write # to push back to the repository
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        name: Checkout Ruff
+        with:
+          persist-credentials: true
+          ref: ${{ env.UPSTREAM_BRANCH}}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "0.11.24"
+      - name: Setup git
+        run: |
+          git config --global user.name typeshedbot
+          git config --global user.email '<>'
+      - name: Sync Windows docstrings
+        id: docstrings
+        env:
+          FORCE_COLOR: 1
+        run: ./scripts/codemod_docstrings.sh
+      - name: Commit the changes
+        if: ${{ steps.docstrings.outcome == 'success' }}
+        run: |
+          git commit -am "Sync Windows docstrings" --allow-empty
+          git push
+
+  # - Checkout the branch created by the sync job.
+  # - Sync all docstrings available on macOS that are not available on Linux or Windows.
+  # - Format the stubs.
+  # - Apply the typeshed patches.
+  # - Push the changes to the same branch.
+  docstrings-macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    needs: [sync, docstrings-windows]
+
+    # Don't run the cron job on forks.
+    # The job will also be skipped if the sync or docstrings-windows jobs failed,
+    # because they're specified in `needs` above and we haven't used an `always()` condition in the `if` here
+    # (https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-requiring-successful-dependent-jobs)
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+
+    permissions:
+      contents: write # to push back to the repository
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        name: Checkout Ruff
+        with:
+          persist-credentials: true
+          ref: ${{ env.UPSTREAM_BRANCH}}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "0.11.24"
+      - name: Setup git
+        run: |
+          git config --global user.name typeshedbot
+          git config --global user.email '<>'
+      - name: Sync macOS docstrings
+        if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
+        run: |
+          ./scripts/codemod_docstrings.sh
+          git commit -am "Sync macOS docstrings" --allow-empty
+      - name: Format the changes
+        if: ${{ success() }}
+        env:
+          FORCE_COLOR: 1
+        run: |
+          # Here we just reformat the codemodded stubs so that they are
+          # consistent with the other typeshed stubs around them.
+          # Typeshed formats code using black in their CI, so we just invoke
+          # black on the stubs the same way that typeshed does.
+          # TODO: Switch to a released version of Black once a release includes
+          # https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
+          uvx \
+            --from="git+https://github.com/psf/black.git@e34bb1bef70e83410c2816dfd07485ec026959aa" \
+            black "${VENDORED_TYPESHED}/stdlib" \
+            --config "${VENDORED_TYPESHED}/pyproject.toml" || true
+          git commit -am "Format codemodded docstrings" --allow-empty
+      - name: Remove typeshed pyproject.toml file
+        if: ${{ success() }}
+        run: |
+          rm "${VENDORED_TYPESHED}/pyproject.toml"
+          git commit -am "Remove pyproject.toml file"
+      - name: Push synced changes upstream
+        if: ${{ success() }}
+        run: git push
+      - name: Apply and push typeshed patches
+        if: ${{ success() }}
+        run: |
+          git apply --directory="${VENDORED_TYPESHED}" crates/ty_vendored/typeshed_patches/*.patch
+          git add "${VENDORED_TYPESHED}"
+          git commit -m "Apply typeshed patches"
+          git push
+
+  # Best-effort snapshot update. A failure or timeout here must not prevent PR creation.
+  update-snapshots:
+    name: Update snapshots
+    # Use a beefier depot runner if possible, because Rust compile times are really slow on GitHub runners
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    needs: [sync, docstrings-windows, docstrings-macos]
+
+    # Don't run the cron job on forks.
+    # The job will also be skipped if the docstrings-macos job failed.
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+
+    # Allow any failure in this best-effort job without failing the overall workflow.
+    # This does not automatically cause later steps to run after a failure; a step-level
+    # `continue-on-error: true` is also required for that (which we do below for one of the steps).
+    continue-on-error: true
+
+    permissions:
+      contents: write # to push back to the repository
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        name: Checkout Ruff
+        with:
+          persist-credentials: true
+          ref: ${{ env.UPSTREAM_BRANCH}}
+      - name: Setup git
+        run: |
+          git config --global user.name typeshedbot
+          git config --global user.email '<>'
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          # Reuse the cache populated by the `cargo test (linux)` CI job on `main`.
+          shared-key: ruff-linux-debug
+          # This infrequent workflow should not overwrite the shared cache.
+          save-if: false
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+      - name: "Install cargo nextest and insta"
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: |
+            cargo-nextest
+            cargo-insta
+      - name: Update snapshots
+        # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
+        # in this test, causing the step overall to fail. We want to continue to later steps
+        # anyway here, so that snapshots are updated and pushed even if other tests fail.
+        continue-on-error: true
+        env:
+          # Work around https://github.com/mitsuhiko/insta/pull/924 until its fix is released.
+          CI: "0"
+          MDTEST_UPDATE_SNAPSHOTS: "1"
+        run: cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
+      - name: Commit and push snapshot changes
+        if: ${{ success() }}
+        run: |
+          git add --all
+          if git diff --cached --quiet; then
+            echo "No snapshot changes to commit"
+          else
+            git commit -m "Update snapshots"
+            git push
+          fi
+
+  # Publish the required changes even if the best-effort snapshot update failed or timed out.
+  create-pr:
+    name: Create PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [sync, docstrings-windows, docstrings-macos, update-snapshots]
+
+    # update-snapshots is deliberately NOT included here: it shouldn't block PR creation if it fails or times out.
+    if: ${{ always() && needs.sync.result == 'success' && needs.docstrings-windows.result == 'success' && needs.docstrings-macos.result == 'success' && (github.repository == 'astral-sh/ruff' || github.event_name != 'schedule') }}
+
+    permissions:
+      contents: read
+      pull-requests: write # to create a PR
+    steps:
+      - name: Create a PR
+        run: |
+          gh pr list --repo "${GITHUB_REPOSITORY}" --head "${UPSTREAM_BRANCH}" --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
+          gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${UPSTREAM_BRANCH}" --title "[ty] Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "ty"
 
   create-issue-on-failure:
     name: Create an issue if the typeshed sync failed
     runs-on: ubuntu-latest
-    needs: [sync]
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.sync.result == 'failure' }}
+    needs: [sync, docstrings-windows, docstrings-macos, create-pr]
+
+    # update-snapshots is deliberately NOT included here: it shouldn't block PR creation if it fails or times out,
+    # so there's no need for the bot to create an issue if that happens.
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && (needs.sync.result != 'success' || needs.docstrings-windows.result != 'success' || needs.docstrings-macos.result != 'success' || needs.create-pr.result != 'success') }}
+
     permissions:
-      issues: write
+      issues: write # to create an issue on failure
     steps:
-      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -78,6 +333,6 @@ jobs:
               owner: "astral-sh",
               repo: "ruff",
               title: `Automated typeshed sync failed on ${new Date().toDateString()}`,
-              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              body: `Run listed here: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               labels: ["bug", "ty"],
             })

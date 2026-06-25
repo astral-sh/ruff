@@ -1,7 +1,8 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: return_type.md - Function return type - Invalid return type in stub file
 mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
@@ -37,11 +38,8 @@ error[invalid-return-type]: Return type does not match returned value
   |            --- Expected `int` because of return type
 2 |     # error: [invalid-return-type]
 3 |     return ...
-  |            ^^^ expected `int`, found `ellipsis`
-4 |
-5 | # error: [invalid-return-type]
+  |            ^^^ expected `int`, found `EllipsisType`
   |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -49,14 +47,10 @@ info: rule `invalid-return-type` is enabled by default
 error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.pyi:6:14
   |
-5 | # error: [invalid-return-type]
 6 | def foo() -> int:
   |              ^^^
-7 |     print("...")
-8 |     ...
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -64,13 +58,9 @@ info: rule `invalid-return-type` is enabled by default
 error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
   --> src/mdtest_snippet.pyi:11:14
    |
-10 | # error: [invalid-return-type]
 11 | def foo() -> int:
    |              ^^^
-12 |     f"""{foo} is a function that ..."""
-13 |     ...
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```

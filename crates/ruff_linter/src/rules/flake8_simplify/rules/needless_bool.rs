@@ -56,6 +56,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,
     negate: bool,
@@ -132,11 +133,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 body: elif_body,
                 test: Some(elif_test),
                 range: elif_range,
+                node_index: _,
             },
             ElifElseClause {
                 body: else_body,
                 test: None,
                 range: else_range,
+                node_index: _,
             },
         ] => (
             elif_test,
@@ -254,6 +257,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                         left: left.clone(),
                         comparators: Box::new([right.clone()]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     }))
                 }
 
@@ -261,6 +265,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
             }
         } else if if_test.is_compare_expr() {
@@ -273,15 +278,18 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
                     args: Box::from([if_test.clone()]),
-                    keywords: Box::from([]),
+                    keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             Some(Expr::Call(call_node))
         } else {
@@ -294,6 +302,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         Stmt::Return(ast::StmtReturn {
             value: Some(Box::new(expr.clone())),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
     });
 
@@ -336,7 +345,12 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     let [stmt] = stmts else {
         return None;
     };
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
+    let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return None;
     };
     let Some(Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. })) = value.as_deref() else {

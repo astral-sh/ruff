@@ -54,6 +54,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
@@ -82,7 +83,7 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()

@@ -3,7 +3,9 @@ use log::debug;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
+use ruff_python_ast::{
+    self as ast, Arguments, DecoratorList, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
+};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -50,6 +52,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct ConvertNamedTupleFunctionalToClass {
     name: String,
 }
@@ -85,9 +88,10 @@ pub(crate) fn convert_named_tuple_functional_to_class(
 
     let fields = match (args, keywords) {
         // Ex) `NamedTuple("MyType")`
-        ([_typename], []) => vec![Stmt::Pass(ast::StmtPass {
+        ([_typename], []) => Suite::from([Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
-        })],
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        })]),
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
         ([_typename, fields], []) => {
             if let Some(fields) = create_fields_from_fields_arg(fields) {
@@ -145,6 +149,7 @@ fn match_named_tuple_assign<'a>(
         func,
         arguments: Arguments { args, keywords, .. },
         range: _,
+        node_index: _,
     }) = value
     else {
         return None;
@@ -163,6 +168,7 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
                 id: field,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -170,18 +176,20 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
         value: None,
         simple: true,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
 
 /// Create a list of field assignments from the `NamedTuple` fields argument.
-fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
+fn create_fields_from_fields_arg(fields: &Expr) -> Option<Suite> {
     let fields = fields.as_list_expr()?;
     if fields.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(vec![node])
+        Some(Suite::from([node]))
     } else {
         fields
             .iter()
@@ -210,7 +218,7 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
 }
 
 /// Create a list of field assignments from the `NamedTuple` keyword arguments.
-fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
+fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
     keywords
         .iter()
         .map(|keyword| {
@@ -224,18 +232,20 @@ fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
-fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
+fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt {
     ast::StmtClassDef {
         name: Identifier::new(typename.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         body,
         type_params: None,
-        decorator_list: vec![],
+        decorator_list: DecoratorList::new(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
@@ -244,7 +254,7 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
 fn convert_to_class(
     stmt: &Stmt,
     typename: &str,
-    body: Vec<Stmt>,
+    body: Suite,
     base_class: &Expr,
     generator: Generator,
     comment_ranges: &CommentRanges,

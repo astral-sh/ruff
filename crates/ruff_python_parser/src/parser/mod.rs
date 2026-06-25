@@ -1,17 +1,25 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::str::FromStr;
 
 use bitflags::bitflags;
-
-use ruff_python_ast::{Mod, ModExpression, ModModule};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{
+    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use thin_vec::ThinVec;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
-use crate::token::TokenValue;
+use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::{Mode, ParseError, ParseErrorType, TokenKind, UnsupportedSyntaxErrorKind};
+use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
 use crate::{Parsed, Tokens};
 
 pub use crate::parser::options::ParseOptions;
@@ -54,6 +62,12 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
+
+    /// Current parser recursion depth remaining before the depth limit is exceeded.
+    depth_remaining: u16,
+
+    /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
+    max_nesting_depth: u32,
 }
 
 impl<'src> Parser<'src> {
@@ -69,6 +83,8 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
+        let depth_remaining = options.max_recursion_depth;
+        let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
         Parser {
             options,
@@ -80,6 +96,38 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
+            depth_remaining,
+            max_nesting_depth,
+        }
+    }
+
+    /// Runs `f` if the recursive parser depth limit has not been hit.
+    ///
+    /// # Note
+    ///
+    /// This recursion guard is a temporary fix for #22930.
+    #[must_use]
+    #[inline]
+    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
+        if self.depth_remaining == 0 {
+            return None;
+        }
+
+        self.depth_remaining -= 1;
+        let result = f(self);
+        self.depth_remaining += 1;
+        Some(result)
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn report_recursion_limit_exceeded<R: Ranged>(&mut self, ranged: R) {
+        self.add_error(ParseErrorType::RecursionLimitExceeded, ranged);
+        // Skip to end-of-file so outer parser frames unwind quickly and our
+        // `ParserProgress` infinite-loop guards don't fire when they see the
+        // same `(` / `[` etc. that this frame failed to consume.
+        while self.current_token_kind() != TokenKind::EndOfFile {
+            self.bump_any();
         }
     }
 
@@ -132,6 +180,7 @@ impl<'src> Parser<'src> {
         ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -139,16 +188,16 @@ impl<'src> Parser<'src> {
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
     fn parse_module(&mut self) -> ModModule {
-        let body = self.parse_list_into_vec(
-            RecoveryContextKind::ModuleStatements,
-            Parser::parse_statement,
-        );
+        let body = self.parse_list_into_thin_vec(RecoveryContextKind::ModuleStatements, |p| {
+            p.parse_statement()
+        });
 
         self.bump(TokenKind::EndOfFile);
 
         ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -343,15 +392,143 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    /// Take the token value from the underlying token source and bump the current token.
-    ///
-    /// # Panics
-    ///
-    /// If the current token is not of the given kind.
-    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
-        let value = self.tokens.take_value();
-        self.bump(kind);
+    fn bump_name(&mut self) -> Name {
+        let text = self.current_token_text();
+        let name = if !self.tokens.current_flags().is_non_ascii_name() {
+            Name::new(text)
+        } else {
+            normalize_name(text)
+        };
+        self.bump(TokenKind::Name);
+        name
+    }
+
+    fn bump_int(&mut self) -> Int {
+        let text = self.current_token_text();
+        let value = if let Some(digits) =
+            text.strip_prefix("0x").or_else(|| text.strip_prefix("0X"))
+        {
+            Int::from_str_radix(&strip_underscores(digits), 16, text)
+        } else if let Some(digits) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            Int::from_str_radix(&strip_underscores(digits), 8, text)
+        } else if let Some(digits) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            Int::from_str_radix(&strip_underscores(digits), 2, text)
+        } else {
+            Int::from_str(&strip_underscores(text))
+        }
+        .expect("lexer validated integer literal");
+        self.bump(TokenKind::Int);
         value
+    }
+
+    fn bump_float(&mut self) -> f64 {
+        let value = f64::from_str(&strip_underscores(self.current_token_text()))
+            .expect("lexer validated float literal");
+        self.bump(TokenKind::Float);
+        value
+    }
+
+    fn bump_complex(&mut self) -> (f64, f64) {
+        let text = self.current_token_text();
+        let value = f64::from_str(&strip_underscores(&text[..text.len() - 1]))
+            .expect("lexer validated complex literal");
+        self.bump(TokenKind::Complex);
+        (0.0, value)
+    }
+
+    fn bump_string_value(&mut self) -> &'src str {
+        let range = self.current_token_range();
+        let flags = self.tokens.current_flags().as_any_string_flags();
+        let value_range = TextRange::new(
+            range.start() + flags.opener_len(),
+            range.end() - flags.closer_len(),
+        );
+        let value = &self.source[value_range];
+        self.bump(TokenKind::String);
+        value
+    }
+
+    fn bump_ipython_escape_command(
+        &mut self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let (value, kind) = self.parse_ipython_escape_command_value(context);
+        self.bump(TokenKind::IpyEscapeCommand);
+        (value, kind)
+    }
+
+    fn current_token_text(&self) -> &'src str {
+        self.src_text(self.current_token_range())
+    }
+
+    fn parse_ipython_escape_command_value(
+        &self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let raw = self.current_token_text();
+        let initial_kind = if context.is_logical_line_start()
+            && let Ok(kind) = IpyEscapeKind::try_from([
+                raw.as_bytes()[0] as char,
+                raw[1..].chars().next().unwrap_or('\0'),
+            ]) {
+            kind
+        } else {
+            IpyEscapeKind::try_from(raw.as_bytes()[0] as char).expect("IPython escape token")
+        };
+
+        let mut value = String::new();
+        let mut chars = raw[initial_kind.as_str().len()..].chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' if matches!(chars.peek(), Some('\r' | '\n')) => {
+                    if chars.next() == Some('\r') && matches!(chars.peek(), Some('\n')) {
+                        chars.next();
+                    }
+                }
+                '?' => {
+                    let mut question_count = 1;
+                    while matches!(chars.peek(), Some('?')) {
+                        chars.next();
+                        question_count += 1;
+                    }
+
+                    // At logical-line start, IPython treats one or two terminal `?` after a
+                    // nonempty help or magic command as the command kind. Strict `foo?` syntax
+                    // is parsed separately.
+                    // https://github.com/ipython/ipython/blob/292e3a23459ca965b8c1bfe2c3707044c510209a/IPython/core/inputtransformer2.py#L454-L462
+                    if !context.is_logical_line_start()
+                        || !(initial_kind.is_magic() || initial_kind.is_help())
+                        || question_count > 2
+                        || value.chars().last().is_none_or(is_python_whitespace)
+                        || !matches!(chars.peek(), None | Some('\n' | '\r'))
+                    {
+                        value.extend(std::iter::repeat_n('?', question_count));
+                        continue;
+                    }
+
+                    let kind = if question_count == 1 {
+                        IpyEscapeKind::Help
+                    } else {
+                        IpyEscapeKind::Help2
+                    };
+
+                    // A help suffix replaces a leading help prefix, but takes precedence over a
+                    // magic prefix, which remains part of the value (`%foo?` becomes help for
+                    // `%foo`).
+                    if initial_kind.is_help() {
+                        value = value.trim_start_matches([' ', '?']).to_string();
+                    } else {
+                        value.insert_str(0, initial_kind.as_str());
+                    }
+
+                    return (value.into_boxed_str(), kind);
+                }
+                '\n' | '\r' => break,
+                c => value.push(c),
+            }
+        }
+
+        (value.into_boxed_str(), initial_kind)
     }
 
     /// Bumps the current token assuming it is found in the given token set.
@@ -467,25 +644,21 @@ impl<'src> Parser<'src> {
         &self.source[ranged.range()]
     }
 
-    /// Parses a list of elements into a vector where each element is parsed using
+    /// Parses a list of elements into a thin vector where each element is parsed using
     /// the given `parse_element` function.
-    fn parse_list_into_vec<T>(
+    fn parse_list_into_thin_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        let mut elements = Vec::new();
+    ) -> ThinVec<T> {
+        let mut elements = ThinVec::new();
         self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
+        elements.shrink_to_fit();
         elements
     }
 
     /// Parses a list of elements where each element is parsed using the given
     /// `parse_element` function.
-    ///
-    /// The difference between this function and `parse_list_into_vec` is that
-    /// this function does not return the parsed elements. Instead, it is the
-    /// caller's responsibility to handle the parsed elements. This is the reason
-    /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].
     fn parse_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
@@ -533,7 +706,21 @@ impl<'src> Parser<'src> {
         recovery_context_kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
     ) -> Vec<T> {
-        let mut elements = Vec::new();
+        self.parse_comma_separated_list_into_vec_with_capacity(
+            recovery_context_kind,
+            parse_element,
+            0,
+        )
+    }
+
+    /// Parses a comma separated list of elements into a vector with an initial capacity.
+    fn parse_comma_separated_list_into_vec_with_capacity<T>(
+        &mut self,
+        recovery_context_kind: RecoveryContextKind,
+        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        capacity: usize,
+    ) -> Vec<T> {
+        let mut elements = Vec::with_capacity(capacity);
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements
     }
@@ -709,6 +896,31 @@ impl<'src> Parser<'src> {
     }
 }
 
+fn strip_underscores(text: &str) -> Cow<'_, str> {
+    if text.as_bytes().contains(&b'_') {
+        Cow::Owned(text.chars().filter(|&c| c != '_').collect())
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+#[cold]
+fn normalize_name(text: &str) -> Name {
+    text.nfkc().collect::<Name>()
+}
+
+#[derive(Copy, Clone)]
+enum IpyEscapeContext {
+    Assignment,
+    LogicalLineStart,
+}
+
+impl IpyEscapeContext {
+    const fn is_logical_line_start(self) -> bool {
+        matches!(self, Self::LogicalLineStart)
+    }
+}
+
 struct ParserCheckpoint {
     tokens: TokenSourceCheckpoint,
     errors_position: usize,
@@ -797,7 +1009,7 @@ impl WithItemKind {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum InterpolatedStringElementsKind {
     /// The regular f-string elements.
     ///
@@ -805,7 +1017,7 @@ enum InterpolatedStringElementsKind {
     /// ```py
     /// f"hello {x:.2f} world"
     /// ```
-    Regular,
+    Regular(InterpolatedStringKind),
 
     /// The f-string elements are part of the format specifier.
     ///
@@ -813,19 +1025,17 @@ enum InterpolatedStringElementsKind {
     /// ```py
     /// f"hello {x:.2f} world"
     /// ```
-    FormatSpec,
+    FormatSpec(InterpolatedStringKind),
 }
 
 impl InterpolatedStringElementsKind {
-    const fn list_terminators(self) -> TokenSet {
+    const fn list_terminator(self) -> TokenKind {
         match self {
-            InterpolatedStringElementsKind::Regular => {
-                TokenSet::new([TokenKind::FStringEnd, TokenKind::TStringEnd])
-            }
+            InterpolatedStringElementsKind::Regular(string_kind) => string_kind.end_token(),
             // test_ok fstring_format_spec_terminator
             // f"hello {x:} world"
             // f"hello {x:.3f} world"
-            InterpolatedStringElementsKind::FormatSpec => TokenSet::new([TokenKind::Rbrace]),
+            InterpolatedStringElementsKind::FormatSpec(_) => TokenKind::Rbrace,
         }
     }
 }
@@ -972,6 +1182,8 @@ impl RecoveryContextKind {
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context but
     /// the token isn't part of the error recovery set.
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn is_regular_list_terminator(self, p: &Parser) -> bool {
         matches!(
             self.list_terminator_kind(p),
@@ -981,6 +1193,8 @@ impl RecoveryContextKind {
 
     /// Checks the current token the parser is at and returns the list terminator kind if the token
     /// terminates the list as per the context.
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn list_terminator_kind(self, p: &Parser) -> Option<ListTerminatorKind> {
         // The end of file marker ends all lists.
         if p.at(TokenKind::EndOfFile) {
@@ -1114,12 +1328,32 @@ impl RecoveryContextKind {
                     TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
                     _ => None,
                 },
-                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => p
+                // test_err ipython_help_escape_command_error_recovery_1
+                // # parse_options: {"mode": "ipython"}
+                // with (a, ?b)
+                // ?
+
+                // test_err ipython_help_escape_command_error_recovery_2
+                // # parse_options: {"mode": "ipython"}
+                // with (a, ?b
+                // ?
+
+                // test_err ipython_help_escape_command_error_recovery_3
+                // # parse_options: {"mode": "ipython"}
+                // with a, ?b
+                // ?
+                // x = 1
+                WithItemKind::Unparenthesized => matches!(
+                    p.current_token_kind(),
+                    TokenKind::Colon | TokenKind::Newline
+                )
+                .then_some(ListTerminatorKind::Regular),
+                WithItemKind::ParenthesizedExpression => p
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => {
-                if p.at_ts(kind.list_terminators()) {
+                if p.at(kind.list_terminator()) {
                     Some(ListTerminatorKind::Regular)
                 } else {
                     // test_err unterminated_fstring_newline_recovery
@@ -1138,6 +1372,8 @@ impl RecoveryContextKind {
         }
     }
 
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn is_list_element(self, p: &Parser) -> bool {
         match self {
             RecoveryContextKind::ModuleStatements => p.at_stmt(),
@@ -1175,13 +1411,13 @@ impl RecoveryContextKind {
                 ) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::InterpolatedStringElements(_) => matches!(
-                p.current_token_kind(),
-                // Literal element
-                TokenKind::FStringMiddle | TokenKind::TStringMiddle
-                // Expression element
-                | TokenKind::Lbrace
-            ),
+            RecoveryContextKind::InterpolatedStringElements(elements_kind) => match elements_kind {
+                InterpolatedStringElementsKind::Regular(interpolated_string_kind)
+                | InterpolatedStringElementsKind::FormatSpec(interpolated_string_kind) => {
+                    p.current_token_kind() == interpolated_string_kind.middle_token()
+                        || p.current_token_kind() == TokenKind::Lbrace
+                }
+            },
         }
     }
 
@@ -1270,12 +1506,14 @@ impl RecoveryContextKind {
                 ),
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
-                InterpolatedStringElementsKind::Regular => ParseErrorType::OtherError(
-                    "Expected an f-string or t-string element or the end of the f-string or t-string".to_string(),
+                InterpolatedStringElementsKind::Regular(string_kind) => ParseErrorType::OtherError(
+                    format!("Expected an element of or the end of the {string_kind}"),
                 ),
-                InterpolatedStringElementsKind::FormatSpec => ParseErrorType::OtherError(
-                    "Expected an f-string or t-string element or a '}'".to_string(),
-                ),
+                InterpolatedStringElementsKind::FormatSpec(string_kind) => {
+                    ParseErrorType::OtherError(format!(
+                        "Expected an {string_kind} element or a '}}'"
+                    ))
+                }
             },
         }
     }
@@ -1313,9 +1551,11 @@ bitflags! {
         const LAMBDA_PARAMETERS = 1 << 24;
         const WITH_ITEMS_PARENTHESIZED = 1 << 25;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
-        const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
-        const FT_STRING_ELEMENTS = 1 << 29;
-        const FT_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
+        const WITH_ITEMS_UNPARENTHESIZED = 1 << 27;
+        const F_STRING_ELEMENTS = 1 << 28;
+        const T_STRING_ELEMENTS = 1 << 29;
+        const F_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
+        const T_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 31;
     }
 }
 
@@ -1369,9 +1609,18 @@ impl RecoveryContext {
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
-                InterpolatedStringElementsKind::Regular => RecoveryContext::FT_STRING_ELEMENTS,
-                InterpolatedStringElementsKind::FormatSpec => {
-                    RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString) => {
+                    RecoveryContext::F_STRING_ELEMENTS
+                }
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString) => {
+                    RecoveryContext::T_STRING_ELEMENTS
+                }
+
+                InterpolatedStringElementsKind::FormatSpec(InterpolatedStringKind::FString) => {
+                    RecoveryContext::F_STRING_ELEMENTS_IN_FORMAT_SPEC
+                }
+                InterpolatedStringElementsKind::FormatSpec(InterpolatedStringKind::TString) => {
+                    RecoveryContext::T_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
             },
         }
@@ -1440,12 +1689,20 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::FT_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
-                InterpolatedStringElementsKind::Regular,
+            RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString),
             ),
-            RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
+            RecoveryContext::T_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString),
+            ),
+            RecoveryContext::F_STRING_ELEMENTS_IN_FORMAT_SPEC => {
                 RecoveryContextKind::InterpolatedStringElements(
-                    InterpolatedStringElementsKind::FormatSpec,
+                    InterpolatedStringElementsKind::FormatSpec(InterpolatedStringKind::FString),
+                )
+            }
+            RecoveryContext::T_STRING_ELEMENTS_IN_FORMAT_SPEC => {
+                RecoveryContextKind::InterpolatedStringElements(
+                    InterpolatedStringElementsKind::FormatSpec(InterpolatedStringKind::TString),
                 )
             }
             _ => return None,

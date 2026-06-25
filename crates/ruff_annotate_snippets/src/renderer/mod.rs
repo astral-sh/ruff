@@ -76,6 +76,7 @@ impl Renderer {
                 }
                 .effects(Effects::BOLD),
                 none: Style::new(),
+                hyperlink: true,
             },
             ..Self::plain()
         }
@@ -89,7 +90,7 @@ impl Renderer {
     /// # Example
     ///
     /// ```text
-    ///   --> $DIR/whitespace-trimming.rs:4:193
+    ///   --> $DIR/whitespace-trimming.rs:LL:193
     ///    |
     /// LL | ...                   let _: () = 42;
     ///    |                                   ^^ expected (), found integer
@@ -151,6 +152,11 @@ impl Renderer {
     /// Set the output style for none
     pub const fn none(mut self, style: Style) -> Self {
         self.stylesheet.none = style;
+        self
+    }
+
+    pub const fn hyperlink(mut self, hyperlink: bool) -> Self {
+        self.stylesheet.hyperlink = hyperlink;
         self
     }
 

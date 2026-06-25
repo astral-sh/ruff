@@ -47,6 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `break` and `continue` Statements, and `else` Clauses on Loops](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {

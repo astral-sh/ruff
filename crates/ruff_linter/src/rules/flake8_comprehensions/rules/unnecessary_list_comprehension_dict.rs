@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{AlwaysFixableViolation, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list comprehensions.
@@ -29,6 +29,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.58")]
 pub(crate) struct UnnecessaryListComprehensionDict;
 
 impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {

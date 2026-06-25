@@ -57,12 +57,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 ///
-/// [PEP 586](https://peps.python.org/pep-0586/)
+/// [PEP 586]: https://peps.python.org/pep-0586/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryNestedLiteral;
 
 impl Violation for UnnecessaryNestedLiteral {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -74,7 +75,7 @@ impl Violation for UnnecessaryNestedLiteral {
     }
 }
 
-/// RUF039
+/// RUF041
 pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     let mut is_nested = false;
 
@@ -116,12 +117,14 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
                 Expr::Tuple(ExprTuple {
                     elts: nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

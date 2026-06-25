@@ -35,8 +35,14 @@ use crate::checkers::ast::Checker;
 ///         pass
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct BadStaticmethodArgument {
     argument_name: String,
 }
@@ -71,8 +77,8 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     match type_ {

@@ -1,12 +1,19 @@
-import sys
+"""Convert a NT pathname to a file URL and vice versa.
+
+This module only exists to provide OS-specific code
+for urllib.requests, thus do not use directly.
+"""
+
 from typing_extensions import deprecated
 
-if sys.version_info >= (3, 14):
-    @deprecated("nturl2path module was deprecated since Python 3.14")
-    def url2pathname(url: str) -> str: ...
-    @deprecated("nturl2path module was deprecated since Python 3.14")
-    def pathname2url(p: str) -> str: ...
+@deprecated("The `nturl2path` module is deprecated since Python 3.14.")
+def url2pathname(url: str) -> str:
+    """OS-specific conversion from a relative URL of the 'file' scheme
+    to a file system path; not recommended for general use.
+    """
 
-else:
-    def url2pathname(url: str) -> str: ...
-    def pathname2url(p: str) -> str: ...
+@deprecated("The `nturl2path` module is deprecated since Python 3.14.")
+def pathname2url(p: str) -> str:
+    """OS-specific conversion from a file system path to a relative URL
+    of the 'file' scheme; not recommended for general use.
+    """

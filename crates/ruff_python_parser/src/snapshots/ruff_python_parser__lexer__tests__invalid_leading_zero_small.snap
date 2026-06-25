@@ -1,19 +1,12 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: "lex_invalid(source, Mode::Module)"
-snapshot_kind: text
 ---
 ## Tokens
 ```
 [
-    (
-        Unknown,
-        0..3,
-    ),
-    (
-        Newline,
-        3..3,
-    ),
+    Unknown 0..3,
+    Newline 3..3,
 ]
 ```
 ## Errors

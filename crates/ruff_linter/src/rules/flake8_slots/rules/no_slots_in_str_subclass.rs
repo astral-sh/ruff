@@ -5,7 +5,7 @@ use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_slots::rules::helpers::has_slots;
+use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does
 /// Checks for subclasses of `str` that lack a `__slots__` definition.
@@ -39,6 +39,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct NoSlotsInStrSubclass;
 
 impl Violation for NoSlotsInStrSubclass {

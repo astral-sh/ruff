@@ -3,13 +3,15 @@ use std::borrow::Cow;
 use ruff_formatter::{FormatError, FormatOptions, SourceCode, format_args, write};
 use ruff_python_ast::{AnyNodeRef, NodeKind, PySourceType};
 use ruff_python_trivia::{
-    CommentLinePosition, is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
+    CommentLinePosition, find_trailing_pragma_offset, is_pragma_comment, lines_after,
+    lines_after_ignoring_trivia, lines_before,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
+use crate::preview::is_trailing_pragma_in_comment_width_enabled;
 use crate::statement::suite::should_insert_blank_line_after_class_in_stub_file;
 
 /// Formats the leading comments of a node.
@@ -21,7 +23,7 @@ where
 }
 
 /// Formats the passed comments as leading comments
-pub(crate) const fn leading_comments(comments: &[SourceComment]) -> FormatLeadingComments {
+pub(crate) const fn leading_comments(comments: &[SourceComment]) -> FormatLeadingComments<'_> {
     FormatLeadingComments::Comments(comments)
 }
 
@@ -135,7 +137,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
 }
 
 /// Formats the passed comments as trailing comments
-pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments {
+pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments<'_> {
     FormatTrailingComments(comments)
 }
 
@@ -199,7 +201,7 @@ where
     FormatDanglingComments::Node(node.into())
 }
 
-pub(crate) fn dangling_comments(comments: &[SourceComment]) -> FormatDanglingComments {
+pub(crate) fn dangling_comments(comments: &[SourceComment]) -> FormatDanglingComments<'_> {
     FormatDanglingComments::Comments(comments)
 }
 
@@ -260,7 +262,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
 /// ```
 pub(crate) fn dangling_open_parenthesis_comments(
     comments: &[SourceComment],
-) -> FormatDanglingOpenParenthesisComments {
+) -> FormatDanglingOpenParenthesisComments<'_> {
     FormatDanglingOpenParenthesisComments { comments }
 }
 
@@ -290,9 +292,9 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
 
 /// Formats the content of the passed comment.
 ///
-/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
+/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, `!`, or `|`
 /// * Replaces non breaking whitespaces with regular whitespaces except if in front of a `types:` comment
-pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment {
+pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment<'_> {
     FormatComment { comment }
 }
 
@@ -361,7 +363,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
 /// * Expands parent node.
 pub(crate) const fn trailing_end_of_line_comment(
     comment: &SourceComment,
-) -> FormatTrailingEndOfLineComment {
+) -> FormatTrailingEndOfLineComment<'_> {
     FormatTrailingEndOfLineComment { comment }
 }
 
@@ -376,14 +378,26 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Don't reserve width for excluded pragma comments.
-        let reserved_width = if is_pragma_comment(&normalized_comment) {
+        // Don't reserve width for pragma comments. In preview, comments
+        // containing a trailing pragma (e.g., `# comment # noqa: F401`) only
+        // reserve width for the non-pragma prefix.
+        let non_pragma_comment_part = if is_trailing_pragma_in_comment_width_enabled(f.context()) {
+            match find_trailing_pragma_offset(&normalized_comment) {
+                Some(offset) => normalized_comment[..offset].trim_end(),
+                None => &normalized_comment,
+            }
+        } else if is_pragma_comment(&normalized_comment) {
+            ""
+        } else {
+            &normalized_comment
+        };
+
+        let reserved_width = if non_pragma_comment_part.is_empty() {
             0
         } else {
             // Start with 2 because of the two leading spaces.
-
             2u32.saturating_add(
-                TextWidth::from_text(&normalized_comment, f.options().indent_width())
+                TextWidth::from_text(non_pragma_comment_part, f.options().indent_width())
                     .width()
                     .expect("Expected comment not to contain any newlines")
                     .value(),
@@ -477,7 +491,7 @@ fn normalize_comment<'a>(
     // Fast path for correctly formatted comments: if the comment starts with a space, or any
     // of the allowed characters, then it's included verbatim (apart for trimming any trailing
     // whitespace).
-    if content.starts_with([' ', '!', ':', '#', '\'']) {
+    if content.starts_with([' ', '!', ':', '#', '\'', '|']) {
         return Ok(Cow::Borrowed(trimmed));
     }
 
@@ -537,7 +551,7 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 pub(crate) fn empty_lines_before_trailing_comments(
     comments: &[SourceComment],
     node_kind: NodeKind,
-) -> FormatEmptyLinesBeforeTrailingComments {
+) -> FormatEmptyLinesBeforeTrailingComments<'_> {
     FormatEmptyLinesBeforeTrailingComments {
         comments,
         node_kind,
@@ -589,7 +603,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
 /// additional empty line before the comment.
 pub(crate) fn empty_lines_after_leading_comments(
     comments: &[SourceComment],
-) -> FormatEmptyLinesAfterLeadingComments {
+) -> FormatEmptyLinesAfterLeadingComments<'_> {
     FormatEmptyLinesAfterLeadingComments { comments }
 }
 

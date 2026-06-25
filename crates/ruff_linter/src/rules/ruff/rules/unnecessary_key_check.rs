@@ -1,9 +1,10 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::helpers::side_effect;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -28,7 +29,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// if dct.get("key"):
 ///     ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments
+/// or may have side effects.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {
@@ -96,35 +102,37 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
-        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
-    {
+    let obj_effect = side_effect(obj_left, |id| checker.semantic().has_builtin_binding(id));
+    let key_effect = side_effect(key_left, |id| checker.semantic().has_builtin_binding(id));
+    let combined = obj_effect.merge(key_effect);
+    if combined.is_present() {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!(
-            "{}.get({})",
-            checker.locator().slice(
-                parenthesized_range(
-                    obj_right.into(),
-                    right.into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                )
-                .unwrap_or(obj_right.range())
+
+    let applicability =
+        if !combined.is_absent() || checker.comment_ranges().intersects(expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            format!(
+                "{}.get({})",
+                checker.locator().slice(
+                    parenthesized_range(obj_right.into(), right.into(), checker.tokens(),)
+                        .unwrap_or(obj_right.range())
+                ),
+                checker.locator().slice(
+                    parenthesized_range(key_right.into(), right.into(), checker.tokens(),)
+                        .unwrap_or(key_right.range())
+                ),
             ),
-            checker.locator().slice(
-                parenthesized_range(
-                    key_right.into(),
-                    right.into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                )
-                .unwrap_or(key_right.range())
-            ),
+            expr.range(),
         ),
-        expr.range(),
-    )));
+        applicability,
+    ));
 }

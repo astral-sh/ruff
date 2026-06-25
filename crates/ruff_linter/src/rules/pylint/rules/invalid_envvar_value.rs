@@ -18,14 +18,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import os
+///
 /// os.getenv(1)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import os
+///
 /// os.getenv("1")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.255")]
 pub(crate) struct InvalidEnvvarValue;
 
 impl Violation for InvalidEnvvarValue {

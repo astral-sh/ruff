@@ -21,16 +21,23 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import os
+///
+///
 /// async def foo():
 ///     os.popen(cmd)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct CreateSubprocessInAsyncFunction;
 
 impl Violation for CreateSubprocessInAsyncFunction {
@@ -54,16 +61,23 @@ impl Violation for CreateSubprocessInAsyncFunction {
 ///
 /// ## Example
 /// ```python
+/// import subprocess
+///
+///
 /// async def foo():
 ///     subprocess.run(cmd)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RunProcessInAsyncFunction;
 
 impl Violation for RunProcessInAsyncFunction {
@@ -87,12 +101,19 @@ impl Violation for RunProcessInAsyncFunction {
 ///
 /// ## Example
 /// ```python
+/// import os
+///
+///
 /// async def foo():
 ///     os.waitpid(0)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+/// import os
+///
+///
 /// def wait_for_process():
 ///     os.waitpid(0)
 ///
@@ -101,6 +122,7 @@ impl Violation for RunProcessInAsyncFunction {
 ///     await asyncio.loop.run_in_executor(None, wait_for_process)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct WaitForProcessInAsyncFunction;
 
 impl Violation for WaitForProcessInAsyncFunction {

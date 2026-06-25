@@ -39,8 +39,8 @@ pub enum TupleParentheses {
     ///
     /// ```python
     /// return len(self.nodeseeeeeeeee), sum(
-    //     len(node.parents) for node in self.node_map.values()
-    // )
+    ///     len(node.parents) for node in self.node_map.values()
+    /// )
     /// ```
     OptionalParentheses,
 
@@ -116,6 +116,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             elts,
             ctx: _,
             range: _,
+            node_index: _,
             parenthesized: is_parenthesized,
         } = item;
 

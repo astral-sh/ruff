@@ -21,6 +21,11 @@ use super::{
 /// Special type parameter syntax was introduced in Python 3.12 by [PEP 695] for defining generic
 /// classes. This syntax is easier to read and provides cleaner support for generics.
 ///
+/// In particular, old-style `TypeVar` variables are typically allocated at module scope, but their
+/// semantic meaning is only valid within the context of a generic class, function, or type alias.
+/// [PEP 695] eliminates this [source of confusion] by declaring type parameters at their point of
+/// use.
+///
 /// ## Known problems
 ///
 /// The rule currently skips generic classes nested inside of other functions or classes. It also
@@ -32,7 +37,7 @@ use super::{
 /// fix.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
-/// cause type checking to fail.
+/// cause type checking to [fail].
 ///
 /// ## Fix safety
 ///
@@ -40,10 +45,10 @@ use super::{
 /// of the `covariant` and `contravariant` keywords used by `TypeVar` variables. As such, replacing
 /// a `TypeVar` variable with an inline type parameter may change its variance.
 ///
-/// ## Example
+/// ## Examples
 ///
 /// ```python
-/// from typing import TypeVar
+/// from typing import Generic, TypeVar
 ///
 /// T = TypeVar("T")
 ///
@@ -57,6 +62,40 @@ use super::{
 /// ```python
 /// class GenericClass[T]:
 ///     var: T
+/// ```
+///
+/// In cases where you've intentionally defined a reusable `TypeVar` to share
+/// the bounds across multiple uses:
+///
+/// ```python
+/// from typing import Generic, TypeVar
+///
+/// ReusableT = TypeVar("ReusableT", bound=int | str | dict[int, str])
+///
+///
+/// class GenericClass1(Generic[ReusableT]): ...
+///
+///
+/// class GenericClass2(Generic[ReusableT]): ...
+///
+///
+/// class GenericClass3(Generic[ReusableT]): ...
+/// ```
+///
+/// You can instead extract the bound as a [type alias] to retain both the
+/// benefits of the PEP 695 syntax and the reuse of the bound:
+///
+/// ```python
+/// type ReusableTBound = int | str | dict[int, str]
+///
+///
+/// class GenericClass1[ReusableT: ReusableTBound]: ...
+///
+///
+/// class GenericClass2[ReusableT: ReusableTBound]: ...
+///
+///
+/// class GenericClass3[ReusableT: ReusableTBound]: ...
 /// ```
 ///
 /// ## See also
@@ -78,13 +117,21 @@ use super::{
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`][UP047] for the function version.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [PYI059]: https://docs.astral.sh/ruff/rules/generic-not-last-base-class/
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
+/// [fail]: https://github.com/python/mypy/issues/18507
+/// [source of confusion]: https://peps.python.org/pep-0695/#points-of-confusion
+/// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
 }
@@ -153,7 +200,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
-    if generic_idx != arguments.len() - 1 {
+    if generic_idx != arguments.args.len() - 1 {
         return;
     }
 
@@ -185,7 +232,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // just because we can't confirm that `SomethingElse` is a `TypeVar`
     if !visitor.any_skipped {
-        let Some(type_vars) = check_type_vars(visitor.vars) else {
+        let Some(type_vars) = check_type_vars(visitor.vars, checker) else {
             diagnostic.defuse();
             return;
         };
@@ -202,6 +249,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
                 arguments,
                 Parentheses::Remove,
                 checker.source(),
+                checker.tokens(),
             )?;
             Ok(Fix::unsafe_edits(
                 Edit::insertion(type_params.to_string(), name.end()),

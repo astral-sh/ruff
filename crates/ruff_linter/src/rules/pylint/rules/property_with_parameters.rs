@@ -32,9 +32,14 @@ use crate::checkers::ast::Checker;
 ///     def purr_volume(self, volume): ...
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.property-decorators`
+///
 /// ## References
 /// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.153")]
 pub(crate) struct PropertyWithParameters;
 
 impl Violation for PropertyWithParameters {
@@ -55,7 +60,7 @@ pub(crate) fn property_with_parameters(
         return;
     }
     let semantic = checker.semantic();
-    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
     if is_property(decorator_list, extra_property_decorators, semantic) {
         checker.report_diagnostic(PropertyWithParameters, stmt.identifier());
     }

@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::Ranged;
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -27,6 +27,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Keywords](https://docs.python.org/3/reference/lexical_analysis.html#keywords)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MissingWhitespaceAfterKeyword;
 
 impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
@@ -41,10 +42,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
 }
 
 /// E275
-pub(crate) fn missing_whitespace_after_keyword(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace_after_keyword(line: &LogicalLine, context: &LintContext) {
     for window in line.tokens().windows(2) {
         let tok0 = &window[0];
         let tok1 = &window[1];
@@ -72,7 +70,7 @@ pub(crate) fn missing_whitespace_after_keyword(
             && tok0.end() == tok1.start()
         {
             if let Some(mut diagnostic) =
-                context.report_diagnostic(MissingWhitespaceAfterKeyword, tok0.range())
+                context.report_diagnostic_if_enabled(MissingWhitespaceAfterKeyword, tok0.range())
             {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
             }

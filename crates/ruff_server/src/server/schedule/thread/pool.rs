@@ -15,6 +15,7 @@
 
 use std::{
     num::NonZeroUsize,
+    panic::AssertUnwindSafe,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -71,7 +72,26 @@ impl Pool {
                                 current_priority = job.requested_priority;
                             }
                             extant_tasks.fetch_add(1, Ordering::SeqCst);
-                            (job.f)();
+
+                            // SAFETY: it's safe to assume that `job.f` is unwind safe because we always
+                            // abort the process if it panics.
+                            // Panicking here ensures that we don't swallow errors and is the same as
+                            // what rayon does.
+                            // Any recovery should be implemented outside the thread pool (e.g. when
+                            // dispatching requests/notifications etc).
+                            if let Err(error) = std::panic::catch_unwind(AssertUnwindSafe(job.f)) {
+                                if let Some(msg) = error.downcast_ref::<String>() {
+                                    tracing::error!("Worker thread panicked with: {msg}; aborting");
+                                } else if let Some(msg) = error.downcast_ref::<&str>() {
+                                    tracing::error!("Worker thread panicked with: {msg}; aborting");
+                                } else {
+                                    tracing::error!(
+                                        "Worker thread panicked with: {error:?}; aborting"
+                                    );
+                                }
+
+                                std::process::abort();
+                            }
                             extant_tasks.fetch_sub(1, Ordering::SeqCst);
                         }
                     }

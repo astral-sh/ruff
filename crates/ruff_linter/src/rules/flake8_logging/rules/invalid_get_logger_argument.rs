@@ -39,8 +39,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logger = logging.getLogger(__name__)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe, as changing the arguments to `getLogger` can change the
+/// received logger object, and thus program behavior.
+///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct InvalidGetLoggerArgument;
 
 impl Violation for InvalidGetLoggerArgument {

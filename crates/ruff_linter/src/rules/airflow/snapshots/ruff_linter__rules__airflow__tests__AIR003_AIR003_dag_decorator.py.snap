@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR003 `Variable.get()` outside of a task
+ --> AIR003_dag_decorator.py:4:7
+  |
+2 | from airflow.models import Variable
+3 |
+4 | var = Variable.get("foo")  # AIR003
+  |       ^^^^^^^^^^^^^^^^^^^
+  |
+help: Use Jinja templates instead

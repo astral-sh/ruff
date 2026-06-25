@@ -1,15 +1,16 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.9.3,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.11.12"
+version = "0.15.19"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = [
     "automation",
     "flake8",
@@ -22,7 +23,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.7",
@@ -32,6 +32,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Rust",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -52,9 +53,6 @@ strip = true
 exclude = [
     "crates/ruff_linter/resources/test/fixtures/**/*",
     "crates/ruff_linter/src/rules/*/snapshots/**/*"
-]
-include = [
-    "rust-toolchain.toml"
 ]
 
 [tool.ruff]
@@ -82,6 +80,7 @@ select = [
     "PGH", # pygrep-hooks
     "PYI", # flake8-pyi
     "RUF",
+    "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
 ]
 
 ignore = [
@@ -95,6 +94,11 @@ ignore = [
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+combine-as-imports = true
+
+[tool.ruff.per-file-target-version]
+"crates/ty_python_semantic/mdtest.py" = "py310"
+"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
 
 [tool.black]
 force-exclude = '''
@@ -110,34 +114,39 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-changelog_ignore_labels = ["internal", "ci", "testing", "ty"]
-
-changelog_sections.breaking = "Breaking changes"
-changelog_sections.preview = "Preview features"
-changelog_sections.bug = "Bug fixes"
-changelog_sections.rule = "Rule changes"
-changelog_sections.diagnostics = "Rule changes"
-changelog_sections.docstring = "Rule changes"
-changelog_sections.fixes = "Rule changes"
-changelog_sections.isort = "Rule changes"
-changelog_sections.performance = "Performance"
-changelog_sections.formatter = "Formatter"
-changelog_sections.server = "Server"
-changelog_sections.cli = "CLI"
-changelog_sections.configuration = "Configuration"
-changelog_sections.documentation = "Documentation"
-changelog_sections.__unknown__ = "Other changes"
-
-# We exclude contributors from the CHANGELOG file
-# Generate separately with `rooster contributors` for the GitHub release page
-changelog_contributors = false
+ignore_labels = ["internal", "ci", "testing", "ty"]
 
 version_files = [
     "README.md",
+    "pyproject.toml",
+    # Might become unneeded once Markdown formatting is stabilized.
+    "docs/formatter.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
     "crates/ruff_linter/Cargo.toml",
+    # Note that the value being replaced here needs to be kept in sync with the
+    # validation regex in the `violation_metadata` macro.
+    { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
 ]
+
+[tool.rooster.section-labels]
+"Breaking changes" = ["breaking"]
+"Preview features" = ["preview"]
+"Bug fixes" = ["bug"]
+"Rule changes" = [
+    "diagnostics",
+    "docstrings",
+    "rule",
+    "fixes",
+    "isort",
+]
+"Performance" = ["performance"]
+"Formatter" = ["formatter"]
+"Server" = ["server"]
+"CLI" = ["cli"]
+"Configuration" = ["configuration"]
+"Documentation" = ["documentation"]
+"Other changes" = ["__unknown__"]

@@ -8,17 +8,17 @@ def _(x: int):
         # cannot narrow; could be a subclass of `int`
         reveal_type(x)  # revealed: int
     elif x == 2:
-        reveal_type(x)  # revealed: int & ~Literal[1]
+        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True]
     elif x != 3:
-        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[2] & ~Literal[3]
+        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
 
 ## Positive contributions become negative in elif-else blocks, with simplification
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = 1 if flag1 else 2 if flag2 else 3
+from typing import Literal
 
+def _(x: Literal[1, 2, 3]):
     if x == 1:
         reveal_type(x)  # revealed: Literal[1]
     elif x == 2:
@@ -30,9 +30,9 @@ def _(flag1: bool, flag2: bool):
 ## Multiple negative contributions using elif, with simplification
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = 1 if flag1 else 2 if flag2 else 3
+from typing import Literal
 
+def _(x: Literal[1, 2, 3]):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2, 3]
     elif x != 2:
@@ -46,12 +46,15 @@ def _(flag1: bool, flag2: bool):
 ## Assignment expressions
 
 ```py
-def f() -> int | str | None: ...
+class Foo: ...
+class Bar: ...
 
-if isinstance(x := f(), int):
-    reveal_type(x)  # revealed: int
-elif isinstance(x, str):
-    reveal_type(x)  # revealed: str & ~int
+def f() -> Foo | Bar | None: ...
+
+if isinstance(x := f(), Foo):
+    reveal_type(x)  # revealed: Foo
+elif isinstance(x, Bar):
+    reveal_type(x)  # revealed: Bar & ~Foo
 else:
     reveal_type(x)  # revealed: None
 ```

@@ -1,30 +1,13 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
-snapshot_kind: text
 ---
 ## Tokens
 ```
 [
-    (
-        Name(
-            Name("x"),
-        ),
-        3..4,
-    ),
-    (
-        Equal,
-        5..6,
-    ),
-    (
-        Int(
-            1,
-        ),
-        7..8,
-    ),
-    (
-        Newline,
-        8..8,
-    ),
+    Name 3..4,
+    Equal 5..6,
+    Int 7..8,
+    Newline 8..8,
 ]
 ```
