@@ -105,13 +105,10 @@ get-size2 = { version = "0.10.0", features = [
     "ordermap",
     "thin-vec",
 ] }
-getrandom = { version = "0.4.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
 hashbrown = { version = "0.17.0", default-features = false, features = [
-    "raw-entry",
-    "equivalent",
     "inline-more",
 ] }
 heck = "0.5.0"
@@ -151,7 +148,7 @@ quick-junit = { version = "0.6.0" }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.10.0" }
+rand = { version = "0.10.0", default-features = false, features = ["std_rng"] }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 regex-automata = { version = "0.4.9" }
@@ -172,9 +169,6 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.4" }
 serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
-serde_with = { version = "3.6.0", default-features = false, features = [
-    "macros",
-] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "3.0.0", features = ["inline"] }
 smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
@@ -212,17 +206,16 @@ unicode-normalization = { version = "0.1.23" }
 unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 url = { version = "2.5.0" }
-uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+uuid = { version = "1.6.1" }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
 which = { version = "8.0.0" }
 wild = { version = "2" }
-zip = { version = "8.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "8.0", default-features = false }
 
 [workspace.metadata.cargo-shear]
 ignored = [
-    "getrandom",
     "ruff_mdtest",
     "ty_completion_bench",
     "ty_completion_eval",

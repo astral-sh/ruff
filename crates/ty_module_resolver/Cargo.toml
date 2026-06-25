@@ -34,7 +34,6 @@ ruff_db = { workspace = true, features = ["testing", "os"] }
 # Keep this path-only so Cargo strips the unpublished ty dev-dependency when packaging.
 ty_vendored = { path = "../ty_vendored" }
 
-anyhow = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
 
