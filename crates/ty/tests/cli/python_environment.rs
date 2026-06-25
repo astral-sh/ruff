@@ -1110,12 +1110,7 @@ fn config_file_unsupported_python_version() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`: TOML parse error at line 3, column 18
-      |
-    3 | python-version = "2.7"
-      |                  ^^^^^
-    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
-
+      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`
       Cause: TOML parse error at line 3, column 18
       |
     3 | python-version = "2.7"
