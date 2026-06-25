@@ -778,6 +778,24 @@ reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum
 reveal_type(enum_members(InheritedWeirdEnum))
 ```
 
+### Data-type mixin `__init__`
+
+A user-defined `__init__` on a data-type mixin can replace `_value_` after the built-in scalar
+constructor runs. Without an explicit `_value_` annotation, `.value` falls back to `Any`:
+
+```py
+from enum import Enum
+
+class BooleanInt(int):
+    def __init__(self, value: int) -> None:
+        self._value_ = False
+
+class BooleanEnum(BooleanInt, Enum):
+    VALUE = False
+
+reveal_type(BooleanEnum.VALUE.value)  # revealed: Any
+```
+
 Known built-in data-type mixins normalize member values before aliases are detected:
 
 ```py
@@ -835,6 +853,21 @@ reveal_type(InheritedInt.FROM_BOOL.value)  # revealed: Literal[0]
 reveal_type(InheritedInt.FROM_INT)  # revealed: Literal[InheritedInt.FROM_BOOL]
 # revealed: tuple[Literal["FROM_BOOL"], Literal["OTHER"]]
 reveal_type(enum_members(InheritedInt))
+
+# Built-in payload normalization must not override user-defined equality during alias detection.
+class NeverEqualInt(int):
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+class CustomEquality(NeverEqualInt, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+
+reveal_type(CustomEquality.FROM_BOOL.value)  # revealed: Literal[0]
+reveal_type(CustomEquality.FROM_INT.value)  # revealed: Literal[0]
+reveal_type(CustomEquality.FROM_INT)  # revealed: Literal[CustomEquality.FROM_INT]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
+reveal_type(enum_members(CustomEquality))
 ```
 
 `StrEnum` uses the same built-in `str` normalization as an explicit data-type mixin:

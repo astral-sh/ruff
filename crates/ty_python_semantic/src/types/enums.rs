@@ -47,7 +47,8 @@ pub(super) enum ResolvedEnumMethod<'db> {
 ///     ZERO = 0  # Alias of `FALSE` after `int(False)` produces `0`.
 /// ```
 ///
-/// User-defined mixins are excluded because their constructors can transform values arbitrarily.
+/// Value normalization is only used when user-defined mixins do not replace construction. Alias
+/// detection additionally requires the enum to retain the built-in mixin's equality semantics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
 enum KnownEnumDataTypeMixin {
     Int,
@@ -112,6 +113,7 @@ impl<'db> ResolvedEnumMethod<'db> {
 pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
     pub(super) new: ResolvedEnumMethod<'db>,
+    eq: ResolvedEnumMethod<'db>,
     generate_next_value: ResolvedEnumMethod<'db>,
     known_data_type_mixin: Option<KnownEnumDataTypeMixin>,
     pub(super) metaclass_may_transform_values: bool,
@@ -165,6 +167,8 @@ impl<'db> EnumValueConstruction<'db> {
     /// Returns `None` when construction can rewrite `_value_` before alias registration, because
     /// the inferred value is not reliable alias evidence in those cases. `__init__` does not affect
     /// this result because alias registration uses the value captured before `__init__` runs.
+    /// Built-in normalization is skipped when member equality is customized, because equal scalar
+    /// payloads may then represent distinct members.
     fn alias_detection_value(
         self,
         db: &'db dyn Db,
@@ -184,7 +188,11 @@ impl<'db> EnumValueConstruction<'db> {
         } else {
             value_ty
         };
-        Some(self.normalize_value(db, value))
+        Some(if self.eq.is_user_defined() {
+            value
+        } else {
+            self.normalize_value(db, value)
+        })
     }
 }
 
@@ -925,20 +933,23 @@ pub(crate) fn enum_metadata<'db>(
 
     // Look up custom construction methods, falling back to parent enum classes. An opaque binding
     // still shadows methods from classes later in the MRO.
-    let user_defined_init = custom_enum_method(db, scope_id, "__init__")
-        .or_else(|| inherited_user_defined_enum_method(db, class, "__init__"));
+    let inherited_data_type_mixin = inherited_data_type_mixin(db, class);
+    let user_defined_init =
+        custom_enum_method(db, scope_id, "__init__").or(inherited_data_type_mixin.init);
     let init = resolve_enum_method(user_defined_init, || {
         inherited_known_enum_method(db, class, "__init__")
     });
     // CPython checks `__new_member__` and then `__new__` on each enum base before continuing
     // through the MRO or falling back to the data-type constructor.
-    let inherited_data_type_mixin = inherited_data_type_mixin(db, class);
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
         .or_else(|| inherited_user_defined_enum_new(db, class))
         .or(inherited_data_type_mixin.new);
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
+    let user_defined_eq =
+        custom_enum_method(db, scope_id, "__eq__").or(inherited_data_type_mixin.eq);
+    let eq = resolve_enum_method(user_defined_eq, || None);
     let metaclass_may_transform_values = enum_metaclass_may_transform_values(db, class);
     let user_defined_generate_next_value =
         custom_enum_method(db, scope_id, "_generate_next_value_")
@@ -949,6 +960,7 @@ pub(crate) fn enum_metadata<'db>(
     let value_construction = EnumValueConstruction {
         init,
         new,
+        eq,
         generate_next_value,
         known_data_type_mixin: inherited_data_type_mixin.known,
         metaclass_may_transform_values,
@@ -1245,11 +1257,14 @@ enum EnumMethodBinding<'db> {
 
 /// Constructor behavior collected from data-type mixins in MRO order.
 ///
-/// `new` records the first user-defined `__new__`, while `known` records the nearest built-in scalar
-/// mixin whose value normalization ty models.
+/// `init` and `new` record the first user-defined constructor methods, `eq` records the first
+/// user-defined `__eq__` preceding the built-in scalar base, and `known` records the nearest
+/// built-in scalar mixin whose value normalization ty models.
 #[derive(Clone, Copy, Default)]
 struct InheritedDataTypeMixin<'db> {
+    init: Option<EnumMethodBinding<'db>>,
     new: Option<EnumMethodBinding<'db>>,
+    eq: Option<EnumMethodBinding<'db>>,
     known: Option<KnownEnumDataTypeMixin>,
 }
 
@@ -1326,8 +1341,17 @@ fn inherited_data_type_mixin<'db>(
             Some(KnownClass::Str) if result.known.is_none() => {
                 result.known = Some(KnownEnumDataTypeMixin::Str);
             }
-            None if result.new.is_none() => {
-                result.new = custom_enum_method(db, base.body_scope(db), "__new__");
+            None => {
+                let scope = base.body_scope(db);
+                if result.init.is_none() {
+                    result.init = custom_enum_method(db, scope, "__init__");
+                }
+                if result.new.is_none() {
+                    result.new = custom_enum_method(db, scope, "__new__");
+                }
+                if result.known.is_none() && result.eq.is_none() {
+                    result.eq = custom_enum_method(db, scope, "__eq__");
+                }
             }
             _ => {}
         }
