@@ -765,30 +765,33 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     }
 }
 
-/// If `value_ty` is a hashable literal and already exists in `enum_values`,
-/// record it as an alias and return `true`. Otherwise track it as canonical.
+/// If `value_ty` has the same supported literal kind and payload as a value in `enum_values`, record
+/// it as an alias and return `true`. Otherwise track it as canonical. Literal metadata does not
+/// affect enum aliasing at runtime, so the map is keyed by [`LiteralValueTypeKind`] rather than
+/// [`Type`].
 fn try_register_alias<'db>(
     value_ty: Type<'db>,
     name: &Name,
-    enum_values: &mut FxHashMap<Type<'db>, Name>,
+    enum_values: &mut FxHashMap<LiteralValueTypeKind<'db>, Name>,
     aliases: &mut FxHashMap<Name, Name>,
 ) -> bool {
+    let Some(value) = value_ty.as_literal_value_kind() else {
+        return false;
+    };
     if !matches!(
-        value_ty.as_literal_value_kind(),
-        Some(
-            LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
+        value,
+        LiteralValueTypeKind::Bool(_)
+            | LiteralValueTypeKind::Int(_)
+            | LiteralValueTypeKind::String(_)
+            | LiteralValueTypeKind::Bytes(_)
     ) {
         return false;
     }
-    if let Some(canonical) = enum_values.get(&value_ty) {
+    if let Some(canonical) = enum_values.get(&value) {
         aliases.insert(name.clone(), canonical.clone());
         return true;
     }
-    enum_values.insert(value_ty, name.clone());
+    enum_values.insert(value, name.clone());
     false
 }
 
@@ -820,7 +823,7 @@ pub(crate) fn enum_metadata<'db>(
             }
             let mut members = FxIndexMap::default();
             let mut aliases = FxHashMap::default();
-            let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+            let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
             for (name, ty) in spec.members(db) {
                 if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
                     continue;
@@ -855,7 +858,7 @@ pub(crate) fn enum_metadata<'db>(
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
-    let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+    let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
     let mut prev_value_was_non_literal_int = false;
@@ -870,7 +873,8 @@ pub(crate) fn enum_metadata<'db>(
         inherited_known_enum_method(db, class, "__init__")
     });
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
-        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"));
+        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"))
+        .or_else(|| inherited_user_defined_mixin_new(db, class));
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
@@ -1210,6 +1214,24 @@ fn inherited_user_defined_enum_method<'db>(
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
+}
+
+/// Looks up a user-defined `__new__` on a data-type mixin before the first parent enum.
+///
+/// When no enum class provides a member constructor, `EnumType` uses this method to construct the
+/// scalar payload stored by the enum member.
+fn inherited_user_defined_mixin_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<EnumMethodBinding<'db>> {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.class_literal(db).as_static())
+        .take_while(|base| !is_enum_class_by_inheritance(db, *base))
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
 }
 
 /// Looks up a resolvable method inherited from a known enum class.

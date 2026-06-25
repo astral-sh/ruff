@@ -10,10 +10,15 @@ use rustc_hash::FxHashSet;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueTypeKind,
-    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints,
+    UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
+
+mod enums;
+
+use self::enums::evaluate_enum_domains;
 
 /// The result of evaluating a runtime comparison between two types.
 ///
@@ -143,6 +148,10 @@ pub(super) fn evaluate_type_equality<'db>(
             ComparisonOperator::Equality,
             condition_expects_equality,
         )
+    })
+    .or_else(|| {
+        evaluate_enum_domains(db, left, right, branch, ComparisonOperator::Equality)
+            .and_then(|result| result.constraint(branch))
     })
     .or_else(|| {
         if comparison_domain(db, left, right, ComparisonOperator::Equality)
@@ -392,6 +401,10 @@ fn evaluate_comparison_once<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
+
+    if let Some(result) = evaluate_enum_domains(db, left, right, branch, operator) {
+        return result;
+    }
 
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
@@ -724,7 +737,10 @@ fn enum_literal_constraint<'db>(
     operator: ComparisonOperator,
     condition_expects_equality: bool,
 ) -> Option<Type<'db>> {
-    let LiteralValueTypeKind::Enum(right) = right.as_literal_value_kind()? else {
+    let Type::LiteralValue(right_literal) = right.resolve_type_alias(db) else {
+        return None;
+    };
+    let LiteralValueTypeKind::Enum(right) = right_literal.kind() else {
         return None;
     };
     if !is_same_enum_domain(db, left, right)
@@ -738,7 +754,10 @@ fn enum_literal_constraint<'db>(
     let name = enum_class_literal
         .resolve_member(db, right.name(db))?
         .clone();
-    let equal_to_right = Type::enum_literal(EnumLiteralType::new(db, enum_class_literal, name));
+    let equal_to_right = Type::from(LiteralValueType::new(
+        EnumLiteralType::new(db, enum_class_literal, name),
+        right_literal.is_promotable(),
+    ));
     Some(equal_to_right.negate_if(db, !condition_expects_equality))
 }
 
@@ -1238,7 +1257,7 @@ impl ComparisonOperator {
 ///
 /// Two types with different known semantics cannot compare equal. Types with custom or otherwise
 /// unknown comparison methods are not assigned a value of this enum.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 enum KnownComparisonSemantics {
     Object,
     Int,
