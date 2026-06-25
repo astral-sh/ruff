@@ -294,6 +294,11 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).contains_key(name)
     }
 
+    /// Returns the declared instance-write requirement for a protocol member.
+    ///
+    /// `None` means that the protocol does not declare `name`; `Some((None, _))` means that the
+    /// member exists but is read-only. A writable member's type is bound to `receiver_ty` before
+    /// it is returned.
     pub(super) fn instance_write_requirement(
         self,
         db: &'db dyn Db,
@@ -442,6 +447,11 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     }
 }
 
+/// A protocol member's exposed type and the context required to resolve it lazily.
+///
+/// Property accessors remain as callables until a relation needs their read or write type. Once
+/// resolved, `Value` retains the accessor's binding context so that only its own `Self` type is
+/// rebound during protocol checks.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum ProtocolMemberType<'db> {
     Value {
@@ -501,6 +511,7 @@ impl<'db> ProtocolMemberType<'db> {
         }
     }
 
+    /// Resolves a stored property accessor to the value type exposed by that access.
     fn resolve(self, db: &'db dyn Db) -> Option<Self> {
         match self {
             Self::Value { .. } => Some(self),
@@ -509,6 +520,7 @@ impl<'db> ProtocolMemberType<'db> {
         }
     }
 
+    /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
     fn bind_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
         let Self::Value {
             ty,
@@ -599,6 +611,11 @@ impl<'db> ProtocolMemberAccess<'db> {
     }
 }
 
+/// The readable and writable types exposed through instance and class access.
+///
+/// Instance access and class access each independently record readable and writable types. For
+/// example, a mutable `ClassVar` is readable through both, writable through the class, and
+/// read-only through an instance.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct ProtocolMemberCapabilities<'db> {
     instance: ProtocolMemberAccess<'db>,
@@ -1030,6 +1047,11 @@ fn protocol_member_read_type<'db>(
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Checks a synthetic protocol-member write using normal attribute-assignment lookup.
+    ///
+    /// Resolution is shared with real assignments, but this path evaluates the result using the
+    /// active type relation and constraints instead of inferring an expression or emitting an
+    /// assignment diagnostic.
     fn check_property_write(
         &self,
         db: &'db dyn Db,
@@ -1382,6 +1404,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
+    /// Checks the read and write capabilities required through instance access or class access.
+    ///
+    /// Reads are checked covariantly and writes contravariantly. For ordinary methods, the
+    /// instance-side signature check is authoritative and class access only establishes presence.
     fn type_satisfies_protocol_member_access(
         &self,
         db: &'db dyn Db,
@@ -1498,6 +1524,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         result
     }
 
+    /// Compares either instance access or class access when relating two protocol members.
+    ///
+    /// Both members bind `Self` to the source protocol type; readable types are compared
+    /// covariantly and writable types contravariantly.
     fn check_protocol_member_access_pair(
         &self,
         db: &'db dyn Db,
@@ -1622,6 +1652,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    /// Conservatively proves that `ty` lacks an instance write required by `member`.
+    ///
+    /// This currently recognizes only a concrete read-only property. Unknown or unresolved write
+    /// behavior is not sufficient to prove disjointness.
     pub(super) fn protocol_member_write_is_definitely_missing_from_ty(
         &self,
         db: &'db dyn Db,
@@ -1644,6 +1678,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, actual_property.setter(db).is_none())
     }
 
+    /// Checks whether `ty` is disjoint from the readable type required by `member`.
+    ///
+    /// Method members are compared conservatively through their non-`Never` return types rather
+    /// than their full callable signatures.
     pub(super) fn protocol_member_has_disjoint_type_from_ty(
         &self,
         db: &'db dyn Db,
