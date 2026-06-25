@@ -493,8 +493,7 @@ def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
-A `TypeOf` self-reference nested in a nominal specialization forms a recursive type. Cycle recovery
-preserves the outer nominal structure and replaces the recursive argument with `Divergent`:
+A direct self-reference in a variable annotation is resolved from the later assignment:
 
 ```toml
 [environment]
@@ -507,41 +506,6 @@ from ty_extensions import TypeOf
 direct: TypeOf[direct]
 direct = 1
 reveal_type(direct)  # revealed: Literal[1]
-
-x: list[TypeOf[x]]
-x = [1]
-reveal_type(x)  # revealed: list[Divergent]
-
-nested: list[tuple[TypeOf[nested]]]
-nested = [(1,)]
-reveal_type(nested)  # revealed: list[Divergent]
-
-variadic_tuple: tuple[TypeOf[variadic_tuple], ...]
-variadic_tuple = (1,)
-reveal_type(variadic_tuple)  # revealed: tuple[Literal[1]]
-
-mixed_variadic_tuple: tuple[TypeOf[mixed_variadic_tuple], *tuple[int, ...]]
-mixed_variadic_tuple = (1,)
-reveal_type(mixed_variadic_tuple)  # revealed: tuple[Literal[1]]
-
-optional: list[TypeOf[optional]] | None
-optional = [1]
-reveal_type(optional)  # revealed: list[Divergent]
-
-class Container[T]: ...
-
-y: Container[TypeOf[y]]
-y = 1  # error: [invalid-assignment]
-reveal_type(y)  # revealed: Container[Divergent]
-
-# Regression test for https://github.com/astral-sh/ty/issues/3837.
-union: list[TypeOf[union]] | Container[TypeOf[union]]
-union = [1]
-reveal_type(union)  # revealed: list[Divergent]
-
-stable_union: list[TypeOf[stable_union]] | Container[TypeOf[stable_union]] | None
-stable_union = [1]
-reveal_type(stable_union)  # revealed: list[Divergent]
 ```
 
 ## Recursive `TypeOf` in returned callables

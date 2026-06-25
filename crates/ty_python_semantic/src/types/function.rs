@@ -1099,21 +1099,18 @@ impl<'db> FunctionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        // Type replacement during cycle recovery, returned-callable rescoping, and type-alias
-        // specialization should not rebuild signatures from the function literal; doing so can
-        // re-enter recursive type inference.
+        // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
+        // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_signature) = if matches!(
             type_mapping,
-            TypeMapping::ReplaceType { .. }
-                | TypeMapping::ApplySpecialization(
-                    ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
-                )
-                | TypeMapping::ApplySpecializationWithMaterialization {
-                    specialization: ApplySpecialization::ReturnCallables(_)
-                        | ApplySpecialization::TypeAlias(_),
-                    ..
-                }
+            TypeMapping::ApplySpecialization(
+                ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
+            ) | TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::ReturnCallables(_)
+                    | ApplySpecialization::TypeAlias(_),
+                ..
+            }
         ) {
             (
                 self.updated_signature(db).map(|signature| {

@@ -269,7 +269,10 @@ impl<'db> Mro<'db> {
                         ) else {
                             continue;
                         };
-                        base_to_indices.entry(base).or_default().push(index);
+                        base_to_indices
+                            .entry(base.mro_identity())
+                            .or_default()
+                            .push(index);
                     }
 
                     let mut errors = vec![];
@@ -285,7 +288,7 @@ impl<'db> Mro<'db> {
                             ClassBase::Class(_)
                             | ClassBase::Generic
                             | ClassBase::Protocol
-                            | ClassBase::TypedDict => {
+                            | ClassBase::TypedDict(_) => {
                                 errors.push(DuplicateBaseError {
                                     duplicate_base: base,
                                     first_index: *first_index,
@@ -401,7 +404,7 @@ impl<'db> Mro<'db> {
                 }
                 continue;
             }
-            if !seen.insert(*base) {
+            if !seen.insert(base.mro_identity()) {
                 duplicates.push(*base);
             }
         }
@@ -803,10 +806,14 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
         // with the given bases.
         let mro_entry = sequences.iter().find_map(|outer_sequence| {
             let candidate = outer_sequence[0];
+            let candidate_identity = candidate.mro_identity();
 
-            let not_head = sequences
-                .iter()
-                .all(|sequence| sequence.iter().skip(1).all(|base| base != &candidate));
+            let not_head = sequences.iter().all(|sequence| {
+                sequence
+                    .iter()
+                    .skip(1)
+                    .all(|base| base.mro_identity() != candidate_identity)
+            });
 
             not_head.then_some(candidate)
         })?;
@@ -815,7 +822,7 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
 
         // Make sure we don't try to add the candidate to the MRO twice:
         for sequence in &mut sequences {
-            if sequence[0] == mro_entry {
+            if sequence[0].mro_identity() == mro_entry.mro_identity() {
                 sequence.pop_front();
             }
         }

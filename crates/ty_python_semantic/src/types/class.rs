@@ -39,8 +39,8 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -88,7 +88,7 @@ pub(crate) enum CodeGeneratorKind<'db> {
     DataclassLike(Option<DataclassTransformerParams<'db>>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
-    /// Classes inheriting from `typing.TypedDict`
+    /// Classes inheriting from `typing.TypedDict` or `typing_extensions.TypedDict`
     TypedDict,
 }
 
@@ -507,10 +507,9 @@ impl<'db> ClassLiteral<'db> {
                 let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
                 match result {
                     ClassMemberResult::Done(result) => result.finalize(db),
-                    ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
-                        .to_class_literal(db)
-                        .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Will return Some() when called on class literal"),
+                    ClassMemberResult::TypedDict(module) => {
+                        typed_dict::typed_dict_fallback_class_member(db, module, policy, name)
+                    }
                 }
             }
         }
@@ -2253,7 +2252,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 },
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => self.never(),
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
 
                 ClassBase::Class(source) => match (source, target) {
                     // Two non-generic classes match if they have the same class literal.
@@ -2437,8 +2436,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// - `inherited_generic_context`: Generic context for `own_class_member` calls
     /// - `is_self_object`: Whether the class itself is `object` (affects policy filtering)
     ///
-    /// Returns `ClassMemberResult::TypedDict` if a `TypedDict` base is encountered,
-    /// allowing the caller to handle this case specially.
+    /// Returns `ClassMemberResult::TypedDict` with the originating module if a `TypedDict` base is
+    /// encountered, allowing the caller to handle this case specially.
     ///
     /// If we encounter a dynamic type in the MRO, we save it and after traversal:
     /// 1. Use it as the type if no other classes define the attribute, or
@@ -2500,8 +2499,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         )
                     });
                 }
-                ClassBase::TypedDict => {
-                    return ClassMemberResult::TypedDict;
+                ClassBase::TypedDict(module) => {
+                    return ClassMemberResult::TypedDict(module);
                 }
             }
             if lookup_result.is_ok() {
@@ -2576,7 +2575,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         union_qualifiers |= qualifiers;
                     }
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     return InstanceMemberResult::TypedDict;
                 }
             }
@@ -2610,7 +2609,7 @@ pub(super) enum ClassMemberResult<'db> {
     /// Found the member or exhausted the MRO.
     Done(CompletedMemberLookup<'db>),
     /// Encountered a `TypedDict` base.
-    TypedDict,
+    TypedDict(TypedDictModule),
 }
 
 pub(super) struct CompletedMemberLookup<'db> {

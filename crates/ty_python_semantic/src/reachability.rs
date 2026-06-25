@@ -201,10 +201,10 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
-        definite_match_pattern_type, equality_truthiness, expand_type, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        callable_pattern_type, definite_match_pattern_type, equality_truthiness, expand_type,
+        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -530,6 +530,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
+        PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
         PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
     }
 }
@@ -1295,6 +1296,15 @@ fn analyze_non_terminal_call<'db>(
     }
 }
 
+fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
+    match infer_same_file_expression_type(db, iterable, TypeContext::default()) {
+        Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
+            Truthiness::from(is_non_empty)
+        }
+        _ => Truthiness::Ambiguous,
+    }
+}
+
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -1313,6 +1323,9 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)
+        }
+        PredicateNode::IsNonEmptyIterable(iterable) => {
+            analyze_non_empty_iterable(db, iterable).negate_if(!predicate.is_positive)
         }
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));

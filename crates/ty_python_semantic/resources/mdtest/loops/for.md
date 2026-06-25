@@ -38,6 +38,90 @@ for x in IntIterable():
 reveal_type(x)  # revealed: Literal["foo"] | int
 ```
 
+## With statically non-empty builtin `range`
+
+```py
+for x in range(42):
+    pass
+
+reveal_type(x)  # revealed: int
+
+previous = "foo"
+
+for previous in range(1, 3):
+    pass
+
+reveal_type(previous)  # revealed: int
+
+for descending in range(3, 0, -1):
+    pass
+
+reveal_type(descending)  # revealed: int
+
+count = 42
+
+for from_count in range(count):
+    pass
+
+reveal_type(from_count)  # revealed: int
+```
+
+The emptiness refinement is independent of the order in which range values are assigned:
+
+```py
+def empty_first(flag: bool) -> None:
+    value = range(0)
+    if flag:
+        value = range(1)
+
+    if value:
+        reveal_type(value)  # revealed: range
+
+def non_empty_first(flag: bool) -> None:
+    value = range(1)
+    if flag:
+        value = range(0)
+
+    if value:
+        reveal_type(value)  # revealed: range
+```
+
+Empty ranges all compare equal, but non-empty ranges with the same type refinement may contain
+different values:
+
+```py
+empty_left = range(0)
+empty_right = range(1, 1)
+
+if empty_left == empty_right:
+    reveal_type(empty_left)  # revealed: range
+else:
+    reveal_type(empty_left)  # revealed: Never
+
+non_empty_left = range(1)
+non_empty_right = range(2)
+
+if non_empty_left == non_empty_right:
+    reveal_type(non_empty_left)  # revealed: range
+else:
+    reveal_type(non_empty_left)  # revealed: range
+```
+
+## With shadowed `range`
+
+```py
+def shadowed_range():
+    def range(n: int) -> list[int]:
+        return []
+
+    for x in range(42):
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
+```
+
 ## With `else` (no break)
 
 ```py
@@ -1464,10 +1548,13 @@ reveal_type(loop_only)  # revealed: int
 def random() -> bool:
     return False
 
+def iterable() -> list[int]:
+    return []
+
 x = "A"
-for _ in range(1_000_000):
+for _ in iterable():
     reveal_type(x)  # revealed: Literal["A", "D"]
-    for _ in range(1_000_000):
+    for _ in iterable():
         # The "C" binding isn't visible here. It breaks this inner loop, and it always gets
         # overwritten before the end of the outer loop.
         reveal_type(x)  # revealed: Literal["A", "D", "B"]
@@ -1539,8 +1626,11 @@ On the other hand, if `x` is defined before the loop, the `del` makes it a
 `[possibly-unresolved-reference]`:
 
 ```py
+def iterable() -> list[int]:
+    return []
+
 x = 0
-for _ in range(1_000_000):
+for _ in iterable():
     x  # error: [possibly-unresolved-reference]
     x = 42
     del x
@@ -1549,8 +1639,11 @@ for _ in range(1_000_000):
 ### `del` in a loop makes a variable possibly-unbound after the loop
 
 ```py
+def iterable() -> list[int]:
+    return []
+
 x = 0
-for _ in range(1_000_000):
+for _ in iterable():
     # error: [possibly-unresolved-reference]
     del x
 # error: [possibly-unresolved-reference]
@@ -1560,7 +1653,10 @@ x
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
-for _ in range(1_000_000):
+def iterable() -> list[int]:
+    return []
+
+for _ in iterable():
     x = 42
 # error: [possibly-unresolved-reference]
 x

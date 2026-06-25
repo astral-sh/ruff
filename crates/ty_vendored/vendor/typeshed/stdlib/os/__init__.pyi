@@ -1088,7 +1088,7 @@ class DirEntry(Generic[AnyStr]):
         """Returns the path for the entry."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """DirEntry is generic over the type of the path (str or bytes)"""
 
     if sys.version_info >= (3, 12):
         def is_junction(self) -> bool:
@@ -2012,11 +2012,11 @@ else:
     def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) -> None:
         """makedirs(name [, mode=0o777][, exist_ok=False])
 
-        Super-mkdir; create a leaf directory and all intermediate ones.  Works like
-        mkdir, except that any intermediate path segment (not just the rightmost)
-        will be created if it does not exist. If the target directory already
-        exists, raise an OSError if exist_ok is False. Otherwise no exception is
-        raised.  This is recursive.
+        Super-mkdir; create a leaf directory and all intermediate ones.  Works
+        like mkdir, except that any intermediate path segment (not just the
+        rightmost) will be created if it does not exist.  If the target
+        directory already exists, raise an OSError if exist_ok is False.
+        Otherwise no exception is raised.  This is recursive.
 
         """
 
@@ -3049,7 +3049,8 @@ else:
             resetids
               If the value is `true` the POSIX_SPAWN_RESETIDS will be activated.
             setsid
-              If the value is `true` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP will be activated.
+              If the value is `true` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP
+              will be activated.
             setsigmask
               The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
             setsigdef
@@ -3087,7 +3088,8 @@ else:
             resetids
               If the value is `True` the POSIX_SPAWN_RESETIDS will be activated.
             setsid
-              If the value is `True` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP will be activated.
+              If the value is `True` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP
+              will be activated.
             setsigmask
               The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
             setsigdef

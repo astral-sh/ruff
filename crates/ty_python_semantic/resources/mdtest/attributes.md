@@ -1016,6 +1016,70 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
+## Allow replacing ordinary methods with compatible functions
+
+An ordinary method can be replaced directly on a class by another function with a compatible
+signature. The replacement remains an ordinary function, so Python binds it to instances in the same
+way as the original method.
+
+A function-literal type identifies a specific function, not just its signature. This makes
+identity-sensitive code unsound: after the assignment below, `Foo.add is original_add` is inferred
+as `Literal[True]`, even though it evaluates to `False` at runtime and the assertion fails. Calls to
+the method itself remain safe because both functions have compatible signatures and the same
+instance-binding behavior.
+
+```py
+from typing import Literal
+
+class Foo:
+    def add(self, x: int, y: int, /) -> int:
+        return x + y
+
+def add_replacement(self: Foo, x: int, y: int, /) -> int:
+    return x * y
+
+original_add = Foo.add
+
+def requires_true(value: Literal[True]) -> None:
+    assert value
+
+Foo.add = add_replacement
+requires_true(Foo.add is original_add)  # accepted; assertion fails at runtime
+
+def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
+    return x + y
+
+Foo.add = incompatible_replacement  # error: [invalid-assignment]
+```
+
+`staticmethod` and `classmethod` attributes cannot yet be replaced this way. If `static` were
+replaced with a plain function, `DescriptorMethods.static(1)` would pass only `1`, as before, but
+`DescriptorMethods().static(1)` would also pass the instance as the first argument. If `class_` were
+replaced, `DescriptorMethods.class_(1)` would stop passing `DescriptorMethods` as the first
+argument, while `DescriptorMethods().class_(1)` would pass the instance instead of the class.
+Supporting these assignments requires replacements with the corresponding decorator (for example,
+`staticmethod(static_replacement)` or `classmethod(class_replacement)`).
+
+```py
+class DescriptorMethods:
+    @staticmethod
+    def static(x: int) -> str:
+        return str(x)
+
+    @classmethod
+    def class_(cls, x: int) -> str:
+        return str(x)
+
+def static_replacement(x: int) -> str:
+    return str(x)
+
+def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
+    return str(x)
+
+DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
+DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class

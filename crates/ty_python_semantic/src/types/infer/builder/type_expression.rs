@@ -1714,6 +1714,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::Range { .. } => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(&subscript.slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`range` instances cannot be specialized"
+                        ));
+                    }
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
@@ -2457,7 +2468,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::TypingSelf
             | SpecialFormType::TypeAlias
-            | SpecialFormType::TypedDict
+            | SpecialFormType::TypedDict(_)
             | SpecialFormType::Unknown
             | SpecialFormType::Divergent
             | SpecialFormType::Todo

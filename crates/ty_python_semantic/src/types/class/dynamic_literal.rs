@@ -10,6 +10,7 @@ use crate::{
         SubclassOfType, Type,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
+            typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
@@ -421,12 +422,8 @@ impl<'db> DynamicClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-            ClassMemberResult::TypedDict => {
-                // Simplified `TypedDict` handling without type mapping.
-                KnownClass::TypedDictFallback
-                    .to_class_literal(db)
-                    .find_name_in_mro_with_policy(db, name, policy)
-                    .expect("Will return Some() when called on class literal")
+            ClassMemberResult::TypedDict(module) => {
+                typed_dict_fallback_class_member(db, module, policy, name)
             }
         }
     }

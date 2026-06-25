@@ -37,7 +37,10 @@ class panel:
         """Set the panel's user pointer to obj."""
 
     def show(self) -> None:
-        """Display the panel (which might have been hidden)."""
+        """Display the panel (which might have been hidden).
+
+        The panel is placed on top of the panel stack.
+        """
 
     def top(self) -> None:
         """Push panel to the top of the stack."""
@@ -52,7 +55,10 @@ def bottom_panel() -> panel:
     """Return the bottom panel in the panel stack."""
 
 def new_panel(win: window, /) -> panel:
-    """Return a panel object, associating it with the given window win."""
+    """Return a panel object, associating it with the given window win.
+
+    The new panel is placed on top of the panel stack.
+    """
 
 def top_panel() -> panel:
     """Return the top panel in the panel stack."""

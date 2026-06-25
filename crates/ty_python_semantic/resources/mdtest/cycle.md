@@ -46,6 +46,81 @@ while 1:
     y = (y, *y)
 ```
 
+## Literal reduction during cycle recovery
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3851>. Constructing a union
+during cycle recovery must not run redundancy checks between a literal and a protocol instance.
+Resolving the protocol interface can depend on the expression inference query that is already being
+recovered, which would introduce a new Salsa cycle.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, runtime_checkable
+
+_: Any
+
+@property
+def prop(self) -> A:
+    raise NotImplementedError
+
+@runtime_checkable
+class B(Protocol):
+    _: A
+
+x = 5
+
+while isinstance(x, B):
+    x = B()  # error: [call-non-callable]
+
+type(x)
+x = 2
+
+from typing import Any, assert_type
+
+assert_type(prop, property)
+
+if bool:
+    x = 5
+
+while isinstance(x, B):
+    x = B()  # error: [call-non-callable]
+
+class A: ...
+```
+
+## Literal widening during cycle recovery
+
+Once a recursively growing group of integer literals widens to `int`, later iterations must not
+reintroduce individual literals. Otherwise, the inferred type continues changing and the cycle never
+converges. This is a reduced regression test from SciPy's iterative sparse solvers.
+
+```py
+def solve(maxiter, a, b, c, d, e):
+    iteration = 0
+    stop = 0
+    while iteration < maxiter:
+        iteration = iteration + 1
+        if iteration >= maxiter:
+            stop = 7
+        if a:
+            stop = 6
+        if b:
+            stop = 5
+        if c:
+            stop = 4
+        if d:
+            stop = 3
+        if e:
+            stop = 2
+        if stop > 0:
+            break
+    return stop
+```
+
 ## Self-referential bare type alias
 
 ```toml
@@ -242,31 +317,6 @@ X = NewType("X", C)
 Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
 min(Y)
 T = f()
-```
-
-## Type replacement with a lazy function signature
-
-Type replacement while recovering the first `function` definition must not evaluate its lazy
-signature. The definition's reachability depends on the enclosing loop header through the match
-pattern. Evaluating the signature during `infer_definition_types` cycle recovery would therefore
-introduce a new `loop_header_reachability` dependency, which Salsa rejects.
-
-```toml
-[environment]
-python-version = "3.10"
-```
-
-```py
-lambda: function
-for factory in (lambda: (function for _ in factory),):  # error: [not-iterable]
-    match 0:
-        case missing():  # error: [unresolved-reference]
-            def function(): ...
-
-        case factory():  # error: [invalid-match-pattern]
-            ...
-        case 0:
-            def function(): ...
 ```
 
 ## Lazy cached property behind `hasattr`

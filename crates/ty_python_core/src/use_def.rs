@@ -626,17 +626,53 @@ static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
         narrowing_constraints: NarrowingConstraintsBuilder::default().build(),
     });
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+enum RetainedDefinitionState<'db> {
+    Unused(Definition<'db>),
+    Used(Definition<'db>),
+    Undefined,
+    Deleted,
+}
+
+impl<'db> RetainedDefinitionState<'db> {
+    fn new(state: DefinitionState<'db>, used: bool) -> Self {
+        match state {
+            DefinitionState::Defined(definition) if used => Self::Used(definition),
+            DefinitionState::Defined(definition) => Self::Unused(definition),
+            DefinitionState::Undefined => {
+                debug_assert!(!used);
+                Self::Undefined
+            }
+            DefinitionState::Deleted => {
+                debug_assert!(!used);
+                Self::Deleted
+            }
+        }
+    }
+
+    fn state(self) -> DefinitionState<'db> {
+        match self {
+            Self::Unused(definition) | Self::Used(definition) => {
+                DefinitionState::Defined(definition)
+            }
+            Self::Undefined => DefinitionState::Undefined,
+            Self::Deleted => DefinitionState::Deleted,
+        }
+    }
+
+    fn is_used(self) -> bool {
+        matches!(self, Self::Used(_))
+    }
+}
+
+static_assertions::assert_eq_size!(RetainedDefinitionState<'static>, DefinitionState<'static>);
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
-    all_definitions: FrozenIndexVec<ScopedDefinitionId, DefinitionState<'db>>,
-
-    /// A bitset-like map indicating whether each binding definition has at least one use.
-    ///
-    /// This uses the same index as `all_definitions`.
-    used_bindings: FrozenIndexVec<ScopedDefinitionId, bool>,
+    all_definitions: FrozenIndexVec<ScopedDefinitionId, RetainedDefinitionState<'db>>,
 
     /// Constraint lookup tables, absent when all retained constraints are built-in terminal
     /// values that require no table lookup.
@@ -775,7 +811,7 @@ impl<'db> UseDefMap<'db> {
     ) -> impl Iterator<Item = (ScopedDefinitionId, DefinitionState<'db>, bool)> + '_ {
         self.all_definitions
             .iter_enumerated()
-            .map(|(id, &state)| (id, state, self.used_bindings[id]))
+            .map(|(id, &state)| (id, state.state(), state.is_used()))
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -836,7 +872,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {
-        self.all_definitions[id]
+        self.all_definitions[id].state()
     }
 
     pub fn narrowing_evaluator(
@@ -1126,7 +1162,7 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 
 #[derive(Clone, Debug)]
 pub struct BindingWithConstraintsIterator<'map, 'db> {
-    all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
+    all_definitions: &'map IndexSlice<ScopedDefinitionId, RetainedDefinitionState<'db>>,
     constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     inner: LiveBindingsIterator<'map>,
@@ -1153,7 +1189,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
         self.inner
             .next()
             .map(|live_binding| BindingWithConstraints {
-                binding: self.all_definitions[live_binding.binding()],
+                binding: self.all_definitions[live_binding.binding()].state(),
                 binding_order: live_binding.binding(),
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: live_binding.narrowing_constraint(),
@@ -1195,7 +1231,7 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
 
 #[derive(Clone)]
 pub struct DeclarationsIterator<'map, 'db> {
-    all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
+    all_definitions: &'map IndexSlice<ScopedDefinitionId, RetainedDefinitionState<'db>>,
     constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     inner: LiveDeclarationsIterator<'map>,
@@ -1233,7 +1269,7 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
                  reachability_constraint,
              }| {
                 DeclarationWithConstraint {
-                    declaration: self.all_definitions[*declaration],
+                    declaration: self.all_definitions[*declaration].state(),
                     declaration_order: *declaration,
                     reachability_constraint: *reachability_constraint,
                 }
@@ -2535,10 +2571,15 @@ impl<'db> UseDefMapBuilder<'db> {
                 narrowing_constraints,
             })
         });
+        let all_definitions = self
+            .all_definitions
+            .into_iter()
+            .zip(self.used_bindings)
+            .map(|(state, used)| RetainedDefinitionState::new(state, used))
+            .collect();
 
         UseDefMap {
-            all_definitions: self.all_definitions.into(),
-            used_bindings: self.used_bindings.into(),
+            all_definitions,
             constraint_tables,
             interned_bindings,
             interned_declarations,

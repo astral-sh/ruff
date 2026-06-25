@@ -1217,6 +1217,61 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
+///
+/// Each callable argument places a distinct union upper bound on `T` through callable-parameter
+/// contravariance. Fully materializing the conjunction of these bounds would require constructing
+/// the cross product of all union alternatives. Factored path bounds and bounded intersection
+/// keep the work bounded instead.
+fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
+    const NUM_CLAUSES: usize = 12;
+    const ALTERNATIVES_PER_CLAUSE: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "from collections.abc import Callable\n\n".to_string();
+    for clause in 0..NUM_CLAUSES {
+        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
+            writeln!(&mut code, "class C{clause}_{alternative}: ...").ok();
+        }
+    }
+
+    code.push_str("\ndef infer[T](\n");
+    for clause in 0..NUM_CLAUSES {
+        writeln!(&mut code, "    consumer{clause}: Callable[[T], None],").ok();
+    }
+    code.push_str(") -> T:\n    raise NotImplementedError\n\n");
+
+    for clause in 0..NUM_CLAUSES {
+        write!(&mut code, "def consume{clause}(value: ").ok();
+        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
+            if alternative > 0 {
+                code.push_str(" | ");
+            }
+            write!(&mut code, "C{clause}_{alternative}").ok();
+        }
+        code.push_str(") -> None: ...\n");
+    }
+
+    code.push_str("\nresult = infer(\n");
+    for clause in 0..NUM_CLAUSES {
+        writeln!(&mut code, "    consume{clause},").ok();
+    }
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[factored_upper_bounds]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
     let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
@@ -1522,6 +1577,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
+    benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
