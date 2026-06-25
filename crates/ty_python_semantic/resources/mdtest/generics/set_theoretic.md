@@ -2,6 +2,8 @@
 
 This test suite explores the interplay between generics and set theoretic gradual types.
 
+## General relationships
+
 ```toml
 [environment]
 python-version = "3.14"
@@ -324,11 +326,68 @@ We can verify all three relations in ty:
 
 ```pyi
 static_assert(is_equivalent_to(Co[P] & ~Co[Any], Co[P] & ~Bottom[Co[Any]] & Any))
-static_assert(is_equivalent_to(Contra[P] & ~Contra[Any], Contra[P] & ~Bottom[Contra[Any]] & Any))
-static_assert(is_equivalent_to(Invariant[P] & ~Invariant[Any], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
-
-# The simplification is independent of the order in which the intersection elements are added.
 static_assert(is_equivalent_to(~Co[Any] & Co[P], Co[P] & ~Bottom[Co[Any]] & Any))
+
+static_assert(is_equivalent_to(Contra[P] & ~Contra[Any], Contra[P] & ~Bottom[Contra[Any]] & Any))
 static_assert(is_equivalent_to(~Contra[Any] & Contra[P], Contra[P] & ~Bottom[Contra[Any]] & Any))
+
+static_assert(is_equivalent_to(Invariant[P] & ~Invariant[Any], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
 static_assert(is_equivalent_to(~Invariant[Any] & Invariant[P], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
+```
+
+## Edge cases
+
+The simplification must preserve the identities of type variables and `NewType` instances:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```pyi
+from typing import Any, NewType
+from ty_extensions import is_equivalent_to, static_assert
+
+class P: ...
+class Q: ...
+
+class Co[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+CoId = NewType("CoId", Co[P])
+
+def preserve_typevar[T: Co[P]](value: T & Co[Any]) -> T:
+    return value
+
+def preserve_newtype(value: CoId & Co[Any]) -> CoId:
+    return value
+```
+
+Tuple specializations carry information about their length and individual element types in addition
+to the aggregate type argument. Tuple shapes therefore need to match for the generalization to
+apply:
+
+```pyi
+static_assert(is_equivalent_to(tuple[int, str] & ~tuple[Any], tuple[int, str]))
+```
+
+For matching fixed-length tuples, intersections are simplified element-wise:
+
+```pyi
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Q], tuple[P & Any, Q]))
+static_assert(is_equivalent_to(tuple[Any, Q] & tuple[P, Q], tuple[P & Any, Q]))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[P, Any], tuple[P, Q & Any]))
+static_assert(is_equivalent_to(tuple[P, Any] & tuple[P, Q], tuple[P, Q & Any]))
+```
+
+The same element-wise relationship applies when the gradual tuple is negated:
+
+```pyi
+static_assert(is_equivalent_to(tuple[P, Q] & ~tuple[Any, Q], tuple[P, Q] & Any))
+static_assert(is_equivalent_to(~tuple[Any, Q] & tuple[P, Q], tuple[P, Q] & Any))
+
+static_assert(is_equivalent_to(tuple[P, Q] & ~tuple[P, Any], tuple[P, Q] & Any))
+static_assert(is_equivalent_to(~tuple[P, Any] & tuple[P, Q], tuple[P, Q] & Any))
 ```
