@@ -201,7 +201,7 @@ match 56:
     case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
-    case object(S):
+    case object(__class__=S):
         pass
 
 match 12345:
@@ -298,7 +298,7 @@ match 42:
         pass
     case object(foo=G):
         pass
-    case object(H):
+    case object(__class__=H):
         pass
     case I:
         pass
@@ -368,7 +368,7 @@ match 42:
         pass
     case object(foo=G):
         pass
-    case object(H):
+    case object(__class__=H):
         pass
     case I:
         pass

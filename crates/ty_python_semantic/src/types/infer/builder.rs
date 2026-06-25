@@ -107,8 +107,8 @@ use crate::types::{
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    class_pattern_positional_limit, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -2467,48 +2467,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
 
-            let positional_count = pattern.arguments.patterns.len();
-            if positional_count > 0 {
-                let member =
-                    class.class_member(self.db(), "__match_args__", MemberLookupPolicy::default());
-                if let Some(match_args_len) = match member.ignore_possibly_undefined() {
-                    Some(Type::NominalInstance(nominal)) => {
-                        if let Some(len) = nominal
-                            .tuple_spec(self.db())
-                            .and_then(|spec| spec.len().into_fixed_length())
-                        {
-                            Some(len)
-                        } else if nominal
-                            .class(self.db())
-                            .is_known(self.db(), KnownClass::Str)
-                        {
-                            Some(1)
-                        } else {
-                            None
-                        }
-                    }
-                    Some(Type::KnownInstance(known))
-                        if known.class(self.db()) == KnownClass::Str =>
-                    {
-                        Some(1)
-                    }
-                    Some(Type::LiteralValue(literal))
-                        if literal.is_string() || literal.is_literal_string() =>
-                    {
-                        Some(1)
-                    }
-                    _ => None,
-                } {
-                    if positional_count > match_args_len {
-                        report_too_many_positional_patterns_for_match_args(
-                            &self.context,
-                            &pattern.arguments.patterns[match_args_len],
-                            match_args_len,
-                            positional_count,
-                            cls_ty,
-                        );
-                    }
-                }
+            let positional_patterns = &pattern.arguments.patterns;
+            if let Some(positional_limit) = class_pattern_positional_limit(self.db(), class)
+                && let Some(first_excess_pattern) = positional_patterns.get(positional_limit)
+            {
+                report_too_many_positional_patterns_for_match_args(
+                    &self.context,
+                    first_excess_pattern,
+                    positional_limit,
+                    positional_patterns.len(),
+                    cls_ty,
+                );
             }
         } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);

@@ -11,7 +11,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{FixedLengthTuple, TupleType};
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
@@ -347,6 +347,31 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
                 )
             )
         })
+}
+
+/// Return the maximum number of positional subpatterns accepted by `class`.
+///
+/// `None` means that the limit cannot be determined statically, as for a valid variable-length
+/// `__match_args__` tuple or a conditionally defined `__match_args__` member.
+pub(crate) fn class_pattern_positional_limit(
+    db: &dyn Db,
+    class: ClassLiteral<'_>,
+) -> Option<usize> {
+    match class_match_args_type(db, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => Some(1),
+        ClassMatchArgs::Undefined => Some(0),
+        ClassMatchArgs::Defined(match_args) => {
+            if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
+                tuple.as_fixed_length().map(FixedLengthTuple::len)
+            } else if match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+            {
+                Some(0)
+            } else {
+                None
+            }
+        }
+        ClassMatchArgs::PossiblyUndefined => None,
+    }
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.

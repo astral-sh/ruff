@@ -26,7 +26,7 @@ def check(x: Position) -> None:
             pass
 ```
 
-## Limitations
+## Invalid `__match_args__`
 
 ```py
 class Point:
@@ -34,8 +34,28 @@ class Point:
 
 def describe(p: Point) -> None:
     match p:
-        # We cannot infer the length from the `list[str]` type as it has no length information.
-        # This will raise a `TypeError` at runtime.
+        case Point(x):  # error: [invalid-match-pattern]
+            pass
+```
+
+```py
+class Vec:
+    __match_args__ = "coords"
+
+def describe(v: Vec) -> None:
+    match v:
+        case Vec(a):  # error: [invalid-match-pattern]
+            pass
+```
+
+## Unknown `__match_args__` tuple length (no error)
+
+```py
+class Point:
+    __match_args__: tuple[str, ...] = ("x", "y")
+
+def describe(p: Point) -> None:
+    match p:
         case Point(x, y, z):
             pass
 ```
@@ -61,18 +81,6 @@ class Point:
 def describe(p: Point) -> None:
     match p:
         case Point(x, y):
-            pass
-```
-
-## String __match_args__ (single field)
-
-```py
-class Vec:
-    __match_args__ = "coords"
-
-def describe(v: Vec) -> None:
-    match v:
-        case Vec(a, b):  # error: [invalid-match-pattern]
             pass
 ```
 
@@ -104,7 +112,18 @@ def describe(p: Point) -> None:
             pass
 ```
 
-## Dataclass with match_args=False (no __match_args__ synthesized)
+## Missing `__match_args__`
+
+```python
+class Plain: ...
+
+def describe(p: Plain) -> None:
+    match p:
+        case Plain(value):  # error: [invalid-match-pattern]
+            pass
+```
+
+## Dataclass with `match_args=False`
 
 ```python
 from dataclasses import dataclass
@@ -116,7 +135,21 @@ class NoMatch:
 
 def describe(n: NoMatch) -> None:
     match n:
-        case NoMatch(x, y):
+        case NoMatch(x, y):  # error: [invalid-match-pattern]
+            pass
+```
+
+## Built-in match-self classes
+
+```python
+def one_positional(value: int) -> None:
+    match value:
+        case int(_):
+            pass
+
+def two_positionals(value: int) -> None:
+    match value:
+        case int(_, _):  # error: [invalid-match-pattern]
             pass
 ```
 
