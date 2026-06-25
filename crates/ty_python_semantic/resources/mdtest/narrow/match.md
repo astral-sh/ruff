@@ -693,6 +693,359 @@ def failed_sequence_pattern_does_not_narrow_mutable_subject(
                     reveal_type(value)  # revealed: list[int]
 ```
 
+## Correlated constrained type variables
+
+A constrained type variable chooses one constraint for every occurrence. A test in one child pattern
+can therefore refine a capture in a sibling. Narrowing the original subject is stricter: two
+distinct child patterns must test the shared type variable. An upper-bounded type variable is not
+expanded this way because it can specialize to the bound itself, including a union.
+
+```py
+from typing import Generic, Literal, TypeVar, TypedDict, final
+
+@final
+class CorrelatedA: ...
+
+@final
+class CorrelatedB: ...
+
+@final
+class CorrelatedC: ...
+
+CorrelatedT = TypeVar("CorrelatedT", CorrelatedA, CorrelatedB)
+FirstCorrelationT = TypeVar("FirstCorrelationT", CorrelatedA, CorrelatedB)
+SecondCorrelationT = TypeVar("SecondCorrelationT", CorrelatedA, CorrelatedB)
+SequenceCorrelationT = TypeVar(
+    "SequenceCorrelationT",
+    tuple[int],
+    tuple[str],
+)
+PartialSequenceCorrelationT = TypeVar(
+    "PartialSequenceCorrelationT",
+    tuple[int],
+    tuple[int, int],
+)
+BoundedCorrelationT = TypeVar(
+    "BoundedCorrelationT",
+    bound=CorrelatedA | CorrelatedB,
+)
+Expansion0T = TypeVar("Expansion0T", CorrelatedA, CorrelatedB, CorrelatedC)
+Expansion1T = TypeVar("Expansion1T", CorrelatedA, CorrelatedB, CorrelatedC)
+Expansion2T = TypeVar("Expansion2T", CorrelatedA, CorrelatedB, CorrelatedC)
+Expansion3T = TypeVar("Expansion3T", CorrelatedA, CorrelatedB, CorrelatedC)
+
+def exhaustive_or_alias_preserves_typevar(value: CorrelatedT) -> CorrelatedT:
+    match value:
+        case (CorrelatedA() | CorrelatedB()) as whole:
+            reveal_type(whole)  # revealed: CorrelatedT@exhaustive_or_alias_preserves_typevar
+            return whole
+
+def exhaustive_or_alternative_alias_preserves_typevar(
+    value: CorrelatedT,
+) -> CorrelatedT:
+    match value:
+        case (CorrelatedA() as whole) | (CorrelatedB() as whole):
+            # revealed: CorrelatedT@exhaustive_or_alternative_alias_preserves_typevar
+            reveal_type(whole)
+            return whole
+
+def exhaustive_sequence_alias_preserves_typevar(
+    value: SequenceCorrelationT,
+) -> SequenceCorrelationT:
+    match value:
+        case [_] as whole:
+            # revealed: SequenceCorrelationT@exhaustive_sequence_alias_preserves_typevar
+            reveal_type(whole)
+            return whole
+
+def partial_sequence_alias_preserves_typevar(
+    value: PartialSequenceCorrelationT,
+) -> PartialSequenceCorrelationT:
+    match value:
+        case [_] as whole:
+            # revealed: PartialSequenceCorrelationT@partial_sequence_alias_preserves_typevar & tuple[int]
+            reveal_type(whole)
+            return whole
+        case _:
+            raise ValueError
+
+def repeated_typevar_uses_one_constraint(
+    value: tuple[CorrelatedT, CorrelatedT],
+) -> CorrelatedB:
+    match value:
+        case [CorrelatedA() as item, CorrelatedB()]:
+            reveal_type(item)  # revealed: Never
+            return item
+        case _:
+            raise ValueError
+
+def tested_child_refines_sibling_capture(
+    value: tuple[CorrelatedT, CorrelatedT],
+) -> CorrelatedA:
+    match value:
+        case [CorrelatedA(), item]:
+            # revealed: CorrelatedT@tested_child_refines_sibling_capture & CorrelatedA
+            reveal_type(item)
+            return item
+        case _:
+            raise ValueError
+
+# Independent type variables choose their constraints separately. Analyzing both variables must
+# therefore consider every combination of their constraints.
+def independent_typevars_expand_cartesian_product(
+    value: tuple[
+        FirstCorrelationT,
+        FirstCorrelationT,
+        SecondCorrelationT,
+        SecondCorrelationT,
+    ],
+) -> None:
+    match value:
+        case [CorrelatedA(), first, CorrelatedB(), second]:
+            # revealed: FirstCorrelationT@independent_typevars_expand_cartesian_product & CorrelatedA
+            reveal_type(first)
+            # revealed: SecondCorrelationT@independent_typevars_expand_cartesian_product & CorrelatedB
+            reveal_type(second)
+
+def homogeneous_sequence_uses_one_constraint(value: list[CorrelatedT]) -> CorrelatedB:
+    match value:
+        case [CorrelatedA() as item, CorrelatedB()]:
+            reveal_type(item)  # revealed: Never
+            return item
+        case _:
+            raise ValueError
+
+def sequence_rest_uses_the_tested_constraint(value: list[CorrelatedT]) -> None:
+    match value:
+        case [CorrelatedA(), *rest]:
+            # revealed: list[CorrelatedT@sequence_rest_uses_the_tested_constraint] & list[CorrelatedA]
+            reveal_type(rest)
+
+def bounded_typevar_can_use_different_union_members(
+    value: tuple[BoundedCorrelationT, BoundedCorrelationT],
+) -> None:
+    match value:
+        case [CorrelatedA() as item, CorrelatedB()]:
+            # revealed: BoundedCorrelationT@bounded_typevar_can_use_different_union_members & CorrelatedA
+            reveal_type(item)
+
+@final
+class CorrelatedPair(Generic[CorrelatedT]):
+    __match_args__ = ("left", "right")
+    left: CorrelatedT
+    right: CorrelatedT
+
+def correlated_sequence_alternatives_are_exhaustive(
+    value: tuple[CorrelatedT, CorrelatedT],
+) -> int:
+    match value:
+        case [CorrelatedA(), CorrelatedA()] | [CorrelatedB(), CorrelatedB()]:
+            return 1
+
+def incomplete_correlated_sequence_alternatives_can_fall_through(
+    value: tuple[CorrelatedT, CorrelatedT],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [CorrelatedA(), CorrelatedA()]:
+            return 1
+
+def correlated_class_alternatives_are_exhaustive(
+    value: CorrelatedPair[CorrelatedT],
+) -> int:
+    match value:
+        case CorrelatedPair(CorrelatedA(), CorrelatedA()) | CorrelatedPair(CorrelatedB(), CorrelatedB()):
+            return 1
+
+def class_child_refines_sibling_capture(
+    value: CorrelatedPair[CorrelatedT],
+) -> CorrelatedA:
+    match value:
+        case CorrelatedPair(CorrelatedA(), item):
+            # revealed: CorrelatedT@class_child_refines_sibling_capture & CorrelatedA
+            reveal_type(item)
+            return item
+        case _:
+            raise ValueError
+
+def one_child_test_does_not_narrow_subject(value: CorrelatedPair[CorrelatedT]) -> None:
+    match value:
+        case CorrelatedPair(CorrelatedA(), _):
+            # revealed: CorrelatedPair[CorrelatedT@one_child_test_does_not_narrow_subject]
+            reveal_type(value)
+
+def two_child_tests_narrow_subject(value: CorrelatedPair[CorrelatedT]) -> None:
+    match value:
+        case CorrelatedPair(CorrelatedA(), CorrelatedA()):
+            # revealed: CorrelatedPair[CorrelatedT@two_child_tests_narrow_subject] & CorrelatedPair[CorrelatedA]
+            reveal_type(value)
+
+def later_class_alias_keeps_positive_constraint(
+    value: CorrelatedPair[CorrelatedT],
+) -> CorrelatedPair[CorrelatedB]:
+    match value:
+        case CorrelatedPair(CorrelatedA(), CorrelatedA()):
+            raise ValueError
+        case CorrelatedPair(CorrelatedB(), CorrelatedB()) as whole:
+            return whole
+
+def later_sequence_alias_keeps_positive_constraint(
+    value: tuple[CorrelatedT, CorrelatedT],
+) -> tuple[CorrelatedB, CorrelatedB]:
+    match value:
+        case [CorrelatedA(), CorrelatedA()]:
+            raise ValueError
+        case [CorrelatedB(), CorrelatedB()] as whole:
+            return whole
+
+def mapping_siblings_share_one_constraint(value: dict[str, CorrelatedT]) -> CorrelatedB:
+    match value:
+        case {"left": CorrelatedA() as item, "right": CorrelatedB()}:
+            reveal_type(item)  # revealed: Never
+            return item
+        case _:
+            raise ValueError
+
+def mapping_test_refines_sibling_capture(value: dict[str, CorrelatedT]) -> CorrelatedA:
+    match value:
+        case {"kind": CorrelatedA(), "item": item}:
+            # revealed: CorrelatedT@mapping_test_refines_sibling_capture & CorrelatedA
+            reveal_type(item)
+            return item
+        case _:
+            raise ValueError
+
+def mapping_rest_uses_the_tested_constraint(value: dict[str, CorrelatedT]) -> None:
+    match value:
+        case {"kind": CorrelatedA(), **rest}:
+            # revealed: dict[str, CorrelatedT@mapping_rest_uses_the_tested_constraint] & dict[str, CorrelatedA]
+            reveal_type(rest)
+
+class CorrelatedIntPayload(TypedDict):
+    kind: Literal["int"]
+    item: int
+
+class CorrelatedStrPayload(TypedDict):
+    kind: Literal["str"]
+    item: str
+
+CorrelatedPayloadT = TypeVar(
+    "CorrelatedPayloadT",
+    CorrelatedIntPayload,
+    CorrelatedStrPayload,
+)
+
+def direct_mapping_subject_uses_the_selected_constraint(
+    value: CorrelatedPayloadT,
+) -> str:
+    match value:
+        case {"kind": "str", "item": item, **rest}:
+            reveal_type(item)  # revealed: str
+            reveal_type(rest)  # revealed: dict[str, object]
+            return item
+        case _:
+            raise ValueError
+
+class CorrelatedBase(Generic[CorrelatedT]):
+    __match_args__ = ("item",)
+    item: CorrelatedT
+
+class CorrelatedLeft(CorrelatedBase[CorrelatedT]): ...
+class CorrelatedRight(CorrelatedBase[CorrelatedT]): ...
+
+class ThreeWayPair(Generic[Expansion0T]):
+    __match_args__ = ("left", "right")
+    left: Expansion0T
+    right: Expansion0T
+
+def union_arms_are_not_sibling_tests(
+    value: CorrelatedLeft[CorrelatedT] | CorrelatedRight[CorrelatedT],
+) -> None:
+    match value:
+        case CorrelatedBase(CorrelatedA()):
+            # revealed: CorrelatedLeft[CorrelatedT@union_arms_are_not_sibling_tests] | CorrelatedRight[CorrelatedT@union_arms_are_not_sibling_tests]
+            reveal_type(value)
+
+def or_alternatives_are_not_sibling_tests(
+    value: ThreeWayPair[Expansion0T],
+) -> None:
+    match value:
+        case ThreeWayPair(CorrelatedA() | CorrelatedB(), _):
+            # revealed: ThreeWayPair[Expansion0T@or_alternatives_are_not_sibling_tests]
+            reveal_type(value)
+
+class CorrelatedOuter(Generic[CorrelatedT]):
+    __match_args__ = ("pair",)
+    pair: CorrelatedPair[CorrelatedT]
+
+def nested_sibling_tests_narrow_parent(value: CorrelatedOuter[CorrelatedT]) -> None:
+    match value:
+        case CorrelatedOuter(CorrelatedPair(CorrelatedA(), CorrelatedA())):
+            # revealed: CorrelatedOuter[CorrelatedT@nested_sibling_tests_narrow_parent] & CorrelatedOuter[CorrelatedA]
+            reveal_type(value)
+
+def excessive_constraint_combinations_fall_back(
+    value: tuple[
+        Expansion0T,
+        Expansion0T,
+        Expansion1T,
+        Expansion1T,
+        Expansion2T,
+        Expansion2T,
+        Expansion3T,
+        Expansion3T,
+    ],
+) -> None:
+    match value:
+        case [
+            CorrelatedA(),
+            first,
+            CorrelatedA(),
+            second,
+            CorrelatedA(),
+            third,
+            CorrelatedA(),
+            fourth,
+        ]:
+            # The 81 possible combinations exceed the expansion limit.
+            reveal_type(first)  # revealed: Expansion0T@excessive_constraint_combinations_fall_back
+            reveal_type(fourth)  # revealed: Expansion3T@excessive_constraint_combinations_fall_back
+            # revealed: tuple[Expansion0T@excessive_constraint_combinations_fall_back, Expansion0T@excessive_constraint_combinations_fall_back, Expansion1T@excessive_constraint_combinations_fall_back, Expansion1T@excessive_constraint_combinations_fall_back, Expansion2T@excessive_constraint_combinations_fall_back, Expansion2T@excessive_constraint_combinations_fall_back, Expansion3T@excessive_constraint_combinations_fall_back, Expansion3T@excessive_constraint_combinations_fall_back] & <Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+```
+
+The same relationship is preserved when the repeated type variable appears through a generic type
+alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar, final
+
+@final
+class AliasCorrelationA: ...
+
+@final
+class AliasCorrelationB: ...
+
+AliasCorrelationT = TypeVar("AliasCorrelationT", AliasCorrelationA, AliasCorrelationB)
+
+type CorrelatedAlias[T] = tuple[T, T]
+
+def generic_alias_uses_one_constraint(
+    value: CorrelatedAlias[AliasCorrelationT],
+) -> AliasCorrelationB:
+    match value:
+        case [AliasCorrelationA() as item, AliasCorrelationB()]:
+            reveal_type(item)  # revealed: Never
+            return item
+        case _:
+            raise ValueError
+```
+
 ## Indirect class patterns
 
 A class pattern can use a variable whose type is `type[Class]`. Both the subject and an `as` binding
@@ -1591,6 +1944,18 @@ def nested_list_pattern_does_not_keep_index_types_after_mutation(
             value[0].reverse()
             reveal_type(value[0][0])  # revealed: int | str
 
+ConstrainedPayloadT = TypeVar(
+    "ConstrainedPayloadT",
+    TaggedPayload[Literal["int"], int],
+    TaggedPayload[Literal["str"], str],
+)
+
+def constrained_typevar_subject_uses_nested_test(value: ConstrainedPayloadT) -> None:
+    match value:
+        case TaggedPayload("int", _):
+            # revealed: ConstrainedPayloadT@constrained_typevar_subject_uses_nested_test & TaggedPayload[Literal["int"], int]
+            reveal_type(value)
+
 def match_class_or_pattern_narrows_subject(
     value: (TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool]),
 ) -> None:
@@ -2032,6 +2397,44 @@ def builtin_positional_behavior_comes_from_pattern_class(
 ) -> int:
     match value:
         case PlainBase(_):
+            return 1
+```
+
+## Class patterns with constrained type variables
+
+A class pattern is exhaustive for a constrained type variable when every possible constraint has the
+requested attribute. If one constraint can lack the attribute, the match can still fall through.
+
+```py
+from typing import TypeVar, final
+
+class PatternBase: ...
+
+@final
+class FirstWithX(PatternBase):
+    x: int = 0
+
+@final
+class SecondWithX(PatternBase):
+    x: int = 0
+
+@final
+class WithoutX(PatternBase): ...
+
+AllWithX = TypeVar("AllWithX", FirstWithX, SecondWithX)
+PossiblyWithoutX = TypeVar("PossiblyWithoutX", FirstWithX, WithoutX)
+
+def constrained_typevar_is_exhaustive(value: AllWithX) -> int:
+    match value:
+        case PatternBase(x=_):
+            return 1
+
+def constrained_typevar_can_fall_through(
+    value: PossiblyWithoutX,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PatternBase(x=_):
             return 1
 ```
 
