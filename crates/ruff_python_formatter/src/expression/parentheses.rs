@@ -110,20 +110,19 @@ pub enum Parentheses {
     Never,
 }
 
-/// Index of source offsets immediately inside parentheses.
+/// Index of source ranges enclosed by matching parentheses.
 ///
 /// Formatting frequently needs to know if an expression was parenthesized in the source. Building
 /// this index once avoids re-tokenizing the source for every expression.
 #[derive(Debug)]
 pub(crate) struct ParenthesesIndex {
-    starts_after_l_paren: FxHashSet<TextSize>,
-    ends_before_r_paren: FxHashSet<TextSize>,
+    ranges: FxHashSet<TextRange>,
 }
 
 impl ParenthesesIndex {
     pub(crate) fn from_tokens(tokens: &Tokens) -> Self {
-        let mut starts_after_l_paren = FxHashSet::default();
-        let mut ends_before_r_paren = FxHashSet::default();
+        let mut ranges = FxHashSet::default();
+        let mut stack = Vec::<Option<TextSize>>::new();
         let mut previous = None::<Token>;
 
         for token in tokens.iter().copied() {
@@ -131,27 +130,33 @@ impl ParenthesesIndex {
                 continue;
             }
 
-            if previous.is_some_and(|previous| previous.kind() == TokenKind::Lpar) {
-                starts_after_l_paren.insert(token.start());
-            }
-            if token.kind() == TokenKind::Rpar
-                && let Some(previous) = previous
-            {
-                ends_before_r_paren.insert(previous.end());
+            match token.kind() {
+                TokenKind::Lpar => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                    stack.push(None);
+                }
+                TokenKind::Rpar => {
+                    if let (Some(Some(start)), Some(previous)) = (stack.pop(), previous) {
+                        ranges.insert(TextRange::new(start, previous.end()));
+                    }
+                }
+                _ => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                }
             }
 
             previous = Some(token);
         }
 
-        Self {
-            starts_after_l_paren,
-            ends_before_r_paren,
-        }
+        Self { ranges }
     }
 
     pub(crate) fn is_expression_parenthesized(&self, expression: ExprRef) -> bool {
-        self.starts_after_l_paren.contains(&expression.start())
-            && self.ends_before_r_paren.contains(&expression.end())
+        self.ranges.contains(&expression.range())
     }
 }
 
