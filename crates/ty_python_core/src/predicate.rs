@@ -187,6 +187,27 @@ impl<'db> SequencePatternPredicateKind<'db> {
     }
 }
 
+/// Structural details for a class pattern.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternPredicateKind<'db> {
+    pub class: Expression<'db>,
+    pub positional: Box<[PatternPredicateKind<'db>]>,
+    pub positional_irrefutable: bool,
+    pub keywords: Box<[ClassPatternKeywordPredicateKind<'db>]>,
+}
+
+impl ClassPatternPredicateKind<'_> {
+    pub fn is_empty(&self) -> bool {
+        self.positional.is_empty() && self.keywords.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternKeywordPredicateKind<'db> {
+    pub attr: Name,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
 /// Pattern structure used for type narrowing, static reachability, and inferring the types of
 /// names bound by a successful match.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
@@ -194,7 +215,7 @@ pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Box<[PatternPredicateKind<'db>]>),
-    Class(Expression<'db>, ClassPatternKind),
+    Class(ClassPatternPredicateKind<'db>),
     Mapping(ClassPatternKind),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),

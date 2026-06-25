@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
 use ty_python_core::predicate::{
-    ClassPatternKind, PatternPredicateKind, SequencePatternPredicateKind,
+    ClassPatternPredicateKind, PatternPredicateKind, SequencePatternPredicateKind,
 };
 
 use crate::Db;
@@ -11,8 +11,8 @@ use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
+    CallableType, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
+    Parameters, Signature, SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
     infer_same_file_expression_type,
 };
 
@@ -167,6 +167,59 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
         .build()
 }
 
+/// Return whether every value in `subject_ty` is statically guaranteed to match this class pattern.
+///
+/// Attribute subpatterns are checked recursively against their statically known member types. The
+/// subject's class can provide members that are absent from the class named in the pattern.
+///
+/// ```python
+/// class Base: ...
+///
+/// class Child(Base):
+///     x: int
+///
+/// # Exhaustive for a `Child` subject because `Child.x` is definitely bound.
+/// case Base(x=_): ...
+/// ```
+fn class_pattern_is_exhaustive(
+    db: &dyn Db,
+    class: ClassLiteral<'_>,
+    subject_ty: Type<'_>,
+    kind: &ClassPatternPredicateKind<'_>,
+) -> bool {
+    let class_instance_ty = Type::instance(db, class.top_materialization(db));
+    if !subject_ty.is_subtype_of(db, class_instance_ty) {
+        return false;
+    }
+
+    if kind.is_empty() {
+        return true;
+    }
+
+    if !kind.positional_irrefutable {
+        return false;
+    }
+
+    kind.keywords.iter().all(|keyword| {
+        member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
+    })
+}
+
+/// Return whether `name` is definitely bound and `pattern` consumes its entire static member type.
+fn member_pattern_is_exhaustive(
+    db: &dyn Db,
+    instance_ty: Type<'_>,
+    name: &str,
+    pattern: &PatternPredicateKind<'_>,
+) -> bool {
+    let place = instance_ty.member(db, name).place;
+    place.is_definitely_bound()
+        && place
+            .raw_type()
+            .is_some_and(|member_ty| pattern_is_exhaustive_for_subject(db, pattern, member_ty))
+}
+
+/// Return whether `pattern` is statically guaranteed to match every value in `subject_ty`.
 fn pattern_is_exhaustive_for_subject(
     db: &dyn Db,
     pattern: &PatternPredicateKind<'_>,
@@ -178,6 +231,10 @@ fn pattern_is_exhaustive_for_subject(
     )
 }
 
+/// Return whether an exact tuple subject is fully consumed by a sequence pattern.
+///
+/// Each aligned element is checked with the subject-aware matcher so nested class patterns use the
+/// tuple element's actual static type.
 fn sequence_pattern_is_exhaustive_for_subject(
     db: &dyn Db,
     kind: &SequencePatternPredicateKind<'_>,
@@ -219,46 +276,28 @@ fn sequence_pattern_is_exhaustive_for_subject(
         .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, pattern, *element))
 }
 
-fn subject_independent_definite_match_pattern_type<'db>(
-    db: &'db dyn Db,
-    kind: &PatternPredicateKind<'db>,
-) -> Option<Type<'db>> {
-    match kind {
-        PatternPredicateKind::Singleton(_)
-        | PatternPredicateKind::Class(_, ClassPatternKind::Irrefutable)
-        | PatternPredicateKind::Mapping(ClassPatternKind::Irrefutable) => {
-            Some(definite_match_pattern_type(db, kind))
-        }
-        PatternPredicateKind::Sequence(sequence) if sequence.is_irrefutable() => {
-            Some(definite_match_pattern_type(db, kind))
-        }
-        PatternPredicateKind::Or(patterns) => {
-            let patterns = patterns
-                .iter()
-                .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
-                .collect::<Option<Vec<_>>>()?;
-            Some(UnionType::from_elements(db, patterns))
-        }
-        PatternPredicateKind::As(Some(pattern), _) => {
-            subject_independent_definite_match_pattern_type(db, pattern)
-        }
-        PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => Some(Type::object()),
-        PatternPredicateKind::Value(_)
-        | PatternPredicateKind::Class(_, ClassPatternKind::Refutable)
-        | PatternPredicateKind::Mapping(ClassPatternKind::Refutable)
-        | PatternPredicateKind::Sequence(_) => None,
-    }
-}
-
-/// Return values that are statically guaranteed to match `kind`, using `subject_ty` to recognize
-/// cases where the pattern covers a complete subject arm.
+/// Return the values that are statically guaranteed to match `kind`, using `subject_ty` when the
+/// answer depends on the subject.
 ///
-/// Unlike [`definite_match_pattern_type`], this can recognize guarantees that depend on the
-/// current subject. For example, both `Literal[True]` and `Literal[1]` are guaranteed to match the
-/// value pattern `1` because match value patterns use equality. The returned type can include
-/// values outside `subject_ty`; callers intersect it with the subject before using it for negative
-/// narrowing. Keeping the non-exhaustive part independent of the subject also prevents each case
-/// in a long match statement from embedding all previous negative constraints again.
+/// This is an under-approximation used for negative narrowing and ordered alternatives: callers
+/// may subtract the result from `subject_ty` under ty's static member model. A subject-independent
+/// pattern can return a type wider than `subject_ty`; for example, `case Base()` returns `Base`
+/// even for a `Child` subject. Class patterns need the current subject type when member extraction
+/// depends on the subject's statically known members.
+/// A subject-independent pattern can return its context-free definite-match type directly. A
+/// definitely bound descriptor is treated as successful even though it could raise at runtime.
+/// The same rule is propagated through nested sequence, `or`, and `as` patterns.
+///
+/// ```python
+/// class Base:
+///     x: int
+///
+/// class Child(Base):
+///     pass
+///
+/// # For a `tuple[Child]` subject, this checks `x` on `Child`, not only on `Base`.
+/// case [Base(x=_)]: ...
+/// ```
 pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
@@ -284,30 +323,54 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
             if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
-                subject_ty
-            } else {
-                definite_match_pattern_type(db, kind)
+                return subject_ty;
+            }
+        }
+        PatternPredicateKind::Class(kind) => {
+            let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
+            match class_ty {
+                Type::ClassLiteral(class) => {
+                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
+                        return subject_ty;
+                    }
+                }
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_empty()
+                        && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
+                {
+                    return callable_pattern_type(db);
+                }
+                _ => {}
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
+            return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
                 subject_ty
             } else {
-                definite_sequence_pattern_type(db, kind)
-            }
+                // A nested subject-dependent pattern rejected the context-free approximation.
+                // Reusing that approximation for the surrounding sequence would reintroduce the
+                // values that the recursive analysis deliberately excluded.
+                Type::Never
+            };
         }
-        PatternPredicateKind::Or(patterns) => UnionType::from_elements(
-            db,
-            patterns
-                .iter()
-                .map(|pattern| definite_match_pattern_type_for_subject(db, pattern, subject_ty)),
-        ),
+        PatternPredicateKind::Or(patterns) => {
+            return UnionType::from_elements(
+                db,
+                patterns.iter().map(|pattern| {
+                    definite_match_pattern_type_for_subject(db, pattern, subject_ty)
+                }),
+            );
+        }
         PatternPredicateKind::As(Some(pattern), _) => {
-            definite_match_pattern_type_for_subject(db, pattern, subject_ty)
+            return definite_match_pattern_type_for_subject(db, pattern, subject_ty);
         }
-        PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
-        _ => definite_match_pattern_type(db, kind),
+        _ => return Type::Never,
     }
+
+    IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_positive(definite_match_pattern_type(db, kind))
+        .build()
 }
 
 /// Return the part of `subject_ty` that can reach a later alternative after `kind` fails.
@@ -455,6 +518,53 @@ fn is_same_enum_pattern_domain<'db>(
     }
 }
 
+/// Return the definite-match type when it does not depend on the current subject type.
+///
+/// `None` means that callers must use subject-aware analysis instead of falling back to the
+/// context-free approximation. In particular, attribute class patterns can depend on members of
+/// the static subject type.
+fn subject_independent_definite_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Type<'db>> {
+    match kind {
+        PatternPredicateKind::Class(kind) => {
+            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+                Type::ClassLiteral(class) if kind.is_empty() => {
+                    Some(Type::instance(db, class.top_materialization(db)))
+                }
+                Type::ClassLiteral(_) => None,
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
+                    Some(callable_pattern_type(db))
+                }
+                _ => Some(Type::Never),
+            }
+        }
+        PatternPredicateKind::Sequence(kind) => {
+            build_definite_sequence_pattern_type(db, kind, |pattern| {
+                subject_independent_definite_match_pattern_type(db, pattern)
+            })
+        }
+        PatternPredicateKind::Mapping(kind) => {
+            if kind.is_irrefutable() {
+                Some(mapping_pattern_type(db))
+            } else {
+                None
+            }
+        }
+        PatternPredicateKind::Or(patterns) => patterns
+            .iter()
+            .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
+            .collect::<Option<Vec<_>>>()
+            .map(|types| UnionType::from_elements(db, types)),
+        PatternPredicateKind::As(Some(pattern), _) => {
+            subject_independent_definite_match_pattern_type(db, pattern)
+        }
+        PatternPredicateKind::Value(_) => None,
+        _ => Some(definite_match_pattern_type(db, kind)),
+    }
+}
+
 /// Return the values that are guaranteed to match `kind`.
 ///
 /// Reachability and negative narrowing can only subtract this under-approximation.
@@ -475,17 +585,15 @@ pub(crate) fn definite_match_pattern_type<'db>(
                 Type::Never
             }
         }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            if kind.is_irrefutable() {
-                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db)
-                    }
-                    _ => Type::Never,
+        PatternPredicateKind::Class(kind) => {
+            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+                Type::ClassLiteral(class) if kind.is_empty() => {
+                    Type::instance(db, class.top_materialization(db))
                 }
-            } else {
-                Type::Never
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
+                    callable_pattern_type(db)
+                }
+                _ => Type::Never,
             }
         }
         PatternPredicateKind::Mapping(kind) => {
@@ -511,36 +619,51 @@ pub(crate) fn definite_match_pattern_type<'db>(
 }
 
 /// Return the values that are guaranteed to match a sequence pattern.
-pub(crate) fn definite_sequence_pattern_type<'db>(
+fn definite_sequence_pattern_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
+    build_definite_sequence_pattern_type(db, kind, |pattern| {
+        Some(definite_match_pattern_type(db, pattern))
+    })
+    .unwrap_or(Type::Never)
+}
+
+fn build_definite_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    mut element_type: impl FnMut(&PatternPredicateKind<'db>) -> Option<Type<'db>>,
+) -> Option<Type<'db>> {
     if kind.is_irrefutable() {
-        return sequence_pattern_type_builder(db).build();
+        return Some(sequence_pattern_type_builder(db).build());
     }
 
     if let Some((prefix, suffix)) = kind.split_around_star() {
-        return Type::tuple(TupleType::mixed(
+        let prefix_types = prefix
+            .iter()
+            .map(&mut element_type)
+            .collect::<Option<Vec<_>>>()?;
+        let suffix_types = suffix
+            .iter()
+            .map(&mut element_type)
+            .collect::<Option<Vec<_>>>()?;
+        return Some(Type::tuple(TupleType::mixed(
             db,
-            prefix
-                .iter()
-                .map(|pattern| definite_match_pattern_type(db, pattern)),
+            prefix_types,
             Type::object(),
-            suffix
-                .iter()
-                .map(|pattern| definite_match_pattern_type(db, pattern)),
-        ));
+            suffix_types,
+        )));
     }
 
     let element_types: Vec<_> = kind
         .patterns
         .iter()
-        .map(|pattern| definite_match_pattern_type(db, pattern))
-        .collect();
+        .map(element_type)
+        .collect::<Option<_>>()?;
 
     if element_types.iter().any(Type::is_never) {
-        Type::Never
+        Some(Type::Never)
     } else {
-        exact_sequence_pattern_type(db, element_types.into_iter())
+        Some(exact_sequence_pattern_type(db, element_types.into_iter()))
     }
 }

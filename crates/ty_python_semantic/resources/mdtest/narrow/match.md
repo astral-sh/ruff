@@ -732,6 +732,129 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
             reveal_type(item)  # revealed: Never
 ```
 
+## Properties and declared attributes
+
+Properties and declared attributes count as present when checking exhaustiveness, even though
+descriptor access can raise `AttributeError` and an annotated attribute can be absent at runtime:
+
+```py
+from typing import Literal
+
+class FallibleProperty:
+    @property
+    def x(self) -> Literal[1]:
+        raise AttributeError
+
+def fallible_property_value_pattern_is_statically_exhaustive(value: FallibleProperty) -> int:
+    match value:
+        case FallibleProperty(x=1):
+            return 1
+
+class DeclaredLiteralAttribute:
+    x: Literal[1]
+
+def declared_literal_attribute_is_exhaustive(
+    value: DeclaredLiteralAttribute,
+) -> int:
+    match value:
+        case DeclaredLiteralAttribute(x=1):
+            return 1
+```
+
+## Runtime-checkable protocol patterns
+
+Runtime-checkable protocols use the same rule. The subject below is known to provide `x`, so the
+pattern is exhaustive even though the subject class is not final:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocolWithX(Protocol):
+    x: int
+
+class RuntimeProtocolImplementer:
+    x: int = 0
+
+def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) -> int:
+    match value:
+        case RuntimeProtocolWithX(x=_):
+            return 1
+```
+
+## Members from the subject type
+
+A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
+an attribute that is not declared by the class named in the pattern. This also applies when the
+subject class is not final:
+
+```py
+class BaseWithoutX: ...
+
+class ChildWithX(BaseWithoutX):
+    x: int = 0
+
+def subclass_member_is_exhaustive(value: ChildWithX) -> int:
+    match value:
+        case BaseWithoutX(x=_):
+            return 1
+```
+
+## Nested class patterns
+
+The same rule applies recursively: every nested pattern must match every value allowed for the
+attribute it receives.
+
+```py
+class Inner:
+    x: int = 0
+
+class Outer:
+    inner: Inner = Inner()
+
+def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
+    match value:
+        case [Outer(inner=Inner(x=_))]:
+            return 1
+```
+
+## Missing class-pattern attributes
+
+A class pattern can fail after its `isinstance` check if a requested attribute is missing or only
+conditionally defined. The failed branch therefore keeps the original subject type:
+
+```py
+from typing import final
+
+class MissingAttributes: ...
+class OtherClass: ...
+
+def missing_attribute_keeps_original_subject(
+    value: MissingAttributes | OtherClass,
+) -> None:
+    match value:
+        case MissingAttributes(missing=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: MissingAttributes | OtherClass
+
+def attribute_condition() -> bool:
+    return bool()
+
+@final
+class PossiblyMissingAttribute:
+    if attribute_condition():
+        x: int = 0
+
+def possibly_missing_attribute_is_not_exhaustive(
+    value: PossiblyMissingAttribute,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PossiblyMissingAttribute(x=_):
+            return 1
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
@@ -739,6 +862,9 @@ make a match exhaustive.
 
 ```py
 from typing_extensions import assert_never
+
+class HasX:
+    x: int = 0
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
@@ -769,6 +895,15 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
             return left + right
         case _:
             assert_never(value)
+
+# Matching the element would succeed, but a one-element pattern cannot match a two-element tuple.
+def sequence_length_is_still_checked(
+    value: tuple[HasX, HasX],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [HasX(x=_)]:
+            return 1
 
 def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
