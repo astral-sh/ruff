@@ -103,6 +103,24 @@ pub struct AnalysisSettings {
     pub replace_imports_with_any: ModuleGlobSet,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, get_size2::GetSize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum IsInstanceNarrowing {
+    #[default]
+    Strict,
+    Relaxed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, get_size2::GetSize)]
+pub struct SemanticSettings {
+    pub isinstance_narrowing: IsInstanceNarrowing,
+}
+
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {

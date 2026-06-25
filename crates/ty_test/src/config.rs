@@ -21,7 +21,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use ty_python_core::platform::PythonPlatform;
-use ty_python_semantic::lint::Level;
+use ty_python_semantic::{IsInstanceNarrowing, lint::Level};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -33,6 +33,8 @@ pub(crate) struct MarkdownTestConfig {
     pub(crate) rules: Option<Rules>,
 
     pub(crate) analysis: Option<Analysis>,
+
+    pub(crate) semantics: Option<Semantics>,
 
     /// The [`ruff_db::system::System`] to use for tests.
     ///
@@ -127,6 +129,12 @@ pub(crate) struct Analysis {
     pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
 
     pub(crate) replace_imports_with_any: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Semantics {
+    pub(crate) isinstance_narrowing: Option<IsInstanceNarrowing>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
