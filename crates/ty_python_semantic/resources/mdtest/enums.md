@@ -777,6 +777,35 @@ reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum
 reveal_type(enum_members(InheritedWeirdEnum))
 ```
 
+Known built-in data-type mixins normalize member values before aliases are detected:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class DirectInt(int, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+    OTHER = 2
+
+reveal_type(DirectInt.FROM_BOOL.value)  # revealed: Literal[0]
+reveal_type(DirectInt.FROM_INT)  # revealed: Literal[DirectInt.FROM_BOOL]
+reveal_type(DirectInt.OTHER.value)  # revealed: Literal[2]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["OTHER"]]
+reveal_type(enum_members(DirectInt))
+
+class DirectStr(str, Enum):
+    FROM_INT = 1
+    FROM_STR = "1"
+    OTHER = "other"
+
+reveal_type(DirectStr.FROM_INT.value)  # revealed: Literal["1"]
+reveal_type(DirectStr.FROM_STR)  # revealed: Literal[DirectStr.FROM_INT]
+reveal_type(DirectStr.OTHER.value)  # revealed: Literal["other"]
+# revealed: tuple[Literal["FROM_INT"], Literal["OTHER"]]
+reveal_type(enum_members(DirectStr))
+```
+
 ### Assigned `__new__`
 
 Assigning to `__new__` can prevent us from validating members against its signature or inferring
@@ -1318,10 +1347,10 @@ reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
-It's [hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613) what the
-effect of using `auto()` will be for an arbitrary non-integer mixin, so for anything that isn't a
-`StrEnum` and has a non-`int` mixin, we simply fallback to typeshed's annotation of `Any` for the
-`value` property:
+For a known `str` mixin, the generated value is still normalized to `str`. It's
+[hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613) what the
+effect of using `auto()` will be for an arbitrary other non-integer mixin, so we fall back to
+typeshed's annotation of `Any` for the `value` property in those cases:
 
 ```python
 from enum import Enum, auto
@@ -1331,7 +1360,7 @@ class A(str, Enum):
     X = auto()
     Y = auto()
 
-reveal_type(A.X.value)  # revealed: Any
+reveal_type(A.X.value)  # revealed: str
 
 class B(bytes, Enum):
     X = auto()

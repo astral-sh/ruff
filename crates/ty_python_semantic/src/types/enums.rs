@@ -37,6 +37,32 @@ pub(super) enum ResolvedEnumMethod<'db> {
     Opaque,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+enum KnownEnumDataTypeMixin {
+    Int,
+    Str,
+}
+
+impl KnownEnumDataTypeMixin {
+    fn normalize_value<'db>(self, db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
+        match (self, value.as_literal_value_kind()) {
+            (Self::Int, Some(LiteralValueTypeKind::Int(_)))
+            | (Self::Str, Some(LiteralValueTypeKind::String(_))) => value,
+            (Self::Int, Some(LiteralValueTypeKind::Bool(value))) => {
+                Type::int_literal(i64::from(value))
+            }
+            (Self::Str, Some(LiteralValueTypeKind::Int(value))) => {
+                Type::string_literal(db, &value.to_string())
+            }
+            (Self::Str, Some(LiteralValueTypeKind::Bool(value))) => {
+                Type::string_literal(db, if value { "True" } else { "False" })
+            }
+            (Self::Int, _) => KnownClass::Int.to_instance(db),
+            (Self::Str, _) => KnownClass::Str.to_instance(db),
+        }
+    }
+}
+
 impl<'db> ResolvedEnumMethod<'db> {
     pub(super) const fn function(self) -> Option<FunctionType<'db>> {
         match self {
@@ -68,6 +94,7 @@ pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
     pub(super) new: ResolvedEnumMethod<'db>,
     generate_next_value: ResolvedEnumMethod<'db>,
+    known_data_type_mixin: Option<KnownEnumDataTypeMixin>,
     pub(super) metaclass_may_transform_values: bool,
 }
 
@@ -85,9 +112,10 @@ impl<'db> EnumValueConstruction<'db> {
 
     /// Returns whether the declared value cannot be used as the precise type of `.value`.
     ///
-    /// Standard-library constructors are trusted because their value normalization is reflected in
-    /// the inherited `_value_` annotation. A resolvable `_generate_next_value_` is excluded because
-    /// its return type can be used for an `auto()` member instead.
+    /// Standard-library constructors are trusted because their value normalization is either
+    /// modeled directly or reflected in the inherited `_value_` annotation. A resolvable
+    /// `_generate_next_value_` is excluded because its return type can be used for an `auto()`
+    /// member instead.
     const fn member_value_may_be_transformed(self, is_auto: bool) -> bool {
         self.init.is_user_defined()
             || self.new.is_user_defined()
@@ -102,6 +130,12 @@ impl<'db> EnumValueConstruction<'db> {
     /// each `auto()` member before the values are combined.
     const fn instance_value_may_be_transformed(self) -> bool {
         self.init.is_present() || self.new.is_present() || self.metaclass_may_transform_values
+    }
+
+    /// Applies the payload normalization performed by a known built-in data-type mixin.
+    fn normalize_value(self, db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
+        self.known_data_type_mixin
+            .map_or(value, |mixin| mixin.normalize_value(db, value))
     }
 
     /// Returns the value to use when checking whether an enum member is an alias.
@@ -119,16 +153,19 @@ impl<'db> EnumValueConstruction<'db> {
         is_auto: bool,
     ) -> Option<Type<'db>> {
         if self.new.is_user_defined() || self.metaclass_may_transform_values {
-            None
-        } else if !is_auto {
-            Some(value_ty)
-        } else if self.generate_next_value.is_opaque() {
-            None
-        } else if let Some(function) = self.generate_next_value.function() {
-            Some(function.signature(db).overload_return_type_or_unknown(db))
-        } else {
-            Some(value_ty)
+            return None;
         }
+
+        let value = if !is_auto {
+            value_ty
+        } else if self.generate_next_value.is_opaque() {
+            return None;
+        } else if let Some(function) = self.generate_next_value.function() {
+            function.signature(db).overload_return_type_or_unknown(db)
+        } else {
+            value_ty
+        };
+        Some(self.normalize_value(db, value))
     }
 }
 
@@ -406,8 +443,9 @@ impl<'db> EnumMetadata<'db> {
     ///
     /// A user-defined `_value_` annotation takes priority. Otherwise, values transformed by
     /// user-defined construction methods or metaclasses become `Any`. For standard-library
-    /// constructors, a literal is preserved when its runtime class matches the inherited `_value_`
-    /// annotation; otherwise, the annotation describes the normalized value.
+    /// constructors, known data-type mixins normalize the value directly. A literal is preserved
+    /// when its runtime class matches an inherited `_value_` annotation; otherwise, the annotation
+    /// describes the normalized value.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
         let declared_value = self.members.get(member_name).copied()?;
 
@@ -429,6 +467,7 @@ impl<'db> EnumMetadata<'db> {
         } else {
             declared_value
         };
+        let value = self.value_construction.normalize_value(db, value);
 
         if let Some(EnumValueAnnotation::StandardLibrary(annotation)) = self.value_annotation
             && !known_constructor_preserves_value_type(db, value, annotation)
@@ -891,6 +930,7 @@ pub(crate) fn enum_metadata<'db>(
         init,
         new,
         generate_next_value,
+        known_data_type_mixin: inherited_known_data_type_mixin(db, class),
         metaclass_may_transform_values,
     };
 
@@ -1248,6 +1288,24 @@ fn inherited_user_defined_mixin_new<'db>(
         .filter_map(|class| class.class_literal(db).as_static())
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
+}
+
+/// Looks up a built-in data-type mixin before the first parent enum.
+fn inherited_known_data_type_mixin<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<KnownEnumDataTypeMixin> {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.class_literal(db).as_static())
+        .take_while(|base| !is_enum_class_by_inheritance(db, *base))
+        .find_map(|base| match base.known(db) {
+            Some(KnownClass::Int) => Some(KnownEnumDataTypeMixin::Int),
+            Some(KnownClass::Str) => Some(KnownEnumDataTypeMixin::Str),
+            _ => None,
+        })
 }
 
 /// Looks up a resolvable method inherited from a known enum class.
