@@ -913,6 +913,28 @@ def _(answer: CoupledInequality):
         reveal_type(answer)  # revealed: CoupledInequality
 ```
 
+## Recursive aliases containing enum domains
+
+Enum domains nested in a recursive alias fall back to general comparison inference:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class EnumValue(Enum):
+    VALUE = 1
+    OTHER = 2
+
+type Recursive = EnumValue | Recursive
+
+def _(left: Recursive, right: EnumValue):
+    reveal_type(left == right)  # revealed: bool
+```
+
 ## Known built-in equality behavior
 
 `bool`, `LiteralString`, `TypedDict`, and final classes that inherit `object.__eq__` have known

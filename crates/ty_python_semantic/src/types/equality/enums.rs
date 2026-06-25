@@ -195,45 +195,71 @@ impl<'db> EnumValueSet<'db> {
     ///
     /// This deliberately does not use subtyping: a `NewType` over an enum is a subtype of the
     /// enum but remains disjoint from the enum's literal members.
-    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        let value_set = match ty.resolve_type_alias(db) {
-            Type::LiteralValue(literal) => {
-                let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
-                    return None;
-                };
-                let enum_class = enum_literal.enum_class_literal(db);
-                let name = enum_class.resolve_member(db, enum_literal.name(db))?;
-                Self {
-                    enum_class,
-                    members: EnumValueSetMembers::One {
-                        name,
-                        promotable: literal.is_promotable(),
-                    },
+    fn from_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        active_types: &mut FxHashSet<Type<'db>>,
+    ) -> Option<Self> {
+        fn from_type_inner<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            active_types: &mut FxHashSet<Type<'db>>,
+        ) -> Option<EnumValueSet<'db>> {
+            let value_set = match ty.resolve_type_alias(db) {
+                Type::LiteralValue(literal) => {
+                    let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
+                        return None;
+                    };
+                    let enum_class = enum_literal.enum_class_literal(db);
+                    let name = enum_class.resolve_member(db, enum_literal.name(db))?;
+                    EnumValueSet {
+                        enum_class,
+                        members: EnumValueSetMembers::One {
+                            name,
+                            promotable: literal.is_promotable(),
+                        },
+                    }
                 }
-            }
-            Type::NominalInstance(instance) => Self {
-                enum_class: instance.class_literal(db).into_enum_class(db)?,
-                members: EnumValueSetMembers::All,
-            },
-            Type::EnumComplement(complement) => Self {
-                enum_class: complement.enum_class_literal(db),
-                members: EnumValueSetMembers::AllExcept(complement),
-            },
-            Type::Union(union) => Self::from_union(db, union.elements(db))?,
-            Type::Intersection(intersection) => Self::from_intersection(db, intersection)?,
-            _ => return None,
-        };
-        (value_set.member_count(db) > 0).then_some(value_set)
+                Type::NominalInstance(instance) => EnumValueSet {
+                    enum_class: instance.class_literal(db).into_enum_class(db)?,
+                    members: EnumValueSetMembers::All,
+                },
+                Type::EnumComplement(complement) => EnumValueSet {
+                    enum_class: complement.enum_class_literal(db),
+                    members: EnumValueSetMembers::AllExcept(complement),
+                },
+                Type::Union(union) => {
+                    EnumValueSet::from_union(db, union.elements(db), active_types)?
+                }
+                Type::Intersection(intersection) => {
+                    EnumValueSet::from_intersection(db, intersection, active_types)?
+                }
+                _ => return None,
+            };
+            (value_set.member_count(db) > 0).then_some(value_set)
+        }
+
+        // A cycle prevents extracting a finite enum domain, so fall back to general comparison.
+        if !active_types.insert(ty) {
+            return None;
+        }
+        let value_set = from_type_inner(db, ty, active_types);
+        active_types.remove(&ty);
+        value_set
     }
 
     /// Extract an exact included-member set from a union of enum domains.
     ///
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
-    fn from_union(db: &'db dyn Db, elements: &[Type<'db>]) -> Option<Self> {
+    fn from_union(
+        db: &'db dyn Db,
+        elements: &[Type<'db>],
+        active_types: &mut FxHashSet<Type<'db>>,
+    ) -> Option<Self> {
         let mut enum_class = None;
         let mut included = FxOrderMap::default();
         for element in elements {
-            let value_set = Self::from_type(db, *element)?;
+            let value_set = Self::from_type(db, *element, active_types)?;
             if let Some(enum_class) = enum_class
                 && enum_class != value_set.enum_class
             {
@@ -292,9 +318,13 @@ impl<'db> EnumValueSet<'db> {
     }
 
     /// Extract the enum restriction while discarding unrelated positive intersection state.
-    fn from_intersection(db: &'db dyn Db, intersection: IntersectionType<'db>) -> Option<Self> {
+    fn from_intersection(
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        active_types: &mut FxHashSet<Type<'db>>,
+    ) -> Option<Self> {
         if let Some(complement) = intersection.enum_complement(db) {
-            return Self::from_type(db, Type::EnumComplement(complement));
+            return Self::from_type(db, Type::EnumComplement(complement), active_types);
         }
 
         // Other intersection components can only reduce the represented enum values. Ignoring
@@ -302,7 +332,7 @@ impl<'db> EnumValueSet<'db> {
         let mut value_sets = intersection
             .positive(db)
             .iter()
-            .filter_map(|positive| Self::from_type(db, *positive));
+            .filter_map(|positive| Self::from_type(db, *positive, active_types));
         let value_set = value_sets.next()?;
         value_sets
             .all(|other| other.enum_class == value_set.enum_class)
@@ -466,23 +496,39 @@ impl<'db> EnumDomainSet<'db> {
             db: &'db dyn Db,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
+            active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<()> {
-            if let Some(domain) = EnumValueSet::from_type(db, ty) {
+            if let Some(domain) = EnumValueSet::from_type(db, ty, active_types) {
                 domains.push(domain);
                 return Some(());
             }
 
+            if !active_types.insert(ty) {
+                return None;
+            }
+            let result = collect_union(db, ty, domains, active_types);
+            active_types.remove(&ty);
+            result
+        }
+
+        fn collect_union<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            domains: &mut Vec<EnumValueSet<'db>>,
+            active_types: &mut FxHashSet<Type<'db>>,
+        ) -> Option<()> {
             let Type::Union(union) = ty.resolve_type_alias(db) else {
                 return None;
             };
             for element in union.elements(db) {
-                collect(db, *element, domains)?;
+                collect(db, *element, domains, active_types)?;
             }
             Some(())
         }
 
         let mut domains = Vec::new();
-        collect(db, ty, &mut domains)?;
+        let mut active_types = FxHashSet::default();
+        collect(db, ty, &mut domains, &mut active_types)?;
         (!domains.is_empty()).then_some(Self { domains })
     }
 
