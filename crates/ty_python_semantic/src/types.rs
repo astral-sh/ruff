@@ -98,6 +98,10 @@ pub use crate::types::typevar::{
     BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ParamSpecAttrKind,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarNonce,
 };
+pub(crate) use crate::types::typevar::{
+    constrained_typevars_in_type, contains_constrained_typevar, expand_constrained_typevars,
+    flatten_constrained_typevars,
+};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;

@@ -18,8 +18,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
-    TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
-    infer_same_file_expression_type,
+    TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type,
+    constrained_typevars_in_type, equality_truthiness, expand_constrained_typevars,
+    flatten_constrained_typevars, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -587,6 +588,61 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let ordinary_ty = definite_match_pattern_type_for_subject_impl(db, kind, subject_ty);
+    if subject_ty.is_subtype_of(db, ordinary_ty) {
+        return ordinary_ty;
+    }
+
+    let resolved_subject_ty = subject_ty.resolve_type_alias(db);
+    let constrained_typevars = constrained_typevars_in_type(db, resolved_subject_ty);
+    if constrained_typevars.is_empty() {
+        return ordinary_ty;
+    }
+
+    if let Some(expanded_subject_types) =
+        expand_constrained_typevars(db, resolved_subject_ty, &constrained_typevars)
+    {
+        let mut all_expansions_match = true;
+        let definite_ty = UnionType::from_elements(
+            db,
+            expanded_subject_types
+                .into_iter()
+                .map(|expanded_subject_ty| {
+                    let expanded_definite_ty =
+                        definite_match_pattern_type_for_subject_impl(db, kind, expanded_subject_ty);
+                    all_expansions_match &=
+                        expanded_subject_ty.is_subtype_of(db, expanded_definite_ty);
+                    expanded_definite_ty
+                }),
+        );
+        return if all_expansions_match {
+            subject_ty
+        } else {
+            IntersectionBuilder::new(db)
+                .add_positive(subject_ty)
+                .add_positive(definite_ty)
+                .build()
+        };
+    }
+
+    let filtering_subject_ty =
+        flatten_constrained_typevars(db, resolved_subject_ty, &constrained_typevars);
+    let definite_ty = definite_match_pattern_type_for_subject_impl(db, kind, filtering_subject_ty);
+    if filtering_subject_ty.is_subtype_of(db, definite_ty) {
+        subject_ty
+    } else {
+        IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_positive(definite_ty)
+            .build()
+    }
+}
+
+fn definite_match_pattern_type_for_subject_impl<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
     if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
     {
         return subject_independent_ty;
@@ -599,7 +655,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             union
                 .elements(db)
                 .iter()
-                .map(|element| definite_match_pattern_type_for_subject(db, kind, *element)),
+                .map(|element| definite_match_pattern_type_for_subject_impl(db, kind, *element)),
         );
     }
 
@@ -660,12 +716,12 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             return UnionType::from_elements(
                 db,
                 patterns.iter().map(|pattern| {
-                    definite_match_pattern_type_for_subject(db, pattern, subject_ty)
+                    definite_match_pattern_type_for_subject_impl(db, pattern, subject_ty)
                 }),
             );
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            return definite_match_pattern_type_for_subject(db, pattern, subject_ty);
+            return definite_match_pattern_type_for_subject_impl(db, pattern, subject_ty);
         }
         _ => return Type::Never,
     }
@@ -824,6 +880,40 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
     budget: &mut ExactTuplePatternExpansionBudget,
 ) -> Result<Type<'db>, ()> {
     let resolved = subject_ty.resolve_type_alias(db);
+    // Apply fallthrough to the complete type when an exact tuple contains a constrained TypeVar.
+    // Expanding one element at a time would lose the correlation between repeated occurrences.
+    let is_correlated_exact_tuple_domain = !constrained_typevars_in_type(db, resolved).is_empty()
+        && (resolved.exact_tuple_instance_spec(db).is_some()
+            || match resolved {
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .any(|positive| positive.exact_tuple_instance_spec(db).is_some()),
+                _ => false,
+            }
+            || resolved.as_typevar().is_some_and(|typevar| {
+                typevar
+                    .typevar(db)
+                    .constraints(db)
+                    .is_some_and(|constraints| {
+                        constraints.iter().all(|constraint| {
+                            constraint
+                                .resolve_type_alias(db)
+                                .exact_tuple_instance_spec(db)
+                                .is_some()
+                        })
+                    })
+            }));
+    if is_correlated_exact_tuple_domain {
+        let narrowed =
+            pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), resolved);
+        return if narrowed == resolved {
+            Ok(subject_ty)
+        } else {
+            Ok(narrowed)
+        };
+    }
+
     let narrowed = match resolved {
         Type::Union(union) => union
             .try_map(db, |element| {
