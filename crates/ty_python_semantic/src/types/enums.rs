@@ -1300,7 +1300,7 @@ fn inherited_user_defined_mixin_new<'db>(
         .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
 }
 
-/// Looks up a built-in data-type mixin before the first parent enum.
+/// Looks up a built-in data-type mixin anywhere in the MRO, including through an enum base.
 fn inherited_known_data_type_mixin<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -1310,7 +1310,6 @@ fn inherited_known_data_type_mixin<'db>(
         .skip(1)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| class.class_literal(db).as_static())
-        .take_while(|base| !is_enum_class_by_inheritance(db, *base))
         .find_map(|base| match base.known(db) {
             Some(KnownClass::Int) => Some(KnownEnumDataTypeMixin::Int),
             Some(KnownClass::Str) => Some(KnownEnumDataTypeMixin::Str),

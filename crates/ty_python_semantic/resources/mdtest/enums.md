@@ -22,9 +22,9 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
-Known standard-library enum constructors preserve literal `.value` types when they do not normalize
-the declared value. The inherited `_value_` annotation remains the fallback when construction does
-normalize the value or when accessing `.value` on the enum class as a whole:
+Known standard-library enum constructors preserve precise `.value` types when their built-in
+data-type normalization can be modeled. The inherited `_value_` annotation remains the fallback when
+the result cannot be inferred precisely or when accessing `.value` on the enum class as a whole:
 
 ```py
 from enum import IntEnum, auto
@@ -33,10 +33,11 @@ from typing import Literal
 class Integer(IntEnum):
     ONE = 1
     TRUE = True
+    TWO = 2
 
 reveal_type(Integer.ONE.value)  # revealed: Literal[1]
 reveal_type(Integer.ONE._value_)  # revealed: Literal[1]
-reveal_type(Integer.TRUE.value)  # revealed: int
+reveal_type(Integer.TRUE.value)  # revealed: Literal[1]
 
 def _(value: Integer):
     reveal_type(value.value)  # revealed: int
@@ -780,7 +781,7 @@ reveal_type(enum_members(InheritedWeirdEnum))
 Known built-in data-type mixins normalize member values before aliases are detected:
 
 ```py
-from enum import Enum
+from enum import Enum, IntEnum
 from ty_extensions import enum_members
 from typing import Literal
 
@@ -811,6 +812,29 @@ def union_member_value(value: Literal[1, 2]):
         MEMBER = value
 
     reveal_type(UnionInt.MEMBER.value)  # revealed: Literal[1, 2]
+
+class StandardInt(IntEnum):
+    FROM_BOOL = False
+    FROM_INT = 0
+    OTHER = 2
+
+reveal_type(StandardInt.FROM_BOOL.value)  # revealed: Literal[0]
+reveal_type(StandardInt.FROM_INT)  # revealed: Literal[StandardInt.FROM_BOOL]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["OTHER"]]
+reveal_type(enum_members(StandardInt))
+
+class EmptyInt(int, Enum):
+    pass
+
+class InheritedInt(EmptyInt):
+    FROM_BOOL = False
+    FROM_INT = 0
+    OTHER = 2
+
+reveal_type(InheritedInt.FROM_BOOL.value)  # revealed: Literal[0]
+reveal_type(InheritedInt.FROM_INT)  # revealed: Literal[InheritedInt.FROM_BOOL]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["OTHER"]]
+reveal_type(enum_members(InheritedInt))
 ```
 
 ### Assigned `__new__`
