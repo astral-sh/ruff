@@ -37,6 +37,17 @@ pub(super) enum ResolvedEnumMethod<'db> {
     Opaque,
 }
 
+/// A built-in enum data-type mixin whose runtime value normalization ty models.
+///
+/// ```python
+/// from enum import Enum
+///
+/// class Number(int, Enum):
+///     FALSE = False
+///     ZERO = 0  # Alias of `FALSE` after `int(False)` produces `0`.
+/// ```
+///
+/// User-defined mixins are excluded because their constructors can transform values arbitrarily.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
 enum KnownEnumDataTypeMixin {
     Int,
@@ -44,6 +55,10 @@ enum KnownEnumDataTypeMixin {
 }
 
 impl KnownEnumDataTypeMixin {
+    /// Returns the scalar payload type after applying the built-in mixin's constructor.
+    ///
+    /// Literal conversions are preserved precisely, unions are normalized element-wise, and values
+    /// whose conversion cannot be modeled precisely fall back to the mixin's instance type.
     fn normalize_value<'db>(self, db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
         if let Type::Union(union) = value {
             return union.map(db, |element| self.normalize_value(db, *element));
@@ -1228,6 +1243,10 @@ enum EnumMethodBinding<'db> {
     Opaque,
 }
 
+/// Constructor behavior collected from data-type mixins in MRO order.
+///
+/// `new` records the first user-defined `__new__`, while `known` records the nearest built-in scalar
+/// mixin whose value normalization ty models.
 #[derive(Clone, Copy, Default)]
 struct InheritedDataTypeMixin<'db> {
     new: Option<EnumMethodBinding<'db>>,
@@ -1283,17 +1302,16 @@ fn inherited_user_defined_enum_new<'db>(
         })
 }
 
-/// Looks up the constructor behavior inherited from a data-type mixin.
+/// Looks up constructor behavior inherited from data-type mixins across the full MRO.
 ///
-/// When no enum class provides a member constructor, `EnumType` uses this method to construct the
-/// scalar payload stored by the enum member. `StrEnum.__new__` validates that values are already
-/// strings instead of applying `str()`.
+/// The scan continues through enum bases because a memberless parent enum can itself inherit the
+/// data-type mixin. When no enum class provides a member constructor, `EnumType` uses this method to
+/// construct the scalar payload stored by the enum member.
 fn inherited_data_type_mixin<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> InheritedDataTypeMixin<'db> {
     let mut result = InheritedDataTypeMixin::default();
-    let mut has_str_enum_constructor = false;
 
     for base in class
         .iter_mro(db, None)
@@ -1308,7 +1326,6 @@ fn inherited_data_type_mixin<'db>(
             Some(KnownClass::Str) if result.known.is_none() => {
                 result.known = Some(KnownEnumDataTypeMixin::Str);
             }
-            Some(KnownClass::StrEnum) => has_str_enum_constructor = true,
             None if result.new.is_none() => {
                 result.new = custom_enum_method(db, base.body_scope(db), "__new__");
             }
@@ -1316,12 +1333,6 @@ fn inherited_data_type_mixin<'db>(
         }
     }
 
-    // Although non-string `StrEnum` members are invalid at runtime, we still model the class for
-    // error recovery. Applying ordinary `str` normalization would incorrectly make values such as
-    // `1` aliases of string members with the value `"1"`.
-    if has_str_enum_constructor && result.known == Some(KnownEnumDataTypeMixin::Str) {
-        result.known = None;
-    }
     result
 }
 

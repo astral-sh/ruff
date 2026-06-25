@@ -837,8 +837,7 @@ reveal_type(InheritedInt.FROM_INT)  # revealed: Literal[InheritedInt.FROM_BOOL]
 reveal_type(enum_members(InheritedInt))
 ```
 
-`StrEnum` validates non-string members instead of converting them with `str()`, so rejected values
-must not be normalized into aliases of valid string members:
+`StrEnum` uses the same built-in `str` normalization as an explicit data-type mixin:
 
 ```toml
 [environment]
@@ -850,13 +849,13 @@ from enum import StrEnum
 from ty_extensions import enum_members
 
 class StrictStr(StrEnum):
-    FROM_INT = 1
+    FROM_INT = 1  # TODO: Emit an error for non-string `StrEnum` values.
     FROM_STR = "1"
     OTHER = "other"
 
-reveal_type(StrictStr.FROM_INT.value)  # revealed: Literal[1]
-reveal_type(StrictStr.FROM_STR)  # revealed: Literal[StrictStr.FROM_STR]
-# revealed: tuple[Literal["FROM_INT"], Literal["FROM_STR"], Literal["OTHER"]]
+reveal_type(StrictStr.FROM_INT.value)  # revealed: Literal["1"]
+reveal_type(StrictStr.FROM_STR)  # revealed: Literal[StrictStr.FROM_INT]
+# revealed: tuple[Literal["FROM_INT"], Literal["OTHER"]]
 reveal_type(enum_members(StrictStr))
 ```
 

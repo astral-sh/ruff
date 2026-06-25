@@ -195,15 +195,14 @@ reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Litera
 ```
 
 A scalar mixin can normalize member values before `Enum` checks for aliases. Here, `str` converts
-`1` to `"1"`, so the two members are aliases at runtime. Since ty does not model this constructor
-call, the comparison remains `bool`:
+`1` to `"1"`, so the two members are aliases:
 
 ```py
 class CoercingAlias(str, Enum):
     FIRST = 1
     SECOND = "1"
 
-reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: bool
+reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: Literal[True]
 ```
 
 Equality can transfer restrictions on enum members, but other intersection elements must stay on the
