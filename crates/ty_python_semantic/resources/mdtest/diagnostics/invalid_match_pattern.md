@@ -48,6 +48,20 @@ def describe(v: Vec) -> None:
             pass
 ```
 
+## Tuple subclass
+
+```py
+class MatchArgs(tuple[str, ...]): ...
+
+class Point:
+    __match_args__ = MatchArgs(("x",))
+
+def describe(p: Point) -> None:
+    match p:
+        case Point(x):  # error: [invalid-match-pattern]
+            pass
+```
+
 ## Unknown `__match_args__` tuple length (no error)
 
 ```py
