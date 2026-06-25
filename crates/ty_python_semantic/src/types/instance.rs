@@ -229,11 +229,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::NominalInstance(instance) if instance.is_exact())
     }
 
-    #[cfg(test)]
-    pub(crate) fn is_exact_instance_of(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        matches!(self, Type::NominalInstance(instance) if instance.is_exact() && instance.has_known_class(db, known_class))
-    }
-
     /// Return this exact builtin collection's statically known cardinality.
     pub(crate) fn exact_collection_cardinality(
         self,
