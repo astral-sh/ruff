@@ -20,6 +20,7 @@ use super::diagnostic::{
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
+use super::recursive::{Foldable, RecursiveType};
 use super::special_form::SpecialFormType;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
@@ -179,6 +180,75 @@ impl<'db> SubscriptError<'db> {
         let slice_node = subscript.slice.as_ref();
         for error in &self.errors {
             error.report_diagnostic(context, subscript, value_node, slice_node);
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            result_ty: self.result_ty.fold(db, rec),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.fold(db, rec))
+                .collect(),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::IndexOutOfBounds {
+                kind,
+                tuple_ty,
+                length,
+                index,
+            } => Self::IndexOutOfBounds {
+                kind,
+                tuple_ty: tuple_ty.fold(db, rec),
+                length,
+                index,
+            },
+            Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty: value_ty.fold(db, rec),
+            },
+            Self::DunderCallError {
+                method,
+                value_ty,
+                slice_ty,
+                kind,
+                bindings,
+            } => Self::DunderCallError {
+                method,
+                value_ty: value_ty.fold(db, rec),
+                slice_ty: slice_ty.fold(db, rec),
+                kind,
+                bindings: bindings.fold(db, rec),
+            },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                full_object_ty,
+            } => Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty: slice_ty.fold(db, rec),
+                full_object_ty: full_object_ty.fold(db, rec),
+            },
+            Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
+                value_ty: value_ty.fold(db, rec),
+                method,
+            },
+            Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty,
+            } => Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty: argument_ty.fold(db, rec),
+            },
+            other => other,
         }
     }
 }
@@ -547,6 +617,26 @@ impl<'db> Type<'db> {
 
             (_, Type::TypeAlias(alias)) => {
                 Some(value_ty.subscript(db, alias.value_type(db), expr_context))
+            }
+
+            (Type::Recursive(recursive), _) if recursive.is_non_contractive(db) => {
+                Some(Ok(value_ty))
+            }
+
+            (Type::Recursive(recursive), _) => {
+                Some(recursive.map(db, |unfolded| {
+                    unfolded.subscript(db, slice_ty, expr_context)
+                }))
+            }
+
+            (_, Type::Recursive(recursive)) if recursive.is_non_contractive(db) => {
+                Some(value_ty.subscript(db, Type::divergent(recursive.binder_id(db)), expr_context))
+            }
+
+            (_, Type::Recursive(recursive)) => {
+                Some(recursive.map(db, |unfolded| {
+                    value_ty.subscript(db, unfolded, expr_context)
+                }))
             }
 
             (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {

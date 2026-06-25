@@ -3,7 +3,7 @@ use super::{Signature, Type, TypeContext};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
-use crate::types::{MemberLookupPolicy, PropertyInstanceType};
+use crate::types::{Foldable, MemberLookupPolicy, PropertyInstanceType, RecursiveType};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -237,6 +237,24 @@ impl<'db> CallDunderError<'db> {
 
     pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.return_type(db).unwrap_or(Type::unknown())
+    }
+}
+
+impl<'db> Foldable<'db> for CallDunderError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::CallError(kind, bindings, provenance) => {
+                Self::CallError(kind, bindings.fold(db, rec), provenance)
+            }
+            Self::PossiblyUnbound {
+                bindings,
+                unbound_on,
+            } => Self::PossiblyUnbound {
+                bindings: bindings.fold(db, rec),
+                unbound_on: unbound_on.fold(db, rec),
+            },
+            Self::MethodNotAvailable => Self::MethodNotAvailable,
+        }
     }
 }
 

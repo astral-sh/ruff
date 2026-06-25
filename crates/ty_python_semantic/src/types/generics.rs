@@ -1286,11 +1286,20 @@ impl<'db> Specialization<'db> {
 
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
-            if typevar.variance(db).is_covariant() {
+            let mapped = if typevar.variance(db).is_covariant() {
                 ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             } else {
                 ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+            };
+            if let TypeMapping::FoldRecursive { recursive, .. } = type_mapping {
+                // Generic arguments are nested positions for this fold: a marker anywhere in the
+                // argument means the whole argument refers back to the binder.
+                let marker = Type::divergent(recursive.binder_id(db));
+                if mapped.contains_cycle_marker(db, marker) {
+                    return marker;
+                }
             }
+            mapped
         });
 
         let original_tuple_inner = self.tuple_inner(db);

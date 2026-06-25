@@ -70,6 +70,10 @@ impl<'db> SubclassOfType<'db> {
             Type::SpecialForm(SpecialFormType::Unknown) => {
                 SubclassOfInner::Dynamic(DynamicType::Unknown)
             }
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => return None,
+            Type::Recursive(recursive) => {
+                return recursive.map(db, |unfolded| Self::try_from_type(db, unfolded));
+            }
             _ => return None,
         };
 
@@ -81,6 +85,10 @@ impl<'db> SubclassOfType<'db> {
         // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
         match ty {
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => None,
+            Type::Recursive(recursive) => {
+                recursive.map(db, |unfolded| Self::try_from_instance(db, unfolded))
+            }
             Type::Union(union) => UnionType::try_from_elements(
                 db,
                 union

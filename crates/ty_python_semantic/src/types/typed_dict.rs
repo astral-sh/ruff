@@ -17,6 +17,7 @@ use super::diagnostic::{
     TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
+use super::recursive::{Foldable, RecursiveType};
 use super::{
     ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
     UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
@@ -162,6 +163,18 @@ impl<'db> TypedDictOpenness<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for TypedDictOpenness<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::ImplicitlyOpen | Self::Closed => self,
+            Self::Extra(extra_items) => {
+                let extra_items = extra_items.fold(db, rec);
+                Self::extra(db, extra_items.declared_ty, extra_items.is_read_only)
+            }
+        }
+    }
+}
+
 /// The value type and mutability of a `TypedDict`'s extra items.
 ///
 /// This represents either an explicit `extra_items` declaration or the synthetic read-only
@@ -176,6 +189,15 @@ pub struct TypedDictExtraItems<'db> {
 impl TypedDictExtraItems<'_> {
     pub(crate) const fn is_read_only(self) -> bool {
         self.is_read_only
+    }
+}
+
+impl<'db> Foldable<'db> for TypedDictExtraItems<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            declared_ty: self.declared_ty.fold(db, rec),
+            is_read_only: self.is_read_only,
+        }
     }
 }
 
@@ -1595,6 +1617,16 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
     pub(crate) definition: Option<Definition<'db>>,
 }
 
+impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            value_ty: self.value_ty.fold(db, rec),
+            is_required: self.is_required,
+            definition: self.definition,
+        }
+    }
+}
+
 /// A normalized view of a `TypedDict`-shaped value used when unpacking it.
 ///
 /// Union and intersection inputs are combined into one set of possible keys and one openness
@@ -1604,6 +1636,19 @@ pub(crate) struct UnpackedTypedDict<'db> {
     /// Declared keys that may be present after unpacking.
     pub(crate) keys: BTreeMap<Name, UnpackedTypedDictKey<'db>>,
     pub(crate) openness: TypedDictOpenness<'db>,
+}
+
+impl<'db> Foldable<'db> for UnpackedTypedDict<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            keys: self
+                .keys
+                .into_iter()
+                .map(|(name, key)| (name, key.fold(db, rec)))
+                .collect(),
+            openness: self.openness.fold(db, rec),
+        }
+    }
 }
 
 /// Combines the openness policies of intersected `TypedDict`-shaped values.
@@ -1851,6 +1896,10 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
+        Type::Recursive(recursive) if recursive.is_non_contractive(db) => None,
+        Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+            extract_unpacked_typed_dict_from_value_type(db, unfolded)
+        }),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -1950,6 +1999,10 @@ pub(super) fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -
             .elements(db)
             .iter()
             .any(|element| element.resolve_type_alias(db).is_dynamic()),
+        Type::Recursive(recursive) if recursive.is_non_contractive(db) => true,
+        Type::Recursive(recursive) => {
+            recursive.map(db, |unfolded| unpacked_keyword_is_gradual(db, unfolded))
+        }
         _ => false,
     }
 }

@@ -278,6 +278,12 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                self.extend_with_type(db, Type::object());
+            }
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                self.extend_with_type(db, unfolded);
+            }),
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {

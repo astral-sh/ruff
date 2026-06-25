@@ -8,10 +8,11 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
+        recursive::Foldable,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
@@ -224,6 +225,12 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => Some(
+                CallableTypes::one(CallableType::function_like(db, Signature::dynamic(self))),
+            ),
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                unfolded.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+            }),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>
@@ -703,6 +710,21 @@ impl<'db> CallableTypes<'db> {
             CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
+    }
+}
+
+impl<'db> Foldable<'db> for CallableType<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match Type::Callable(self).fold(db, rec) {
+            Type::Callable(callable) => callable,
+            folded => CallableType::function_like(db, Signature::dynamic(folded)),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for CallableTypes<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map(|callable| callable.fold(db, rec))
     }
 }
 

@@ -125,6 +125,9 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Recursive type binders that are currently being displayed.
+    /// Used to prevent infinite recursion when displaying recursive bodies.
+    visited_recursive_type_binders: Rc<FxHashSet<salsa::Id>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     pub hide_return_type: bool,
@@ -175,6 +178,16 @@ impl<'db> DisplaySettings<'db> {
     pub fn hide_return_type(&self) -> Self {
         Self {
             hide_return_type: true,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    fn with_recursive_type_binder(&self, binder_id: salsa::Id) -> Self {
+        let mut visited_recursive_type_binders = (*self.visited_recursive_type_binders).clone();
+        visited_recursive_type_binders.insert(binder_id);
+        Self {
+            visited_recursive_type_binders: Rc::new(visited_recursive_type_binders),
             ..self.clone()
         }
     }
@@ -957,6 +970,23 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
+            Type::Recursive(recursive) => {
+                let binder_id = recursive.binder_id(self.db);
+                let marker = Type::divergent(binder_id);
+                if self
+                    .settings
+                    .visited_recursive_type_binders
+                    .contains(&binder_id)
+                {
+                    return f.with_type(marker).write_str("Divergent");
+                }
+                let body = recursive
+                    .body_with_origin_marker(self.db)
+                    .recursive_type_normalized_impl(self.db, marker, false)
+                    .unwrap_or(marker);
+                body.display_with(self.db, self.settings.with_recursive_type_binder(binder_id))
+                    .fmt_detailed(f)
+            }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);

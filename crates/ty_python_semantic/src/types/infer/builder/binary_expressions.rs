@@ -364,6 +364,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
+            (Type::Recursive(recursive), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                if recursive.is_non_contractive(db) {
+                    Some(left_ty)
+                } else {
+                    recursive.map(db, |unfolded| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            unfolded,
+                            rhs,
+                            op,
+                            visitor,
+                        )
+                    })
+                }
+            }),
+
+            (lhs, Type::Recursive(recursive), _) => visitor.visit((left_ty, op, right_ty), || {
+                if recursive.is_non_contractive(db) {
+                    Some(right_ty)
+                } else {
+                    recursive.map(db, |unfolded| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            lhs,
+                            unfolded,
+                            op,
+                            visitor,
+                        )
+                    })
+                }
+            }),
+
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
             {

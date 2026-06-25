@@ -108,8 +108,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionType,
+    BoundTypeVarInstance, Foldable, IntersectionType, RecursiveType, Type,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -334,6 +334,12 @@ pub struct ConstraintSet<'db, 'c> {
 
     /// Ensures that the `'c` lifetime is invariant
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
+}
+
+impl<'db> Foldable<'db> for ConstraintSet<'db, '_> {
+    fn fold(self, _db: &'db dyn Db, _rec: RecursiveType<'db>) -> Self {
+        self
+    }
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {

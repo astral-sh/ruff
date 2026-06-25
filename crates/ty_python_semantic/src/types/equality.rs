@@ -10,9 +10,9 @@ use rustc_hash::FxHashSet;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints,
-    UnionBuilder,
+    EnumLiteralType, Foldable, IntersectionBuilder, KnownBoundMethodType, KnownClass,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, RecursiveType, Truthiness, Type,
+    TypeVarBoundOrConstraints, UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -116,6 +116,15 @@ impl<'db> ComparisonResult<'db> {
         match self {
             ComparisonResult::CanNarrow(_) => ComparisonResult::Ambiguous,
             result => result,
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for ComparisonResult<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::CanNarrow(ty) => Self::CanNarrow(ty.fold(db, rec)),
+            Self::AlwaysTrue | Self::AlwaysFalse | Self::Ambiguous => self,
         }
     }
 }
@@ -414,6 +423,16 @@ fn evaluate_comparison_once<'db>(
     }
 
     match (left, right) {
+        (Type::Recursive(recursive), other) if !recursive.is_non_contractive(db) => recursive
+            .map(db, |unfolded| {
+                evaluator.evaluate(unfolded, other, branch, operator)
+            }),
+        (other, Type::Recursive(recursive)) if !recursive.is_non_contractive(db) => recursive
+            .map(db, |unfolded| {
+                evaluator.evaluate(other, unfolded, branch, operator)
+            }),
+        (Type::Recursive(_), _) | (_, Type::Recursive(_)) => ComparisonResult::Ambiguous,
+
         (
             Type::Never
             | Type::Divergent(_)

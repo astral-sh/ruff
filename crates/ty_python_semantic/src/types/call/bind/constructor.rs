@@ -175,6 +175,14 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
+    pub(super) fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
+        self.entry.map_fields(map);
+        self.constructor_context = self.constructor_context.map_instance_type(map);
+        if let Some(downstream) = self.downstream_constructor.as_mut() {
+            downstream.map_fields(map);
+        }
+    }
+
     /// Compute the overall effective return type of this `ConstructorBinding`.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
@@ -521,6 +529,10 @@ impl<'db> ConstructorContext<'db> {
         }
     }
 
+    pub(super) fn map_instance_type(self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        self.with_instance_type(map(self.instance_type))
+    }
+
     fn instance_type(self) -> Type<'db> {
         self.instance_type
     }
@@ -563,6 +575,10 @@ fn constructor_returns_instance<'db>(
         Type::Intersection(intersection) => intersection
             .iter_positive(db)
             .any(|element| constructor_returns_instance(db, class_literal, element)),
+        Type::Recursive(recursive) if !recursive.is_non_contractive(db) => recursive
+            .map(db, |unfolded| {
+                constructor_returns_instance(db, class_literal, unfolded)
+            }),
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => false,
         // But a missing return annotation should be considered instance.

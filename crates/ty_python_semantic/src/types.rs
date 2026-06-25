@@ -41,6 +41,7 @@ pub(crate) use self::match_pattern::{
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
     typed_dict_matches_class_pattern,
 };
+pub(crate) use self::recursive::{BinderId, Foldable, RecursiveOrigin, RecursiveType};
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
@@ -147,6 +148,7 @@ pub(crate) mod narrow;
 mod newtype;
 mod overrides;
 mod protocol_class;
+mod recursive;
 pub(crate) mod relation;
 mod relation_error;
 mod set_theoretic;
@@ -904,6 +906,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// A recursive type `mu binder. body`.
+    Recursive(RecursiveType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -1033,6 +1037,22 @@ struct GeneratorTypes<'db> {
     return_ty: Option<Type<'db>>,
 }
 
+impl<'db> GeneratorTypes<'db> {
+    fn map_types(self, f: impl Fn(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            yield_ty: self.yield_ty.map(&f),
+            send_ty: self.send_ty.map(&f),
+            return_ty: self.return_ty.map(&f),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for GeneratorTypes<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map_types(|ty| ty.fold(db, rec))
+    }
+}
+
 fn object_type_form(db: &dyn Db) -> Type<'_> {
     TypeFormType::from_type_expression(db, Type::object())
 }
@@ -1051,6 +1071,40 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    pub(crate) fn recursive(
+        db: &'db dyn Db,
+        binder_id: salsa::Id,
+        origin: RecursiveOrigin<'db>,
+        body: Type<'db>,
+    ) -> Self {
+        let marker = Type::divergent(binder_id);
+        if body.contains_cycle_marker(db, marker) {
+            RecursiveType::build(db, binder_id, origin, body)
+        } else {
+            // μa. T => T if T does not contain a.
+            body
+        }
+    }
+
+    #[expect(dead_code, reason = "staged API for recursive type construction")]
+    pub(crate) fn implicit_recursive(
+        db: &'db dyn Db,
+        binder_id: salsa::Id,
+        body: Type<'db>,
+    ) -> Self {
+        Self::recursive(db, binder_id, RecursiveOrigin::Implicit, body)
+    }
+
+    /// One-step unwrapping of a recursive type for finite recursive walkers.
+    ///
+    /// This is not binder-preserving; type operations should use [`RecursiveType::map`] instead.
+    pub(crate) fn unwrap_recursive(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::Recursive(recursive) => recursive.body(db),
+            _ => self,
+        }
+    }
+
     pub(crate) const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
@@ -1062,6 +1116,24 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn is_non_contractive_recursive(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self,
+            Type::Recursive(recursive) if recursive.is_non_contractive(db)
+        )
+    }
+
+    pub(crate) fn is_cycle_artifact(self, db: &'db dyn Db) -> bool {
+        self.is_divergent() || self.is_non_contractive_recursive(db)
+    }
+
+    /// Returns `true` if this type contains a cycle-recovery marker.
+    ///
+    /// This descends into recursive bodies because the marker may be hidden under a μ-binder.
+    pub(crate) fn contains_cycle_artifact(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| ty.is_cycle_artifact(db))
+    }
+
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
     /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
@@ -1069,6 +1141,22 @@ impl<'db> Type<'db> {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
             _ => false,
         }
+    }
+
+    fn is_top_level_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
+        self.same_divergent_marker(marker)
+            || matches!(
+                self,
+                Type::Recursive(recursive)
+                    if recursive.is_non_contractive(db)
+                        && Type::divergent(recursive.binder_id(db)).same_divergent_marker(marker)
+            )
+    }
+
+    fn contains_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
+        any_over_type(db, self, false, |ty| {
+            ty.is_top_level_cycle_marker(db, marker)
+        })
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -1308,6 +1396,9 @@ impl<'db> Type<'db> {
             Type::TypedDict(typed_dict) => typed_dict
                 .defining_class()
                 .is_some_and(ClassType::is_generic),
+            Type::Recursive(recursive) => recursive
+                .body_with_origin_marker(db)
+                .is_specialized_generic(db),
             Type::Dynamic(dynamic) => {
                 matches!(dynamic, DynamicType::UnknownGeneric(_))
             }
@@ -1353,6 +1444,7 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|ty| ty.is_awaitable(db)),
+            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_awaitable(db),
             _ => false,
         }
     }
@@ -1364,6 +1456,9 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(f) => {
                 f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
             }
+            Type::Recursive(recursive) => {
+                recursive.body_with_origin_marker(db).is_type_check_only(db)
+            }
             _ => false,
         }
     }
@@ -1373,6 +1468,7 @@ impl<'db> Type<'db> {
         match self {
             Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
+            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_deprecated(db),
             _ => false,
         }
     }
@@ -1436,7 +1532,13 @@ impl<'db> Type<'db> {
     /// This is the case for any type which may contain types in non-covariant position within it,
     /// e.g., nominal instances of a generic class, or callables.
     pub(crate) fn may_prefer_declared_type(self, db: &'db dyn Db) -> bool {
-        self.class_specialization(db).is_some() || self.expand_eagerly(db).is_callable_type()
+        if let Type::Recursive(recursive) = self {
+            recursive
+                .body_with_origin_marker(db)
+                .may_prefer_declared_type(db)
+        } else {
+            self.class_specialization(db).is_some() || self.expand_eagerly(db).is_callable_type()
+        }
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -1768,6 +1870,9 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::LiteralString => false,
             },
             Type::NominalInstance(_) => self.is_none(db) || self.is_bool(db) || self.is_enum(db),
+            Type::Recursive(recursive) => recursive
+                .body_with_origin_marker(db)
+                .is_literal_or_union_of_literals(db),
             _ => false,
         }
     }
@@ -1871,9 +1976,10 @@ impl<'db> Type<'db> {
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {
-                IntersectionBuilder::new(db).add_negative(*self).build()
-            }
+            Type::Union(_)
+            | Type::Intersection(_)
+            | Type::EnumComplement(_)
+            | Type::Recursive(_) => IntersectionBuilder::new(db).add_negative(*self).build(),
         }
     }
 
@@ -1924,6 +2030,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::GenericAlias(_)
             | Type::KnownInstance(_) => false,
+            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_spellable(db),
             Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
         }
     }
@@ -1995,6 +2102,7 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoStarredExpression
                 | DynamicType::AmbiguousOverload => false,
             },
+            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_hintable(db),
         }
     }
 
@@ -2156,6 +2264,27 @@ impl<'db> Type<'db> {
             return None;
         }
         match self {
+            Type::Recursive(recursive) => {
+                let marker = Type::divergent(recursive.binder_id(db));
+                if marker.same_divergent_marker(div) {
+                    Some(marker)
+                } else {
+                    let body = recursive.body(db);
+                    let folded_body = body
+                        .recursive_type_normalized_impl(db, div, true)
+                        .unwrap_or(div);
+                    if folded_body == body {
+                        Some(self)
+                    } else {
+                        Some(Type::recursive(
+                            db,
+                            recursive.binder_id(db),
+                            recursive.origin(db),
+                            folded_body,
+                        ))
+                    }
+                }
+            }
             Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, div, nested)
@@ -2320,6 +2449,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_singleton(db),
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2521,6 +2651,9 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
+            Type::Recursive(recursive) => {
+                recursive.body_with_origin_marker(db).is_single_valued(db)
+            }
 
             Type::Intersection(intersection) => intersection
                 .enum_complement(db)
@@ -2570,6 +2703,13 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                Some(Place::bound(self).into())
+            }
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                unfolded.find_name_in_mro_with_policy(db, name, policy)
+            }),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -2880,6 +3020,13 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                Place::bound(self).into()
+            }
+            Type::Recursive(recursive) => {
+                recursive.map(db, |unfolded| unfolded.instance_member(db, name))
+            }
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3317,6 +3464,9 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
+            Type::Recursive(recursive) => recursive
+                .body_with_origin_marker(db)
+                .is_data_descriptor_impl(db, any_of_union),
             _ => {
                 !self
                     .class_member_with_policy(
@@ -3636,6 +3786,13 @@ impl<'db> Type<'db> {
                 }
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
+
+                Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                    Place::bound(this).into()
+                }
+                Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                    unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                }),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4552,6 +4709,11 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
+
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                Binding::single(self, Signature::dynamic(self)).into()
+            }
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| unfolded.bindings(db)),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -5497,6 +5659,10 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => self,
+            Type::Recursive(recursive) => {
+                recursive.map(db, |unfolded| unfolded.flatten_typevars(db))
+            }
             // Don't descend into other types; only flatten top-level typevars.
             _ => self,
         }
@@ -5655,6 +5821,16 @@ impl<'db> Type<'db> {
                 send_ty: Some(ty),
                 return_ty: Some(ty),
             }),
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                Some(GeneratorTypes {
+                    yield_ty: Some(self),
+                    send_ty: Some(self),
+                    return_ty: Some(self),
+                })
+            }
+            Type::Recursive(recursive) => {
+                recursive.map(db, |unfolded| unfolded.generator_types(db))
+            }
             _ => None,
         }
     }
@@ -5673,6 +5849,8 @@ impl<'db> Type<'db> {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => Some(self),
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| unfolded.to_instance(db)),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -5923,6 +6101,11 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => Ok(*self),
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                unfolded.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
+            }),
+
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
@@ -6005,6 +6188,8 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             Type::Divergent(_) => self,
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => self,
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| unfolded.to_meta_type(db)),
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
@@ -6170,6 +6355,14 @@ impl<'db> Type<'db> {
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
             _ => {}
+        }
+        if let TypeMapping::FoldRecursive {
+            recursive,
+            replacement,
+        } = type_mapping
+            && (self == *replacement || self == Type::Recursive(*recursive))
+        {
+            return Type::divergent(recursive.binder_id(db));
         }
 
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
@@ -6431,6 +6624,8 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceDivergent { .. } |
+                TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6450,6 +6645,8 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceDivergent { .. } |
+                TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6466,8 +6663,36 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization_kind) => {
                     Type::Divergent(divergent.materialized(*materialization_kind))
                 }
+                TypeMapping::ReplaceDivergent {
+                    binder_id,
+                    replacement,
+                } if self.same_divergent_marker(Type::divergent(binder_id.into_id())) => {
+                    *replacement
+                }
                 _ => self,
             },
+            Type::Recursive(recursive) => visitor.visit(db, self, type_mapping, || {
+                if let TypeMapping::ReplaceDivergent { binder_id, .. } = type_mapping
+                    && recursive.binder(db) == *binder_id
+                {
+                    return self;
+                }
+                if let TypeMapping::FoldRecursive {
+                    recursive: folded,
+                    ..
+                } = type_mapping
+                    && recursive.binder(db) == folded.binder(db)
+                {
+                    return self;
+                }
+                let body = recursive.body(db);
+                let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                if mapped == body {
+                    self
+                } else {
+                    Type::recursive(db, recursive.binder_id(db), recursive.origin(db), mapped)
+                }
+            }),
 
             Type::Never
             | Type::AlwaysTruthy
@@ -6550,6 +6775,14 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Divergent(_) => {}
+            Type::Recursive(recursive) => visitor.visit(self, || {
+                recursive.body(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }),
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(self, || {
@@ -6975,7 +7208,8 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(
+            Self::Recursive(_)
+            | Self::Dynamic(
                 DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
@@ -7347,6 +7581,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
+            Type::Recursive(recursive) => recursive
+                .body_with_origin_marker(db)
+                .variance_of(db, typevar),
         };
 
         tracing::trace!(
@@ -7505,6 +7742,19 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
+    /// Replaces a recursive-type binder marker with another type.
+    ///
+    /// Recursive binders block this mapping for their own marker, so this behaves like a
+    /// capture-avoiding substitution for `Type::Recursive`.
+    ReplaceDivergent {
+        binder_id: BinderId,
+        replacement: Type<'db>,
+    },
+    /// Folds occurrences introduced by unfolding a recursive type back to the binder marker.
+    FoldRecursive {
+        recursive: RecursiveType<'db>,
+        replacement: Type<'db>,
+    },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -7558,6 +7808,8 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
+            | TypeMapping::ReplaceDivergent { .. }
+            | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -7604,6 +7856,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceDivergent { .. }
+            | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
@@ -7634,6 +7888,10 @@ impl DivergentType {
             id,
             materialization: None,
         }
+    }
+
+    pub(crate) const fn id(self) -> salsa::Id {
+        self.id
     }
 
     fn same_marker(self, other: Self) -> bool {
@@ -7895,6 +8153,19 @@ impl<'db> InvalidTypeExpressionError<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for InvalidTypeExpressionError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            fallback_type: self.fallback_type.fold(db, rec),
+            invalid_expressions: self
+                .invalid_expressions
+                .into_iter()
+                .map(|error| error.fold(db, rec))
+                .collect(),
+        }
+    }
+}
+
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 enum InvalidTypeExpression<'db> {
@@ -8142,6 +8413,15 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info("`typing.Concatenate` is only valid:");
             diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for InvalidTypeExpression<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::InvalidType(ty, scope) => Self::InvalidType(ty.fold(db, rec), scope),
+            other => other,
         }
     }
 }

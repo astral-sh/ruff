@@ -78,6 +78,11 @@ impl<Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CA
             _tag: PhantomData,
         }
     }
+
+    /// Returns true if any currently active visit key satisfies `predicate`.
+    pub(crate) fn any_active(&self, predicate: impl Fn(&T) -> bool) -> bool {
+        self.seen.borrow().iter().any(predicate)
+    }
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>

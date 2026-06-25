@@ -2882,6 +2882,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_value_ty,
                 emit_diagnostics,
             ),
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                infer_value_ty(self, TypeContext::default());
+                true
+            }
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                self.validate_attribute_assignment(
+                    target,
+                    unfolded,
+                    attribute,
+                    infer_value_ty,
+                    emit_diagnostics,
+                )
+            }),
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
@@ -3534,6 +3547,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 attribute,
                 emit_diagnostics,
             ),
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => true,
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+            }),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -3722,6 +3739,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
+                Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                    Place::bound(object_ty).into()
+                }
+                Type::Recursive(recursive) => {
+                    recursive.map(db, |unfolded| unfolded.instance_member(db, attribute))
+                }
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
                 }
@@ -5532,6 +5555,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     propagate_callable_kind(db, alias.value_type(db), kind, provenance)
                 }
+                Type::Recursive(recursive) if recursive.is_non_contractive(db) => Some(ty),
+                Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                    propagate_callable_kind(db, unfolded, kind, provenance)
+                }),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -10601,6 +10628,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
+
+            (_, Type::Recursive(recursive)) if recursive.is_non_contractive(self.db()) => {
+                operand_type
+            }
+            (_, Type::Recursive(recursive)) => recursive.map(self.db(), |unfolded| {
+                self.infer_unary_expression_type(op, unfolded, unary)
+            }),
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),

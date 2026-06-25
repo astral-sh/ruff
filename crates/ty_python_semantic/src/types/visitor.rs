@@ -5,8 +5,9 @@ use crate::{
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
+        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
+        TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -130,6 +131,8 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
         walk_newtype_instance_type(db, newtype, self);
     }
+
+    fn visit_recursive_type(&self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) {}
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -156,6 +159,7 @@ pub(super) enum NonAtomicType<'db> {
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
     NewTypeInstance(NewType<'db>),
+    Recursive(RecursiveType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -229,6 +233,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::NewTypeInstance(newtype) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
+            Type::Recursive(recursive) => TypeKind::NonAtomic(NonAtomicType::Recursive(recursive)),
         }
     }
 }
@@ -277,6 +282,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);
+        }
+        NonAtomicType::Recursive(recursive) => {
+            visitor.visit_recursive_type(db, recursive);
         }
     }
 }
@@ -346,6 +354,10 @@ where
                 return;
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            self.visit_type(db, recursive.body(db));
         }
     }
 

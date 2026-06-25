@@ -8,9 +8,9 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
-        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
+        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType, Foldable,
+        IntersectionBuilder, KnownClass, MemberLookupPolicy, RecursiveType, SpecialFormType,
+        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -218,6 +218,35 @@ impl<'db> BoundSuperError<'db> {
                 ));
                 constraints.as_type(db)
             }
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for BoundSuperError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::AbstractOwnerType {
+                owner_type,
+                pivot_class,
+                typevar_context,
+            } => Self::AbstractOwnerType {
+                owner_type: owner_type.fold(db, rec),
+                pivot_class: pivot_class.fold(db, rec),
+                typevar_context,
+            },
+            Self::InvalidPivotClassType { pivot_class } => Self::InvalidPivotClassType {
+                pivot_class: pivot_class.fold(db, rec),
+            },
+            Self::FailingConditionCheck {
+                pivot_class,
+                owner,
+                typevar_context,
+            } => Self::FailingConditionCheck {
+                pivot_class: pivot_class.fold(db, rec),
+                owner: owner.fold(db, rec),
+                typevar_context,
+            },
+            Self::UnavailableImplicitArguments => Self::UnavailableImplicitArguments,
         }
     }
 }
@@ -743,6 +772,12 @@ impl<'db> BoundSuperType<'db> {
             }
             Type::TypeAlias(alias) => {
                 return delegate_to(alias.value_type(db));
+            }
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                return delegate_to(Type::divergent(recursive.binder_id(db)));
+            }
+            Type::Recursive(recursive) => {
+                return recursive.map(db, delegate_to);
             }
             Type::TypeVar(bound_typevar) => {
                 let typevar = bound_typevar.typevar(db);

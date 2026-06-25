@@ -831,6 +831,12 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn map_types(mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        self.parameters = self.parameters.map_types(map);
+        self.return_ty = map(self.return_ty);
+        self
+    }
+
     pub(crate) fn freshen_bound_typevars(&self, db: &'db dyn Db, delta: u32) -> Self {
         let Some(generic_context) = self.generic_context else {
             return self.clone();
@@ -3652,6 +3658,18 @@ impl<'db> Parameters<'db> {
 
         Self::from_parts(value, self.data.kind)
     }
+
+    fn map_types(&self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        let value: Box<[_]> = self
+            .data
+            .value
+            .iter()
+            .map(|param| param.map_types(map))
+            .collect();
+
+        Self::from_parts(value, self.data.kind)
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
     }
@@ -3948,6 +3966,16 @@ impl<'db> Parameter<'db> {
             kind: self
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            inferred_annotation: self.inferred_annotation,
+            annotation_kind: self.annotation_kind,
+        }
+    }
+
+    fn map_types(&self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            annotated_type: map(self.annotated_type),
+            definition: self.definition,
+            kind: self.kind.map_types(map),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
         }
@@ -4339,6 +4367,31 @@ impl<'db> ParameterKind<'db> {
             Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
                 default_type: apply_to_default_type(default_type),
                 name: name.clone(),
+            },
+            Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),
+        }
+    }
+
+    fn map_types(&self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        fn map_default<'db>(
+            default_type: Option<&Type<'db>>,
+            map: &mut impl FnMut(Type<'db>) -> Type<'db>,
+        ) -> Option<Type<'db>> {
+            default_type.map(|ty| map(*ty))
+        }
+
+        match self {
+            Self::PositionalOnly { name, default_type } => Self::PositionalOnly {
+                name: name.clone(),
+                default_type: map_default(default_type.as_ref(), map),
+            },
+            Self::PositionalOrKeyword { name, default_type } => Self::PositionalOrKeyword {
+                name: name.clone(),
+                default_type: map_default(default_type.as_ref(), map),
+            },
+            Self::KeywordOnly { name, default_type } => Self::KeywordOnly {
+                name: name.clone(),
+                default_type: map_default(default_type.as_ref(), map),
             },
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),
         }

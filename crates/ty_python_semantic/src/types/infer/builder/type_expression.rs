@@ -24,7 +24,7 @@ use crate::types::{
     IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
     TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
-    any_over_type, todo_type,
+    todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -946,6 +946,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
     ) -> Type<'db> {
         match value_ty {
+            Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
+                self.infer_subscript_type_expression(subscript, value_ty)
+            }
+            Type::Recursive(recursive) => recursive.map(self.db(), |unfolded| {
+                self.infer_subscript_type_expression_no_store(subscript, slice, unfolded)
+            }),
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
@@ -1267,81 +1273,111 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ..
                 },
             ) => {
-                let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
-                    Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
-                        ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements_leave_aliases(
-                                self.db(),
-                                tuple
-                                    .iter()
-                                    .map(|element| self.infer_subclass_of_type_expression(element)),
-                            );
-                            self.store_expression_type(parameters, ty);
-                            ty
-                        }
-                        _ => self.infer_subclass_of_type_expression(parameters),
-                    },
-                    value_ty @ Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_protocol(self.db()) {
-                            SubclassOfType::from(
-                                self.db(),
-                                todo_type!("type[T] for protocols").expect_dynamic(),
-                            )
-                        } else if class_literal.is_tuple(self.db()) {
-                            let class_type = self
-                                .infer_tuple_type_expression(subscript)
-                                .map(|tuple_type| tuple_type.to_class_type(self.db()))
-                                .unwrap_or_else(|| class_literal.default_specialization(self.db()));
-                            SubclassOfType::from(self.db(), class_type)
-                        } else {
-                            match class_literal.generic_context(self.db()) {
-                                Some(generic_context) => {
-                                    let db = self.db();
-                                    let specialize = &|types: &[Option<Type<'db>>]| {
-                                        SubclassOfType::from(
-                                            db,
-                                            class_literal.apply_specialization(db, |_| {
-                                                generic_context
-                                                    .specialize_partial(db, types.iter().copied())
-                                            }),
-                                        )
-                                    };
-                                    self.infer_explicit_callable_specialization(
-                                        subscript,
-                                        value_ty,
-                                        generic_context,
-                                        specialize,
-                                    )
-                                }
-                                None => {
-                                    // TODO: emit a diagnostic if you try to specialize a non-generic class.
-                                    self.infer_expression(parameters, TypeContext::default());
-                                    todo_type!("specialized non-generic class")
-                                }
-                            }
-                        }
-                    }
-                    Type::SpecialForm(
-                        special_form @ (SpecialFormType::TypingCallable
-                        | SpecialFormType::CollectionsAbcCallable),
-                    ) => {
-                        self.infer_parameterized_special_form_type_expression(
-                            subscript,
-                            special_form,
-                        );
-                        invalid_type_argument(self, slice)
-                    }
-                    _ => {
-                        self.infer_expression(parameters, TypeContext::default());
-                        todo_type!("unsupported nested subscript in type[X]")
-                    }
-                };
+                let value_ty = self.infer_expression(value, TypeContext::default());
+                let parameters_ty = self.infer_nested_subclass_of_type_expression(
+                    slice, subscript, parameters, value_ty,
+                );
                 self.store_expression_type(slice, parameters_ty);
                 parameters_ty
             }
             _ => {
                 self.infer_expression(slice, TypeContext::default());
                 todo_type!("unsupported type[X] special form")
+            }
+        }
+    }
+
+    fn infer_nested_subclass_of_type_expression(
+        &mut self,
+        outer_slice: &ast::Expr,
+        subscript: &ast::ExprSubscript,
+        parameters: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        let invalid_type_argument = |builder: &Self, slice: &ast::Expr| {
+            builder.report_invalid_type_expression(
+                slice,
+                "The argument to `type[]` must be a class object type",
+            );
+            SubclassOfType::subclass_of_unknown()
+        };
+
+        match value_ty {
+            Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
+                self.infer_expression(parameters, TypeContext::default());
+                todo_type!("unsupported nested subscript in type[X]")
+            }
+            Type::Recursive(recursive) => recursive.map(self.db(), |unfolded| {
+                self.infer_nested_subclass_of_type_expression(
+                    outer_slice,
+                    subscript,
+                    parameters,
+                    unfolded,
+                )
+            }),
+            Type::SpecialForm(SpecialFormType::Union) => match parameters {
+                ast::Expr::Tuple(tuple) => {
+                    let ty = UnionType::from_elements_leave_aliases(
+                        self.db(),
+                        tuple
+                            .iter()
+                            .map(|element| self.infer_subclass_of_type_expression(element)),
+                    );
+                    self.store_expression_type(parameters, ty);
+                    ty
+                }
+                _ => self.infer_subclass_of_type_expression(parameters),
+            },
+            value_ty @ Type::ClassLiteral(class_literal) => {
+                if class_literal.is_protocol(self.db()) {
+                    SubclassOfType::from(
+                        self.db(),
+                        todo_type!("type[T] for protocols").expect_dynamic(),
+                    )
+                } else if class_literal.is_tuple(self.db()) {
+                    let class_type = self
+                        .infer_tuple_type_expression(subscript)
+                        .map(|tuple_type| tuple_type.to_class_type(self.db()))
+                        .unwrap_or_else(|| class_literal.default_specialization(self.db()));
+                    SubclassOfType::from(self.db(), class_type)
+                } else {
+                    match class_literal.generic_context(self.db()) {
+                        Some(generic_context) => {
+                            let db = self.db();
+                            let specialize = &|types: &[Option<Type<'db>>]| {
+                                SubclassOfType::from(
+                                    db,
+                                    class_literal.apply_specialization(db, |_| {
+                                        generic_context
+                                            .specialize_partial(db, types.iter().copied())
+                                    }),
+                                )
+                            };
+                            self.infer_explicit_callable_specialization(
+                                subscript,
+                                value_ty,
+                                generic_context,
+                                specialize,
+                            )
+                        }
+                        None => {
+                            // TODO: emit a diagnostic if you try to specialize a non-generic class.
+                            self.infer_expression(parameters, TypeContext::default());
+                            todo_type!("specialized non-generic class")
+                        }
+                    }
+                }
+            }
+            Type::SpecialForm(
+                special_form @ (SpecialFormType::TypingCallable
+                | SpecialFormType::CollectionsAbcCallable),
+            ) => {
+                self.infer_parameterized_special_form_type_expression(subscript, special_form);
+                invalid_type_argument(self, outer_slice)
+            }
+            _ => {
+                self.infer_expression(parameters, TypeContext::default());
+                todo_type!("unsupported nested subscript in type[X]")
             }
         }
     }
@@ -1381,7 +1417,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent()) {
+        if value_ty.contains_cycle_artifact(db) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(
@@ -1729,6 +1765,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
+            Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
+                // Infer slice as a value expression to avoid false-positive
+                // `invalid-type-form` diagnostics, when we have e.g.
+                // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
+                if !self.in_string_annotation() {
+                    self.infer_expression(slice, TypeContext::default());
+                }
+                value_ty
+            }
+            Type::Recursive(recursive) => recursive.map(self.db(), |unfolded| {
+                self.infer_subscript_type_expression(subscript, unfolded)
+            }),
             Type::Dynamic(_) | Type::Divergent(_) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.

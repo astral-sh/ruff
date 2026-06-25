@@ -210,11 +210,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
                 // for more discussion.
                 let unpack_types = match value_ty {
-                    Type::Union(union_ty) => union_ty.elements(self.db()),
-                    _ => std::slice::from_ref(&value_ty),
+                    Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
+                    Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
+                        vec![value_ty]
+                    }
+                    Type::Recursive(recursive) => {
+                        recursive.map(self.db(), |unfolded| match unfolded {
+                            Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
+                            ty => vec![ty],
+                        })
+                    }
+                    _ => vec![value_ty],
                 };
 
-                for ty in unpack_types.iter().copied() {
+                for ty in unpack_types {
                     let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, ty, value_expr);
                         Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
