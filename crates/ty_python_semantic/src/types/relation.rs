@@ -1072,7 +1072,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 return self.never();
             }
 
-            return self.check_type_pair(db, source, target.forget_exactness());
+            return self.check_type_pair(db, source, target.forget_exactness(db));
         }
 
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
@@ -1158,7 +1158,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
             // identity and precise members, but have the same assignability as `Any`.
             (Type::NominalInstance(source), _)
-                if self.relation.is_assignability() && source.inherits_from_explicit_any() =>
+                if self.relation.is_assignability() && source.inherits_from_explicit_any(db) =>
             {
                 self.always()
             }
