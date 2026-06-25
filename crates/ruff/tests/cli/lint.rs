@@ -656,7 +656,6 @@ extend = "ruff2.toml"
 select = [E501]
 "#,
     )?;
-
     assert_cmd_snapshot!(
         fixture.check_command(),
         @"
@@ -2761,6 +2760,112 @@ fn unused_ignore_with_syntax_error() -> Result<()> {
     ----- stdout -----
     test.py:2:9: invalid-syntax: Expected an expression
     Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_multiline_noqa_mapping() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        r#"import logging
+
+logger = logging.getLogger(__name__)
+name = "world"
+logger.error(
+    f"""Hello {
+        name
+    }""",
+)
+"#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=G004,RUF100", "--preview", "--add-ignore"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 suppression comment.
+    "
+    );
+
+    insta::assert_snapshot!(fixture.read_file("test.py")?, @r#"
+    import logging
+
+    logger = logging.getLogger(__name__)
+    name = "world"
+    # ruff:ignore[logging-f-string]
+    logger.error(
+        f"""Hello {
+            name
+        }""",
+    )
+    "#);
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=G004,RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_continuation_mapping() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file("test.py", "value = 'first' \\\n    'second'\n")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=Q000,RUF100", "--preview", "--add-ignore"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 suppression comment.
+    "
+    );
+
+    assert_eq!(
+        fixture.read_file("test.py")?,
+        "# ruff:ignore[bad-quotes-inline-string]\nvalue = 'first' \\\n    'second'\n"
+    );
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=Q000,RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "
