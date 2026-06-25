@@ -40,9 +40,10 @@ use super::RecursivelyDefined;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    BytesLiteralType, ClassLiteral, CollectionCardinality, EnumLiteralType, IntersectionType,
+    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -1052,6 +1053,28 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
+            // Exact empty and non-empty refinements partition an exact collection.
+            if matches!(
+                (
+                    ty.exact_collection_cardinality(self.db),
+                    element_type.exact_collection_cardinality(self.db)
+                ),
+                (
+                    Some(CollectionCardinality::Empty),
+                    Some(CollectionCardinality::NonEmpty)
+                ) | (
+                    Some(CollectionCardinality::NonEmpty),
+                    Some(CollectionCardinality::Empty)
+                )
+            ) {
+                let widened = ty.forget_own_collection_cardinality(self.db);
+                if widened == element_type.forget_own_collection_cardinality(self.db) {
+                    to_remove.push(i);
+                    ty = widened;
+                    continue;
+                }
+            }
+
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
             if !self.cycle_recovery
                 && let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type)
@@ -1627,6 +1650,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         self.negative.swap_remove_index(index);
                         break;
                     }
+                }
+
+                if let Some((index, refined)) =
+                    self.positive
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, existing)| {
+                            new_positive
+                                .with_exact_runtime_class_of(db, *existing)
+                                .or_else(|| existing.with_exact_runtime_class_of(db, new_positive))
+                                .map(|refined| (index, refined))
+                        })
+                {
+                    self.positive.swap_remove_index(index);
+                    new_positive = refined;
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();

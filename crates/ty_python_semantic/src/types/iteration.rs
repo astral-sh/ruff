@@ -1,8 +1,8 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        AwaitError, Bindings, CallArguments, CallDunderError, CollectionCardinality, KnownClass,
+        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
@@ -105,7 +105,15 @@ impl<'db> Type<'db> {
             const MAX_TUPLE_LENGTH: usize = 128;
 
             match ty {
-                Type::NominalInstance(nominal) => nominal.tuple_spec(db),
+                Type::NominalInstance(nominal) => {
+                    if nominal.exact_collection_cardinality(db)
+                        == Some(CollectionCardinality::Empty)
+                    {
+                        Some(Cow::Owned(TupleSpec::heterogeneous(std::iter::empty())))
+                    } else {
+                        nominal.tuple_spec(db)
+                    }
+                }
                 Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(

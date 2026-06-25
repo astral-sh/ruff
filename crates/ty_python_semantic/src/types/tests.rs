@@ -50,6 +50,101 @@ fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
         .expect("a specialized `list` should be a generic alias")
 }
 
+#[test]
+fn exact_collection_relations_and_cardinality() {
+    let db = setup_db();
+    let list_class = KnownClass::List
+        .to_specialized_class_type(&db, &[KnownClass::Int.to_instance(&db)])
+        .expect("`list` should accept one type argument");
+
+    let ordinary = Type::instance(&db, list_class);
+    let exact = Type::exact_collection_instance(&db, list_class, CollectionCardinality::Unknown);
+    let empty = Type::exact_collection_instance(&db, list_class, CollectionCardinality::Empty);
+    let non_empty =
+        Type::exact_collection_instance(&db, list_class, CollectionCardinality::NonEmpty);
+
+    assert!(exact.is_exact_instance_of(&db, KnownClass::List));
+    assert!(!ordinary.is_exact_instance_of(&db, KnownClass::List));
+    assert!(exact.is_subtype_of(&db, ordinary));
+    assert!(!ordinary.is_subtype_of(&db, exact));
+    assert_eq!(UnionType::from_two_elements(&db, exact, ordinary), ordinary);
+
+    assert!(empty.is_subtype_of(&db, exact));
+    assert!(non_empty.is_subtype_of(&db, exact));
+    assert!(!exact.is_subtype_of(&db, empty));
+    assert!(!exact.is_subtype_of(&db, non_empty));
+    assert!(empty.is_disjoint_from(&db, non_empty));
+    assert_eq!(
+        IntersectionBuilder::new(&db)
+            .add_positive(empty)
+            .add_positive(non_empty)
+            .build(),
+        Type::Never
+    );
+
+    assert_eq!(empty.bool(&db), Truthiness::AlwaysFalse);
+    assert_eq!(non_empty.bool(&db), Truthiness::AlwaysTrue);
+    assert_eq!(exact.bool(&db), Truthiness::Ambiguous);
+    assert_eq!(
+        empty.exact_collection_cardinality(&db),
+        Some(CollectionCardinality::Empty)
+    );
+    assert_eq!(empty.forget_collection_cardinality(&db), exact);
+    assert_eq!(UnionType::from_two_elements(&db, empty, non_empty), exact);
+
+    let nested_list_class = KnownClass::List
+        .to_specialized_class_type(&db, &[empty])
+        .expect("`list` should accept one type argument");
+    let nested =
+        Type::exact_collection_instance(&db, nested_list_class, CollectionCardinality::NonEmpty)
+            .forget_collection_cardinality(&db);
+    assert_eq!(
+        nested.exact_collection_cardinality(&db),
+        Some(CollectionCardinality::Unknown)
+    );
+    assert_eq!(
+        nested
+            .class_specialization(&db)
+            .expect("an exact specialized list should retain its specialization")
+            .1
+            .types(&db),
+        &[exact]
+    );
+
+    let concatenated = Type::try_call_bin_op_return_type(&db, non_empty, ast::Operator::Add, empty)
+        .expect("exact lists should support concatenation");
+    assert_eq!(
+        concatenated.exact_collection_cardinality(&db),
+        Some(CollectionCardinality::NonEmpty)
+    );
+
+    assert!(matches!(
+        exact.dunder_class(&db),
+        Type::ClassLiteral(class) if class.is_known(&db, KnownClass::List)
+    ));
+    assert!(matches!(ordinary.dunder_class(&db), Type::SubclassOf(_)));
+
+    let int_class = KnownClass::Int
+        .try_to_class_literal(&db)
+        .expect("`int` should be available")
+        .default_specialization(&db);
+    let exact_int = Type::exact_instance(&db, int_class);
+    let one = Type::int_literal(1);
+    let true_literal = Type::bool_literal(true);
+    assert!(one.is_subtype_of(&db, exact_int));
+    assert!(!one.is_disjoint_from(&db, exact_int));
+    assert!(!true_literal.is_subtype_of(&db, exact_int));
+    assert!(true_literal.is_disjoint_from(&db, exact_int));
+
+    let range_class = KnownClass::Range
+        .try_to_class_literal(&db)
+        .expect("`range` should be available")
+        .default_specialization(&db);
+    let exact_range = Type::exact_instance(&db, range_class);
+    let non_empty_range = Type::KnownInstance(KnownInstanceType::Range { is_non_empty: true });
+    assert!(non_empty_range.is_subtype_of(&db, exact_range));
+}
+
 fn oscillating_generic_alias_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,

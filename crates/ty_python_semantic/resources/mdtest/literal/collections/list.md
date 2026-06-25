@@ -4,6 +4,41 @@
 
 ```py
 reveal_type([])  # revealed: list[Unknown]
+reveal_type(type([]))  # revealed: <class 'list'>
+reveal_type(bool([]))  # revealed: Literal[False]
+reveal_type(type(list[int]()))  # revealed: <class 'list'>
+reveal_type(bool(list[int]()))  # revealed: Literal[False]
+```
+
+The runtime class remains exact when two exact lists are concatenated. If either operand could be a
+list subclass, the result could be produced by an overridden `__add__` or `__radd__` method and is
+therefore not exact:
+
+```py
+left = [1]
+right = [2]
+reveal_type(type(left + right))  # revealed: <class 'list'>
+reveal_type(bool([] + []))  # revealed: Literal[False]
+reveal_type(bool([1] + []))  # revealed: Literal[True]
+
+def concatenate(left: list[int], right: list[int]) -> None:
+    reveal_type(type(left + right))  # revealed: type[list[int]]
+    reveal_type(type([1] + right))  # revealed: type[list[int]]
+    reveal_type(type(left + [1]))  # revealed: type[list[int]]
+    reveal_type(bool([] + right))  # revealed: bool
+```
+
+Exact runtime class survives storage, but cardinality does not. A list can be mutated through the
+stored place or another alias, so definite cardinality is retained only on fresh expressions and
+results:
+
+```py
+empty = []
+reveal_type(type(empty))  # revealed: <class 'list'>
+reveal_type(bool(empty))  # revealed: bool
+
+nested = [[]]
+reveal_type(bool(nested[0]))  # revealed: bool
 ```
 
 ## List of tuples

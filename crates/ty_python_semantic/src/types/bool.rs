@@ -4,9 +4,10 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
-        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
+        CallArguments, CallDunderError, ClassType, CollectionCardinality, CycleDetector,
+        KnownClass, KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Type, TypeContext,
+        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
+        constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
@@ -285,11 +286,15 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::NominalInstance(instance) => instance
-                .known_class(db)
-                .and_then(KnownClass::bool)
-                .map(Ok)
-                .unwrap_or_else(try_dunders)?,
+            Type::NominalInstance(instance) => match instance.exact_collection_cardinality(db) {
+                Some(CollectionCardinality::Empty) => Truthiness::AlwaysFalse,
+                Some(CollectionCardinality::NonEmpty) => Truthiness::AlwaysTrue,
+                Some(CollectionCardinality::Unknown) | None => instance
+                    .known_class(db)
+                    .and_then(KnownClass::bool)
+                    .map(Ok)
+                    .unwrap_or_else(try_dunders)?,
+            },
 
             Type::ProtocolInstance(_) => try_dunders()?,
 

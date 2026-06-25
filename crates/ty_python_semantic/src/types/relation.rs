@@ -16,10 +16,11 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType,
+    CollectionCardinality, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1044,6 +1045,34 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // and unnecessary. This early return is only an optimisation.
         if self.relation.can_safely_assume_reflexivity(source) && source == target {
             return self.always();
+        }
+
+        // An exact nominal target requires one specific runtime class. Types such as literals and
+        // known instances carry that information outside `NominalInstanceType`, so compare their
+        // runtime class here before delegating generic specialization checks to the ordinary
+        // nominal target.
+        if let Type::NominalInstance(target_instance) = target
+            && target_instance.is_exact()
+            && let Some(source_class) = source.exact_runtime_class(db)
+        {
+            if source_class != target_instance.class_literal(db) {
+                return self.never();
+            }
+
+            let cardinality_is_compatible = match target.exact_collection_cardinality(db) {
+                Some(CollectionCardinality::Empty) => {
+                    source.exact_collection_cardinality(db) == Some(CollectionCardinality::Empty)
+                }
+                Some(CollectionCardinality::NonEmpty) => {
+                    source.exact_collection_cardinality(db) == Some(CollectionCardinality::NonEmpty)
+                }
+                Some(CollectionCardinality::Unknown) | None => true,
+            };
+            if !cardinality_is_compatible {
+                return self.never();
+            }
+
+            return self.check_type_pair(db, source, target.forget_exactness());
         }
 
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
@@ -2530,6 +2559,26 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
         if let Some(right) = right.materialized_divergent_fallback() {
             return self.check_type_pair(db, left, right);
+        }
+
+        // A value with one known runtime class cannot inhabit a different exact nominal class,
+        // even when its class is a subclass of that nominal class. For example, `Literal[True]`
+        // is disjoint from exact `int`, despite `bool` being a subclass of `int`.
+        if let Type::NominalInstance(right_instance) = right
+            && right_instance.is_exact()
+            && let Some(left_class) = left.exact_runtime_class(db)
+        {
+            if left_class != right_instance.class_literal(db) {
+                return self.always();
+            }
+        }
+        if let Type::NominalInstance(left_instance) = left
+            && left_instance.is_exact()
+            && let Some(right_class) = right.exact_runtime_class(db)
+        {
+            if right_class != left_instance.class_literal(db) {
+                return self.always();
+            }
         }
 
         match (left, right) {

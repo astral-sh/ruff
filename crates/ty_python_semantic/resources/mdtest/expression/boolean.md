@@ -183,9 +183,9 @@ def f(x: EmptyTupleSubclass | FinalClassOverridingLenAndNotBool | Literal[EnumWi
 import enum
 from typing import Literal
 
-reveal_type(bool([]))  # revealed: bool
+reveal_type(bool([]))  # revealed: Literal[False]
 reveal_type(bool({}))  # revealed: bool
-reveal_type(bool(set()))  # revealed: bool
+reveal_type(bool(set()))  # revealed: Literal[False]
 
 class VariadicTupleSubclass(tuple[int, ...]): ...
 

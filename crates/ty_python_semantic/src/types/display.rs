@@ -2912,6 +2912,13 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'db> {
         if self.negated {
             f.write_str("~")?;
         }
+        if self.negated && self.ty.is_exact_instance() {
+            f.write_str("Exact[")?;
+            self.ty
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f)?;
+            return f.write_str("]");
+        }
         DisplayMaybeParenthesizedType {
             ty: self.ty,
             db: self.db,

@@ -200,9 +200,9 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
-        callable_pattern_type, definite_match_pattern_type,
+        ActiveRecursionDetector, CallableTypes, CollectionCardinality, EnumClassLiteral,
+        IntersectionBuilder, KnownInstanceType, NarrowingConstraint, SpecialFormType, Type,
+        TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
         definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
         infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
         pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
@@ -1311,11 +1311,16 @@ fn analyze_non_terminal_call<'db>(
 }
 
 fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
-    match infer_same_file_expression_type(db, iterable, TypeContext::default()) {
+    let ty = infer_same_file_expression_type(db, iterable, TypeContext::default());
+    match ty {
         Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
             Truthiness::from(is_non_empty)
         }
-        _ => Truthiness::Ambiguous,
+        _ => match ty.exact_collection_cardinality(db) {
+            Some(CollectionCardinality::Empty) => Truthiness::AlwaysFalse,
+            Some(CollectionCardinality::NonEmpty) => Truthiness::AlwaysTrue,
+            Some(CollectionCardinality::Unknown) | None => Truthiness::Ambiguous,
+        },
     }
 }
 
