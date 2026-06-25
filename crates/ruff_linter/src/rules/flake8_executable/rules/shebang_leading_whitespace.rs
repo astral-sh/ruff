@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
@@ -74,11 +75,7 @@ pub(crate) fn shebang_leading_whitespace(
     if let Some(mut diagnostic) =
         context.report_diagnostic_if_enabled(ShebangLeadingWhitespace, prefix)
     {
-        let applicability = if locator
-            .up_to(range.start())
-            .chars()
-            .any(|c| matches!(c, '\r' | '\n'))
-        {
+        let applicability = if locator.contains_line_break(prefix) {
             Applicability::Unsafe
         } else {
             Applicability::Safe
