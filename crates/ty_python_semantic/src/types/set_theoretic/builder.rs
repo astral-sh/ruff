@@ -38,11 +38,13 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::EnumComplement;
+use crate::types::generics::{Specialization, specialization_variance};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    StaticClassLiteral, StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -91,21 +93,66 @@ fn split_truthiness_guarded_intersection<'db>(
     Some((core.build(), guard))
 }
 
-/// Return `true` if `general` and `specific` are specializations of the same generic class and
-/// `general` only differs by using dynamic types for invariant type variables. For example,
-/// `list[Any]` is an invariant-dynamic generalization of `list[int]`.
-fn is_invariant_dynamic_generalization_of<'db>(
+struct DynamicGeneralization<'db> {
+    class: StaticClassLiteral<'db>,
+    general: Specialization<'db>,
+    specific: Specialization<'db>,
+    specific_type: Type<'db>,
+    has_variant_replacement: bool,
+}
+
+impl<'db> DynamicGeneralization<'db> {
+    fn intersection(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let generic_context = self.general.generic_context(db);
+        if !self.has_variant_replacement {
+            return Some(self.specific_type);
+        }
+
+        // Tuple specializations carry additional element information, and variance-based merges
+        // require the specific specialization to be fully static.
+        if self.class.known(db) == Some(KnownClass::Tuple) || self.specific_type.has_dynamic(db) {
+            return None;
+        }
+
+        let types: Vec<_> = generic_context
+            .variables(db)
+            .zip(self.general.types(db))
+            .zip(self.specific.types(db))
+            .map(|((typevar, general), specific)| {
+                if general == specific {
+                    return *specific;
+                }
+                match specialization_variance(db, typevar) {
+                    TypeVarVariance::Covariant => {
+                        IntersectionType::from_two_elements(db, *specific, *general)
+                    }
+                    TypeVarVariance::Contravariant => {
+                        UnionType::from_two_elements(db, *specific, *general)
+                    }
+                    TypeVarVariance::Invariant | TypeVarVariance::Bivariant => *specific,
+                }
+            })
+            .collect();
+        let specialization = generic_context.specialize(db, types);
+
+        Some(Type::instance(
+            db,
+            self.class
+                .apply_optional_specialization(db, Some(specialization)),
+        ))
+    }
+}
+
+/// Return the relationship between two specializations of the same generic class if `general`
+/// only differs from `specific` by using dynamic types.
+fn dynamic_generalization_of<'db>(
     db: &'db dyn Db,
     general: Type<'db>,
     specific: Type<'db>,
-) -> bool {
+) -> Option<DynamicGeneralization<'db>> {
     // Fast path to avoid performance regressions.
-    if !general.has_dynamic(db) {
-        return false;
-    }
-
-    if matches!(general, Type::TypeVar(_) | Type::NewTypeInstance(_)) {
-        return false;
+    if !general.has_dynamic(db) || matches!(general, Type::TypeVar(_) | Type::NewTypeInstance(_)) {
+        return None;
     }
 
     let (
@@ -116,7 +163,7 @@ fn is_invariant_dynamic_generalization_of<'db>(
         specific.class_specialization(db),
     )
     else {
-        return false;
+        return None;
     };
 
     // Top and bottom materializations are not gradual types.
@@ -124,10 +171,11 @@ fn is_invariant_dynamic_generalization_of<'db>(
         || general_specialization.materialization_kind(db).is_some()
         || specific_specialization.materialization_kind(db).is_some()
     {
-        return false;
+        return None;
     }
 
     let mut has_dynamic_replacement = false;
+    let mut has_variant_replacement = false;
     for ((typevar, general_type), specific_type) in general_specialization
         .generic_context(db)
         .variables(db)
@@ -137,15 +185,44 @@ fn is_invariant_dynamic_generalization_of<'db>(
         if general_type == specific_type {
             continue;
         }
-        if general_type.is_non_divergent_dynamic()
-            && typevar.variance(db) == TypeVarVariance::Invariant
-        {
+        if general_type.is_non_divergent_dynamic() {
             has_dynamic_replacement = true;
+            has_variant_replacement |= matches!(
+                specialization_variance(db, typevar),
+                TypeVarVariance::Covariant | TypeVarVariance::Contravariant
+            );
             continue;
         }
-        return false;
+        return None;
     }
-    has_dynamic_replacement
+    has_dynamic_replacement.then_some(DynamicGeneralization {
+        class: general_class,
+        general: general_specialization,
+        specific: specific_specialization,
+        specific_type: specific,
+        has_variant_replacement,
+    })
+}
+
+fn dynamic_intersection<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    dynamic_generalization_of(db, left, right)
+        .or_else(|| dynamic_generalization_of(db, right, left))
+        .and_then(|generalization| generalization.intersection(db))
+}
+
+/// If `general` is a dynamic generalization of the fully-static `specific`, return the bottom
+/// materialization that should replace `general` in `specific & ~general`.
+fn negated_generalization_bottom<'db>(
+    db: &'db dyn Db,
+    general: Type<'db>,
+    specific: Type<'db>,
+) -> Option<Type<'db>> {
+    dynamic_generalization_of(db, general, specific)?;
+    (!specific.has_dynamic(db)).then(|| general.bottom_materialization(db))
 }
 
 /// Try to merge a complementary guarded pair into an unguarded core.
@@ -1631,25 +1708,22 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
+                let mut dynamic_merge = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
-                    // S & T = S if S <: T or T is an invariant-dynamic generalization of S.
-                    if existing_positive.is_redundant_with(db, new_positive)
-                        || is_invariant_dynamic_generalization_of(
-                            db,
-                            new_positive,
-                            *existing_positive,
-                        )
+                    if let Some(merged) = dynamic_intersection(db, new_positive, *existing_positive)
                     {
+                        if merged == *existing_positive {
+                            return;
+                        }
+                        dynamic_merge = Some((index, merged));
+                        break;
+                    }
+                    // S & T = S if S <: T.
+                    if existing_positive.is_redundant_with(db, new_positive) {
                         return;
                     }
                     // same rule, reverse order
-                    if new_positive.is_redundant_with(db, *existing_positive)
-                        || is_invariant_dynamic_generalization_of(
-                            db,
-                            *existing_positive,
-                            new_positive,
-                        )
-                    {
+                    if new_positive.is_redundant_with(db, *existing_positive) {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
@@ -1659,12 +1733,27 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         return;
                     }
                 }
+                if let Some((index, merged)) = dynamic_merge {
+                    self.positive.swap_remove_index(index);
+                    self.add_positive(db, merged);
+                    return;
+                }
                 for index in to_remove.into_iter().rev() {
                     self.positive.swap_remove_index(index);
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
+                let mut replacement_negatives = SmallVec::<[Type<'db>; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
+                    // S & ~G = S & ~Bottom[G] & Any if G is a dynamic generalization of the
+                    // fully-static specialization S. This follows because S <: Top[G].
+                    if let Some(bottom) =
+                        negated_generalization_bottom(db, *existing_negative, new_positive)
+                    {
+                        to_remove.push(index);
+                        replacement_negatives.push(bottom);
+                        continue;
+                    }
                     // S & ~T = Never    if S <: T
                     if new_positive.is_subtype_of(db, *existing_negative) {
                         *self = Self::default();
@@ -1678,6 +1767,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 for index in to_remove.into_iter().rev() {
                     self.negative.swap_remove_index(index);
+                }
+                if !replacement_negatives.is_empty() {
+                    for bottom in replacement_negatives {
+                        self.add_negative(db, bottom);
+                    }
+                    self.add_positive(db, Type::any());
+                    self.add_positive(db, new_positive);
+                    return;
                 }
 
                 self.positive.insert(new_positive);
@@ -1760,6 +1857,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
+                if let Some(bottom) = self.positive.iter().find_map(|existing_positive| {
+                    negated_generalization_bottom(db, new_negative, *existing_positive)
+                }) {
+                    self.add_negative(db, bottom);
+                    self.add_positive(db, Type::any());
+                    return;
+                }
+
                 let new_negative_enum = new_negative.as_enum_literal();
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
