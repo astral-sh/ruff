@@ -38,6 +38,7 @@ use crate::definition::{
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
+use crate::node_key::NodeIndexMap;
 use crate::place::{
     PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -2637,9 +2638,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             place_tables: place_tables.into(),
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
-            expressions_by_node: self.expressions_by_node,
+            expressions_by_node: NodeIndexMap::from_entries(
+                self.expressions_by_node
+                    .into_iter()
+                    .map(|(key, expression)| (key.index(), expression)),
+            ),
             unpacks_by_target: FrozenMap::from(self.unpacks_by_target),
-            statements_by_node: self.statements_by_node,
+            statements_by_node: NodeIndexMap::from_entries(
+                self.statements_by_node
+                    .into_iter()
+                    .map(|(key, statement)| (key.index(), statement)),
+            ),
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),

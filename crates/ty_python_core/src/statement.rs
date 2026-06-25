@@ -61,6 +61,12 @@ impl<'db> StatementInner<'db> {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub struct StatementNodeKey(NodeKey);
 
+impl StatementNodeKey {
+    pub(crate) fn index(self) -> ast::NodeIndex {
+        self.0.index()
+    }
+}
+
 impl From<&ast::Stmt> for StatementNodeKey {
     fn from(node: &ast::Stmt) -> Self {
         Self(NodeKey::from_node(node))
