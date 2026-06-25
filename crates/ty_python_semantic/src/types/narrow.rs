@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
-use crate::Db;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
@@ -21,6 +20,7 @@ use crate::types::{
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
+use crate::{Db, GenericNarrowing};
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -433,19 +433,27 @@ impl ClassInfoConstraintFunction {
         db: &'db dyn Db,
         classinfo: Type<'db>,
         is_positive: bool,
+        generic_narrowing: GenericNarrowing,
     ) -> Option<Type<'db>> {
-        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
-            ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
-            }
-            ClassInfoConstraintFunction::IsSubclass => {
-                SubclassOfType::from(db, class.top_materialization(db))
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| {
+            let specialization = match (generic_narrowing, is_positive) {
+                (GenericNarrowing::Relaxed, true) => class.unknown_specialization(db),
+                // A negative result excludes every specialization of the class, even though the
+                // positive branch uses the gradual Unknown-specialization.
+                (GenericNarrowing::Strict, _) | (GenericNarrowing::Relaxed, false) => {
+                    class.top_materialization(db)
+                }
+            };
+
+            match self {
+                ClassInfoConstraintFunction::IsInstance => Type::instance(db, specialization),
+                ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, specialization),
             }
         };
 
         match classinfo {
             Type::TypeAlias(alias) => {
-                self.generate_constraint(db, alias.value_type(db), is_positive)
+                self.generate_constraint(db, alias.value_type(db), is_positive, generic_narrowing)
             }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -494,7 +502,12 @@ impl ClassInfoConstraintFunction {
                         // target) should be SKIPPED, not abort narrowing on the
                         // whole intersection. Narrowing on the remaining members
                         // is still sound.
-                        if let Some(c) = self.generate_constraint(db, *element, is_positive) {
+                        if let Some(c) = self.generate_constraint(
+                            db,
+                            *element,
+                            is_positive,
+                            generic_narrowing,
+                        ) {
                             builder = builder.add_positive(c);
                             any_member = true;
                         }
@@ -510,16 +523,20 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => union.try_map(db, |element| {
-                self.generate_constraint(db, *element, is_positive)
+                self.generate_constraint(db, *element, is_positive, generic_narrowing)
             }),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, bound, is_positive)
+                        self.generate_constraint(db, bound, is_positive, generic_narrowing)
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        self.generate_constraint(db, constraints.as_type(db), is_positive)
-                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => self
+                        .generate_constraint(
+                            db,
+                            constraints.as_type(db),
+                            is_positive,
+                            generic_narrowing,
+                        ),
                 }
             }
 
@@ -532,7 +549,9 @@ impl ClassInfoConstraintFunction {
                     db,
                     tuple
                         .iter_element_types(db)
-                        .map(|element| self.generate_constraint(db, element, is_positive)),
+                        .map(|element| {
+                            self.generate_constraint(db, element, is_positive, generic_narrowing)
+                        }),
                 )
             }
 
@@ -549,9 +568,10 @@ impl ClassInfoConstraintFunction {
                                 db,
                                 KnownClass::NoneType.to_class_literal(db),
                                 is_positive,
+                                generic_narrowing,
                             )
                         } else {
-                            self.generate_constraint(db, element, is_positive)
+                            self.generate_constraint(db, element, is_positive, generic_narrowing)
                         }
                     }),
                 )
@@ -562,15 +582,20 @@ impl ClassInfoConstraintFunction {
                     db,
                     alias.aliased_class().to_class_literal(db),
                     is_positive,
+                    generic_narrowing,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
                     KnownClass::Tuple.to_class_literal(db),
                     is_positive,
+                    generic_narrowing,
                 ),
-                SpecialFormType::Type => {
-                    self.generate_constraint(db, KnownClass::Type.to_class_literal(db), is_positive)
-                }
+                SpecialFormType::Type => self.generate_constraint(
+                    db,
+                    KnownClass::Type.to_class_literal(db),
+                    is_positive,
+                    generic_narrowing,
+                ),
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
@@ -937,6 +962,7 @@ fn positive_class_pattern_type<'db>(
                 db,
                 class_expression_ty,
                 true,
+                GenericNarrowing::Strict,
             )
         }
         _ => None,
@@ -1785,7 +1811,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                         )
                     })
                 {
-                    // The pattern class's unknown specialization loses type arguments known
+                    // The pattern class's Unknown-specialization loses type arguments known
                     // through the related subject type. Prefer the subject's member type when it
                     // exists, but retain a member declared only by the pattern class.
                     member_ty = Some(
@@ -3711,8 +3737,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let class_info_ty = inference.expression_type(second_arg);
 
+                let generic_narrowing = self
+                    .db
+                    .analysis_settings(self.scope().file(self.db))
+                    .generic_narrowing;
+
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive)
+                    .generate_constraint(self.db, class_info_ty, is_positive, generic_narrowing)
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
                             place,
