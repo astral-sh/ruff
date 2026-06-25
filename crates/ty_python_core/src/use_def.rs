@@ -693,12 +693,14 @@ impl<'db> RetainedDefinitions<'db> {
         }
     }
 
+    #[inline]
     fn get(&self, id: ScopedDefinitionId) -> RetainedDefinitionState<'db> {
-        id.index()
-            .checked_sub(1)
-            .map_or(RetainedDefinitionState::Undefined, |index| {
-                self.states[index]
-            })
+        let index = id.index();
+        if index == 0 {
+            RetainedDefinitionState::Undefined
+        } else {
+            self.states[index - 1]
+        }
     }
 
     fn iter_enumerated(
