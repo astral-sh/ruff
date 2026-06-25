@@ -654,6 +654,43 @@ Defaults to `true`.
 
 ---
 
+## `semantics`
+
+### `isinstance-narrowing`
+
+Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.
+
+With `strict`, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows an `object` value to `Top[list[Unknown]]`, representing
+a list with any possible specialization.
+
+With `relaxed`, ty narrows to the class's default specialization instead. The same check
+narrows an `object` value to `list[Unknown]`.
+
+Defaults to `strict`.
+
+**Default value**: `strict`
+
+**Type**: `strict | relaxed`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.semantics]
+    isinstance-narrowing = "relaxed"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [semantics]
+    isinstance-narrowing = "relaxed"
+    ```
+
+---
+
 ## `src`
 
 ### `exclude`

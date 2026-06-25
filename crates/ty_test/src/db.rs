@@ -1,4 +1,4 @@
-use crate::config::{Analysis, Rules};
+use crate::config::{Analysis, Rules, Semantics};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -18,7 +18,7 @@ use ty_python_core::Db as _;
 use ty_python_core::program::Program;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, SemanticSettings, check_file_unwrap, default_lint_registry,
 };
 
 #[salsa::db]
@@ -107,6 +107,19 @@ impl Db {
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
+        }
+    }
+
+    pub(crate) fn update_semantics_options(&mut self, options: Option<&Semantics>) {
+        let semantics = SemanticSettings {
+            isinstance_narrowing: options
+                .and_then(|options| options.isinstance_narrowing)
+                .unwrap_or_default(),
+        };
+
+        let settings = self.settings();
+        if settings.semantics(self) != &semantics {
+            settings.set_semantics(self).to(semantics);
         }
     }
 
@@ -199,6 +212,10 @@ impl SemanticDb for Db {
         self.settings().analysis(self)
     }
 
+    fn semantic_settings(&self, _file: File) -> &SemanticSettings {
+        self.settings().semantics(self)
+    }
+
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }
@@ -219,6 +236,9 @@ struct Settings {
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
+    #[default]
+    #[returns(ref)]
+    semantics: SemanticSettings,
     #[default]
     #[returns(deref)]
     rule_selection: MdtestRuleSelection,

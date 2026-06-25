@@ -728,6 +728,215 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
+## Use cases: `isinstance` narrowing and generics
+
+### Strict mode
+
+```toml
+[semantics]
+isinstance-narrowing = "strict"
+```
+
+#### Covariance
+
+Narrowing from `object` via `isinstance(.., Sequence)`:
+
+```py
+from typing import Sequence, final
+
+def _(xs: object):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[object]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: ~Sequence[object]
+```
+
+Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
+
+```py
+@final
+class Item: ...
+
+def _(xs: Item | Sequence[Item]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | Sequence[OpenItem]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[object]) | Sequence[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
+```
+
+#### Invariance
+
+Narrowing from `object` via `isinstance(.., list)`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: Top[list[Unknown]]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+
+        # This is an error in strict mode:
+        # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
+        xs.append(1)
+
+    else:
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
+```
+
+Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+
+def _(xs: Item | list[Item]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | list[OpenItem]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: (OpenItem & Top[list[Unknown]]) | list[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
+```
+
+### Relaxed mode
+
+The `semantics.isinstance-narrowing` option can be set to `relaxed` to narrow to the default
+specialization of a generic class without top-materializing it:
+
+```toml
+[semantics]
+isinstance-narrowing = "relaxed"
+```
+
+#### Covariance
+
+Narrowing from `object` via `isinstance(.., Sequence)`:
+
+```py
+from typing import Sequence, final
+
+def _(xs: object):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(xs)  # revealed: ~Sequence[Unknown]
+```
+
+Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
+
+```py
+@final
+class Item: ...
+
+def _(xs: Item | Sequence[Item]):
+    if isinstance(xs, Sequence):
+        # TODO: we might want to simplify this to `Sequence[Item & Unknown]`
+        reveal_type(xs)  # revealed: Sequence[Item] & Sequence[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Item & Unknown
+    else:
+        reveal_type(xs)  # revealed: Item | (Sequence[Item] & ~Sequence[Unknown])
+```
+
+Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | Sequence[OpenItem]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | (Sequence[OpenItem] & Sequence[Unknown])
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(xs)  # revealed: (OpenItem & ~Sequence[Unknown]) | (Sequence[OpenItem] & ~Sequence[Unknown])
+```
+
+#### Invariance
+
+Narrowing from `object` via `isinstance(.., list)`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+
+        # In relaxed mode, this is fine
+        xs.append(1)
+
+    else:
+        reveal_type(xs)  # revealed: ~list[Unknown]
+```
+
+Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+
+def _(xs: Item | list[Item]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item | (list[Item] & ~list[Unknown])
+```
+
+Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | list[OpenItem]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: (OpenItem & list[Unknown]) | list[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown | OpenItem
+    else:
+        reveal_type(xs)  # revealed: (OpenItem & ~list[Unknown]) | (list[OpenItem] & ~list[Unknown])
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
