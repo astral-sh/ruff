@@ -811,7 +811,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 NominalInstanceInner::ExactTuple(source_tuple),
                 NominalInstanceInner::ExactTuple(target_tuple),
             ) => self.check_tuple_type_pair(db, source_tuple, target_tuple),
-            _ => self.check_class_pair(db, source.class(db), target.class(db)),
+            _ => {
+                let source_class = source.class(db);
+                let target_class = target.class(db);
+                if source_class == target_class
+                    && self
+                        .relation
+                        .can_safely_assume_reflexivity(Type::NominalInstance(source))
+                {
+                    self.always()
+                } else {
+                    self.check_class_pair(db, source_class, target_class)
+                }
+            }
         }
     }
 }
@@ -841,8 +853,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             return result;
         }
 
-        if left.class_literal(db) == right.class_literal(db)
-            && matches!(
+        if left.is_exact() && right.is_exact() {
+            if left.class_literal(db) != right.class_literal(db) {
+                return self.always();
+            }
+
+            if matches!(
                 (
                     left.exact_collection_cardinality(db),
                     right.exact_collection_cardinality(db)
@@ -854,14 +870,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     Some(CollectionCardinality::NonEmpty),
                     Some(CollectionCardinality::Empty)
                 )
-            )
-        {
-            return self.always();
-        }
-
-        if left.is_exact() && right.is_exact() && left.class_literal(db) != right.class_literal(db)
-        {
-            return self.always();
+            ) {
+                return self.always();
+            }
         }
         // An explicit `Any` base may materialize as the other nominal class, so knowing the exact
         // runtime class does not prove disjointness in the one-exact case.
@@ -985,13 +996,17 @@ impl<'db> NominalInstanceClass<'db> {
         match self {
             Self::Plain(_) => false,
             Self::InheritsFromExplicitAny(_) => true,
-            Self::Exact(class) => class
-                .class(db)
-                .class_literal(db)
-                .inherits_from_explicit_any(db),
+            Self::Exact(class) => {
+                class.cardinality(db).is_none()
+                    && class
+                        .class(db)
+                        .class_literal(db)
+                        .inherits_from_explicit_any(db)
+            }
         }
     }
 
+    #[inline]
     fn class(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Plain(class) => class,
