@@ -14,3 +14,4 @@ help: Remove whitespace before shebang
   -     #!/usr/bin/env python
 1 + #!/usr/bin/env python
   |
+note: This is an unsafe fix and may change runtime behavior
