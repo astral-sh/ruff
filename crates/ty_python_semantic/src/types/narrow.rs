@@ -459,6 +459,7 @@ impl ClassInfoConstraintFunction {
         env: &ProgramEnvironment<'db>,
         classinfo: Type<'db>,
         is_positive: bool,
+        generic_narrowing: GenericNarrowing,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
@@ -546,6 +547,13 @@ impl ClassInfoConstraintFunction {
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
                         self.generate_constraint(db, env, constraints.as_type(db, env), is_positive)
                     }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => self
+                        .generate_constraint(
+                            db,
+                            constraints.as_type(db),
+                            is_positive,
+                            generic_narrowing,
+                        ),
                 }
             }
 
@@ -595,6 +603,7 @@ impl ClassInfoConstraintFunction {
                     env,
                     alias.aliased_class().to_class_literal(db, env),
                     is_positive,
+                    generic_narrowing,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
@@ -607,6 +616,13 @@ impl ClassInfoConstraintFunction {
                     env,
                     KnownClass::Type.to_class_literal(db, env),
                     is_positive,
+                    generic_narrowing,
+                ),
+                SpecialFormType::Type => self.generate_constraint(
+                    db,
+                    KnownClass::Type.to_class_literal(db),
+                    is_positive,
+                    generic_narrowing,
                 ),
 
                 // We don't have a good meta-type for `Callable`s right now,
@@ -987,6 +1003,7 @@ fn positive_class_pattern_type<'db>(
                 env,
                 class_expression_ty,
                 true,
+                GenericNarrowing::Strict,
             )
         }
         _ => None,
@@ -1876,7 +1893,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             )
                     })
                 {
-                    // The pattern class's unknown specialization loses type arguments known
+                    // The pattern class's Unknown-specialization loses type arguments known
                     // through the related subject type. Prefer the subject's member type when it
                     // exists, but retain a member declared only by the pattern class.
                     member_ty = Some(
@@ -3882,6 +3899,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let function = function.into_classinfo_constraint_function()?;
 
                 let class_info_ty = inference.expression_type(second_arg);
+
+                let generic_narrowing = self
+                    .db
+                    .analysis_settings(self.scope().file(self.db))
+                    .generic_narrowing;
 
                 function
                     .generate_constraint(db, &self.env, class_info_ty, is_positive)

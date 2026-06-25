@@ -82,6 +82,17 @@
             "$ref": "#/definitions/string"
           }
         },
+        "generic-narrowing": {
+          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` and\n`issubclass()` checks.\n\nWith `strict`, ty narrows to the top materialization of the class. For example,\n`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,\nrepresenting the (infinite) union of all possible `list` specializations. Iterating\nover the list would yield values of type `object`.\n\nWith `relaxed`, ty narrows to the class's Unknown-specialization instead. The same\ncheck would narrow a value of type `object` to `list[Unknown]`. Iterating over the list\nwould yield values of type `Unknown`, which is more permissive than `object`.\n\nDefaults to `relaxed`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GenericNarrowing"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "replace-imports-with-any": {
           "description": "A list of module glob patterns whose imports should be replaced with `typing.Any`.\n\nUnlike `allowed-unresolved-imports`, this setting replaces the module's type information\nwith `typing.Any` even if the module can be resolved. Import diagnostics are\nunconditionally suppressed for matching modules.\n\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.\n\nWhen multiple patterns match, later entries take precedence.",
           "type": [
@@ -184,6 +195,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "GenericNarrowing": {
+      "type": "string",
+      "enum": [
+        "strict",
+        "relaxed"
+      ]
     },
     "Level": {
       "oneOf": [
