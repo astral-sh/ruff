@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use dashmap::mapref::entry::Entry;
 pub use directory::{
@@ -64,6 +64,9 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
+    /// Overrides the durability of every field for files created after this is set.
+    input_durability: OnceLock<Durability>,
+
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
@@ -81,6 +84,28 @@ struct FilesInner {
 }
 
 impl Files {
+    /// Overrides the durability of all inputs on files created from now on.
+    ///
+    /// Existing files retain their current durability. Callers should therefore set this before
+    /// discovering any files if they need the override to apply to the entire project.
+    pub fn set_input_durability(&self, durability: Durability) {
+        if let Err(durability) = self.inner.input_durability.set(durability) {
+            assert_eq!(
+                self.inner.input_durability.get(),
+                Some(&durability),
+                "the input durability can only be set once"
+            );
+        }
+    }
+
+    fn input_durability(&self, default: Durability) -> Durability {
+        self.inner
+            .input_durability
+            .get()
+            .copied()
+            .unwrap_or(default)
+    }
+
     /// Looks up a file by its `path`.
     ///
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
@@ -104,9 +129,10 @@ impl Files {
 
                 tracing::trace!("Adding file '{absolute}'");
 
-                let durability = self
-                    .root(db, &absolute)
-                    .map_or(Durability::default(), |root| root.durability(db));
+                let durability = self.input_durability(
+                    self.root(db, &absolute)
+                        .map_or(Durability::default(), |root| root.durability(db)),
+                );
 
                 let builder = File::builder(FilePath::from(absolute))
                     .durability(durability)
@@ -117,13 +143,13 @@ impl Files {
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),
                     Ok(metadata) if metadata.file_type().is_directory() => builder
-                        .durability(Durability::MEDIUM.max(durability))
+                        .durability(self.input_durability(Durability::MEDIUM.max(durability)))
                         .status(FileStatus::IsADirectory)
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),
-                    _ => builder
-                        .status(FileStatus::NotFound)
-                        .status_durability(Durability::MEDIUM.max(durability)),
+                    _ => builder.status(FileStatus::NotFound).status_durability(
+                        self.input_durability(Durability::MEDIUM.max(durability)),
+                    ),
                 };
 
                 builder.new(db)
@@ -181,6 +207,7 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::from(path))
+                .durability(self.input_durability(Durability::LOW))
                 .path_durability(Durability::NEVER_CHANGE)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
@@ -677,8 +704,12 @@ impl TryFrom<Span> for FileRange {
 
 #[cfg(test)]
 mod tests {
+    use salsa::{Durability, Setter};
+
+    use crate::Db as _;
     use crate::file_revision::FileRevision;
     use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
+    use crate::source::source_text;
     use crate::system::DbWithWritableSystem as _;
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
@@ -721,6 +752,32 @@ mod tests {
             system_path_to_file(&db, "/root/.././test.py"),
             system_path_to_file(&db, "/root/test.py")
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn input_durability_applies_to_new_file_overrides() {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 1").unwrap();
+        db.files().set_input_durability(Durability::NEVER_CHANGE);
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let source = source_text(&db, file);
+        file.set_source_text_override(&mut db).to(Some(source));
+    }
+
+    #[test]
+    fn input_durability_does_not_change_existing_files() {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 1").unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        db.files().set_input_durability(Durability::NEVER_CHANGE);
+
+        let source = source_text(&db, file);
+        file.set_source_text_override(&mut db)
+            .to(Some(source.clone()));
+        assert_eq!(file.source_text_override(&db).as_ref(), Some(&source));
     }
 
     #[test]

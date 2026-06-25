@@ -190,6 +190,31 @@ impl Project {
             .new(db)
     }
 
+    /// Sets the durability of the project inputs used throughout a one-shot check.
+    pub(crate) fn set_input_durability(self, db: &mut dyn Db, durability: Durability) {
+        let metadata = Box::new(self.metadata(db).clone());
+        let settings = Box::new(self.settings(db).clone());
+        let included_paths = self.included_paths_list(db).to_vec();
+        let check_mode = self.check_mode(db);
+        let force_exclude = self.force_exclude_flag(db);
+
+        self.set_metadata(db)
+            .with_durability(durability)
+            .to(metadata);
+        self.set_settings(db)
+            .with_durability(durability)
+            .to(settings);
+        self.set_included_paths_list(db)
+            .with_durability(durability)
+            .to(included_paths);
+        self.set_check_mode(db)
+            .with_durability(durability)
+            .to(check_mode);
+        self.set_force_exclude_flag(db)
+            .with_durability(durability)
+            .to(force_exclude);
+    }
+
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.metadata(db).root()
     }

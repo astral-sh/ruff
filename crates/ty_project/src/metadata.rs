@@ -24,7 +24,7 @@ pub mod python_version;
 pub mod settings;
 pub mod value;
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
     pub(super) name: Name,

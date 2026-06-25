@@ -7,6 +7,7 @@ use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
 use ruff_ranged_value::RangedValue;
+use salsa::Durability;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
@@ -62,6 +63,7 @@ impl<'a> Benchmark<'a> {
                 .map(|path| SystemPath::absolute(path, &root))
                 .collect(),
         );
+        db.set_input_durability(Durability::NEVER_CHANGE);
         db
     }
 }

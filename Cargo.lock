@@ -3020,6 +3020,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_ranged_value",
  "rustc-hash",
+ "salsa",
  "serde",
  "serde_json",
  "tikv-jemallocator",
