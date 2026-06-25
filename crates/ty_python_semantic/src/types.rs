@@ -108,6 +108,7 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
+pub(crate) use special_form::TypedDictModule;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;

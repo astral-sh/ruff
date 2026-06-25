@@ -23,7 +23,7 @@ use crate::{
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -734,8 +734,15 @@ impl<'db> StaticClassLiteral<'db> {
         instance_flags_inner(db, self)
     }
 
+    /// Return the module defining the `TypedDict` base of this class.
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        self.iter_mro(db, None)
+            .find_map(ClassBase::typed_dict_module)
+    }
+
     /// Return `true` if this class constitutes a typed dict specification (inherits from
-    /// `typing.TypedDict`, either directly or indirectly).
+    /// `typing.TypedDict` or `typing_extensions.TypedDict`, either directly or indirectly).
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.instance_flags(db)
             .contains(ClassInstanceFlags::TYPED_DICT)
@@ -1136,13 +1143,9 @@ impl<'db> StaticClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-            ClassMemberResult::TypedDict => typed_dict_class_member(
-                db,
-                TypedDictType::new(self.identity_specialization(db)),
-                ClassLiteral::Static(self),
-                policy,
-                name,
-            ),
+            ClassMemberResult::TypedDict(module) => {
+                typed_dict_class_member(db, self.identity_specialization(db), module, policy, name)
+            }
         }
     }
 
@@ -1808,7 +1811,10 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None => self.identity_specialization(db),
             };
-            typed_dict_class_member(db, TypedDictType::new(class), self.into(), policy, name)
+            let Some(module) = self.typed_dict_module(db) else {
+                return Place::Undefined.into();
+            };
+            typed_dict_class_member(db, class, module, policy, name)
         }
     }
 

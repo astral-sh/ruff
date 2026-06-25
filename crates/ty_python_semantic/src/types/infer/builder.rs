@@ -104,8 +104,8 @@ use crate::types::{
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
+    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -3865,8 +3865,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
-                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-                        self.infer_typeddict_call_expression(call_expr, Some(definition))
+                    } else if let Some(typed_dict_module) =
+                        TypedDictModule::from_type(self.db(), callable_type)
+                    {
+                        self.infer_typeddict_call_expression(
+                            call_expr,
+                            Some(definition),
+                            typed_dict_module,
+                        )
                     } else if let Some(function) = callable_type.as_function_literal()
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
@@ -4172,7 +4178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
-        if func_ty == Type::SpecialForm(SpecialFormType::TypedDict) {
+        if TypedDictModule::from_type(self.db(), func_ty).is_some() {
             self.infer_functional_typeddict_deferred(arguments);
             return;
         }
@@ -8528,8 +8534,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-            return self.infer_typeddict_call_expression(call_expression, None);
+        if let Some(typed_dict_module) = TypedDictModule::from_type(self.db(), callable_type) {
+            return self.infer_typeddict_call_expression(call_expression, None, typed_dict_module);
         }
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {
