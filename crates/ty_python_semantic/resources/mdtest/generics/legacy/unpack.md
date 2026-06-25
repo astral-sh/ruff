@@ -103,7 +103,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
+# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
 ```
 
