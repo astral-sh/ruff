@@ -2,7 +2,7 @@ use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{Argument, Arguments, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprRef;
-use ruff_python_ast::token::{Token, TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
     BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
@@ -123,9 +123,9 @@ impl ParenthesesIndex {
     pub(crate) fn from_tokens(tokens: &Tokens) -> Self {
         let mut ranges = FxHashSet::default();
         let mut stack = Vec::<Option<TextSize>>::new();
-        let mut previous = None::<Token>;
+        let mut previous_end = None;
 
-        for token in tokens.iter().copied() {
+        for token in tokens {
             if token.kind().is_trivia() {
                 continue;
             }
@@ -138,8 +138,8 @@ impl ParenthesesIndex {
                     stack.push(None);
                 }
                 TokenKind::Rpar => {
-                    if let (Some(Some(start)), Some(previous)) = (stack.pop(), previous) {
-                        ranges.insert(TextRange::new(start, previous.end()));
+                    if let (Some(Some(start)), Some(end)) = (stack.pop(), previous_end) {
+                        ranges.insert(TextRange::new(start, end));
                     }
                 }
                 _ => {
@@ -149,7 +149,7 @@ impl ParenthesesIndex {
                 }
             }
 
-            previous = Some(token);
+            previous_end = Some(token.end());
         }
 
         Self { ranges }
