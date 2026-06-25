@@ -9,6 +9,7 @@ use ruff_ranged_value::{RangedValue, ValueSource};
 
 use crate::codes::RuleIter;
 use crate::codes::{RuleCodePrefix, RuleGroup};
+use crate::preview::is_human_readable_names_enabled;
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
@@ -19,14 +20,19 @@ use crate::warn_user_once_by_message;
 pub struct UnresolvedRuleSelector(RangedValue<String>);
 
 impl UnresolvedRuleSelector {
-    pub fn resolve(&self, _preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
-        RuleSelector::from_str(self.0.as_str()).map_err(|_| {
-            let kind = if matches!(self.0.as_str(), "PREVIEW" | "NURSERY") {
+    pub fn resolve(&self, preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
+        RuleSelector::from_str(self.0.as_str()).or_else(|_| {
+            let kind = if let Ok(rule) = Rule::from_name(self.0.as_str()) {
+                if is_human_readable_names_enabled(preview) {
+                    return Ok(RuleSelector::rule(rule));
+                }
+                RuleResolutionErrorKind::PreviewName
+            } else if matches!(self.0.as_str(), "PREVIEW" | "NURSERY") {
                 RuleResolutionErrorKind::Removed
             } else {
                 RuleResolutionErrorKind::Unknown
             };
-            RuleResolutionError::from_selector(self, kind)
+            Err(RuleResolutionError::from_selector(self, kind))
         })
     }
 
@@ -47,6 +53,7 @@ impl UnresolvedRuleSelector {
 enum RuleResolutionErrorKind {
     Removed,
     Unknown,
+    PreviewName,
 }
 
 #[derive(Debug)]
@@ -81,19 +88,34 @@ impl RuleResolutionError {
 
 impl std::fmt::Display for RuleResolutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let kind = match self.kind {
-            RuleResolutionErrorKind::Removed => "Removed",
-            RuleResolutionErrorKind::Unknown => "Unknown rule",
+        let Self {
+            selector,
+            setting,
+            source,
+            kind,
+        } = self;
+        let setting = match setting {
+            Some(setting) => format_args!(" in `{}`", *setting),
+            None => format_args!(""),
         };
-        write!(f, "{kind} selector `{selector}`", selector = self.selector)?;
-        if let Some(setting) = self.setting {
-            write!(f, " in `{setting}`")?;
-        }
-        write!(f, " from ")?;
-        match &self.source {
-            ValueSource::File(path) => write!(f, "{}", path.as_path()),
-            ValueSource::Cli => write!(f, "the CLI"),
-            ValueSource::Editor => write!(f, "the editor configuration"),
+        let source = match &source {
+            ValueSource::File(path) => format_args!("`{}`", path.as_path()),
+            ValueSource::Cli => format_args!("the CLI"),
+            ValueSource::Editor => format_args!("the editor configuration"),
+        };
+        match kind {
+            RuleResolutionErrorKind::Removed => {
+                write!(f, "Removed selector `{selector}`{setting} from {source}")
+            }
+            RuleResolutionErrorKind::Unknown => write!(
+                f,
+                "Unknown rule selector `{selector}`{setting} from {source}"
+            ),
+            RuleResolutionErrorKind::PreviewName => write!(
+                f,
+                "Invalid selector `{selector}`{setting} from {source}. \
+                    Selecting rules by name requires preview mode"
+            ),
         }
     }
 }
@@ -117,17 +139,17 @@ pub enum RuleSelector {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
-    /// Select an individual rule with a given prefix.
+    /// Select an individual rule.
     Rule {
-        prefix: RuleCodePrefix,
+        rule: Rule,
         redirected_from: Option<&'static str>,
     },
 }
 
 impl RuleSelector {
-    pub(crate) const fn rule(prefix: RuleCodePrefix) -> Self {
+    pub(crate) const fn rule(rule: Rule) -> Self {
         Self::Rule {
-            prefix,
+            rule,
             redirected_from: None,
         }
     }
@@ -172,9 +194,9 @@ impl FromStr for RuleSelector {
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
-                if is_single_rule_selector(&prefix) {
+                if let Some(rule) = prefix.as_rule() {
                     Ok(Self::Rule {
-                        prefix,
+                        rule,
                         redirected_from,
                     })
                 } else {
@@ -188,21 +210,21 @@ impl FromStr for RuleSelector {
     }
 }
 
-/// Returns `true` if the [`RuleCodePrefix`] matches a single rule exactly
-/// (e.g., `E225`, as opposed to `E2`).
-pub(crate) fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
-    let mut rules = prefix.rules();
+impl RuleCodePrefix {
+    /// Returns the rule if this prefix matches a single rule exactly
+    /// (e.g., `E225`, as opposed to `E2`).
+    pub(crate) fn as_rule(&self) -> Option<Rule> {
+        let mut rules = self.rules();
 
-    // The selector must match a single rule.
-    let Some(rule) = rules.next() else {
-        return false;
-    };
-    if rules.next().is_some() {
-        return false;
+        // The selector must match a single rule.
+        let rule = rules.next()?;
+        if rules.next().is_some() {
+            return None;
+        }
+
+        // The rule must match the selector exactly.
+        (rule.noqa_code().suffix() == self.short_code()).then_some(rule)
     }
-
-    // The rule must match the selector exactly.
-    rule.noqa_code().suffix() == prefix.short_code()
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -219,9 +241,10 @@ impl RuleSelector {
             RuleSelector::All => ("", "ALL"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+            RuleSelector::Prefix { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
+            RuleSelector::Rule { rule, .. } => rule.noqa_code().into_parts(),
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
     }
@@ -244,9 +267,8 @@ impl RuleSelector {
                     .chain(Linter::Flake8Print.rules()),
             ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
-                RuleSelectorIter::Vec(prefix.clone().rules())
-            }
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.clone().rules()),
+            RuleSelector::Rule { rule, .. } => RuleSelectorIter::Once(std::iter::once(*rule)),
         }
     }
 
@@ -281,6 +303,7 @@ pub enum RuleSelectorIter {
     All(RuleIter),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
+    Once(std::iter::Once<Rule>),
 }
 
 impl Iterator for RuleSelectorIter {
@@ -291,6 +314,7 @@ impl Iterator for RuleSelectorIter {
             RuleSelectorIter::All(iter) => iter.next(),
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
+            RuleSelectorIter::Once(iter) => iter.next(),
         }
     }
 }
@@ -310,6 +334,7 @@ mod schema {
     use serde_json::Value;
     use strum::IntoEnumIterator;
 
+    use crate::codes::Rule;
     use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
     use crate::{RuleSelector, UnresolvedRuleSelector};
@@ -345,13 +370,13 @@ mod schema {
                     })),
             )
             .filter(|p| {
-                // Exclude any prefixes where all of the rules are removed
-                if let Ok(RuleSelector::Rule { prefix, .. } | RuleSelector::Prefix { prefix, .. }) =
-                    RuleSelector::parse_no_redirect(p)
-                {
-                    !prefix.rules().all(|rule| rule.is_removed())
-                } else {
-                    true
+                // Exclude removed rules and prefixes where all of the rules are removed
+                match RuleSelector::parse_no_redirect(p) {
+                    Ok(RuleSelector::Rule { rule, .. }) => !rule.is_removed(),
+                    Ok(RuleSelector::Prefix { prefix, .. }) => {
+                        !prefix.rules().all(|rule| rule.is_removed())
+                    }
+                    _ => true,
                 }
             })
             .filter(|_rule| {
@@ -363,6 +388,12 @@ mod schema {
                 }
 
                 true
+            })
+            .flat_map(|code| {
+                Rule::from_code(&code)
+                    .map(|rule| rule.name().to_string())
+                    .into_iter()
+                    .chain(std::iter::once(code))
             })
             .sorted()
             .collect();
@@ -419,9 +450,9 @@ impl RuleSelector {
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
-                if is_single_rule_selector(&prefix) {
+                if let Some(rule) = prefix.as_rule() {
                     Ok(Self::Rule {
-                        prefix,
+                        rule,
                         redirected_from: None,
                     })
                 } else {
@@ -461,9 +492,9 @@ pub mod clap_completion {
     use strum::IntoEnumIterator;
 
     use crate::{
-        codes::RuleCodePrefix,
+        codes::{Rule, RuleCodePrefix},
         registry::{Linter, RuleNamespace},
-        rule_selector::{UnresolvedRuleSelector, is_single_rule_selector},
+        rule_selector::UnresolvedRuleSelector,
     };
 
     #[derive(Clone)]
@@ -510,8 +541,7 @@ pub mod clap_completion {
                             }
 
                             // Ex) `UP004`
-                            if is_single_rule_selector(&prefix) {
-                                let rule = prefix.rules().next()?;
+                            if let Some(rule) = prefix.as_rule() {
                                 let code = format!(
                                     "{}{}",
                                     prefix.linter().common_prefix(),
@@ -521,6 +551,10 @@ pub mod clap_completion {
                             }
 
                             None
+                        }))
+                        .chain(Rule::iter().map(|rule| {
+                            PossibleValue::new(rule.name().as_str())
+                                .help(rule.noqa_code().to_string())
                         })),
                 ),
             ))
