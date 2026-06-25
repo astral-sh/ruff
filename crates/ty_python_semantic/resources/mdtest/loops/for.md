@@ -267,6 +267,37 @@ for _ in b"":
 reveal_type(value)  # revealed: Literal[1]
 ```
 
+## With `else` clauses and statically known literal emptiness
+
+```py
+def empty() -> None:
+    value = "before"
+
+    for _ in []:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["before"]
+
+def non_empty() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["body"]
+
+def non_empty_break() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+        break
+    else:
+        value = "else"
+
+    reveal_type(value)  # revealed: Literal["body"]
+```
+
 Starred elements and dictionary unpacking make emptiness ambiguous:
 
 ```py
