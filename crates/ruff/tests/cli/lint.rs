@@ -876,7 +876,7 @@ fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `extend-safe-fixes` from [TMP]/ruff.toml
+      Cause: Unknown rule selector `F481` in `extend-safe-fixes` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -892,7 +892,7 @@ fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `extend-unsafe-fixes` from [TMP]/ruff.toml
+      Cause: Unknown rule selector `F481` in `extend-unsafe-fixes` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -941,7 +941,7 @@ fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -960,7 +960,7 @@ fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481() -> Result<()>
 
     ----- stderr -----
     ruff failed
-      Cause: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -1097,7 +1097,7 @@ fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481_preview() -> Result<(
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `extend-safe-fixes` from [TMP]/ruff.toml
+    warning: Unknown rule selector `F481` in `extend-safe-fixes` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -1118,7 +1118,7 @@ fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481_preview() -> Result
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from [TMP]/ruff.toml
+    warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -1173,7 +1173,7 @@ fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481_preview() -> Result<()
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
+    warning: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -1194,7 +1194,7 @@ fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481_preview() -> Re
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Unknown rule selector `F481` in `per-file-ignores` from [TMP]/ruff.toml
+    warning: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
     ");
     Ok(())
 }
@@ -1246,7 +1246,7 @@ fn rule_name_selector_config_preview_disabled() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Rule name `unused-import` used as selector with preview disabled in `select` from [TMP]/ruff.toml
+      Cause: Rule name `unused-import` used as selector with preview disabled in `select` from `[TMP]/ruff.toml`
     ");
 
     Ok(())

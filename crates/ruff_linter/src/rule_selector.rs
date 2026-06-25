@@ -107,7 +107,7 @@ impl std::fmt::Display for RuleResolutionError {
         }
         write!(f, " from ")?;
         match &source {
-            ValueSource::File(path) => write!(f, "{}", path.as_path()),
+            ValueSource::File(path) => write!(f, "`{}`", path.as_path()),
             ValueSource::Cli => write!(f, "the CLI"),
             ValueSource::Editor => write!(f, "the editor configuration"),
         }
