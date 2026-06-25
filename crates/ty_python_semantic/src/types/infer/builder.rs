@@ -62,7 +62,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
     report_invalid_match_args_element, report_invalid_match_args_type,
-    report_invalid_type_checking_constant,
+    report_invalid_match_args_union, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -2507,6 +2507,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 pattern,
                                 match_args_ty,
+                                cls_ty,
+                            );
+                        }
+                    }
+                    ClassPatternPositionalResult::AlwaysInvalid => {
+                        if let Some(pattern) = positional_patterns.first() {
+                            report_invalid_match_args_union(
+                                &self.context,
+                                pattern,
+                                positional_patterns.len(),
                                 cls_ty,
                             );
                         }

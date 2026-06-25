@@ -370,6 +370,17 @@ pub(crate) enum ClassPatternPositionalResult<'db> {
     InvalidElement(usize),
     /// A statically known non-exact-tuple type used for `__match_args__`.
     InvalidType(Type<'db>),
+    /// Every possible state fails, but not for one common statically known reason.
+    AlwaysInvalid,
+}
+
+impl ClassPatternPositionalResult<'_> {
+    fn always_fails(&self, positional_count: usize) -> bool {
+        match self {
+            Self::Limit(limit) => positional_count > *limit,
+            Self::InvalidElement(_) | Self::InvalidType(_) | Self::AlwaysInvalid => true,
+        }
+    }
 }
 
 /// Validate the positional subpatterns accepted by `class`.
@@ -390,15 +401,20 @@ pub(crate) fn class_pattern_positional_result<'db>(
             match_args_positional_result(db, class, match_args, positional_count)
         }
         ClassMatchArgs::PossiblyUndefined(match_args) => {
-            let ClassPatternPositionalResult::Limit(defined_limit) =
-                match_args_positional_result(db, class, match_args, positional_count)?
-            else {
-                return None;
-            };
+            let defined_result =
+                match_args_positional_result(db, class, match_args, positional_count)?;
             let undefined_limit = usize::from(class_has_match_self_flag(db, class));
-            Some(ClassPatternPositionalResult::Limit(
-                defined_limit.max(undefined_limit),
-            ))
+            if let ClassPatternPositionalResult::Limit(defined_limit) = defined_result {
+                Some(ClassPatternPositionalResult::Limit(
+                    defined_limit.max(undefined_limit),
+                ))
+            } else if positional_count > undefined_limit
+                && defined_result.always_fails(positional_count)
+            {
+                Some(ClassPatternPositionalResult::AlwaysInvalid)
+            } else {
+                None
+            }
         }
     }
 }
@@ -431,6 +447,11 @@ fn match_args_positional_result<'db>(
             ) => Some(ClassPatternPositionalResult::InvalidType(
                 UnionType::from_two_elements(db, left, right),
             )),
+            (left, right)
+                if left.always_fails(positional_count) && right.always_fails(positional_count) =>
+            {
+                Some(ClassPatternPositionalResult::AlwaysInvalid)
+            }
             _ => None,
         });
     }

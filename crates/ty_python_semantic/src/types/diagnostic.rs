@@ -2555,6 +2555,22 @@ pub(crate) fn report_invalid_match_args_type<T: Ranged>(
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
+pub(crate) fn report_invalid_match_args_union<T: Ranged>(
+    context: &InferContext,
+    pattern: T,
+    positional_count: usize,
+    cls_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
+        return;
+    };
+    let class_display = cls_ty.display(context.db());
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Every possible `__match_args__` value for `{class_display}` is invalid with {positional_count} positional subpatterns"
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+}
+
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
     mut diag: LintDiagnosticGuard<'db, 'ctx>,
 ) -> LintDiagnosticGuard<'db, 'ctx> {

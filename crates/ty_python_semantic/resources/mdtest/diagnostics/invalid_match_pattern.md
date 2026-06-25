@@ -184,6 +184,31 @@ def describe(value: InvalidUnion) -> None:
             pass
 ```
 
+## Heterogeneous invalid `__match_args__` union
+
+```py
+from typing import Literal
+
+flag: bool = bool()
+
+class HeterogeneousInvalid:
+    __match_args__: tuple[Literal["x"]] | list[str] = ("x",) if flag else ["x"]
+
+class HeterogeneousPossiblyValid:
+    __match_args__: tuple[Literal["x"], Literal["y"]] | list[str] = ("x", "y") if flag else ["x", "y"]
+
+def describe(value: HeterogeneousInvalid) -> None:
+    match value:
+        # error: [invalid-match-pattern] "Every possible `__match_args__` value"
+        case HeterogeneousInvalid(_, _):
+            pass
+
+def describe_possible(value: HeterogeneousPossiblyValid) -> None:
+    match value:
+        case HeterogeneousPossiblyValid(_, _):
+            pass
+```
+
 ## Unknown `__match_args__` tuple length (no error)
 
 ```py
