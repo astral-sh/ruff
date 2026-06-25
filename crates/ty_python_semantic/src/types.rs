@@ -2423,6 +2423,9 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            // All empty ranges compare equal, but non-empty ranges can contain different values.
+            Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => !is_non_empty,
+
             // Each `partial()` call creates a distinct object at runtime.
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
 
