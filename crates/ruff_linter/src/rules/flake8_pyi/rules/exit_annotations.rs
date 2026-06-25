@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::{
-    Expr, ExprBinOp, ExprSubscript, ExprTuple, Operator, ParameterWithDefault, Parameters, Stmt,
-    StmtClassDef, StmtFunctionDef,
+    Expr, ExprBinOp, ExprName, ExprSubscript, ExprTuple, Operator, ParameterWithDefault,
+    Parameters, Stmt, StmtClassDef, StmtFunctionDef, TypeParam,
 };
 use smallvec::SmallVec;
 
@@ -206,7 +206,15 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         );
     }
 
-    check_positional_args_for_non_overloaded_method(checker, &non_self_positional_args, func_kind);
+    check_positional_args_for_non_overloaded_method(
+        checker,
+        &non_self_positional_args,
+        func_kind,
+        function
+            .type_params
+            .as_deref()
+            .map_or(&[], |tp| &tp.type_params),
+    );
 }
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
@@ -252,16 +260,27 @@ fn check_positional_args_for_non_overloaded_method(
     checker: &Checker,
     non_self_positional_params: &[&ParameterWithDefault],
     kind: FuncKind,
+    type_params: &[TypeParam],
 ) {
     // For each argument, define the predicate against which to check the annotation.
-    type AnnotationValidator = fn(&Expr, &SemanticModel) -> bool;
+    type AnnotationValidator<'a> = Box<dyn Fn(&Expr, &SemanticModel) -> bool + 'a>;
 
     let validations: [(ErrorKind, AnnotationValidator); 3] = [
-        (ErrorKind::FirstArgBadAnnotation, is_base_exception_type),
-        (ErrorKind::SecondArgBadAnnotation, |expr, semantic| {
-            semantic.match_builtin_expr(expr, "BaseException")
-        }),
-        (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
+        (
+            ErrorKind::FirstArgBadAnnotation,
+            Box::new(|expr, semantic| is_base_exception_type(expr, semantic, type_params)),
+        ),
+        (
+            ErrorKind::SecondArgBadAnnotation,
+            Box::new(|expr, semantic| {
+                semantic.match_builtin_expr(expr, "BaseException")
+                    || is_base_exception_type_param(expr, semantic, type_params)
+            }),
+        ),
+        (
+            ErrorKind::ThirdArgBadAnnotation,
+            Box::new(|expr, semantic| is_traceback_type(expr, semantic)),
+        ),
     ];
 
     for (param, (error_info, predicate)) in
@@ -408,7 +427,7 @@ fn check_positional_args_for_overloaded_method(
     // Now check the second:
     if parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[0],
-        |annotation| is_base_exception_type(annotation, semantic),
+        |annotation| is_base_exception_type(annotation, semantic, &[]),
         semantic,
     ) && parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[1],
@@ -510,15 +529,40 @@ fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         })
 }
 
-/// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
-fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
+/// Return `true` if the [`Expr`] is, e.g., `type[BaseException]` or `type[T]` where
+/// `T` is a PEP 695 type parameter bound to `BaseException`.
+fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel, type_params: &[TypeParam]) -> bool {
     let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr else {
         return false;
     };
 
     if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
         semantic.match_builtin_expr(slice, "BaseException")
+            || is_base_exception_type_param(slice, semantic, type_params)
     } else {
         false
     }
+}
+
+/// Return `true` if `expr` is a PEP 695 type parameter whose bound is `BaseException`.
+///
+/// This handles patterns like `def __exit__[T: BaseException](self, exc_type: type[T] | None, ...)`.
+fn is_base_exception_type_param(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    type_params: &[TypeParam],
+) -> bool {
+    let Expr::Name(ExprName { id, .. }) = expr else {
+        return false;
+    };
+    type_params.iter().any(|tp| {
+        if let TypeParam::TypeVar(tv) = tp {
+            if tv.name.as_str() == id.as_str() {
+                return tv.bound.as_deref().is_some_and(|bound| {
+                    semantic.match_builtin_expr(bound, "BaseException")
+                });
+            }
+        }
+        false
+    })
 }
