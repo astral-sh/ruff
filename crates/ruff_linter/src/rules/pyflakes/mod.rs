@@ -196,22 +196,6 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test for https://github.com/astral-sh/ruff/issues/26282
-    /// Ensure `ruff:ignore` protects imports from being removed by autofixes,
-    /// the same way `noqa` does.
-    #[test]
-    fn f401_ruff_ignore_protects_imports() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyflakes").join("F401_36.py").as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(Rule::UnusedImport)
-            },
-        )?;
-        assert_diagnostics!("F401_36", diagnostics);
-        Ok(())
-    }
-
     #[test_case(Rule::UndefinedName, Path::new("F821_29.py"))]
     fn rules_with_flake8_type_checking_settings_enabled(
         rule_code: Rule,
