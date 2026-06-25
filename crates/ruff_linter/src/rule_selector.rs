@@ -94,22 +94,28 @@ impl std::fmt::Display for RuleResolutionError {
             source,
             kind,
         } = self;
+        let setting = match setting {
+            Some(setting) => format_args!(" in `{}`", *setting),
+            None => format_args!(""),
+        };
+        let source = match &source {
+            ValueSource::File(path) => format_args!("`{}`", path.as_path()),
+            ValueSource::Cli => format_args!("the CLI"),
+            ValueSource::Editor => format_args!("the editor configuration"),
+        };
         match kind {
-            RuleResolutionErrorKind::Removed => write!(f, "Removed selector `{selector}`")?,
-            RuleResolutionErrorKind::Unknown => write!(f, "Unknown rule selector `{selector}`")?,
+            RuleResolutionErrorKind::Removed => {
+                write!(f, "Removed selector `{selector}`{setting} from {source}")
+            }
+            RuleResolutionErrorKind::Unknown => write!(
+                f,
+                "Unknown rule selector `{selector}`{setting} from {source}"
+            ),
             RuleResolutionErrorKind::PreviewName => write!(
                 f,
-                "Rule name `{selector}` used as selector with preview disabled"
-            )?,
-        }
-        if let Some(setting) = setting {
-            write!(f, " in `{setting}`")?;
-        }
-        write!(f, " from ")?;
-        match &source {
-            ValueSource::File(path) => write!(f, "`{}`", path.as_path()),
-            ValueSource::Cli => write!(f, "the CLI"),
-            ValueSource::Editor => write!(f, "the editor configuration"),
+                "Invalid selector `{selector}`{setting} from {source}. \
+                    Selecting rules by name requires preview mode"
+            ),
         }
     }
 }

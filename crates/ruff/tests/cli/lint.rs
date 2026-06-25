@@ -1210,7 +1210,7 @@ fn rule_name_selector_cli_preview_disabled() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Rule name `unused-import` used as selector with preview disabled in `select` from the CLI
+      Cause: Invalid selector `unused-import` in `select` from the CLI. Selecting rules by name requires preview mode
     ");
 
     Ok(())
@@ -1246,7 +1246,7 @@ fn rule_name_selector_config_preview_disabled() -> Result<()> {
 
     ----- stderr -----
     ruff failed
-      Cause: Rule name `unused-import` used as selector with preview disabled in `select` from `[TMP]/ruff.toml`
+      Cause: Invalid selector `unused-import` in `select` from `[TMP]/ruff.toml`. Selecting rules by name requires preview mode
     ");
 
     Ok(())
