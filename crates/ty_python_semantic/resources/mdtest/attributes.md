@@ -2964,10 +2964,11 @@ def f(never: Never):
     never.another_attribute = never
 ```
 
-### Mutable collection cardinality
+### Mutable collection refinements
 
 An inferred instance attribute can be mutated through any access to the attribute, so its initial
-cardinality cannot be retained:
+cardinality cannot be retained. It is also a mutable place that can be reassigned, so its initial
+exact runtime class cannot constrain later assignments:
 
 ```py
 from typing import Final
@@ -2983,6 +2984,13 @@ class InitiallyNonEmpty:
 class FinalItems:
     def __init__(self):
         self.items: Final = []
+
+class CopiedItems:
+    def __init__(self):
+        self.items = list[int]()
+
+    def copy_to(self, other: "CopiedItems") -> None:
+        other.items = self.items.copy()
 
 empty = InitiallyEmpty()
 empty.items.append(1)
