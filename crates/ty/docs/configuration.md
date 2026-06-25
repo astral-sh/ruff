@@ -83,6 +83,44 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
+### `generic-narrowing`
+
+Controls how ty narrows to unspecialized generic classes in `isinstance()` and
+`issubclass()` checks.
+
+With `strict`, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
+check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
+would yield values of type `Unknown`, which is more permissive than `object`.
+
+Defaults to `relaxed`.
+
+**Default value**: `relaxed`
+
+**Type**: `strict | relaxed`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    generic-narrowing = "strict"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    generic-narrowing = "strict"
+    ```
+
+---
+
 ### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -679,6 +717,44 @@ any module where the first component contains the substring `test`, use `*test*.
     [overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
+#### `generic-narrowing`
+
+Controls how ty narrows to unspecialized generic classes in `isinstance()` and
+`issubclass()` checks.
+
+With `strict`, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
+check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
+would yield values of type `Unknown`, which is more permissive than `object`.
+
+Defaults to `relaxed`.
+
+**Default value**: `relaxed`
+
+**Type**: `strict | relaxed`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    generic-narrowing = "strict"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    generic-narrowing = "strict"
     ```
 
 ---
