@@ -2213,6 +2213,30 @@ class XCustomDescriptor:
 static_assert(is_subtype_of(XCustomDescriptor, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XCustomDescriptor, HasAsymmetricXProperty))
 
+from typing import overload
+
+class HasIntOrStrWriteProperty(Protocol):
+    @property
+    def x(self) -> object: ...
+    @x.setter
+    def x(self, value: int | str) -> None: ...
+
+class OverloadedSetterDescriptor:
+    def __get__(self, instance, owner) -> object:
+        return object()
+
+    @overload
+    def __set__(self, instance, value: int) -> None: ...
+    @overload
+    def __set__(self, instance, value: str) -> None: ...
+    def __set__(self, instance, value: int | str) -> None: ...
+
+class ObjectReadOverloadedWriteDescriptor:
+    x: OverloadedSetterDescriptor = OverloadedSetterDescriptor()
+
+static_assert(is_subtype_of(ObjectReadOverloadedWriteDescriptor, HasIntOrStrWriteProperty))
+static_assert(is_assignable_to(ObjectReadOverloadedWriteDescriptor, HasIntOrStrWriteProperty))
+
 class AnySetterDescriptor:
     def __get__(self, instance, owner) -> object:
         return object()

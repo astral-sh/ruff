@@ -1310,6 +1310,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         self_ty: Type<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Type::Union(union) = value_ty {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |value_ty| {
+                    self.check_callable_write_parameter(
+                        db,
+                        callable_ty,
+                        parameter_index,
+                        self_ty,
+                        *value_ty,
+                    )
+                });
+        }
+
         callable_ty
             .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
             .when_some_and(db, self.constraints, |callables| {
