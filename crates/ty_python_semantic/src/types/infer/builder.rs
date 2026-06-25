@@ -356,38 +356,29 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 }
 
 /// An expression cache shared across builders during multi-inference.
-type ExpressionCache<'db> = ExpressionCacheMap<'db, ReplayableExpression<'db>>;
-
-struct ExpressionCacheMap<'db, T> {
-    entries: FxHashMap<ExpressionNodeKey, ExpressionCacheEntry<'db, T>>,
+#[derive(Default)]
+struct ExpressionCache<'db> {
+    entries: FxHashMap<ExpressionNodeKey, ExpressionCacheEntry<'db>>,
 }
 
-impl<T> Default for ExpressionCacheMap<'_, T> {
-    fn default() -> Self {
-        Self {
-            entries: FxHashMap::default(),
-        }
-    }
-}
-
-enum ExpressionCacheEntry<'db, T> {
+enum ExpressionCacheEntry<'db> {
     /// The core inference of this expression is independent of type context. Contextual finishing
     /// is still applied to the cached result on every lookup.
-    Independent(T),
-    Contextual(ContextualExpressionCache<'db, T>),
+    Independent(ReplayableExpression<'db>),
+    Contextual(ContextualExpressionCache<'db>),
 }
 
 /// A compact type-context mapping for a context-dependent expression.
 ///
 /// Most expressions are only inferred under one context. Avoid allocating a hash table for that
 /// case, but promote to one when multi-inference actually observes another context.
-enum ContextualExpressionCache<'db, T> {
-    One(TypeContext<'db>, T),
-    Multiple(FxHashMap<TypeContext<'db>, T>),
+enum ContextualExpressionCache<'db> {
+    One(TypeContext<'db>, ReplayableExpression<'db>),
+    Multiple(FxHashMap<TypeContext<'db>, ReplayableExpression<'db>>),
 }
 
-impl<'db, T> ContextualExpressionCache<'db, T> {
-    fn get(&self, tcx: TypeContext<'db>) -> Option<&T> {
+impl<'db> ContextualExpressionCache<'db> {
+    fn get(&self, tcx: TypeContext<'db>) -> Option<&ReplayableExpression<'db>> {
         match self {
             Self::One(cached_tcx, value) if *cached_tcx == tcx => Some(value),
             Self::One(_, _) => None,
@@ -395,7 +386,7 @@ impl<'db, T> ContextualExpressionCache<'db, T> {
         }
     }
 
-    fn insert(&mut self, tcx: TypeContext<'db>, value: T) {
+    fn insert(&mut self, tcx: TypeContext<'db>, value: ReplayableExpression<'db>) {
         if let Self::One(cached_tcx, cached_value) = self
             && *cached_tcx == tcx
         {
@@ -419,13 +410,13 @@ impl<'db, T> ContextualExpressionCache<'db, T> {
     }
 }
 
-impl<'db, T> ExpressionCacheMap<'db, T> {
+impl<'db> ExpressionCache<'db> {
     fn get(
         &self,
         expression: ExpressionNodeKey,
         tcx: TypeContext<'db>,
         independent: bool,
-    ) -> Option<&T> {
+    ) -> Option<&ReplayableExpression<'db>> {
         match self.entries.get(&expression)? {
             ExpressionCacheEntry::Independent(value) if independent => Some(value),
             ExpressionCacheEntry::Contextual(values) if !independent => values.get(tcx),
@@ -444,7 +435,7 @@ impl<'db, T> ExpressionCacheMap<'db, T> {
         expression: ExpressionNodeKey,
         tcx: TypeContext<'db>,
         independent: bool,
-        value: T,
+        value: ReplayableExpression<'db>,
     ) {
         if independent {
             self.entries
