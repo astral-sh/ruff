@@ -19,6 +19,8 @@ use crate::docstrings::Docstring;
 /// the docstring should be placed on the non-decorated definition that contains
 /// the implementation.
 ///
+/// This rule does not apply to stub files, which don't contain implementations.
+///
 /// ## Example
 ///
 /// ```python
@@ -67,14 +69,6 @@ use crate::docstrings::Docstring;
 ///
 /// - `lint.pydocstyle.ignore-decorators`
 ///
-/// ## Stub files
-///
-/// This rule is not enforced in stub files (`.pyi`). Overloaded functions in
-/// stub files have no non-overloaded implementation to attach a shared
-/// docstring to, so the docstring can only live on one of the overloads.
-/// Type checkers such as mypy and zuban actually reject non-overloaded
-/// implementations in stub files.
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: `typing.overload`](https://docs.python.org/3/library/typing.html#typing.overload)
@@ -91,9 +85,6 @@ impl Violation for OverloadWithDocstring {
 
 /// D418
 pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
-    // Stub files (`.pyi`) cannot have a non-overloaded implementation to host
-    // the docstring, so the docstring must live on one of the overloads.
-    // See https://github.com/astral-sh/ruff/issues/26153.
     if checker.source_type.is_stub() {
         return;
     }
