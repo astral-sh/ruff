@@ -681,7 +681,7 @@ def remove_bytes[*Prefix](*args: *tuple[*Prefix, bytes]) -> tuple[*Prefix]:
 
 accept_str_in_between(True, "phase", "status", b"ok")
 accept_str_in_between(True, b"ok")
-# error: [invalid-argument-type] "Argument to function `accept_str_in_between` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
+# TODO: error: [invalid-argument-type] "Argument to function `accept_str_in_between` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept_str_in_between(True, 1, b"bad")
 
 # TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.

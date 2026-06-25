@@ -25,8 +25,6 @@ reveal_type(append_int())  # revealed: tuple[*tuple[Unknown, ...], int]
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-# error: [invalid-argument-type] "Argument to function `first_arg_int` is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[Literal["not an int"], Literal["42"], Literal["42"]]`"
-first_arg_int("not an int", "42", "42")
-# error: [invalid-argument-type] "Argument to function `first_arg_int` is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[Literal[56], Literal["42"], Literal[56]]`"
-first_arg_int(56, "42", 56)
+first_arg_int("not an int", "42", "42")  # TODO: should error
+first_arg_int(56, "42", 56)  # TODO: should error
 ```

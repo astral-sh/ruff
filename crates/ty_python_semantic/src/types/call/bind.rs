@@ -5322,8 +5322,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let parameter_index = matched_parameter.index;
                 let parameter = &parameters[parameter_index];
                 let declared_type = parameter.annotated_type();
-                // A `TypeVarTuple` needs to be inferred from all matched positional arguments as a
-                // single tuple. Skip per-argument inference until call binding supports that.
+                // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
+                // tuple. Until then, skip per-argument inference.
                 if parameter.has_starred_annotation()
                     && (matches!(
                         declared_type,
@@ -5505,67 +5505,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let is_paramspec_component_parameter = |parameter_index: usize| {
             paramspec_component_start.is_some_and(|start| parameter_index >= start)
         };
-
-        for (parameter_index, parameter) in self.signature.parameters().iter().enumerate() {
-            if !parameter.is_variadic()
-                || !parameter.has_starred_annotation()
-                || parameter
-                    .annotated_type()
-                    .exact_tuple_instance_spec(self.db)
-                    .is_none()
-            {
-                continue;
-            }
-
-            let mut positional_types = Vec::new();
-            let mut diagnostic_argument_index = None;
-            let mut has_unpacked_argument = false;
-            for (argument_index, adjusted_argument_index, argument, argument_types) in
-                self.enumerate_argument_types()
-            {
-                if !self.argument_matches[argument_index]
-                    .iter()
-                    .any(|matched_parameter| matched_parameter.index == parameter_index)
-                {
-                    continue;
-                }
-                if matches!(argument, Argument::Variadic) {
-                    has_unpacked_argument = true;
-                    break;
-                }
-                if !matches!(argument, Argument::Positional | Argument::Synthetic) {
-                    continue;
-                }
-                positional_types
-                    .push(argument_types.get_for_declared_type(parameter.annotated_type()));
-                diagnostic_argument_index = diagnostic_argument_index.or(adjusted_argument_index);
-            }
-            if has_unpacked_argument {
-                continue;
-            }
-
-            let provided_ty = Type::heterogeneous_tuple(self.db, positional_types);
-            let expected_ty = self.specialization.map_or_else(
-                || parameter.annotated_type(),
-                |specialization| {
-                    parameter
-                        .annotated_type()
-                        .apply_specialization(self.db, specialization)
-                },
-            );
-            if provided_ty
-                .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
-                .is_never_satisfied(self.db)
-            {
-                self.errors.push(BindingError::InvalidArgumentType {
-                    parameter: ParameterContext::new(parameter, parameter_index, false),
-                    argument_index: diagnostic_argument_index,
-                    expected_ty,
-                    provided_ty,
-                    provenance: InvalidArgumentTypeProvenance::Argument,
-                });
-            }
-        }
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
