@@ -21,7 +21,6 @@ use super::diagnostic::{
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
-use super::tuple::TupleSpec;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
     TypedDictType, UnionBuilder, UnionType, todo_type,
@@ -636,19 +635,10 @@ impl<'db> Type<'db> {
                 .tuple_spec(db)
                 .as_deref()
                 .and_then(|tuple_spec| Some((tuple_spec, maybe_slice_nominal.slice_literal(db)?)))
-                .map(|(tuple, SliceLiteral { start, stop, step })| match tuple {
-                    TupleSpec::Fixed(tuple) => match tuple.py_slice(db, start, stop, step) {
-                        Ok(new_elements) => {
-                            Ok(Type::heterogeneous_tuple(db, new_elements))
-                        }
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::SliceStepSizeZero,
-                        )),
-                    },
-                    TupleSpec::Variable(_) => {
-                        Ok(todo_type!("slice into variable-length tuple"))
-                    }
+                .map(|(tuple, SliceLiteral { start, stop, step })| {
+                    tuple.py_slice_type(db, start, stop, step).map_err(|_| {
+                        SubscriptError::new(Type::unknown(), SubscriptErrorKind::SliceStepSizeZero)
+                    })
                 }),
 
             // Ex) Given `"value"[1]`, return `"a"`
