@@ -240,6 +240,9 @@ struct SuppressionDiagnostic<'a> {
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
 
+    /// Whether the suppression comment includes `RUF100`.
+    self_ignore: bool,
+
     /// Whether one of the invalid codes was totally unknown and may be external.
     has_unknown_code: bool,
 
@@ -255,6 +258,7 @@ impl<'a> SuppressionDiagnostic<'a> {
             duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
+            self_ignore: false,
             has_unknown_code: false,
             has_stable_rule_name: false,
         }
@@ -268,6 +272,22 @@ impl<'a> SuppressionDiagnostic<'a> {
         !self.disabled_codes.is_empty()
             || !self.duplicated_codes.is_empty()
             || !self.unused_codes.is_empty()
+    }
+}
+
+pub(crate) struct RuleSuppressions<'a> {
+    suppressions: Box<[&'a Suppression]>,
+}
+
+impl RuleSuppressions<'_> {
+    pub(crate) fn check(&self, range: TextRange, parent: Option<TextSize>) -> bool {
+        for suppression in &self.suppressions {
+            if suppression.applies_to_diagnostic(range, parent) {
+                suppression.used.set(true);
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -368,6 +388,16 @@ impl Suppressions {
         false
     }
 
+    pub(crate) fn for_rule(&self, rule: Rule) -> RuleSuppressions<'_> {
+        RuleSuppressions {
+            suppressions: self
+                .valid
+                .iter()
+                .filter(|suppression| suppression.rule(self.preview) == Some(rule))
+                .collect(),
+        }
+    }
+
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
         fn process_pending_diagnostics(
             key: Option<TextRange>,
@@ -407,7 +437,7 @@ impl Suppressions {
                 }
             }
 
-            if group.any_unused() {
+            if !group.self_ignore && group.any_unused() {
                 let mut codes = group.disabled_codes.clone();
                 codes.extend(group.unused_codes.clone());
                 Suppressions::report_suppression_codes(
@@ -455,7 +485,10 @@ impl Suppressions {
                 group.invalid_codes.push(code_str);
                 group.has_unknown_code |= !name_is_known;
                 group.has_stable_rule_name |= name_is_known;
-            } else if !suppression.used.get() {
+                continue;
+            }
+
+            if !suppression.used.get() {
                 // UnusedNOQA
                 let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
@@ -464,21 +497,28 @@ impl Suppressions {
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
 
-                if context.is_rule_enabled(rule) {
-                    if first_comment
-                        .codes_as_str(locator.contents())
-                        .filter(|code| *code == code_str)
-                        .count()
-                        > 1
-                    {
-                        group.duplicated_codes.push(code_str);
-                    } else {
-                        group.unused_codes.push(code_str);
-                    }
+                if rule == Rule::UnusedNOQA {
+                    group.self_ignore = true;
                 } else {
-                    group.disabled_codes.push(code_str);
+                    if context.is_rule_enabled(rule) {
+                        if first_comment
+                            .codes_as_str(locator.contents())
+                            .filter(|code| *code == code_str)
+                            .count()
+                            > 1
+                        {
+                            group.duplicated_codes.push(code_str);
+                        } else {
+                            group.unused_codes.push(code_str);
+                        }
+                    } else {
+                        group.disabled_codes.push(code_str);
+                    }
+                    continue;
                 }
-            } else if let SuppressionComments::Single(SuppressionComment {
+            }
+
+            if let SuppressionComments::Single(SuppressionComment {
                 action: SuppressionAction::Disable,
                 range,
                 ..

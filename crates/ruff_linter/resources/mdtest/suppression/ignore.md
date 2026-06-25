@@ -221,6 +221,43 @@ from sys import ( # ruff:ignore[F401]
 )
 ```
 
+## `ruff:ignore` can suppress `RUF100`
+
+```toml
+[lint]
+preview = true
+select = ["RUF100"]
+```
+
+A `ruff:ignore` comment can suppress an unused `noqa` comment:
+
+```py
+value = 1  # noqa: F401  # ruff:ignore[unused-noqa]
+```
+
+A multi-code comment containing `RUF100` should also suppress its own unused suppression
+diagnostic:
+
+```py
+value = 1  # ruff:ignore[unused-import, unused-noqa]
+```
+
+## Self-suppression does not hide unmatched comments
+
+An unmatched `ruff:disable[RUF100]` should suppress its own unused warning without hiding the
+unmatched-comment diagnostic:
+
+```toml
+[lint]
+preview = true
+select = ["RUF100", "RUF104"]
+```
+
+```py
+# error: [unmatched-suppression-comment]
+# ruff:disable[RUF100]
+```
+
 ## Trailing whitespace is included in the suppression range
 
 ```toml

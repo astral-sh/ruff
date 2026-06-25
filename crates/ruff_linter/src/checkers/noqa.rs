@@ -126,6 +126,7 @@ pub(crate) fn check_noqa(
         && analyze_directives
         && !exemption.includes(Rule::UnusedNOQA)
     {
+        let unused_noqa_suppressions = suppressions.for_rule(Rule::UnusedNOQA);
         let directives = noqa_directives
             .lines()
             .iter()
@@ -140,6 +141,9 @@ pub(crate) fn check_noqa(
             match directive {
                 Directive::All(directive) => {
                     if matches.is_empty() {
+                        if unused_noqa_suppressions.check(directive.range(), None) {
+                            continue;
+                        }
                         let edit = delete_comment(directive.range(), locator);
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
@@ -203,6 +207,9 @@ pub(crate) fn check_noqa(
                         && duplicated_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
+                        if unused_noqa_suppressions.check(directive.range(), None) {
+                            continue;
+                        }
                         let edit = if valid_codes.is_empty() {
                             delete_comment(directive.range(), locator)
                         } else {
