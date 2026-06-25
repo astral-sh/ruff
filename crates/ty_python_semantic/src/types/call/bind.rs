@@ -790,17 +790,18 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Returns whether any overload is generic and, for each source argument whose type context
-    /// can change when that generic call is specialized, the number of inferable type-variable
-    /// occurrences in its matched parameter contexts.
+    /// Returns whether any overload is generic, the source arguments whose type context can change
+    /// when that generic call is specialized, and the maximum number of inferable type-variable
+    /// occurrences in any one matching overload's parameter contexts.
     pub(crate) fn generic_context_arguments(
         &self,
         db: &'db dyn Db,
-        argument_count: usize,
-    ) -> (bool, SmallVec<[(usize, usize); 4]>) {
-        let mut generic_arguments = SmallVec::<[usize; 8]>::with_capacity(argument_count);
-        generic_arguments.resize(argument_count, 0);
+        arguments: &CallArguments<'_, 'db>,
+    ) -> (bool, SmallVec<[usize; 4]>, usize) {
+        let mut generic_arguments = SmallVec::<[bool; 8]>::with_capacity(arguments.len());
+        generic_arguments.resize(arguments.len(), false);
         let mut has_generic_context = false;
+        let mut max_typevar_occurrences = 0;
 
         self.visit_type_context_callables(&mut |binding| {
             has_generic_context |= binding
@@ -811,10 +812,19 @@ impl<'db> Bindings<'db> {
                 if overload.signature.generic_context.is_none() {
                     continue;
                 }
-                for (argument_index, occurrences) in generic_arguments.iter_mut().enumerate() {
-                    *occurrences +=
+                let mut overload_typevar_occurrences = 0;
+                for (argument_index, is_generic) in generic_arguments.iter_mut().enumerate() {
+                    if arguments.is_variadic(argument_index) {
+                        continue;
+                    }
+                    let occurrences =
                         overload.generic_argument_typevar_occurrences(db, binding, argument_index);
+                    *is_generic |= occurrences > 0;
+                    overload_typevar_occurrences += occurrences;
                 }
+                // Overloads are alternative inference paths. Their dependency depths do not
+                // compose, so the fixpoint bound only needs the deepest matching overload.
+                max_typevar_occurrences = max_typevar_occurrences.max(overload_typevar_occurrences);
             }
         });
 
@@ -823,10 +833,9 @@ impl<'db> Bindings<'db> {
             generic_arguments
                 .into_iter()
                 .enumerate()
-                .filter_map(|(index, occurrences)| {
-                    (occurrences > 0).then_some((index, occurrences))
-                })
+                .filter_map(|(index, is_generic)| is_generic.then_some(index))
                 .collect(),
+            max_typevar_occurrences,
         )
     }
 

@@ -5986,15 +5986,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Return-context attempts all start from the same parameter matches, so their generic
         // argument indices are identical. Compute them once for the complete call inference.
-        let (has_generic_context, generic_context_arguments) =
-            bindings.generic_context_arguments(db, argument_types.len());
-        let mut generic_fixpoint = GenericCallFixpoint::default();
-        for (index, occurrences) in generic_context_arguments {
-            if !argument_types.is_variadic(index) {
-                generic_fixpoint.argument_indices.push(index);
-                generic_fixpoint.typevar_occurrences += occurrences;
-            }
-        }
+        let (has_generic_context, argument_indices, typevar_occurrences) =
+            bindings.generic_context_arguments(db, argument_types);
+        let generic_fixpoint = GenericCallFixpoint {
+            argument_indices,
+            typevar_occurrences,
+        };
 
         // Keep one cache active across return-context narrowing attempts and the final full-context
         // attempt. If this call is itself part of multi-inference, reuse the surrounding cache so
@@ -12206,9 +12203,10 @@ struct CallArgumentInferenceParams<'a, 'db> {
 
 /// The source arguments whose contexts participate in generic-call fixpoint inference.
 ///
-/// The number of inferable type-variable occurrences provides the safety ceiling for synchronous
-/// rounds. Unlike the source-argument count, it accounts for dependency chains packaged inside a
-/// single tuple or other structural argument.
+/// The maximum number of inferable type-variable occurrences in any matching overload provides the
+/// safety ceiling for synchronous rounds. Unlike the source-argument count, it accounts for
+/// dependency chains packaged inside a single tuple or other structural argument without composing
+/// alternative overload paths.
 #[derive(Default)]
 struct GenericCallFixpoint {
     argument_indices: SmallVec<[usize; 4]>,
