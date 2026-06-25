@@ -192,7 +192,7 @@ fn class_pattern_is_exhaustive(
         return false;
     }
 
-    if kind.is_argumentless() {
+    if kind.is_empty() {
         return true;
     }
 
@@ -335,7 +335,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                     }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
-                    if kind.is_argumentless()
+                    if kind.is_empty()
                         && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
                 {
                     return callable_pattern_type(db);
@@ -530,13 +530,11 @@ fn subject_independent_definite_match_pattern_type<'db>(
     match kind {
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class) if kind.is_argumentless() => {
+                Type::ClassLiteral(class) if kind.is_empty() => {
                     Some(Type::instance(db, class.top_materialization(db)))
                 }
                 Type::ClassLiteral(_) => None,
-                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
-                    if kind.is_argumentless() =>
-                {
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     Some(callable_pattern_type(db))
                 }
                 _ => Some(Type::Never),
@@ -589,12 +587,10 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class) if kind.is_argumentless() => {
+                Type::ClassLiteral(class) if kind.is_empty() => {
                     Type::instance(db, class.top_materialization(db))
                 }
-                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
-                    if kind.is_argumentless() =>
-                {
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     callable_pattern_type(db)
                 }
                 _ => Type::Never,

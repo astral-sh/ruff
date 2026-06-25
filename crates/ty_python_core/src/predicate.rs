@@ -197,7 +197,7 @@ pub struct ClassPatternPredicateKind<'db> {
 }
 
 impl ClassPatternPredicateKind<'_> {
-    pub fn is_argumentless(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.positional.is_empty() && self.keywords.is_empty()
     }
 }
