@@ -826,6 +826,17 @@ def fixed_match_args_are_exhaustive(value: KnownAttributes) -> int:
     match value:
         case KnownAttributes(_, _):
             return 1
+
+class ValidMatchArgsMeta(type):
+    __match_args__ = ("x",)
+
+class WithMetaclassMatchArgs(metaclass=ValidMatchArgsMeta):
+    x: int = 0
+
+def metaclass_match_args_is_exhaustive(value: WithMetaclassMatchArgs) -> int:
+    match value:
+        case WithMetaclassMatchArgs(_):
+            return 1
 ```
 
 The pattern is not exhaustive when a selected attribute is missing, an explicit annotation widens
