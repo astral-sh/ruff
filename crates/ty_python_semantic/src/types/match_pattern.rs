@@ -410,17 +410,28 @@ fn match_args_positional_result<'db>(
 ) -> Option<ClassPatternPositionalResult<'db>> {
     let match_args = match_args.resolve_type_alias(db);
     if let Type::Union(union) = match_args {
-        return union
+        let mut results = union
             .elements(db)
             .iter()
-            .try_fold(0, |maximum, element| {
-                match match_args_positional_result(db, *element, positional_count)? {
-                    ClassPatternPositionalResult::Limit(limit) => Some(maximum.max(limit)),
-                    ClassPatternPositionalResult::InvalidElement(_)
-                    | ClassPatternPositionalResult::InvalidType(_) => None,
-                }
-            })
-            .map(ClassPatternPositionalResult::Limit);
+            .map(|element| match_args_positional_result(db, *element, positional_count));
+        let first = results.next()??;
+        return results.try_fold(first, |combined, result| match (combined, result?) {
+            (
+                ClassPatternPositionalResult::Limit(left),
+                ClassPatternPositionalResult::Limit(right),
+            ) => Some(ClassPatternPositionalResult::Limit(left.max(right))),
+            (
+                ClassPatternPositionalResult::InvalidElement(left),
+                ClassPatternPositionalResult::InvalidElement(right),
+            ) if left == right => Some(ClassPatternPositionalResult::InvalidElement(left)),
+            (
+                ClassPatternPositionalResult::InvalidType(left),
+                ClassPatternPositionalResult::InvalidType(right),
+            ) => Some(ClassPatternPositionalResult::InvalidType(
+                UnionType::from_two_elements(db, left, right),
+            )),
+            _ => None,
+        });
     }
 
     if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {

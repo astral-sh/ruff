@@ -160,6 +160,22 @@ def describe_conditional(flag: bool) -> None:
             pass
 ```
 
+## Common invalid `__match_args__` union element
+
+```py
+from typing import Literal
+
+flag: bool = bool()
+
+class InvalidUnion:
+    __match_args__: tuple[Literal[1]] | tuple[Literal[2]] = (1,) if flag else (2,)
+
+def describe(value: InvalidUnion) -> None:
+    match value:
+        case InvalidUnion(_):  # error: [invalid-match-pattern] "not an exact string"
+            pass
+```
+
 ## Unknown `__match_args__` tuple length (no error)
 
 ```py
