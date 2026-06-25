@@ -195,6 +195,19 @@ pub struct ClassPatternKeywordPredicateKind<'db> {
     pub pattern: PatternPredicateKind<'db>,
 }
 
+/// Structural details for a mapping pattern.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct MappingPatternPredicateKind<'db> {
+    pub entries: Box<[MappingPatternEntryPredicateKind<'db>]>,
+    pub rest: Option<Name>,
+}
+
+impl MappingPatternPredicateKind<'_> {
+    pub fn is_irrefutable(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct MappingPatternEntryPredicateKind<'db> {
     pub key: Expression<'db>,
@@ -209,7 +222,7 @@ pub enum PatternPredicateKind<'db> {
     Value(Expression<'db>),
     Or(Box<[PatternPredicateKind<'db>]>),
     Class(ClassPatternPredicateKind<'db>),
-    Mapping(Box<[MappingPatternEntryPredicateKind<'db>]>),
+    Mapping(MappingPatternPredicateKind<'db>),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Star(Option<Name>),

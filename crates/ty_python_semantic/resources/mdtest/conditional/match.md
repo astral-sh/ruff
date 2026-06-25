@@ -220,8 +220,9 @@ DynamicClass: Any = int
 
 def _(target: int | str):
     match target:
-        case DynamicClass():
+        case DynamicClass() as whole:
             reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(whole)  # revealed: (int & Any) | (str & Any)
             y = 1
         case _:
             reveal_type(target)  # revealed: int | str

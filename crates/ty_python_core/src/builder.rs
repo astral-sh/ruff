@@ -44,9 +44,9 @@ use crate::place::{
 };
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
-    MappingPatternEntryPredicateKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
-    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
+    SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -2063,8 +2063,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Pattern::MatchMapping(pattern) => {
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
-                PatternPredicateKind::Mapping(
-                    pattern
+                PatternPredicateKind::Mapping(MappingPatternPredicateKind {
+                    entries: pattern
                         .keys
                         .iter()
                         .zip(&pattern.patterns)
@@ -2073,7 +2073,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             pattern: self.predicate_kind(pattern),
                         })
                         .collect(),
-                )
+                    rest: pattern.rest.as_ref().map(|name| name.id.clone()),
+                })
             }
             ast::Pattern::MatchSequence(pattern) => {
                 PatternPredicateKind::Sequence(SequencePatternPredicateKind {
