@@ -140,6 +140,11 @@ def f(x: Covariant[int]):
 
 ## Mapping patterns
 
+```toml
+[semantics]
+isinstance-narrowing = "strict"
+```
+
 ```py
 from collections.abc import Mapping
 from typing import Any

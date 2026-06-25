@@ -1614,12 +1614,12 @@ pub struct SemanticsOptions {
     /// With `relaxed`, ty narrows to the class's default specialization instead. The same check
     /// narrows an `object` value to `list[Unknown]`.
     ///
-    /// Defaults to `strict`.
+    /// Defaults to `relaxed`.
     #[option(
-        default = "strict",
+        default = "relaxed",
         value_type = "strict | relaxed",
         example = r#"
-            isinstance-narrowing = "relaxed"
+            isinstance-narrowing = "strict"
         "#
     )]
     pub isinstance_narrowing: Option<RangedValue<IsInstanceNarrowing>>,
