@@ -2847,7 +2847,10 @@ of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent t
 `P.x` after the descriptor protocol has been invoked on `P.x`:
 
 ```py
-from typing import Protocol
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Protocol, overload
+from typing_extensions import Self
 from ty_extensions import static_assert, is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
 
 class PClassMethod(Protocol):
@@ -2857,6 +2860,9 @@ class PClassMethod(Protocol):
 class PStaticMethod(Protocol):
     @staticmethod
     def x(val: int) -> str: ...
+
+class PInstanceMethod(Protocol):
+    def x(self, val: int) -> str: ...
 
 class NNotCallable:
     x = None
@@ -2885,23 +2891,129 @@ class NStaticMethodBad:
     def x(cls, val: int) -> str:
         return "foo"
 
+class PFactory(Protocol):
+    @classmethod
+    def create(cls) -> Self: ...
+
+class POverloadedClassMethod(Protocol):
+    @overload
+    @classmethod
+    def convert(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def convert(cls, value: str) -> str: ...
+
+class POverloadedStaticMethod(Protocol):
+    @overload
+    @staticmethod
+    def convert(value: int) -> int: ...
+    @overload
+    @staticmethod
+    def convert(value: str) -> str: ...
+
+class OverloadedClassMethod:
+    @overload
+    @classmethod
+    def convert(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def convert(cls, value: str) -> str: ...
+    @classmethod
+    def convert(cls, value: int | str) -> int | str:
+        return value
+
+class POverloadedSelf(Protocol):
+    @overload
+    @classmethod
+    def copy(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def copy(cls, value: str) -> tuple[Self, Self]: ...
+
+class OverloadedSelf:
+    @overload
+    @classmethod
+    def copy(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def copy(cls, value: str) -> tuple[Self, Self]: ...
+    @classmethod
+    def copy(cls, value: int | str) -> Self | tuple[Self, Self]:
+        if isinstance(value, int):
+            return cls()
+        return cls(), cls()
+
+class Factory:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class BadFactory:
+    @classmethod
+    def create(cls) -> int:
+        return 42
+
+class PContextManager1(Protocol):
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[Self]: ...
+
+class PContextManager2(Protocol):
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[Self]: ...
+
+class ContextManagerImplementation:
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[Self]:
+        yield cls()
+
+class PRegularContextManager(Protocol):
+    @contextmanager
+    def open(self) -> Iterator[int]: ...
+
+class ClassContextManagerImplementation:
+    @classmethod
+    @contextmanager
+    def open(cls) -> Iterator[int]:
+        yield 1
+
+class StaticContextManagerImplementation:
+    @staticmethod
+    @contextmanager
+    def open() -> Iterator[int]:
+        yield 1
+
+def use_decorated_protocol_methods(class_method: PClassMethod, static_method: PStaticMethod) -> None:
+    reveal_type(class_method.x(1))  # revealed: str
+    reveal_type(static_method.x(1))  # revealed: str
+
 # `PClassMethod.x` and `PStaticMethod.x` evaluate to callable types with equivalent signatures
 # whether you access them on the protocol class or instances of the protocol.
 # That means that they are equivalent protocols!
 static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
+static_assert(is_equivalent_to(POverloadedClassMethod, POverloadedStaticMethod))
+static_assert(is_equivalent_to(PContextManager1, PContextManager2))
 
-# TODO: these should all pass
-static_assert(not is_assignable_to(NNotCallable, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NNotCallable, PStaticMethod))  # error: [static-assert-error]
-static_assert(is_disjoint_from(NNotCallable, PClassMethod))  # error: [static-assert-error]
-static_assert(is_disjoint_from(NNotCallable, PStaticMethod))  # error: [static-assert-error]
+# Like nominal classmethod and staticmethod implementations, protocols containing these members
+# satisfy an ordinary method requirement with the same bound signature.
+static_assert(is_subtype_of(PClassMethod, PInstanceMethod))
+static_assert(is_assignable_to(PClassMethod, PInstanceMethod))
+static_assert(is_subtype_of(PStaticMethod, PInstanceMethod))
+static_assert(is_assignable_to(PStaticMethod, PInstanceMethod))
+static_assert(not is_assignable_to(PInstanceMethod, PClassMethod))
+static_assert(not is_assignable_to(PInstanceMethod, PStaticMethod))
+
+static_assert(not is_assignable_to(NNotCallable, PClassMethod))
+static_assert(not is_assignable_to(NNotCallable, PStaticMethod))
+static_assert(is_disjoint_from(NNotCallable, PClassMethod))
+static_assert(is_disjoint_from(NNotCallable, PStaticMethod))
 
 # `NInstanceMethod.x` has the correct type when accessed on an instance of
 # `NInstanceMethod`, but not when accessed on the class object itself
-#
-# TODO: these should pass
-static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))
+static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))
 
 # A nominal type with a `@staticmethod` can satisfy a protocol with a `@classmethod`
 # if the staticmethod duck-types the same as the classmethod member
@@ -2910,21 +3022,38 @@ static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [s
 # with a `@staticmethod` member
 static_assert(is_assignable_to(NClassMethodGood, PClassMethod))
 static_assert(is_assignable_to(NClassMethodGood, PStaticMethod))
-# TODO: these should all pass:
-static_assert(is_subtype_of(NClassMethodGood, PClassMethod))  # error: [static-assert-error]
-static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NClassMethodGood, PClassMethod))
+static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))
 
 static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
 static_assert(is_assignable_to(NStaticMethodGood, PStaticMethod))
-# TODO: these should all pass:
-static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))  # error: [static-assert-error]
-static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))
+static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))
+
+# `Self` in the classmethod signature is bound to the implementation type.
+static_assert(is_subtype_of(Factory, PFactory))
+static_assert(is_assignable_to(Factory, PFactory))
+static_assert(not is_subtype_of(BadFactory, PFactory))
+static_assert(not is_assignable_to(BadFactory, PFactory))
+static_assert(is_subtype_of(ContextManagerImplementation, PContextManager1))
+static_assert(is_assignable_to(ContextManagerImplementation, PContextManager1))
+
+# Wrapped classmethods and staticmethods can also satisfy regular method members.
+static_assert(is_subtype_of(ClassContextManagerImplementation, PRegularContextManager))
+static_assert(is_assignable_to(ClassContextManagerImplementation, PRegularContextManager))
+static_assert(is_subtype_of(StaticContextManagerImplementation, PRegularContextManager))
+static_assert(is_assignable_to(StaticContextManagerImplementation, PRegularContextManager))
+
+static_assert(is_subtype_of(OverloadedClassMethod, POverloadedClassMethod))
+static_assert(is_subtype_of(OverloadedClassMethod, POverloadedStaticMethod))
+static_assert(is_subtype_of(OverloadedSelf, POverloadedSelf))
+static_assert(is_assignable_to(OverloadedSelf, POverloadedSelf))
 ```
 
 Until classmethod protocol members are fully supported, their placeholder representation should not
