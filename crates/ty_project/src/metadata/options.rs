@@ -37,9 +37,9 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
-    inferred_python_version_source_annotation,
+    AnalysisSettings, IsInstanceNarrowing, PythonEnvironment, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SemanticSettings, SitePackagesPaths,
+    SysPrefixPathOrigin, inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -99,6 +99,11 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub analysis: Option<AnalysisOptions>,
+
+    /// Configures semantic type inference behavior.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
+    pub semantics: Option<SemanticsOptions>,
 
     /// Override configurations for specific file patterns.
     ///
@@ -490,6 +495,8 @@ impl Options {
             };
         let analysis = strategy.fallback(analysis_result, |_| AnalysisSettings::default())?;
 
+        let semantics = self.semantics.or_default().to_settings();
+
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
             .map_err(|err| ToSettingsError {
@@ -504,6 +511,7 @@ impl Options {
             terminal,
             src,
             analysis,
+            semantics,
             overrides,
         };
 
@@ -1579,6 +1587,60 @@ impl AnalysisOptions {
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
             replace_imports_with_any,
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct SemanticsOptions {
+    /// Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.
+    ///
+    /// With `strict`, ty narrows to the top materialization of the class. For example,
+    /// `isinstance(value, list)` narrows an `object` value to `Top[list[Unknown]]`, representing
+    /// a list with any possible specialization.
+    ///
+    /// With `relaxed`, ty narrows to the class's default specialization instead. The same check
+    /// narrows an `object` value to `list[Unknown]`.
+    ///
+    /// Defaults to `strict`.
+    #[option(
+        default = "strict",
+        value_type = "strict | relaxed",
+        example = r#"
+            isinstance-narrowing = "relaxed"
+        "#
+    )]
+    pub isinstance_narrowing: Option<RangedValue<IsInstanceNarrowing>>,
+}
+
+impl SemanticsOptions {
+    fn to_settings(&self) -> SemanticSettings {
+        SemanticSettings {
+            isinstance_narrowing: self
+                .isinstance_narrowing
+                .as_deref()
+                .copied()
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl Combine for SemanticsOptions {
+    fn combine_with(&mut self, other: Self) {
+        if self.isinstance_narrowing.is_none() {
+            self.isinstance_narrowing = other.isinstance_narrowing;
         }
     }
 }
