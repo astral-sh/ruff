@@ -963,6 +963,21 @@ impl<'db> ConstraintConjunction<'db> {
         self
     }
 
+    /// Add only the deferred key facts from `other`, leaving its type constraints behind.
+    fn and_with_key_constraints_from(mut self, other: &Self) -> Self {
+        if self.key_constraints.is_empty() {
+            self.key_constraints = other.key_constraints.clone();
+        } else {
+            for key_constraint in &other.key_constraints {
+                if !self.key_constraints.contains(key_constraint) {
+                    self.key_constraints.push(key_constraint.clone());
+                }
+            }
+        }
+
+        self
+    }
+
     /// Materialize this conjunction, applying deferred key facts after ordinary type constraints.
     ///
     /// Present-key facts are applied before absent-key facts so contradictory facts for the same
@@ -1444,8 +1459,9 @@ impl<'db> NarrowingConstraint<'db> {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
         //
-        // In our representation, the RHS `replacement_disjuncts` will all clobber the LHS disjuncts
-        // when they are `and`ed, so they'll just stay as is.
+        // The RHS replacement disjuncts clobber the LHS type constraints when they are `and`ed,
+        // but facts established by LHS key checks still apply to the replacement type. Combine each
+        // replacement disjunct with the key facts from each LHS disjunct.
         //
         // The thing we actually need to deal with is the RHS `intersection_disjuncts`. Each RHS
         // disjunct gets intersected with each LHS disjunct, producing the cartesian product.
@@ -1453,11 +1469,16 @@ impl<'db> NarrowingConstraint<'db> {
         //
         // We also intersect each LHS `replacement_disjunct` with every RHS intersection disjunct
         // to form new additional `replacement_disjuncts`.
-        if !other.has_intersection_disjuncts() {
-            return other;
+        let (other_intersection_disjuncts, other_replacement_disjuncts) = other.into_disjuncts();
+        let mut new_replacement_disjuncts = smallvec![];
+        for left in self.disjuncts(true).chain(self.disjuncts(false)) {
+            for right in &other_replacement_disjuncts {
+                let merged = right.clone().and_with_key_constraints_from(left.as_ref());
+                if !new_replacement_disjuncts.contains(&merged) {
+                    new_replacement_disjuncts.push(merged);
+                }
+            }
         }
-
-        let (other_intersection_disjuncts, mut new_replacement_disjuncts) = other.into_disjuncts();
         let mut new_intersection_disjuncts = smallvec![];
         for intersection_disjunct in self.disjuncts(true) {
             for other_intersection_disjunct in &other_intersection_disjuncts {
