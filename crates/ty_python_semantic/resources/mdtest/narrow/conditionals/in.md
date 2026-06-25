@@ -489,7 +489,7 @@ every possible container. A `NewType` uses the behavior of its underlying type.
 
 ```py
 from collections.abc import Iterable, Iterator, Sized
-from typing import Literal, NewType, TypeVar, final
+from typing import Any, Literal, NewType, TypeVar, final
 
 @final
 class Token: ...
@@ -545,7 +545,8 @@ def mixed_constraints(
 
 An `isinstance` check can also identify a concrete container. After narrowing to `tuple`, membership
 can use the tuple's item type. Checking only an unrelated protocol such as `Sized` does not tell us
-how membership works.
+how membership works. A custom `__contains__` from another intersection component can precede a
+known implementation in a concrete subclass, so that intersection also remains conservative.
 
 ```py
 def tuple_intersection(
@@ -560,6 +561,23 @@ def unrelated_intersection(
     values: Iterable[Literal[1]],
 ) -> None:
     if isinstance(values, Sized) and value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+
+class ContainsEverything:
+    def __contains__(self, value: object) -> bool:
+        return True
+
+class Items(list[Literal[1]]):
+    def __iter__(self) -> Iterator[Any]:
+        return super().__iter__()
+
+class Actual(ContainsEverything, Items): ...
+
+def custom_contains_precedes_builtin(
+    value: Token | Literal[1],
+    values: Items,
+) -> None:
+    if isinstance(values, ContainsEverything) and value in values:
         reveal_type(value)  # revealed: Token | Literal[1]
 ```
 
