@@ -361,6 +361,7 @@ pub(crate) fn class_pattern_positional_limit(
         ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => Some(1),
         ClassMatchArgs::Undefined => Some(0),
         ClassMatchArgs::Defined(match_args) => {
+            let match_args = match_args.resolve_type_alias(db);
             if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
                 tuple.as_fixed_length().map(FixedLengthTuple::len)
             } else if match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))

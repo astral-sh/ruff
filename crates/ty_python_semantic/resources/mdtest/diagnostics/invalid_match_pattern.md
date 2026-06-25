@@ -60,6 +60,27 @@ def describe(p: Point) -> None:
             pass
 ```
 
+## PEP 695 type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type MatchArgs = tuple[Literal["x"], Literal["y"]]
+
+class Point:
+    __match_args__: MatchArgs = ("x", "y")
+
+def describe(p: Point) -> None:
+    match p:
+        case Point(x, y, z):  # error: [invalid-match-pattern]
+            pass
+```
+
 ## Exact match (no error)
 
 ```py
