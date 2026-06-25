@@ -1,4 +1,5 @@
 use ruff_db::parsed::parsed_module;
+use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 use crate::Db;
@@ -96,10 +97,8 @@ impl<'db> Member<'db> {
     }
 }
 
-fn definition_is_runtime_binding(
-    db: &dyn Db,
-    definition: ty_python_core::definition::Definition,
-) -> bool {
+#[salsa::tracked]
+fn definition_is_runtime_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     definition

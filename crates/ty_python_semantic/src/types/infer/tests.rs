@@ -593,6 +593,59 @@ fn class_patterns_without_positionals_ignore_match_args_changes() -> anyhow::Res
 }
 
 #[test]
+fn class_patterns_ignore_equivalent_match_args_annotation_edits() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    db.write_dedented(
+        "/src/model.py",
+        r#"
+        from typing import Literal
+
+        class Model:
+            __match_args__: tuple[Literal["value"]] = ("value",)
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from model import Model
+
+        value = Model()
+
+        match value:
+            case Model(_):
+                pass
+        "#,
+    )?;
+
+    let main = system_path_to_file(&db, "/src/main.py").unwrap();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    db.write_dedented(
+        "/src/model.py",
+        r#"
+        from typing import Literal
+
+        class Model:
+            __match_args__: tuple[Literal['value']] = ("value",)
+        "#,
+    )?;
+
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+
+    assert_function_query_was_not_run(
+        &db,
+        infer_scope_types_impl,
+        InferScope::Bare(global_scope(&db, main)),
+        &events,
+    );
+
+    Ok(())
+}
+
+#[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
