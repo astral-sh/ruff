@@ -15,10 +15,6 @@ use super::{
     enums::{enum_member_literals, enum_metadata},
 };
 
-mod enums;
-
-pub(super) use self::enums::enum_membership_constraint;
-
 /// The result of evaluating a runtime comparison between two types.
 ///
 /// Definite truthiness is represented separately from a constraint for the operand currently being
@@ -159,6 +155,25 @@ pub(super) fn evaluate_type_equality<'db>(
             None
         }
     })
+}
+
+/// Return a constraint excluding every value known to compare equal to `ty`.
+pub(super) fn equality_exclusion_constraint<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let ty = ty.resolve_type_alias(db);
+    builtin_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
+        .or_else(|| ty.is_single_valued(db).then(|| ty.negate(db)))
+        .or_else(|| {
+            (ComparisonEvaluator::new(db).evaluate(
+                ty,
+                ty,
+                ComparisonBranch::Positive,
+                ComparisonOperator::Equality,
+            ) == ComparisonResult::AlwaysTrue)
+                .then(|| ty.negate(db))
+        })
 }
 
 /// Return a constraint for `left` in a branch where `left != right` has the given truthiness.

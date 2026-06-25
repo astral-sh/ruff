@@ -620,19 +620,6 @@ impl<'db> EnumComplementType<'db> {
                 .overrides_equality(db)
     }
 
-    /// Return `true` when this complement can be losslessly split into single-valued literals.
-    ///
-    /// This permits finite-union narrowing over large complements without materializing the
-    /// alternatives for complements that still carry positive rest components.
-    pub(crate) fn has_finite_single_valued_alternatives(self, db: &'db dyn Db) -> bool {
-        self.rest(db).is_empty()
-            && self.remaining_member_count(db) > 0
-            && !self
-                .enum_class(db)
-                .to_non_generic_instance(db)
-                .overrides_equality(db)
-    }
-
     /// Expand this complement to the enum literals that remain possible.
     pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
