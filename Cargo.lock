@@ -3621,7 +3621,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_ranged_value"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "get-size2",
  "ruff_db",
@@ -4610,7 +4610,7 @@ dependencies = [
 
 [[package]]
 name = "ty_combine"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "ordermap",
  "ruff_db",
@@ -4764,7 +4764,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_core"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -4797,7 +4797,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_semantic"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -4941,7 +4941,7 @@ dependencies = [
 
 [[package]]
 name = "ty_vendored"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "path-slash",
  "ruff_db",
