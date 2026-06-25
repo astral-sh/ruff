@@ -115,12 +115,24 @@ def _(flag: bool):
 
     this_fails = ThisFails()
 
-    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
-    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
-    # that the cause of the error was a possibly missing `__getitem__` method
-    #
-    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `ThisFails` may be missing"
+    # error: [not-subscriptable] "Cannot subscript an object of type `ThisFails` with a possibly missing `__getitem__` method"
+    this_fails[0]
+
+    # snapshot: not-subscriptable
     reveal_type(this_fails[0])  # revealed: str
+```
+
+```snapshot
+error[not-subscriptable]: Invalid subscript read
+  --> src/mdtest_snippet.py:41:17
+   |
+41 |     reveal_type(this_fails[0])  # revealed: str
+   |                 ----------^^^
+   |                 |          |
+   |                 |          Method `__getitem__` may be missing
+   |                 Has type `ThisFails`
+   |
+info: `__getitem__` is implicitly called due to this subscript expression
 ```
 
 ### Dunder methods as class-level annotations with no value
@@ -277,10 +289,19 @@ def _(flag: bool):
 
     c = C()
 
-    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
-    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
-    # that the cause of the error was a possibly missing `__getitem__` method
-    #
-    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `C` may be missing"
+    # snapshot: not-subscriptable
     reveal_type(c[0])  # revealed: str
+```
+
+```snapshot
+error[not-subscriptable]: Invalid subscript read
+  --> src/mdtest_snippet.py:10:17
+   |
+10 |     reveal_type(c[0])  # revealed: str
+   |                 -^^^
+   |                 | |
+   |                 | Method `__getitem__` may be missing
+   |                 Has type `C`
+   |
+info: `__getitem__` is implicitly called due to this subscript expression
 ```

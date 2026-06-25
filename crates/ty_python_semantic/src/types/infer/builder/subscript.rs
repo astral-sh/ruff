@@ -2069,6 +2069,7 @@ fn infer_legacy_generic_subscript<'db>(
                 origin,
                 argument_ty,
             },
+            origin.into(),
         )),
         Err(LegacyGenericContextError::DuplicateTypevar(typevar_name)) => Err(SubscriptError::new(
             Type::unknown(),
@@ -2076,10 +2077,12 @@ fn infer_legacy_generic_subscript<'db>(
                 origin,
                 typevar_name,
             },
+            origin.into(),
         )),
         Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked) => Err(SubscriptError::new(
             Type::unknown(),
             SubscriptErrorKind::TypeVarTupleNotUnpacked { origin },
+            origin.into(),
         )),
         Err(
             error @ (LegacyGenericContextError::NotYetSupported

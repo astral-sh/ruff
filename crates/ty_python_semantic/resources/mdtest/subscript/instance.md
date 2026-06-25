@@ -5,15 +5,18 @@
 ```py
 class NotSubscriptable: ...
 
+# error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
+NotSubscriptable()[0]
+
 # snapshot: not-subscriptable
 a = NotSubscriptable()[0]
 ```
 
 ```snapshot
 error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method
- --> src/mdtest_snippet.py:4:5
+ --> src/mdtest_snippet.py:7:5
   |
-4 | a = NotSubscriptable()[0]
+7 | a = NotSubscriptable()[0]
   |     ^^^^^^^^^^^^^^^^^^^^^
   |
 ```
@@ -24,12 +27,22 @@ error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` wit
 class NotSubscriptable:
     __getitem__ = None
 
-# TODO: this would be more user-friendly if the `call-non-callable` diagnostic was
-# transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
-# that this was because `__getitem__` was possibly not callable
-#
-# error: [call-non-callable] "Method `__getitem__` of type `None | Unknown` may not be callable on object of type `NotSubscriptable`"
+# snapshot: not-subscriptable
 a = NotSubscriptable()[0]
+```
+
+```snapshot
+error[not-subscriptable]: Invalid subscript read
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | a = NotSubscriptable()[0]
+  |     ------------------^^^
+  |     |                  |
+  |     |                  Method `__getitem__` has type `None | Unknown`
+  |     |                  An object of type `None | Unknown` may not be callable
+  |     Has type `NotSubscriptable`
+  |
+info: `__getitem__` is implicitly called due to this subscript expression
 ```
 
 ## Valid `__getitem__`
@@ -77,6 +90,166 @@ def _(flag: bool):
                 return str(index)
 
     reveal_type(Identity()[0])  # revealed: int | str
+```
+
+## `__getitem__` with too many parameters
+
+```py
+class Foo:
+    def __getitem__(self, x, y): ...
+
+# error: [missing-argument] "No argument provided for required parameter `y` of bound method `Foo.__getitem__`"
+Foo()["x"]
+
+Foo()["x"]  # snapshot: missing-argument
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `y` of bound method `Foo.__getitem__`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | Foo()["x"]  # snapshot: missing-argument
+  | ^^^^^^^^^^
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:30
+  |
+2 |     def __getitem__(self, x, y): ...
+  |                              ^
+  |
+```
+
+## `__getitem__` with too few parameters
+
+```py
+class Foo:
+    def __getitem__(self): ...
+
+Foo()["x"]  # snapshot: too-many-positional-arguments
+```
+
+```snapshot
+error[too-many-positional-arguments]: Too many positional arguments to bound method `Foo.__getitem__`: expected 1, got 2
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | Foo()["x"]  # snapshot: too-many-positional-arguments
+  | ^^^^^^^^^^
+  |
+info: Method signature here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __getitem__(self): ...
+  |         ^^^^^^^^^^^^^^^^^
+  |
+```
+
+## `__getitem__` with a bad `self` parameter
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class Foo[T]:
+    def __getitem__(self: Foo[str], x): ...
+
+def test(x: Foo[int]):
+    # TODO: should emit an error here, the `__getitem__` is only valid
+    # if called on an instance of `Foo[str]`, not of `Foo[int]`
+    x["foo"]
+```
+
+## Overloaded bad `__getitem__`
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import overload
+
+class Foo[T]:
+    @overload
+    def __getitem__(self, x: int): ...
+    @overload
+    def __getitem__(self, x: str, y): ...
+    def __getitem__(self, x, y=None): ...
+
+def test(x: Foo[int]):
+    x["foo"]  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `Foo.__getitem__` is incorrect
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     x["foo"]  # snapshot: invalid-argument-type
+   |     ^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Matching overload defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __getitem__(self, x: int): ...
+  |         ^^^^^^^^^^^       ------ Parameter declared here
+  |
+info: Non-matching overloads for bound method `__getitem__`:
+info:   (self, x: str, y) -> Unknown
+```
+
+## Union of bad `__getitem__` methods
+
+```py
+class Foo:
+    def __getitem__(self, x: str): ...
+
+class Bar:
+    def __getitem__(self, x: str): ...
+
+def test(x: Foo | Bar):
+    # error: [invalid-argument-type] "Cannot subscript an object of type `Bar` with a key of type `Literal[42]` (expected `str`)"
+    # error: [invalid-argument-type] "Cannot subscript an object of type `Foo` with a key of type `Literal[42]` (expected `str`)"
+    x[42]
+
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
+    x[42]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+  --> src/mdtest_snippet.py:14:5
+   |
+14 |     x[42]
+   |     -^^^^
+   |     | |
+   |     | Expected `str`, got object of type `Literal[42]`
+   |     Has type `Foo | Bar`
+   |
+info: This subscript expression implicitly calls `Bar.__getitem__`
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __getitem__(self, x: str): ...
+  |         ^^^^^^^^^^^ Method defined here
+  |
+
+
+error[invalid-argument-type]: Invalid subscript read
+  --> src/mdtest_snippet.py:14:5
+   |
+14 |     x[42]
+   |     -^^^^
+   |     | |
+   |     | Expected `str`, got object of type `Literal[42]`
+   |     Has type `Foo | Bar`
+   |
+info: This subscript expression implicitly calls `Foo.__getitem__`
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __getitem__(self, x: str): ...
+  |         ^^^^^^^^^^^ Method defined here
+  |
 ```
 
 ## Enum complement as overloaded `__getitem__` receiver
@@ -154,8 +327,26 @@ class Identity:
         return index
 
 a = Identity()
-# error: [invalid-argument-type] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with key of type `Literal["a"]` on object of type `Identity`"
+# snapshot: invalid-argument-type
 a["a"]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | a["a"]
+  | -^^^^^
+  | | |
+  | | Expected `int`, got object of type `Literal["a"]`
+  | Has type `Identity`
+  |
+info: This subscript expression implicitly calls `Identity.__getitem__`
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __getitem__(self, index: int) -> int:
+  |         ^^^^^^^^^^^ Method defined here
+  |
 ```
 
 ## `__setitem__` with no `__getitem__`

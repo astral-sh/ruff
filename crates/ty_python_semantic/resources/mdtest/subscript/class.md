@@ -5,8 +5,44 @@
 ```py
 class NotSubscriptable: ...
 
-# error: "Cannot subscript object of type `<class 'NotSubscriptable'>` with no `__class_getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `<class 'NotSubscriptable'>` with no `__class_getitem__` method"
+NotSubscriptable[0]
+
+# snapshot: not-subscriptable
 a = NotSubscriptable[0]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript object of type `<class 'NotSubscriptable'>` with no `__class_getitem__` method
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | a = NotSubscriptable[0]
+  |     ^^^^^^^^^^^^^^^^^^^
+  |
+```
+
+## Class getitem not callable
+
+```py
+class NotSubscriptable:
+    __class_getitem__ = None
+
+# snapshot: not-subscriptable
+a = NotSubscriptable[0]
+```
+
+```snapshot
+error[not-subscriptable]: Invalid subscript read
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | a = NotSubscriptable[0]
+  |     ----------------^^^
+  |     |                |
+  |     |                Method `__class_getitem__` has type `None | Unknown`
+  |     |                An object of type `None | Unknown` may not be callable
+  |     Has type `<class 'NotSubscriptable'>`
+  |
+info: `__class_getitem__` is implicitly called due to this subscript expression
 ```
 
 ## Class getitem
@@ -41,6 +77,117 @@ def _(flag: bool):
     reveal_type(UnionClassGetItem[0])  # revealed: str | int
 ```
 
+## Class getitem with too many parameters
+
+```py
+class Foo:
+    def __class_getitem__(cls, x, y): ...
+
+# error: [missing-argument] "No argument provided for required parameter `y` of bound method `Foo.__class_getitem__`"
+Foo["x"]
+
+Foo["x"]  # snapshot: missing-argument
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `y` of bound method `Foo.__class_getitem__`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | Foo["x"]  # snapshot: missing-argument
+  | ^^^^^^^^
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:35
+  |
+2 |     def __class_getitem__(cls, x, y): ...
+  |                                   ^
+  |
+```
+
+## Class getitem with too few parameters
+
+```py
+class Foo:
+    def __class_getitem__(cls): ...
+
+Foo["x"]  # snapshot: too-many-positional-arguments
+```
+
+```snapshot
+error[too-many-positional-arguments]: Too many positional arguments to bound method `Foo.__class_getitem__`: expected 1, got 2
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | Foo["x"]  # snapshot: too-many-positional-arguments
+  | ^^^^^^^^
+  |
+info: Method signature here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __class_getitem__(cls): ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
+
+## Overloaded bad class getitem
+
+```py
+from typing import overload
+
+class Foo:
+    @overload
+    def __class_getitem__(cls, x: int): ...
+    @overload
+    def __class_getitem__(cls, x: str, y): ...
+    def __class_getitem__(cls, x, y=None): ...
+
+Foo["foo"]  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `Foo.__class_getitem__` is incorrect
+  --> src/mdtest_snippet.py:10:1
+   |
+10 | Foo["foo"]  # snapshot: invalid-argument-type
+   | ^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Matching overload defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __class_getitem__(cls, x: int): ...
+  |         ^^^^^^^^^^^^^^^^^      ------ Parameter declared here
+  |
+info: Non-matching overloads for bound method `__class_getitem__`:
+info:   (cls, x: str, y) -> Unknown
+```
+
+## Class getitem with invalid index argument
+
+```py
+class Identity:
+    def __class_getitem__(cls, index: int) -> int:
+        return index
+
+Identity["a"]  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | Identity["a"]  # snapshot: invalid-argument-type
+  | --------^^^^^
+  | |        |
+  | |        Expected `int`, got object of type `Literal["a"]`
+  | Has type `<class 'Identity'>`
+  |
+info: This subscript expression implicitly calls `<class 'Identity'>.__class_getitem__`
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __class_getitem__(cls, index: int) -> int:
+  |         ^^^^^^^^^^^^^^^^^ Method defined here
+  |
+```
+
 ## Class getitem with class union
 
 ```py
@@ -59,6 +206,62 @@ def _(flag: bool):
     reveal_type(x[0])  # revealed: str | int
 ```
 
+## Union of bad class getitem methods
+
+```py
+class Foo:
+    def __class_getitem__(cls, x: str): ...
+
+class Bar:
+    def __class_getitem__(cls, x: str): ...
+
+def test(flag: bool):
+    x = Foo if flag else Bar
+
+    # error: [invalid-argument-type] "Cannot subscript an object of type `<class 'Bar'>` with a key of type `Literal[42]` (expected `str`)"
+    # error: [invalid-argument-type] "Cannot subscript an object of type `<class 'Foo'>` with a key of type `Literal[42]` (expected `str`)"
+    x[42]
+
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
+    x[42]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+  --> src/mdtest_snippet.py:16:5
+   |
+16 |     x[42]
+   |     -^^^^
+   |     | |
+   |     | Expected `str`, got object of type `Literal[42]`
+   |     Has type `<class 'Foo'> | <class 'Bar'>`
+   |
+info: This subscript expression implicitly calls `<class 'Bar'>.__class_getitem__`
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __class_getitem__(cls, x: str): ...
+  |         ^^^^^^^^^^^^^^^^^ Method defined here
+  |
+
+
+error[invalid-argument-type]: Invalid subscript read
+  --> src/mdtest_snippet.py:16:5
+   |
+16 |     x[42]
+   |     -^^^^
+   |     | |
+   |     | Expected `str`, got object of type `Literal[42]`
+   |     Has type `<class 'Foo'> | <class 'Bar'>`
+   |
+info: This subscript expression implicitly calls `<class 'Foo'>.__class_getitem__`
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __class_getitem__(cls, x: str): ...
+  |         ^^^^^^^^^^^^^^^^^ Method defined here
+  |
+```
+
 ## Class getitem with unbound method union
 
 ```py
@@ -71,9 +274,18 @@ def _(flag: bool):
     else:
         class Spam: ...
 
-    # error: [not-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
+    # snapshot: not-subscriptable
     # revealed: str | Unknown
     reveal_type(Spam[42])
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method
+  --> src/mdtest_snippet.py:12:17
+   |
+12 |     reveal_type(Spam[42])
+   |                 ^^^^^^^^
+   |
 ```
 
 ## Class getitem non-class union

@@ -95,7 +95,31 @@ def f(x: LiteralString):
 
 ```py
 def invalid_slice_bounds(s: str, start: float, end: float) -> str:
-    return s[start:end]  # error: [invalid-argument-type]
+    return s[start:end]  # snapshot: invalid-argument-type
 
 "foo"["bar":"baz"]  # error: [invalid-argument-type]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+ --> src/mdtest_snippet.py:2:12
+  |
+2 |     return s[start:end]  # snapshot: invalid-argument-type
+  |            -^^^^^^^^^^^
+  |            | |
+  |            | Expected `SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]`, got object of type `slice[int | float, int | float, None]`
+  |            Has type `str`
+  |
+info: This subscript expression implicitly calls `str.__getitem__`
+info: First overload defined here
+    --> stdlib/builtins.pyi:1466:5
+     |
+1466 | /     @overload
+1467 | |     def __getitem__(self: LiteralString, key: SupportsIndex | slice[SupportsIndex | None], /) -> LiteralString:
+1468 | |         """Return self[key]."""
+     | |_______________________________^ First overload defined here
+     |
+info: Possible overloads for bound method `__getitem__`:
+info:   (self: LiteralString, key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> LiteralString
+info:   (self, key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str
 ```
