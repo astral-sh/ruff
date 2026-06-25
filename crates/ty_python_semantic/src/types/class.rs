@@ -2491,12 +2491,13 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(
-                            db,
-                            class
-                                .own_class_member(db, inherited_generic_context, name)
-                                .inner,
-                        )
+                        let member = class.own_class_member(db, inherited_generic_context, name);
+                        let member = if policy.require_runtime_bound() {
+                            member.require_runtime_bound(db)
+                        } else {
+                            member
+                        };
+                        lookup_error.or_fall_back_to(db, member.inner)
                     });
                 }
                 ClassBase::TypedDict(module) => {

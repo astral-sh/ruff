@@ -1,21 +1,20 @@
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ty_python_core::Truthiness;
 use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
     SequencePatternPredicateKind,
 };
-use ty_python_core::{Truthiness, use_def_map};
 
 use crate::Db;
-use crate::place::{DefinedPlace, Place, place_from_bindings};
+use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
+    MemberLookupPolicy, Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
     TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
@@ -301,7 +300,14 @@ pub(crate) enum ClassPatternPositionalSource {
 /// authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly absent
 /// `__match_args__` enables match-self behavior.
 fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
-    match Type::ClassLiteral(class).member(db, "__match_args__").place {
+    match Type::ClassLiteral(class)
+        .member_lookup_with_policy(
+            db,
+            "__match_args__".into(),
+            MemberLookupPolicy::REQUIRE_RUNTIME_BOUND,
+        )
+        .place
+    {
         Place::Defined(
             place @ DefinedPlace {
                 ty,
@@ -310,49 +316,17 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
                 ..
             },
         ) => {
-            if origin.is_declared()
-                && let Some(definition) = provenance.definition()
-                && {
-                    let file = definition.file(db);
-                    let module = parsed_module(db, file).load(db);
-                    !definition
-                        .kind(db)
-                        .category(file.is_stub(db), &module)
-                        .is_binding()
-                }
-            {
-                let binding_place =
-                    definition
-                        .place(db)
-                        .as_symbol()
-                        .map_or(Place::Undefined, |symbol_id| {
-                            place_from_bindings(
-                                db,
-                                use_def_map(db, definition.scope(db))
-                                    .end_of_scope_symbol_bindings(symbol_id),
-                            )
-                            .place
-                        });
-                match binding_place {
-                    Place::Defined(binding) if binding.is_definitely_defined() => {
-                        ClassMatchArgs::Defined(ty)
-                    }
-                    Place::Defined(_) => ClassMatchArgs::PossiblyUndefined(ty),
-                    Place::Undefined => ClassMatchArgs::Undefined,
-                }
+            let ty = if origin.is_declared() {
+                ty
             } else {
-                let ty = if origin.is_declared() {
-                    ty
-                } else {
-                    provenance
-                        .definition()
-                        .map_or(ty, |definition| binding_type(db, definition))
-                };
-                if place.is_definitely_defined() {
-                    ClassMatchArgs::Defined(ty)
-                } else {
-                    ClassMatchArgs::PossiblyUndefined(ty)
-                }
+                provenance
+                    .definition()
+                    .map_or(ty, |definition| binding_type(db, definition))
+            };
+            if place.is_definitely_defined() {
+                ClassMatchArgs::Defined(ty)
+            } else {
+                ClassMatchArgs::PossiblyUndefined(ty)
             }
         }
         Place::Undefined => ClassMatchArgs::Undefined,

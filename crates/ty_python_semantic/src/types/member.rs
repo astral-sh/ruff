@@ -1,10 +1,12 @@
+use ruff_db::parsed::parsed_module;
+use ty_python_core::{place_table, scope::ScopeId, use_def_map};
+
 use crate::Db;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
-    place_by_id, place_from_bindings,
+    TypeOrigin, place_by_id, place_from_bindings,
 };
 use crate::types::Type;
-use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
@@ -49,6 +51,61 @@ impl<'db> Member<'db> {
             inner: self.inner.map_type(f),
         }
     }
+
+    /// Require a runtime binding for a declared member.
+    pub(super) fn require_runtime_bound(self, db: &'db dyn Db) -> Self {
+        let Place::Defined(
+            declared @ DefinedPlace {
+                origin: TypeOrigin::Declared,
+                provenance,
+                ..
+            },
+        ) = self.inner.place
+        else {
+            return self;
+        };
+        let Some(definition) = provenance.definition() else {
+            return self;
+        };
+        if definition_is_runtime_binding(db, definition) {
+            return self;
+        }
+
+        let binding_place =
+            definition
+                .place(db)
+                .as_symbol()
+                .map_or(Place::Undefined, |symbol_id| {
+                    place_from_bindings(
+                        db,
+                        use_def_map(db, definition.scope(db))
+                            .end_of_scope_symbol_bindings(symbol_id),
+                    )
+                    .place
+                });
+        let place = match binding_place {
+            Place::Defined(binding) => Place::Defined(DefinedPlace {
+                definedness: binding.definedness,
+                ..declared
+            }),
+            Place::Undefined => Place::Undefined,
+        };
+        Self {
+            inner: place.with_qualifiers(self.inner.qualifiers),
+        }
+    }
+}
+
+fn definition_is_runtime_binding(
+    db: &dyn Db,
+    definition: ty_python_core::definition::Definition,
+) -> bool {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    definition
+        .kind(db)
+        .category(file.is_stub(db), &module)
+        .is_binding()
 }
 
 /// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given

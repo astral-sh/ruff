@@ -295,6 +295,33 @@ def describe(source: SourceModel, split: SplitModel, stub: StubModel) -> None:
             pass
 ```
 
+## Annotation-only `__match_args__` falls back
+
+```py
+from typing import Literal
+
+class Base:
+    __match_args__ = ("value",)
+
+class Derived(Base):
+    __match_args__: tuple[Literal["value"]]
+
+class Meta(type):
+    __match_args__ = ("value",)
+
+class FromMeta(metaclass=Meta):
+    __match_args__: tuple[Literal["value"]]
+
+def describe(derived: Derived, from_meta: FromMeta) -> None:
+    match derived:
+        case Derived(_):
+            pass
+
+    match from_meta:
+        case FromMeta(_):
+            pass
+```
+
 ## Dataclass with `match_args=False`
 
 ```python

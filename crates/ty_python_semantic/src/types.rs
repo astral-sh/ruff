@@ -482,6 +482,9 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
+
+        /// Ignore source declarations that do not create a runtime binding.
+        const REQUIRE_RUNTIME_BOUND = 1 << 6;
     }
 }
 
@@ -518,6 +521,11 @@ impl MemberLookupPolicy {
     /// Ignore members that are only available through a dynamic type.
     pub(crate) const fn require_concrete(self) -> bool {
         self.contains(Self::REQUIRE_CONCRETE)
+    }
+
+    /// Ignore source declarations that do not create a runtime binding.
+    pub(crate) const fn require_runtime_bound(self) -> bool {
+        self.contains(Self::REQUIRE_RUNTIME_BOUND)
     }
 }
 
@@ -2808,7 +2816,14 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
             _ => self.to_class_type(db),
         };
-        let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
+        let own_class_attr = own_class.map(|class| {
+            let member = class.own_class_member(db, None, name);
+            if policy.require_runtime_bound() {
+                member.require_runtime_bound(db).inner
+            } else {
+                member.inner
+            }
+        });
 
         // A definitely-declared attribute in this class's own namespace is the contract for
         // values populated by metaclass initialization, analogous to a declared instance
