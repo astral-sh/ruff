@@ -127,8 +127,11 @@ impl<'db> ComparisonResult<'db> {
         }
     }
 
-    /// Discard builtin return-type information that may be refined by expression inference.
-    fn discard_boolean_result(self) -> Self {
+    /// Defer ambiguous result-type inference to expression inference.
+    ///
+    /// Definite comparison results are preserved; only the knowledge that an ambiguous result is a
+    /// builtin `bool` is discarded.
+    fn defer(self) -> Self {
         match self {
             ComparisonResult::AmbiguousBoolean => ComparisonResult::Ambiguous,
             result => result,
@@ -479,12 +482,12 @@ fn evaluate_comparison_once<'db>(
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => evaluator
                 .evaluate(constraints.as_type(db), other, branch, operator)
-                .discard_boolean_result(),
+                .defer(),
         },
         (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => evaluator
                 .evaluate(other, constraints.as_type(db), branch, operator)
-                .discard_boolean_result(),
+                .defer(),
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
 
@@ -1046,8 +1049,7 @@ fn evaluate_intersection_left<'db>(
             positive
                 .iter()
                 .map(|element| evaluator.evaluate(*element, other, branch, operator)),
-        )
-        .discard_boolean_result();
+        );
     }
 
     let db = evaluator.db;
