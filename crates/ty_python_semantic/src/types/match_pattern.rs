@@ -6,14 +6,15 @@ use ty_python_core::predicate::{
 };
 
 use crate::Db;
+use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    CallableType, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
-    Parameters, Signature, SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
-    infer_same_file_expression_type,
+    CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
+    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext, UnionType, binding_type,
+    equality_truthiness, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -196,13 +197,160 @@ fn class_pattern_is_exhaustive(
         return true;
     }
 
-    if !kind.positional_irrefutable {
+    if !kind.keywords.iter().all(|keyword| {
+        member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
+    }) {
         return false;
     }
 
-    kind.keywords.iter().all(|keyword| {
-        member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
-    })
+    let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
+    kind.positional
+        .iter()
+        .zip(positional_sources)
+        .all(|(pattern, source)| match source {
+            ClassPatternPositionalSource::MatchSelf => {
+                pattern_is_exhaustive_for_subject(db, pattern, subject_ty)
+            }
+            ClassPatternPositionalSource::Attribute(name) => {
+                member_pattern_is_exhaustive(db, subject_ty, name.as_str(), pattern)
+            }
+            ClassPatternPositionalSource::Unknown => false,
+        })
+}
+
+/// The static lookup result for a pattern class's `__match_args__` member.
+///
+/// `PossiblyUndefined` is distinct from `Undefined` because a conditional definition can take
+/// precedence over match-self behavior at runtime, so that behavior cannot be assumed.
+enum ClassMatchArgs<'db> {
+    /// The class and its metaclass hierarchy do not define `__match_args__`.
+    Undefined,
+    /// `__match_args__` is definitely bound with this type.
+    Defined(Type<'db>),
+    /// `__match_args__` is defined along some control-flow paths but not others.
+    PossiblyUndefined,
+}
+
+/// The value supplied to one positional subpattern in a class pattern.
+enum ClassPatternPositionalSource {
+    /// The complete subject, as used by Python's special built-in class patterns.
+    MatchSelf,
+    /// The named attribute extracted from the subject according to `__match_args__`.
+    Attribute(Name),
+    /// No value source can be determined statically, so the subpattern is not exhaustive.
+    Unknown,
+}
+
+/// Resolve `__match_args__` through the pattern class, including its metaclass.
+///
+/// Inferred assignments retain their literal binding type, while an explicit annotation remains
+/// authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly absent
+/// `__match_args__` enables match-self behavior.
+fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
+    match Type::ClassLiteral(class).member(db, "__match_args__").place {
+        Place::Defined(
+            place @ DefinedPlace {
+                ty,
+                origin,
+                provenance,
+                ..
+            },
+        ) if place.is_definitely_defined() => ClassMatchArgs::Defined(if origin.is_declared() {
+            ty
+        } else {
+            provenance
+                .definition()
+                .map_or(ty, |definition| binding_type(db, definition))
+        }),
+        Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
+        Place::Undefined => ClassMatchArgs::Undefined,
+    }
+}
+
+/// Return whether `class` inherits Python's special match-self class-pattern behavior.
+///
+/// Callers must first establish that `__match_args__` is statically absent. A definite definition
+/// overrides match-self behavior, while a conditional definition makes it runtime-dependent;
+/// neither case should consult this flag.
+fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|base| {
+            matches!(
+                base.class_literal(db).known(db),
+                Some(
+                    KnownClass::Bool
+                        | KnownClass::Bytearray
+                        | KnownClass::Bytes
+                        | KnownClass::Dict
+                        | KnownClass::Float
+                        | KnownClass::FrozenSet
+                        | KnownClass::Int
+                        | KnownClass::List
+                        | KnownClass::Set
+                        | KnownClass::Str
+                        | KnownClass::Tuple
+                )
+            )
+        })
+}
+
+/// Resolve the value supplied to each positional subpattern, preserving source order and length.
+///
+/// A fixed tuple of string literals in `__match_args__` maps positions to subject attributes.
+/// Python's special built-in classes map only the first position to the complete subject. Missing,
+/// extra, widened, or conditionally defined positions resolve to
+/// [`ClassPatternPositionalSource::Unknown`].
+///
+/// ```python
+/// class Point:
+///     __match_args__ = ("x",)
+///     x: int
+///
+/// match point:
+///     case Point(_):  # The positional subpattern receives `point.x`.
+///         pass
+///
+/// match number:
+///     case int(_):  # The positional subpattern receives `number` itself.
+///         pass
+/// ```
+fn class_pattern_positional_sources(
+    db: &dyn Db,
+    class: ClassLiteral<'_>,
+    positional_count: usize,
+) -> Vec<ClassPatternPositionalSource> {
+    let fixed = match class_match_args_type(db, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+            return (0..positional_count)
+                .map(|index| {
+                    if index == 0 {
+                        ClassPatternPositionalSource::MatchSelf
+                    } else {
+                        ClassPatternPositionalSource::Unknown
+                    }
+                })
+                .collect();
+        }
+        ClassMatchArgs::Defined(match_args) => match_args
+            .exact_tuple_instance_spec(db)
+            .and_then(|tuple| tuple.as_fixed_length().cloned()),
+        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
+    };
+
+    (0..positional_count)
+        .map(|index| {
+            fixed
+                .as_ref()
+                .and_then(|tuple| tuple.elements_slice().get(index))
+                .and_then(|ty| ty.as_string_literal())
+                .map(|literal| {
+                    ClassPatternPositionalSource::Attribute(Name::new(literal.value(db)))
+                })
+                .unwrap_or(ClassPatternPositionalSource::Unknown)
+        })
+        .collect()
 }
 
 /// Return whether `name` is definitely bound and `pattern` consumes its entire static member type.

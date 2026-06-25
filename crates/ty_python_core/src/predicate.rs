@@ -192,7 +192,6 @@ impl<'db> SequencePatternPredicateKind<'db> {
 pub struct ClassPatternPredicateKind<'db> {
     pub class: Expression<'db>,
     pub positional: Box<[PatternPredicateKind<'db>]>,
-    pub positional_irrefutable: bool,
     pub keywords: Box<[ClassPatternKeywordPredicateKind<'db>]>,
 }
 

@@ -2050,11 +2050,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .iter()
                         .map(|pattern| self.predicate_kind(pattern))
                         .collect(),
-                    positional_irrefutable: pattern
-                        .arguments
-                        .patterns
-                        .iter()
-                        .all(ast::Pattern::is_irrefutable),
                     keywords: pattern
                         .arguments
                         .keywords
