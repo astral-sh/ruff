@@ -171,6 +171,9 @@ Settings: Settings {
             globs: [],
         },
     },
+    semantics: SemanticSettings {
+        isinstance_narrowing: Strict,
+    },
     overrides: [],
 }
 
