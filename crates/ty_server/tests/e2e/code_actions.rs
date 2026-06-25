@@ -190,7 +190,7 @@ x: Literal[1] = 1
     let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
     let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
 
-    assert_eq!(code_actions.as_ref().map(Vec::len), Some(2));
+    insta::assert_json_snapshot!(code_actions);
 
     Ok(())
 }

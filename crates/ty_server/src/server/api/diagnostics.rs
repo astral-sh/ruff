@@ -58,9 +58,10 @@ impl Diagnostics {
         if client_capabilities.supports_full_diagnostic_output() {
             // The rendered output includes source snippets that aren't part of the raw diagnostic.
             // Hash each referenced file's source once so that source-only changes invalidate the
-            // result without eagerly rendering every diagnostic. Hashing the entire file is
-            // deliberately conservative: an edit outside the rendered context can cause a full
-            // report, but an edit inside it can never leave stale rendered output on the client.
+            // result without eagerly rendering every diagnostic.
+            // TODO: Hash only the source snippets used by the rendered output. Hashing the entire
+            // file is deliberately conservative: an edit outside the rendered context can cause a
+            // full report, but an edit inside it can never leave stale rendered output on the client.
             let mut hashed_files = FxHashSet::default();
 
             for diagnostic in diagnostics {
