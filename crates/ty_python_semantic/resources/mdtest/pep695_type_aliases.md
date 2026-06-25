@@ -583,6 +583,52 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Generic self-recursive aliases with deeper specializations
+
+Regression test for <https://github.com/astral-sh/ty/issues/3452>.
+
+A recursive alias may refer to itself with a more deeply nested specialization. This should still
+terminate and preserve the alias at the recursive position.
+
+```py
+from typing import Callable, Concatenate
+
+type RecursiveParamspec[**P] = Callable[[], RecursiveParamspec[Concatenate[int, P]]]
+
+def paramspec_alias(func: RecursiveParamspec):
+    reveal_type(func)  # revealed: () -> RecursiveParamspec[(...)]
+
+type RecursiveCallable[T] = Callable[[RecursiveCallable[T]], RecursiveCallable[T | RecursiveCallable[T]]]
+
+def callable_alias(x: RecursiveCallable[int]):
+    reveal_type(x)  # revealed: (RecursiveCallable[int], /) -> RecursiveCallable[int]
+
+type GrowingList[T] = list[GrowingList[T | GrowingList[T]]]
+
+def growing_list(x: GrowingList[int]):
+    reveal_type(x)  # revealed: list[GrowingList[int]]
+
+type GrowingCallable[T] = Callable[[], GrowingCallable[T | GrowingCallable[T]] | None]
+
+def growing_callable(x: GrowingCallable[int]):
+    reveal_type(x())  # revealed: (() -> GrowingCallable[int] | None) | None
+```
+
+Non-growing recursive aliases should continue to preserve distinct specializations.
+
+```py
+type StableRecursiveList[T] = T | list[StableRecursiveList[T]]
+
+def stable_recursive_list(x: StableRecursiveList[int]):
+    reveal_type(x)  # revealed: int | list[StableRecursiveList[int]]
+
+type StableWrapped[T] = list[StableWrapped[T]]
+
+def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
+    reveal_type(x)  # revealed: list[StableWrapped[int]]
+    reveal_type(y)  # revealed: list[StableWrapped[str]]
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py

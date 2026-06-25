@@ -52,7 +52,18 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_function_specialization(db, self.raw_value_type(db))
+        let raw = self.raw_value_type(db);
+        // Normalize self-references before specialization so `A[list[T]]` does not keep
+        // spawning deeper aliases while computing the value type for `A[T]`.
+        let folded_raw = raw.apply_type_mapping_impl(
+            db,
+            &TypeMapping::CollapseSelfAlias {
+                definition: self.definition(db),
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        self.apply_function_specialization(db, folded_raw)
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.

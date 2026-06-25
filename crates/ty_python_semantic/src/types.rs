@@ -6307,6 +6307,12 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
+                    TypeMapping::CollapseSelfAlias { definition } if alias.definition(db) == *definition => {
+                        Type::TypeAlias(alias.apply_specialization(db, |generic_context| {
+                            generic_context.identity_specialization(db)
+                        }))
+                    }
+                    TypeMapping::CollapseSelfAlias { .. } => self,
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
@@ -6377,6 +6383,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::CollapseSelfAlias { .. } |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
@@ -6393,6 +6400,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::CollapseSelfAlias { .. } |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -7451,6 +7459,11 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+    /// Collapse recursive references to a PEP 695 alias back to that alias's identity specialization.
+    ///
+    /// This keeps recursive alias specialization finite without introducing a recursive type wrapper:
+    /// `type A[T] = A[list[T]]` is treated as though the recursive occurrence were `A[T]`.
+    CollapseSelfAlias { definition: Definition<'db> },
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -7498,6 +7511,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::CollapseSelfAlias { .. }
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7544,6 +7558,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::CollapseSelfAlias { .. }
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
