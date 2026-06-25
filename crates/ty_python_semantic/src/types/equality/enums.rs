@@ -20,6 +20,8 @@ use super::{
 ///
 /// Any narrowing constraint produced here contains only enum-membership facts. In particular,
 /// equality never transfers gradual or nominal intersection state from one operand to the other.
+/// Same-class domains compare compact member sets directly, while comparisons spanning multiple
+/// classes project their members onto runtime comparison keys.
 pub(super) fn evaluate_enum_domains<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
@@ -27,50 +29,16 @@ pub(super) fn evaluate_enum_domains<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    EnumDomainComparison::from_types(db, target, other, operator)?.evaluate(db, branch, operator)
-}
-
-/// A comparison of one or more enum domains, using the narrowest applicable representation.
-enum EnumDomainComparison<'db> {
-    SameClass(SameEnumComparison<'db>),
-    Projected(ProjectedEnumComparison<'db>),
-}
-
-impl<'db> EnumDomainComparison<'db> {
-    fn from_types(
-        db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
-        operator: ComparisonOperator,
-    ) -> Option<Self> {
-        let left = EnumDomainSet::from_type(db, left)?;
-        let right = EnumDomainSet::from_type(db, right)?;
-        if let (Some(left), Some(right)) = (left.single(), right.single())
-            && left.enum_class == right.enum_class
-        {
-            return Some(Self::SameClass(SameEnumComparison::new(
-                db,
-                left.clone(),
-                right.clone(),
-                operator,
-            )));
-        }
-        Some(Self::Projected(ProjectedEnumComparison::new(
-            db, left, &right, operator,
-        )?))
+    let target = EnumDomainSet::from_type(db, target)?;
+    let other = EnumDomainSet::from_type(db, other)?;
+    if let (Some(target), Some(other)) = (target.single(), other.single())
+        && target.enum_class == other.enum_class
+    {
+        return SameEnumComparison::new(db, target.clone(), other.clone(), operator)
+            .evaluate(db, branch, operator);
     }
 
-    fn evaluate(
-        &self,
-        db: &'db dyn Db,
-        branch: ComparisonBranch,
-        operator: ComparisonOperator,
-    ) -> Option<ComparisonResult<'db>> {
-        match self {
-            Self::SameClass(comparison) => comparison.evaluate(db, branch, operator),
-            Self::Projected(comparison) => comparison.evaluate(db, branch, operator),
-        }
-    }
+    ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, branch, operator)
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
