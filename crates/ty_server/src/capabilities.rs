@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
+        const COLOR_DIAGNOSTIC_OUTPUT = 1 << 21;
     }
 }
 
@@ -180,6 +181,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::FULL_DIAGNOSTIC_OUTPUT)
     }
 
+    /// Returns `true` if the client supports ANSI color and styling in fully rendered diagnostics.
+    pub(crate) const fn supports_color_diagnostic_output(self) -> bool {
+        self.contains(Self::COLOR_DIAGNOSTIC_OUTPUT)
+    }
+
     /// Returns `true` if the client supports "label details" in completion items.
     pub(crate) const fn supports_completion_item_label_details(self) -> bool {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
@@ -258,12 +264,23 @@ impl ResolvedClientCapabilities {
         if client_capabilities
             .experimental
             .as_ref()
-            // Protocol: crates/ty_server/README.md#full-diagnostic-output
+            // Protocol: https://docs.astral.sh/ty/features/language-server/#full-diagnostic-output
             .and_then(|experimental| experimental.get("fullDiagnosticOutput"))
             .and_then(serde_json::Value::as_bool)
             .unwrap_or_default()
         {
             flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            // Protocol: https://docs.astral.sh/ty/features/language-server/#colored-diagnostic-output
+            .and_then(|experimental| experimental.get("colorDiagnosticOutput"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default()
+        {
+            flags |= Self::COLOR_DIAGNOSTIC_OUTPUT;
         }
 
         if text_document

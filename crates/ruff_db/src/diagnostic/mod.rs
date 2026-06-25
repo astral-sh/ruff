@@ -1395,6 +1395,10 @@ pub struct DisplayDiagnosticConfig {
     ///
     /// Disabled by default.
     color: bool,
+    /// Whether to emit hyperlinks in colored diagnostic output when the environment supports them.
+    ///
+    /// Enabled by default.
+    hyperlinks: bool,
     /// Whether to anonymize line numbers in full diagnostic output.
     ///
     /// Disabled by default.
@@ -1438,6 +1442,7 @@ impl DisplayDiagnosticConfig {
             program,
             format: DiagnosticFormat::default(),
             color: false,
+            hyperlinks: true,
             anonymized_line_numbers: false,
             context: 2,
             merge_window: 2,
@@ -1458,6 +1463,14 @@ impl DisplayDiagnosticConfig {
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { color: yes, ..self }
+    }
+
+    /// Whether to emit hyperlinks in colored diagnostic output when the environment supports them.
+    pub fn hyperlinks(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            hyperlinks: yes,
+            ..self
+        }
     }
 
     /// Whether to anonymize line numbers in full diagnostic output.

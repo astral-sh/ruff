@@ -118,6 +118,11 @@ impl DiagnosticStylesheet {
         }
     }
 
+    pub(super) fn hyperlinks(mut self, yes: bool) -> Self {
+        self.hyperlink &= yes;
+        self
+    }
+
     pub fn plain() -> Self {
         Self {
             error: Style::new(),

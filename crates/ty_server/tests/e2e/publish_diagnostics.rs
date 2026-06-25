@@ -63,6 +63,52 @@ def foo() -> str:
     Ok(())
 }
 
+#[test]
+fn colored_full_diagnostic_output() -> Result<()> {
+    const CHILD_PROCESS: &str = "TY_TEST_COLORED_FULL_DIAGNOSTIC_OUTPUT_CHILD";
+
+    if std::env::var_os(CHILD_PROCESS).is_none() {
+        // Hyperlink detection reads process-wide environment variables. Re-run this test in a
+        // child process so forcing hyperlink support cannot race with other tests.
+        let status = std::process::Command::new(
+            std::env::current_exe().context("Failed to locate the e2e test binary")?,
+        )
+        .args([
+            "--exact",
+            "publish_diagnostics::colored_full_diagnostic_output",
+        ])
+        .env(CHILD_PROCESS, "1")
+        .env("FORCE_HYPERLINK", "1")
+        .status()
+        .context("Failed to run colored diagnostic test in a child process")?;
+
+        anyhow::ensure!(status.success(), "Child test failed with {status}");
+        return Ok(());
+    }
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_colored_full_diagnostic_output()
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
 /// Tests that we get diagnostics for a file that is NOT saved to
 /// disk when using `OpenFilesOnly` diagnostic mode.
 #[test]
