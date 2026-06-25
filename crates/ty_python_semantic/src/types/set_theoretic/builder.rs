@@ -1054,22 +1054,19 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // Exact empty and non-empty refinements partition an exact collection.
-            if ty.is_exact_instance()
-                && element_type.is_exact_instance()
-                && matches!(
-                    (
-                        ty.exact_collection_cardinality(self.db),
-                        element_type.exact_collection_cardinality(self.db)
-                    ),
-                    (
-                        Some(CollectionCardinality::Empty),
-                        Some(CollectionCardinality::NonEmpty)
-                    ) | (
-                        Some(CollectionCardinality::NonEmpty),
-                        Some(CollectionCardinality::Empty)
-                    )
+            if matches!(
+                (
+                    ty.exact_collection_cardinality(self.db),
+                    element_type.exact_collection_cardinality(self.db)
+                ),
+                (
+                    Some(CollectionCardinality::Empty),
+                    Some(CollectionCardinality::NonEmpty)
+                ) | (
+                    Some(CollectionCardinality::NonEmpty),
+                    Some(CollectionCardinality::Empty)
                 )
-            {
+            ) {
                 let widened = ty.forget_own_collection_cardinality(self.db);
                 if widened == element_type.forget_own_collection_cardinality(self.db) {
                     to_remove.push(i);

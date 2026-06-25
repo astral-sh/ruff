@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{Signature, Type, TypeContext};
+use super::{NominalInstanceType, Signature, Type, TypeContext};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -31,7 +31,15 @@ impl<'db> Type<'db> {
                 .ok()
                 .map(|bindings| {
                     let result = bindings.return_type(db).forget_collection_cardinality(db);
-                    Type::refine_exact_builtin_binary_result(db, left_ty, op, right_ty, result)
+                    if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
+                        (left_ty, right_ty)
+                        && left.is_exact()
+                        && right.is_exact()
+                    {
+                        Type::refine_exact_builtin_binary_result(db, left, op, right, result)
+                    } else {
+                        result
+                    }
                 })
         }
 
@@ -40,9 +48,9 @@ impl<'db> Type<'db> {
 
     fn refine_exact_builtin_binary_result(
         db: &'db dyn Db,
-        left_ty: Type<'db>,
+        left: NominalInstanceType<'db>,
         op: ast::Operator,
-        right_ty: Type<'db>,
+        right: NominalInstanceType<'db>,
         result: Type<'db>,
     ) -> Type<'db> {
         fn concatenated_cardinality(
@@ -62,12 +70,11 @@ impl<'db> Type<'db> {
 
         let exact_cardinalities = |known_class| {
             Some((
-                left_ty
-                    .is_exact_instance_of(db, known_class)
-                    .then(|| left_ty.exact_collection_cardinality(db))??,
-                right_ty
-                    .is_exact_instance_of(db, known_class)
-                    .then(|| right_ty.exact_collection_cardinality(db))??,
+                left.has_known_class(db, known_class)
+                    .then(|| left.exact_collection_cardinality(db))??,
+                right
+                    .has_known_class(db, known_class)
+                    .then(|| right.exact_collection_cardinality(db))??,
             ))
         };
 

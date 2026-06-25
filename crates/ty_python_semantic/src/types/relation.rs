@@ -1075,6 +1075,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, source, target.forget_exactness(db));
         }
 
+        // Exactness only imposes an additional constraint on a nominal relation when the target is
+        // also exact. Otherwise, delegate through the same nominal specialization without the
+        // runtime-class refinement. This restores the ordinary reflexivity fast path for the
+        // common case of a list or set literal flowing into its inferred or declared instance type.
+        if let (Type::NominalInstance(source_instance), Type::NominalInstance(target_instance)) =
+            (source, target)
+            && source_instance.is_exact()
+            && !target_instance.is_exact()
+        {
+            return self.check_type_pair(db, source.forget_exactness(db), target);
+        }
+
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
         if self.relation == TypeRelation::SubtypingAssuming
