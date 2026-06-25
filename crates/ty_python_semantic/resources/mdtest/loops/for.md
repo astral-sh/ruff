@@ -66,6 +66,26 @@ for from_count in range(count):
 reveal_type(from_count)  # revealed: int
 ```
 
+The emptiness refinement is independent of the order in which range values are assigned:
+
+```py
+def empty_first(flag: bool) -> None:
+    value = range(0)
+    if flag:
+        value = range(1)
+
+    if value:
+        reveal_type(value)  # revealed: range
+
+def non_empty_first(flag: bool) -> None:
+    value = range(1)
+    if flag:
+        value = range(0)
+
+    if value:
+        reveal_type(value)  # revealed: range
+```
+
 ## With shadowed `range`
 
 ```py

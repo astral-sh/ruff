@@ -22,6 +22,17 @@ static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
+## Statically empty and non-empty ranges
+
+```py
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+static_assert(is_disjoint_from(TypeOf[range(0)], TypeOf[range(1)]))
+static_assert(is_disjoint_from(TypeOf[range(1)], TypeOf[range(0)]))
+static_assert(not is_disjoint_from(TypeOf[range(0)], range))
+static_assert(not is_disjoint_from(TypeOf[range(1)], range))
+```
+
 ## Enum complements
 
 ```pyi

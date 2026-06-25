@@ -42,6 +42,7 @@ str(b"", errors="replace")
 
 ```py
 reveal_type(list(range(3)))  # revealed: list[int]
+reveal_type([range(0)])  # revealed: list[range]
 
 class Uop:
     replicated = range(0)

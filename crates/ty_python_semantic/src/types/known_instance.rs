@@ -5,8 +5,9 @@ use crate::{
     Db, DisplaySettings,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
+        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
+        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
+        TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -408,6 +409,12 @@ impl<'db> KnownInstanceType<'db> {
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::Range { .. } => match type_mapping {
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
+                    self.instance_fallback(db)
+                }
+                _ => Type::KnownInstance(self),
+            },
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
@@ -420,7 +427,6 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::SubscriptedGeneric(_)
             | KnownInstanceType::TypeAliasType(_)
             | KnownInstanceType::Deprecated(_)
-            | KnownInstanceType::Range { .. }
             | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
             | KnownInstanceType::GenericContext(_)

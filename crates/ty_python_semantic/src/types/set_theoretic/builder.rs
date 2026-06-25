@@ -41,8 +41,8 @@ use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
-    SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
+    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -1034,6 +1034,21 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if !self.cycle_recovery && should_preserve_hashable_union(self.db, ty, element_type) {
+                continue;
+            }
+
+            // The empty and non-empty range refinements are disjoint, but together they cover
+            // the ordinary `range` instance type.
+            if let (
+                Type::KnownInstance(KnownInstanceType::Range { is_non_empty: left }),
+                Type::KnownInstance(KnownInstanceType::Range {
+                    is_non_empty: right,
+                }),
+            ) = (ty, element_type)
+                && left != right
+            {
+                to_remove.push(i);
+                ty = KnownClass::Range.to_instance(self.db);
                 continue;
             }
 
