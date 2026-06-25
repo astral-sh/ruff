@@ -17,8 +17,9 @@ def append_int(*args: *Ts) -> tuple[*Ts, int]:
 
     return (*args, 1)
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
+# TODO should be tuple[Literal[True], Literal["a"], int]
 reveal_type(append_int(True, "a"))  # revealed: tuple[*tuple[Unknown, ...], int]
+# TODO should be tuple[int]
 reveal_type(append_int())  # revealed: tuple[*tuple[Unknown, ...], int]
 
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
