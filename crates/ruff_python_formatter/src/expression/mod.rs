@@ -4,7 +4,7 @@ use std::slice;
 use ruff_formatter::{
     FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions, write,
 };
-use ruff_python_ast::parenthesize::parentheses_iterator;
+use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
@@ -212,13 +212,8 @@ fn format_with_parentheses_comments(
     //     )
     // )
     // ```
-    let range_with_parens = parentheses_iterator(
-        expression.into(),
-        None,
-        f.context().comments().ranges(),
-        f.context().source(),
-    )
-    .last();
+    let range_with_parens =
+        parentheses_iterator(expression.into(), None, f.context().tokens()).last();
 
     let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
         let leading_split = node_comments

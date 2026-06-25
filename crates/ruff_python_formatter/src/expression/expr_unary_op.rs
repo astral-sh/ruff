@@ -1,7 +1,7 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::comments::trailing_comments;
@@ -106,12 +106,8 @@ impl NeedsParentheses for ExprUnaryOp {
 /// operand and thus requires parentheses.
 fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
     let comments = context.comments();
-    let parenthesized_operand_range = parenthesized_range(
-        item.operand.as_ref().into(),
-        item.into(),
-        comments.ranges(),
-        context.source(),
-    );
+    let parenthesized_operand_range =
+        parenthesized_range(item.operand.as_ref().into(), item.into(), context.tokens());
     let leading_operand_comments = comments.leading(item.operand.as_ref());
     let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
         leading_operand_comments
