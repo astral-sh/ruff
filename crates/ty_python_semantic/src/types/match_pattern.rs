@@ -451,6 +451,9 @@ fn match_args_positional_result<'db>(
 
     if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
         let tuple = tuple.as_fixed_length()?;
+        if positional_count > tuple.len() {
+            return Some(ClassPatternPositionalResult::Limit(tuple.len()));
+        }
         if let Some(index) = tuple
             .elements_slice()
             .iter()

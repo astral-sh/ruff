@@ -120,6 +120,19 @@ def describe_enum(value: EnumArgs) -> None:
             pass
 ```
 
+## Positional overflow before invalid elements
+
+```py
+class OverflowFirst:
+    __match_args__ = (1,)
+
+def describe(value: OverflowFirst) -> None:
+    match value:
+        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'OverflowFirst'>`: expected 1, got 2"
+        case OverflowFirst(_, _):
+            pass
+```
+
 ## Alternate finite `__match_args__` limits
 
 ```py
