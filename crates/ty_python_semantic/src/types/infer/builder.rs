@@ -22,11 +22,12 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
-    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
-    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -52,16 +53,17 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
-    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_match_args_type, report_invalid_type_checking_constant,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_bad_dunder_set_call,
+    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_match_args_type,
+    report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -462,11 +464,96 @@ impl<'db> ExpressionCache<'db> {
     }
 }
 
+/// The mutable inference state captured by an expression-cache miss.
+///
+/// Unlike [`ExpressionInference`], this is not a Salsa result. Keep its collections in the forms
+/// used by [`TypeInferenceBuilder`] so creating a short-lived cache entry does not sort, compact,
+/// or reallocate them.
+struct ReplayableExpressionInference<'db> {
+    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    bindings: VecMap<Definition<'db>, Type<'db>>,
+    diagnostics: TypeCheckDiagnostics,
+    called_functions: FxIndexSet<FunctionType<'db>>,
+    cycle_recovery: Option<Type<'db>>,
+    #[cfg(debug_assertions)]
+    scope: ScopeId<'db>,
+}
+
+impl<'db> ReplayableExpressionInference<'db> {
+    fn expression_type(&self, expression: ExpressionNodeKey) -> Type<'db> {
+        self.expressions
+            .get(&expression)
+            .copied()
+            .or(self.cycle_recovery)
+            .unwrap_or_else(Type::unknown)
+    }
+
+    fn contains_only_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
+        self.expressions.len() == 1
+            && self.expressions.get(&expression) == Some(&ty)
+            && self.type_expression_flags.is_empty()
+            && self.collection_use_constraints.is_empty()
+            && self.string_annotations.is_empty()
+            && self.expected_types.is_empty()
+            && self.bindings.is_empty()
+            && self.diagnostics.is_empty()
+            && self.called_functions.is_empty()
+            && self.cycle_recovery.is_none()
+    }
+
+    fn into_expression_inference(
+        mut self,
+        region: InferenceRegion<'db>,
+    ) -> ExpressionInference<'db> {
+        let extra = (!self.string_annotations.is_empty()
+            || !self.type_expression_flags.is_empty()
+            || !self.collection_use_constraints.is_empty()
+            || !self.expected_types.is_empty()
+            || self.cycle_recovery.is_some()
+            || !self.bindings.is_empty()
+            || !self.called_functions.is_empty()
+            || !self.diagnostics.is_empty())
+        .then(|| {
+            if self.bindings.len() > 20 {
+                tracing::debug!(
+                    "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                    region,
+                    self.bindings.len()
+                );
+            }
+
+            self.collection_use_constraints.shrink_to_fit();
+            self.diagnostics.shrink_to_fit();
+            Box::new(ExpressionInferenceExtra {
+                string_annotations: FrozenSet::from(self.string_annotations),
+                expected_types: FrozenMap::from(self.expected_types),
+                type_expression_flags: FrozenMap::from(self.type_expression_flags),
+                bindings: self.bindings.into_boxed_slice(),
+                diagnostics: self.diagnostics,
+                called_functions: self.called_functions.into_iter().collect(),
+                cycle_recovery: self.cycle_recovery,
+                collection_use_constraints: self.collection_use_constraints,
+            })
+        });
+
+        ExpressionInference {
+            expressions: FrozenMap::from(self.expressions),
+            extra,
+            #[cfg(debug_assertions)]
+            scope: self.scope,
+        }
+    }
+}
+
 #[derive(Clone)]
 enum ReplayableExpression<'db> {
     /// A compact snapshot for an expression whose only inference effect is its root type.
     Type(Type<'db>),
-    Inference(Rc<ExpressionInference<'db>>),
+    Inference(Rc<ReplayableExpressionInference<'db>>),
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -710,6 +797,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings.extend(extra.bindings.iter().copied());
             }
+        }
+    }
+
+    fn extend_replayable_expression(&mut self, inference: &ReplayableExpressionInference<'db>) {
+        #[cfg(debug_assertions)]
+        assert_eq!(self.scope, inference.scope);
+
+        self.expressions
+            .extend(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.context.extend(&inference.diagnostics);
+        self.extend_cycle_recovery(inference.cycle_recovery);
+        self.called_functions
+            .extend(inference.called_functions.iter().copied());
+        self.string_annotations
+            .extend(inference.string_annotations.iter().copied());
+        self.expected_types
+            .extend(inference.expected_types.iter().map(|(key, ty)| (*key, *ty)));
+        self.type_expression_flags.extend(
+            inference
+                .type_expression_flags
+                .iter()
+                .map(|(key, flags)| (*key, *flags)),
+        );
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "constraints for distinct collection definitions are merged independently"
+        )]
+        for (collection_def, constraints) in &inference.collection_use_constraints {
+            self.collection_use_constraints
+                .entry(*collection_def)
+                .and_modify(|this| this.extend(constraints))
+                .or_insert(constraints.clone());
+        }
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            self.bindings.extend(
+                inference
+                    .bindings
+                    .iter()
+                    .map(|(definition, ty)| (*definition, *ty)),
+            );
         }
     }
 
@@ -6633,8 +6762,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let cached_ty = match cached {
                 ReplayableExpression::Type(ty) => ty,
                 ReplayableExpression::Inference(inference) => {
-                    let ty = inference.expression_type(expression);
-                    self.extend_expression(&inference);
+                    let ty = inference.expression_type(expression_key);
+                    self.extend_replayable_expression(&inference);
                     let replayed_root = self.expressions.remove(&expression_key);
                     debug_assert_eq!(replayed_root, Some(ty));
                     ty
@@ -6659,16 +6788,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut speculative_builder = self.speculate();
         let ty = speculative_builder.infer_expression_uncached(expression, inference_tcx);
-        let inference = speculative_builder.into_expression_inference();
-        let cached = if inference.extra.is_none()
-            && inference.expressions.iter().len() == 1
-            && inference.expressions.get(&expression_key) == Some(&ty)
-        {
+        let inference = speculative_builder.into_replayable_expression_inference();
+        let cached = if inference.contains_only_expression(expression_key, ty) {
             self.store_expression_type(expression, ty);
             ReplayableExpression::Type(ty)
         } else {
             let inference = Rc::new(inference);
-            self.extend_expression(&inference);
+            self.extend_replayable_expression(&inference);
             ReplayableExpression::Inference(inference)
         };
 
@@ -11442,12 +11568,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Consume the results already collected by this builder without inferring its region.
     fn into_expression_inference(self) -> ExpressionInference<'db> {
+        let region = self.region;
+        self.into_replayable_expression_inference()
+            .into_expression_inference(region)
+    }
+
+    /// Consume the results already collected by this builder without compacting them.
+    fn into_replayable_expression_inference(self) -> ReplayableExpressionInference<'db> {
         let Self {
             context,
             expressions,
             qualifiers: _,
             type_expression_flags,
-            mut collection_use_constraints,
+            collection_use_constraints,
             string_annotations,
             expected_types,
             scope,
@@ -11472,7 +11605,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
         } = self;
 
-        let diagnostics = context.finish();
+        let diagnostics = context.finish_unshrunk();
         let _ = scope;
 
         assert!(
@@ -11484,39 +11617,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Expression region can't have deferred definitions"
         );
 
-        let extra =
-            (!string_annotations.is_empty()
-                || !type_expression_flags.is_empty()
-                || !collection_use_constraints.is_empty()
-                || !expected_types.is_empty()
-                || cycle_recovery.is_some()
-                || !bindings.is_empty()
-                || !called_functions.is_empty()
-                || !diagnostics.is_empty()).then(|| {
-                if bindings.len() > 20 {
-                    tracing::debug!(
-                        "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
-                        self.region,
-                        bindings.len()
-                    );
-                }
-
-                collection_use_constraints.shrink_to_fit();
-                Box::new(ExpressionInferenceExtra {
-                    string_annotations: FrozenSet::from(string_annotations),
-                    expected_types: FrozenMap::from(expected_types),
-                    type_expression_flags: FrozenMap::from(type_expression_flags),
-                    bindings: bindings.into_boxed_slice(),
-                    diagnostics,
-                    called_functions: called_functions.into_iter().collect(),
-                    cycle_recovery,
-                    collection_use_constraints,
-                })
-            });
-
-        ExpressionInference {
-            expressions: FrozenMap::from(expressions),
-            extra,
+        ReplayableExpressionInference {
+            expressions,
+            type_expression_flags,
+            collection_use_constraints,
+            string_annotations,
+            expected_types,
+            bindings,
+            diagnostics,
+            called_functions,
+            cycle_recovery,
             #[cfg(debug_assertions)]
             scope,
         }
