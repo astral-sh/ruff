@@ -6043,7 +6043,8 @@ impl<'db> Type<'db> {
     ///
     /// For most types, this is equivalent to the meta type of this type. For `TypedDict` types,
     /// this returns `type[dict[str, object]]` instead, because inhabitants of a `TypedDict` are
-    /// instances of `dict` at runtime.
+    /// instances of `dict` at runtime. For module literals, this returns `type[ModuleType]`
+    /// because a module can replace its runtime class with a `ModuleType` subclass.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
         if self.is_typed_dict() {
@@ -6052,6 +6053,10 @@ impl<'db> Type<'db> {
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
+        }
+
+        if matches!(self, Type::ModuleLiteral(_)) {
+            return KnownClass::ModuleType.to_subclass_of(db);
         }
 
         if let Type::NominalInstance(instance) = self

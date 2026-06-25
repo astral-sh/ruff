@@ -2611,13 +2611,14 @@ def _(obj: Immutable) -> None:
 ## Objects of all types have a `__class__` method
 
 The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as
-`type(x)`.
+`type(x)`. A module is represented as `type[ModuleType]` because it can replace its runtime class
+with a `ModuleType` subclass.
 
 ```py
 import typing_extensions
 
-reveal_type(typing_extensions.__class__)  # revealed: <class 'ModuleType'>
-reveal_type(type(typing_extensions))  # revealed: <class 'ModuleType'>
+reveal_type(typing_extensions.__class__)  # revealed: type[ModuleType]
+reveal_type(type(typing_extensions))  # revealed: type[ModuleType]
 
 a = 42
 reveal_type(a.__class__)  # revealed: <class 'int'>

@@ -423,6 +423,34 @@ def _(x: Literal[1, True, "one"]):
         reveal_type(x)  # revealed: Literal[True, "one"]
 ```
 
+## Module literals with custom runtime classes
+
+A module can replace its runtime class with a subclass of `types.ModuleType`. Its module-literal
+type must therefore remain compatible with exact-class narrowing to that subclass.
+
+`custom_module.py`:
+
+```py
+import sys
+from types import ModuleType
+
+class CustomModule(ModuleType): ...
+
+sys.modules[__name__].__class__ = CustomModule
+```
+
+`check.py`:
+
+```py
+import custom_module
+from custom_module import CustomModule
+
+reveal_type(custom_module)  # revealed: <module 'custom_module'>
+
+if type(custom_module) is CustomModule:
+    reveal_type(custom_module)  # revealed: <module 'custom_module'> & CustomModule
+```
+
 ## Assignment expressions
 
 ```py
