@@ -253,6 +253,30 @@ fn comparison_truthiness<'db>(
     }
 }
 
+/// Selects how recursive comparison results are combined.
+///
+/// The goal is only an optimization; both modes use the same comparison semantics and agree on
+/// which results are definite. [`Constraint`](Self::Constraint) preserves branch-specific narrowing
+/// for the left operand. [`Truthiness`](Self::Truthiness) can discard those constraints because its
+/// caller only needs to know whether every expanded alternative agrees, and can stop as soon as the
+/// comparison cannot be definite.
+///
+/// For example, truthiness evaluation proves that this comparison is always false by checking the
+/// finite alternatives on both sides, without constructing a narrowing constraint:
+///
+/// ```python
+/// from enum import Enum
+/// from typing import Literal
+///
+/// class Choice(Enum):
+///     A = 1
+///     B = 2
+///     C = 3
+///     D = 4
+///
+/// def compare(left: Literal[Choice.A, Choice.B], right: Literal[Choice.C, Choice.D]):
+///     reveal_type(left == right)  # Literal[False]
+/// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ComparisonGoal {
     Constraint,
@@ -309,8 +333,10 @@ impl<'db> ComparisonEvaluator<'db> {
     ///         reveal_type(x)  # Any & ~EQUAL_VALUES
     /// ```
     ///
-    /// `branch` selects the branch whose constraint is accumulated when either operand expands
-    /// into multiple alternatives. Re-entering an active comparison conservatively returns an
+    /// In [`ComparisonGoal::Constraint`] mode, `branch` selects the branch whose constraint is
+    /// accumulated when either operand expands into multiple alternatives. In
+    /// [`ComparisonGoal::Truthiness`] mode, expansion instead requires every alternative to agree
+    /// on the comparison result. Re-entering an active comparison conservatively returns an
     /// ambiguous result instead of recursing indefinitely.
     fn evaluate(
         &mut self,
