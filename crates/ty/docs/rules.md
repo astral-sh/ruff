@@ -4086,7 +4086,7 @@ false positives it can produce.
 
 
 ```python
-for i in range(0):
+for i in range(int(input())):
     x = i
 
 # NameError: name 'x' is not defined

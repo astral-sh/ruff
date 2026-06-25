@@ -129,6 +129,11 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
+    /// Whether an iterable is statically known to yield at least one item.
+    ///
+    /// Currently, this predicate is only emitted for direct `range(...)` calls. It is resolved
+    /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
+    IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
