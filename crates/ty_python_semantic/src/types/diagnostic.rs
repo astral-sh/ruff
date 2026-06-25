@@ -2532,7 +2532,7 @@ pub(crate) fn report_invalid_match_args_element<T: Ranged>(
     };
     let class_display = cls_ty.display(context.db());
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "`__match_args__` element {element_index} for `{class_display}` is not a string"
+        "`__match_args__` element {element_index} for `{class_display}` is not an exact string"
     ));
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }

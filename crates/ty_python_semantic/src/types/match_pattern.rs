@@ -455,7 +455,7 @@ fn match_args_positional_result<'db>(
             .elements_slice()
             .iter()
             .take(positional_count)
-            .position(|element| element.is_disjoint_from(db, KnownClass::Str.to_instance(db)))
+            .position(|element| match_args_element_is_not_exact_string(db, *element))
         {
             Some(ClassPatternPositionalResult::InvalidElement(index))
         } else {
@@ -467,6 +467,31 @@ fn match_args_positional_result<'db>(
         Some(ClassPatternPositionalResult::InvalidType(match_args))
     } else {
         None
+    }
+}
+
+fn match_args_element_is_not_exact_string(db: &dyn Db, element: Type<'_>) -> bool {
+    let element = element.resolve_type_alias(db);
+    if let Type::Union(union) = element {
+        return union
+            .elements(db)
+            .iter()
+            .all(|element| match_args_element_is_not_exact_string(db, *element));
+    }
+
+    let str_instance = KnownClass::Str.to_instance(db);
+    match element {
+        Type::NominalInstance(_) => {
+            element.is_subtype_of(db, str_instance) && !element.is_instance_of(db, KnownClass::Str)
+        }
+        Type::LiteralValue(literal) => {
+            literal.as_enum().is_some_and(|enum_literal| {
+                enum_literal
+                    .enum_class_instance(db)
+                    .is_subtype_of(db, str_instance)
+            }) || element.is_disjoint_from(db, str_instance)
+        }
+        _ => element.is_disjoint_from(db, str_instance),
     }
 }
 

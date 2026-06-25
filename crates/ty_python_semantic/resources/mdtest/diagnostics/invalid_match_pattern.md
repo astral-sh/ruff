@@ -88,6 +88,38 @@ def describe_two(value: LaterInvalid) -> None:
             pass
 ```
 
+## Non-exact-string `__match_args__` elements
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum
+
+class StringSubclass(str): ...
+
+class Field(StrEnum):
+    VALUE = "value"
+
+class SubclassArgs:
+    __match_args__ = (StringSubclass("value"),)
+
+class EnumArgs:
+    __match_args__ = (Field.VALUE,)
+
+def describe_subclass(value: SubclassArgs) -> None:
+    match value:
+        case SubclassArgs(_):  # error: [invalid-match-pattern] "not an exact string"
+            pass
+
+def describe_enum(value: EnumArgs) -> None:
+    match value:
+        case EnumArgs(_):  # error: [invalid-match-pattern] "not an exact string"
+            pass
+```
+
 ## Alternate finite `__match_args__` limits
 
 ```py
