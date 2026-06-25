@@ -62,6 +62,32 @@ def describe(p: Point) -> None:
             pass
 ```
 
+## Non-string `__match_args__` elements
+
+```py
+class FirstInvalid:
+    __match_args__ = (1,)
+
+class LaterInvalid:
+    __match_args__ = ("value", 1)
+    value: int = 0
+
+def describe_first(value: FirstInvalid) -> None:
+    match value:
+        case FirstInvalid(_):  # error: [invalid-match-pattern]
+            pass
+
+def describe_one(value: LaterInvalid) -> None:
+    match value:
+        case LaterInvalid(_):
+            pass
+
+def describe_two(value: LaterInvalid) -> None:
+    match value:
+        case LaterInvalid(_, _):  # error: [invalid-match-pattern]
+            pass
+```
+
 ## Unknown `__match_args__` tuple length (no error)
 
 ```py

@@ -12,7 +12,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
-use crate::types::tuple::{FixedLengthTuple, TupleType};
+use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
@@ -365,25 +365,48 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         })
 }
 
-/// Return the maximum number of positional subpatterns accepted by `class`.
+/// The statically known result of validating positional subpatterns for a class pattern.
+pub(crate) enum ClassPatternPositionalResult {
+    /// The maximum number of positional subpatterns accepted by the class.
+    Limit(usize),
+    /// The zero-based index of a consumed `__match_args__` element that is not a string.
+    InvalidElement(usize),
+}
+
+/// Validate the positional subpatterns accepted by `class`.
 ///
-/// `None` means that the limit cannot be determined statically, as for a valid variable-length
+/// `None` means that the result cannot be determined statically, as for a valid variable-length
 /// `__match_args__` tuple or a conditionally defined `__match_args__` member.
-pub(crate) fn class_pattern_positional_limit(
+pub(crate) fn class_pattern_positional_result(
     db: &dyn Db,
     class: ClassLiteral<'_>,
-) -> Option<usize> {
+    positional_count: usize,
+) -> Option<ClassPatternPositionalResult> {
     match class_match_args_type(db, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => Some(1),
-        ClassMatchArgs::Undefined => Some(0),
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+            Some(ClassPatternPositionalResult::Limit(1))
+        }
+        ClassMatchArgs::Undefined => Some(ClassPatternPositionalResult::Limit(0)),
         ClassMatchArgs::Defined(match_args) => {
             let match_args = match_args.resolve_type_alias(db);
             if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
-                tuple.as_fixed_length().map(FixedLengthTuple::len)
+                let tuple = tuple.as_fixed_length()?;
+                if let Some(index) = tuple
+                    .elements_slice()
+                    .iter()
+                    .take(positional_count)
+                    .position(|element| {
+                        element.is_disjoint_from(db, KnownClass::Str.to_instance(db))
+                    })
+                {
+                    Some(ClassPatternPositionalResult::InvalidElement(index))
+                } else {
+                    Some(ClassPatternPositionalResult::Limit(tuple.len()))
+                }
             } else if match_args.tuple_instance_spec(db).is_some()
                 || match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
             {
-                Some(0)
+                Some(ClassPatternPositionalResult::Limit(0))
             } else {
                 None
             }
