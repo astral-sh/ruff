@@ -5214,10 +5214,25 @@ fn narrow_with_present_key<'db>(
         Type::Union(union) => union.map(db, env, |element| {
             narrow_with_present_key(db, env, *element, key)
         }),
+        resolved if closed_typeddict_excludes_key(db, resolved, key) => Type::Never,
         resolved if is_mapping_subtype(db, env, resolved) => {
             constrain(ty, mapping_present_key_protocol(db, env, key))
         }
         _ => constrain(ty, key_membership_contains_protocol(db, env, key)),
+    }
+}
+
+/// Return whether a closed `TypedDict` in `ty` rules out `key`.
+fn closed_typeddict_excludes_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::TypedDict(typed_dict) => {
+            typed_dict.openness(db).is_closed() && !typed_dict.items(db).contains_key(key)
+        }
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| closed_typeddict_excludes_key(db, *element, key)),
+        _ => false,
     }
 }
 
