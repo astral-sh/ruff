@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.15.20
+
+Released on 2026-06-25.
+
+### Preview features
+
+- Allow human-readable names in rule selectors ([#25887](https://github.com/astral-sh/ruff/pull/25887))
+- Emit a warning instead of an error for unknown rule selectors ([#26113](https://github.com/astral-sh/ruff/pull/26113))
+- Match `noqa` shebang handling in `ruff:ignore` comments ([#26286](https://github.com/astral-sh/ruff/pull/26286))
+- \[`ruff`\] Remove `pytest-fixture-autouse` (`RUF076`) ([#26240](https://github.com/astral-sh/ruff/pull/26240), [#26371](https://github.com/astral-sh/ruff/pull/26371))
+
+### Documentation
+
+- Add versioning sections to custom crate READMEs ([#26317](https://github.com/astral-sh/ruff/pull/26317))
+- Update `ruff_python_parser` README for crates.io ([#26315](https://github.com/astral-sh/ruff/pull/26315))
+- \[`perflint`\] Clarify that `PERF402` applies to any iterable ([#26242](https://github.com/astral-sh/ruff/pull/26242))
+
+### Contributors
+
+- [@dhruvmanila](https://github.com/dhruvmanila)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@ntBre](https://github.com/ntBre)
+- [@trilamsr](https://github.com/trilamsr)
+
 ## 0.15.19
 
 Released on 2026-06-23.
