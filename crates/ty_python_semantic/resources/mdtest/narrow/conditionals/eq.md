@@ -712,16 +712,16 @@ class ShiftedInt(int):
     def __new__(cls, value: int) -> "ShiftedInt":
         return int.__new__(cls, value + 1)
 
-class Shifted(ShiftedInt, Enum):
+class MixinShifted(ShiftedInt, Enum):
     MEMBER = 1
 
 class Normal(IntEnum):
     MEMBER = 2
 
-reveal_type(Shifted.MEMBER == Normal.MEMBER)  # revealed: bool
+reveal_type(MixinShifted.MEMBER == Normal.MEMBER)  # revealed: bool
 
-if Shifted.MEMBER == Normal.MEMBER:
-    reveal_type(Shifted.MEMBER)  # revealed: Shifted
+if MixinShifted.MEMBER == Normal.MEMBER:
+    reveal_type(MixinShifted.MEMBER)  # revealed: MixinShifted
 ```
 
 The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
