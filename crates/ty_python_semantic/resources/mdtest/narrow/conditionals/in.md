@@ -145,7 +145,8 @@ def empty_bytes(x: bytes):
 ## Byte containment
 
 `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, not only the
-integers described by their iteration type. We therefore leave the subject unchanged:
+integers described by their iteration type. We therefore leave the subject unchanged in the positive
+branch:
 
 ```py
 from typing import Literal, final
@@ -161,9 +162,13 @@ class ByteIndex:
 def bytes_subsequence(value: ByteSubstring | Literal[97]) -> None:
     if value in b"abc":
         reveal_type(value)  # revealed: ByteSubstring | Literal[97]
+    else:
+        reveal_type(value)  # revealed: ByteSubstring
 
 def bytes_index(value: ByteIndex | Literal[97], values: bytes) -> None:
     if value in values:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+    else:
         reveal_type(value)  # revealed: ByteIndex | Literal[97]
 
 def bytes_union_container(
@@ -172,13 +177,19 @@ def bytes_union_container(
 ) -> None:
     if value in values:
         reveal_type(value)  # revealed: Literal[b"a", 97]
+    else:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
 
 def bytearray_index(value: ByteIndex | Literal[97], values: bytearray) -> None:
     if value in values:
         reveal_type(value)  # revealed: ByteIndex | Literal[97]
+    else:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
 
 def bytearray_subsequence(value: Literal[b"a", 97], values: bytearray) -> None:
     if value in values:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
+    else:
         reveal_type(value)  # revealed: Literal[b"a", 97]
 ```
 
