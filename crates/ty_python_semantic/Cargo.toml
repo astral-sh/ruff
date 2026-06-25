@@ -49,7 +49,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-ruff_python_parser = { workspace = true }
 test-case = { workspace = true }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }
