@@ -2115,6 +2115,19 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Resolve a converged value/place cycle with no structure to `Never`.
+    ///
+    /// A result that is exactly the bare `Divergent` marker for one of the cycle heads represents a
+    /// value defined only in terms of itself, with no base case. Keep structural cycles like
+    /// `list[Divergent]` unchanged; they are still normalized by `recursive_type_normalized`.
+    pub(crate) fn resolve_structureless_cycle_to_never(self, cycle: &salsa::Cycle) -> Self {
+        if cycle.head_ids().any(|id| self == Type::divergent(id)) {
+            Type::Never
+        } else {
+            self
+        }
+    }
+
     /// Normalizes types including divergent types (recursive types), which is necessary for convergence of fixed-point iteration.
     /// When `nested` is true, propagate `None`. That is, if the type contains a `Divergent` type, the return value of this method is `None` (so we can use the `?` operator).
     /// When `nested` is false, create a type containing `Divergent` types instead of propagating `None` (we should use `unwrap_or(Divergent)`).
@@ -2686,7 +2699,9 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            member.cycle_normalized(db, *previous, cycle)
+            member
+                .cycle_normalized(db, *previous, cycle)
+                .map_type(|ty| ty.resolve_structureless_cycle_to_never(cycle))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -3500,7 +3515,9 @@ impl<'db> Type<'db> {
         #[salsa::tracked(
             cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
-                member.cycle_normalized(db, *previous, cycle)
+                member
+                    .cycle_normalized(db, *previous, cycle)
+                    .map_type(|ty| ty.resolve_structureless_cycle_to_never(cycle))
             },
             heap_size=ruff_memory_usage::heap_size
         )]

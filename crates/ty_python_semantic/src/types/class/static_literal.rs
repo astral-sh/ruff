@@ -3227,6 +3227,7 @@ fn implicit_attribute_cycle_recover<'db>(
 ) -> Member<'db> {
     let inner = member
         .inner
-        .cycle_normalized(db, previous_member.inner, cycle);
+        .cycle_normalized(db, previous_member.inner, cycle)
+        .map_type(|ty| ty.resolve_structureless_cycle_to_never(cycle));
     Member { inner }
 }

@@ -2978,14 +2978,16 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
+If the only assignment to a name is cyclic, the attribute has no base case and no inhabitants, so we
+infer `Never`:
 
 ```py
 class D:
     def copy(self, other: "D"):
+        # error: [unresolved-attribute]
         self.x = other.x
 
-reveal_type(D().x)  # revealed: Divergent
+reveal_type(D().x)  # revealed: Never
 ```
 
 If there is an annotation for a name, we don't try to infer any type from the RHS of assignments to

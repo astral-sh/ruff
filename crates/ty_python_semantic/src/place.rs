@@ -959,7 +959,9 @@ impl<'db> PlaceAndQualifiers<'db> {
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
             // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
             (Place::Defined(prev), Place::Undefined) => {
-                if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
+                if prev.ty.is_never() {
+                    Place::Defined(prev)
+                } else if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
@@ -984,7 +986,9 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 #[salsa::tracked(
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
-        place.cycle_normalized(db, *previous, cycle)
+        place
+            .cycle_normalized(db, *previous, cycle)
+            .map_type(|ty| ty.resolve_structureless_cycle_to_never(cycle))
     },
     heap_size=ruff_memory_usage::heap_size
 )]
