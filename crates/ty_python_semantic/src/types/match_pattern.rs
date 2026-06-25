@@ -757,10 +757,12 @@ fn subject_independent_definite_match_pattern_type<'db>(
     match kind {
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class)
-                    if kind.is_empty() && !typed_dict_matches_class_pattern(db, class) =>
-                {
-                    Some(Type::instance(db, class.top_materialization(db)))
+                Type::ClassLiteral(class) if kind.is_empty() => {
+                    let class_instance_ty = Type::instance(db, class.top_materialization(db));
+                    let typed_dict_adds_runtime_matches =
+                        typed_dict_matches_class_pattern(db, class)
+                            && !Type::object().is_subtype_of(db, class_instance_ty);
+                    (!typed_dict_adds_runtime_matches).then_some(class_instance_ty)
                 }
                 Type::ClassLiteral(_) => None,
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {

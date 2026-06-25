@@ -833,7 +833,8 @@ field and every value pattern matches all values allowed for that field. The neg
 exercise three separate checks: an optional field, an unknown key, and a non-string key.
 
 ```py
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
+from ty_extensions import Unknown
 
 class RequiredPayload(TypedDict):
     tag: Literal["int"]
@@ -842,9 +843,18 @@ class RequiredPayload(TypedDict):
 class OptionalPayload(TypedDict, total=False):
     value: int
 
+class DynamicPayload(TypedDict):
+    any_value: Any
+    unknown_value: Unknown
+
 def required_typed_dict_keys_are_exhaustive(value: RequiredPayload) -> int:
     match value:
         case {"tag": "int", "value": int()}:
+            return 1
+
+def universal_nested_patterns_are_exhaustive(value: DynamicPayload) -> int:
+    match value:
+        case {"any_value": object(), "unknown_value": object()}:
             return 1
 
 def optional_key_is_not_exhaustive(
