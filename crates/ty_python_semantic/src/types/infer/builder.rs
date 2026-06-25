@@ -2457,7 +2457,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Type::ClassLiteral(class) = cls_ty {
             if class.is_typed_dict(self.db()) {
                 report_match_pattern_against_typed_dict(&self.context, &*pattern.cls, class);
-            } else if let Some(protocol_class) = class.into_protocol_class(self.db())
+                return;
+            }
+            if let Some(protocol_class) = class.into_protocol_class(self.db())
                 && !protocol_class.is_runtime_checkable(self.db())
             {
                 report_match_pattern_against_non_runtime_checkable_protocol(
@@ -2465,6 +2467,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &*pattern.cls,
                     protocol_class,
                 );
+                return;
             }
 
             let positional_patterns = &pattern.arguments.patterns;

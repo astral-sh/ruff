@@ -188,6 +188,29 @@ def two_positionals(value: int) -> None:
             pass
 ```
 
+## Invalid pattern classes do not cascade
+
+```python
+from typing import Protocol, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class HasValue(Protocol):
+    value: int
+
+def describe(value: object) -> None:
+    match value:
+        # error: [isinstance-against-typed-dict]
+        case Payload(_):
+            pass
+
+    match value:
+        # error: [isinstance-against-protocol]
+        case HasValue(_):
+            pass
+```
+
 ## Dataclass with kw_only=True
 
 ```python
