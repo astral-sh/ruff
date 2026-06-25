@@ -298,7 +298,8 @@ def non_empty_break() -> None:
     reveal_type(value)  # revealed: Literal["body"]
 ```
 
-Starred elements and dictionary unpacking make emptiness ambiguous:
+Starred elements and dictionary unpacking make emptiness ambiguous unless the literal also contains
+a required element:
 
 ```py
 def _(items: list[int], mapping: dict[str, int]):
@@ -315,6 +316,16 @@ def _(items: list[int], mapping: dict[str, int]):
     # revealed: str
     # error: [possibly-unresolved-reference]
     reveal_type(key)
+
+    for item in [*items, 1]:
+        pass
+
+    reveal_type(item)  # revealed: int
+
+    for key in {**mapping, "c": 2}:
+        pass
+
+    reveal_type(key)  # revealed: str
 ```
 
 ## With literal list
