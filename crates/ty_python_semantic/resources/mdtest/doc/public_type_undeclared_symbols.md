@@ -21,6 +21,112 @@ class Counter:
 reveal_type(Counter().value)  # revealed: int
 ```
 
+Class literals stored in inferred attributes are widened when accessed through an instance. A
+subclass can override an undeclared class attribute, so a method that accesses the attribute through
+`self` cannot assume that it still holds the original class object. Direct access on a specific
+class object remains exact:
+
+```py
+from typing import Final, NewType, TypeVar, final
+from typing_extensions import assert_never
+
+class Response: ...
+class HtmlResponse(Response): ...
+
+class TestResponse:
+    response_class = Response
+    response_classes = (Response,)
+
+    def check(self) -> None:
+        reveal_type(self.response_class)  # revealed: type[Response]
+        reveal_type(self.response_classes)  # revealed: tuple[type[Response]]
+
+class TestHtmlResponse(TestResponse):
+    response_class = HtmlResponse
+
+reveal_type(TestResponse.response_class)  # revealed: <class 'Response'>
+reveal_type(TestResponse.response_classes)  # revealed: tuple[<class 'Response'>]
+
+def check_type(response: type[TestResponse]) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+T = TypeVar("T", bound=TestResponse)
+
+def check_typevar(response: T) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+TClass = TypeVar("TClass", bound=type[TestResponse])
+
+def check_typevar_class(response: TClass) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+@final
+class FinalTestResponse:
+    response_class = Response
+
+    @classmethod
+    def check(cls) -> None:
+        if cls.response_class is not Response:
+            assert_never(cls.response_class)
+
+TFinal = TypeVar("TFinal", bound=FinalTestResponse)
+
+def check_final_typevar(response: type[TFinal]) -> None:
+    reveal_type(response.response_class)  # revealed: <class 'Response'>
+
+NewTestResponse = NewType("NewTestResponse", TestResponse)
+
+def check_newtype(response: NewTestResponse) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+class ResponseMeta(type):
+    response_class = Response
+
+NewResponseMeta = NewType("NewResponseMeta", ResponseMeta)
+
+def check_newtype_class(response: NewResponseMeta) -> None:
+    reveal_type(response.response_class)  # revealed: type[Response]
+
+class AnnotatedResponse:
+    response_class: type[Response] = Response
+
+    def check(self) -> None:
+        reveal_type(self.response_class)  # revealed: type[Response]
+
+class FixedResponse:
+    response_class: Final = Response
+
+    def check(self) -> None:
+        reveal_type(self.response_class)  # revealed: <class 'Response'>
+```
+
+The same widening applies to undeclared instance attributes assigned in methods:
+
+```py
+class InstanceResponse: ...
+
+class Wrapper:
+    def __init__(self) -> None:
+        self.response_class = InstanceResponse
+
+reveal_type(Wrapper().response_class)  # revealed: type[InstanceResponse]
+```
+
+Widening distributes over unions of class literals:
+
+```py
+class UnionA: ...
+class UnionB: ...
+
+def get_flag() -> bool:
+    return bool()
+
+class EitherClass:
+    value = UnionA if get_flag() else UnionB
+
+reveal_type(EitherClass().value)  # revealed: type[UnionA | UnionB]
+```
+
 ## Widening of non-literal singleton types
 
 It's similarly unlikely that an unannotated attribute initialized to a singleton type (like `None`)

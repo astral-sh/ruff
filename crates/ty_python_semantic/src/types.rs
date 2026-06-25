@@ -2063,6 +2063,19 @@ impl<'db> Type<'db> {
         self.promote_singletons_impl(db)
     }
 
+    /// Promote class literals to the class objects represented by `type[...]`.
+    ///
+    /// This is intentionally separate from regular promotion. Applying it during collection
+    /// inference would lose useful precision for local and module-level collections of class
+    /// objects.
+    pub(crate) fn promote_class_literals(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly),
+            TypeContext::default(),
+        )
+    }
+
     /// Recursively promote singleton types (like `None`, `EllipsisType`) to
     /// `T | Unknown` within nominal type parameters, without recursing into unions.
     /// Used for collection literal inference so that `[None]` is inferred as
@@ -3512,6 +3525,25 @@ impl<'db> Type<'db> {
             policy: MemberLookupPolicy,
             receiver: Option<Type<'db>>,
         ) -> PlaceAndQualifiers<'db> {
+            fn promote_inferred_attribute_class_literals<'db>(
+                db: &'db dyn Db,
+                result: PlaceAndQualifiers<'db>,
+            ) -> PlaceAndQualifiers<'db> {
+                let should_promote = matches!(
+                    result.place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Inferred,
+                        ..
+                    })
+                ) && !result.qualifiers.contains(TypeQualifiers::FINAL);
+
+                if should_promote {
+                    result.map_type(|ty| ty.promote_class_literals(db))
+                } else {
+                    result
+                }
+            }
+
             fn instance_like_member_lookup<'db>(
                 db: &'db dyn Db,
                 this: Type<'db>,
@@ -3559,8 +3591,10 @@ impl<'db> Type<'db> {
                 }
 
                 let result = this.fallback_to_getattr(db, name, result, policy);
-
-                result.map_type(|ty| ty.bind_self_typevars(db, receiver))
+                // An inferred attribute accessed through an instance can resolve to an override
+                // on a subclass, so an exact class object is not a safe public type here.
+                let result = result.map_type(|ty| ty.bind_self_typevars(db, receiver));
+                promote_inferred_attribute_class_literals(db, result)
             }
 
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);
@@ -4045,6 +4079,15 @@ impl<'db> Type<'db> {
                     // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                     // lookup to hit the catch-all that only checks the meta-type (the metaclass).
                     let result = this.fallback_to_getattr(db, &name, result, policy);
+                    // Unlike a specific class literal, `type[C]` can represent any subclass of
+                    // `C`, unless a `TypeVar` upper bound normalizes to a final class.
+                    let result = if let Type::SubclassOf(subclass_of) = this
+                        && subclass_of.exact_typevar_upper_bound(db).is_none()
+                    {
+                        promote_inferred_attribute_class_literals(db, result)
+                    } else {
+                        result
+                    };
 
                     // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
                     // (which is at least `type`). Attributes resolved via `type`'s descriptors
@@ -6138,6 +6181,15 @@ impl<'db> Type<'db> {
             return self;
         }
 
+        if let Type::ClassLiteral(class) = self
+            && matches!(
+                type_mapping,
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly)
+            )
+        {
+            return SubclassOfType::from(db, class.default_specialization(db));
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -6146,7 +6198,7 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
-                    TypeMapping::Promote(PromotionMode::On, _) => {
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
                             type_mapping,
@@ -6263,9 +6315,12 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 }
-                // Promotion should remove negative contributions from intersections,
-                // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
+                // Regular promotion should remove negative contributions from intersections,
+                // so we don't preserve them here when regular promotion is enabled.
+                if !matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                ) {
                     for negative in intersection.negative(db) {
                         builder = builder.add_negative(
                             negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
@@ -6380,7 +6435,10 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
+                TypeMapping::Promote(
+                    PromotionMode::On,
+                    PromotionKind::ClassLiteralsOnly | PromotionKind::SingletonsOnly,
+                ) => self,
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
             }
 
@@ -7318,6 +7376,8 @@ impl PromotionMode {
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
+    /// Promote class literals recursively without promoting other literal types.
+    ClassLiteralsOnly,
     /// Singleton-only promotion recursively descends through nominal instances
     /// without recursing into unions or non-nominal types.
     SingletonsOnly,

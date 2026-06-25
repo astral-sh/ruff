@@ -976,11 +976,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source_subclass: SubclassOfType<'db>,
         target: Type<'db>,
     ) -> bool {
-        let is_exact_upper_bound = source_subclass.into_type_var().is_some_and(|source_i| {
-            source_i.typevar(db).upper_bound(db).and_then(|bound| {
-                SubclassOfType::try_from_instance(db, bound.resolve_type_alias(db))
-            }) == Some(target)
-        });
+        let is_exact_upper_bound = source_subclass.exact_typevar_upper_bound(db) == Some(target);
 
         (!matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_)) || is_exact_upper_bound)
             && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
