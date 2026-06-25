@@ -837,6 +837,29 @@ reveal_type(InheritedInt.FROM_INT)  # revealed: Literal[InheritedInt.FROM_BOOL]
 reveal_type(enum_members(InheritedInt))
 ```
 
+`StrEnum` validates non-string members instead of converting them with `str()`, so rejected values
+must not be normalized into aliases of valid string members:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum
+from ty_extensions import enum_members
+
+class StrictStr(StrEnum):
+    FROM_INT = 1
+    FROM_STR = "1"
+    OTHER = "other"
+
+reveal_type(StrictStr.FROM_INT.value)  # revealed: Literal[1]
+reveal_type(StrictStr.FROM_STR)  # revealed: Literal[StrictStr.FROM_STR]
+# revealed: tuple[Literal["FROM_INT"], Literal["FROM_STR"], Literal["OTHER"]]
+reveal_type(enum_members(StrictStr))
+```
+
 ### Assigned `__new__`
 
 Assigning to `__new__` can prevent us from validating members against its signature or inferring

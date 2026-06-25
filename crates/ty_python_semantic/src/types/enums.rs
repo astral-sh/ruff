@@ -1300,11 +1300,19 @@ fn inherited_user_defined_mixin_new<'db>(
         .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
 }
 
-/// Looks up a built-in data-type mixin anywhere in the MRO, including through an enum base.
+/// Looks up a built-in data-type mixin that coerces member values during construction.
+///
+/// `StrEnum.__new__` validates that values are already strings instead of applying `str()`.
 fn inherited_known_data_type_mixin<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> Option<KnownEnumDataTypeMixin> {
+    let has_str_enum_constructor = class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .any(|base| base.known(db) == Some(KnownClass::StrEnum));
+
     class
         .iter_mro(db, None)
         .skip(1)
@@ -1312,7 +1320,7 @@ fn inherited_known_data_type_mixin<'db>(
         .filter_map(|class| class.class_literal(db).as_static())
         .find_map(|base| match base.known(db) {
             Some(KnownClass::Int) => Some(KnownEnumDataTypeMixin::Int),
-            Some(KnownClass::Str) => Some(KnownEnumDataTypeMixin::Str),
+            Some(KnownClass::Str) if !has_str_enum_constructor => Some(KnownEnumDataTypeMixin::Str),
             _ => None,
         })
 }
