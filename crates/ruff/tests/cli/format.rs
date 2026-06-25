@@ -459,6 +459,69 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/18980>
+#[test]
+fn extend_exclude_cli() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+extend-exclude = ["out"]
+
+[format]
+exclude = ["test.py"]
+"#,
+        ),
+        (
+            "main.py",
+            r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+        ),
+        // Excluded by `format.exclude` from the config.
+        (
+            "test.py",
+            r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+        ),
+        // Excluded by `--extend-exclude` on the CLI.
+        (
+            "generated.py",
+            r#"NUMBERS = [
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+]
+OTHER = "OTHER"
+"#,
+        ),
+        // Excluded by `extend-exclude` from the config.
+        ("out/a.py", "a = a"),
+    ])?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args([
+            "--check",
+            "--config",
+            "ruff.toml",
+            "--extend-exclude",
+            "generated.py",
+        ])
+        .arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {
@@ -987,7 +1050,7 @@ if True:
       Cause: Failed to parse [TMP]/ruff.toml
       Cause: TOML parse error at line 1, column 1
       |
-    1 | 
+    1 |
       | ^
     unknown field `tab-size`
     ");
