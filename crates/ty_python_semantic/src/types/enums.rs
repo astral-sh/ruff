@@ -1216,7 +1216,8 @@ fn inherited_user_defined_enum_method<'db>(
         .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
 }
 
-/// Looks up a user-defined `__new__` on a data-type mixin before the first parent enum.
+/// Looks up a user-defined `__new__` on a data-type mixin anywhere in the MRO, including through an
+/// enum base.
 ///
 /// When no enum class provides a member constructor, `EnumType` uses this method to construct the
 /// scalar payload stored by the enum member.
@@ -1229,7 +1230,6 @@ fn inherited_user_defined_mixin_new<'db>(
         .skip(1)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| class.class_literal(db).as_static())
-        .take_while(|base| !is_enum_class_by_inheritance(db, *base))
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
 }

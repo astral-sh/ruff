@@ -702,6 +702,7 @@ dynamic when we cannot model the transformation:
 
 ```py
 from enum import Enum
+from ty_extensions import enum_members
 
 class OffsetInt(int):
     def __new__(cls, value: int) -> "OffsetInt":
@@ -712,6 +713,23 @@ class OffsetEnum(OffsetInt, Enum):
     INVALID = "not an int"  # error: [invalid-assignment]
 
 reveal_type(OffsetEnum.VALID.value)  # revealed: Any
+
+class WeirdInt(int):
+    def __new__(cls, value: int) -> "WeirdInt":
+        return int.__new__(cls, 100 if value is False else value)
+
+class EmptyWeirdEnum(WeirdInt, Enum):
+    pass
+
+class InheritedWeirdEnum(EmptyWeirdEnum):
+    FROM_BOOL = False
+    FROM_INT = 0
+    OTHER = 2
+
+reveal_type(InheritedWeirdEnum.FROM_BOOL.value)  # revealed: Any
+reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum.FROM_INT]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"], Literal["OTHER"]]
+reveal_type(enum_members(InheritedWeirdEnum))
 ```
 
 ### Assigned `__new__`
