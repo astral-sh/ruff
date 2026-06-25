@@ -966,6 +966,16 @@ def propagate[A, B, C, D](
 ) -> D:
     return first(second(third(source[0])))
 
+def propagate_tuple[A, B, C, D](
+    arguments: tuple[
+        Callable[[C], D],
+        Callable[[B], C],
+        Callable[[A], B],
+        list[A],
+    ],
+) -> D:
+    raise NotImplementedError
+
 def _(seed: int):
     propagated = propagate(
         contextual_identity([]),
@@ -974,6 +984,14 @@ def _(seed: int):
         [seed],
     )
     reveal_type(propagated)  # revealed: int
+
+    tuple_propagated = propagate_tuple((
+        contextual_identity([]),
+        contextual_identity([]),
+        contextual_identity([]),
+        [seed],
+    ))
+    reveal_type(tuple_propagated)  # revealed: int
 ```
 
 Deferred callable constraints can widen a specialization inferred from another argument:

@@ -5866,15 +5866,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Return-context attempts all start from the same parameter matches, so their generic
         // argument indices are identical. Compute them once for the complete call inference.
-        let (has_generic_context, mut generic_argument_indices) =
+        let (has_generic_context, generic_context_arguments) =
             bindings.generic_context_arguments(db, argument_types.len());
-        generic_argument_indices.retain(|index| !argument_types.is_variadic(*index));
+        let mut generic_fixpoint = GenericCallFixpoint::default();
+        for (index, occurrences) in generic_context_arguments {
+            if !argument_types.is_variadic(index) {
+                generic_fixpoint.argument_indices.push(index);
+                generic_fixpoint.typevar_occurrences += occurrences;
+            }
+        }
 
         // Keep one cache active across return-context narrowing attempts and the final full-context
         // attempt. If this call is itself part of multi-inference, reuse the surrounding cache so
         // deeply nested generic calls can share complete inference results.
         let teardown_expression_cache =
-            !generic_argument_indices.is_empty() && self.setup_expression_cache();
+            !generic_fixpoint.argument_indices.is_empty() && self.setup_expression_cache();
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = call_expression_tcx
@@ -5908,7 +5914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut speculative_argument_types = baseline_argument_types.clone();
 
             // Attempt to infer the argument types using the narrowed type context.
-            let checked_result = if generic_argument_indices.is_empty() {
+            let checked_result = if generic_fixpoint.argument_indices.is_empty() {
                 speculative_builder.infer_all_argument_types(
                     ast_arguments.clone(),
                     &mut speculative_argument_types,
@@ -5927,7 +5933,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut speculative_bindings,
                     &constraints,
                     narrowed_tcx,
-                    &generic_argument_indices,
+                    &generic_fixpoint,
                 )
             };
 
@@ -5992,7 +5998,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         argument_types.clone_from(&baseline_argument_types);
-        if !generic_argument_indices.is_empty() {
+        if !generic_fixpoint.argument_indices.is_empty() {
             if let Some(result) = self.infer_argument_types_to_fixpoint(
                 ast_arguments,
                 argument_types,
@@ -6000,7 +6006,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bindings,
                 &constraints,
                 call_expression_tcx,
-                &generic_argument_indices,
+                &generic_fixpoint,
             ) {
                 if teardown_expression_cache {
                     self.teardown_expression_cache();
@@ -6049,12 +6055,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
-        generic_argument_indices: &[usize],
+        generic_fixpoint: &GenericCallFixpoint,
     ) -> Option<Result<(), CallErrorKind>> {
         let db = self.db();
         let baseline_argument_types = argument_types.clone();
 
-        debug_assert!(!generic_argument_indices.is_empty());
+        debug_assert!(!generic_fixpoint.argument_indices.is_empty());
+        debug_assert!(generic_fixpoint.typevar_occurrences > 0);
 
         let mut context_argument_types = baseline_argument_types.clone();
         let mut round_inference_contexts = self.collect_call_argument_inference_contexts(
@@ -6069,7 +6076,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // The active expression cache remains shared across every round. A cache hit restores the
         // complete expression inference into whichever round is ultimately committed, including
         // any diagnostics captured by the original inference.
-        for round in 0..=generic_argument_indices.len() {
+        //
+        // The inclusive range allows the initial inference round followed by at most one
+        // propagation round per inferable type-variable occurrence.
+        for round in 0..=generic_fixpoint.typevar_occurrences {
             // Reuse both round buffers; cloning these graphs from scratch is significant for
             // overloaded and constructor calls.
             next_argument_types.clone_from(&baseline_argument_types);
@@ -6081,9 +6091,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_argument_ty,
             );
 
-            let converged = next_argument_types
-                .inferred_types_equal_at(&context_argument_types, generic_argument_indices);
-            if converged || round == generic_argument_indices.len() {
+            let converged = next_argument_types.inferred_types_equal_at(
+                &context_argument_types,
+                &generic_fixpoint.argument_indices,
+            );
+            if converged || round == generic_fixpoint.typevar_occurrences {
                 argument_types.clone_from(&next_argument_types);
                 self.extend(round_builder);
                 return None;
@@ -6104,7 +6116,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 constraints,
                 call_expression_tcx,
             );
-            if round_inference_contexts.equal_at(&next_inference_contexts, generic_argument_indices)
+            if round_inference_contexts
+                .equal_at(&next_inference_contexts, &generic_fixpoint.argument_indices)
             {
                 argument_types.clone_from(&next_argument_types);
                 self.extend(round_builder);
@@ -12084,6 +12097,17 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 /// An expression representing the function argument at the given index, along with its type
 /// context.
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
+
+/// The source arguments whose contexts participate in generic-call fixpoint inference.
+///
+/// The number of inferable type-variable occurrences provides the safety ceiling for synchronous
+/// rounds. Unlike the source-argument count, it accounts for dependency chains packaged inside a
+/// single tuple or other structural argument.
+#[derive(Default)]
+struct GenericCallFixpoint {
+    argument_indices: SmallVec<[usize; 4]>,
+    typevar_occurrences: usize,
+}
 
 /// The complete argument-inference context snapshot for one call inference round.
 ///

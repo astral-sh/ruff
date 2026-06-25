@@ -12,7 +12,7 @@ mod constructor;
 mod enum_property;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -57,15 +57,16 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, any_over_type, enums,
-    list_members,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -789,15 +790,16 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Returns whether any overload is generic and the source argument indices whose type context
-    /// can change when that generic call is specialized.
+    /// Returns whether any overload is generic and, for each source argument whose type context
+    /// can change when that generic call is specialized, the number of inferable type-variable
+    /// occurrences in its matched parameter contexts.
     pub(crate) fn generic_context_arguments(
         &self,
         db: &'db dyn Db,
         argument_count: usize,
-    ) -> (bool, SmallVec<[usize; 4]>) {
-        let mut generic_arguments = SmallVec::<[bool; 8]>::with_capacity(argument_count);
-        generic_arguments.resize(argument_count, false);
+    ) -> (bool, SmallVec<[(usize, usize); 4]>) {
+        let mut generic_arguments = SmallVec::<[usize; 8]>::with_capacity(argument_count);
+        generic_arguments.resize(argument_count, 0);
         let mut has_generic_context = false;
 
         self.visit_type_context_callables(&mut |binding| {
@@ -809,9 +811,9 @@ impl<'db> Bindings<'db> {
                 if overload.signature.generic_context.is_none() {
                     continue;
                 }
-                for (argument_index, is_generic) in generic_arguments.iter_mut().enumerate() {
-                    *is_generic |=
-                        overload.has_generic_argument_type_context(db, binding, argument_index);
+                for (argument_index, occurrences) in generic_arguments.iter_mut().enumerate() {
+                    *occurrences +=
+                        overload.generic_argument_typevar_occurrences(db, binding, argument_index);
                 }
             }
         });
@@ -821,7 +823,9 @@ impl<'db> Bindings<'db> {
             generic_arguments
                 .into_iter()
                 .enumerate()
-                .filter_map(|(index, is_generic)| is_generic.then_some(index))
+                .filter_map(|(index, occurrences)| {
+                    (occurrences > 0).then_some((index, occurrences))
+                })
                 .collect(),
         )
     }
@@ -5760,6 +5764,62 @@ fn collect_typevar_variances<'db>(
     variances
 }
 
+/// Counts occurrences of type variables from `inferable_typevars` in `ty`.
+///
+/// Type variables are counted before consulting the recursion guard so repeated occurrences of the
+/// same variable in distinct positions are retained. Their bounds and defaults are deliberately not
+/// visited: those are not part of the parameter context being applied to an argument expression.
+fn count_inferable_typevar_occurrences<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    inferable_typevars: InferableTypeVars<'db>,
+) -> usize {
+    struct InferableTypeVarOccurrenceCounter<'db> {
+        inferable_typevars: InferableTypeVars<'db>,
+        occurrences: Cell<usize>,
+        recursion_path: RefCell<SmallVec<[Type<'db>; 8]>>,
+    }
+
+    impl<'db> TypeVisitor<'db> for InferableTypeVarOccurrenceCounter<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if let Type::TypeVar(typevar) = ty {
+                let identity = if typevar.is_paramspec(db) {
+                    typevar.without_paramspec_attr(db).identity(db)
+                } else {
+                    typevar.identity(db)
+                };
+                if identity.is_inferable(db, self.inferable_typevars) {
+                    self.occurrences.set(self.occurrences.get() + 1);
+                }
+                return;
+            }
+
+            let TypeKind::NonAtomic(non_atomic_type) = TypeKind::from(ty) else {
+                return;
+            };
+            if self.recursion_path.borrow().contains(&ty) {
+                return;
+            }
+            self.recursion_path.borrow_mut().push(ty);
+            walk_non_atomic_type(db, non_atomic_type, self);
+            let popped = self.recursion_path.borrow_mut().pop();
+            debug_assert_eq!(popped, Some(ty));
+        }
+    }
+
+    let counter = InferableTypeVarOccurrenceCounter {
+        inferable_typevars,
+        occurrences: Cell::new(0),
+        recursion_path: RefCell::default(),
+    };
+    counter.visit_type(db, ty);
+    counter.occurrences.get()
+}
+
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug, Clone)]
 pub(crate) struct Binding<'db> {
@@ -5840,51 +5900,34 @@ impl<'db> Binding<'db> {
             .get(argument_index + usize::from(binding.bound_type.is_some()))
     }
 
-    /// Returns whether specializing this overload can change the type context for the given source
-    /// argument.
-    fn has_generic_argument_type_context(
+    /// Returns the number of inferable type-variable occurrences in the parameter contexts matched
+    /// to the given source argument.
+    fn generic_argument_typevar_occurrences(
         &self,
         db: &'db dyn Db,
         binding: &CallableBinding<'db>,
         argument_index: usize,
-    ) -> bool {
+    ) -> usize {
         let Some(generic_context) = self.signature.generic_context else {
-            return false;
+            return 0;
         };
         let Some(argument_match) = self.matched_argument_for_call_argument(binding, argument_index)
         else {
-            return false;
+            return 0;
         };
 
         let inferable_typevars = generic_context.inferable_typevars(db);
-        for parameter in &argument_match.parameters {
-            let parameter_type = self.signature.parameters()[parameter.index].annotated_type();
-
-            if let Type::TypeVar(typevar) = parameter_type
-                && !typevar.is_paramspec(db)
-            {
-                if typevar.identity(db).is_inferable(db, inferable_typevars) {
-                    return true;
-                }
-                continue;
-            }
-
-            if any_over_type(db, parameter_type, false, |ty| {
-                let Type::TypeVar(typevar) = ty else {
-                    return false;
-                };
-                let identity = if typevar.is_paramspec(db) {
-                    typevar.without_paramspec_attr(db).identity(db)
-                } else {
-                    typevar.identity(db)
-                };
-                identity.is_inferable(db, inferable_typevars)
-            }) {
-                return true;
-            }
-        }
-
-        false
+        argument_match
+            .parameters
+            .iter()
+            .map(|parameter| {
+                count_inferable_typevar_occurrences(
+                    db,
+                    self.signature.parameters()[parameter.index].annotated_type(),
+                    inferable_typevars,
+                )
+            })
+            .sum()
     }
 
     /// Returns source argument indices matched to the `ParamSpec` component.
