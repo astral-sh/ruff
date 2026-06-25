@@ -279,15 +279,36 @@ impl<'a> Dependency<'a> {
         };
 
         let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
-            let arguments = depends_arguments(metadata_element, semantic)?;
-
-            // Arguments to `Depends` can be empty if the dependency is a class
-            // that FastAPI will call to create an instance of the class itself.
-            // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
-            if arguments.is_empty() {
-                Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+            if let Some(arguments) = depends_arguments(metadata_element, semantic) {
+                // Arguments to `Depends` can be empty if the dependency is a class
+                // that FastAPI will call to create an instance of the class itself.
+                // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
+                if arguments.is_empty() {
+                    Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+                } else {
+                    Self::from_depends_call(arguments, semantic)
+                }
+            } else if let Expr::Name(name) = metadata_element {
+                // The metadata element is a bare name (e.g. `FindItem = Depends(find_item)`).
+                // We can't statically resolve what it wraps, so treat it as unknown to avoid
+                // false positives — unless it clearly isn't a dependency (i.e. it resolves to
+                // something other than an assignment).
+                match semantic.only_binding(name).map(|id| semantic.binding(id)) {
+                    Some(binding)
+                        if matches!(
+                            binding.kind,
+                            BindingKind::FunctionDefinition(_)
+                                | BindingKind::ClassDefinition(_)
+                                | BindingKind::Import(_)
+                                | BindingKind::FromImport(_)
+                        ) =>
+                    {
+                        None
+                    }
+                    _ => Some(Self::Unknown),
+                }
             } else {
-                Self::from_depends_call(arguments, semantic)
+                None
             }
         });
 

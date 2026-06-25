@@ -486,5 +486,6 @@ help: Add `thing_id` to function signature
 370 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
 371 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+372 |
     |
 note: This is an unsafe fix and may change runtime behavior
