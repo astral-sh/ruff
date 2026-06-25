@@ -1,5 +1,7 @@
 import type { IRange } from "monaco-editor";
-import { useCallback } from "react";
+import { type ReactNode, useCallback } from "react";
+
+const URL_PATTERN = /\bhttps?:\/\/[^\s<>"']*[^\s<>"'.,;:!?)]/g;
 
 export interface DiagnosticDetail {
   message: string;
@@ -30,7 +32,7 @@ export function DiagnosticDetailItem({
     return (
       <span>
         {severity}
-        {item.message}
+        <DiagnosticMessage>{item.message}</DiagnosticMessage>
       </span>
     );
   }
@@ -43,7 +45,7 @@ export function DiagnosticDetailItem({
   return (
     <>
       {severity}
-      {item.message}{" "}
+      <DiagnosticMessage>{item.message}</DiagnosticMessage>{" "}
       {onGoTo == null ? (
         <span className="text-gray-500">{locationLabel}</span>
       ) : (
@@ -57,4 +59,31 @@ export function DiagnosticDetailItem({
       )}
     </>
   );
+}
+
+function DiagnosticMessage({ children }: { children: string }) {
+  const parts: ReactNode[] = [];
+  let previousEnd = 0;
+
+  for (const match of children.matchAll(URL_PATTERN)) {
+    const start = match.index;
+    const url = match[0];
+
+    parts.push(children.slice(previousEnd, start));
+    parts.push(
+      <a
+        key={start}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
+      >
+        {url}
+      </a>,
+    );
+    previousEnd = start + url.length;
+  }
+
+  parts.push(children.slice(previousEnd));
+  return parts;
 }

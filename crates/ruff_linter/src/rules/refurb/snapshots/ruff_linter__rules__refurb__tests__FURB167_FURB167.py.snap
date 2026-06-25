@@ -10,14 +10,12 @@ FURB167 [*] Use of regular expression alias `re.I`
 14 |         pass
    |
 help: Replace with `re.IGNORECASE`
-10 |     import re
-11 |
+   |
 12 |     # FURB167
    -     if re.search("^hello", "hello world", re.I):
 13 +     if re.search("^hello", "hello world", re.IGNORECASE):
 14 |         pass
-15 |
-16 |
+   |
 
 FURB167 [*] Use of regular expression alias `re.I`
   --> FURB167.py:21:40
@@ -28,14 +26,12 @@ FURB167 [*] Use of regular expression alias `re.I`
 22 |         pass
    |
 help: Replace with `re.IGNORECASE`
+   |
 1  + import re
 2  | def func():
-3  |     import re
-4  |
 --------------------------------------------------------------------------------
-19 |     from re import search, I
-20 |
 21 |     # FURB167
    -     if search("^hello", "hello world", I):
 22 +     if search("^hello", "hello world", re.IGNORECASE):
 23 |         pass
+   |

@@ -336,6 +336,30 @@ fn lex_inline_noqa(
     lexer.lex_inline_noqa()
 }
 
+/// Return the range of the rule identifier at `offset` within `comment_range`, if it exists and is
+/// part of a file-level or line-level `noqa` comment.
+pub(crate) fn rule_identifier_range_at_offset(
+    source: &str,
+    comment_range: TextRange,
+    offset: TextSize,
+) -> Option<TextRange> {
+    let Some(NoqaLexerOutput {
+        directive: Directive::Codes(codes),
+        ..
+    }) = lex_inline_noqa(comment_range, source)
+        .ok()
+        .flatten()
+        .or_else(|| lex_file_exemption(comment_range, source).ok().flatten())
+    else {
+        return None;
+    };
+
+    codes
+        .iter()
+        .map(Ranged::range)
+        .find(|range| range.contains(offset))
+}
+
 /// Lexes file-level exemption comment, e.g. `# ruff: noqa: F401`
 fn lex_file_exemption(
     comment_range: TextRange,

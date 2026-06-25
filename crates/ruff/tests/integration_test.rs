@@ -920,7 +920,7 @@ fn full_output_preview() {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[E741]: Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -949,7 +949,7 @@ preview = true
     success: false
     exit_code: 1
     ----- stdout -----
-    error[E741]: Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -1287,12 +1287,12 @@ fn preview_enabled_prefix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
-    -:1:1: error[RUF911] Hey this is a preview test rule.
-    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1309,14 +1309,14 @@ fn preview_enabled_all() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[D100] Missing docstring in public module
-    -:1:1: error[CPY001] Missing copyright notice at top of file
-    -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
-    -:1:1: error[RUF911] Hey this is a preview test rule.
-    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    -:1:1: undocumented-public-module: Missing docstring in public module
+    -:1:1: missing-copyright-notice: Missing copyright notice at top of file
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1336,7 +1336,7 @@ fn preview_enabled_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[RUF911] Hey this is a preview test rule.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
     Found 1 error.
 
     ----- stderr -----
@@ -1411,7 +1411,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 
 #[test]
 fn preview_group_selector() {
-    // `--select PREVIEW` should error (selector was removed)
+    // `--select PREVIEW` should warn (selector was removed)
     let mut cmd = RuffCheck::default()
         .args([
             "--select",
@@ -1422,14 +1422,13 @@ fn preview_group_selector() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    error: invalid value 'PREVIEW' for '--select <RULE_CODE>'
-
-    For more information, try '--help'.
+    warning: Removed selector `PREVIEW` in `select` from the CLI
     ");
 }
 
@@ -1450,12 +1449,12 @@ fn preview_enabled_group_ignore() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
-    -:1:1: error[RUF911] Hey this is a preview test rule.
-    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -2430,7 +2429,7 @@ select = ["RUF017"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[RUF017]: Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
@@ -2471,7 +2470,7 @@ unfixable = ["RUF"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[RUF017]: Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]

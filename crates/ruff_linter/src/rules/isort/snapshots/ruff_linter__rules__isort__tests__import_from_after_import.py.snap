@@ -9,6 +9,8 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_________^
   |
 help: Organize imports
+  |
 1 + import os
 2 | from collections import Collection
   - import os
+  |

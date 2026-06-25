@@ -11,17 +11,17 @@ RUF017 [*] Avoid quadratic list summation
 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
   |
 help: Replace with `functools.reduce`
-1  + import functools
-2  + import operator
-3  | x = [1, 2, 3]
-4  | y = [4, 5, 6]
-5  |
-6  | # RUF017
-   - sum([x, y], start=[])
-7  + functools.reduce(operator.iadd, [x, y], [])
-8  | sum([x, y], [])
-9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
-10 | sum([[1, 2, 3], [4, 5, 6]], [])
+  |
+1 + import functools
+2 + import operator
+3 | x = [1, 2, 3]
+4 | y = [4, 5, 6]
+5 |
+6 | # RUF017
+  - sum([x, y], start=[])
+7 + functools.reduce(operator.iadd, [x, y], [])
+8 | sum([x, y], [])
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -35,18 +35,16 @@ RUF017 [*] Avoid quadratic list summation
 8 | sum([[1, 2, 3], [4, 5, 6]], [])
   |
 help: Replace with `functools.reduce`
-1  + import functools
-2  + import operator
-3  | x = [1, 2, 3]
-4  | y = [4, 5, 6]
-5  |
-6  | # RUF017
-7  | sum([x, y], start=[])
-   - sum([x, y], [])
-8  + functools.reduce(operator.iadd, [x, y], [])
-9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
-10 | sum([[1, 2, 3], [4, 5, 6]], [])
-11 | sum([[1, 2, 3], [4, 5, 6]],
+  |
+1 + import functools
+2 + import operator
+3 | x = [1, 2, 3]
+--------------------------------------------------------------------------------
+7 | sum([x, y], start=[])
+  - sum([x, y], [])
+8 + functools.reduce(operator.iadd, [x, y], [])
+9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -60,19 +58,16 @@ RUF017 [*] Avoid quadratic list summation
 9 | sum([[1, 2, 3], [4, 5, 6]],
   |
 help: Replace with `functools.reduce`
+   |
 1  + import functools
 2  + import operator
 3  | x = [1, 2, 3]
-4  | y = [4, 5, 6]
-5  |
-6  | # RUF017
-7  | sum([x, y], start=[])
+--------------------------------------------------------------------------------
 8  | sum([x, y], [])
    - sum([[1, 2, 3], [4, 5, 6]], start=[])
 9  + functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
 10 | sum([[1, 2, 3], [4, 5, 6]], [])
-11 | sum([[1, 2, 3], [4, 5, 6]],
-12 |     [])
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -86,20 +81,16 @@ RUF017 [*] Avoid quadratic list summation
 10 |     [])
    |
 help: Replace with `functools.reduce`
+   |
 1  + import functools
 2  + import operator
 3  | x = [1, 2, 3]
-4  | y = [4, 5, 6]
-5  |
 --------------------------------------------------------------------------------
-7  | sum([x, y], start=[])
-8  | sum([x, y], [])
 9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
    - sum([[1, 2, 3], [4, 5, 6]], [])
 10 + functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
 11 | sum([[1, 2, 3], [4, 5, 6]],
-12 |     [])
-13 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -114,21 +105,17 @@ RUF017 [*] Avoid quadratic list summation
 12 |   # OK
    |
 help: Replace with `functools.reduce`
+   |
 1  + import functools
 2  + import operator
 3  | x = [1, 2, 3]
-4  | y = [4, 5, 6]
-5  |
 --------------------------------------------------------------------------------
-8  | sum([x, y], [])
-9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
 10 | sum([[1, 2, 3], [4, 5, 6]], [])
    - sum([[1, 2, 3], [4, 5, 6]],
    -     [])
 11 + functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
 12 |
-13 | # OK
-14 | sum([x, y])
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -140,14 +127,12 @@ RUF017 [*] Avoid quadratic list summation
    |     ^^^^^^^^^^^^^^^
    |
 help: Replace with `functools.reduce`
-18 | def func():
-19 |     import functools, operator
+   |
 20 |
    -     sum([x, y], [])
 21 +     functools.reduce(operator.iadd, [x, y], [])
 22 |
-23 |
-24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
@@ -159,15 +144,13 @@ RUF017 [*] Avoid quadratic list summation
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `functools.reduce`
+   |
 1  + import functools
 2  + import operator
 3  | x = [1, 2, 3]
-4  | y = [4, 5, 6]
-5  |
 --------------------------------------------------------------------------------
-25 |
-26 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
 27 | def func():
    -     sum((factor.dims for factor in bases), [])
 28 +     functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
+   |
 note: This is an unsafe fix and may change runtime behavior

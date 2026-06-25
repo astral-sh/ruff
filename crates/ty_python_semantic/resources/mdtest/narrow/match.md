@@ -176,7 +176,6 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
-from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
@@ -189,7 +188,7 @@ def test_match_star(x: Sequence[int] | int) -> None:
             # TODO: After https://github.com/astral-sh/ty/issues/3314 is
             # fixed, the `Sequence[int] & str` intersection should simplify to
             # `Never`.
-            reveal_type(x)  # revealed: (int & ~Sequence[object]) | (Sequence[int] & str) | bytes | bytearray
+            reveal_type(x)  # revealed: (Sequence[int] & str) | bytes | bytearray | (int & ~Sequence[object])
 
 def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
     match x:
@@ -201,74 +200,1006 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
 def test_match_exact_sequence_excludes_str(x: str | tuple[int, int]) -> None:
     match x:
         case (a, b):
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: str
 
 def test_match_exact_sequence_excludes_bytes(x: bytes | tuple[int, int]) -> None:
     match x:
         case (a, b):
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: bytes
 
 def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int]) -> None:
     match x:
         case (a, b):
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: bytearray
 
 def test_match_exact_object_sequence(value: object) -> None:
     match value:
         case int(), str():
-            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: Literal[2]
-            reveal_type(value[0])  # revealed: int
-            reveal_type(value[1])  # revealed: str
+            reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: object
+            reveal_type(value[1])  # revealed: object
 
 def test_match_empty_object_sequence(value: object) -> None:
     match value:
         case []:
-            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: Literal[0]
+            reveal_type(len(value))  # revealed: int
 
 def test_match_singleton_object_sequence(value: object) -> None:
     match value:
         case [int()]:
-            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: Literal[1]
-            reveal_type(value[0])  # revealed: int
+            reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: object
 
 def test_match_prefix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest]:
-            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
             reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: int
+            reveal_type(value[0])  # revealed: object
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest, str()]:
-            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(value[0])  # revealed: int
-            reveal_type(value[-1])  # revealed: str
+            reveal_type(value[0])  # revealed: object
+            reveal_type(value[-1])  # revealed: object
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
     match value:
         case [int(), *rest]:
-            reveal_type(value[0])  # revealed: int
+            reveal_type(value[0])  # revealed: int | str
             reveal_type(value[1])  # revealed: int | str
+            reveal_type(rest)  # revealed: list[int | str]
+```
+
+## Sequence capture types
+
+A capture gets its type from the sequence element it binds. A starred capture is always a list. For
+a fixed-length tuple, we can determine exactly which elements appear in that list.
+
+```py
+from typing import Any, Literal, TypeVar
+from ty_extensions import Unknown
+
+BoundTupleT = TypeVar("BoundTupleT", bound=tuple[int] | tuple[str])
+
+def test_match_star_capture(value: tuple[int, str, bool]) -> None:
+    match value:
+        case [first, *rest]:
+            reveal_type(first)  # revealed: int
+            reveal_type(rest)  # revealed: list[str | bool]
+
+def test_match_star_capture_between_patterns(value: tuple[int, bytes, str]) -> None:
+    match value:
+        case [int(), *rest, str()]:
+            reveal_type(rest)  # revealed: list[bytes]
+
+def test_match_dynamic_sequence_captures(any_value: Any, unknown_value: Unknown) -> None:
+    match any_value:
+        case [item, *rest]:
+            reveal_type(item)  # revealed: Any
+            reveal_type(rest)  # revealed: list[Any]
+
+    match unknown_value:
+        case [item, *rest]:
+            reveal_type(item)  # revealed: Unknown
+            reveal_type(rest)  # revealed: list[Unknown]
+
+def test_match_capture_in_guard(value: tuple[int]) -> None:
+    match value:
+        case [item] if reveal_type(item):  # revealed: int
+            pass
+
+def test_impossible_sequence_capture(value: tuple[str]) -> None:
+    match value:
+        case [int() as item]:
+            reveal_type(item)  # revealed: Never
+
+# A pattern only binds names if the complete pattern succeeds. The first element would bind `str`
+# on its own, but the second element makes this pattern impossible.
+def test_later_failure_rejects_earlier_capture(value: tuple[str, str]) -> None:
+    match value:
+        case [item, int()]:
+            reveal_type(item)  # revealed: Never
+
+# A nested capture receives the element type from a type variable's bound, rather than the type
+# variable that represents the complete sequence.
+def test_capture_from_typevar_bound(value: BoundTupleT) -> None:
+    match value:
+        case [item]:
+            reveal_type(item)  # revealed: int | str
+
+def match_nested_tuple_captures(
+    subject: tuple[Literal[1], str, tuple[Literal[2], int]],
+) -> None:
+    match subject:
+        case [1, item1, [2, item2]]:
+            reveal_type(item1)  # revealed: str
+            reveal_type(item2)  # revealed: int
+
+def match_nested_list_of_tuples_captures(
+    subject: list[tuple[Literal[1], bytes]],
+) -> None:
+    match subject:
+        case [(1, item)]:
+            reveal_type(item)  # revealed: bytes
+```
+
+## Captures from unions of tuples
+
+When a union contains several tuple types, matching one element can determine the types of the other
+captures. A wildcard keeps every tuple type that can match. The same rules apply through type
+aliases.
+
+```py
+from typing import Literal, TypeAlias
+
+def match_capture_filters_union_members_by_length(
+    value: (tuple[Literal[1], int] | tuple[Literal[1], Literal[2], str] | tuple[Literal[1], Literal[2], Literal[3], bytes]),
+) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
+        case [1, 2, item]:
+            reveal_type(item)  # revealed: str
+        case [1, 2, 3, item]:
+            reveal_type(item)  # revealed: bytes
+
+def match_capture_rejects_wrong_tuple_length(
+    value: tuple[Literal[1], Literal[2], str],
+) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: Never
+        case [1, 2, item]:
+            reveal_type(item)  # revealed: str
+
+def test_match_star_capture_filters_union_members(
+    value: tuple[Literal[1], int, int] | tuple[Literal[2], str, str],
+) -> list[int]:
+    match value:
+        case [1, *rest]:
+            reveal_type(rest)  # revealed: list[int]
+            return rest
+        case _:
+            reveal_type(value)  # revealed: tuple[Literal[2], str, str]
+            return []
+
+def test_match_star_capture_preserves_compatible_union_members(
+    value: tuple[Literal[1], int, int] | tuple[Literal[2], str, str],
+) -> None:
+    match value:
+        case [_, *rest]:
+            reveal_type(rest)  # revealed: list[int] | list[str]
+
+def test_match_capture_filters_union_members(
+    value: tuple[Literal[1], int] | tuple[Literal[2], str],
+) -> int:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
+            return item
+        case _:
+            return 0
+
+MatchPair: TypeAlias = tuple[Literal[1], int] | tuple[Literal[2], str]
+
+def test_match_capture_filters_aliased_union_members(value: MatchPair) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
+```
+
+## Pattern aliases
+
+An `as` pattern binds the original matched value. The binding keeps facts already known about the
+subject as well as facts established by the nested pattern. A later case also starts with the values
+not handled by earlier cases.
+
+```py
+from typing import Literal
+
+def test_match_sequence_as_pattern(value: object) -> None:
+    match value:
+        case [int() as item, _]:
+            reveal_type(item)  # revealed: int
+
+def test_match_sequence_as_pattern_preserves_subject_type(
+    value: tuple[Literal[1], object],
+) -> None:
+    match value:
+        case [int() as item, _]:
+            reveal_type(item)  # revealed: Literal[1]
+
+def test_match_sequence_value_as_pattern_preserves_subject_type(
+    value: tuple[Literal[1]],
+) -> None:
+    match value:
+        case [1 as item]:
+            reveal_type(item)  # revealed: Literal[1]
+
+def test_match_sequence_wildcard_as_pattern_preserves_subject_type(
+    value: tuple[Literal[1]],
+) -> None:
+    match value:
+        case [_ as item]:
+            reveal_type(item)  # revealed: Literal[1]
+
+def test_match_sequence_as_pattern_excludes_previous_cases(
+    value: tuple[Literal[1], object] | tuple[Literal[2], object],
+) -> None:
+    match value:
+        case [1, _]:
+            pass
+        case [int() as item, _]:
+            reveal_type(item)  # revealed: Literal[2]
+
+def test_match_alias_excludes_cross_type_equal_values(
+    value: Literal[True, 1, 2],
+) -> None:
+    match value:
+        case 1:
+            pass
+        case _ as item:
+            # Both `True` and `1` compare equal to the first pattern.
+            reveal_type(item)  # revealed: Literal[2]
+
+def test_ordered_or_alias_excludes_cross_type_equal_values(
+    value: tuple[Literal[True], str] | tuple[Literal[2], bytes],
+) -> None:
+    match value:
+        case [1, *item] | [item, _]:
+            # The first alternative consumes the `Literal[True]` tuple.
+            reveal_type(item)  # revealed: list[str] | Literal[2]
+```
+
+## Ordered `or`-pattern bindings
+
+Alternatives are tried from left to right, but a later alternative must keep any value for which an
+earlier pattern can fail. Here, `Values.x` is only an annotation, so `HasX()` can fail at runtime
+and the sequence alternative can still bind the value:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class HasX(Protocol):
+    x: int
+
+class Values(list[str]):
+    x: int
+
+def test_or_binding_keeps_values_that_can_fail_a_class_pattern(value: Values) -> None:
+    match value:
+        case (HasX() as item) | [item]:
+            # Class child bindings are added by a later change, so this branch cannot yet combine
+            # the supported whole-pattern alias with the sequence capture.
+            reveal_type(item)  # revealed: Unknown
+```
+
+Class and mapping child bindings are added by a later change. Until then, an `or` pattern that mixes
+one of those patterns with a supported alternative falls back to `Unknown` instead of inferring a
+type from only the supported alternative.
+
+```py
+from typing import final
+from ty_extensions import Unknown
+
+@final
+class TextValue:
+    value: str = ""
+
+def class_or_sequence_binding(value: TextValue | tuple[int]) -> None:
+    match value:
+        case TextValue(value=item) | [item]:
+            reveal_type(item)  # revealed: Unknown
+
+def mapping_or_sequence_binding(value: dict[str, str] | tuple[int]) -> None:
+    match value:
+        case {"value": item} | [item]:
+            reveal_type(item)  # revealed: Unknown
+```
+
+## Declared pattern captures
+
+A capture still has to satisfy an earlier declaration for the same name. This uses the same
+assignment checks as other bindings; the declaration remains the authoritative type when the
+captured value is incompatible.
+
+```py
+from typing import Literal
+
+def test_incompatible_declared_capture(subject: int) -> None:
+    item: str
+    match subject:
+        case item:  # error: [invalid-assignment]
+            reveal_type(item)  # revealed: str
+
+def test_incompatible_declared_star_capture(subject: tuple[int, int]) -> None:
+    rest: list[str]
+    match subject:
+        case [*rest]:  # error: [invalid-assignment]
+            reveal_type(rest)  # revealed: list[str]
+
+def test_incompatible_declared_or_capture(
+    subject: tuple[Literal[1]] | tuple[Literal["x"]],
+) -> None:
+    item: int
+    match subject:
+        # TODO: Report one error for the logical OR-pattern binding instead of validating each
+        # syntactic definition separately.
+        # error: [invalid-assignment]
+        # error: [invalid-assignment]
+        case [1 as item] | ["x" as item]:
+            reveal_type(item)  # revealed: int
+
+def test_compatible_declared_alias(subject: object) -> None:
+    item: int
+    match subject:
+        case int() as item:
+            reveal_type(item)  # revealed: int
+```
+
+Pattern captures also respect declarations in global, enclosing function, and class scopes:
+
+```py
+global_capture: str
+
+def capture_respects_global_declaration(subject: int) -> None:
+    global global_capture
+    match subject:
+        case global_capture:  # error: [invalid-assignment]
+            reveal_type(global_capture)  # revealed: str
+
+def outer() -> None:
+    nonlocal_capture: str = ""
+
+    def capture_respects_nonlocal_declaration(subject: int) -> None:
+        nonlocal nonlocal_capture
+        match subject:
+            case nonlocal_capture:  # error: [invalid-assignment]
+                reveal_type(nonlocal_capture)  # revealed: str
+
+class CaptureRespectsClassDeclaration:
+    class_capture: str
+
+    match 1:
+        case class_capture:  # error: [invalid-assignment]
+            reveal_type(class_capture)  # revealed: str
+```
+
+## Binding the whole pattern
+
+Binding an entire pattern with `as` keeps the subject's original type variable. For a tuple,
+successful child patterns can also refine the types at fixed indices.
+
+```py
+from typing import Literal, TypeVar
+
+BoundSequenceT = TypeVar("BoundSequenceT", bound=tuple[object])
+
+def test_match_sequence_alias_preserves_bound_typevar(
+    value: BoundSequenceT,
+) -> BoundSequenceT:
+    match value:
+        case [_] as whole:
+            reveal_type(whole)  # revealed: BoundSequenceT@test_match_sequence_alias_preserves_bound_typevar
+            return whole
+
+def test_match_sequence_alias_preserves_typevar_union_member(
+    value: BoundSequenceT | str,
+) -> BoundSequenceT:
+    match value:
+        case [_] as whole:
+            # revealed: BoundSequenceT@test_match_sequence_alias_preserves_typevar_union_member
+            reveal_type(whole)
+            return whole
+        case _:
+            raise ValueError
+
+def test_match_sequence_alias_keeps_matched_element_types(
+    value: tuple[Literal[1, 2]],
+) -> None:
+    match value:
+        case [1] as whole:
+            reveal_type(len(whole))  # revealed: Literal[1]
+            reveal_type(whole[0])  # revealed: Literal[1]
+
+def test_match_starred_sequence_alias_keeps_matched_element_types(
+    value: tuple[Literal[1, 2], str, Literal[3, 4]],
+) -> None:
+    match value:
+        case [1, *_, 4] as whole:
+            reveal_type(whole[0])  # revealed: Literal[1]
+            reveal_type(whole[-1])  # revealed: Literal[4]
+
+def test_mutable_sequence_alias_does_not_keep_index_types(
+    value: list[int | str],
+) -> None:
+    match value:
+        case [int(), str()] as whole:
+            reveal_type(len(whole))  # revealed: int
+            whole.reverse()
+            reveal_type(whole[0])  # revealed: int | str
+
+def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
+    value: list[int],
+) -> None:
+    match value:
+        case []:
+            pass
+        case whole:
+            whole.clear()
+            match whole:
+                case []:
+                    reveal_type(whole)  # revealed: list[int]
+```
+
+## Indirect class patterns
+
+A class pattern can use a variable whose type is `type[Class]`. Both the subject and an `as` binding
+use the instance type described by that annotation.
+
+```py
+class IndirectPattern: ...
+
+def test_match_indirect_class_pattern(
+    value: object,
+    PatternClass: type[IndirectPattern],
+) -> None:
+    match value:
+        case PatternClass() as item:
+            reveal_type(item)  # revealed: IndirectPattern
+            reveal_type(value)  # revealed: IndirectPattern
+```
+
+## Class pattern aliases
+
+The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a
+matched alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Container = int | dict[str, int] | list[int]
+
+def class_pattern_preserves_alias(value: Container) -> None:
+    match value:
+        case dict() as mapping:
+            reveal_type(mapping)  # revealed: dict[str, int]
+            mapping["bad"] = "bad"  # error: [invalid-assignment]
+        case list() as sequence:
+            reveal_type(sequence)  # revealed: list[int]
+            sequence.append("bad")  # error: [invalid-argument-type]
+```
+
+## Binding overlapping classes with `as`
+
+Unrelated classes can share a subclass through multiple inheritance. Binding the whole class pattern
+therefore preserves their intersection unless the classes are known to be disjoint.
+
+```py
+from typing import final
+
+class OverlapA: ...
+class OverlapB: ...
+
+def test_match_class_alias_preserves_possible_multiple_inheritance(
+    value: OverlapA,
+) -> None:
+    match value:
+        case OverlapB() as item:
+            reveal_type(item)  # revealed: OverlapA & OverlapB
+
+def test_match_class_alias_preserves_negative_narrowing(value: object) -> None:
+    if isinstance(value, OverlapA):
+        return
+
+    match value:
+        case OverlapB() as item:
+            reveal_type(item)  # revealed: OverlapB & ~OverlapA
+
+@final
+class FinalA: ...
+
+class FinalB: ...
+
+def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
+    match value:
+        case FinalB() as item:
+            reveal_type(item)  # revealed: Never
+```
+
+## Exhaustive positional patterns for built-in classes
+
+Python defines a fixed set of built-in classes whose single positional subpattern receives the
+entire subject. The `float` element also handles `int`, which is assignable to `float` but is not a
+`float` instance at runtime:
+
+```py
+def builtin_positional_patterns_are_exhaustive(
+    value: tuple[
+        bool,
+        bytearray,
+        bytes,
+        dict[object, object],
+        float,
+        frozenset[object],
+        int,
+        list[object],
+        set[object],
+        str,
+        tuple[object, ...],
+    ],
+) -> int:
+    match value:
+        case (
+            bool(_),
+            bytearray(_),
+            bytes(_),
+            dict(_),
+            (int(_) | float(_)),
+            frozenset(_),
+            int(_),
+            list(_),
+            set(_),
+            str(_),
+            tuple(_),
+        ):
+            return 1
+```
+
+## `TypedDict` class patterns at runtime
+
+A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapping` patterns always
+match it. The positional `dict` pattern does as well. This also applies when the subject is a
+truthiness-narrowed intersection or a type variable bounded by or constrained to `TypedDict`s:
+
+```py
+from collections.abc import Mapping
+from typing import TypeVar, TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+class OptionalMovie(TypedDict, total=False):
+    title: str
+
+class Series(TypedDict):
+    seasons: int
+
+T = TypeVar("T", bound=Movie)
+U = TypeVar("U", Movie, Series)
+
+def argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict():
+            return 1
+
+def mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case Mapping():
+            return 1
+
+def positional_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict(_):
+            return 1
+
+def narrowed_typed_dict_pattern_is_exhaustive(value: OptionalMovie) -> int:
+    if not value:
+        return 0
+    match value:
+        case dict():
+            return 1
+
+def bounded_typed_dict_pattern_is_exhaustive(value: T) -> int:
+    match value:
+        case dict():
+            return 1
+
+def constrained_typed_dict_pattern_is_exhaustive(value: U) -> int:
+    match value:
+        case dict():
+            return 1
+```
+
+## Required `TypedDict` keys
+
+A mapping pattern is exhaustive for a `TypedDict` when every key in the pattern names a required
+field and every value pattern matches all values allowed for that field. The negative cases below
+exercise three separate checks: an optional field, an unknown key, and a non-string key.
+
+```py
+from typing import Any, Literal, Protocol, TypeVar, TypedDict
+from ty_extensions import Intersection, Unknown
+
+class RequiredPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class OptionalPayload(TypedDict, total=False):
+    value: int
+
+class DynamicPayload(TypedDict):
+    any_value: Any
+    unknown_value: Unknown
+
+class AlternatePayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class Marker(Protocol):
+    marker: int
+
+P = TypeVar("P", bound=RequiredPayload)
+Q = TypeVar("Q", RequiredPayload, AlternatePayload)
+
+def required_typed_dict_keys_are_exhaustive(value: RequiredPayload) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def universal_nested_patterns_are_exhaustive(value: DynamicPayload) -> int:
+    match value:
+        case {"any_value": object(), "unknown_value": object()}:
+            return 1
+
+def bounded_typed_dict_mapping_is_exhaustive(value: P) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def constrained_typed_dict_mapping_is_exhaustive(value: Q) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def intersected_typed_dict_mapping_is_exhaustive(
+    value: Intersection[RequiredPayload, Marker],
+) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def optional_key_is_not_exhaustive(
+    value: OptionalPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {"value": _}:
+            return 1
+
+def absent_key_is_not_exhaustive(
+    value: RequiredPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {"missing": _}:
+            return 1
+
+def non_string_key_is_not_exhaustive(
+    value: RequiredPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {1: _}:
+            return 1
+```
+
+## `NamedTuple` positional patterns
+
+A `NamedTuple` provides a generated `__match_args__` tuple containing all of its fields:
+
+```py
+from typing import NamedTuple
+
+class NamedPoint(NamedTuple):
+    x: int
+    label: str
+
+def named_tuple_positional_pattern_is_exhaustive(value: NamedPoint) -> int:
+    match value:
+        case NamedPoint(_, _):
+            return 1
+```
+
+## Positional patterns for built-in subclasses
+
+Subclasses inherit this positional behavior. The positional subpattern still needs to match the
+entire value, so a literal subpattern is not exhaustive:
+
+```py
+class MyInt(int): ...
+
+def builtin_subclass_positional_pattern_is_exhaustive(value: MyInt) -> int:
+    match value:
+        case MyInt(_):
+            return 1
+
+def builtin_positional_literal_is_not_exhaustive(
+    value: MyInt,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case MyInt(0):
+            return 1
+```
+
+## Resolving `__match_args__`
+
+For other positional class patterns, Python reads `__match_args__` from the pattern class. A fixed
+tuple of attribute names makes the corresponding positional patterns exhaustive when every selected
+attribute is present on the subject:
+
+```py
+class KnownAttributes:
+    __match_args__ = ("x", "y")
+    x: int = 0
+    y: int = 0
+
+def fixed_match_args_are_exhaustive(value: KnownAttributes) -> int:
+    match value:
+        case KnownAttributes(_, _):
+            return 1
+
+class ValidMatchArgsMeta(type):
+    __match_args__ = ("x",)
+
+class WithMetaclassMatchArgs(metaclass=ValidMatchArgsMeta):
+    x: int = 0
+
+def metaclass_match_args_is_exhaustive(value: WithMetaclassMatchArgs) -> int:
+    match value:
+        case WithMetaclassMatchArgs(_):
+            return 1
+```
+
+The pattern is not exhaustive when a selected attribute is missing, an explicit annotation widens
+the tuple type, or a conditional definition can override a built-in class's usual positional
+behavior. A metaclass can also provide `__match_args__` that selects a missing attribute:
+
+```py
+class IntWithMissingMatchArg(int):
+    __match_args__ = ("missing",)
+
+def missing_match_arg_is_not_exhaustive(
+    value: IntWithMissingMatchArg,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case IntWithMissingMatchArg(_):
+            return 1
+
+class MatchArgsMeta(type):
+    __match_args__ = ("missing",)
+
+class IntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
+
+def metaclass_match_args_is_not_exhaustive(
+    value: IntWithMetaclassMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case IntWithMetaclassMatchArgs(_):
+            return 1
+
+class WidenedMatchArgs:
+    __match_args__: tuple[str, ...] = ("x",)
+    x: int = 0
+
+def widened_match_args_is_not_exhaustive(
+    value: WidenedMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case WidenedMatchArgs(_):
+            return 1
+
+def condition() -> bool:
+    return bool()
+
+flag = condition()
+
+class ConditionalIntMatchArgs(int):
+    if flag:
+        __match_args__ = ("missing",)
+
+def conditional_match_args_disables_builtin_behavior(
+    value: ConditionalIntMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case ConditionalIntMatchArgs(_):
+            return 1
+```
+
+## Properties and declared attributes
+
+Properties and declared attributes count as present when checking exhaustiveness, even though
+descriptor access can raise `AttributeError` and an annotated attribute can be absent at runtime:
+
+```py
+from typing import Literal
+
+class FallibleProperty:
+    @property
+    def x(self) -> Literal[1]:
+        raise AttributeError
+
+def fallible_property_value_pattern_is_statically_exhaustive(value: FallibleProperty) -> int:
+    match value:
+        case FallibleProperty(x=1):
+            return 1
+
+class DeclaredLiteralAttribute:
+    x: Literal[1]
+
+def declared_literal_attribute_is_exhaustive(
+    value: DeclaredLiteralAttribute,
+) -> int:
+    match value:
+        case DeclaredLiteralAttribute(x=1):
+            return 1
+```
+
+## Runtime-checkable protocol patterns
+
+Runtime-checkable protocols use the same rule. The subject below is known to provide `x`, so the
+pattern is exhaustive even though the subject class is not final:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocolWithX(Protocol):
+    x: int
+
+class RuntimeProtocolImplementer:
+    x: int = 0
+
+def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) -> int:
+    match value:
+        case RuntimeProtocolWithX(x=_):
+            return 1
+```
+
+## Members from the subject type
+
+A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
+an attribute that is not declared by the class named in the pattern. This also applies when the
+subject class is not final:
+
+```py
+class BaseWithoutX: ...
+
+class ChildWithX(BaseWithoutX):
+    x: int = 0
+
+def subclass_member_is_exhaustive(value: ChildWithX) -> int:
+    match value:
+        case BaseWithoutX(x=_):
+            return 1
+```
+
+## Positional behavior comes from the pattern class
+
+Only the class named in the pattern determines what a positional subpattern receives. Although
+`IntPlainChild` also inherits from `int`, `PlainBase(_)` does not receive the whole value:
+
+```py
+class PlainBase: ...
+class IntPlainChild(int, PlainBase): ...
+
+def builtin_positional_behavior_comes_from_pattern_class(
+    value: IntPlainChild,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PlainBase(_):
+            return 1
+```
+
+## Nested class patterns
+
+The same rule applies recursively: every nested pattern must match every value allowed for the
+attribute it receives.
+
+```py
+class Inner:
+    x: int = 0
+
+class Outer:
+    inner: Inner = Inner()
+
+def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
+    match value:
+        case [Outer(inner=Inner(x=_))]:
+            return 1
+```
+
+## Missing class-pattern attributes
+
+A class pattern can fail after its `isinstance` check if a requested attribute is missing or only
+conditionally defined. This applies to both keyword and positional attributes, including inside a
+sequence. The failed branch therefore keeps the original subject type:
+
+```py
+from typing import final
+
+class MissingAttributes:
+    __match_args__ = ("x", "missing")
+    x: int = 0
+
+class OtherClass: ...
+
+def missing_attribute_keeps_original_subject(
+    value: MissingAttributes | OtherClass,
+) -> None:
+    match value:
+        case MissingAttributes(missing=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: MissingAttributes | OtherClass
+
+def missing_positional_attribute_keeps_sequence_possible(
+    value: tuple[MissingAttributes],
+) -> None:
+    match value:
+        case [MissingAttributes(_, _)]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: tuple[MissingAttributes]
+
+def attribute_condition() -> bool:
+    return bool()
+
+@final
+class PossiblyMissingAttribute:
+    if attribute_condition():
+        x: int = 0
+
+def possibly_missing_attribute_is_not_exhaustive(
+    value: PossiblyMissingAttribute,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PossiblyMissingAttribute(x=_):
+            return 1
+```
+
+## Sequence exhaustiveness
+
+Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
+make a match exhaustive.
+
+```py
+from typing_extensions import assert_never
+
+class HasX:
+    x: int = 0
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
@@ -300,16 +1231,23 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
         case _:
             assert_never(value)
 
-def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:  # error: [invalid-return-type]
+# Matching the element would succeed, but a one-element pattern cannot match a two-element tuple.
+def sequence_length_is_still_checked(
+    value: tuple[HasX, HasX],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [HasX(x=_)]:
+            return 1
+
+def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
         case [int()]:
             return 42
         case [str()]:
             return 42
         case _:
-            # TODO: The previous cases are exhaustive, so this should simplify
-            # to `tuple[Never]`, and therefore `Never`.
-            # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
+            # revealed: Never
             reveal_type(x)
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
@@ -317,13 +1255,19 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
         case [int()]:
             pass
         case _:
-            # revealed: list[int] & ~<Protocol with members '__getitem__', '__len__'>
-            reveal_type(value)
+            reveal_type(value)  # revealed: list[int]
+```
 
+## Nested sequence patterns
+
+Nested patterns narrow values captured from the positions they inspect. For subjects without a known
+tuple shape, length and indexed-element facts are not retained on the original subject.
+
+```py
 def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
     match value:
-        case [None, [int()], {}]:
-            ret = value[0], value[1][0], len(value[2])
+        case [None as first, [int() as number], {} as mapping]:
+            ret = first, number, len(mapping)
             reveal_type(ret)  # revealed: tuple[None, int, int]
             return ret
     return None
@@ -331,16 +1275,9 @@ def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
 def unwrap_number_or_label(value: object) -> int | str | None:
     match value:
         case [(int() | str()) as item]:
-            reveal_type(value[0])  # revealed: int | str
-            return value[0]
+            reveal_type(item)  # revealed: int | str
+            return item
     return None
-
-def test_match_value_sequence(value: object) -> None:
-    match value:
-        case [1]:
-            # Value patterns use equality, so matching `1` does not prove that
-            # the element is an `int`.
-            reveal_type(value[0])  # revealed: object
 ```
 
 ## Sequence display subjects
@@ -475,10 +1412,11 @@ def match_tuple_expression_starred_pattern(
             reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
-## Subject-time bindings in display subjects
+## Bindings used in match subjects
 
-Each element constraint applies to the binding read while that subject element was evaluated. It
-does not constrain a binding introduced by a later subject element, pattern capture, or guard.
+Each element is narrowed using the binding that Python read when it evaluated that part of the
+subject. A later assignment in another element, pattern capture, or guard does not change which
+binding the earlier element referred to.
 
 ```py
 from typing import final
@@ -513,10 +1451,28 @@ def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> No
             reveal_type(a)  # revealed: TupleSubjectA1
             reveal_type(b)  # revealed: TupleSubjectB1
 
-def match_tuple_expression_subject_capture(a: TupleSubjectA, b: TupleSubjectB) -> None:
+def match_tuple_expression_subject_capture(
+    a: TupleSubjectA | TupleSubjectB,
+    b: TupleSubjectB,
+) -> None:
     match a, b:
         case [TupleSubjectA1(), a]:
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: TupleSubjectB
+
+def match_capture_shadows_subject() -> None:
+    x = (1,)
+    match x:
+        case [x]:
+            reveal_type(x)  # revealed: Literal[1]
+
+def later_case_uses_saved_subject_after_guarded_capture(flag: bool) -> None:
+    x = (1,)
+    match x:
+        case [x] if flag:
+            pass
+        case [1]:
+            reveal_type(x)  # revealed: Literal[1]
+            x + "bad"  # error: [unsupported-operator]
 
 def match_tuple_expression_guard_rebinding(
     a: TupleSubjectA,
@@ -529,6 +1485,58 @@ def match_tuple_expression_guard_rebinding(
         case [TupleSubjectA1(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1
+```
+
+## Named-expression subjects
+
+A named expression creates a new binding for the subject. The successful pattern narrows that
+binding just like it narrows a subject that was already bound.
+
+```py
+class NamedSubject: ...
+
+class NamedSubjectChild(NamedSubject):
+    child: int
+
+def match_named_expression_subject(value: NamedSubject) -> None:
+    match subject := value:
+        case NamedSubjectChild():
+            reveal_type(subject)  # revealed: NamedSubjectChild
+            reveal_type(subject.child)  # revealed: int
+
+def match_named_expression_subject_capture(value: tuple[int]) -> None:
+    match subject := value:
+        case [subject]:
+            # The capture shadows the named-expression binding and receives the element type.
+            reveal_type(subject)  # revealed: int
+```
+
+## Cycles in pattern binding types
+
+Pattern captures can affect the type of a later match subject, including through a loop or a
+function defined before the capture. These cycles should resolve to the same concrete binding types
+as equivalent code without a cycle.
+
+```py
+def match_loop_carried_capture(flag: bool, x: int) -> None:
+    while flag:
+        match x:
+            case x:
+                reveal_type(x)  # revealed: int
+
+def match_loop_carried_sequence_capture(flag: bool) -> None:
+    x = (1,)
+    while flag:
+        match x:
+            case [x]:
+                reveal_type(x)  # revealed: Literal[1]
+
+def capture_from_later_global() -> int:
+    return captured
+
+match capture_from_later_global():
+    case captured:
+        reveal_type(captured)  # revealed: int
 ```
 
 ## Value patterns
@@ -558,7 +1566,89 @@ arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow
 In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
 rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
 
-More examples follow.
+A final subclass with inherited builtin equality can compare equal to a literal despite being
+disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
+
+```py
+from typing import Final, final
+
+@final
+class FinalPatternInt(int): ...
+
+class PatternValues:
+    ONE: Final = 1
+
+def _(value: FinalPatternInt):
+    match value:
+        case 1 as captured:
+            reveal_type(value)  # revealed: FinalPatternInt
+            reveal_type(captured)  # revealed: FinalPatternInt
+
+    match value:
+        case PatternValues.ONE:
+            reveal_type(value)  # revealed: FinalPatternInt
+```
+
+Some precisely modeled objects compare equal to themselves, so an equivalent value pattern is
+exhaustive:
+
+```py
+from types import FunctionType
+from typing import NewType, TypeVar
+
+T = TypeVar("T")
+UserId = NewType("UserId", int)
+
+class ReflexivePatternValues:
+    LIST_INT = list[int]
+    TYPE_VAR = T
+    NEW_TYPE = UserId
+
+def generic_alias_value_pattern() -> int:
+    match list[int]:
+        case ReflexivePatternValues.LIST_INT:
+            return 1
+
+def type_var_value_pattern() -> int:
+    match T:
+        case ReflexivePatternValues.TYPE_VAR:
+            return 1
+
+def new_type_value_pattern() -> int:
+    match UserId:
+        case ReflexivePatternValues.NEW_TYPE:
+            return 1
+
+def helper() -> None: ...
+def wrapper_descriptor_value_pattern() -> int:
+    match FunctionType.__get__:
+        case FunctionType.__get__:
+            return 1
+
+def bound_method_value_pattern() -> int:
+    match helper.__get__:
+        case helper.__get__:
+            return 1
+```
+
+Two calls that construct equivalent objects need not produce equal values. For example, separate
+`partial` objects do not compare equal, so this match is not exhaustive:
+
+```py
+from functools import partial
+
+def target(value: int) -> int:
+    return value
+
+class PartialPatternValues:
+    VALUE = partial(target, 1)
+
+# error: [invalid-return-type]
+def partial_value_pattern() -> int:
+    match partial(target, 1):
+        case PartialPatternValues.VALUE:
+            return 1
+```
 
 ```py
 from typing import Literal
@@ -580,6 +1670,232 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
             reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
         case _:
             reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
+```
+
+The same limitation applies inside a sequence. Matching a literal proves only that the element
+compares equal to that literal, not that the element has the same type.
+
+```py
+def test_match_value_sequence(value: object) -> None:
+    match value:
+        case [1]:
+            reveal_type(value[0])  # revealed: object
+```
+
+## Enum equality semantics
+
+Enum value patterns use the enum class's actual `__eq__` implementation. Members of an enum whose
+`__eq__` resolves to `object.__eq__` compare by identity and cannot equal `None`. `StrEnum` members
+compare equal to string literals with the same value. Matching a member against itself is exhaustive
+whenever its comparison behavior is known, even if its underlying value is not:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, IntEnum, StrEnum, auto
+from typing import Literal, assert_never
+
+class Color(StrEnum):
+    RED = "r"
+    GREEN = "g"
+    BLUE = "b"
+
+def test_literal_as_enum(x: Literal["g"]) -> None:
+    match x:
+        case Color.RED:
+            assert_never(x)
+        case Color.GREEN:
+            reveal_type(x)  # revealed: Literal["g"]
+        case Color.BLUE:
+            assert_never(x)
+        case _:
+            assert_never(x)
+
+def test_enum_as_literal(y: Literal[Color.BLUE]) -> None:
+    match y:
+        case "r":
+            assert_never(y)
+        case "g":
+            assert_never(y)
+        case "b":
+            reveal_type(y)  # revealed: Literal[Color.BLUE]
+        case _:
+            assert_never(y)
+
+class Direction(Enum):
+    NORTH = "north"
+    SOUTH = "south"
+
+def enum_member_excludes_none(direction: Direction | None) -> None:
+    match direction:
+        case Direction.NORTH:
+            reveal_type(direction)  # revealed: Literal[Direction.NORTH]
+
+class Status(IntEnum):
+    READY = 1
+
+def exact_int_enum_member_is_exhaustive(status: Literal[Status.READY]) -> int:
+    match status:
+        case Status.READY:
+            return 1
+
+class First(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class Second(IntEnum):
+    ONE = 1
+    TWO = 2
+
+def cross_int_enum_members(value: First | Second) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
+        case _:
+            reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
+
+class Warning(Enum):
+    W1 = auto()
+
+class Verdict(Enum):
+    V0 = auto()
+    V1 = auto()
+    V2 = auto()
+    V3 = auto()
+    V4 = auto()
+    V5 = auto()
+    V6 = auto()
+    V7 = auto()
+    V8 = auto()
+    V9 = auto()
+    V10 = auto()
+    V11 = auto()
+
+def many_cross_enum_cases(value: Warning | Verdict) -> None:
+    match value:
+        case Verdict.V0:
+            return
+        case Verdict.V1:
+            return
+        case Verdict.V2:
+            return
+        case Verdict.V3:
+            return
+        case Verdict.V4:
+            return
+        case Verdict.V5:
+            return
+        case Verdict.V6:
+            return
+        case Verdict.V7:
+            return
+        case _:
+            reveal_type(value)  # revealed: Warning | Literal[Verdict.V8, Verdict.V9, Verdict.V10, Verdict.V11]
+
+class Automatic(StrEnum):
+    GENERATED = auto()
+
+def auto_member_value_is_known(value: Literal["generated"]) -> None:
+    match value:
+        case Automatic.GENERATED:
+            return
+    assert_never(value)
+
+class AlwaysEqual(Enum):
+    RED = "r"
+    GREEN = "g"
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_eq(value: AlwaysEqual) -> None:
+    match value:
+        case AlwaysEqual.RED:
+            reveal_type(value)  # revealed: AlwaysEqual
+        case AlwaysEqual.GREEN:
+            reveal_type(value)  # revealed: AlwaysEqual
+        case _:
+            reveal_type(value)  # revealed: AlwaysEqual
+```
+
+Equality also determines the type of captures later in a sequence. An `IntEnum` member can match an
+integer, and custom equality can make otherwise distinct enum members compare equal, so the capture
+keeps the type of the subject that actually matched.
+
+```py
+from enum import Enum, IntEnum
+from typing import Literal
+
+class Number(IntEnum):
+    ONE = 1
+
+def test_match_capture_preserves_int_enum_equal_member(
+    value: tuple[Literal[1], int],
+) -> None:
+    match value:
+        case [Number.ONE, item]:
+            reveal_type(item)  # revealed: int
+
+class AlwaysEqualEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def test_match_capture_preserves_custom_equal_enum_member() -> None:
+    value = (AlwaysEqualEnum.B, "actual")
+    match value:
+        case [AlwaysEqualEnum.A, item]:
+            reveal_type(item)  # revealed: Literal["actual"]
+```
+
+A fallback alias can still receive a value that failed an earlier value pattern. Match patterns use
+`==`, so a non-reflexive value can fail to match itself, while a custom `__ne__` has no effect.
+
+```py
+from typing import Literal
+
+class AliasNeverEqualMeta(type):
+    def __eq__(cls, other: object) -> Literal[False]:
+        return False
+
+class AliasNeverEqualValue(metaclass=AliasNeverEqualMeta):
+    pass
+
+class NeverEqualConstants:
+    VALUE = AliasNeverEqualValue
+
+def test_match_alias_preserves_nonreflexive_value(flag: bool) -> None:
+    value = AliasNeverEqualValue if flag else "fallback"
+    match value:
+        case NeverEqualConstants.VALUE:
+            pass
+        case _ as item:
+            # revealed: <class 'AliasNeverEqualValue'> | Literal["fallback"]
+            reveal_type(item)
+
+class CustomNeMeta(type):
+    def __ne__(cls, other: object) -> Literal[True]:
+        return True
+
+class CustomNeA(metaclass=CustomNeMeta):
+    pass
+
+class CustomNeConstants:
+    A = CustomNeA
+
+def test_match_alias_ignores_custom_ne(flag: bool) -> str:
+    value = CustomNeA if flag else "fallback"
+    match value:
+        case CustomNeConstants.A:
+            return ""
+        case _ as item:
+            reveal_type(item)  # revealed: Literal["fallback"]
+            return item
 ```
 
 ## Value patterns with guard
@@ -654,6 +1970,35 @@ def _(x: A | B | C):
             reveal_type(x)  # revealed: A
         case _:
             reveal_type(x)  # revealed: (B & ~A) | (C & ~A)
+```
+
+Every `or` alternative binds the same names, but each alternative can give them a different type.
+The binding combines the type from each reachable alternative. Because alternatives are tried from
+left to right, a later alternative sees only values not matched earlier.
+
+```py
+from typing import Literal
+
+def test_match_sequence_or_as_pattern(
+    value: tuple[None] | tuple[Literal[True]],
+) -> None:
+    match value:
+        case [None as item] | [True as item]:
+            reveal_type(item)  # revealed: None | Literal[True]
+
+def test_match_ordered_or_capture(value: tuple[int] | str) -> int | str:
+    match value:
+        case [item] | item:
+            reveal_type(item)  # revealed: int | str
+            return item
+
+def test_match_ordered_or_capture_after_star(
+    value: tuple[Literal[1], int] | tuple[Literal[2], str],
+) -> list[int] | Literal[2]:
+    match value:
+        case [1, *item] | [item, _]:
+            reveal_type(item)  # revealed: list[int] | Literal[2]
+            return item
 ```
 
 ## Or patterns with guard
@@ -773,6 +2118,12 @@ class Answer(Enum):
             case _:
                 reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
                 raise ValueError("Answer is not YES")
+
+    def alias_through_alternatives(self) -> Self:
+        match self:
+            case (Answer.NO as item) | (Answer.YES as item) | (Answer.MAYBE as item):
+                reveal_type(item)  # revealed: Self@alias_through_alternatives
+                return item
 
 Answer.YES.is_yes_through_class_member()
 

@@ -10,15 +10,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
   |         ^^^^^^^^^^^^^^^^^^
   |
 help: Replace for loop with dict comprehension
-1 | def foo():
+  |
 2 |     fruit = ["apple", "pear", "orange"]
   -     result = {}
   -     for idx, name in enumerate(fruit):
   -         result[idx] = name  # PERF403
 3 +     result = {idx: name for idx, name in enumerate(fruit)}  # PERF403
 4 |
-5 |
-6 | def foo():
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -30,8 +29,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
    |             ^^^^^^^^^^^^^^^^^^
    |
 help: Replace for loop with dict comprehension
-7  |
-8  | def foo():
+   |
 9  |     fruit = ["apple", "pear", "orange"]
    -     result = {}
    -     for idx, name in enumerate(fruit):
@@ -39,8 +37,7 @@ help: Replace for loop with dict comprehension
    -             result[idx] = name  # PERF403
 10 +     result = {idx: name for idx, name in enumerate(fruit) if idx % 2}  # PERF403
 11 |
-12 |
-13 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -52,8 +49,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
    |             ^^^^^^^^^^^^^^^^^^
    |
 help: Replace for loop with dict comprehension
-26 |
-27 |
+   |
 28 | def foo():
    -     result = {}
 29 |     fruit = ["apple", "pear", "orange"]
@@ -62,8 +58,7 @@ help: Replace for loop with dict comprehension
    -             result[idx] = name  # PERF403
 30 +     result = {idx: name for idx, name in enumerate(fruit) if idx % 2}  # PERF403
 31 |
-32 |
-33 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
@@ -75,16 +70,14 @@ PERF403 [*] Use `dict.update` instead of a for-loop
    |             ^^^^^^^^^^^^^^^^^^
    |
 help: Replace for loop with `dict.update`
-58 | def foo():
-59 |     result = {1: "banana"}
+   |
 60 |     fruit = ["apple", "pear", "orange"]
    -     for idx, name in enumerate(fruit):
    -         if idx % 2:
    -             result[idx] = name  # PERF403
 61 +     result.update({idx: name for idx, name in enumerate(fruit) if idx % 2})  # PERF403
 62 |
-63 |
-64 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -96,16 +89,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
    |         ^^^^^^^^^^^^^^^^^^^
    |
 help: Replace for loop with dict comprehension
-73 |
-74 | def foo():
+   |
 75 |     fruit = ["apple", "pear", "orange"]
    -     result = {}
    -     for name in fruit:
    -         result[name] = name  # PERF403
 76 +     result = {name: name for name in fruit}  # PERF403
 77 |
-78 |
-79 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -117,16 +108,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
    |         ^^^^^^^^^^^^^^^^^^
    |
 help: Replace for loop with dict comprehension
-80 |
-81 | def foo():
+   |
 82 |     fruit = ["apple", "pear", "orange"]
    -     result = {}
    -     for idx, name in enumerate(fruit):
    -         result[name] = idx  # PERF403
 83 +     result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
 84 |
-85 |
-86 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -138,16 +127,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
    |         ^^^^^^^^^^^^^^^^^^
    |
 help: Replace for loop with dict comprehension
-89 |     from builtins import dict as SneakyDict
-90 |
+   |
 91 |     fruit = ["apple", "pear", "orange"]
    -     result = SneakyDict()
    -     for idx, name in enumerate(fruit):
    -         result[name] = idx  # PERF403
 92 +     result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
 93 |
-94 |
-95 | def foo():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -161,8 +148,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
     | |_______________^
     |
 help: Replace for loop with dict comprehension
-96  |
-97  | def foo():
+    |
 98  |     fruit = ["apple", "pear", "orange"]
     -     result: dict[str, int] = {
     -         # comment 1
@@ -180,8 +166,7 @@ help: Replace for loop with dict comprehension
     -         ] = idx  # PERF403
 104 +     )}  # PERF403
 105 |
-106 |
-107 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -193,8 +178,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
     |         ^^^^^^^^^^^^^^^^^^
     |
 help: Replace for loop with dict comprehension
-110 |
-111 | def foo():
+    |
 112 |     fruit = ["apple", "pear", "orange"]
     -     a = 1; result = {}; b = 2
     -     for idx, name in enumerate(fruit):
@@ -202,8 +186,7 @@ help: Replace for loop with dict comprehension
 113 +     a = 1; b = 2
 114 +     result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
 115 |
-116 |
-117 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
@@ -215,15 +198,13 @@ PERF403 [*] Use `dict.update` instead of a for-loop
     |         ^^^^^^^^^^^^^^^^^^
     |
 help: Replace for loop with `dict.update`
-118 | def foo():
-119 |     fruit = ["apple", "pear", "orange"]
+    |
 120 |     result = {"kiwi": 3}
     -     for idx, name in enumerate(fruit):
     -         result[name] = idx  # PERF403
 121 +     result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
 122 |
-123 |
-124 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
@@ -235,15 +216,13 @@ PERF403 [*] Use `dict.update` instead of a for-loop
     |         ^^^^^^^^^^^^^^^^^^
     |
 help: Replace for loop with `dict.update`
-125 | def foo():
-126 |     fruit = ["apple", "pear", "orange"]
+    |
 127 |     (_, result) = (None, {"kiwi": 3})
     -     for idx, name in enumerate(fruit):
     -         result[name] = idx  # PERF403
 128 +     result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
 129 |
-130 |
-131 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
@@ -255,15 +234,13 @@ PERF403 [*] Use `dict.update` instead of a for-loop
     |         ^^^^^^^^^^^^^^^^^^
     |
 help: Replace for loop with `dict.update`
-133 |     fruit = ["apple", "pear", "orange"]
-134 |     result = {}
+    |
 135 |     print(len(result))
     -     for idx, name in enumerate(fruit):
     -         result[name] = idx  # PERF403
 136 +     result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
 137 |
-138 |
-139 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -275,8 +252,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
     |             ^^^^^^^^^^^^^^^^^^
     |
 help: Replace for loop with dict comprehension
-139 |
-140 | def foo():
+    |
 141 |     fruit = ["apple", "pear", "orange"]
     -     result = {}
     -     for idx, name in enumerate(fruit):
@@ -284,8 +260,7 @@ help: Replace for loop with dict comprehension
     -             result[name] = idx  # PERF403
 142 +     result = {name: idx for idx, name in enumerate(fruit) if (last_idx := idx % 3)}  # PERF403
 143 |
-144 |
-145 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -297,16 +272,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
     |         ^^^^^^^^^^^^^^^^^^
     |
 help: Replace for loop with dict comprehension
-148 | def foo():
-149 |     fruit = ["apple", "pear", "orange"]
+    |
 150 |     indices = [0, 1, 2]
     -     result = {}
     -     for idx, name in indices, fruit:
     -         result[name] = idx  # PERF403
 151 +     result = {name: idx for idx, name in (indices, fruit)}  # PERF403
 152 |
-153 |
-154 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -320,8 +293,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
 164 |     for k, v in src:
     |
 help: Replace for loop with dict comprehension
-155 |
-156 | def foo():
+    |
 157 |     src = (("x", 1),)
     -     dst = {}
 158 |
@@ -330,8 +302,7 @@ help: Replace for loop with dict comprehension
     -             dst[k] = v
 159 +     dst = {k: v for k, v in src if (True if True else False)}
 160 |
-161 |     for k, v in src:
-162 |         if lambda: 0:
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
@@ -345,16 +316,14 @@ PERF403 [*] Use `dict.update` instead of a for-loop
 168 | # https://github.com/astral-sh/ruff/issues/18859
     |
 help: Replace for loop with `dict.update`
-161 |         if True if True else False:
-162 |             dst[k] = v
+    |
 163 |
     -     for k, v in src:
     -         if lambda: 0:
     -             dst[k] = v
 164 +     dst.update({k: v for k, v in src if (lambda: 0)})
 165 |
-166 | # https://github.com/astral-sh/ruff/issues/18859
-167 | def foo():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -366,16 +335,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
     |         ^^^^^^^
     |
 help: Replace for loop with dict comprehension
-167 |
-168 | # https://github.com/astral-sh/ruff/issues/18859
+    |
 169 | def foo():
     -     v = {}
     -     for o,(x,)in():
     -         v[x,]=o
 170 +     v = {(x,): o for o,(x,) in ()}
 171 |
-172 |
-173 | # https://github.com/astral-sh/ruff/issues/19005
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -388,16 +355,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
 201 |     return v
     |
 help: Replace for loop with dict comprehension
-195 |
-196 |
+    |
 197 | def issue_19153_1():
     -     v = {}
     -     for o, (x,) in ["ox"]:
     -         v[x,] = o
 198 +     v = {(x,): o for o, (x,) in ["ox"]}
 199 |     return v
-200 |
-201 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -410,16 +375,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
 208 |     return v
     |
 help: Replace for loop with dict comprehension
-202 |
-203 |
+    |
 204 | def issue_19153_2():
     -     v = {}
     -     for (o, p), x in [("op", "x")]:
     -         v[x] = o, p
 205 +     v = {x: (o, p) for (o, p), x in [("op", "x")]}
 206 |     return v
-207 |
-208 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -432,16 +395,14 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
 215 |     return v
     |
 help: Replace for loop with dict comprehension
-209 |
-210 |
+    |
 211 | def issue_19153_3():
     -     v = {}
     -     for o, (x,) in ["ox"]:
     -         v[(x,)] = o
 212 +     v = {(x,): o for o, (x,) in ["ox"]}
 213 |     return v
-214 |
-215 | def f():
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -455,8 +416,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
 227 | def f():
     |
 help: Replace for loop with dict comprehension
-216 |
-217 | def f():
+    |
 218 |     # comment duplication in if test (https://github.com/astral-sh/ruff/issues/18787)
     -     result = {}
     -     for k in ["a", "b", "c"]:
@@ -468,8 +428,7 @@ help: Replace for loop with dict comprehension
 219 +     # comment
 220 +     result = {k: k for k in ["a", "b", "c"] if k}
 221 |
-222 | def f():
-223 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
@@ -481,8 +440,7 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
     |         ^^^^^^^^^^^^^
     |
 help: Replace for loop with dict comprehension
-226 |
-227 | def f():
+    |
 228 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
     -     result = {}
     -     for (
@@ -491,4 +449,5 @@ help: Replace for loop with dict comprehension
     -         result[k] = k
 229 +     # comment
 230 +     result = {k: k for k in ["a", "b", "c"]}
+    |
 note: This is an unsafe fix and may change runtime behavior

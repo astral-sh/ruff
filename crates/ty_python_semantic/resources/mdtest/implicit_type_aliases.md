@@ -429,6 +429,8 @@ MyType = type[T]
 IntAndType = tuple[int, T]
 Pair = tuple[T, T]
 Sum = tuple[T, U]
+# The homogeneous element type is `object`, but the exact tuple is still generic in `T`.
+ObjectAndList = tuple[object, list[T]]
 ListOrTuple = list[T] | tuple[T, ...]
 ListOrTupleLegacy = Union[list[T], tuple[T, ...]]
 MyCallable = Callable[P, T]
@@ -442,6 +444,7 @@ reveal_type(MyType)  # revealed: <special-form 'type[T@MyType]'>
 reveal_type(IntAndType)  # revealed: <class 'tuple[int, T@IntAndType]'>
 reveal_type(Pair)  # revealed: <class 'tuple[T@Pair, T@Pair]'>
 reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
+reveal_type(ObjectAndList)  # revealed: <class 'tuple[object, list[T@ObjectAndList]]'>
 reveal_type(ListOrTuple)  # revealed: <types.UnionType special-form 'list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]'>
 # revealed: <types.UnionType special-form 'list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]'>
 reveal_type(ListOrTupleLegacy)
@@ -457,6 +460,7 @@ def _(
     int_and_str: IntAndType[str],
     pair_of_ints: Pair[int],
     int_and_bytes: Sum[int, bytes],
+    object_and_list: ObjectAndList[int],
     list_or_tuple: ListOrTuple[int],
     list_or_tuple_legacy: ListOrTupleLegacy[int],
     my_callable: MyCallable[[str, bytes], int],
@@ -471,6 +475,7 @@ def _(
     reveal_type(int_and_str)  # revealed: tuple[int, str]
     reveal_type(pair_of_ints)  # revealed: tuple[int, int]
     reveal_type(int_and_bytes)  # revealed: tuple[int, bytes]
+    reveal_type(object_and_list)  # revealed: tuple[object, list[int]]
     reveal_type(list_or_tuple)  # revealed: list[int] | tuple[int, ...]
     reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
     reveal_type(my_callable)  # revealed: (str, bytes, /) -> int

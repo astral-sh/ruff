@@ -36,12 +36,12 @@ warning[redundant-cast]: Value is already of type `Foo2`
    |     ^^^^^^^^^^^^^^^
    |
 help: Remove the redundant `cast`
-7  |     x: int
-8  |
+   |
 9  | foo: Foo2 = {"x": 1}
    - _ = cast(Foo2, foo)  # error: [redundant-cast]
 10 + _ = foo  # error: [redundant-cast]
 11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
+   |
 
 ```
 
@@ -54,10 +54,10 @@ warning[redundant-cast]: Value is already of type `Bar2`
    |
 info: `Bar2` is equivalent to `Foo2`
 help: Remove the redundant `cast`
-8  |
-9  | foo: Foo2 = {"x": 1}
+   |
 10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
    - _ = cast(Bar2, foo)  # error: [redundant-cast]
 11 + _ = foo  # error: [redundant-cast]
+   |
 
 ```

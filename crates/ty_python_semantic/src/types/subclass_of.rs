@@ -135,6 +135,18 @@ impl<'db> SubclassOfType<'db> {
         self.subclass_of.into_type_var()
     }
 
+    /// Return the exact class-object type of this `type[T]` `TypeVar`'s upper bound, if it has one.
+    ///
+    /// This can only succeed when the upper bound normalizes to a final class.
+    pub(crate) fn exact_typevar_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.into_type_var()
+            .and_then(|typevar| typevar.typevar(db).upper_bound(db))
+            .and_then(|bound| {
+                let bound = Self::try_from_instance(db, bound.resolve_type_alias(db))?;
+                matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
+            })
+    }
+
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,

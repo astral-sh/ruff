@@ -501,6 +501,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
+            "--error=ambiguous-protocol-member",
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
             "--error=mismatched-type-name",
@@ -850,10 +851,7 @@ def diff_format(
         case (False, False):
             return f"{down}{good}"
         case _:
-            # The ty false positive seems to be due to insufficient type narrowing for tuples;
-            # possibly related to https://github.com/astral-sh/ty/issues/493 and/or
-            # https://github.com/astral-sh/ty/issues/887
-            assert_never((greater_is_better, increased))  # ty: ignore[type-assertion-failure]
+            assert_never((greater_is_better, increased))
 
 
 def render_summary(

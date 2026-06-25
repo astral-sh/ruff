@@ -14,6 +14,7 @@ use ruff_db::vendored::VendoredPath;
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
+use ruff_ranged_value::ValueSource;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
@@ -23,7 +24,6 @@ use ty_ide::{
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
@@ -857,7 +857,6 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Diagnostic {
-    #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
 }
 
@@ -937,6 +936,16 @@ impl Diagnostic {
     #[wasm_bindgen]
     pub fn severity(&self) -> Severity {
         Severity::from(self.inner.severity())
+    }
+
+    #[wasm_bindgen]
+    pub fn tags(&self) -> Vec<DiagnosticTag> {
+        self.inner
+            .primary_tags()
+            .unwrap_or_default()
+            .iter()
+            .map(DiagnosticTag::from)
+            .collect()
     }
 
     #[wasm_bindgen(js_name = "textRange")]
@@ -1203,6 +1212,22 @@ impl From<diagnostic::Severity> for Severity {
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,
             diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for DiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
         }
     }
 }

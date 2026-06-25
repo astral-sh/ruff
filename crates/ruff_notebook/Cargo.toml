@@ -1,7 +1,7 @@
 [package]
 name = "ruff_notebook"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -20,7 +20,6 @@ itertools = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_with = { workspace = true, default-features = false, features = ["macros"] }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 

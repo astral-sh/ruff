@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use ty_wasm::{Position, PositionEncoding, SubDiagnosticSeverity, Workspace};
+use ty_wasm::{DiagnosticTag, Position, PositionEncoding, SubDiagnosticSeverity, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
@@ -59,6 +59,43 @@ fn check() {
         sub_diagnostics
             .iter()
             .all(|sub_diagnostic| sub_diagnostic.annotations.is_empty())
+    );
+}
+
+#[wasm_bindgen_test]
+fn diagnostic_tags() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse("{}").unwrap(),
+    )
+    .expect("Workspace to be created");
+
+    workspace
+        .open_file(
+            "test.py",
+            "from typing_extensions import deprecated\n\n\
+             @deprecated(\"use replacement\")\n\
+             def old() -> None: ...\n\n\
+             old()\n\
+             value = 1  # ty: ignore\n",
+        )
+        .expect("File to be opened");
+
+    let result = workspace.check().expect("Check to succeed");
+    let tags = |id| {
+        result
+            .iter()
+            .find(|diagnostic| diagnostic.id() == id)
+            .map(ty_wasm::Diagnostic::tags)
+    };
+
+    assert_eq!(tags("deprecated"), Some(vec![DiagnosticTag::Deprecated]));
+    assert_eq!(
+        tags("unused-ignore-comment"),
+        Some(vec![DiagnosticTag::Unnecessary])
     );
 }
 
@@ -123,7 +160,7 @@ f(x=\"foo\")\n",
 }
 
 #[wasm_bindgen_test]
-fn sub_diagnostics_include_multiple_primary_annotations() {
+fn diagnostic_includes_secondary_annotations() {
     ty_wasm::before_main();
 
     let mut workspace = Workspace::new(
@@ -153,35 +190,49 @@ class VeryEggyOmelette(
         .iter()
         .find(|diagnostic| diagnostic.id() == "duplicate-base")
         .expect("Expected a duplicate-base diagnostic");
-    let sub_diagnostics = diagnostic.sub_diagnostics(&workspace);
-    let definition_detail = sub_diagnostics
-        .iter()
-        .find(|sub_diagnostic| {
-            sub_diagnostic.message
-                == "The definition of class `VeryEggyOmelette` will raise `TypeError` at runtime"
-        })
-        .expect("Expected a class definition sub-diagnostic");
+    let annotations = diagnostic.annotations(&workspace);
 
-    assert_eq!(definition_detail.annotations.len(), 3);
+    assert_eq!(annotations.len(), 4);
     assert_eq!(
-        definition_detail
-            .annotations
+        annotations
             .iter()
             .map(|annotation| annotation.primary)
             .collect::<Vec<_>>(),
-        [false, true, true]
+        [true, false, true, true]
     );
     assert_eq!(
-        definition_detail
-            .annotations
+        annotations
             .iter()
             .map(|annotation| annotation.message.as_deref())
             .collect::<Vec<_>>(),
         [
+            None,
             Some("Class `Eggs` first included in bases list here"),
             Some("Class `Eggs` later repeated here"),
             Some("Class `Eggs` later repeated here"),
         ]
+    );
+    assert!(
+        annotations
+            .iter()
+            .all(|annotation| annotation.location.is_some())
+    );
+
+    assert_eq!(
+        diagnostic
+            .sub_diagnostics(&workspace)
+            .iter()
+            .map(|sub_diagnostic| (
+                sub_diagnostic.severity,
+                sub_diagnostic.message.as_str(),
+                sub_diagnostic.annotations.len(),
+            ))
+            .collect::<Vec<_>>(),
+        [(
+            SubDiagnosticSeverity::Info,
+            "Definition of class `VeryEggyOmelette` will raise `TypeError` at runtime",
+            0,
+        )]
     );
 }
 

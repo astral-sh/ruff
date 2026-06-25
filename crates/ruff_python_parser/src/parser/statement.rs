@@ -355,6 +355,12 @@ impl<'src> Parser<'src> {
 
                 let start = self.node_start();
 
+                // test_err yield_after_comma
+                // def f(): 1, yield 1
+
+                // test_ok yield_after_comma_parenthesized
+                // def f(): 1, (yield 1)
+
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
                 let parsed_expr =
                     self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());

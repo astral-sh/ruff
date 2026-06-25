@@ -5,8 +5,9 @@ use crate::{
     Db, DisplaySettings,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
+        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
+        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
+        TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -134,6 +135,9 @@ pub enum KnownInstanceType<'db> {
     /// A `functools.partial(func, ...)` call result where we could determine
     /// the remaining callable signature after binding some arguments.
     FunctoolsPartial(FunctoolsPartialInstance<'db>),
+
+    /// A `range(...)` call result where we could determine whether it is non-empty.
+    Range { is_non_empty: bool },
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -153,6 +157,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_type_alias_type(db, type_alias);
         }
         KnownInstanceType::Deprecated(_)
+        | KnownInstanceType::Range { .. }
         | KnownInstanceType::ConstraintSet(_)
         | KnownInstanceType::GenericContext(_)
         | KnownInstanceType::Specialization(_) => {
@@ -221,6 +226,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::SubscriptedProtocol(context) => Some(Self::SubscriptedProtocol(context)),
             Self::SubscriptedGeneric(context) => Some(Self::SubscriptedGeneric(context)),
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
+            Self::Range { is_non_empty } => Some(Self::Range { is_non_empty }),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
@@ -288,6 +294,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Sentinel(_) => KnownClass::Sentinel,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
+            Self::Range { .. } => KnownClass::Range,
         }
     }
 
@@ -402,6 +409,12 @@ impl<'db> KnownInstanceType<'db> {
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::Range { .. } => match type_mapping {
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
+                    self.instance_fallback(db)
+                }
+                _ => Type::KnownInstance(self),
+            },
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
@@ -472,6 +485,7 @@ pub struct FieldInstance<'db> {
     pub kw_only: Option<bool>,
 
     /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
+    #[returns(ref)]
     pub alias: Option<Box<str>>,
 
     /// The converter types for this field, if a `converter` argument was provided.

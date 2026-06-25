@@ -876,7 +876,7 @@ When assigning to a union of `TypedDict` types, the type will be narrowed based 
 literal:
 
 ```py
-from typing import TypedDict
+from typing import TypeVar, TypedDict
 from typing_extensions import NotRequired
 
 class Foo(TypedDict):
@@ -908,6 +908,9 @@ reveal_type(x4)  # revealed: Bar
 x5: Foo | Bar = {"baz": 1}
 reveal_type(x5)  # revealed: Foo | Bar
 
+x5_fallback: Foo | Bar | dict[str, object] = {"baz": 1}
+reveal_type(x5_fallback)  # revealed: dict[str, object]
+
 class FooBar1(TypedDict):
     foo: int
     bar: int
@@ -929,6 +932,21 @@ reveal_type(x7)  # revealed: FooBar1 | FooBar3
 
 x8: FooBar1 | FooBar2 | FooBar3 | None = {"foo": 1, "bar": 1}
 reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3
+
+# Nested peer inference must still observe its speculative diagnostics while the outer dictionary
+# is tested against multiple TypedDicts.
+class PeerContainer(TypedDict):
+    nested: Foo
+
+PeerT = TypeVar("PeerT")
+
+def preserve_peer(value: PeerT) -> PeerT:
+    return value
+
+def _(payload: Foo | None):
+    # error: [invalid-assignment]
+    nested: PeerContainer | Bar = {"nested": preserve_peer(payload or {"unexpected": 1})}
+    reveal_type(nested)  # revealed: PeerContainer | Bar
 ```
 
 In doing so, may have to infer the same type with multiple distinct type contexts:
@@ -2626,24 +2644,54 @@ def _(p: Person) -> None:
 
 ## Special properties
 
+### Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
 `TypedDict` class definitions have some special properties that can be used for introspection:
 
 ```py
+from typing import TypedDict as TypingTypedDict
 from typing_extensions import TypedDict
+
+class StdlibPerson(TypingTypedDict):
+    name: str
+
+StdlibFunctionalPerson = TypingTypedDict("StdlibFunctionalPerson", {"name": str})
+DynamicStdlibPerson = type("DynamicStdlibPerson", (StdlibPerson,), {})
 
 class Person(TypedDict):
     name: str
     age: int | None
 
 FunctionalPerson = TypedDict("FunctionalPerson", {"name": str, "age": int | None})
+DynamicPerson = type("DynamicPerson", (Person,), {})
+
+class Employee(Person):
+    employee_id: int
+
+class GenericPerson[T](TypedDict):
+    value: T
+
+StdlibPerson.__closed__  # error: [unresolved-attribute]
+StdlibPerson.__readonly_keys__  # error: [unresolved-attribute]
+StdlibFunctionalPerson.__closed__  # error: [unresolved-attribute]
+DynamicStdlibPerson.__closed__  # error: [unresolved-attribute]
 
 reveal_type(Person.__total__)  # revealed: bool
 reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__closed__)  # revealed: bool | None
 reveal_type(Person.__extra_items__)  # revealed: Any
+reveal_type(Person.__readonly_keys__)  # revealed: frozenset[str]
 reveal_type(FunctionalPerson.__closed__)  # revealed: bool | None
 reveal_type(FunctionalPerson.__extra_items__)  # revealed: Any
+reveal_type(Employee.__closed__)  # revealed: bool | None
+reveal_type(DynamicPerson.__closed__)  # revealed: bool | None
+reveal_type(GenericPerson[int].__readonly_keys__)  # revealed: frozenset[str]
 ```
 
 These attributes cannot be accessed on inhabitants:
@@ -2680,9 +2728,57 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
     reveal_type(t_person.__extra_items__)  # revealed: Any
 
 accepts_typed_dict_class(Person)
+
+def accepts_stdlib_typed_dict_class(t_person: type[StdlibPerson]) -> None:
+    t_person.__closed__  # error: [unresolved-attribute]
+```
+
+### Python 3.13
+
+The standard-library `TypedDict` has the PEP 705 attributes on Python 3.13, but not the PEP 728
+attributes:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+
+reveal_type(Foo.__readonly_keys__)  # revealed: frozenset[str]
+Foo.__closed__  # error: [unresolved-attribute]
+```
+
+### Python 3.15
+
+On Python 3.15 and newer, classes defined using the standard-library `TypedDict` also have the PEP
+728 attributes:
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+
+reveal_type(Person.__closed__)  # revealed: bool | None
+reveal_type(Person.__extra_items__)  # revealed: Any
 ```
 
 ## Subclassing
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 `TypedDict` types can be subclassed. The subclass can add new keys:
 
@@ -2712,6 +2808,16 @@ def combine(p: Person, e: Employee):
     # compatible with `Person` (which simply doesn't require it).
     reveal_type(p | e)  # revealed: Person
     reveal_type(e | p)  # revealed: Person
+```
+
+The `TypedDict` special forms from `typing` and `typing_extensions` cannot both appear in the same
+bases list:
+
+```py
+from typing import TypedDict as TypingTypedDict
+from typing_extensions import TypedDict as TypingExtensionsTypedDict
+
+class MixedTypedDict(TypingTypedDict, TypingExtensionsTypedDict): ...  # error: [duplicate-base]
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
@@ -4385,6 +4491,36 @@ reveal_type(user_empty["name"])  # revealed: str
 reveal_type(user_partial["age"])  # revealed: int
 ```
 
+Compatibility imports that fall back to `typing_extensions.TypedDict` should also preserve
+`TypedDict` semantics:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+try:
+    from typing import TypedDict as CompatTypedDict
+except ImportError:
+    from typing_extensions import TypedDict as CompatTypedDict
+
+class FormattedError(CompatTypedDict, total=False):
+    message: str
+
+class ErrorMessage(CompatTypedDict):
+    payload: FormattedError
+
+# `__closed__` is only available on the `typing_extensions` branch for Python 3.12.
+FormattedError.__closed__  # error: [unresolved-attribute]
+
+error = ErrorMessage(payload={"message": "Subscription limit reached"})
+reveal_type(error["payload"])  # revealed: FormattedError
+
+FunctionalError = CompatTypedDict("FunctionalError", {"message": str}, total=False)
+functional_error: FunctionalError = {"message": "Subscription limit reached"}
+```
+
 ## Shadowing behavior
 
 When a local class shadows the `TypedDict` import, only the actual `TypedDict` import should be
@@ -4745,6 +4881,60 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
+Enum literals are also supported as tags:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def _(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    if u["tag"] == Tag.A:
+        reveal_type(u)  # revealed: WithEnumTagA
+    elif u["tag"] == Tag.B:
+        reveal_type(u)  # revealed: WithEnumTagB
+    else:
+        reveal_type(u)  # revealed: WithEnumTagC
+```
+
+Explicit enum aliases resolve to their canonical member:
+
+```py
+class AliasTag(Enum):
+    A = 1
+    ALSO_A = A
+    B = 2
+
+class WithAliasTagA(TypedDict):
+    tag: Literal[AliasTag.A]
+    a: int
+
+class WithAliasTagAlsoA(TypedDict):
+    tag: Literal[AliasTag.ALSO_A]
+    also_a: int
+
+class WithAliasTagB(TypedDict):
+    tag: Literal[AliasTag.B]
+
+def _(u: WithAliasTagA | WithAliasTagAlsoA | WithAliasTagB):
+    if u["tag"] == AliasTag.A:
+        reveal_type(u)  # revealed: WithAliasTagA | WithAliasTagAlsoA
+    else:
+        reveal_type(u)  # revealed: WithAliasTagB
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -5060,6 +5250,35 @@ def match_statements(u: Foo | Bar | Baz | Bing):
             reveal_type(u)  # revealed: Bing
 ```
 
+Enum literal tags are also supported in match statements:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    match u["tag"]:
+        case Tag.A:
+            reveal_type(u)  # revealed: WithEnumTagA
+        case Tag.B:
+            reveal_type(u)  # revealed: WithEnumTagB
+        case _:
+            reveal_type(u)  # revealed: WithEnumTagC
+```
+
 We can also narrow a single `TypedDict` type to `Never`:
 
 ```py
@@ -5127,6 +5346,30 @@ def match_with_dict(u: Foo | Bar | dict[Any, Any]):
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
             # false negative in `is_disjoint_impl`.
             reveal_type(u)  # revealed: Foo | (dict[Any, Any] & ~<TypedDict with items 'tag'>)
+```
+
+Loop variables over literal collections preserve literal key types for `TypedDict` subscripting:
+
+```py
+class EDict(TypedDict):
+    path: str
+
+def equality_key(example: EDict):
+    for key in ["path"]:
+        if key == "path":
+            reveal_type(key)  # revealed: Literal["path"]
+            reveal_type(example[key])  # revealed: str
+
+def match_key(example: EDict):
+    for key in ["path"]:
+        match key:
+            case "path":
+                reveal_type(key)  # revealed: Literal["path"]
+                reveal_type(example[key])  # revealed: str
+
+def comprehension_key(example: EDict):
+    values = [example[key] for key in ["path"]]
+    reveal_type(values)  # revealed: list[str]
 ```
 
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases

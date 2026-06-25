@@ -4,9 +4,7 @@ use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
-use crate::metadata::value::{
-    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
-};
+use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use anyhow::Context;
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
@@ -20,6 +18,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -78,7 +77,9 @@ pub struct Options {
     /// * `ignore`: Disable the rule.
     /// * `warn`: Enable the rule and create a warning diagnostic.
     /// * `error`: Enable the rule and create an error diagnostic.
-    ///   ty will exit with a non-zero code if any error diagnostics are emitted.
+    ///
+    /// By default, ty exits with code 1 if it emits any warning or error diagnostics.
+    /// Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
@@ -429,7 +430,7 @@ impl Options {
                 .as_deref()
                 .copied()
                 .unwrap_or_default(),
-            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or(true),
         };
 
         let src_options = self.src.or_default();
@@ -772,6 +773,10 @@ pub struct EnvironmentOptions {
     /// and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
+    ///
+    /// ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+    /// through 3.9 can still be selected, but ty may produce false positives or false negatives for
+    /// standard-library APIs because its bundled stubs do not fully describe those versions.
     ///
     /// If a version is not specified, ty will try the following techniques in order of preference
     /// to determine a value:
@@ -1430,15 +1435,15 @@ pub struct TerminalOptions {
         "#
     )]
     pub output_format: Option<RangedValue<OutputFormat>>,
-    /// Use exit code 1 if there are any warning-level diagnostics.
+    /// Use exit code 1, even if all diagnostics only had `warning` severity.
     ///
-    /// Defaults to `false`.
+    /// Defaults to `true`.
     #[option(
-        default = r#"false"#,
+        default = r#"true"#,
         value_type = "bool",
         example = r#"
-        # Error if ty emits any warning-level diagnostics.
-        error-on-warning = true
+        # Exit with code 0 if all diagnostics had `warning` severity.
+        error-on-warning = false
         "#
     )]
     pub error_on_warning: Option<bool>,
@@ -1756,7 +1761,18 @@ pub struct OverrideOptions {
     pub analysis: Option<AnalysisOptions>,
 }
 
-impl RangedValue<OverrideOptions> {
+trait ToOverride {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        global_analysis: Option<&AnalysisOptions>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>>;
+}
+
+impl ToOverride for RangedValue<OverrideOptions> {
     fn to_override(
         &self,
         db: &dyn Db,

@@ -1,9 +1,9 @@
 use lsp_types::{
     self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
     DiagnosticOptions, DiagnosticProvider, InlayHintOptions, MarkupKind, NotebookCellLanguage,
-    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, SemanticTokensLegend,
-    SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions, TextDocumentSyncKind,
-    TextDocumentSyncOptions, WorkDoneProgressOptions,
+    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, Save, SaveOptions,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
 
@@ -35,6 +35,7 @@ bitflags::bitflags! {
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
+        const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
     }
 }
 
@@ -174,6 +175,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
     }
 
+    /// Returns `true` if the client supports opening fully rendered diagnostics.
+    pub(crate) const fn supports_full_diagnostic_output(self) -> bool {
+        self.contains(Self::FULL_DIAGNOSTIC_OUTPUT)
+    }
+
     /// Returns `true` if the client supports "label details" in completion items.
     pub(crate) const fn supports_completion_item_label_details(self) -> bool {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
@@ -247,6 +253,17 @@ impl ResolvedClientCapabilities {
             {
                 flags |= Self::DIAGNOSTIC_RELATED_INFORMATION;
             }
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            // Protocol: crates/ty_server/README.md#full-diagnostic-output
+            .and_then(|experimental| experimental.get("fullDiagnosticOutput"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default()
+        {
+            flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
         }
 
         if text_document
@@ -416,6 +433,9 @@ pub(crate) fn server_capabilities(
             TextDocumentSyncOptions {
                 open_close: Some(true),
                 change: Some(TextDocumentSyncKind::Incremental),
+                save: Some(Save::SaveOptions(SaveOptions {
+                    include_text: Some(false),
+                })),
                 ..Default::default()
             }
             .into(),

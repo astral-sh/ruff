@@ -9,7 +9,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________^
   |
 help: Organize imports
+  |
   - ﻿import foo
   - import bar
 1 + ﻿import bar
 2 + import foo
+  |

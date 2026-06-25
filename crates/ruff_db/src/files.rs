@@ -110,7 +110,7 @@ impl Files {
 
                 let builder = File::builder(FilePath::from(absolute))
                     .durability(durability)
-                    .path_durability(Durability::HIGH);
+                    .path_durability(Durability::NEVER_CHANGE);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -161,7 +161,7 @@ impl Files {
                 let file = File::builder(FilePath::from(path))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
-                    .durability(Durability::HIGH)
+                    .durability(Durability::NEVER_CHANGE)
                     .new(db);
 
                 entry.insert(file);
@@ -181,11 +181,11 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::from(path))
-                .path_durability(Durability::HIGH)
+                .path_durability(Durability::NEVER_CHANGE)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
-                .permissions_durability(Durability::HIGH)
+                .permissions_durability(Durability::NEVER_CHANGE)
                 .new(db),
         );
         self.inner

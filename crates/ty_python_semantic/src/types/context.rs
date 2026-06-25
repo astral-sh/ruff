@@ -43,6 +43,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     file: File,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
+    diagnostics_suppressed: bool,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
@@ -56,6 +57,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             module,
             file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
+            diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
@@ -105,6 +107,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(super) fn has_diagnostics(&self) -> bool {
         !self.diagnostics.borrow().is_empty()
+    }
+
+    /// Prevents diagnostic construction for this inference context.
+    pub(super) fn suppress_diagnostics(&mut self) {
+        debug_assert!(!self.diagnostics_suppressed);
+        self.diagnostics_suppressed = true;
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
@@ -410,6 +418,10 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: LintId,
     ) -> Option<(Severity, LintSource)> {
+        if ctx.diagnostics_suppressed {
+            return None;
+        }
+
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
         // has been refactored, but this still kind of looked
@@ -530,6 +542,10 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
+        if ctx.diagnostics_suppressed {
+            return None;
+        }
+
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }

@@ -27,9 +27,9 @@ if sys.version_info >= (3, 13):
 class Queue(_LoopBoundMixin, Generic[_T]):
     """A queue, useful for coordinating producer and consumer coroutines.
 
-    If maxsize is less than or equal to zero, the queue size is infinite. If it
-    is an integer greater than 0, then "await put()" will block when the
-    queue reaches maxsize, until an item is removed by get().
+    If maxsize is less than or equal to zero, the queue size is infinite.
+    If it is an integer greater than 0, then "await put()" will block when
+    the queue reaches maxsize, until an item is removed by get().
 
     Unlike queue.Queue, you can reliably know this Queue's size
     with qsize(), since your single-threaded asyncio application won't be
@@ -80,26 +80,28 @@ class Queue(_LoopBoundMixin, Generic[_T]):
 
         If queue is empty, wait until an item is available.
 
-        Raises QueueShutDown if the queue has been shut down and is empty, or
-        if the queue has been shut down immediately.
+        Raises QueueShutDown if the queue has been shut down and is empty,
+        or if the queue has been shut down immediately.
         """
 
     def get_nowait(self) -> _T:
         """Remove and return an item from the queue.
 
-        Return an item if one is immediately available, else raise QueueEmpty.
+        Return an item if one is immediately available, else raise
+        QueueEmpty.
 
-        Raises QueueShutDown if the queue has been shut down and is empty, or
-        if the queue has been shut down immediately.
+        Raises QueueShutDown if the queue has been shut down and is empty,
+        or if the queue has been shut down immediately.
         """
 
     async def join(self) -> None:
         """Block until all items in the queue have been gotten and processed.
 
-        The count of unfinished tasks goes up whenever an item is added to the
-        queue. The count goes down whenever a consumer calls task_done() to
-        indicate that the item was retrieved and all work on it is complete.
-        When the count of unfinished tasks drops to zero, join() unblocks.
+        The count of unfinished tasks goes up whenever an item is added to
+        the queue.  The count goes down whenever a consumer calls
+        task_done() to indicate that the item was retrieved and all work on
+        it is complete.  When the count of unfinished tasks drops to zero,
+        join() unblocks.
         """
 
     def task_done(self) -> None:
@@ -109,18 +111,19 @@ class Queue(_LoopBoundMixin, Generic[_T]):
         a subsequent call to task_done() tells the queue that the processing
         on the task is complete.
 
-        If a join() is currently blocking, it will resume when all items have
-        been processed (meaning that a task_done() call was received for every
-        item that had been put() into the queue).
+        If a join() is currently blocking, it will resume when all items
+        have been processed (meaning that a task_done() call was received
+        for every item that had been put() into the queue).
 
-        Raises ValueError if called more times than there were items placed in
-        the queue.
+        Raises ValueError if called more times than there were items placed
+        in the queue.
         """
 
     def __class_getitem__(cls, type: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
     if sys.version_info >= (3, 13):

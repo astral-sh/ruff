@@ -113,6 +113,7 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
+    Hashable,
     SupportsIndex,
     Iterable,
     Iterator,
@@ -217,6 +218,7 @@ impl KnownClass {
             | Self::GenericAlias
             | Self::NewType
             | Self::StdlibAlias
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::Set
             | Self::Int
@@ -351,6 +353,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -454,6 +457,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -557,6 +561,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -604,7 +609,8 @@ impl KnownClass {
     /// 2. It's probably more performant.
     pub(crate) const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex
+            Self::Hashable
+            | Self::SupportsIndex
             | Self::Iterable
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
@@ -782,6 +788,7 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::TyExtensionsAsyncIterable
@@ -863,10 +870,11 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
-            Self::Sentinel => "Sentinel",
+            Self::Sentinel => "sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
+            Self::Hashable => "Hashable",
             Self::SupportsIndex => "SupportsIndex",
             Self::ChainMap => "ChainMap",
             Self::Counter => "Counter",
@@ -1244,16 +1252,23 @@ impl KnownClass {
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::ParamSpec
+            | Self::Hashable
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
-            | Self::Sentinel
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::Sentinel => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY315 {
+                    KnownModule::Builtins
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1342,6 +1357,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::VersionInfo
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeAliasType
@@ -1439,6 +1455,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::StdlibAlias
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
@@ -1563,7 +1580,7 @@ impl KnownClass {
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
-            "Sentinel" => &[Self::Sentinel],
+            "sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
             "defaultdict" => &[Self::DefaultDict],
@@ -1572,6 +1589,7 @@ impl KnownClass {
             "_Alias" => &[Self::StdlibAlias],
             "_SpecialForm" => &[Self::SpecialForm],
             "_NoDefaultType" => &[Self::NoDefaultType],
+            "Hashable" => &[Self::Hashable],
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
@@ -1703,6 +1721,7 @@ impl KnownClass {
             Self::SpecialForm
             | Self::TypeAliasType
             | Self::NoDefaultType
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs

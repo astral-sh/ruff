@@ -1110,12 +1110,7 @@ fn config_file_unsupported_python_version() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`: TOML parse error at line 3, column 18
-      |
-    3 | python-version = "2.7"
-      |                  ^^^^^
-    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
-
+      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`
       Cause: TOML parse error at line 3, column 18
       |
     3 | python-version = "2.7"
@@ -1213,9 +1208,9 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.
      --> venv/pyvenv.cfg:2:16
@@ -1226,7 +1221,7 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
     info: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.
     info: Set `environment.python-version` explicitly to override the inferred version.
     info: The version was inferred from your virtual environment metadata.
-    
+
     Found 1 diagnostic
 
     ----- stderr -----
@@ -2285,8 +2280,8 @@ fn src_root_deprecation_warning() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
      --> pyproject.toml:3:8
@@ -2320,8 +2315,8 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
      --> pyproject.toml:3:8
@@ -2362,8 +2357,8 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
     // The test should pass because environment.root points to ./app where my_module.py exists
     // If src.root took precedence, it would fail because my_module.py doesn't exist in ./src
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
      --> pyproject.toml:3:8

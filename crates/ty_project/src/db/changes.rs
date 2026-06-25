@@ -264,8 +264,9 @@ impl ProjectDatabase {
             match new_project_metadata {
                 Ok(mut metadata) => {
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
+                        let error = anyhow::Error::new(error);
                         tracing::error!(
-                            "Failed to apply configuration files, continuing without applying them: {error}"
+                            "Failed to apply configuration files, continuing without applying them: {error:#}"
                         );
                     }
 
@@ -327,8 +328,9 @@ impl ProjectDatabase {
                     }
                 }
                 Err(error) => {
+                    let error = anyhow::Error::new(error);
                     tracing::error!(
-                        "Failed to load project, keeping old project configuration: {error}"
+                        "Failed to load project, keeping old project configuration: {error:#}"
                     );
                     if reload_project_files {
                         project.reload_files(self);

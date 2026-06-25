@@ -1,0 +1,71 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: first_response
+---
+RelatedFullDocumentDiagnosticReport(
+    RelatedFullDocumentDiagnosticReport {
+        related_documents: None,
+        full_document_diagnostic_report: FullDocumentDiagnosticReport {
+            result_id: Some(
+                "[RESULT_ID]",
+            ),
+            items: [
+                Diagnostic {
+                    range: Range {
+                        start: Position {
+                            line: 1,
+                            character: 11,
+                        },
+                        end: Position {
+                            line: 1,
+                            character: 13,
+                        },
+                    },
+                    severity: Some(
+                        Error,
+                    ),
+                    code: Some(
+                        String(
+                            "invalid-return-type",
+                        ),
+                    ),
+                    code_description: Some(
+                        CodeDescription {
+                            href: Url {
+                                scheme: "https",
+                                cannot_be_a_base: false,
+                                username: "",
+                                password: None,
+                                host: Some(
+                                    Domain(
+                                        "ty.dev",
+                                    ),
+                                ),
+                                port: None,
+                                path: "/rules",
+                                query: None,
+                                fragment: Some(
+                                    "invalid-return-type",
+                                ),
+                            },
+                        },
+                    ),
+                    source: Some(
+                        "ty",
+                    ),
+                    message: String(
+                        "Return type does not match returned value: expected `str`, found `Literal[42]`",
+                    ),
+                    tags: None,
+                    related_information: None,
+                    data: Some(
+                        Object {
+                            "diagnostic_id": String("invalid-return-type"),
+                            "rendered": String("error[invalid-return-type]: Return type does not match returned value\n --> src/foo.py:1:14\n  |\n1 | def foo() -> str:\n  |              --- Expected `str` because of return type\n2 |     return 42  # before\n  |            ^^ expected `str`, found `Literal[42]`\n  |\n\n"),
+                        },
+                    ),
+                },
+            ],
+        },
+    },
+)

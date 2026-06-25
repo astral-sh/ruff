@@ -2,7 +2,7 @@
 
 A type is single-valued iff it is not empty and all inhabitants of it compare equal.
 
-```py
+```pyi
 import types
 from types import UnionType
 from typing_extensions import Any, Literal, LiteralString, Never, Callable, TypeAliasType
@@ -62,8 +62,8 @@ An enum literal is only considered single-valued if it has no custom `__eq__`/`_
 these methods always return `True`/`False`, respectively. Otherwise, the single member of the enum
 literal type might not compare equal to itself.
 
-```py
-from ty_extensions import Intersection, is_single_valued, static_assert, TypeOf
+```pyi
+from ty_extensions import is_single_valued, static_assert, TypeOf
 from enum import Enum
 
 class NormalEnum(Enum):
@@ -111,7 +111,7 @@ def _(value: NormalEnum) -> None:
         return
     static_assert(is_single_valued(TypeOf[value]))
 
-def _(value: Intersection[NormalEnum, Any]) -> None:
+def _(value: NormalEnum & Any) -> None:
     if value is NormalEnum.NO:
         return
     static_assert(not is_single_valued(TypeOf[value]))
