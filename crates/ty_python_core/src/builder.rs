@@ -3483,11 +3483,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let literal_iterable_is_non_empty = if *is_async {
-                    None
-                } else {
-                    literal_iterable_truthiness(iter).into_bool()
-                };
+                let literal_iterable_is_non_empty = (!*is_async)
+                    .then(|| literal_iterable_truthiness(iter))
+                    .and_then(Truthiness::into_bool);
 
                 let (after_empty_iter, non_empty_range_constraint) =
                     match literal_iterable_is_non_empty {
