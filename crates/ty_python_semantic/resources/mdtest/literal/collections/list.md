@@ -45,6 +45,27 @@ annotated.append(1)
 reveal_type(bool(annotated))  # revealed: bool
 ```
 
+Potentially mutating calls can return an argument or receiver, so their results preserve exact
+runtime class but not cardinality unless the call's cardinality behavior is explicitly modeled:
+
+```py
+from typing import Any, TypeVar, cast
+
+T = TypeVar("T")
+
+def append_and_return(value: T) -> T:
+    cast(Any, value).append(1)
+    return value
+
+reveal_type(type([].__iadd__([1])))  # revealed: <class 'list'>
+reveal_type(bool([].__iadd__([1])))  # revealed: bool
+reveal_type(len([].__iadd__([1])))  # revealed: int
+
+reveal_type(type(append_and_return([])))  # revealed: <class 'list'>
+reveal_type(bool(append_and_return([])))  # revealed: bool
+reveal_type(len(append_and_return([])))  # revealed: int
+```
+
 ## List of tuples
 
 ```py
