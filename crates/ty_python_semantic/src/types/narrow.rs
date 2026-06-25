@@ -24,8 +24,8 @@ use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, SequencePatternPredicateKind, SubjectElementPatternPredicate,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    SequencePatternPredicateKind, SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
@@ -1271,8 +1271,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     is_positive,
                 ))
             }
-            PatternPredicateKind::Mapping(kind) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_mapping(subject, *kind, is_positive),
+            PatternPredicateKind::Mapping(_) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_mapping(subject, pattern_predicate_kind, is_positive),
             ),
             PatternPredicateKind::Sequence(kind) => {
                 self.evaluate_match_pattern_sequence(subject, kind, is_positive)
@@ -2955,21 +2955,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         if !is_positive {
-            let subject_place =
-                PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-            let place = self.expect_place(&subject_place);
-            let subject_ty =
-                infer_same_file_expression_type(self.db, subject, TypeContext::default());
-            let definitely_matched =
-                definite_match_pattern_type_for_subject(self.db, pattern, subject_ty);
-            if definitely_matched.is_never() {
-                return None;
-            }
-
-            return Some(NarrowingConstraints::from_iter([(
-                place,
-                NarrowingConstraint::intersection(definitely_matched.negate(self.db)),
-            )]));
+            return self.evaluate_negative_match_pattern(subject, pattern);
         }
 
         let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
@@ -2986,26 +2972,44 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_match_pattern_mapping(
         &mut self,
         subject: Expression<'db>,
-        kind: ClassPatternKind,
+        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        if !kind.is_irrefutable() && !is_positive {
-            return None;
+        if !is_positive {
+            return self.evaluate_negative_match_pattern(subject, pattern);
         }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject);
-        let mapping_type = ClassInfoConstraintFunction::IsInstance
-            .generate_constraint(
-                self.db,
-                KnownClass::Mapping.to_class_literal(self.db),
-                is_positive,
-            )?
-            .negate_if(self.db, !is_positive);
+        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&subject_place);
+        let mapping_type = ClassInfoConstraintFunction::IsInstance.generate_constraint(
+            self.db,
+            KnownClass::Mapping.to_class_literal(self.db),
+            true,
+        )?;
 
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(mapping_type),
+        )]))
+    }
+
+    fn evaluate_negative_match_pattern(
+        &self,
+        subject: Expression<'db>,
+        pattern: &PatternPredicateKind<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&subject_place);
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let definitely_matched =
+            definite_match_pattern_type_for_subject(self.db, pattern, subject_ty);
+        if definitely_matched.is_never() {
+            return None;
+        }
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(definitely_matched.negate(self.db)),
         )]))
     }
 

@@ -43,9 +43,9 @@ use crate::place::{
     match_subject_place_expressions,
 };
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternKind,
-    ClassPatternPredicateKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-    PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
+    CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
+    MappingPatternEntryPredicateKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
     StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
@@ -2062,13 +2062,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchMapping(pattern) => {
-                // `case {}` and `case {**rest}` match every mapping, while keyed mapping
-                // patterns are refutable (`case {"x": _}` may fail for some mappings).
-                PatternPredicateKind::Mapping(if pattern.keys.is_empty() {
-                    ClassPatternKind::Irrefutable
-                } else {
-                    ClassPatternKind::Refutable
-                })
+                // Retain keyed entries for subject-aware exhaustiveness analysis.
+                PatternPredicateKind::Mapping(
+                    pattern
+                        .keys
+                        .iter()
+                        .zip(&pattern.patterns)
+                        .map(|(key, pattern)| MappingPatternEntryPredicateKind {
+                            key: self.add_standalone_expression(key),
+                            pattern: self.predicate_kind(pattern),
+                        })
+                        .collect(),
+                )
             }
             ast::Pattern::MatchSequence(pattern) => {
                 PatternPredicateKind::Sequence(SequencePatternPredicateKind {

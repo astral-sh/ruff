@@ -771,6 +771,144 @@ def builtin_positional_patterns_are_exhaustive(
             return 1
 ```
 
+## `TypedDict` class patterns at runtime
+
+A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapping` patterns always
+match it. The positional `dict` pattern does as well. This also applies when the subject is a
+truthiness-narrowed intersection or a type variable bounded by or constrained to `TypedDict`s:
+
+```py
+from collections.abc import Mapping
+from typing import TypeVar, TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+class OptionalMovie(TypedDict, total=False):
+    title: str
+
+class Series(TypedDict):
+    seasons: int
+
+T = TypeVar("T", bound=Movie)
+U = TypeVar("U", Movie, Series)
+
+def argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict():
+            return 1
+
+def mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case Mapping():
+            return 1
+
+def positional_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict(_):
+            return 1
+
+def narrowed_typed_dict_pattern_is_exhaustive(value: OptionalMovie) -> int:
+    if not value:
+        return 0
+    match value:
+        case dict():
+            return 1
+
+def bounded_typed_dict_pattern_is_exhaustive(value: T) -> int:
+    match value:
+        case dict():
+            return 1
+
+def constrained_typed_dict_pattern_is_exhaustive(value: U) -> int:
+    match value:
+        case dict():
+            return 1
+```
+
+## Required `TypedDict` keys
+
+A mapping pattern is exhaustive for a `TypedDict` when every key in the pattern names a required
+field and every value pattern matches all values allowed for that field. The negative cases below
+exercise three separate checks: an optional field, an unknown key, and a non-string key.
+
+```py
+from typing import Any, Literal, Protocol, TypeVar, TypedDict
+from ty_extensions import Intersection, Unknown
+
+class RequiredPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class OptionalPayload(TypedDict, total=False):
+    value: int
+
+class DynamicPayload(TypedDict):
+    any_value: Any
+    unknown_value: Unknown
+
+class AlternatePayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class Marker(Protocol):
+    marker: int
+
+P = TypeVar("P", bound=RequiredPayload)
+Q = TypeVar("Q", RequiredPayload, AlternatePayload)
+
+def required_typed_dict_keys_are_exhaustive(value: RequiredPayload) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def universal_nested_patterns_are_exhaustive(value: DynamicPayload) -> int:
+    match value:
+        case {"any_value": object(), "unknown_value": object()}:
+            return 1
+
+def bounded_typed_dict_mapping_is_exhaustive(value: P) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def constrained_typed_dict_mapping_is_exhaustive(value: Q) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def intersected_typed_dict_mapping_is_exhaustive(
+    value: Intersection[RequiredPayload, Marker],
+) -> int:
+    match value:
+        case {"tag": "int", "value": int()}:
+            return 1
+
+def optional_key_is_not_exhaustive(
+    value: OptionalPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {"value": _}:
+            return 1
+
+def absent_key_is_not_exhaustive(
+    value: RequiredPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {"missing": _}:
+            return 1
+
+def non_string_key_is_not_exhaustive(
+    value: RequiredPayload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case {1: _}:
+            return 1
+```
+
 ## `NamedTuple` positional patterns
 
 A `NamedTuple` provides a generated `__match_args__` tuple containing all of its fields:

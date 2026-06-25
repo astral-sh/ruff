@@ -2538,7 +2538,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     rest,
                 } = match_mapping;
                 for key in keys {
-                    self.infer_expression(key, TypeContext::default());
+                    self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
                 for pattern in patterns {
                     self.infer_nested_match_pattern(pattern);
