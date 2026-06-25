@@ -774,14 +774,24 @@ def builtin_positional_patterns_are_exhaustive(
 ## `TypedDict` class patterns at runtime
 
 A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapping` patterns always
-match it. The positional `dict` pattern does as well:
+match it. The positional `dict` pattern does as well. This also applies when the subject is a
+truthiness-narrowed intersection or a type variable bounded by or constrained to `TypedDict`s:
 
 ```py
 from collections.abc import Mapping
-from typing import TypedDict
+from typing import TypeVar, TypedDict
 
 class Movie(TypedDict):
     title: str
+
+class OptionalMovie(TypedDict, total=False):
+    title: str
+
+class Series(TypedDict):
+    seasons: int
+
+T = TypeVar("T", bound=Movie)
+U = TypeVar("U", Movie, Series)
 
 def argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
     match value:
@@ -796,6 +806,23 @@ def mapping_pattern_is_exhaustive(value: Movie) -> int:
 def positional_dict_pattern_is_exhaustive(value: Movie) -> int:
     match value:
         case dict(_):
+            return 1
+
+def narrowed_typed_dict_pattern_is_exhaustive(value: OptionalMovie) -> int:
+    if not value:
+        return 0
+    match value:
+        case dict():
+            return 1
+
+def bounded_typed_dict_pattern_is_exhaustive(value: T) -> int:
+    match value:
+        case dict():
+            return 1
+
+def constrained_typed_dict_pattern_is_exhaustive(value: U) -> int:
+    match value:
+        case dict():
             return 1
 ```
 

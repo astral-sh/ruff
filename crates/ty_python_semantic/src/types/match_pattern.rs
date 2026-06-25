@@ -14,8 +14,9 @@ use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext, UnionType, binding_type,
-    equality_truthiness, infer_same_file_expression_type,
+    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, binding_type, equality_truthiness,
+    infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -47,6 +48,32 @@ fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> boo
     };
     Type::instance(db, dict.top_materialization(db))
         .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
+}
+
+/// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
+fn is_typed_dict_pattern_domain(db: &dyn Db, ty: Type<'_>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::TypedDict(_) => true,
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_typed_dict_pattern_domain(db, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .all(|constraint| is_typed_dict_pattern_domain(db, *constraint)),
+            None => false,
+        },
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_typed_dict_pattern_domain(db, *element)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| is_typed_dict_pattern_domain(db, *element)),
+        _ => false,
+    }
 }
 
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
@@ -204,7 +231,7 @@ fn class_pattern_is_exhaustive(
 ) -> bool {
     let class_instance_ty = Type::instance(db, class.top_materialization(db));
     let is_typed_dict_match =
-        matches!(subject_ty, Type::TypedDict(_)) && typed_dict_matches_class_pattern(db, class);
+        is_typed_dict_pattern_domain(db, subject_ty) && typed_dict_matches_class_pattern(db, class);
     if !is_typed_dict_match && !subject_ty.is_subtype_of(db, class_instance_ty) {
         return false;
     }
