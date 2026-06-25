@@ -424,19 +424,29 @@ fn match_args_positional_result<'db>(
     }
 
     if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
-        let tuple = tuple.as_fixed_length()?;
-        if positional_count > tuple.len() {
-            return Some(ClassPatternPositionalResult::Limit(tuple.len()));
-        }
-        if let Some(index) = tuple
-            .elements_slice()
-            .iter()
-            .take(positional_count)
-            .position(|element| match_args_element_is_not_exact_string(db, *element))
+        if let Some(tuple) = tuple.as_fixed_length() {
+            if positional_count > tuple.len() {
+                return Some(ClassPatternPositionalResult::Limit(tuple.len()));
+            }
+            if let Some(index) = tuple
+                .elements_slice()
+                .iter()
+                .take(positional_count)
+                .position(|element| match_args_element_is_not_exact_string(db, *element))
+            {
+                Some(ClassPatternPositionalResult::InvalidElement(index))
+            } else {
+                Some(ClassPatternPositionalResult::Limit(tuple.len()))
+            }
+        } else if positional_count > 0
+            && tuple.fixed_elements().next().is_none()
+            && tuple
+                .variable_element()
+                .is_some_and(|element| match_args_element_is_not_exact_string(db, *element))
         {
-            Some(ClassPatternPositionalResult::InvalidElement(index))
+            Some(ClassPatternPositionalResult::InvalidElement(0))
         } else {
-            Some(ClassPatternPositionalResult::Limit(tuple.len()))
+            None
         }
     } else if match_args.tuple_instance_spec(db).is_some()
         || match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
@@ -459,7 +469,9 @@ fn match_args_element_is_not_exact_string(db: &dyn Db, element: Type<'_>) -> boo
     let str_instance = KnownClass::Str.to_instance(db);
     match element {
         Type::NominalInstance(_) => {
-            element.is_subtype_of(db, str_instance) && !element.is_instance_of(db, KnownClass::Str)
+            (element.is_subtype_of(db, str_instance)
+                && !element.is_instance_of(db, KnownClass::Str))
+                || element.is_disjoint_from(db, str_instance)
         }
         Type::LiteralValue(literal) => {
             literal.as_enum().is_some_and(|enum_literal| {

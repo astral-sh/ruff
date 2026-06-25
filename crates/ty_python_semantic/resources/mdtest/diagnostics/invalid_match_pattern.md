@@ -172,6 +172,26 @@ def describe(p: Point) -> None:
             pass
 ```
 
+## Homogeneous `__match_args__` element types
+
+```py
+class InvalidElements:
+    __match_args__: tuple[int, ...] = ()
+
+class StringElements:
+    __match_args__: tuple[str, ...] = ()
+
+def describe_invalid(value: InvalidElements) -> None:
+    match value:
+        case InvalidElements(_):  # error: [invalid-match-pattern]
+            pass
+
+def describe_strings(value: StringElements) -> None:
+    match value:
+        case StringElements(_):
+            pass
+```
+
 ## PEP 695 type alias
 
 ```toml
