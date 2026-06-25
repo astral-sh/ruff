@@ -158,6 +158,37 @@ def describe(p: Plain) -> None:
             pass
 ```
 
+## Annotation-only `__match_args__`
+
+`model.pyi`:
+
+```pyi
+from typing import Literal
+
+class StubModel:
+    __match_args__: tuple[Literal["value"]]
+```
+
+`main.py`:
+
+```python
+from typing import Literal
+
+from model import StubModel
+
+class SourceModel:
+    __match_args__: tuple[Literal["value"]]
+
+def describe(source: SourceModel, stub: StubModel) -> None:
+    match source:
+        case SourceModel(_):  # error: [invalid-match-pattern]
+            pass
+
+    match stub:
+        case StubModel(_):
+            pass
+```
+
 ## Dataclass with `match_args=False`
 
 ```python

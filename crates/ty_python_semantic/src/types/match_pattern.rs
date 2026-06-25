@@ -1,3 +1,4 @@
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
@@ -308,13 +309,28 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
                 provenance,
                 ..
             },
-        ) if place.is_definitely_defined() => ClassMatchArgs::Defined(if origin.is_declared() {
-            ty
-        } else {
-            provenance
-                .definition()
-                .map_or(ty, |definition| binding_type(db, definition))
-        }),
+        ) if place.is_definitely_defined() => {
+            if origin.is_declared()
+                && provenance.definition().is_some_and(|definition| {
+                    let file = definition.file(db);
+                    let module = parsed_module(db, file).load(db);
+                    !definition
+                        .kind(db)
+                        .category(file.is_stub(db), &module)
+                        .is_binding()
+                })
+            {
+                ClassMatchArgs::Undefined
+            } else {
+                ClassMatchArgs::Defined(if origin.is_declared() {
+                    ty
+                } else {
+                    provenance
+                        .definition()
+                        .map_or(ty, |definition| binding_type(db, definition))
+                })
+            }
+        }
         Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
         Place::Undefined => ClassMatchArgs::Undefined,
     }
