@@ -46,13 +46,7 @@ enum KnownEnumDataTypeMixin {
 impl KnownEnumDataTypeMixin {
     fn normalize_value<'db>(self, db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
         if let Type::Union(union) = value {
-            return UnionType::from_elements(
-                db,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| self.normalize_value(db, *element)),
-            );
+            return union.map(db, |element| self.normalize_value(db, *element));
         }
 
         match (self, value.as_literal_value_kind()) {
@@ -923,9 +917,10 @@ pub(crate) fn enum_metadata<'db>(
     });
     // CPython checks `__new_member__` and then `__new__` on each enum base before continuing
     // through the MRO or falling back to the data-type constructor.
+    let inherited_data_type_mixin = inherited_data_type_mixin(db, class);
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
         .or_else(|| inherited_user_defined_enum_new(db, class))
-        .or_else(|| inherited_user_defined_mixin_new(db, class));
+        .or(inherited_data_type_mixin.new);
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
@@ -940,7 +935,7 @@ pub(crate) fn enum_metadata<'db>(
         init,
         new,
         generate_next_value,
-        known_data_type_mixin: inherited_known_data_type_mixin(db, class),
+        known_data_type_mixin: inherited_data_type_mixin.known,
         metaclass_may_transform_values,
     };
 
@@ -1233,6 +1228,12 @@ enum EnumMethodBinding<'db> {
     Opaque,
 }
 
+#[derive(Clone, Copy, Default)]
+struct InheritedDataTypeMixin<'db> {
+    new: Option<EnumMethodBinding<'db>>,
+    known: Option<KnownEnumDataTypeMixin>,
+}
+
 /// Returns the enum method defined in `scope`, including opaque bindings.
 fn custom_enum_method<'db>(
     db: &'db dyn Db,
@@ -1282,47 +1283,46 @@ fn inherited_user_defined_enum_new<'db>(
         })
 }
 
-/// Looks up a user-defined `__new__` on a data-type mixin anywhere in the MRO, including through an
-/// enum base.
+/// Looks up the constructor behavior inherited from a data-type mixin.
 ///
 /// When no enum class provides a member constructor, `EnumType` uses this method to construct the
-/// scalar payload stored by the enum member.
-fn inherited_user_defined_mixin_new<'db>(
+/// scalar payload stored by the enum member. `StrEnum.__new__` validates that values are already
+/// strings instead of applying `str()`.
+fn inherited_data_type_mixin<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
-) -> Option<EnumMethodBinding<'db>> {
-    class
+) -> InheritedDataTypeMixin<'db> {
+    let mut result = InheritedDataTypeMixin::default();
+    let mut has_str_enum_constructor = false;
+
+    for base in class
         .iter_mro(db, None)
         .skip(1)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| class.class_literal(db).as_static())
-        .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
-}
+    {
+        match base.known(db) {
+            Some(KnownClass::Int) if result.known.is_none() => {
+                result.known = Some(KnownEnumDataTypeMixin::Int);
+            }
+            Some(KnownClass::Str) if result.known.is_none() => {
+                result.known = Some(KnownEnumDataTypeMixin::Str);
+            }
+            Some(KnownClass::StrEnum) => has_str_enum_constructor = true,
+            None if result.new.is_none() => {
+                result.new = custom_enum_method(db, base.body_scope(db), "__new__");
+            }
+            _ => {}
+        }
+    }
 
-/// Looks up a built-in data-type mixin that coerces member values during construction.
-///
-/// `StrEnum.__new__` validates that values are already strings instead of applying `str()`.
-fn inherited_known_data_type_mixin<'db>(
-    db: &'db dyn Db,
-    class: StaticClassLiteral<'db>,
-) -> Option<KnownEnumDataTypeMixin> {
-    let has_str_enum_constructor = class
-        .iter_mro(db, None)
-        .skip(1)
-        .filter_map(ClassBase::into_class)
-        .any(|base| base.known(db) == Some(KnownClass::StrEnum));
-
-    class
-        .iter_mro(db, None)
-        .skip(1)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).as_static())
-        .find_map(|base| match base.known(db) {
-            Some(KnownClass::Int) => Some(KnownEnumDataTypeMixin::Int),
-            Some(KnownClass::Str) if !has_str_enum_constructor => Some(KnownEnumDataTypeMixin::Str),
-            _ => None,
-        })
+    // Although non-string `StrEnum` members are invalid at runtime, we still model the class for
+    // error recovery. Applying ordinary `str` normalization would incorrectly make values such as
+    // `1` aliases of string members with the value `"1"`.
+    if has_str_enum_constructor && result.known == Some(KnownEnumDataTypeMixin::Str) {
+        result.known = None;
+    }
+    result
 }
 
 /// Looks up a resolvable method inherited from a known enum class.
