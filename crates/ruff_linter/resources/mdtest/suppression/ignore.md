@@ -40,6 +40,30 @@ class Point:
         self.x = x
 ```
 
+## Leading indentation is included in the suppression range
+
+Trailing ignores should suppress diagnostics whose ranges start in the line's indentation:
+
+```toml
+[lint]
+preview = true
+select = ["E111", "E117", "RUF100"]
+```
+
+```py
+if True:
+   first = 1  # ruff:ignore[indentation-with-invalid-multiple]
+   second = 2  # ruff:ignore[indentation-with-invalid-multiple]
+```
+
+Standalone ignores should include their own indentation and the indentation of the following line:
+
+```py
+def function():
+        # ruff:ignore[over-indented]
+        pass
+```
+
 ## Empty diagnostic range at end of file
 
 Diagnostics with empty ranges should also be suppressible, as with `noqa`.

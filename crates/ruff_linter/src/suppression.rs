@@ -806,7 +806,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     {
                         // own-line ignore
                         let mut range =
-                            Self::standalone_comment_range(suppression.range, before, after);
+                            self.standalone_comment_range(suppression.range, before, after);
 
                         // Allow an ignore to suppress diagnostics on a leading shebang.
                         if let Some(shebang) = leading_shebang_range(self.source, tokens)
@@ -944,8 +944,8 @@ impl<'a> SuppressionsBuilder<'a> {
     /// Find the relevant range to cover for own-line suppression comments
     ///
     /// When placed above a "logical line", either a single- or multi-line statement or
-    /// suite header, this should return the range from the start of the comment to the end
-    /// of the entire logical line:
+    /// suite header, this should return the range from the start of the comment's physical line to
+    /// the end of the entire logical line:
     ///
     /// ```py
     ///
@@ -969,8 +969,8 @@ impl<'a> SuppressionsBuilder<'a> {
     /// ```
     ///
     /// When placed "inside" of a logical line, ie, above any line within a multi-line statement
-    /// or suite header, this should return only the range from the start of the comment to the
-    /// end of the next "physical" (non-comment) line:
+    /// or suite header, this should return only the range from the start of the comment's physical
+    /// line to the end of the next "physical" (non-comment) line:
     ///
     /// ```py
     ///
@@ -983,7 +983,12 @@ impl<'a> SuppressionsBuilder<'a> {
     /// ]
     ///
     /// ```
-    fn standalone_comment_range(range: TextRange, before: &[Token], after: &[Token]) -> TextRange {
+    fn standalone_comment_range(
+        &self,
+        range: TextRange,
+        before: &[Token],
+        after: &[Token],
+    ) -> TextRange {
         let mut end = range.end();
         let mut is_inner_comment = false;
 
@@ -1030,7 +1035,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        TextRange::new(range.start(), end)
+        TextRange::new(self.source.line_start(range.start()), end)
     }
 
     /// Find the relevant range to cover for trailing end-of-line suppression comments
@@ -1078,6 +1083,8 @@ impl<'a> SuppressionsBuilder<'a> {
                 }
             }
         }
+
+        let start = self.source.line_start(start);
 
         // Until the end of the line.
         let end = self.source.line_end(range.end());
@@ -2120,7 +2127,7 @@ print(
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "'hello'  # ruff:ignore[code]",
+                    covered_source: "    'hello'  # ruff:ignore[code]",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -2302,7 +2309,7 @@ print(
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "# ruff:ignore[code]\n    'hello'",
+                    covered_source: "    # ruff:ignore[code]\n    'hello'",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -2374,7 +2381,7 @@ bar = [
                     enable_comment: None,
                 },
                 Suppression {
-                    covered_source: "# ruff:ignore[gamma]\n    # stacked\n    arg2,",
+                    covered_source: "    # ruff:ignore[gamma]\n    # stacked\n    arg2,",
                     code: "gamma",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[gamma]",
