@@ -40,6 +40,12 @@ class TestResponse:
     def check(self) -> None:
         reveal_type(self.response_class)  # revealed: type[Response]
         reveal_type(self.response_classes)  # revealed: tuple[type[Response]]
+        reveal_type(self.response_class == Response)  # revealed: bool
+
+        if self.response_class == Response:
+            true_branch: int = "not an int"  # error: [invalid-assignment]
+        else:
+            false_branch: int = "not an int"  # error: [invalid-assignment]
 
 class TestHtmlResponse(TestResponse):
     response_class = HtmlResponse
@@ -92,12 +98,14 @@ class AnnotatedResponse:
 
     def check(self) -> None:
         reveal_type(self.response_class)  # revealed: type[Response]
+        reveal_type(self.response_class == Response)  # revealed: bool
 
 class FixedResponse:
     response_class: Final = Response
 
     def check(self) -> None:
         reveal_type(self.response_class)  # revealed: <class 'Response'>
+        reveal_type(self.response_class == Response)  # revealed: Literal[True]
 ```
 
 The same widening applies to undeclared instance attributes assigned in methods:
@@ -125,6 +133,24 @@ class EitherClass:
     value = UnionA if get_flag() else UnionB
 
 reveal_type(EitherClass().value)  # revealed: type[UnionA | UnionB]
+```
+
+Module-level variables keep their narrow inferred type. In particular, class literals in an
+invariant collection remain precise enough for exhaustive equality checks:
+
+```py
+class OffsetA: ...
+class OffsetB: ...
+
+classes = {"a": OffsetA, "b": OffsetB}
+
+def choose(name: str) -> None:
+    class_value = classes[name]
+    if class_value == OffsetA:
+        expected = 1
+    elif class_value == OffsetB:
+        expected = 2
+    reveal_type(expected)  # revealed: Literal[1, 2]
 ```
 
 ## Widening of non-literal singleton types

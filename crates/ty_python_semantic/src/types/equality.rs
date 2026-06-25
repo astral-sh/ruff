@@ -221,16 +221,66 @@ pub(crate) fn equality_truthiness<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    match ComparisonEvaluator::new(db).evaluate(
+    comparison_truthiness(db, left, right, ComparisonOperator::Equality)
+}
+
+/// Return the truthiness of `left != right` when it is known for every represented runtime value.
+///
+/// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
+pub(super) fn inequality_truthiness<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Truthiness {
+    comparison_truthiness(db, left, right, ComparisonOperator::Inequality)
+}
+
+fn comparison_truthiness<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    operator: ComparisonOperator,
+) -> Truthiness {
+    match ComparisonEvaluator::for_truthiness(db).evaluate(
         left,
         right,
         ComparisonBranch::Positive,
-        ComparisonOperator::Equality,
+        operator,
     ) {
         ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
         ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
         ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => Truthiness::Ambiguous,
     }
+}
+
+/// Selects how recursive comparison results are combined.
+///
+/// The goal is only an optimization; both modes use the same comparison semantics and agree on
+/// which results are definite. [`Constraint`](Self::Constraint) preserves branch-specific narrowing
+/// for the left operand. [`Truthiness`](Self::Truthiness) can discard those constraints because its
+/// caller only needs to know whether every expanded alternative agrees, and can stop as soon as the
+/// comparison cannot be definite.
+///
+/// For example, truthiness evaluation proves that this comparison is always false by checking the
+/// finite alternatives on both sides, without constructing a narrowing constraint:
+///
+/// ```python
+/// from enum import Enum
+/// from typing import Literal
+///
+/// class Choice(Enum):
+///     A = 1
+///     B = 2
+///     C = 3
+///     D = 4
+///
+/// def compare(left: Literal[Choice.A, Choice.B], right: Literal[Choice.C, Choice.D]):
+///     reveal_type(left == right)  # Literal[False]
+/// ```
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComparisonGoal {
+    Constraint,
+    Truthiness,
 }
 
 /// Identifies an active comparison evaluation.
@@ -248,6 +298,7 @@ struct ComparisonKey<'db> {
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     active: FxHashSet<ComparisonKey<'db>>,
+    goal: ComparisonGoal,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
@@ -255,6 +306,15 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             active: FxHashSet::default(),
+            goal: ComparisonGoal::Constraint,
+        }
+    }
+
+    fn for_truthiness(db: &'db dyn Db) -> Self {
+        Self {
+            db,
+            active: FxHashSet::default(),
+            goal: ComparisonGoal::Truthiness,
         }
     }
 
@@ -273,8 +333,10 @@ impl<'db> ComparisonEvaluator<'db> {
     ///         reveal_type(x)  # Any & ~EQUAL_VALUES
     /// ```
     ///
-    /// `branch` selects the branch whose constraint is accumulated when either operand expands
-    /// into multiple alternatives. Re-entering an active comparison conservatively returns an
+    /// In [`ComparisonGoal::Constraint`] mode, `branch` selects the branch whose constraint is
+    /// accumulated when either operand expands into multiple alternatives. In
+    /// [`ComparisonGoal::Truthiness`] mode, expansion instead requires every alternative to agree
+    /// on the comparison result. Re-entering an active comparison conservatively returns an
     /// ambiguous result instead of recursing indefinitely.
     fn evaluate(
         &mut self,
@@ -698,6 +760,14 @@ fn evaluate_union_left<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return combine_definite_truthiness(
+            elements
+                .iter()
+                .map(|element| evaluator.evaluate(*element, other, branch, operator)),
+        );
+    }
+
     let db = evaluator.db;
     evaluate_target_union(db, elements, branch, |element| {
         evaluator.evaluate(element, other, branch, operator)
@@ -791,6 +861,14 @@ fn evaluate_union_right<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return combine_definite_truthiness(
+            elements
+                .iter()
+                .map(|element| evaluator.evaluate(left, *element, branch, operator)),
+        );
+    }
+
     let db = evaluator.db;
     evaluate_against_results(
         db,
@@ -800,6 +878,34 @@ fn evaluate_union_right<'db>(
             .iter()
             .map(|element| evaluator.evaluate(left, *element, branch, operator)),
     )
+}
+
+/// Combine results when the caller only needs definite truthiness.
+///
+/// Any ambiguous or narrowing result, or any disagreement between definite results, makes the
+/// aggregate ambiguous. In each case, later alternatives cannot make it definite again.
+fn combine_definite_truthiness<'db>(
+    results: impl IntoIterator<Item = ComparisonResult<'db>>,
+) -> ComparisonResult<'db> {
+    let mut definite = None;
+
+    for result in results {
+        let current = match result {
+            ComparisonResult::AlwaysTrue => true,
+            ComparisonResult::AlwaysFalse => false,
+            ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
+                return ComparisonResult::Ambiguous;
+            }
+        };
+
+        match definite {
+            Some(previous) if previous != current => return ComparisonResult::Ambiguous,
+            Some(_) => {}
+            None => definite = Some(current),
+        }
+    }
+
+    definite.map_or(ComparisonResult::Ambiguous, ComparisonResult::from_bool)
 }
 
 /// Combine comparison results produced by alternatives of the non-target operand.
@@ -865,6 +971,14 @@ fn evaluate_intersection_left<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return combine_definite_truthiness(
+            positive
+                .iter()
+                .map(|element| evaluator.evaluate(*element, other, branch, operator)),
+        );
+    }
+
     let db = evaluator.db;
     let mut any_true = false;
     let mut any_false = false;
