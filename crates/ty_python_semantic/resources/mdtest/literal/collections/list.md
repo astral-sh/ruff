@@ -45,6 +45,35 @@ annotated.append(1)
 reveal_type(bool(annotated))  # revealed: bool
 ```
 
+Exactness is widened when a collection becomes an element of another mutable collection. The outer
+collection could later be mutated to contain an instance of a subclass:
+
+```py
+from typing import overload
+from typing_extensions import assert_type
+
+def takes_lists(values: dict[str, list[int]]) -> None: ...
+
+empty_list: list[int] = []
+lists = {"nonempty": [1], "empty": empty_list}
+takes_lists(lists)
+
+def takes_sets(values: list[set[int]]) -> None: ...
+
+empty_set: set[int] = set()
+sets = [{1}, empty_set]
+takes_sets(sets)
+
+@overload
+def choose(values: dict[str, list[int]]) -> int: ...
+@overload
+def choose(values: object) -> str: ...
+def choose(values: object) -> int | str:
+    return 0
+
+assert_type(choose(lists), int)
+```
+
 Potentially mutating calls can return an argument or receiver, so their results preserve exact
 runtime class but not cardinality unless the call's cardinality behavior is explicitly modeled:
 

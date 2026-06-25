@@ -7453,7 +7453,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     continue;
                 };
-
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
                     tuple_size_promotion_constraints.record_unpromotable_type(
@@ -7526,7 +7525,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     inferred_elt_ty
                 };
-
                 tuple_size_promotion_constraints.record_inferred_expression_type(
                     self.db(),
                     elt_ty_identity,
@@ -7545,6 +7543,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
                     let lower = bounds?.lower?;
+
+                    // Mutable collections can later receive instances of subclasses, so exact
+                    // element types cannot become invariant type arguments.
+                    let lower = lower.forget_exactness_recursively(self.db());
 
                     let lower = if tcx.annotation.is_none() {
                         // Constraints learned from later collection uses should follow the same

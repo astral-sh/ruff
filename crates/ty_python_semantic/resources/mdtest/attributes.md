@@ -3119,7 +3119,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        # revealed: list[int] | list[Divergent] | Unknown | list[int | list[Unknown]] | list[Unknown]
+        # revealed: list[int] | list[Divergent] | Unknown | list[list[Unknown] | int] | list[Unknown]
         reveal_type(self.x3)
 
         self.x1 = [self.x2] + [self.x3]
