@@ -172,7 +172,7 @@ Settings: Settings {
         },
     },
     semantics: SemanticSettings {
-        isinstance_narrowing: Strict,
+        isinstance_narrowing: Relaxed,
     },
     overrides: [],
 }

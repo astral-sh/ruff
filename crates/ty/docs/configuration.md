@@ -667,9 +667,9 @@ a list with any possible specialization.
 With `relaxed`, ty narrows to the class's default specialization instead. The same check
 narrows an `object` value to `list[Unknown]`.
 
-Defaults to `strict`.
+Defaults to `relaxed`.
 
-**Default value**: `strict`
+**Default value**: `relaxed`
 
 **Type**: `strict | relaxed`
 
@@ -679,14 +679,14 @@ Defaults to `strict`.
 
     ```toml
     [tool.ty.semantics]
-    isinstance-narrowing = "relaxed"
+    isinstance-narrowing = "strict"
     ```
 
 === "ty.toml"
 
     ```toml
     [semantics]
-    isinstance-narrowing = "relaxed"
+    isinstance-narrowing = "strict"
     ```
 
 ---

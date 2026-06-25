@@ -301,6 +301,11 @@ def _(x: int | str | None):
 Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these
 can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them:
 
+```toml
+[semantics]
+isinstance-narrowing = "strict"
+```
+
 ```py
 import typing as t
 
@@ -596,6 +601,9 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
 ```toml
 [environment]
 python-version = "3.12"
+
+[semantics]
+isinstance-narrowing = "strict"
 ```
 
 Narrowing to a generic class using `isinstance()` uses the top materialization of the generic. With
@@ -960,6 +968,9 @@ instead), so the default value is irrelevant here:
 ```toml
 [environment]
 python-version = "3.13"
+
+[semantics]
+isinstance-narrowing = "strict"
 ```
 
 ```py
@@ -997,6 +1008,9 @@ arm that later causes `call-top-callable` false positives.
 ```toml
 [environment]
 python-version = "3.13"
+
+[semantics]
+isinstance-narrowing = "strict"
 ```
 
 ```py

@@ -111,8 +111,8 @@ pub struct AnalysisSettings {
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum IsInstanceNarrowing {
-    #[default]
     Strict,
+    #[default]
     Relaxed,
 }
 

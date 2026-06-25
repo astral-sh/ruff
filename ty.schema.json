@@ -1567,7 +1567,7 @@
       "type": "object",
       "properties": {
         "isinstance-narrowing": {
-          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.\n\nWith `strict`, ty narrows to the top materialization of the class. For example,\n`isinstance(value, list)` narrows an `object` value to `Top[list[Unknown]]`, representing\na list with any possible specialization.\n\nWith `relaxed`, ty narrows to the class's default specialization instead. The same check\nnarrows an `object` value to `list[Unknown]`.\n\nDefaults to `strict`.",
+          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.\n\nWith `strict`, ty narrows to the top materialization of the class. For example,\n`isinstance(value, list)` narrows an `object` value to `Top[list[Unknown]]`, representing\na list with any possible specialization.\n\nWith `relaxed`, ty narrows to the class's default specialization instead. The same check\nnarrows an `object` value to `list[Unknown]`.\n\nDefaults to `relaxed`.",
           "anyOf": [
             {
               "$ref": "#/definitions/IsInstanceNarrowing"
