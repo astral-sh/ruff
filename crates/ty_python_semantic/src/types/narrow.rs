@@ -750,6 +750,21 @@ impl<'db> ConstraintConjunction<'db> {
         self
     }
 
+    /// Add only the deferred key facts from `other`, leaving its type constraints behind.
+    fn and_with_key_constraints_from(mut self, other: &Self) -> Self {
+        if self.key_constraints.is_empty() {
+            self.key_constraints = other.key_constraints.clone();
+        } else {
+            for key_constraint in &other.key_constraints {
+                if !self.key_constraints.contains(key_constraint) {
+                    self.key_constraints.push(key_constraint.clone());
+                }
+            }
+        }
+
+        self
+    }
+
     /// Materialize this conjunction, applying deferred key facts after ordinary type constraints.
     ///
     /// Present-key facts are applied before absent-key facts so contradictory facts for the same
@@ -871,14 +886,17 @@ impl<'db> NarrowingConstraint<'db> {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
         //
-        // The RHS replacement disjuncts all clobber the LHS disjuncts when they are `and`ed, so
-        // they stay as is.
+        // The RHS replacement disjuncts clobber the LHS type constraints when they are `and`ed,
+        // but facts established by LHS key checks still apply to the replacement type. Combine each
+        // replacement disjunct with the key facts from each LHS disjunct.
         //
         // Each RHS intersection disjunct gets intersected with each LHS disjunct, producing the
         // cartesian product. The merged disjunct retains the LHS kind.
         //
         // The conjunctions still defer constructing the corresponding intersection types.
         let mut other_intersection_disjuncts: SmallVec<[ConstraintConjunction<'db>; 1]> =
+            smallvec![];
+        let mut other_replacement_conjunctions: SmallVec<[ConstraintConjunction<'db>; 1]> =
             smallvec![];
         let mut new_disjuncts: SmallVec<[ConstraintDisjunct<'db>; 1]> = smallvec![];
         for disjunct in other.disjuncts {
@@ -887,7 +905,21 @@ impl<'db> NarrowingConstraint<'db> {
                     other_intersection_disjuncts.push(disjunct.conjunction);
                 }
                 ConstraintDisjunctKind::Replacement => {
-                    new_disjuncts.push(disjunct);
+                    other_replacement_conjunctions.push(disjunct.conjunction);
+                }
+            }
+        }
+
+        for disjunct in &self.disjuncts {
+            for other_conjunction in &other_replacement_conjunctions {
+                let merged = ConstraintDisjunct {
+                    kind: ConstraintDisjunctKind::Replacement,
+                    conjunction: other_conjunction
+                        .clone()
+                        .and_with_key_constraints_from(&disjunct.conjunction),
+                };
+                if !new_disjuncts.contains(&merged) {
+                    new_disjuncts.push(merged);
                 }
             }
         }

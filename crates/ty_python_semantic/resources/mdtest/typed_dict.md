@@ -5138,6 +5138,8 @@ def membership_after_typeguard(value: Foo | Literal["abc"]):
     has_z = "z" in value
     if guard_bar(value) and has_z:
         reveal_type(value["z"])  # revealed: object
+    if has_z and guard_bar(value):
+        reveal_type(value["z"])  # revealed: object
 
 class OptionalKey(TypedDict):
     x: NotRequired[int]
@@ -5160,6 +5162,8 @@ def guard_mapping_or_target(value: object) -> TypeGuard[AlwaysContains | Target]
 def absent_key_after_typeguard(value: SometimesContains):
     lacks_x = "x" not in value
     if guard_mapping_or_target(value) and lacks_x:
+        reveal_type(value)  # revealed: Target
+    if lacks_x and guard_mapping_or_target(value):
         reveal_type(value)  # revealed: Target
 
 def mapping_membership_after_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
