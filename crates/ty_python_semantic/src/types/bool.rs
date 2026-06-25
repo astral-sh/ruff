@@ -234,6 +234,10 @@ impl<'db> Type<'db> {
                 Truthiness::from(tracked_set.is_always_satisfied(db))
             }
 
+            Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
+                Truthiness::from(*is_non_empty)
+            }
+
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -334,7 +338,7 @@ impl<'db> Type<'db> {
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
 pub(crate) type TryBoolVisitor<'db> =
-    CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
+    CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
 pub(crate) struct TryBool;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -27,6 +27,7 @@ pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
     ast::CmpOp,
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
+    1,
 >;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -542,6 +543,35 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         }
                     };
                     Some(Ok(result))
+                }
+
+                // Same-kind exact literals and the special relationship between `int` and `bool`
+                // are handled above. Any remaining pair of exact builtin literals compares
+                // unequal. `LiteralString` also compares unequal to non-string literals, but its
+                // comparison with an exact string literal remains ambiguous.
+                (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                )
+                | (
+                    LiteralValueTypeKind::LiteralString,
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                )
+                | (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::LiteralString,
+                ) if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) => {
+                    Some(Ok(Type::bool_literal(op == ast::CmpOp::NotEq)))
                 }
 
                 (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))

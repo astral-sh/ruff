@@ -11,7 +11,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
     PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
@@ -1113,6 +1113,42 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
+    ///
+    /// Known argument mismatches are not merged because doing so would be unsound for invariant
+    /// type variables; the caller must retain the outer semantic union in that case.
+    pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        if self.generic_context(db) != previous.generic_context(db)
+            || self.materialization_kind(db) != previous.materialization_kind(db)
+            || self.tuple_inner(db) != previous.tuple_inner(db)
+        {
+            return None;
+        }
+
+        let types: Box<[_]> = previous
+            .types(db)
+            .iter()
+            .zip(self.types(db))
+            .map(|(previous, current)| match (*previous, *current) {
+                (previous, current) if previous == current => Some(current),
+                (previous, current)
+                    if previous == Type::unknown() || current == Type::unknown() =>
+                {
+                    Some(Type::unknown())
+                }
+                _ => None,
+            })
+            .collect::<Option<Box<[_]>>>()?;
+
+        Some(Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        ))
+    }
+
     /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
     /// type is unchanged and [`Cow::Owned`] otherwise.
     fn map_types(
@@ -1448,11 +1484,13 @@ impl<'db> Specialization<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        for ty in self.types(db) {
-            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        if let Some(tuple) = self.tuple_inner(db) {
+            tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        } else {
+            for ty in self.types(db) {
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
         }
-        // A tuple's specialization will include all of its element types, so we don't need to also
-        // look in `self.tuple`.
     }
 }
 
@@ -1910,10 +1948,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        mut choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            Option<ConstraintBounds<'db>>,
-        ) -> Option<Type<'db>>,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let types = self.solve_pending_with(generic_context, &mut choose);
         let specialization =
@@ -1933,10 +1968,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_pending_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        choose: &mut impl FnMut(
-            BoundTypeVarInstance<'db>,
-            Option<ConstraintBounds<'db>>,
-        ) -> Option<Type<'db>>,
+        choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         if generic_context
             .variables_inner(self.db)
@@ -1962,12 +1994,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .pending
             .remove_noninferable(self.db, self.constraints, self.inferable);
         let solutions =
-            match pending.solutions_with(self.db, self.constraints, |typevar, _variance, bounds| {
-                if let Some(ty) = choose(typevar, Some(bounds)) {
+            match pending.solutions_with(self.db, self.constraints, |_variance, path_bound| {
+                let typevar = path_bound.bound_typevar;
+                if let Some(ty) = choose(typevar, Some(path_bound)) {
                     return Ok(Some(ty));
                 }
 
-                PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
+                PathBounds::default_solve(self.db, self.constraints, path_bound)
             }) {
                 Solutions::Unsatisfiable | Solutions::Unconstrained => {
                     return self.solve_hash_map_with(generic_context, choose);
@@ -1997,12 +2030,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // TODO: This is a solution-level projection. A more principled version would live in the
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
         // for and existentially quantifying away the other typevars in that domain.
-        if self.can_remove_inferable_typevar_artifacts(generic_context) {
-            for identity in generic_context.variables_inner(self.db).keys() {
-                if let Some(ty) = types.get_mut(identity) {
-                    *ty =
-                        self.remove_inferable_typevar_artifacts_from_solution(generic_context, *ty);
-                }
+        for (identity, variable) in generic_context.variables_inner(self.db) {
+            if let Some(ty) = types.get_mut(identity) {
+                *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
             }
         }
 
@@ -2094,54 +2124,47 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         })
     }
 
-    fn can_remove_inferable_typevar_artifacts(&self, generic_context: GenericContext<'db>) -> bool {
-        // Mixed contexts can intentionally use one context's typevars to solve another (for
-        // example, constructor calls whose `__init__` self annotation remaps class typevars).
-        // Only remove artifacts for ordinary generic calls whose typevars all come from one
-        // source-level binding context.
-        let mut binding_contexts = generic_context
-            .variables_inner(self.db)
-            .values()
-            .map(|typevar| typevar.binding_context(self.db));
-        let Some(first) = binding_contexts.next() else {
-            return false;
-        };
-        first != BindingContext::Synthetic && binding_contexts.all(|context| context == first)
-    }
-
     fn is_inferable_typevar_artifact(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> bool {
+        let target_context = target.binding_context(self.db);
         ty.as_typevar().is_some_and(|typevar| {
-            typevar.is_inferable(self.db, self.inferable)
-                && generic_context.contains(self.db, typevar.identity(self.db))
+            // Relationships across binding contexts can intentionally remap one generic context
+            // onto another, as with constructor `self` annotations. Synthetic contexts do not
+            // identify a single source-level binding, so they are not safe to project either.
+            target_context != BindingContext::Synthetic
+                && typevar.is_inferable(self.db, self.inferable)
+                && typevar.binding_context(self.db) == target_context
         })
     }
 
-    fn remove_inferable_typevar_artifacts_from_solution(
+    /// Remove inferable type variables introduced by transitivity within the target's binding
+    /// context while preserving intentional relationships to other generic contexts.
+    pub(crate) fn remove_inferable_typevar_artifacts_from_solution(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(generic_context, ty);
-        self.remove_inferable_typevar_artifacts_from_upper_bound(generic_context, ty)
+        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(target, ty);
+        self.remove_inferable_typevar_artifacts_from_upper_bound(target, ty)
     }
 
     fn remove_inferable_typevar_artifacts_from_lower_bound(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         match ty {
             Type::Union(union)
-                if union.elements(self.db).iter().any(|element| {
-                    !self.is_inferable_typevar_artifact(generic_context, *element)
-                }) =>
+                if union
+                    .elements(self.db)
+                    .iter()
+                    .any(|element| !self.is_inferable_typevar_artifact(target, *element)) =>
             {
                 union.filter(self.db, |element| {
-                    !self.is_inferable_typevar_artifact(generic_context, *element)
+                    !self.is_inferable_typevar_artifact(target, *element)
                 })
             }
             _ => ty,
@@ -2150,17 +2173,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     fn remove_inferable_typevar_artifacts_from_upper_bound(
         &self,
-        generic_context: GenericContext<'db>,
+        target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         match ty {
             Type::Intersection(intersection)
-                if intersection.iter_positive(self.db).any(|element| {
-                    !self.is_inferable_typevar_artifact(generic_context, element)
-                }) =>
+                if intersection
+                    .iter_positive(self.db)
+                    .any(|element| !self.is_inferable_typevar_artifact(target, element)) =>
             {
                 intersection.map_positive(self.db, |element| {
-                    if self.is_inferable_typevar_artifact(generic_context, *element) {
+                    if self.is_inferable_typevar_artifact(target, *element) {
                         Type::object()
                     } else {
                         *element
@@ -2174,10 +2197,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_hash_map_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        choose: &mut impl FnMut(
-            BoundTypeVarInstance<'db>,
-            Option<ConstraintBounds<'db>>,
-        ) -> Option<Type<'db>>,
+        choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         generic_context
             .variables_inner(self.db)
@@ -2188,8 +2208,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .get_mut(identity)
                     .map(|accumulator| accumulator.get_or_build(self.db));
                 let chosen = match mapped_ty {
-                    Some(mapped_ty) => choose(*variable, Some(ConstraintBounds::exact(mapped_ty)))
-                        .unwrap_or(mapped_ty),
+                    Some(mapped_ty) => {
+                        let path_bound = PathBound::exact(*variable, mapped_ty);
+                        choose(*variable, Some(&path_bound)).unwrap_or(mapped_ty)
+                    }
                     None => choose(*variable, None)?,
                 };
                 Some((*identity, chosen))
@@ -2836,6 +2858,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(formal, actual_instance, polarity, seen);
             }
 
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::KnownInstance(known_instance @ KnownInstanceType::Range { .. }),
+            ) => {
+                // `range(...)` is a known instance only to preserve its truthiness; use the
+                // ordinary `range` instance when inferring through generic nominal/protocol types.
+                return self.infer_map_impl(
+                    formal,
+                    known_instance.instance_fallback(self.db),
+                    polarity,
+                    seen,
+                );
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
@@ -2852,7 +2888,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal, Type::NominalInstance(actual_nominal)) => {
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::NominalInstance(actual_nominal),
+            ) => {
                 // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
                     formal.tuple_instance_spec(self.db),

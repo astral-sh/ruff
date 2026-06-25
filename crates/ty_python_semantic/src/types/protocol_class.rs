@@ -77,6 +77,38 @@ impl<'db> ProtocolClass<'db> {
             })
     }
 
+    /// Return whether `name` is declared by this protocol or one of its superclasses.
+    ///
+    /// Unlike [`ProtocolClass::interface`], this includes names deliberately excluded from a
+    /// protocol's runtime interface. This distinction lets callers recognize declarations such as:
+    ///
+    /// ```python
+    /// class P(Protocol):
+    ///     __doc__: str
+    /// ```
+    pub(super) fn has_member_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|superclass| {
+                let Some((superclass_literal, _)) = superclass.static_class_literal(db) else {
+                    return false;
+                };
+                let superclass_scope = superclass_literal.body_scope(db);
+                let Some(scoped_symbol_id) = place_table(db, superclass_scope).symbol_id(name)
+                else {
+                    return false;
+                };
+                !place_from_declarations(
+                    db,
+                    use_def_map(db, superclass_scope)
+                        .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                )
+                .ignore_conflicting_declarations()
+                .place
+                .is_undefined()
+            })
+    }
+
     /// Iterate through the body of the protocol class. Check that all definitions
     /// in the protocol class body are either explicitly declared directly in the
     /// class body, or are declared in a superclass of the protocol class.
@@ -98,32 +130,7 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             }
 
-            let has_declaration =
-                self.iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .any(|superclass| {
-                        let Some((superclass_literal, _)) = superclass.static_class_literal(db)
-                        else {
-                            return false;
-                        };
-                        let superclass_scope = superclass_literal.body_scope(db);
-                        let Some(scoped_symbol_id) =
-                            place_table(db, superclass_scope).symbol_id(symbol_name)
-                        else {
-                            return false;
-                        };
-                        !place_from_declarations(
-                            db,
-                            use_def_map(db, superclass_scope)
-                                .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
-                        )
-                        .into_place_and_conflicting_declarations()
-                        .0
-                        .place
-                        .is_undefined()
-                    });
-
-            if has_declaration {
+            if self.has_member_declaration(db, symbol_name) {
                 continue;
             }
 

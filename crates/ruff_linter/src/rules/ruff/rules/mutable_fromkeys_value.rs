@@ -53,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 pub(crate) struct MutableFromkeysValue;
 
 impl Violation for MutableFromkeysValue {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {

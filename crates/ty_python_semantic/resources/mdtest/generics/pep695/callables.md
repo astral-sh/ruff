@@ -28,6 +28,13 @@ def identity2[**P, T](c: Callable[P, T]) -> Callable[P, T]:
 reveal_type(generic_context(identity2))
 # revealed: [T](t: T) -> T
 reveal_type(identity2(identity))
+
+class CallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+# revealed: (value: int, /) -> str
+reveal_type(identity2(CallableInstance()))
 ```
 
 Generic classes are another example, since you invoke the class to instantiate it:
@@ -252,6 +259,308 @@ from typing import Callable, cast
 def body_annotation[**P]() -> Callable[P, None]:
     local: Callable[P, None] = cast(Callable[P, None], object())
     return local
+```
+
+## Inferring an explicit `object` upper bound from a callable
+
+A type variable in a callable parameter position is constrained from above because callable
+parameters are contravariant. An explicit `object` upper bound is still inference evidence; it is
+different from having no inferred bound at all.
+
+```py
+from typing import Callable
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_object(value: object) -> None: ...
+
+reveal_type(infer_from_consumer(consume_object))  # revealed: object
+```
+
+## Intersecting inferred union upper bounds
+
+Multiple callable arguments can infer multiple union upper bounds for the same type variable. We
+keep those bounds factored and infer a compact type satisfying every bound rather than losing the
+inference result while materializing their full cross product.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+def consume_left(value: A | B | C) -> None: ...
+def consume_right(value: B | D | E) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: B
+```
+
+## Union without intersection does not consider budget
+
+If the precise inferred solution comes from a single union type, rather than an intersection of
+several unions, we return the precise solution.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+def consume(value: A | B | C | D | E) -> None: ...
+
+reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
+```
+
+## Overlapping inferred union upper bounds exceeding the solution budget
+
+Even if the precise intersection of two large union upper bounds is small, processing either union
+currently exceeds the solution budget before we can discover that intersection.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: A | B | F | G | H) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+```
+
+## Contextual generic return exceeding the solution budget
+
+A generic call can receive an upper bound from the type context in which its return value is used.
+An existing union in that upper bound should not consume the bounded-intersection budget unless an
+intersection actually needs to be distributed over it.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+
+def make_list[T](value: T) -> list[T]:
+    return [value]
+
+def consume(values: Sequence[Literal["a", "b", "c", "d", "e"]] | None) -> None: ...
+
+consume(make_list("a"))
+```
+
+## Disjoint inferred union upper bounds
+
+If `Never` is the only type satisfying all inferred union upper bounds, it is the valid inferred
+specialization for the type variable.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+def consume_left(value: A | B) -> None: ...
+def consume_right(value: C | D) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
+```
+
+## Disjoint inferred union upper bounds exceeding the solution budget
+
+Large disjoint union upper bounds also exceed the budget before we can discover that their precise
+intersection is bottom.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+@final
+class I: ...
+
+@final
+class J: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: F | G | H | I | J) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
+```
+
+## Combining inferred and declared upper bounds
+
+A declared type-variable bound also participates when selecting a type that satisfies an inferred
+union upper bound.
+
+```py
+from typing import Callable
+
+def infer_str[T: str](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_str(consume_int_or_str))  # revealed: str
+```
+
+## Inferring `Never` from a callable parameter
+
+`Never` is a valid upper-bound inference result and should not be replaced with the fallback for an
+unsolved type variable.
+
+```py
+from typing import Callable, NoReturn
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_never(value: NoReturn) -> None: ...
+
+reveal_type(infer_from_consumer(consume_never))  # revealed: Never
+```
+
+## Conflicting inferred lower and upper bounds
+
+A concrete argument can infer a lower bound that is incompatible with an upper bound inferred from a
+callable argument. Such a call is invalid rather than producing a solution outside the inferred
+upper bound.
+
+```py
+from typing import Callable, final
+
+def infer_with_consumer[T](value: T, consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+def consume_b(value: B) -> None: ...
+
+infer_with_consumer(A(), consume_b)  # error: [invalid-argument-type]
+```
+
+## Combined upper bounds uses redundancy
+
+When solving an upper bound involving a union, we should use the same typing relation to look for
+redundant elements as we use for unions in general.
+
+```py
+from typing import Any, Callable, final
+
+def infer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+def callback(value: A | Any) -> None: ...
+
+reveal_type(infer(callback))  # revealed: A | Any
 ```
 
 ## Overloaded callable as generic `Callable` argument

@@ -785,6 +785,9 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     - `fn AnyRootNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
     """
 
+    root_nodes = [(group.name, group.owned_enum_ty) for group in ast.groups]
+    root_nodes.extend((node.name, node.ty) for node in ast.ungrouped_nodes)
+
     out.append("""
     /// An enumeration of all AST nodes.
     ///
@@ -799,17 +802,54 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
     pub enum AnyRootNodeRef<'a> {
     """)
-    for group in ast.groups:
-        out.append(f"""{group.name}(&'a {group.owned_enum_ty}),""")
-    for node in ast.ungrouped_nodes:
-        out.append(f"""{node.name}(&'a {node.ty}),""")
+    for name, ty in root_nodes:
+        out.append(f"""{name}(&'a {ty}),""")
     out.append("""
+    }
+    """)
+
+    out.append("""
+    /// The unflattened enum or struct type stored by an [`AnyRootNodeRef`].
+    ///
+    /// Unlike [`NodeKind`], this does not distinguish variants of root enums such as [`Stmt`]
+    /// and [`Expr`].
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+    #[repr(u8)]
+    pub enum RootNodeKind {
+    """)
+    for name, _ in root_nodes:
+        out.append(f"""{name},""")
+    out.append("""
+    }
+
+    impl RootNodeKind {
+        /// All root node kinds in discriminant order.
+        pub const ALL: &'static [Self] = &[
+    """)
+    for name, _ in root_nodes:
+        out.append(f"""Self::{name},""")
+    out.append("""
+        ];
+
+        /// Returns the root node kind with the given discriminant.
+        #[inline]
+        pub fn from_u8(value: u8) -> Option<Self> {
+            match value {
+    """)
+    for index, (name, _) in enumerate(root_nodes):
+        out.append(f"""{index} => Some(Self::{name}),""")
+    out.append("""
+                _ => None,
+            }
+        }
     }
     """)
 
     for group in ast.groups:
         out.append(f"""
             impl<'a> From<&'a {group.owned_enum_ty}> for AnyRootNodeRef<'a> {{
+                #[inline]
                 fn from(node: &'a {group.owned_enum_ty}) -> AnyRootNodeRef<'a> {{
                         AnyRootNodeRef::{group.name}(node)
                 }}
@@ -844,6 +884,7 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     for node in ast.ungrouped_nodes:
         out.append(f"""
             impl<'a> From<&'a {node.ty}> for AnyRootNodeRef<'a> {{
+                #[inline]
                 fn from(node: &'a {node.ty}) -> AnyRootNodeRef<'a> {{
                     AnyRootNodeRef::{node.name}(node)
                 }}
@@ -867,10 +908,8 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
             fn range(&self) -> ruff_text_size::TextRange {
                 match self {
     """)
-    for group in ast.groups:
-        out.append(f"""AnyRootNodeRef::{group.name}(node) => node.range(),""")
-    for node in ast.ungrouped_nodes:
-        out.append(f"""AnyRootNodeRef::{node.name}(node) => node.range(),""")
+    for name, _ in root_nodes:
+        out.append(f"""AnyRootNodeRef::{name}(node) => node.range(),""")
     out.append("""
                 }
             }
@@ -882,10 +921,8 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
             fn node_index(&self) -> &crate::AtomicNodeIndex {
                 match self {
     """)
-    for group in ast.groups:
-        out.append(f"""AnyRootNodeRef::{group.name}(node) => node.node_index(),""")
-    for node in ast.ungrouped_nodes:
-        out.append(f"""AnyRootNodeRef::{node.name}(node) => node.node_index(),""")
+    for name, _ in root_nodes:
+        out.append(f"""AnyRootNodeRef::{name}(node) => node.node_index(),""")
     out.append("""
                 }
             }
@@ -894,6 +931,44 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyRootNodeRef<'a> {
+            /// Decomposes this reference into its root node kind and a type-erased pointer.
+            #[inline]
+            pub fn into_raw_parts(self) -> (RootNodeKind, std::ptr::NonNull<()>) {
+                match self {
+    """)
+    for name, _ in root_nodes:
+        out.append(
+            f"""AnyRootNodeRef::{name}(node) => (RootNodeKind::{name}, std::ptr::NonNull::from(node).cast()),"""
+        )
+    out.append("""
+                }
+            }
+
+            /// Reconstructs an AST reference from its root node kind and type-erased pointer.
+            ///
+            /// # Safety
+            ///
+            /// - `pointer` must be properly aligned for and point to the exact root node type
+            ///   represented by `kind`.
+            /// - The pointer's provenance must permit reads of a complete, initialized, and valid
+            ///   value of that type.
+            /// - The pointed-to value must not be moved, dropped, or accessed mutably for `'a`.
+            #[inline]
+            #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
+            pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: std::ptr::NonNull<()>) -> Self {
+                let pointer = pointer.as_ptr();
+                // SAFETY: The caller guarantees that `pointer` is readable as the exact root node
+                // type selected by `kind` and remains valid and immutable for `'a`.
+                unsafe { match kind {
+    """)
+    for name, ty in root_nodes:
+        out.append(
+            f"""RootNodeKind::{name} => AnyRootNodeRef::{name}(&*pointer.cast::<{ty}>()),"""
+        )
+    out.append("""
+                }}
+            }
+
             pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
                 V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
@@ -901,13 +976,9 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
             {
                 match self {
     """)
-    for group in ast.groups:
+    for name, _ in root_nodes:
         out.append(
-            f"""AnyRootNodeRef::{group.name}(node) => node.visit_source_order(visitor),"""
-        )
-    for node in ast.ungrouped_nodes:
-        out.append(
-            f"""AnyRootNodeRef::{node.name}(node) => node.visit_source_order(visitor),"""
+            f"""AnyRootNodeRef::{name}(node) => node.visit_source_order(visitor),"""
         )
     out.append("""
                 }

@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::TypeTransformer;
+pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -35,9 +35,9 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    callable_pattern_type, definite_match_pattern_type, definite_sequence_pattern_type,
-    exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    callable_pattern_type, definite_match_pattern_type, exact_sequence_pattern_type,
+    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_fallthrough_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -50,6 +50,7 @@ pub use self::set_theoretic::{
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
+pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
@@ -65,7 +66,8 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-pub(crate) use crate::types::enums::{EnumComplementType, enum_metadata};
+pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
+pub(crate) use crate::types::equality::equality_truthiness;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -106,6 +108,7 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
+pub(crate) use special_form::TypedDictModule;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
@@ -124,6 +127,7 @@ mod cyclic;
 mod diagnostic;
 mod display;
 mod enums;
+mod equality;
 mod function;
 mod generics;
 pub mod ide_support;
@@ -152,6 +156,7 @@ mod subclass_of;
 pub(crate) mod tests;
 mod tuple;
 mod type_alias;
+mod type_expansion;
 mod type_form;
 mod typed_dict;
 mod typevar;
@@ -287,7 +292,7 @@ struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
+    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -368,13 +373,14 @@ impl Default for ApplyTypeMappingVisitor<'_> {
 }
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
-pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
+pub(crate) type FindLegacyTypeVarsVisitor<'db> =
+    CycleDetector<FindLegacyTypeVars, Type<'db>, (), 3>;
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, ()>;
+pub(crate) type SpecializationVisitor<'db> = CycleDetector<VisitSpecialization, Type<'db>, (), 3>;
 pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
@@ -467,6 +473,12 @@ bitflags! {
 
         /// Do not call `__getattr__` during member lookup.
         const NO_GETATTR_LOOKUP = 1 << 4;
+
+        /// Ignore members that are only available through a dynamic type.
+        ///
+        /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
+        /// member, but that does not mean that every subclass should be treated as a descriptor.
+        const REQUIRE_CONCRETE = 1 << 5;
     }
 }
 
@@ -498,6 +510,11 @@ impl MemberLookupPolicy {
     /// Do not call `__getattr__` during member lookup.
     pub(crate) const fn no_getattr_lookup(self) -> bool {
         self.contains(Self::NO_GETATTR_LOOKUP)
+    }
+
+    /// Ignore members that are only available through a dynamic type.
+    pub(crate) const fn require_concrete(self) -> bool {
+        self.contains(Self::REQUIRE_CONCRETE)
     }
 }
 
@@ -1179,6 +1196,10 @@ impl<'db> Type<'db> {
             } else {
                 self
             }
+        } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
+            && let Some(merged) = current.merge_cycle_recovery(db, previous)
+        {
+            Type::GenericAlias(merged)
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
             // cause the fixed-point iterations to converge slowly or even fail. Consider the case
@@ -1278,7 +1299,7 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.is_specialized_generic(db))
             }
-            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
+            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(db),
             Type::ProtocolInstance(protocol) => {
                 matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
             }
@@ -1648,6 +1669,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[cfg(test)]
     #[track_caller]
     pub(crate) const fn expect_union(self) -> UnionType<'db> {
         self.as_union().expect("Expected a Type::Union variant")
@@ -1664,33 +1686,6 @@ impl<'db> Type<'db> {
         match self {
             Type::Intersection(intersection) => !intersection.is_simple_negation(db),
             _ => false,
-        }
-    }
-
-    /// Returns the number of union clauses in this type. If the type is not a union, returns 1.
-    pub(crate) fn union_size(self, db: &'db dyn Db) -> usize {
-        match self {
-            Type::Union(union_type) => union_type.elements(db).len(),
-            Type::Never => 0,
-            _ => 1,
-        }
-    }
-
-    /// Returns the number of intersection clauses in this type. If the type is a union, this is
-    /// the maximum of the `intersection_size` of each union element. If the type is not a union
-    /// nor an intersection, returns 1.
-    pub(crate) fn intersection_size(self, db: &'db dyn Db) -> usize {
-        match self {
-            Type::Intersection(intersection) => {
-                intersection.positive(db).len() + intersection.negative(db).len()
-            }
-            Type::Union(union_type) => union_type
-                .elements(db)
-                .iter()
-                .map(|element| element.intersection_size(db))
-                .max()
-                .unwrap_or(1),
-            _ => 1,
         }
     }
 
@@ -2428,6 +2423,9 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            // All empty ranges compare equal, but non-empty ranges can contain different values.
+            Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => !is_non_empty,
+
             // Each `partial()` call creates a distinct object at runtime.
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
 
@@ -2553,6 +2551,8 @@ impl<'db> Type<'db> {
                         .unwrap_or_default()
                 }))
             }
+
+            Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
@@ -2964,6 +2964,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the descriptor result type for directly dynamic values and gradual class-object
+    /// values.
+    fn dynamic_descriptor_type(self) -> Option<Type<'db>> {
+        match self {
+            Type::Dynamic(_) => Some(self),
+            Type::SubclassOf(subclass_of) => {
+                subclass_of.subclass_of().into_dynamic().map(Type::Dynamic)
+            }
+            _ => None,
+        }
+    }
+
     /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
     /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
     /// the descriptor protocol itself.
@@ -2987,6 +2999,10 @@ impl<'db> Type<'db> {
         ) -> Option<(Type<'db>, AttributeKind)> {
             if let Some(fallback) = ty.materialized_divergent_fallback() {
                 return fallback.try_call_dunder_get(db, instance, owner);
+            }
+
+            if let Some(dynamic) = ty.dynamic_descriptor_type() {
+                return Some((dynamic, AttributeKind::DataDescriptor));
             }
 
             match ty {
@@ -3023,38 +3039,56 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = ty.class_member(db, "__get__".into()).place;
+            let Place::Defined(DefinedPlace {
+                ty: concrete_descr_get,
+                ..
+            }) = ty
+                .class_member_with_policy(
+                    db,
+                    "__get__".into(),
+                    MemberLookupPolicy::REQUIRE_CONCRETE,
+                )
+                .place
+            else {
+                return None;
+            };
 
-            if let Place::Defined(DefinedPlace {
+            // A recursive member lookup can yield the internal cycle marker. It does not
+            // represent a concrete descriptor method and must not escape through the access.
+            if concrete_descr_get.is_divergent() {
+                return None;
+            }
+
+            let Place::Defined(DefinedPlace {
                 ty: descr_get,
                 definedness: descr_get_boundness,
                 ..
-            }) = descr_get
-            {
-                let instance_ty = instance.unwrap_or_else(|| Type::none(db));
-                let return_ty = descr_get
-                    .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
-                    .map(|bindings| {
-                        if descr_get_boundness == Definedness::AlwaysDefined {
-                            bindings.return_type(db)
-                        } else {
-                            UnionType::from_two_elements(db, bindings.return_type(db), ty)
-                        }
-                    })
-                    // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
-                    // we should emit a diagnostic here instead of silently ignoring the error.
-                    .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+            }) = ty.class_member(db, "__get__".into()).place
+            else {
+                return None;
+            };
 
-                let descriptor_kind = if ty.is_data_descriptor(db) {
-                    AttributeKind::DataDescriptor
-                } else {
-                    AttributeKind::NormalOrNonDataDescriptor
-                };
+            let instance_ty = instance.unwrap_or_else(|| Type::none(db));
+            let return_ty = descr_get
+                .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
+                .map(|bindings| {
+                    if descr_get_boundness == Definedness::AlwaysDefined {
+                        bindings.return_type(db)
+                    } else {
+                        UnionType::from_two_elements(db, bindings.return_type(db), ty)
+                    }
+                })
+                // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
+                // we should emit a diagnostic here instead of silently ignoring the error.
+                .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
 
-                Some((return_ty, descriptor_kind))
+            let descriptor_kind = if ty.is_data_descriptor(db) {
+                AttributeKind::DataDescriptor
             } else {
-                None
-            }
+                AttributeKind::NormalOrNonDataDescriptor
+            };
+
+            Some((return_ty, descriptor_kind))
         }
 
         tracing::trace!(
@@ -3121,14 +3155,9 @@ impl<'db> Type<'db> {
         }
 
         match attribute {
-            // This branch is not strictly needed, but it short-circuits the lookup of various dunder
-            // methods and calls that would otherwise be made.
-            //
-            // Note that attribute accesses on dynamic types always succeed. For this reason, they also
-            // have `__get__`, `__set__`, and `__delete__` methods and are therefore considered to be
-            // data descriptors.
-            //
-            // The same is true for `Never`.
+            // A directly dynamic attribute could be a data descriptor even though we cannot see
+            // its methods. Preserve that uncertainty, along with the existing bottom and cycle
+            // behavior, without performing member lookups that cannot add information.
             PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
@@ -3243,6 +3272,7 @@ impl<'db> Type<'db> {
 
     /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.
     /// If this type is a union, requires all elements of union to be data descriptors.
+    /// A directly dynamic type is treated as a data descriptor because it could inhabit one.
     pub(crate) fn is_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, false)
     }
@@ -3250,10 +3280,8 @@ impl<'db> Type<'db> {
     /// Returns whether this type should be considered a possible data descriptor.
     /// If this type is a union, returns true if _any_ element is a data descriptor.
     /// This is used to determine whether an attribute assignment is valid for narrowing.
-    /// In theory, dynamic types might be data descriptor types, so it is unsafe to use
-    /// attribute assignment for narrowing if the inferred type of an attribute contains a dynamic type.
-    /// However, strictly applying this rule would disable narrowing too frequently.
-    /// Therefore, for practical convenience, we don't consider dynamic types as data descriptors.
+    /// For practical convenience, dynamic union elements are not considered possible data
+    /// descriptors here, because doing so would disable narrowing too frequently.
     pub(crate) fn may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, true)
     }
@@ -3261,6 +3289,7 @@ impl<'db> Type<'db> {
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
             Type::Dynamic(_) => !any_of_union,
+            Type::SubclassOf(_) if self.dynamic_descriptor_type().is_some() => true,
             Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
@@ -3274,9 +3303,20 @@ impl<'db> Type<'db> {
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
             _ => {
-                !self.class_member(db, "__set__".into()).place.is_undefined()
+                !self
+                    .class_member_with_policy(
+                        db,
+                        "__set__".into(),
+                        MemberLookupPolicy::REQUIRE_CONCRETE,
+                    )
+                    .place
+                    .is_undefined()
                     || !self
-                        .class_member(db, "__delete__".into())
+                        .class_member_with_policy(
+                            db,
+                            "__delete__".into(),
+                            MemberLookupPolicy::REQUIRE_CONCRETE,
+                        )
                         .place
                         .is_undefined()
             }
@@ -3471,6 +3511,57 @@ impl<'db> Type<'db> {
             policy: MemberLookupPolicy,
             receiver: Option<Type<'db>>,
         ) -> PlaceAndQualifiers<'db> {
+            fn instance_like_member_lookup<'db>(
+                db: &'db dyn Db,
+                this: Type<'db>,
+                name: &Name,
+                policy: MemberLookupPolicy,
+                receiver: Type<'db>,
+            ) -> PlaceAndQualifiers<'db> {
+                let name_str = name.as_str();
+
+                // Enum members can be accessed through enum instances and other enum members,
+                // e.g. `answer.YES` or `Answer.YES.NO`.
+                if let Some(enum_class) = match this {
+                    Type::LiteralValue(literal) => literal
+                        .as_enum()
+                        .map(|enum_literal| enum_literal.enum_class_literal(db)),
+                    _ => this
+                        .nominal_class(db)
+                        .map(|class| class.class_literal(db))
+                        .and_then(|class| class.into_enum_class(db)),
+                } && let Some(resolved_name) = enum_class.resolve_member(db, name)
+                {
+                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
+                        db,
+                        enum_class,
+                        resolved_name,
+                    )))
+                    .into();
+                }
+
+                let fallback = this.instance_member(db, name_str);
+
+                let result = this.invoke_descriptor_protocol(
+                    db,
+                    receiver,
+                    name_str,
+                    fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    policy,
+                );
+
+                if result.is_class_var() && this.is_typed_dict() {
+                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
+                    // They can only be accessed on `SomeTypedDict` directly.
+                    return Place::Undefined.into();
+                }
+
+                let result = this.fallback_to_getattr(db, name, result, policy);
+
+                result.map_type(|ty| ty.bind_self_typevars(db, receiver))
+            }
+
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);
             if let Some(fallback) = this.materialized_divergent_fallback() {
                 return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
@@ -3768,24 +3859,23 @@ impl<'db> Type<'db> {
                         }) =>
                 {
                     let enum_literal = literal.as_enum().unwrap();
-                    let enum_class = enum_literal.enum_class(db);
-                    let is_enum_subclass = Type::ClassLiteral(enum_class)
+                    let enum_class = enum_literal.enum_class_literal(db);
+                    let is_enum_subclass = Type::ClassLiteral(enum_class.class_literal(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-                    enum_metadata(db, enum_class)
-                        .and_then(|metadata| match name_str {
-                            "name" if is_enum_subclass => {
-                                metadata.name_type(db, enum_literal.name(db))
-                            }
-                            "_name_" => metadata.name_type(db, enum_literal.name(db)),
-                            "value" if is_enum_subclass => {
-                                metadata.value_type(db, enum_literal.name(db))
-                            }
-                            "_value_" => metadata.value_type(db, enum_literal.name(db)),
-                            _ => None,
-                        })
-                        .map_or_else(|| Place::Undefined, Place::bound)
-                        .into()
+                    (match name_str {
+                        "name" if is_enum_subclass => {
+                            enum_class.name_type(db, enum_literal.name(db))
+                        }
+                        "_name_" => enum_class.name_type(db, enum_literal.name(db)),
+                        "value" if is_enum_subclass => {
+                            enum_class.value_type(db, enum_literal.name(db))
+                        }
+                        "_value_" => enum_class.value_type(db, enum_literal.name(db)),
+                        _ => None,
+                    })
+                    .map_or_else(|| Place::Undefined, Place::bound)
+                    .into()
                 }
 
                 Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
@@ -3799,6 +3889,26 @@ impl<'db> Type<'db> {
                         typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
                     ))
                     .into()
+                }
+                Type::TypeVar(typevar) => {
+                    let receiver = receiver.unwrap_or(this);
+                    if let Some(bound) = typevar
+                        .typevar(db)
+                        .bound_or_constraints(db)
+                        .map(|bound| bound.as_type(db))
+                        && bound.to_instance(db).is_some()
+                    {
+                        // A TypeVar can be bounded by a class-object type such as `type[A]`, which
+                        // requires the full lookup path rather than instance-member lookup.
+                        return bound.member_lookup_with_policy_and_receiver(
+                            db,
+                            name,
+                            policy,
+                            Some(receiver),
+                        );
+                    }
+
+                    instance_like_member_lookup(db, this, &name, policy, receiver)
                 }
 
                 Type::NominalInstance(instance)
@@ -3865,7 +3975,6 @@ impl<'db> Type<'db> {
                 | Type::ProtocolInstance(..)
                 | Type::NewTypeInstance(..)
                 | Type::LiteralValue(..)
-                | Type::TypeVar(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)
                 | Type::PropertyInstance(..)
@@ -3877,56 +3986,23 @@ impl<'db> Type<'db> {
                 | Type::TypeForm(..)
                 | Type::TypedDict(_) => {
                     let receiver = receiver.unwrap_or(this);
-
-                    // Enum members can be accessed through enum instances and other enum members,
-                    // e.g. `answer.YES` or `Answer.YES.NO`.
-                    if let Some(enum_class) =
-                        this.nominal_class(db).map(|class| class.class_literal(db))
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
-                    {
-                        return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                            db,
-                            enum_class,
-                            resolved_name.clone(),
-                        )))
-                        .into();
-                    }
-
-                    let fallback = this.instance_member(db, name_str);
-
-                    let result = this.invoke_descriptor_protocol(
-                        db,
-                        receiver,
-                        name_str,
-                        fallback,
-                        InstanceFallbackShadowsNonDataDescriptor::No,
-                        policy,
-                    );
-
-                    if result.is_class_var() && this.is_typed_dict() {
-                        // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
-                        // They can only be accessed on `SomeTypedDict` directly.
-                        return Place::Undefined.into();
-                    }
-
-                    let result = this.fallback_to_getattr(db, &name, result, policy);
-
-                    result.map_type(|ty| ty.bind_self_typevars(db, receiver))
+                    instance_like_member_lookup(db, this, &name, policy, receiver)
                 }
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
+                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
+                    let receiver = receiver.unwrap_or(this);
                     let enum_class = match this {
-                        Type::ClassLiteral(literal) => Some(literal),
+                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
                             .into_class(db)
-                            .map(|class| class.class_literal(db)),
+                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                        && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
@@ -3938,18 +4014,23 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = this
-                    .to_instance(db)
-                    .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
+                    let self_instance = receiver.to_instance(db).expect(
+                        "The receiver for a class-object lookup should always be instantiable",
+                    );
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                    let class_attr_fallback =
-                        Type::try_call_dunder_get_on_attribute(db, class_attr_plain, None, this).0;
+                    let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        class_attr_plain,
+                        None,
+                        receiver,
+                    )
+                    .0;
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        this,
+                        receiver,
                         name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
@@ -5734,12 +5815,14 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Sentinel(sentinel) => {
                     Ok(Type::KnownInstance(KnownInstanceType::Sentinel(*sentinel)))
                 }
-                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
-                        *self, scope_id
-                    )],
-                    fallback_type: Type::unknown(),
-                }),
+                KnownInstanceType::FunctoolsPartial(_) | KnownInstanceType::Range { .. } => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                            *self, scope_id
+                        )],
+                        fallback_type: Type::unknown(),
+                    })
+                }
             },
 
             Type::SpecialForm(special_form) => special_form
@@ -6567,6 +6650,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::Sentinel(_)
+                | KnownInstanceType::Range { .. }
                 | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
@@ -6820,18 +6904,19 @@ impl<'db> Type<'db> {
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db),
+            Self::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple,
+            ) => Type::SpecialForm(SpecialFormType::Todo).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Divergent(_)
-            | Self::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple
-                | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::UnspecializedTypeVar,
+            Self::Dynamic(
+                DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
@@ -6935,9 +7020,41 @@ impl<'db> Type<'db> {
             Truthiness::Ambiguous => KnownClass::Bool.to_instance(db),
         }
     }
+
+    /// Return whether the negation of this type is a subtype of `target`, reusing `negated_cache`
+    /// for type shapes whose negation must still be materialized.
+    pub(crate) fn negation_is_subtype_of_cached(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        negated_cache: &mut Option<Type<'db>>,
+    ) -> bool {
+        match self {
+            Type::Intersection(intersection) => intersection.negation_is_subtype_of(db, target),
+            _ => {
+                let negated = negated_cache.get_or_insert_with(|| self.negate(db));
+                negated.is_subtype_of(db, target)
+            }
+        }
+    }
 }
 
 impl<'db> IntersectionType<'db> {
+    /// Return whether the negation of this intersection is a subtype of `target`.
+    ///
+    /// Applying De Morgan's law to an intersection produces a union. Checking each branch
+    /// directly avoids constructing and simplifying that temporary union, which can be costly
+    /// for the large intersections produced by repeated narrowing.
+    pub(crate) fn negation_is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        self.positive(db)
+            .iter()
+            .all(|positive| positive.negate(db).is_subtype_of(db, target))
+            && self
+                .negative(db)
+                .iter()
+                .all(|negative| negative.is_subtype_of(db, target))
+    }
+
     // Calls the dunder on each element separately and combines the results.
     // This avoids intersecting bound methods (which often collapses to Never)
     // and instead intersects the return types.
@@ -7964,21 +8081,6 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
-    }
-}
-
-/// Whether a given type originates from value expression inference or type expression inference.
-/// For example, the symbol `int` would be inferred as `<class 'int'>` in value expression context,
-/// and as `int` (i.e. an instance of the class `int`) in type expression context.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
-pub enum InferredAs {
-    ValueExpression,
-    TypeExpression,
-}
-
-impl InferredAs {
-    pub const fn type_expression(self) -> bool {
-        matches!(self, InferredAs::TypeExpression)
     }
 }
 

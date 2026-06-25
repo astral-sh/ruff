@@ -822,7 +822,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "029") => rules::flake8_pyi::rules::StrOrReprDefinedInStub,
         (Flake8Pyi, "030") => rules::flake8_pyi::rules::UnnecessaryLiteralUnion,
         (Flake8Pyi, "032") => rules::flake8_pyi::rules::AnyEqNeAnnotation,
-        (Flake8Pyi, "033") => rules::flake8_pyi::rules::TypeCommentInStub,
+        (Flake8Pyi, "033") => rules::flake8_pyi::rules::LegacyTypeComment,
         (Flake8Pyi, "034") => rules::flake8_pyi::rules::NonSelfReturnType,
         (Flake8Pyi, "035") => rules::flake8_pyi::rules::UnassignedSpecialVariableInStub,
         (Flake8Pyi, "036") => rules::flake8_pyi::rules::BadExitAnnotation,

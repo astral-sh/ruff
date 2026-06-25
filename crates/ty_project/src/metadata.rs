@@ -3,6 +3,7 @@ use ruff_db::files::FileRootKind;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::name::Name;
+use ruff_ranged_value::ValueSource;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
@@ -13,7 +14,6 @@ use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
-use crate::metadata::value::ValueSource;
 pub use options::Options;
 use options::TyTomlError;
 

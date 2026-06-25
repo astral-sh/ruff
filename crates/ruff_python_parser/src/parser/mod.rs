@@ -1182,6 +1182,8 @@ impl RecoveryContextKind {
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context but
     /// the token isn't part of the error recovery set.
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn is_regular_list_terminator(self, p: &Parser) -> bool {
         matches!(
             self.list_terminator_kind(p),
@@ -1191,6 +1193,8 @@ impl RecoveryContextKind {
 
     /// Checks the current token the parser is at and returns the list terminator kind if the token
     /// terminates the list as per the context.
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn list_terminator_kind(self, p: &Parser) -> Option<ListTerminatorKind> {
         // The end of file marker ends all lists.
         if p.at(TokenKind::EndOfFile) {
@@ -1368,6 +1372,8 @@ impl RecoveryContextKind {
         }
     }
 
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn is_list_element(self, p: &Parser) -> bool {
         match self {
             RecoveryContextKind::ModuleStatements => p.at_stmt(),

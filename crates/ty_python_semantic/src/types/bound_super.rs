@@ -375,13 +375,13 @@ impl<'db> BoundSuperType<'db> {
         pivot_class: ClassBase<'db>,
     ) -> bool {
         match pivot_class {
-            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
             ClassBase::Class(pivot_class) => {
                 let pivot_class = pivot_class.class_literal(db);
                 class.iter_mro(db).any(|superclass| match superclass {
-                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
                     ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
-                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
+                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
                 })
             }
             special_form @ (ClassBase::Generic | ClassBase::Protocol) => {
@@ -391,7 +391,7 @@ impl<'db> BoundSuperType<'db> {
                 })
             }
             // typing.TypedDict never stays in a runtime class' MRO
-            ClassBase::TypedDict => false,
+            ClassBase::TypedDict(_) => false,
         }
     }
 
@@ -541,7 +541,7 @@ impl<'db> BoundSuperType<'db> {
             },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
-            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
+            Type::SpecialForm(SpecialFormType::TypedDict(module)) => ClassBase::TypedDict(module),
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
             Type::Divergent(divergent) => ClassBase::Divergent(divergent),
             _ => {
@@ -988,8 +988,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, l == r)
             }
             (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
-            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => self.always(),
-            (ClassBase::Dynamic(_), _) => self.never(),
+            (ClassBase::Any | ClassBase::Dynamic(_), ClassBase::Any | ClassBase::Dynamic(_)) => {
+                self.always()
+            }
+            (ClassBase::Any | ClassBase::Dynamic(_), _) => self.never(),
 
             (ClassBase::Generic, ClassBase::Generic) => self.always(),
             (ClassBase::Generic, _) => self.never(),
@@ -997,8 +999,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (ClassBase::Protocol, ClassBase::Protocol) => self.always(),
             (ClassBase::Protocol, _) => self.never(),
 
-            (ClassBase::TypedDict, ClassBase::TypedDict) => self.always(),
-            (ClassBase::TypedDict, _) => self.never(),
+            (ClassBase::TypedDict(left), ClassBase::TypedDict(right)) => {
+                ConstraintSet::from_bool(self.constraints, left == right)
+            }
+            (ClassBase::TypedDict(_), _) => self.never(),
         };
         if class_equivalence.is_never_satisfied(db) {
             return self.never();

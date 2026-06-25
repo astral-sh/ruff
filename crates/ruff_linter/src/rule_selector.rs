@@ -1,15 +1,104 @@
+use std::hash::Hash;
 use std::str::FromStr;
 
-use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+
+use ruff_ranged_value::{RangedValue, ValueSource};
 
 use crate::codes::RuleIter;
 use crate::codes::{RuleCodePrefix, RuleGroup};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
+use crate::warn_user_once_by_message;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(transparent)]
+pub struct UnresolvedRuleSelector(RangedValue<String>);
+
+impl UnresolvedRuleSelector {
+    pub fn resolve(&self, _preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
+        RuleSelector::from_str(self.0.as_str()).map_err(|_| {
+            let kind = if matches!(self.0.as_str(), "PREVIEW" | "NURSERY") {
+                RuleResolutionErrorKind::Removed
+            } else {
+                RuleResolutionErrorKind::Unknown
+            };
+            RuleResolutionError::from_selector(self, kind)
+        })
+    }
+
+    pub fn new(selector: impl Into<String>, source: ValueSource) -> Self {
+        Self(RangedValue::new(selector.into(), source))
+    }
+
+    pub fn cli(selector: impl Into<String>) -> Self {
+        Self::new(selector, ValueSource::Cli)
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+}
+
+#[derive(Debug)]
+enum RuleResolutionErrorKind {
+    Removed,
+    Unknown,
+}
+
+#[derive(Debug)]
+pub struct RuleResolutionError {
+    selector: String,
+    setting: Option<&'static str>,
+    source: ValueSource,
+    kind: RuleResolutionErrorKind,
+}
+
+impl RuleResolutionError {
+    fn from_selector(unresolved: &UnresolvedRuleSelector, kind: RuleResolutionErrorKind) -> Self {
+        Self {
+            selector: unresolved.0.to_string(),
+            setting: None,
+            source: unresolved.0.source().clone(),
+            kind,
+        }
+    }
+
+    /// Attach the configuration option where the error occurred.
+    #[must_use]
+    pub fn with_setting(mut self, setting: &'static str) -> Self {
+        self.setting = Some(setting);
+        self
+    }
+
+    pub fn log_warning(&self) {
+        warn_user_once_by_message!("{}", self);
+    }
+}
+
+impl std::fmt::Display for RuleResolutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = match self.kind {
+            RuleResolutionErrorKind::Removed => "Removed",
+            RuleResolutionErrorKind::Unknown => "Unknown rule",
+        };
+        write!(f, "{kind} selector `{selector}`", selector = self.selector)?;
+        if let Some(setting) = self.setting {
+            write!(f, " in `{setting}`")?;
+        }
+        write!(f, " from ")?;
+        match &self.source {
+            ValueSource::File(path) => write!(f, "{}", path.as_path()),
+            ValueSource::Cli => write!(f, "the CLI"),
+            ValueSource::Editor => write!(f, "the editor configuration"),
+        }
+    }
+}
+
+impl std::error::Error for RuleResolutionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
@@ -41,12 +130,6 @@ impl RuleSelector {
             prefix,
             redirected_from: None,
         }
-    }
-}
-
-impl From<Linter> for RuleSelector {
-    fn from(linter: Linter) -> Self {
-        Self::Linter(linter)
     }
 }
 
@@ -144,52 +227,9 @@ impl RuleSelector {
     }
 }
 
-impl Serialize for RuleSelector {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let (prefix, code) = self.prefix_and_code();
-        serializer.serialize_str(&format!("{prefix}{code}"))
-    }
-}
-
-impl<'de> Deserialize<'de> for RuleSelector {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // We are not simply doing:
-        // let s: &str = Deserialize::deserialize(deserializer)?;
-        // FromStr::from_str(s).map_err(de::Error::custom)
-        // here because the toml crate apparently doesn't support that
-        // (as of toml v0.6.0 running `cargo test` failed with the above two lines)
-        deserializer.deserialize_str(SelectorVisitor)
-    }
-}
-
-struct SelectorVisitor;
-
-impl Visitor<'_> for SelectorVisitor {
-    type Value = RuleSelector;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(
-            "expected a string code identifying a linter or specific rule, or a partial rule code or ALL to refer to all rules",
-        )
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        FromStr::from_str(v).map_err(de::Error::custom)
-    }
-}
-
 impl RuleSelector {
     /// Return all matching rules, regardless of rule group filters like preview and deprecated.
-    pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
+    pub fn all_rules(&self) -> impl Iterator<Item = Rule> + use<> {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
 
@@ -270,11 +310,11 @@ mod schema {
     use serde_json::Value;
     use strum::IntoEnumIterator;
 
-    use crate::RuleSelector;
     use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
+    use crate::{RuleSelector, UnresolvedRuleSelector};
 
-    impl JsonSchema for RuleSelector {
+    impl JsonSchema for UnresolvedRuleSelector {
         fn schema_name() -> std::borrow::Cow<'static, str> {
             std::borrow::Cow::Borrowed("RuleSelector")
         }
@@ -306,7 +346,7 @@ mod schema {
             )
             .filter(|p| {
                 // Exclude any prefixes where all of the rules are removed
-                if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                if let Ok(RuleSelector::Rule { prefix, .. } | RuleSelector::Prefix { prefix, .. }) =
                     RuleSelector::parse_no_redirect(p)
                 {
                     !prefix.rules().all(|rule| rule.is_removed())
@@ -421,51 +461,36 @@ pub mod clap_completion {
     use strum::IntoEnumIterator;
 
     use crate::{
-        RuleSelector,
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
-        rule_selector::is_single_rule_selector,
+        rule_selector::{UnresolvedRuleSelector, is_single_rule_selector},
     };
 
     #[derive(Clone)]
-    pub struct RuleSelectorParser;
+    pub struct UnresolvedRuleSelectorParser;
 
-    impl ValueParserFactory for RuleSelector {
-        type Parser = RuleSelectorParser;
+    impl ValueParserFactory for UnresolvedRuleSelector {
+        type Parser = UnresolvedRuleSelectorParser;
 
         fn value_parser() -> Self::Parser {
-            RuleSelectorParser
+            UnresolvedRuleSelectorParser
         }
     }
 
-    impl TypedValueParser for RuleSelectorParser {
-        type Value = RuleSelector;
+    impl TypedValueParser for UnresolvedRuleSelectorParser {
+        type Value = UnresolvedRuleSelector;
 
         fn parse_ref(
             &self,
-            cmd: &clap::Command,
-            arg: Option<&clap::Arg>,
+            _cmd: &clap::Command,
+            _arg: Option<&clap::Arg>,
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
             let value = value
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            value.parse().map_err(|_| {
-                let mut error =
-                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-                if let Some(arg) = arg {
-                    error.insert(
-                        clap::error::ContextKind::InvalidArg,
-                        clap::error::ContextValue::String(arg.to_string()),
-                    );
-                }
-                error.insert(
-                    clap::error::ContextKind::InvalidValue,
-                    clap::error::ContextValue::String(value.to_string()),
-                );
-                error
-            })
+            Ok(UnresolvedRuleSelector::cli(value))
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {

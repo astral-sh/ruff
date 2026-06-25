@@ -7,10 +7,11 @@ use divan::{Bencher, bench};
 
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+use ruff_ranged_value::RangedValue;
 use ty_module_resolver::{ModuleName, resolve_module};
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
 
 const SEEDED_TARGETS: &[&str] = &["target_0", "target_1", "target_2", "target_3", "target_4"];
@@ -90,14 +91,9 @@ fn setup_case(n: usize) -> Case {
 fn ty_module_resolver<const PATHS: usize>(bencher: Bencher) {
     bencher
         .with_inputs(|| setup_case(PATHS))
-        .bench_local_values(|case| {
-            let Case {
-                db,
-                importing_file,
-                resolves,
-            } = case;
-            for name in &resolves {
-                black_box(resolve_module(&db, importing_file, name));
+        .bench_local_refs(|case| {
+            for name in &case.resolves {
+                black_box(resolve_module(&case.db, case.importing_file, name));
             }
         });
 }

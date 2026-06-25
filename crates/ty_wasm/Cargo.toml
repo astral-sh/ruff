@@ -36,6 +36,7 @@ ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_diagnostics = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_formatter = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 

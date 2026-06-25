@@ -580,8 +580,8 @@ fn semantic_tokens_full_for_cell(
 #[derive(Debug)]
 pub(crate) struct NotebookBuilder {
     notebook_uri: lsp_types::Uri,
-    // The cells: (cell_metadata, content, language_id)
-    cells: Vec<(lsp_types::NotebookCell, String, String)>,
+    // The cells: (cell_metadata, content, language_id, version)
+    cells: Vec<(lsp_types::NotebookCell, String, String, i32)>,
 }
 
 impl NotebookBuilder {
@@ -594,6 +594,14 @@ impl NotebookBuilder {
     }
 
     pub(crate) fn add_python_cell(&mut self, content: &str) -> lsp_types::Uri {
+        self.add_python_cell_with_version(content, 0)
+    }
+
+    pub(crate) fn add_python_cell_with_version(
+        &mut self,
+        content: &str,
+        version: i32,
+    ) -> lsp_types::Uri {
         let index = self.cells.len();
         let id = format!(
             "vscode-notebook-cell:/{}#{}",
@@ -612,6 +620,7 @@ impl NotebookBuilder {
             },
             content.to_string(),
             "python".to_string(),
+            version,
         ));
 
         uri
@@ -625,17 +634,23 @@ impl NotebookBuilder {
                     notebook_type: "jupyter-notebook".to_string(),
                     version: 0,
                     metadata: None,
-                    cells: self.cells.iter().map(|(cell, _, _)| cell.clone()).collect(),
+                    cells: self
+                        .cells
+                        .iter()
+                        .map(|(cell, _, _, _)| cell.clone())
+                        .collect(),
                 },
                 cell_text_documents: self
                     .cells
                     .iter()
-                    .map(|(cell, content, language_id)| lsp_types::TextDocumentItem {
-                        uri: cell.document.clone(),
-                        language_id: language_id.clone().into(),
-                        version: 0,
-                        text: content.clone(),
-                    })
+                    .map(
+                        |(cell, content, language_id, version)| lsp_types::TextDocumentItem {
+                            uri: cell.document.clone(),
+                            language_id: language_id.clone().into(),
+                            version: *version,
+                            text: content.clone(),
+                        },
+                    )
                     .collect(),
             },
         );

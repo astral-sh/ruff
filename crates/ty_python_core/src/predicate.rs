@@ -67,8 +67,7 @@ impl<'db> PredicatesBuilder<'db> {
         self.predicates.push(predicate)
     }
 
-    pub(crate) fn build(mut self) -> Predicates<'db> {
-        self.predicates.shrink_to_fit();
+    pub(crate) fn build(self) -> Predicates<'db> {
         self.predicates.into()
     }
 }
@@ -130,6 +129,11 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
+    /// Whether an iterable is statically known to yield at least one item.
+    ///
+    /// Currently, this predicate is only emitted for direct `range(...)` calls. It is resolved
+    /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
+    IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
@@ -158,55 +162,43 @@ impl ClassPatternKind {
 }
 
 /// Structural details for sequence patterns that affect narrowing and reachability.
-///
-/// `patterns` stores one predicate per syntactic element, with a starred element
-/// represented by [`PatternPredicateKind::MatchStar`]. `has_star` records
-/// whether the pattern accepts additional sequence elements.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct SequencePatternPredicateKind<'db> {
     pub patterns: Box<[PatternPredicateKind<'db>]>,
-    pub has_star: bool,
 }
 
 impl<'db> SequencePatternPredicateKind<'db> {
     /// Return `true` for `case [*rest]`, the only sequence pattern with no
     /// length or element constraints.
     pub fn is_irrefutable(&self) -> bool {
-        self.patterns.len() == 1 && self.has_star
-    }
-
-    pub const fn is_exact_length(&self) -> bool {
-        !self.has_star
+        matches!(self.patterns.as_ref(), [PatternPredicateKind::Star(_)])
     }
 
     /// Return the patterns before and after the starred element.
     pub fn split_around_star(
         &self,
     ) -> Option<(&[PatternPredicateKind<'db>], &[PatternPredicateKind<'db>])> {
-        if !self.has_star {
-            return None;
-        }
-
         let star_index = self
             .patterns
             .iter()
-            .position(|pattern| matches!(pattern, PatternPredicateKind::MatchStar))?;
+            .position(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))?;
         let (prefix, star_and_suffix) = self.patterns.split_at(star_index);
         Some((prefix, &star_and_suffix[1..]))
     }
 }
 
-/// Pattern kinds for which we support type narrowing and/or static reachability analysis.
+/// Pattern structure used for type narrowing, static reachability, and inferring the types of
+/// names bound by a successful match.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
-    Or(Vec<PatternPredicateKind<'db>>),
+    Or(Box<[PatternPredicateKind<'db>]>),
     Class(Expression<'db>, ClassPatternKind),
     Mapping(ClassPatternKind),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
-    MatchStar,
+    Star(Option<Name>),
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]

@@ -8,7 +8,7 @@ use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::predicate::ScopedPredicateId;
-use crate::rank::RankBitBox;
+use crate::rank::{RankBitBox, RankBitBoxVec};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -146,7 +146,7 @@ pub struct ReachabilityConstraints {
     /// index of that node in the `used_interiors` vector.
     ///
     /// If all interior nodes were retained, the original ID can be used directly instead.
-    used_indices: Option<Box<RankBitBox>>,
+    used_indices: Option<RankBitBox>,
 }
 
 impl ReachabilityConstraints {
@@ -174,7 +174,7 @@ impl ReachabilityConstraints {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
-    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
+    interior_used: RankBitBoxVec,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -195,20 +195,20 @@ pub struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
-        if self.interior_used.iter().all(|used| *used) {
+        if self.interior_used.first_zero().is_none() {
             ReachabilityConstraints {
                 used_interiors: self.interiors.raw.into_boxed_slice(),
                 used_indices: None,
             }
         } else {
-            let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
             let used_interiors = (self.interiors.into_iter())
-                .zip(self.interior_used)
+                .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
+            let used_indices = RankBitBox::from_bits(self.interior_used);
             ReachabilityConstraints {
                 used_interiors,
-                used_indices: Some(Box::new(used_indices)),
+                used_indices: Some(used_indices),
             }
         }
     }
@@ -217,8 +217,8 @@ impl ReachabilityConstraintsBuilder {
     /// only calculated for intermediate values, and which don't need to be included in the final
     /// built result.
     pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
-        if !node.is_terminal() && !self.interior_used[node] {
-            self.interior_used[node] = true;
+        if !node.is_terminal() && !self.interior_used[node.index()] {
+            self.interior_used.set(node.index(), true);
             let node = self.interiors[node];
             self.mark_used(node.if_true);
             self.mark_used(node.if_ambiguous);

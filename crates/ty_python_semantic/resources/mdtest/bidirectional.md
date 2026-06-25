@@ -343,6 +343,19 @@ def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+The return type context should preserve the independent key and value types of a generic `dict`
+constructor:
+
+```py
+from collections.abc import Iterable, Mapping
+
+def dict_with_numeric_promotion(
+    keys: Iterable[float],
+    values: Iterable[int],
+) -> Mapping[float, int]:
+    return dict(zip(keys, values))
+```
+
 ## Type context sources
 
 Type context is sourced from various places, including annotated assignments:
