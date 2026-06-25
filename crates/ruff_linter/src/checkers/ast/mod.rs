@@ -85,6 +85,7 @@ use crate::rules::pylint::rules::{
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
+use crate::suppression::Suppressions;
 use crate::{Edit, Violation};
 use crate::{Locator, docstrings, noqa};
 
@@ -250,6 +251,8 @@ pub(crate) struct Checker<'a> {
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
     context: &'a LintContext<'a>,
+    /// The parsed `ruff:ignore` (and similar) suppressions for this file.
+    suppressions: &'a Suppressions,
 }
 
 impl<'a> Checker<'a> {
@@ -271,6 +274,7 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
         context: &'a LintContext<'a>,
+        suppressions: &'a Suppressions,
     ) -> Self {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -300,12 +304,14 @@ impl<'a> Checker<'a> {
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
             context,
+            suppressions,
         }
     }
 }
 
 impl<'a> Checker<'a> {
-    /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
+    /// Return `true` if a [`Rule`] is disabled by a `noqa` directive or a
+    /// `ruff:ignore` suppression comment.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
@@ -318,13 +324,20 @@ impl<'a> Checker<'a> {
             return false;
         }
 
-        noqa::rule_is_ignored(
+        // Check `# noqa` directives first.
+        if noqa::rule_is_ignored(
             code,
             offset,
             self.noqa_line_for,
             self.comment_ranges(),
             self.locator,
-        )
+        ) {
+            return true;
+        }
+
+        // Also check `# ruff:ignore` (and similar) suppression comments, so that
+        // shared import fixes respect `ruff:ignore` the same way they respect `noqa`.
+        self.suppressions.is_rule_ignored(code, offset)
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
@@ -3352,6 +3365,7 @@ pub(crate) fn check_ast(
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
     context: &LintContext,
+    suppressions: &Suppressions,
 ) -> Vec<SemanticSyntaxError> {
     let module_path = package
         .map(PackageRoot::path)
@@ -3393,6 +3407,7 @@ pub(crate) fn check_ast(
         notebook_index,
         target_version,
         context,
+        suppressions,
     );
     checker.bind_builtins();
 

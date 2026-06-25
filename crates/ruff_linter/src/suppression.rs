@@ -23,7 +23,8 @@ use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
+    RedirectedNOQA, UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind,
+    code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -340,10 +341,83 @@ impl Suppressions {
 
             if suppressed {
                 suppression.used.set(true);
+                // Also mark other suppressions whose code redirects to the same
+                // target as used, to avoid false "unused" reports for redirect
+                // aliases (e.g., `# ruff:ignore[S307, PGH001]` where PGH001
+                // redirects to S307). We only mark suppressions with a *different*
+                // original code, so exact duplicates are still reported as unused.
+                let original_code = suppression.code.as_str();
+                for other in &self.valid {
+                    if !other.used.get() && other.code.as_str() != original_code {
+                        let other_code = get_redirect_target(other.code.as_str())
+                            .unwrap_or(other.code.as_str());
+                        if other_code == suppression_code {
+                            other.used.set(true);
+                        }
+                    }
+                }
                 return true;
             }
         }
         false
+    }
+
+    /// Returns `true` if the given [`Rule`] is ignored at the specified offset by a
+    /// `ruff:ignore` (or similar) suppression comment.
+    ///
+    /// This is used during fix construction (e.g., for shared import fixes) to
+    /// determine whether a given import should be excluded from the fix, mirroring
+    /// the behavior of [`noqa::rule_is_ignored`] for `# noqa` directives.
+    pub(crate) fn is_rule_ignored(&self, code: Rule, offset: TextSize) -> bool {
+        if self.valid.is_empty() {
+            return false;
+        }
+
+        let code_str = code.noqa_code();
+        for suppression in &self.valid {
+            let suppression_code =
+                get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
+
+            if suppression_code != code_str {
+                continue;
+            }
+
+            if suppression.range.contains(offset) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Report RUF101 diagnostics for redirected codes in `ruff:ignore` (and similar)
+    /// suppression comments.
+    ///
+    /// This mirrors the behavior of [`redirected_noqa`] for `# noqa` directives.
+    pub(crate) fn check_redirects(&self, context: &LintContext, locator: &Locator) {
+        let mut seen = FxHashSet::default();
+        for suppression in &self.valid {
+            let comment = suppression.comments.first();
+            // Deduplicate by comment range (multiple Suppression entries can share the same comment).
+            if !seen.insert(comment.range) {
+                continue;
+            }
+            for code_range in &comment.codes {
+                let code_str = locator.slice(*code_range);
+                if let Some(redirected) = get_redirect_target(code_str) {
+                    let mut diagnostic = context.report_diagnostic(
+                        RedirectedNOQA {
+                            original: code_str.to_string(),
+                            target: redirected.to_string(),
+                        },
+                        *code_range,
+                    );
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        redirected.to_string(),
+                        *code_range,
+                    )));
+                }
+            }
+        }
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
@@ -421,6 +495,15 @@ impl Suppressions {
             }
 
             let code_str = suppression.code.as_str();
+
+            // Self-suppression: if the suppression's code is RUF100 itself (after
+            // redirect resolution), treat it as a self-ignore and skip reporting it
+            // as unused. This mirrors the noqa-side self-ignore check.
+            let resolved_code =
+                get_redirect_target(code_str).unwrap_or(code_str);
+            if resolved_code == Rule::UnusedNOQA.noqa_code() {
+                continue;
+            }
 
             let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
             let name_is_known = Rule::from_name(&suppression.code).is_ok();

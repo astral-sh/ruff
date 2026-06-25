@@ -211,6 +211,7 @@ pub fn check_path(
             notebook_index,
             target_version,
             &context,
+            suppressions,
         ));
 
         let use_imports = !directives.isort.skip_file

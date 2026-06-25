@@ -27,8 +27,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct RedirectedNOQA {
-    original: String,
-    target: String,
+    pub(crate) original: String,
+    pub(crate) target: String,
 }
 
 impl AlwaysFixableViolation for RedirectedNOQA {

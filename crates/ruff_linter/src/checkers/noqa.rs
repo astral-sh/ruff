@@ -173,7 +173,10 @@ pub(crate) fn check_noqa(
                                     diag.secondary_code().is_some_and(|noqa| *noqa == code)
                                 })
                             } else {
-                                matches.iter().any(|match_| match_.noqa_code() == code)
+                                matches.iter().any(|match_| {
+                                    let match_code = match_.noqa_code();
+                                    match_code == code || match_code == original_code
+                                })
                             } || settings
                                 .external
                                 .iter()
@@ -243,6 +246,7 @@ pub(crate) fn check_noqa(
     if context.is_rule_enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
         ruff::rules::redirected_noqa(context, &noqa_directives);
         ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
+        suppressions.check_redirects(context, locator);
     }
 
     if context.is_rule_enabled(Rule::BlanketNOQA) && !exemption.enumerates(Rule::BlanketNOQA) {
