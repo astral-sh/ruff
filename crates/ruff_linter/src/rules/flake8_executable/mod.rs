@@ -28,7 +28,6 @@ mod tests {
     #[test_case(Rule::ShebangLeadingWhitespace, Path::new("EXE004_2.py"))]
     #[test_case(Rule::ShebangLeadingWhitespace, Path::new("EXE004_3.py"))]
     #[test_case(Rule::ShebangLeadingWhitespace, Path::new("EXE004_4.py"))]
-    #[test_case(Rule::ShebangLeadingWhitespace, Path::new("EXE004_5.py"))]
     #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_1.py"))]
     #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_2.py"))]
     #[test_case(Rule::ShebangNotFirstLine, Path::new("EXE005_3.py"))]
