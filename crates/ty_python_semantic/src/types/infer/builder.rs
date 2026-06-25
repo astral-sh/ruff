@@ -6191,6 +6191,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let mut next_argument_types = baseline_argument_types.clone();
         let mut next_bindings = bindings.clone();
+        // Keep the check corresponding to `context_argument_types`. If the next inference round
+        // produces those same types, its final check can reuse this result and binding state.
+        let mut previous_checked_result = None;
 
         // The active expression cache remains shared across every round. A cache hit restores the
         // complete expression inference into whichever round is ultimately committed, including
@@ -6214,7 +6217,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &context_argument_types,
                 &generic_fixpoint.argument_indices,
             );
-            if converged || round == generic_fixpoint.typevar_occurrences {
+            if converged {
+                argument_types.clone_from(&next_argument_types);
+                self.extend(round_builder);
+                if let Some(checked_result) = previous_checked_result {
+                    bindings.clone_from(&next_bindings);
+                    return Some(checked_result);
+                }
+                return None;
+            }
+            if round == generic_fixpoint.typevar_occurrences {
                 argument_types.clone_from(&next_argument_types);
                 self.extend(round_builder);
                 return None;
@@ -6243,6 +6255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Some(checked_result);
             }
 
+            previous_checked_result = Some(checked_result);
             std::mem::swap(&mut context_argument_types, &mut next_argument_types);
             round_inference_contexts = next_inference_contexts;
         }
