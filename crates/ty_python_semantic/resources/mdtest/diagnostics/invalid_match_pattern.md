@@ -232,9 +232,17 @@ from model import StubModel
 class SourceModel:
     __match_args__: tuple[Literal["value"]]
 
-def describe(source: SourceModel, stub: StubModel) -> None:
+class SplitModel:
+    __match_args__: tuple[Literal["value"]]
+    __match_args__ = ("value",)
+
+def describe(source: SourceModel, split: SplitModel, stub: StubModel) -> None:
     match source:
         case SourceModel(_):  # error: [invalid-match-pattern]
+            pass
+
+    match split:
+        case SplitModel(_):
             pass
 
     match stub:
