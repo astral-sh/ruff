@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
-use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
+use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -3483,10 +3483,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let non_empty_iterable_constraint = if literal_iterates_at_least_once(iter) {
+                let non_empty_iterable_constraint = if let Some(is_non_empty) =
+                    literal_iterable_truthiness(iter).into_bool()
+                {
                     let after_iter = self.flow_snapshot();
-                    let constraint =
-                        self.record_reachability_constraint(PredicateOrLiteral::Literal(true));
+                    let constraint = self
+                        .record_reachability_constraint(PredicateOrLiteral::Literal(is_non_empty));
 
                     Some((after_iter, constraint))
                 } else if is_direct_range_call(iter) {
@@ -5063,23 +5065,22 @@ impl ExpressionsScopeMapBuilder {
     }
 }
 
-/// Returns `true` if the literal iterable must contain at least one element.
+/// Returns the static truthiness of a literal iterable.
 ///
-/// The check is intentionally syntactic and conservative: starred elements and dictionary
-/// unpacking only prove non-emptiness when there is also a non-starred/non-unpacked element.
-fn literal_iterates_at_least_once(expr: &ast::Expr) -> bool {
+/// Returns [`Truthiness::Unknown`] for other expressions and when starred elements or dictionary
+/// unpacking make the literal's emptiness ambiguous.
+fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
     match expr {
-        ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-        | ast::Expr::List(ast::ExprList { elts, .. })
-        | ast::Expr::Set(ast::ExprSet { elts, .. }) => {
-            elts.iter().any(|elt| !elt.is_starred_expr())
-        }
-        ast::Expr::Dict(ast::ExprDict { items, .. }) => items.iter().any(|item| item.key.is_some()),
-        ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
-        ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
-        _ => false,
+        ast::Expr::Tuple(_)
+        | ast::Expr::List(_)
+        | ast::Expr::Set(_)
+        | ast::Expr::Dict(_)
+        | ast::Expr::StringLiteral(_)
+        | ast::Expr::BytesLiteral(_) => Truthiness::from_expr(expr, |_| false),
+        _ => Truthiness::Unknown,
     }
 }
+
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
     match expr {

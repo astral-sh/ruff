@@ -244,6 +244,48 @@ for x in b"a":
 reveal_type(x)  # revealed: Literal[97]
 ```
 
+## With statically empty literals
+
+```py
+value = 1
+
+for _ in ():
+    value = "tuple"
+
+for _ in []:
+    value = "list"
+
+for _ in {}:
+    value = "dict"
+
+for _ in "":
+    value = "str"
+
+for _ in b"":
+    value = "bytes"
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+Starred elements and dictionary unpacking make emptiness ambiguous:
+
+```py
+def _(items: list[int], mapping: dict[str, int]):
+    for item in [*items]:
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(item)
+
+    for key in {**mapping}:
+        pass
+
+    # revealed: str
+    # error: [possibly-unresolved-reference]
+    reveal_type(key)
+```
+
 ## With literal list
 
 ```py
