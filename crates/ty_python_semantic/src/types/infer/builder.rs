@@ -2471,7 +2471,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let positional_patterns = &pattern.arguments.patterns;
-            if let Some(positional_limit) = class_pattern_positional_limit(self.db(), class)
+            if !positional_patterns.is_empty()
+                && let Some(positional_limit) = class_pattern_positional_limit(self.db(), class)
                 && let Some(first_excess_pattern) = positional_patterns.get(positional_limit)
             {
                 report_too_many_positional_patterns_for_match_args(
