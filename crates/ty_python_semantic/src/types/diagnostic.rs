@@ -968,7 +968,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/call-abstract-method.md")]
     pub(crate) static CALL_ABSTRACT_METHOD = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
-        status: LintStatus::preview("0.0.16"),
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }
@@ -986,7 +986,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-override-decorator.md")]
     pub(crate) static MISSING_OVERRIDE_DECORATOR = {
         summary: "detects methods that override a superclass member without an `@override` annotation",
-        status: LintStatus::preview("0.0.41"),
+        status: LintStatus::stable("0.0.41"),
         default_level: Level::Ignore,
     }
 }
@@ -1103,7 +1103,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unused-awaitable.md")]
     pub(crate) static UNUSED_AWAITABLE = {
         summary: "detects awaitable objects that are used as expression statements without being awaited",
-        status: LintStatus::preview("0.0.21"),
+        status: LintStatus::stable("0.0.21"),
         default_level: Level::Warn,
     }
 }
