@@ -398,10 +398,13 @@ mod tests {
     }
 
     #[test]
-    fn reports_while_false_body_statement() -> anyhow::Result<()> {
+    fn reports_statically_empty_loop_bodies() -> anyhow::Result<()> {
         let source = r#"
             while False:
                 print("dead")
+
+            for _ in ():
+                print("also dead")
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
@@ -410,6 +413,13 @@ mod tests {
           |
         3 |     print("dead")
           |     ^^^^^^^^^^^^^
+          |
+
+        info[unreachable-code]: Code is always unreachable
+         --> src/main.py:6:5
+          |
+        6 |     print("also dead")
+          |     ^^^^^^^^^^^^^^^^^^
           |
         "#);
         Ok(())

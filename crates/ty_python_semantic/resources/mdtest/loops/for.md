@@ -212,9 +212,120 @@ def _(color: Color):
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1, "a", b"foo"]
-# error: [possibly-unresolved-reference]
-reveal_type(x)
+reveal_type(x)  # revealed: Literal[1, "a", b"foo"]
+```
+
+## With statically non-empty literals
+
+```py
+for x in [1]:
+    pass
+
+reveal_type(x)  # revealed: Literal[1]
+
+for x in {1}:
+    pass
+
+reveal_type(x)  # revealed: int
+
+for x in {"foo": 1}:
+    pass
+
+reveal_type(x)  # revealed: str
+
+for x in "a":
+    pass
+
+reveal_type(x)  # revealed: Literal["a"]
+
+for x in b"a":
+    pass
+
+reveal_type(x)  # revealed: Literal[97]
+```
+
+## With statically empty literals
+
+```py
+value = 1
+
+for _ in ():
+    value = "tuple"
+
+for _ in []:
+    value = "list"
+
+for _ in {}:
+    value = "dict"
+
+for _ in "":
+    value = "str"
+
+for _ in b"":
+    value = "bytes"
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+## With `else` clauses and statically known literal emptiness
+
+```py
+def empty() -> None:
+    value = "before"
+
+    for _ in []:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["before"]
+
+def non_empty() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["body"]
+
+def non_empty_break() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+        break
+    else:
+        value = "else"
+
+    reveal_type(value)  # revealed: Literal["body"]
+```
+
+Starred elements and dictionary unpacking make emptiness ambiguous unless the literal also contains
+a required element:
+
+```py
+def _(items: list[int], mapping: dict[str, int]):
+    for item in [*items]:
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(item)
+
+    for key in {**mapping}:
+        pass
+
+    # revealed: str
+    # error: [possibly-unresolved-reference]
+    reveal_type(key)
+
+    for item in [*items, 1]:
+        pass
+
+    reveal_type(item)  # revealed: int
+
+    for key in {**mapping, "c": 2}:
+        pass
+
+    reveal_type(key)  # revealed: str
 ```
 
 ## With literal list
@@ -227,6 +338,10 @@ async def _():
     # error: [not-iterable]
     async for x in ["a", "b"]:
         reveal_type(x)  # revealed: Unknown
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ## With non-callable iterator

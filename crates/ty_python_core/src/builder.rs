@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
-use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
+use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -3471,7 +3471,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for_stmt @ ast::StmtFor {
                     range: _,
                     node_index: _,
-                    is_async: _,
+                    is_async,
                     target,
                     iter,
                     body,
@@ -3483,20 +3483,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let non_empty_range_constraint = if is_direct_range_call(iter) {
-                    let after_iter = self.flow_snapshot();
-                    let constraint = self.record_reachability_constraint(
-                        PredicateOrLiteral::Predicate(Predicate {
-                            node: PredicateNode::IsNonEmptyIterable(iter_expr),
-                            is_positive: true,
-                        }),
-                    );
+                let literal_iterable_is_non_empty = (!*is_async)
+                    .then(|| literal_iterable_truthiness(iter))
+                    .and_then(Truthiness::into_bool);
 
-                    Some((after_iter, constraint))
-                } else {
-                    self.record_ambiguous_reachability();
-                    None
-                };
+                let (after_empty_iter, non_empty_range_constraint) =
+                    match literal_iterable_is_non_empty {
+                        Some(false) => {
+                            let after_iter = self.flow_snapshot();
+                            self.mark_unreachable();
+                            (Some(after_iter), None)
+                        }
+                        Some(true) => (None, None),
+                        None if is_direct_range_call(iter) => {
+                            let after_iter = self.flow_snapshot();
+                            let constraint = self.record_reachability_constraint(
+                                PredicateOrLiteral::Predicate(Predicate {
+                                    node: PredicateNode::IsNonEmptyIterable(iter_expr),
+                                    is_positive: true,
+                                }),
+                            );
+
+                            (None, Some((after_iter, constraint)))
+                        }
+                        None => {
+                            self.record_ambiguous_reachability();
+                            (None, None)
+                        }
+                    };
 
                 let pre_loop = self.flow_snapshot();
 
@@ -3535,17 +3549,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
                 }
 
-                // We may execute the `else` clause without ever executing the body, so merge in a
-                // zero-iteration state before visiting `else`.
-                if let Some((after_iter, non_empty_range_constraint)) = non_empty_range_constraint {
-                    let post_loop_body = self.flow_snapshot();
+                if let Some(after_iter) = after_empty_iter {
                     self.flow_restore(after_iter);
-                    self.record_negated_reachability_constraint(non_empty_range_constraint);
-                    let no_iteration = self.flow_snapshot();
-                    self.flow_restore(post_loop_body);
-                    self.flow_merge(no_iteration);
-                } else {
-                    self.flow_merge(pre_loop);
+                } else if literal_iterable_is_non_empty.is_none() {
+                    // We may execute the `else` clause without ever executing the body, so merge
+                    // in a zero-iteration state before visiting `else`.
+                    if let Some((after_iter, non_empty_range_constraint)) =
+                        non_empty_range_constraint
+                    {
+                        let post_loop_body = self.flow_snapshot();
+                        self.flow_restore(after_iter);
+                        self.record_negated_reachability_constraint(non_empty_range_constraint);
+                        let no_iteration = self.flow_snapshot();
+                        self.flow_restore(post_loop_body);
+                        self.flow_merge(no_iteration);
+                    } else {
+                        self.flow_merge(pre_loop);
+                    }
                 }
                 self.visit_body(orelse);
 
@@ -5052,6 +5072,22 @@ impl ExpressionsScopeMapBuilder {
         interval_map.push((range, current_scope));
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
+}
+
+/// Returns the static truthiness of a literal iterable.
+///
+/// Returns [`Truthiness::Unknown`] for other expressions and when starred elements or dictionary
+/// unpacking make the literal's emptiness ambiguous.
+fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
+    match expr {
+        ast::Expr::Tuple(_)
+        | ast::Expr::List(_)
+        | ast::Expr::Set(_)
+        | ast::Expr::Dict(_)
+        | ast::Expr::StringLiteral(_)
+        | ast::Expr::BytesLiteral(_) => Truthiness::from_expr(expr, |_| false),
+        _ => Truthiness::Unknown,
     }
 }
 
