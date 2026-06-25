@@ -2964,6 +2964,43 @@ def f(never: Never):
     never.another_attribute = never
 ```
 
+### Mutable collection cardinality
+
+An inferred instance attribute can be mutated through any access to the attribute, so its initial
+cardinality cannot be retained:
+
+```py
+from typing import Final
+
+class InitiallyEmpty:
+    def __init__(self):
+        self.items = []
+
+class InitiallyNonEmpty:
+    def __init__(self):
+        self.items = [1]
+
+class FinalItems:
+    def __init__(self):
+        self.items: Final = []
+
+empty = InitiallyEmpty()
+empty.items.append(1)
+(item,) = empty.items
+reveal_type(item)  # revealed: Unknown
+reveal_type(bool(empty.items))  # revealed: bool
+
+non_empty = InitiallyNonEmpty()
+non_empty.items.clear()
+reveal_type(bool(non_empty.items))  # revealed: bool
+assert not non_empty.items
+object().missing  # error: [unresolved-attribute]
+
+final_items = FinalItems()
+final_items.items.append(1)
+reveal_type(bool(final_items.items))  # revealed: bool
+```
+
 ### Cyclic implicit attributes
 
 Inferring types for undeclared implicit attributes can be cyclic:

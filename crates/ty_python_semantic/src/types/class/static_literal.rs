@@ -2326,7 +2326,8 @@ impl<'db> StaticClassLiteral<'db> {
                             db,
                             index.expression(value),
                             TypeContext::default(),
-                        );
+                        )
+                        .forget_collection_cardinality(db);
                         return Member {
                             inner: Place::bound(inferred_ty)
                                 .with_definition(declaration)
@@ -2517,6 +2518,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
+                    let inferred_ty = inferred_ty.forget_collection_cardinality(db);
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
