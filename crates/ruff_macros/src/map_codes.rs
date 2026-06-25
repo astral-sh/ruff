@@ -120,9 +120,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             impl From<#linter> for crate::rule_selector::RuleSelector {
                 fn from(linter: #linter) -> Self {
                     let prefix = RuleCodePrefix::#linter(linter);
-                    if is_single_rule_selector(&prefix) {
+                    if let Some(rule) = prefix.as_rule() {
                         Self::Rule {
-                            prefix,
+                            rule,
                             redirected_from: None,
                         }
                     } else {
@@ -255,7 +255,6 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     }
 
     let mut rule_noqa_code_match_arms = quote!();
-    let mut rule_selector_match_arms = quote!();
 
     // Keep the proc-macro output stable so unchanged code can be reused incrementally.
     for (rule, codes) in rule_to_codes
@@ -295,11 +294,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
         });
-
-        let prefix = get_prefix_ident(&code.value());
-        rule_selector_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => RuleCodePrefix::#linter(#linter::#prefix),
-        });
     }
 
     let rule_to_code = quote! {
@@ -326,14 +320,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
             pub fn is_removed(&self) -> bool {
                 matches!(self.group(), RuleGroup::Removed { .. })
-            }
-        }
-
-        impl From<Rule> for crate::rule_selector::RuleSelector {
-            fn from(rule: Rule) -> Self {
-                Self::rule(match rule {
-                    #rule_selector_match_arms
-                })
             }
         }
 
