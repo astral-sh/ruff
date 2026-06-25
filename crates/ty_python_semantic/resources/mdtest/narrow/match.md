@@ -1086,6 +1086,50 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
             return 1
 ```
 
+## Runtime `Hashable` patterns
+
+Static protocol subtyping does not determine whether a value matches `Hashable()` at runtime. A
+class can disable an inherited `__hash__` method by setting it to `None`, as `dict` does:
+
+```py
+from collections.abc import Hashable
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def unhashable_pattern_is_not_exhaustive(
+    value: dict[str, int],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case Hashable():
+            return 1
+
+def typed_dict_hashable_pattern_is_not_exhaustive(
+    value: Payload,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case Hashable():
+            return 1
+
+def hashable_pattern_fallthrough(value: dict[str, int]) -> None:
+    match value:
+        case Hashable():
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: dict[str, int]
+
+def nested_hashable_pattern_is_not_exhaustive(
+    value: tuple[dict[str, int]],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [Hashable()]:
+            return 1
+```
+
 ## Members from the subject type
 
 A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
