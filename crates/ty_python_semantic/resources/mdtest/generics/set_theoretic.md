@@ -9,7 +9,7 @@ python-version = "3.14"
 
 ```pyi
 from typing import Any
-from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
+from ty_extensions import Bottom, static_assert, is_equivalent_to, is_subtype_of
 ```
 
 Throughout the document, we use the following classes as canonical examples for covariant,
@@ -192,12 +192,19 @@ Contra[P] & Contra[Any] = Contra[P | Any]    (5b)
 We can encode all of these in ty assertions:
 
 ```pyi
-# TODO: all of these should pass
+# TODO: both should pass
 static_assert(is_equivalent_to(Co[P] | Co[Any], Co[P | Any]))  # error: [static-assert-error]
-static_assert(is_equivalent_to(Co[P] & Co[Any], Co[P & Any]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Co[Any] | Co[P], Co[P | Any]))  # error: [static-assert-error]
 
+static_assert(is_equivalent_to(Co[P] & Co[Any], Co[P & Any]))
+static_assert(is_equivalent_to(Co[Any] & Co[P], Co[P & Any]))
+
+# TODO: both should pass
 static_assert(is_equivalent_to(Contra[P] | Contra[Any], Contra[P & Any]))  # error: [static-assert-error]
-static_assert(is_equivalent_to(Contra[P] & Contra[Any], Contra[P | Any]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Contra[Any] | Contra[P], Contra[P & Any]))  # error: [static-assert-error]
+
+static_assert(is_equivalent_to(Contra[P] & Contra[Any], Contra[P | Any]))
+static_assert(is_equivalent_to(Contra[Any] & Contra[P], Contra[P | Any]))
 ```
 
 What about invariance? We can naively write `Invariant[Any]` in its interval representation:
@@ -284,4 +291,44 @@ materializations of the gradual type `Invariant[P] | Invariant[Any]`. So we enco
 static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
+```
+
+Finally, we consider intersections with the negation of an `Any`-specialized generic class. For any
+of the generic classes `C` above, we can negate the canonical interval representation of `C[Any]`:
+
+```ignore
+~C[Any]
+    = ~(Bottom[C[Any]] | Top[C[Any]] & Any)
+    = ~Bottom[C[Any]] & (~Top[C[Any]] | Any)
+    = ~Top[C[Any]] | ~Bottom[C[Any]] & Any
+```
+
+Every fully-static specialization `C[P]` is a subtype of `Top[C[Any]]`, therefore:
+
+```ignore
+C[P] & ~C[Any]
+    = C[P] & (~Top[C[Any]] | ~Bottom[C[Any]] & Any)
+    = C[P] & ~Bottom[C[Any]] & Any
+```
+
+For covariant and contravariant classes, we can simplify the bottom materializations as in (3a) and
+(3b):
+
+```ignore
+Co[P]        & ~Co[Any]        = Co[P]        & ~Co[Never]              & Any
+Contra[P]    & ~Contra[Any]    = Contra[P]    & ~Contra[object]         & Any
+Invariant[P] & ~Invariant[Any] = Invariant[P] & ~Bottom[Invariant[Any]] & Any
+```
+
+We can verify all three relations in ty:
+
+```pyi
+static_assert(is_equivalent_to(Co[P] & ~Co[Any], Co[P] & ~Bottom[Co[Any]] & Any))
+static_assert(is_equivalent_to(Contra[P] & ~Contra[Any], Contra[P] & ~Bottom[Contra[Any]] & Any))
+static_assert(is_equivalent_to(Invariant[P] & ~Invariant[Any], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
+
+# The simplification is independent of the order in which the intersection elements are added.
+static_assert(is_equivalent_to(~Co[Any] & Co[P], Co[P] & ~Bottom[Co[Any]] & Any))
+static_assert(is_equivalent_to(~Contra[Any] & Contra[P], Contra[P] & ~Bottom[Contra[Any]] & Any))
+static_assert(is_equivalent_to(~Invariant[Any] & Invariant[P], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
 ```

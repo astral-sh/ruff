@@ -1723,7 +1723,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
-fn specialization_variance<'db>(
+pub(super) fn specialization_variance<'db>(
     db: &'db dyn Db,
     bound_typevar: BoundTypeVarInstance<'db>,
 ) -> TypeVarVariance {
