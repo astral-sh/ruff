@@ -370,22 +370,24 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
 }
 
 /// The statically known result of validating positional subpatterns for a class pattern.
-pub(crate) enum ClassPatternPositionalResult {
+pub(crate) enum ClassPatternPositionalResult<'db> {
     /// The maximum number of positional subpatterns accepted by the class.
     Limit(usize),
     /// The zero-based index of a consumed `__match_args__` element that is not a string.
     InvalidElement(usize),
+    /// A statically known non-exact-tuple type used for `__match_args__`.
+    InvalidType(Type<'db>),
 }
 
 /// Validate the positional subpatterns accepted by `class`.
 ///
 /// `None` means that the result cannot be determined statically, as for a valid variable-length
 /// `__match_args__` tuple or alternate states without one finite positional limit.
-pub(crate) fn class_pattern_positional_result(
-    db: &dyn Db,
-    class: ClassLiteral<'_>,
+pub(crate) fn class_pattern_positional_result<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
     positional_count: usize,
-) -> Option<ClassPatternPositionalResult> {
+) -> Option<ClassPatternPositionalResult<'db>> {
     match class_match_args_type(db, class) {
         ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
             Some(ClassPatternPositionalResult::Limit(1))
@@ -408,11 +410,11 @@ pub(crate) fn class_pattern_positional_result(
     }
 }
 
-fn match_args_positional_result(
-    db: &dyn Db,
-    match_args: Type<'_>,
+fn match_args_positional_result<'db>(
+    db: &'db dyn Db,
+    match_args: Type<'db>,
     positional_count: usize,
-) -> Option<ClassPatternPositionalResult> {
+) -> Option<ClassPatternPositionalResult<'db>> {
     let match_args = match_args.resolve_type_alias(db);
     if let Type::Union(union) = match_args {
         return union
@@ -421,7 +423,8 @@ fn match_args_positional_result(
             .try_fold(0, |maximum, element| {
                 match match_args_positional_result(db, *element, positional_count)? {
                     ClassPatternPositionalResult::Limit(limit) => Some(maximum.max(limit)),
-                    ClassPatternPositionalResult::InvalidElement(_) => None,
+                    ClassPatternPositionalResult::InvalidElement(_)
+                    | ClassPatternPositionalResult::InvalidType(_) => None,
                 }
             })
             .map(ClassPatternPositionalResult::Limit);
@@ -442,7 +445,7 @@ fn match_args_positional_result(
     } else if match_args.tuple_instance_spec(db).is_some()
         || match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
     {
-        Some(ClassPatternPositionalResult::Limit(0))
+        Some(ClassPatternPositionalResult::InvalidType(match_args))
     } else {
         None
     }

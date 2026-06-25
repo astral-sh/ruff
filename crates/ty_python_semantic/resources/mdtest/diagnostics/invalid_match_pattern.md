@@ -34,7 +34,7 @@ class Point:
 
 def describe(p: Point) -> None:
     match p:
-        case Point(x):  # error: [invalid-match-pattern]
+        case Point(x):  # error: [invalid-match-pattern] "must be an exact tuple"
             pass
 ```
 
@@ -44,7 +44,7 @@ class Vec:
 
 def describe(v: Vec) -> None:
     match v:
-        case Vec(a):  # error: [invalid-match-pattern]
+        case Vec(a):  # error: [invalid-match-pattern] "must be an exact tuple"
             pass
 ```
 
@@ -58,7 +58,7 @@ class Point:
 
 def describe(p: Point) -> None:
     match p:
-        case Point(x):  # error: [invalid-match-pattern]
+        case Point(x):  # error: [invalid-match-pattern] "must be an exact tuple"
             pass
 ```
 
