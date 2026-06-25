@@ -375,6 +375,21 @@ def _(x: Derived):
         reveal_type(x)  # revealed: Derived
 ```
 
+An exact runtime class can still coexist with another nominal class when it inherits from an
+explicit `Any` base, because the dynamic base may materialize as that class:
+
+```py
+from typing import Any
+
+class DynamicBase(Any): ...
+class Unrelated: ...
+
+def _(x: DynamicBase):
+    if type(x) is DynamicBase:
+        if isinstance(x, Unrelated):
+            reveal_type(x)  # revealed: DynamicBase & Unrelated
+```
+
 Literal and singleton types also have one exact runtime class. The exact-class constraint uses that
 information rather than widening them to their nominal fallback:
 

@@ -30,7 +30,7 @@ impl<'db> Type<'db> {
             Type::try_call_bin_op(db, left_ty, op, right_ty)
                 .ok()
                 .map(|bindings| {
-                    let result = bindings.return_type(db);
+                    let result = bindings.return_type(db).forget_collection_cardinality(db);
                     Type::refine_exact_builtin_binary_result(db, left_ty, op, right_ty, result)
                 })
         }

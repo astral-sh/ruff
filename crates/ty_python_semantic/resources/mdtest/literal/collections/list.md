@@ -57,6 +57,11 @@ def append_and_return(value: T) -> T:
     cast(Any, value).append(1)
     return value
 
+class MutatingAdd:
+    def __add__(self, value: T) -> T:
+        cast(Any, value).append(1)
+        return value
+
 reveal_type(type([].__iadd__([1])))  # revealed: <class 'list'>
 reveal_type(bool([].__iadd__([1])))  # revealed: bool
 reveal_type(len([].__iadd__([1])))  # revealed: int
@@ -64,6 +69,10 @@ reveal_type(len([].__iadd__([1])))  # revealed: int
 reveal_type(type(append_and_return([])))  # revealed: <class 'list'>
 reveal_type(bool(append_and_return([])))  # revealed: bool
 reveal_type(len(append_and_return([])))  # revealed: int
+
+reveal_type(type(MutatingAdd() + []))  # revealed: <class 'list'>
+reveal_type(bool(MutatingAdd() + []))  # revealed: bool
+reveal_type(len(MutatingAdd() + []))  # revealed: int
 ```
 
 ## List of tuples

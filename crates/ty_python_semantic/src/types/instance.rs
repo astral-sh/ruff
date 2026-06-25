@@ -960,13 +960,17 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         {
             return self.always();
         }
+        // An explicit `Any` base may materialize as the other nominal class, so knowing the exact
+        // runtime class does not prove disjointness in the one-exact case.
         if left.is_exact()
+            && !left.inherits_from_explicit_any()
             && left.class_literal(db) != right.class_literal(db)
             && !left.class(db).is_subclass_of(db, right.class(db))
         {
             return self.always();
         }
         if right.is_exact()
+            && !right.inherits_from_explicit_any()
             && right.class_literal(db) != left.class_literal(db)
             && !right.class(db).is_subclass_of(db, left.class(db))
         {
