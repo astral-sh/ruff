@@ -103,17 +103,39 @@ struct DynamicGeneralization<'db> {
 
 impl<'db> DynamicGeneralization<'db> {
     fn intersection(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let generic_context = self.general.generic_context(db);
         if !self.has_variant_replacement {
             return Some(self.specific_type);
         }
 
-        // Tuple specializations carry additional element information, and variance-based merges
-        // require the specific specialization to be fully static.
-        if self.class.known(db) == Some(KnownClass::Tuple) || self.specific_type.has_dynamic(db) {
+        // Rebuilding the generic specialization would lose type-variable correlation or NewType
+        // identity.
+        if matches!(
+            self.specific_type,
+            Type::TypeVar(_) | Type::NewTypeInstance(_)
+        ) {
             return None;
         }
 
+        // Variance-based merges require the specific specialization to be fully static.
+        if self.specific_type.has_dynamic(db) {
+            return None;
+        }
+
+        if self.class.known(db) == Some(KnownClass::Tuple) {
+            let general = self.general.tuple(db)?.as_fixed_length()?;
+            let specific = self.specific.tuple(db)?.as_fixed_length()?;
+            return Some(Type::heterogeneous_tuple(
+                db,
+                specific
+                    .iter_all_elements()
+                    .zip(general.iter_all_elements())
+                    .map(|(specific, general)| {
+                        IntersectionType::from_two_elements(db, specific, general)
+                    }),
+            ));
+        }
+
+        let generic_context = self.general.generic_context(db);
         let types: Vec<_> = generic_context
             .variables(db)
             .zip(self.general.types(db))
@@ -174,27 +196,53 @@ fn dynamic_generalization_of<'db>(
         return None;
     }
 
-    let mut has_dynamic_replacement = false;
-    let mut has_variant_replacement = false;
-    for ((typevar, general_type), specific_type) in general_specialization
-        .generic_context(db)
-        .variables(db)
-        .zip(general_specialization.types(db))
-        .zip(specific_specialization.types(db))
-    {
-        if general_type == specific_type {
-            continue;
-        }
-        if general_type.is_non_divergent_dynamic() {
-            has_dynamic_replacement = true;
-            has_variant_replacement |= matches!(
-                specialization_variance(db, typevar),
-                TypeVarVariance::Covariant | TypeVarVariance::Contravariant
-            );
-            continue;
-        }
-        return None;
-    }
+    let (has_dynamic_replacement, has_variant_replacement) =
+        if general_class.known(db) == Some(KnownClass::Tuple) {
+            let general_tuple = general_specialization.tuple(db)?.as_fixed_length()?;
+            let specific_tuple = specific_specialization.tuple(db)?.as_fixed_length()?;
+            if general_tuple.len() != specific_tuple.len() {
+                return None;
+            }
+
+            let mut has_dynamic_replacement = false;
+            for (general_type, specific_type) in general_tuple
+                .iter_all_elements()
+                .zip(specific_tuple.iter_all_elements())
+            {
+                if general_type == specific_type {
+                    continue;
+                }
+                if general_type.is_non_divergent_dynamic() {
+                    has_dynamic_replacement = true;
+                    continue;
+                }
+                return None;
+            }
+            (has_dynamic_replacement, has_dynamic_replacement)
+        } else {
+            let mut has_dynamic_replacement = false;
+            let mut has_variant_replacement = false;
+            for ((typevar, general_type), specific_type) in general_specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(general_specialization.types(db))
+                .zip(specific_specialization.types(db))
+            {
+                if general_type == specific_type {
+                    continue;
+                }
+                if general_type.is_non_divergent_dynamic() {
+                    has_dynamic_replacement = true;
+                    has_variant_replacement |= matches!(
+                        specialization_variance(db, typevar),
+                        TypeVarVariance::Covariant | TypeVarVariance::Contravariant
+                    );
+                    continue;
+                }
+                return None;
+            }
+            (has_dynamic_replacement, has_variant_replacement)
+        };
     has_dynamic_replacement.then_some(DynamicGeneralization {
         class: general_class,
         general: general_specialization,
