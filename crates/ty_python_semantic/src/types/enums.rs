@@ -45,6 +45,16 @@ enum KnownEnumDataTypeMixin {
 
 impl KnownEnumDataTypeMixin {
     fn normalize_value<'db>(self, db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
+        if let Type::Union(union) = value {
+            return UnionType::from_elements(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| self.normalize_value(db, *element)),
+            );
+        }
+
         match (self, value.as_literal_value_kind()) {
             (Self::Int, Some(LiteralValueTypeKind::Int(_)))
             | (Self::Str, Some(LiteralValueTypeKind::String(_))) => value,
