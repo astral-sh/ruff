@@ -68,7 +68,7 @@ impl<'db> UnionType<'db> {
 
     /// Create a union type `A | B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result.cycle_normalized(db, *previous, cycle)
         },
@@ -399,16 +399,16 @@ impl<'db> UnionType<'db> {
                 builder = builder.add(ty);
                 empty = false;
             } else {
-                // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
-                // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
+                let ty = ty
+                    .recursive_type_normalized_impl(db, div, nested)
+                    .unwrap_or(div);
+                // Top-level cycle markers in a union do not mean true divergence, so skip them
+                // if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
+                if ty.is_top_level_cycle_marker(db, div) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
-                builder = builder.add(
-                    ty.recursive_type_normalized_impl(db, div, nested)
-                        .unwrap_or(div),
-                );
+                builder = builder.add(ty);
                 empty = false;
             }
         }
@@ -847,7 +847,7 @@ impl<'db> IntersectionType<'db> {
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result.cycle_normalized(db, *previous, cycle)
         },

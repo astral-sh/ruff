@@ -3059,8 +3059,7 @@ class C3:
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
 
-# TODO: should be `list[Sub] | list[Base]`
-reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Divergent]
+reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
 ```
 
 And cycles between many attributes:
@@ -3118,7 +3117,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -3385,10 +3384,10 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 
 ## Divergent inferred implicit instance attribute types
 
-If an implicit attribute is defined recursively and type inference diverges, the divergent part is
-filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
-recursive types: they are not true recursive types based on recursive type theory, so no unfolding
-is performed when you use them.
+If an implicit attribute is defined recursively and type inference diverges, the recursive position
+is filled in with the dynamic type `Divergent`, and the attribute is inferred as a recursive type.
+Structural operations such as subscript unfold it on demand instead of bottoming out at the bare
+`Divergent` marker.
 
 ```py
 class C:
@@ -3396,7 +3395,7 @@ class C:
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: tuple[Divergent, int]
-reveal_type(C().x[0])  # revealed: Divergent
+reveal_type(C().x[0])  # revealed: tuple[Divergent, int]
 ```
 
 This also works if the tuple is not constructed directly:

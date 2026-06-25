@@ -71,9 +71,10 @@ use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::equality_truthiness;
+pub(crate) use crate::types::function::KnownFunction;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction,
+    FunctionType,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
@@ -1086,7 +1087,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[expect(dead_code, reason = "staged API for recursive type construction")]
     pub(crate) fn implicit_recursive(
         db: &'db dyn Db,
         binder_id: salsa::Id,
@@ -1137,8 +1137,8 @@ impl<'db> Type<'db> {
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
     /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
-        match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
+        match (self.as_divergent(), other.as_divergent()) {
+            (Some(left), Some(right)) => left.same_marker(right),
             _ => false,
         }
     }
@@ -1259,6 +1259,38 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        self.cycle_normalized_with_previous(db, previous, cycle)
+    }
+
+    /// Recover from a Salsa cycle using the previous fixed-point approximation.
+    pub(crate) fn cycle_normalized_with_previous(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        self.recover_cycle_iteration(db, previous.active_cycle_head_body(db, cycle), cycle)
+            .normalize_active_cycle_heads(db, cycle)
+    }
+
+    fn active_cycle_head_body(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        match self {
+            Type::Recursive(recursive)
+                if cycle.head_ids().any(|id| id == recursive.binder_id(db)) =>
+            {
+                recursive.body(db)
+            }
+            _ => self,
+        }
+    }
+
+    // Recover the current fixed-point approximation before recursive marker folding.
+    fn recover_cycle_iteration(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -1273,20 +1305,10 @@ impl<'db> Type<'db> {
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
         if cycle.iteration() <= crate::TAINTED_CYCLES {
-            let self_degraded_by_overload =
-                any_over_type(db, self, false, |ty| {
-                    matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-                }) && !any_over_type(db, self, false, |ty| ty.is_divergent())
-                    && any_over_type(db, previous, false, |ty| ty.is_divergent());
-            // Generally, the precision of type inference improves with each iteration.
-            // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
-            // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
-            if self_degraded_by_overload {
-                UnionType::from_elements_cycle_recovery(db, [previous, self])
-            } else {
-                self
-            }
-        } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
+            return self.recover_tainted_cycle_iteration(db, previous);
+        }
+
+        if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
             && let Some(merged) = current.merge_cycle_recovery(db, previous)
         {
             Type::GenericAlias(merged)
@@ -1298,7 +1320,75 @@ impl<'db> Type<'db> {
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
-        .recursive_type_normalized(db, cycle)
+    }
+
+    fn recover_tainted_cycle_iteration(self, db: &'db dyn Db, previous: Self) -> Self {
+        if self.is_overload_cycle_recovery_degradation(db, previous) {
+            UnionType::from_elements_cycle_recovery(db, [previous, self])
+        } else {
+            self
+        }
+    }
+
+    fn is_overload_cycle_recovery_degradation(self, db: &'db dyn Db, previous: Self) -> bool {
+        // Generally, type-inference precision improves with each iteration. Overload matching is
+        // an exception: later iterations can introduce `AmbiguousOverload` after an earlier
+        // `Divergent` approximation.
+        any_over_type(db, self, false, |ty| {
+            matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
+        }) && !any_over_type(db, self, false, |ty| ty.is_divergent())
+            && any_over_type(db, previous, false, |ty| ty.is_divergent())
+    }
+
+    fn normalize_active_cycle_heads(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        cycle
+            .head_ids()
+            .fold(self.active_cycle_head_body(db, cycle), |ty, id| {
+                ty.normalize_cycle_head(db, id, cycle)
+            })
+    }
+
+    fn normalize_cycle_head(self, db: &'db dyn Db, id: salsa::Id, cycle: &salsa::Cycle) -> Self {
+        let marker = Type::divergent(id);
+        let body = self.cycle_body_for_marker(db, id, marker, cycle);
+        let normalized = body
+            .recursive_type_normalized_impl(db, marker, false)
+            .unwrap_or(marker);
+        normalized.wrap_implicit_recursive_body(db, id)
+    }
+
+    fn cycle_body_for_marker(
+        self,
+        db: &'db dyn Db,
+        id: salsa::Id,
+        marker: Type<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        let Type::Recursive(recursive) = self else {
+            return self;
+        };
+        if recursive.binder_id(db) == id
+            || !cycle
+                .head_ids()
+                .any(|head_id| head_id == recursive.binder_id(db))
+        {
+            return self;
+        }
+
+        let body = recursive.body(db);
+        if body.contains_cycle_marker(db, marker) {
+            body
+        } else {
+            self
+        }
+    }
+
+    fn wrap_implicit_recursive_body(self, db: &'db dyn Db, id: salsa::Id) -> Self {
+        if !matches!(self, Type::Divergent(_)) {
+            Type::implicit_recursive(db, id, self)
+        } else {
+            self
+        }
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -2839,7 +2929,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|db, id, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
             member.cycle_normalized(db, *previous, cycle)
         },
@@ -3663,7 +3753,7 @@ impl<'db> Type<'db> {
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
-            cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_initial=|db, id, _, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 member.cycle_normalized(db, *previous, cycle)
             },
@@ -6309,7 +6399,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -6557,6 +6647,21 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
+                    TypeMapping::ReplaceDivergent { .. } => {
+                        if let Some(specialization) = alias.specialization(db) {
+                            let mapped_specialization =
+                                specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
+                            if mapped_specialization == specialization {
+                                self
+                            } else {
+                                Type::TypeAlias(
+                                    alias.apply_specialization(db, |_| mapped_specialization),
+                                )
+                            }
+                        } else {
+                            self
+                        }
+                    }
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
@@ -7020,7 +7125,7 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(
-        cycle_initial=|_, id, _, ()| Type::divergent(id),
+        cycle_initial=|db, id, _, ()| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
             value.cycle_normalized(db, *previous, cycle)
         },

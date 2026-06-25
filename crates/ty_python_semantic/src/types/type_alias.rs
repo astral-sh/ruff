@@ -58,7 +58,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -176,7 +176,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition to avoid including the value in the interned
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
             value.cycle_normalized(db, *previous, cycle)
         },

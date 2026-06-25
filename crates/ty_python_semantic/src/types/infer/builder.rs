@@ -1653,7 +1653,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
         let expanded = value_ty.expand_eagerly(self.db());
-        if expanded.is_divergent() {
+        if expanded.is_cycle_artifact(self.db()) {
             if let Some(builder) = self
                 .context
                 .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, type_alias)
@@ -7433,16 +7433,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
-                if let Some(divergent) = statement_use_types
-                    .expression_type(use_expression)
-                    .as_divergent()
-                {
+                let expression_ty = statement_use_types.expression_type(use_expression);
+                let divergent_ty = match expression_ty {
+                    Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
+                    Type::Recursive(recursive) => Some(Type::Recursive(recursive)),
+                    _ => None,
+                };
+                if let Some(divergent_ty) = divergent_ty {
                     // Infer `collection[Divergent]` for the initial cycle result.
                     let divergent_instance = collection_alias
                         .origin(self.db())
                         .apply_specialization(self.db(), |generic_context| {
-                            generic_context
-                                .repeat_specialization(self.db(), Type::Divergent(divergent))
+                            generic_context.repeat_specialization(self.db(), divergent_ty)
                         });
 
                     builder

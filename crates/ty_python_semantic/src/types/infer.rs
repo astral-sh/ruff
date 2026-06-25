@@ -120,7 +120,7 @@ fn extend_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, Type::implicit_recursive(db, id, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -255,7 +255,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, Type::implicit_recursive(db, id, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -326,7 +326,7 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, _| ScopeInference::cycle_initial(Type::implicit_recursive(db, id, Type::divergent(id))),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -402,7 +402,7 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
+    let cycle_recovery = Type::implicit_recursive(db, id, Type::divergent(id));
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -436,7 +436,7 @@ pub(crate) fn infer_expression_type<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
         result.cycle_normalized(db, *previous, cycle)
     },
@@ -474,8 +474,8 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
+    cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
+        StatementInferenceInner::cycle_initial(statement.scope(db), Type::implicit_recursive(db, id, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -651,7 +651,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, _| UnpackResult::cycle_initial(Type::implicit_recursive(db, id, Type::divergent(id))),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },
@@ -820,7 +820,7 @@ impl<'db> ScopeInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
+            ty.cycle_normalized_with_previous(db, previous_inference.expression_type(expr), cycle)
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1011,7 +1011,7 @@ impl<'db> DefinitionTypes<'db> {
         ty: Type<'db>,
     ) -> Type<'db> {
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized(db, previous_ty, cycle)
+            ty.cycle_normalized_with_previous(db, previous_ty, cycle)
         } else {
             ty.recursive_type_normalized(db, cycle)
         }
@@ -1025,11 +1025,16 @@ impl<'db> DefinitionTypes<'db> {
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        if let Some(previous_ty) = previous.declaration_type(owner, definition) {
-            ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
-        } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
-        }
+        let previous_ty = previous
+            .declaration_type(owner, definition)
+            .map(|ty| ty.inner_type());
+        ty.map_type(|inner| {
+            if let Some(previous_ty) = previous_ty {
+                inner.cycle_normalized_with_previous(db, previous_ty, cycle)
+            } else {
+                inner.recursive_type_normalized(db, cycle)
+            }
+        })
     }
 
     fn cycle_normalized(
@@ -1314,7 +1319,7 @@ impl<'db> DefinitionInference<'db> {
     ) -> DefinitionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_previous(db, previous_ty, cycle);
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
@@ -1562,7 +1567,8 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
+                    *binding_ty =
+                        binding_ty.cycle_normalized_with_previous(db, *previous_binding, cycle);
                 } else {
                     *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
                 }
@@ -1571,7 +1577,7 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_previous(db, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1735,32 +1741,34 @@ impl<'db> StatementInferenceInner<'db> {
     ) -> StatementInferenceInner<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_previous(db, previous_ty, cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
-            if let Some((_, previous_binding)) = previous_inference
+            let previous_binding = previous_inference
                 .bindings
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
-            {
-                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
+                .map(|(_, ty)| *ty);
+            if let Some(previous_binding) = previous_binding {
+                *binding_ty =
+                    binding_ty.cycle_normalized_with_previous(db, previous_binding, cycle);
             } else {
                 *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
-            if let Some((_, previous_declaration)) = previous_inference
+            let previous_declaration = previous_inference
                 .declarations
                 .iter()
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
-            {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
-                });
-            } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
-            }
+                .map(|(_, ty)| ty.inner_type());
+            *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                if let Some(previous_declaration) = previous_declaration {
+                    decl_ty.cycle_normalized_with_previous(db, previous_declaration, cycle)
+                } else {
+                    decl_ty.recursive_type_normalized(db, cycle)
+                }
+            });
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
