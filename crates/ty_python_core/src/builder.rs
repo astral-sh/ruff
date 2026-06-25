@@ -67,7 +67,8 @@ use crate::use_def::{
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
     DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderId,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
+    NarrowingAliasPredicate, PossiblyNarrowedPlaces, ScopesByNode, SemanticIndex,
+    VisibleAncestorsIter,
 };
 
 use super::place::PlaceExprRef;
@@ -2646,7 +2647,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
-            scopes_by_node: self.scopes_by_node,
+            scopes_by_node: ScopesByNode::from_map(self.scopes_by_node),
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
