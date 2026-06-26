@@ -1,13 +1,13 @@
 # Generics and set theoretic types
 
-This test suite explores the interplay between generics and set theoretic gradual types.
-
-## General relationships
-
 ```toml
 [environment]
 python-version = "3.14"
 ```
+
+This test suite explores the interplay between generics and set theoretic gradual types.
+
+## General relationships
 
 ```pyi
 from typing import Any
@@ -337,12 +337,65 @@ static_assert(is_equivalent_to(~Invariant[Any] & Invariant[P], Invariant[P] & ~B
 
 ## Edge cases
 
-The simplification must preserve the identities of type variables and `NewType` instances:
+### Multi-parameter and mixed-variance generics
 
-```toml
-[environment]
-python-version = "3.14"
+The results above naturally extend to multi-parameter generics and mixed variances:
+
+```pyi
+from typing import Any, Generic, TypeVar
+from ty_extensions import Bottom, static_assert, is_equivalent_to, is_subtype_of
+
+class P: ...
+class Q: ...
+class R: ...
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+T_invariant = TypeVar("T_invariant")
+
+class Mixed(Generic[T_co, T_contra, T_invariant]): ...
+
+static_assert(is_equivalent_to(Mixed[P, Q, R] & Mixed[Any, Any, Any], Mixed[P & Any, Q | Any, R]))
 ```
+
+### Tuples
+
+Tuple types are covariant in every type parameter, so the results derived for `Co[T]` above apply to
+`tuple` at every position:
+
+```pyi
+from typing import Any, Never
+from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
+
+class P: ...
+class Q: ...
+
+static_assert(is_equivalent_to(tuple[P] & tuple[Any], tuple[P & Any]))
+static_assert(is_equivalent_to(tuple[Any] & tuple[P], tuple[P & Any]))
+
+static_assert(is_equivalent_to(tuple[P] & ~tuple[Any], tuple[P] & ~tuple[Never] & Any))
+static_assert(is_equivalent_to(~tuple[Any] & tuple[P], tuple[P] & ~tuple[Never] & Any))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Q], tuple[P & Any, Q]))
+static_assert(is_equivalent_to(tuple[Any, Q] & tuple[P, Q], tuple[P & Any, Q]))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[P, Any], tuple[P, Q & Any]))
+static_assert(is_equivalent_to(tuple[P, Any] & tuple[P, Q], tuple[P, Q & Any]))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Any], tuple[P & Any, Q & Any]))
+static_assert(is_equivalent_to(tuple[Any, Any] & tuple[P, Q], tuple[P & Any, Q & Any]))
+```
+
+Intersections with tuples of different length are not affected:
+
+```pyi
+static_assert(is_equivalent_to(tuple[int, str] & ~tuple[Any], tuple[int, str]))
+static_assert(is_equivalent_to(tuple[int, str] & ~tuple[int, str, Any], tuple[int, str]))
+```
+
+### Type var bounds and `NewTypes`
+
+The simplification preserve the identities of type variables and `NewType` instances:
 
 ```pyi
 from typing import Any, NewType
@@ -362,32 +415,4 @@ def preserve_typevar[T: Co[P]](value: T & Co[Any]) -> T:
 
 def preserve_newtype(value: CoId & Co[Any]) -> CoId:
     return value
-```
-
-Tuple specializations carry information about their length and individual element types in addition
-to the aggregate type argument. Tuple shapes therefore need to match for the generalization to
-apply:
-
-```pyi
-static_assert(is_equivalent_to(tuple[int, str] & ~tuple[Any], tuple[int, str]))
-```
-
-For matching fixed-length tuples, intersections are simplified element-wise:
-
-```pyi
-static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Q], tuple[P & Any, Q]))
-static_assert(is_equivalent_to(tuple[Any, Q] & tuple[P, Q], tuple[P & Any, Q]))
-
-static_assert(is_equivalent_to(tuple[P, Q] & tuple[P, Any], tuple[P, Q & Any]))
-static_assert(is_equivalent_to(tuple[P, Any] & tuple[P, Q], tuple[P, Q & Any]))
-```
-
-The same element-wise relationship applies when the gradual tuple is negated:
-
-```pyi
-static_assert(is_equivalent_to(tuple[P, Q] & ~tuple[Any, Q], tuple[P, Q] & Any))
-static_assert(is_equivalent_to(~tuple[Any, Q] & tuple[P, Q], tuple[P, Q] & Any))
-
-static_assert(is_equivalent_to(tuple[P, Q] & ~tuple[P, Any], tuple[P, Q] & Any))
-static_assert(is_equivalent_to(~tuple[P, Any] & tuple[P, Q], tuple[P, Q] & Any))
 ```
