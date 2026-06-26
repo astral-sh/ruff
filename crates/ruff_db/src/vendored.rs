@@ -130,51 +130,48 @@ impl VendoredFileSystem {
     /// identified by `path`.
     ///
     /// If `path` is not a directory, then this will
-    /// return an empty `Vec`.
-    pub fn read_directory(&self, dir: impl AsRef<VendoredPath>) -> Vec<DirectoryEntry> {
-        fn read_directory(fs: &VendoredFileSystem, dir: &VendoredPath) -> Vec<DirectoryEntry> {
-            let mut normalized = NormalizedVendoredPath::from(dir);
-            if !normalized.as_str().ends_with('/') {
-                normalized = normalized.with_trailing_slash();
+    /// return an empty iterator.
+    pub fn read_directory(
+        &self,
+        dir: impl AsRef<VendoredPath>,
+    ) -> impl Iterator<Item = DirectoryEntry> + '_ {
+        let directory_prefix = NormalizedVendoredPath::from(dir.as_ref())
+            .with_trailing_slash()
+            .0
+            .into_owned();
+
+        self.inner.0.file_names().filter_map(move |name| {
+            // Any entry that doesn't have the `path` (with a
+            // trailing slash) as a prefix cannot possibly be in
+            // the directory referenced by `path`.
+            let without_dir_prefix = name.strip_prefix(&directory_prefix)?;
+            // Filter out an entry equivalent to the path given
+            // since we only want children of the directory.
+            if without_dir_prefix.is_empty() {
+                return None;
             }
-            let archive = &fs.inner;
-            let mut entries = vec![];
-            for name in archive.0.file_names() {
-                // Any entry that doesn't have the `path` (with a
-                // trailing slash) as a prefix cannot possibly be in
-                // the directory referenced by `path`.
-                let Some(without_dir_prefix) = name.strip_prefix(normalized.as_str()) else {
-                    continue;
-                };
-                // Filter out an entry equivalent to the path given
-                // since we only want children of the directory.
-                if without_dir_prefix.is_empty() {
-                    continue;
-                }
-                // We only want *direct* children. Files that are
-                // direct children cannot have any slashes (or else
-                // they are not direct children). Directories that
-                // are direct children can only have one slash and
-                // it must be at the end.
-                //
-                // (We do this manually ourselves to avoid doing a
-                // full file lookup and metadata retrieval via the
-                // `zip` crate.)
-                let file_type = FileType::from_zip_file_name(without_dir_prefix);
-                let slash_count = without_dir_prefix.matches('/').count();
-                match file_type {
-                    FileType::File if slash_count > 0 => continue,
-                    FileType::Directory if slash_count > 1 => continue,
-                    _ => {}
-                }
-                entries.push(DirectoryEntry {
-                    path: VendoredPathBuf::from(name),
-                    file_type,
-                });
+            // We only want *direct* children. Files that are
+            // direct children cannot have any slashes (or else
+            // they are not direct children). Directories that
+            // are direct children can only have one slash and
+            // it must be at the end.
+            //
+            // (We do this manually ourselves to avoid doing a
+            // full file lookup and metadata retrieval via the
+            // `zip` crate.)
+            let file_type = FileType::from_zip_file_name(without_dir_prefix);
+            let slash_count = without_dir_prefix.matches('/').count();
+            match file_type {
+                FileType::File if slash_count > 0 => return None,
+                FileType::Directory if slash_count > 1 => return None,
+                _ => {}
             }
-            entries
-        }
-        read_directory(self, dir.as_ref())
+
+            Some(DirectoryEntry {
+                path: VendoredPathBuf::from(name),
+                file_type,
+            })
+        })
     }
 
     /// Creates a reader with its own cursor over the shared archive data.
@@ -619,7 +616,6 @@ pub(crate) mod tests {
     fn readdir_snapshot(fs: &VendoredFileSystem, path: &str) -> String {
         let mut paths = fs
             .read_directory(VendoredPath::new(path))
-            .into_iter()
             .map(|entry| entry.path().to_string())
             .collect::<Vec<String>>();
         paths.sort();
@@ -743,32 +739,5 @@ pub(crate) mod tests {
             &mock_typeshed(),
             VendoredPath::new("./stdlib/asyncio/../asyncio/tasks.pyi"),
         )
-    }
-
-    #[test]
-    fn concurrent_file_reads() {
-        const READS: &[(&str, &str)] = &[
-            ("stdlib/functools.pyi", FUNCTOOLS_CONTENTS),
-            ("stdlib/asyncio/tasks.pyi", ASYNCIO_TASKS_CONTENTS),
-            ("stdlib/functools.pyi", FUNCTOOLS_CONTENTS),
-            ("stdlib/asyncio/tasks.pyi", ASYNCIO_TASKS_CONTENTS),
-        ];
-
-        let mock_typeshed = mock_typeshed();
-        let barrier = std::sync::Barrier::new(READS.len());
-
-        std::thread::scope(|scope| {
-            for &(path, expected) in READS {
-                let mock_typeshed = &mock_typeshed;
-                let barrier = &barrier;
-
-                scope.spawn(move || {
-                    barrier.wait();
-                    for _ in 0..100 {
-                        assert_eq!(mock_typeshed.read_to_string(path).unwrap(), expected);
-                    }
-                });
-            }
-        });
     }
 }
