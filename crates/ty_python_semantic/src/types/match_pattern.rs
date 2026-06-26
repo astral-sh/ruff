@@ -387,15 +387,15 @@ pub(crate) fn class_pattern_positional_result<'db>(
         && !static_class.has_explicit_bases(db)
         && !static_class.has_explicit_metaclass(db);
     let is_stub = static_class.body_scope(db).file(db).is_stub(db);
-    let has_local_binding = || {
+    let has_local_binding = |name| {
         let places = place_table(db, static_class.body_scope(db));
         places
-            .symbol_id("__match_args__")
+            .symbol_id(name)
             .is_some_and(|symbol_id| places.symbol(symbol_id).is_bound())
     };
 
     let Place::Defined(place) = Type::ClassLiteral(class).member(db, "__match_args__").place else {
-        if has_local_binding() || class_defines_match_args_slot(db, class) {
+        if has_local_binding("__match_args__") || has_local_binding("__slots__") {
             return None;
         }
         return if class.known(db).is_some() && class_has_match_self_flag(db, class) {
@@ -414,7 +414,8 @@ pub(crate) fn class_pattern_positional_result<'db>(
     let definition = place.provenance.definition()?;
     let binding = direct_match_args_binding(db, definition)?;
     if binding == DirectMatchArgsBinding::AnnotationOnly {
-        return (!has_local_binding()).then_some(ClassPatternPositionalResult::Limit(0));
+        return (!has_local_binding("__match_args__"))
+            .then_some(ClassPatternPositionalResult::Limit(0));
     }
     let match_args = if place.origin.is_declared() {
         place.ty
@@ -433,31 +434,6 @@ pub(crate) fn class_pattern_positional_result<'db>(
             .then_some(ClassPatternPositionalResult::InvalidType(match_args)),
         DirectMatchArgsBinding::AnnotationOnly => None,
     }
-}
-
-fn class_defines_match_args_slot(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
-    let Some(slots) = Type::ClassLiteral(class)
-        .member(db, "__slots__")
-        .place
-        .raw_type()
-    else {
-        return false;
-    };
-    if slots
-        .as_string_literal()
-        .is_some_and(|literal| literal.value(db) == "__match_args__")
-    {
-        return true;
-    }
-    slots.exact_tuple_instance_spec(db).is_some_and(|tuple| {
-        tuple.as_fixed_length().is_some_and(|tuple| {
-            tuple.elements_slice().iter().any(|element| {
-                element
-                    .as_string_literal()
-                    .is_some_and(|literal| literal.value(db) == "__match_args__")
-            })
-        })
-    })
 }
 
 #[salsa::tracked]

@@ -323,6 +323,36 @@ def describe(model: Model) -> None:
             pass
 ```
 
+## Synthesized slot descriptors
+
+A local `__slots__` declaration may synthesize a `__match_args__` descriptor. The diagnostic does
+not interpret the possible runtime iterables accepted by `__slots__`.
+
+```py
+class TupleSlots:
+    __slots__ = ("__match_args__",)
+
+class ListSlots:
+    __slots__ = ["__match_args__"]
+
+class SetSlots:
+    __slots__ = {"__match_args__"}
+
+class DictSlots:
+    __slots__ = {"__match_args__": "match arguments"}
+
+def describe(subject: object) -> None:
+    match subject:
+        case TupleSlots(_):
+            pass
+        case ListSlots(_):
+            pass
+        case SetSlots(_):
+            pass
+        case DictSlots(_):
+            pass
+```
+
 ## Deliberately conservative cases
 
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
@@ -422,9 +452,6 @@ if TYPE_CHECKING:
 else:
     PatternModel = RuntimeModel
 
-class Slotted:
-    __slots__ = ("__match_args__",)
-
 def describe(subject: object) -> None:
     match subject:
         case Decorated(_, _):
@@ -460,8 +487,6 @@ def describe(subject: object) -> None:
         case RuntimeValue(_):
             pass
         case PatternModel(_):
-            pass
-        case Slotted(_):
             pass
 ```
 
