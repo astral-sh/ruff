@@ -372,6 +372,9 @@ pub(crate) fn class_pattern_positional_result<'db>(
     class: ClassLiteral<'db>,
 ) -> Option<ClassPatternPositionalResult<'db>> {
     let static_class = class.as_static()?;
+    if class_is_in_type_checking_block(db, static_class) {
+        return None;
+    }
     let is_plain_class = !static_class.has_decorators(db)
         && !static_class.has_explicit_bases(db)
         && !static_class.has_explicit_metaclass(db);
@@ -422,6 +425,17 @@ pub(crate) fn class_pattern_positional_result<'db>(
     } else {
         None
     }
+}
+
+#[salsa::tracked]
+fn class_is_in_type_checking_block(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+    let definition = class.definition(db);
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    semantic_index(db, file).is_in_type_checking_block(
+        definition.scope(db).file_scope_id(db),
+        definition.full_range(db, &module).range(),
+    )
 }
 
 #[salsa::tracked]

@@ -232,6 +232,38 @@ class Declared:
     x = 1
 ```
 
+## Type-checking-only pattern classes
+
+The class selected during type checking may be replaced by a different runtime class.
+
+```py
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    class Model: ...
+
+    @dataclass(match_args=False)
+    class DataModel:
+        value: int
+
+else:
+    class Model:
+        __match_args__ = ("value",)
+
+    @dataclass
+    class DataModel:
+        value: int
+
+def describe(model: Model, data_model: DataModel) -> None:
+    match model:
+        case Model(_):
+            pass
+    match data_model:
+        case DataModel(_):
+            pass
+```
+
 ## Deliberately conservative cases
 
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
