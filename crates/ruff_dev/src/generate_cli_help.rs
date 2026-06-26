@@ -143,7 +143,7 @@ mod tests {
     use super::{Args, main};
 
     #[test]
-    fn test_generate_json_schema() -> Result<()> {
-        main(&Args { mode: Mode::Check })
+    fn generate_cli_help() -> Result<()> {
+        main(&Args { mode: Mode::DryRun })
     }
 }

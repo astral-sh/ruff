@@ -23,5 +23,8 @@ uv run --script "$project_root/scripts/generate-crate-readmes.py"
 echo "Updating lockfile..."
 cargo update -p ruff
 
+echo "Generating JSON schema..."
+cargo dev generate-json-schema
+
 echo "Checking crates.io publish setup..."
 uv run --no-config --script "$project_root/scripts/setup-crates-io-publish.py" --quiet
