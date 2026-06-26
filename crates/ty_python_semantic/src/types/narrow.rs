@@ -18,8 +18,8 @@ use crate::types::{
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, pattern_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -1394,7 +1394,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
         for pattern in patterns {
             remaining_subject_ty =
-                pattern_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
+                pattern_binding_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
             matched_subject_types.add_in_place(alternative.matched_subject_ty);
             binding_subject_types.add_in_place(alternative.binding_subject_ty);

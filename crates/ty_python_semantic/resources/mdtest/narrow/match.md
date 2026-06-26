@@ -507,6 +507,10 @@ class TextValue:
 class StringMapping(TypedDict):
     value: str
 
+@final
+class MutableOrBox:
+    value: int = 0
+
 def class_or_sequence_binding(value: TextValue | tuple[int]) -> None:
     match value:
         case TextValue(value=item) | [item]:
@@ -516,6 +520,15 @@ def mapping_or_singleton_binding(value: StringMapping | None) -> None:
     match value:
         case {"value": item} | (None as item):
             reveal_type(item)  # revealed: str | None
+
+def mixed_or_binding_does_not_keep_failed_sequence_facts(
+    value: list[int] | MutableOrBox,
+) -> None:
+    match value:
+        case [item] | MutableOrBox(value=item) | item:
+            if isinstance(item, list):
+                item.clear()
+                reveal_type(item)  # revealed: list[int]
 ```
 
 ## Declared pattern captures
