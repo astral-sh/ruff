@@ -1382,6 +1382,18 @@ impl Display for SubDiagnosticSeverity {
     }
 }
 
+/// Controls whether colored diagnostic output includes hyperlinks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum HyperlinkMode {
+    /// Detect hyperlink support from the environment.
+    #[default]
+    Auto,
+    /// Always emit hyperlinks.
+    Always,
+    /// Never emit hyperlinks.
+    Never,
+}
+
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
@@ -1395,10 +1407,10 @@ pub struct DisplayDiagnosticConfig {
     ///
     /// Disabled by default.
     color: bool,
-    /// Whether to emit hyperlinks in colored diagnostic output when the environment supports them.
+    /// Whether to emit hyperlinks in colored diagnostic output.
     ///
-    /// Enabled by default.
-    hyperlinks: bool,
+    /// By default, hyperlink support is detected from the environment.
+    hyperlinks: HyperlinkMode,
     /// Whether to anonymize line numbers in full diagnostic output.
     ///
     /// Disabled by default.
@@ -1442,7 +1454,7 @@ impl DisplayDiagnosticConfig {
             program,
             format: DiagnosticFormat::default(),
             color: false,
-            hyperlinks: true,
+            hyperlinks: HyperlinkMode::Auto,
             anonymized_line_numbers: false,
             context: 2,
             merge_window: 2,
@@ -1465,10 +1477,10 @@ impl DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { color: yes, ..self }
     }
 
-    /// Whether to emit hyperlinks in colored diagnostic output when the environment supports them.
-    pub fn hyperlinks(self, yes: bool) -> DisplayDiagnosticConfig {
+    /// Configures hyperlink rendering for colored diagnostic output.
+    pub fn hyperlinks(self, mode: HyperlinkMode) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
-            hyperlinks: yes,
+            hyperlinks: mode,
             ..self
         }
     }

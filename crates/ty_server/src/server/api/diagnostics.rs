@@ -12,7 +12,9 @@ use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_ide::{Hint, hints};
 
-use ruff_db::diagnostic::{Annotation, DisplayDiagnosticConfig, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{
+    Annotation, DisplayDiagnosticConfig, HyperlinkMode, Severity, SubDiagnostic,
+};
 use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
@@ -619,16 +621,14 @@ fn sub_diagnostic_to_related_information(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FullDiagnosticOutput {
-    Enabled { color: bool },
+    Enabled,
     Disabled,
 }
 
 impl FullDiagnosticOutput {
     fn from_client_capabilities(client_capabilities: ResolvedClientCapabilities) -> Self {
         if client_capabilities.supports_full_diagnostic_output() {
-            Self::Enabled {
-                color: client_capabilities.supports_color_diagnostic_output(),
-            }
+            Self::Enabled
         } else {
             Self::Disabled
         }
@@ -666,18 +666,18 @@ impl DiagnosticData {
         let fix = Self::try_fix_from_diagnostic(db, diagnostic, encoding);
 
         match full_diagnostic_output {
-            FullDiagnosticOutput::Enabled { color } => Some(Self::Full(FullDiagnosticData {
+            FullDiagnosticOutput::Enabled => Some(Self::Full(FullDiagnosticData {
                 rendered: diagnostic
                     .display(
                         &(db as &dyn ruff_db::Db),
                         &DisplayDiagnosticConfig::new("ty")
-                            .color(color)
+                            .color(true)
                             // The styled renderer can enable OSC-8 hyperlinks based on the process
                             // environment, even though this output is sent over LSP rather than to a
                             // terminal. The ANSI parser used by ty-vscode does not strip OSC-8
                             // sequences, so their escape codes would appear in the virtual diagnostic
                             // document.
-                            .hyperlinks(false),
+                            .hyperlinks(HyperlinkMode::Never),
                     )
                     .to_string(),
                 diagnostic_id: diagnostic.id().to_string(),

@@ -1,6 +1,8 @@
 use anstyle::{AnsiColor, Effects, Style};
 use std::fmt::Formatter;
 
+use crate::diagnostic::HyperlinkMode;
+
 pub(super) const fn fmt_styled<'a, T>(
     content: T,
     style: anstyle::Style,
@@ -118,8 +120,12 @@ impl DiagnosticStylesheet {
         }
     }
 
-    pub(super) fn hyperlinks(mut self, yes: bool) -> Self {
-        self.hyperlink &= yes;
+    pub(super) fn hyperlinks(mut self, mode: HyperlinkMode) -> Self {
+        match mode {
+            HyperlinkMode::Auto => {}
+            HyperlinkMode::Always => self.hyperlink = true,
+            HyperlinkMode::Never => self.hyperlink = false,
+        }
         self
     }
 
