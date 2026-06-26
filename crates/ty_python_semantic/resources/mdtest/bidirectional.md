@@ -969,6 +969,28 @@ def _(dtype: FloatDtype):
     reveal_type(result)  # revealed: int | float
 ```
 
+A bare type variable does not provide an invariant compatibility check that would expose a missed
+contextual reinference. Reveal the dictionary literal itself to verify that the other argument's
+`TypedDict` type is propagated as context, rather than merely checking the call's return type.
+
+```py
+from typing import TypedDict, reveal_type
+
+class TD(TypedDict):
+    x: int
+
+def f[T](x: T, y: T) -> T:
+    return x
+
+def _(x: TD):
+    reveal_type(
+        f(  # revealed: TD
+            x,
+            reveal_type({"x": 1}),  # revealed: TD
+        )
+    )
+```
+
 Long reverse dependency chains can require more than two speculative iterations:
 
 ```py
