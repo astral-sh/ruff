@@ -602,6 +602,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
         self.expressions.extend(inference.expressions.iter());
+        self.expressions.extend(
+            inference
+                .unknowns
+                .iter()
+                .map(|expression| (*expression, Type::unknown())),
+        );
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -11344,7 +11350,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expected_types,
             type_expression_flags,
             mut collection_use_constraints,
-            expressions,
+            mut expressions,
             scope,
             cycle_recovery,
             qualifiers,
@@ -11373,6 +11379,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
+        let unknowns = if cycle_recovery.is_none() {
+            let mut unknowns = FxHashSet::default();
+            expressions.retain(|expression, ty| {
+                if ty.is_unknown() {
+                    unknowns.insert(*expression);
+                    false
+                } else {
+                    true
+                }
+            });
+            FrozenSet::from(unknowns)
+        } else {
+            FrozenSet::default()
+        };
+
         let extra = (!string_annotations.is_empty()
             || !expected_types.is_empty()
             || !diagnostics.is_empty()
@@ -11395,6 +11416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         ScopeInference {
             expressions: FrozenValueMap::from(expressions),
+            unknowns,
             extra,
         }
     }

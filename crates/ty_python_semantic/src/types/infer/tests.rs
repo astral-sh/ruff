@@ -116,6 +116,25 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 }
 
 #[test]
+fn scope_unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/main.py", "x = missing")?;
+
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let module = parsed_module(&db, file).load(&db);
+    let assignment = module.syntax().body[0].as_assign_stmt().unwrap();
+    let target = &assignment.targets[0];
+    let target_key = target.into();
+    let inference = infer_complete_scope_types(&db, global_scope(&db, file));
+
+    assert!(inference.expressions.get(&target_key).is_none());
+    assert!(inference.unknowns.contains(&target_key));
+    assert_eq!(inference.try_expression_type(target), Some(Type::unknown()));
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
