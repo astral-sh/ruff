@@ -6,15 +6,7 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
-        known_instance::FunctoolsPartialInstance,
-        relation::{TypeRelation, TypeRelationChecker},
-        signatures::{CallableSignature, PartialSignatureApplication},
-        visitor, walk_signature,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor, Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType, constraints::{ConstraintSet, IteratorConstraintsExtension}, known_instance::FunctoolsPartialInstance, relation::{TypeRelation, TypeRelationChecker}, signatures::{CallableSignature, PartialSignatureApplication}, visitor, walk_signature
     },
 };
 use ty_python_core::definition::Definition;
@@ -227,9 +219,9 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) if recursive.is_non_contractive(db) => Some(
                 CallableTypes::one(CallableType::function_like(db, Signature::dynamic(self))),
             ),
-            Type::Recursive(recursive) => recursive
-                .unfold(db)
-                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                unfolded.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+            }),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>
@@ -709,6 +701,25 @@ impl<'db> CallableTypes<'db> {
             CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
+    }
+}
+
+impl<'db> Foldable<'db> for CallableType<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match Type::Callable(self).fold(db, rec) {
+            Type::Callable(callable) => callable,
+            Type::Recursive(recursive) => match recursive.body(db) {
+                Type::Callable(callable) => callable,
+                ty => panic!("Expected `CallableType` in recursive body, got {}", ty.display(db)),
+            }
+            ty => panic!("Expected `CallableType`, got {}", ty.display(db)),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for CallableTypes<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map(|callable| callable.fold(db, rec))
     }
 }
 

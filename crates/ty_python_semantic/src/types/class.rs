@@ -38,9 +38,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
-    UnionBuilder, VarianceInferable,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, FindLegacyTypeVarsVisitor, Foldable, IntersectionType, TypeContext, TypeMapping, TypedDictModule, UnionBuilder, VarianceInferable
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -230,6 +228,19 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericAlias<'_> {}
+
+impl<'db> Foldable<'db> for GenericAlias<'db> {
+    fn fold(self, db: &'db dyn Db, rec: super::RecursiveType<'db>) -> Self {
+        match Type::GenericAlias(self).fold(db, rec) {
+            Type::GenericAlias(alias) => alias,
+            Type::Recursive(recursive) => match recursive.body(db) {
+                Type::GenericAlias(alias) => alias,
+                ty => unreachable!("Expected `Type::GenericAlias` in recursive body, got {}", ty.display(db)),
+            }
+            ty => unreachable!("Expected `Type::GenericAlias`, got {}", ty.display(db)),
+        }
+    }
+}
 
 impl<'db> GenericAlias<'db> {
     /// Merge two cycle iterations that specialize the same class origin.
@@ -910,6 +921,15 @@ pub enum ClassType<'db> {
     // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
     Generic(GenericAlias<'db>),
+}
+
+impl<'db> Foldable<'db> for ClassType<'db> {
+    fn fold(self, db: &'db dyn Db, rec: super::RecursiveType<'db>) -> Self {
+        match self {
+            Self::NonGeneric(class) => Self::NonGeneric(class),
+            Self::Generic(generic) => Self::Generic(generic.fold(db, rec)),
+        }
+    }
 }
 
 #[salsa::tracked]

@@ -1627,7 +1627,7 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
             Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.unfold(db).nominal_class(db)
+                recursive.map(db, |unfolded| unfolded.nominal_class(db))
             }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
@@ -1872,7 +1872,7 @@ impl<'db> Type<'db> {
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
             Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.unfold(db).to_class_type(db)
+                recursive.map(db, |ty| ty.to_class_type(db))
             }
             Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
