@@ -268,6 +268,13 @@ fn negated_generalization_bottom<'db>(
     general: Type<'db>,
     specific: Type<'db>,
 ) -> Option<Type<'db>> {
+    if let (Type::SubclassOf(general_subclass), Type::SubclassOf(_)) = (general, specific)
+        && general_subclass.is_dynamic()
+        && !specific.has_dynamic(db)
+    {
+        return Some(general.bottom_materialization(db));
+    }
+
     dynamic_generalization_of(db, general, specific)?;
     (!specific.has_dynamic(db)).then(|| general.bottom_materialization(db))
 }

@@ -9,7 +9,8 @@ python-version = "3.14"
 
 ## Derivations and general results
 
-This section concentrates on deriving the main results while the next section covers some more edge cases.
+This section concentrates on deriving the main results while the next section covers some more edge
+cases.
 
 ```pyi
 from typing import Any
@@ -397,18 +398,20 @@ static_assert(is_equivalent_to(tuple[int, str] & ~tuple[int, str, Any], tuple[in
 
 ### `type[...]`
 
-`type[..]` can also be a covariant type constructor, so these results also hold here:
+`type[..]` can also be seen as a covariant type constructor, so the results also hold here:
 
 ```pyi
-from typing import Any
+from typing import Any, Never
 from ty_extensions import static_assert, is_equivalent_to
 
 class P: ...
 class Q: ...
 
-# TODO: these should pass
-static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))  # error: [static-assert-error]
-static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
+static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
+
+static_assert(is_equivalent_to(type[P] & ~type[Any], type[P] & ~type[Never] & Any))
+static_assert(is_equivalent_to(~type[Any] & type[P], type[P] & ~type[Never] & Any))
 ```
 
 ### Type var bounds and `NewTypes`
