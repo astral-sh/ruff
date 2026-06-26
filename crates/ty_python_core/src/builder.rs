@@ -1119,6 +1119,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .ok()
     }
 
+    fn unannotated_collection_literal_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        let definition = self.unannotated_collection_initializer_binding(collection_use)?;
+        definition
+            .kind(self.db)
+            .as_unannotated_assignment()
+            .is_some_and(|assignment| is_collection_literal(assignment.value(self.module)))
+            .then_some(definition)
+    }
+
     /// Try to register a narrowing alias for a simple name assignment.
     ///
     /// Any pre-existing alias entry for the `target` name has already been removed by
@@ -4127,14 +4139,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // significant performance regressions.
                     //
                     // Note that built-in collection types do not have methods that explicitly
-                    // return `Never`, so does not have a meaningful semantic impact, except in
+                    // return `Never`, so this does not have a meaningful semantic impact, except in
                     // the rare case where a collection is explicitly marked as having elements
                     // of type `Never`.
                     if !self.source_type.is_stub()
                         && func
                             .as_attribute_expr()
                             .and_then(|attribute| {
-                                self.unannotated_collection_initializer_binding(&attribute.value)
+                                self.unannotated_collection_literal_binding(&attribute.value)
                             })
                             .is_none()
                     {

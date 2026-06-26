@@ -974,12 +974,18 @@ aliased_result = set_alias()
 aliased_result.add(1)
 reveal_type(aliased_result)  # revealed: set[Unknown]
 
-class Result: ...
+from typing import Never
 
-def shadowed_constructor() -> None:
+class Result:
+    def abort(self) -> Never:
+        raise RuntimeError
+
+def shadowed_constructor() -> int:
     set = Result
     result = set()
     reveal_type(result)  # revealed: Result
+    result.abort()
+    return "unreachable"
 ```
 
 ```py
