@@ -36,13 +36,14 @@ use ruff_linter::rules::{
 use ruff_linter::settings::types::{
     IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
-use ruff_linter::{RuleSelector, warn_user_once};
+use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_ranged_value::ValueSourceGuard;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -439,7 +440,7 @@ pub struct Options {
     /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
     ///
-    /// The value must be greater than `0` and less than or equal to `320`.
+    /// The value must be greater than `0`.
     ///
     /// Note: While the formatter will attempt to format lines such that they remain
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
@@ -592,9 +593,20 @@ pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize)]
 #[serde(transparent)]
 pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
+
+impl<'de> Deserialize<'de> for DeprecatedTopLevelLintOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Temporarily disable span information because the flattened values don't retain spans.
+        let _guard = ValueSourceGuard::without_spans();
+        LintCommonOptions::deserialize(deserializer).map(Self)
+    }
+}
 
 impl OptionsMetadata for DeprecatedTopLevelLintOptions {
     fn record(_visit: &mut dyn Visit) {
@@ -696,7 +708,7 @@ pub struct LintCommonOptions {
     #[deprecated(
         note = "The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead."
     )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
+    pub extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by [`select`](#lint_select).
@@ -725,7 +737,7 @@ pub struct LintCommonOptions {
             extend-select = ["B", "Q"]
         "#
     )]
-    pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_select: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to consider fixable, in addition to those
     /// specified by [`fixable`](#lint_fixable).
@@ -737,14 +749,14 @@ pub struct LintCommonOptions {
             extend-fixable = ["B"]
         "#
     )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
+    pub extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by [`unfixable`](#lint_unfixable).
     #[deprecated(
         note = "The `extend-unfixable` option is now interchangeable with [`unfixable`](#lint_unfixable). Please update your configuration to use the `unfixable` option instead."
     )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    pub extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
@@ -771,7 +783,7 @@ pub struct LintCommonOptions {
             fixable = ["E", "F"]
         "#
     )]
-    pub fixable: Option<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
     /// rules (like `F841`), entire categories (like `F`), or anything in
@@ -789,7 +801,7 @@ pub struct LintCommonOptions {
             ignore = ["F841"]
         "#
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes for which unsafe fixes should be considered
     /// safe.
@@ -801,7 +813,7 @@ pub struct LintCommonOptions {
             extend-safe-fixes = ["E", "F401"]
         "#
     )]
-    pub extend_safe_fixes: Option<Vec<RuleSelector>>,
+    pub extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes for which safe fixes should be considered
     /// unsafe.
@@ -813,7 +825,7 @@ pub struct LintCommonOptions {
             extend-unsafe-fixes = ["E", "F401"]
         "#
     )]
-    pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    pub extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
 
     /// Avoid automatically removing unused imports in `__init__.py` files. Such
     /// imports will still be flagged, but with a dedicated message suggesting
@@ -876,7 +888,7 @@ pub struct LintCommonOptions {
             select = ["E4", "E7", "E9", "F", "B", "Q"]
         "#
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    pub select: Option<Vec<UnresolvedRuleSelector>>,
 
     /// Whether to require exact codes to select preview rules. When enabled,
     /// preview rules will not be selected by prefixes — the full code of each
@@ -929,7 +941,7 @@ pub struct LintCommonOptions {
             unfixable = ["F401"]
         "#
     )]
-    pub unfixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// Options for the `flake8-annotations` plugin.
@@ -1050,7 +1062,7 @@ pub struct LintCommonOptions {
             "!src/**.py" = ["D"]
         "#
     )]
-    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).
@@ -1063,7 +1075,7 @@ pub struct LintCommonOptions {
             "__init__.py" = ["E402"]
         "#
     )]
-    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
@@ -1734,6 +1746,10 @@ impl Flake8ImportConventionsOptions {
         }
 
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "every invalid alias is rejected, regardless of which one is reported first"
+        )]
         for (module, alias) in aliases {
             let normalized_alias = alias.nfkc().collect::<String>();
             if normalized_alias == "__debug__" {
@@ -2963,7 +2979,7 @@ impl IsortOptions {
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
+        let sections: FxHashMap<String, Vec<IdentifierPattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -3019,7 +3035,9 @@ impl IsortOptions {
         let import_heading = self.import_heading.unwrap_or_default();
 
         // Verify that all sections listed in `import_heading` are defined in `sections`.
-        for section in import_heading.keys() {
+        let mut import_heading_sections = import_heading.keys().collect::<Vec<_>>();
+        import_heading_sections.sort_unstable();
+        for section in import_heading_sections {
             if let ImportSection::UserDefined(section_name) = section {
                 if !sections.contains_key(section_name) {
                     warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);
@@ -3313,6 +3331,53 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
+    /// The PEP 257 convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D212`](rules/multi-line-summary-first-line.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D214`](rules/overindented-section.md),
+    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D405`](rules/non-capitalized-section-name.md),
+    /// [`D406`](rules/missing-new-line-after-section-name.md),
+    /// [`D407`](rules/missing-dashed-underline-after-section.md),
+    /// [`D408`](rules/missing-section-underline-after-name.md),
+    /// [`D409`](rules/mismatched-section-underline-length.md),
+    /// [`D410`](rules/no-blank-line-after-section.md),
+    /// [`D411`](rules/no-blank-line-before-section.md),
+    /// [`D413`](rules/missing-blank-line-after-last-section.md),
+    /// [`D415`](rules/missing-terminal-punctuation.md),
+    /// [`D416`](rules/missing-section-name-colon.md),
+    /// [`D417`](rules/undocumented-param.md), and
+    /// [`D420`](rules/incorrect-section-order.md).
+    ///
+    /// The NumPy convention includes all `D` errors apart from:
+    /// [`D107`](rules/undocumented-public-init.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D212`](rules/multi-line-summary-first-line.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D402`](rules/signature-in-docstring.md),
+    /// [`D413`](rules/missing-blank-line-after-last-section.md),
+    /// [`D415`](rules/missing-terminal-punctuation.md),
+    /// [`D416`](rules/missing-section-name-colon.md), and
+    /// [`D417`](rules/undocumented-param.md).
+    ///
+    /// The Google convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D204`](rules/incorrect-blank-line-after-class.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D400`](rules/missing-trailing-period.md),
+    /// [`D401`](rules/non-imperative-mood.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D406`](rules/missing-new-line-after-section-name.md),
+    /// [`D407`](rules/missing-dashed-underline-after-section.md),
+    /// [`D408`](rules/missing-section-underline-after-name.md),
+    /// [`D409`](rules/mismatched-section-underline-length.md), and
+    /// [`D413`](rules/missing-blank-line-after-last-section.md).
+    ///
+    /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
+    ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
     /// `D400` instead of `D4` or `D40`):
@@ -3525,6 +3590,14 @@ pub struct PylintOptions {
     #[option(default = r"50", value_type = "int", example = r"max-statements = 75")]
     pub max_statements: Option<usize>,
 
+    /// Maximum number of statements allowed for a try clause body (see `W0717`).
+    #[option(
+        default = r"5",
+        value_type = "int",
+        example = r"max-statements-in-try = 10"
+    )]
+    pub max_statements_in_try: Option<usize>,
+
     /// Maximum number of public methods allowed for a class (see `PLR0904`).
     #[option(
         default = r"20",
@@ -3565,6 +3638,9 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_statements_in_try: self
+                .max_statements_in_try
+                .unwrap_or(defaults.max_statements_in_try),
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
@@ -4150,22 +4226,22 @@ pub struct LintOptionsWire {
     // common: LintCommonOptions
     allowed_confusables: Option<Vec<char>>,
     dummy_variable_rgx: Option<String>,
-    extend_ignore: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    extend_fixable: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     external: Option<Vec<String>>,
-    fixable: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    extend_safe_fixes: Option<Vec<RuleSelector>>,
-    extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
     ignore_init_module_imports: Option<bool>,
     logger_objects: Option<Vec<String>>,
-    select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     explicit_preview_rules: Option<bool>,
     task_tags: Option<Vec<String>>,
     typing_modules: Option<Vec<String>>,
-    unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     flake8_annotations: Option<Flake8AnnotationsOptions>,
     flake8_bandit: Option<Flake8BanditOptions>,
     flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
@@ -4191,8 +4267,8 @@ pub struct LintOptionsWire {
     pyflakes: Option<PyflakesOptions>,
     pylint: Option<PylintOptions>,
     pyupgrade: Option<PyUpgradeOptions>,
-    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
-    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
+    extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     exclude: Option<Vec<String>>,
     pydoclint: Option<PydoclintOptions>,

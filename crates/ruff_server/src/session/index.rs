@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
-use lsp_types::{FileEvent, Url};
+use lsp_types::{FileEvent, Uri};
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 
@@ -27,11 +27,11 @@ mod ruff_settings;
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default)]
 pub(crate) struct Index {
-    /// Maps all document file URLs to the associated document controller
-    documents: FxHashMap<Url, DocumentController>,
+    /// Maps all document file URIs to the associated document controller
+    documents: FxHashMap<Uri, DocumentController>,
 
-    /// Maps opaque cell URLs to a notebook URL (document)
-    notebook_cells: FxHashMap<Url, Url>,
+    /// Maps opaque cell URIs to a notebook URI (document)
+    notebook_cells: FxHashMap<Uri, Uri>,
 
     /// Maps a workspace folder root to its settings.
     settings: WorkspaceSettingsIndex,
@@ -56,15 +56,15 @@ enum DocumentController {
 #[derive(Clone)]
 pub(crate) enum DocumentQuery {
     Text {
-        file_url: Url,
+        file_uri: Uri,
         document: Arc<TextDocument>,
         settings: Arc<RuffSettings>,
     },
     Notebook {
         /// The selected notebook cell, if it exists.
-        cell_url: Option<Url>,
-        /// The URL of the notebook.
-        file_url: Url,
+        cell_uri: Option<Uri>,
+        /// The URI of the notebook.
+        file_uri: Uri,
         notebook: Arc<NotebookDocument>,
         settings: Arc<RuffSettings>,
     },
@@ -88,18 +88,18 @@ impl Index {
         })
     }
 
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
+    pub(super) fn text_document_uris(&self) -> impl Iterator<Item = &Uri> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_text().is_some())
-            .map(|(url, _)| url)
+            .map(|(uri, _)| uri)
     }
 
-    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
+    pub(super) fn notebook_document_uris(&self) -> impl Iterator<Item = &Uri> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
-            .map(|(url, _)| url)
+            .map(|(uri, _)| uri)
     }
 
     pub(super) fn update_text_document(
@@ -124,24 +124,24 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn key_from_url(&self, url: Url) -> DocumentKey {
-        if self.notebook_cells.contains_key(&url) {
-            DocumentKey::NotebookCell(url)
+    pub(super) fn key_from_uri(&self, uri: Uri) -> DocumentKey {
+        if self.notebook_cells.contains_key(&uri) {
+            DocumentKey::NotebookCell(uri)
         } else if self
             .documents
-            .get(&url)
+            .get(&uri)
             .is_some_and(|controller| controller.as_notebook().is_some())
         {
-            DocumentKey::Notebook(url)
+            DocumentKey::Notebook(uri)
         } else {
-            DocumentKey::Text(url)
+            DocumentKey::Text(uri)
         }
     }
 
     pub(super) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,
-        cells: Option<lsp_types::NotebookDocumentCellChange>,
+        cells: Option<lsp_types::NotebookDocumentCellChanges>,
         metadata: Option<serde_json::Map<String, serde_json::Value>>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
@@ -152,7 +152,7 @@ impl Index {
             ..
         }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
-            let Some(path) = self.url_for_key(key).cloned() else {
+            let Some(path) = self.uri_for_key(key).cloned() else {
                 anyhow::bail!("Tried to open unavailable document `{key}`");
             };
 
@@ -174,29 +174,29 @@ impl Index {
 
     pub(super) fn open_workspace_folder(
         &mut self,
-        url: Url,
+        uri: Uri,
         global: &GlobalClientSettings,
         client: &Client,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
         self.settings
-            .register_workspace(&Workspace::new(url), global, client)
+            .register_workspace(&Workspace::new(uri), global, client)
     }
 
-    pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
-        let workspace_path = workspace_url.to_file_path().map_err(|()| {
-            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+    pub(super) fn close_workspace_folder(&mut self, workspace_uri: &Uri) -> crate::Result<()> {
+        let workspace_path = workspace_uri.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URI to file path: {workspace_uri}")
         })?;
 
         self.settings
             .remove(&workspace_path)
-            .ok_or_else(|| anyhow!("Tried to remove non-existent workspace URI {workspace_url}"))?;
+            .ok_or_else(|| anyhow!("Tried to remove non-existent workspace URI {workspace_uri}"))?;
 
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
-            .retain(|url, _| !Path::new(url.path()).starts_with(&workspace_path));
+            .retain(|uri, _| !Path::new(uri.path()).starts_with(&workspace_path));
         self.notebook_cells
-            .retain(|_, url| !Path::new(url.path()).starts_with(&workspace_path));
+            .retain(|_, uri| !Path::new(uri.path()).starts_with(&workspace_path));
 
         Ok(())
     }
@@ -206,12 +206,12 @@ impl Index {
         key: DocumentKey,
         global: &GlobalClientSettings,
     ) -> Option<DocumentQuery> {
-        let url = self.url_for_key(&key)?.clone();
+        let uri = self.uri_for_key(&key)?.clone();
 
         let document_settings = self
-            .settings_for_url(&url)
+            .settings_for_uri(&uri)
             .map(|settings| {
-                if let Ok(file_path) = url.to_file_path() {
+                if let Ok(file_path) = uri.to_file_path() {
                     settings.ruff_settings.get(&file_path)
                 } else {
                     // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
@@ -223,7 +223,7 @@ impl Index {
                         let workspace_path = self.settings.keys().next().unwrap();
                         settings.ruff_settings.get(&workspace_path.join("untitled"))
                     } else {
-                        tracing::debug!("Use the fallback settings for the new document '{url}'.");
+                        tracing::debug!("Use the fallback settings for the new document '{uri}'.");
                         settings.ruff_settings.fallback()
                     }
                 }
@@ -231,11 +231,11 @@ impl Index {
             .unwrap_or_else(|| {
                 tracing::warn!(
                     "No settings available for {} - falling back to default settings",
-                    url
+                    uri
                 );
                 // The path here is only for completeness, it's okay to use a non-existing path
                 // in case this is an unsaved (untitled) document.
-                let path = Path::new(url.path());
+                let path = Path::new(uri.path());
                 let root = path.parent().unwrap_or(path);
                 Arc::new(RuffSettings::fallback(
                     global.to_settings().editor_settings(),
@@ -243,12 +243,12 @@ impl Index {
                 ))
             });
 
-        let controller = self.documents.get(&url)?;
-        let cell_url = match key {
-            DocumentKey::NotebookCell(cell_url) => Some(cell_url),
+        let controller = self.documents.get(&uri)?;
+        let cell_uri = match key {
+            DocumentKey::NotebookCell(cell_uri) => Some(cell_uri),
             _ => None,
         };
-        Some(controller.make_ref(cell_url, url, document_settings))
+        Some(controller.make_ref(cell_uri, uri, document_settings))
     }
 
     /// Reload the settings for all the workspace folders that contain the changed files.
@@ -297,18 +297,18 @@ impl Index {
         }
     }
 
-    pub(super) fn open_text_document(&mut self, url: Url, document: TextDocument) {
+    pub(super) fn open_text_document(&mut self, uri: Uri, document: TextDocument) {
         self.documents
-            .insert(url, DocumentController::new_text(document));
+            .insert(uri, DocumentController::new_text(document));
     }
 
-    pub(super) fn open_notebook_document(&mut self, notebook_url: Url, document: NotebookDocument) {
-        for cell_url in document.urls() {
+    pub(super) fn open_notebook_document(&mut self, notebook_uri: Uri, document: NotebookDocument) {
+        for cell_uri in document.uris() {
             self.notebook_cells
-                .insert(cell_url.clone(), notebook_url.clone());
+                .insert(cell_uri.clone(), notebook_uri.clone());
         }
         self.documents
-            .insert(notebook_url, DocumentController::new_notebook(document));
+            .insert(notebook_uri, DocumentController::new_notebook(document));
     }
 
     pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
@@ -323,21 +323,21 @@ impl Index {
             }
             return Ok(());
         }
-        let Some(url) = self.url_for_key(key).cloned() else {
+        let Some(uri) = self.uri_for_key(key).cloned() else {
             anyhow::bail!("Tried to close unavailable document `{key}`");
         };
 
-        let Some(_) = self.documents.remove(&url) else {
-            anyhow::bail!("tried to close document that didn't exist at {url}")
+        let Some(_) = self.documents.remove(&uri) else {
+            anyhow::bail!("tried to close document that didn't exist at {uri}")
         };
         Ok(())
     }
 
     pub(super) fn client_settings(&self, key: &DocumentKey) -> Option<Arc<ClientSettings>> {
-        let url = self.url_for_key(key)?;
+        let uri = self.uri_for_key(key)?;
         let WorkspaceSettings {
             client_settings, ..
-        } = self.settings_for_url(url)?;
+        } = self.settings_for_uri(uri)?;
         Some(client_settings.clone())
     }
 
@@ -345,30 +345,30 @@ impl Index {
         &mut self,
         key: &DocumentKey,
     ) -> crate::Result<&mut DocumentController> {
-        let Some(url) = self.url_for_key(key).cloned() else {
+        let Some(uri) = self.uri_for_key(key).cloned() else {
             anyhow::bail!("Tried to open unavailable document `{key}`");
         };
-        let Some(controller) = self.documents.get_mut(&url) else {
-            anyhow::bail!("Document controller not available at `{url}`");
+        let Some(controller) = self.documents.get_mut(&uri) else {
+            anyhow::bail!("Document controller not available at `{uri}`");
         };
         Ok(controller)
     }
 
-    fn url_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a Url> {
+    fn uri_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a Uri> {
         match key {
             DocumentKey::Notebook(path) | DocumentKey::Text(path) => Some(path),
             DocumentKey::NotebookCell(uri) => self.notebook_cells.get(uri),
         }
     }
 
-    fn settings_for_url(&self, url: &Url) -> Option<&WorkspaceSettings> {
-        if let Ok(path) = url.to_file_path() {
+    fn settings_for_uri(&self, uri: &Uri) -> Option<&WorkspaceSettings> {
+        if let Ok(path) = uri.to_file_path() {
             self.settings_for_path(&path)
         } else {
             // If there's only a single workspace, use that configuration for an untitled document.
             if self.settings.len() == 1 {
                 tracing::debug!(
-                    "Falling back to configuration of the only active workspace for the new document '{url}'."
+                    "Falling back to configuration of the only active workspace for the new document '{uri}'."
                 );
                 self.settings.values().next()
             } else {
@@ -380,7 +380,7 @@ impl Index {
     fn settings_for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
         self.settings
             .range(..path.to_path_buf())
-            .next_back()
+            .rfind(|(root, _)| path.starts_with(root))
             .map(|(_, settings)| settings)
     }
 
@@ -419,16 +419,16 @@ impl WorkspaceSettingsIndex {
         global: &GlobalClientSettings,
         client: &Client,
     ) -> crate::Result<()> {
-        let workspace_url = workspace.url();
-        if workspace_url.scheme() != "file" {
-            tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
+        let workspace_uri = workspace.uri();
+        if workspace_uri.scheme() != "file" {
+            tracing::info!("Ignoring non-file workspace URI: {workspace_uri}");
             client.show_warning_message(format_args!(
-                "Ruff does not support non-file workspaces; Ignoring {workspace_url}"
+                "Ruff does not support non-file workspaces; Ignoring {workspace_uri}"
             ));
             return Ok(());
         }
-        let workspace_path = workspace_url.to_file_path().map_err(|()| {
-            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+        let workspace_path = workspace_uri.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URI to file path: {workspace_uri}")
         })?;
 
         let client_settings = if let Some(workspace_options) = workspace.options() {
@@ -493,19 +493,19 @@ impl DocumentController {
 
     fn make_ref(
         &self,
-        cell_url: Option<Url>,
-        file_url: Url,
+        cell_uri: Option<Uri>,
+        file_uri: Uri,
         settings: Arc<RuffSettings>,
     ) -> DocumentQuery {
         match &self {
             Self::Notebook(notebook) => DocumentQuery::Notebook {
-                cell_url,
-                file_url,
+                cell_uri,
+                file_uri,
                 notebook: notebook.clone(),
                 settings,
             },
             Self::Text(document) => DocumentQuery::Text {
-                file_url,
+                file_uri,
                 document: document.clone(),
                 settings,
             },
@@ -545,12 +545,12 @@ impl DocumentQuery {
     /// Retrieve the original key that describes this document query.
     pub(crate) fn make_key(&self) -> DocumentKey {
         match self {
-            Self::Text { file_url, .. } => DocumentKey::Text(file_url.clone()),
+            Self::Text { file_uri, .. } => DocumentKey::Text(file_uri.clone()),
             Self::Notebook {
-                cell_url: Some(cell_uri),
+                cell_uri: Some(cell_uri),
                 ..
             } => DocumentKey::NotebookCell(cell_uri.clone()),
-            Self::Notebook { file_url, .. } => DocumentKey::Notebook(file_url.clone()),
+            Self::Notebook { file_uri, .. } => DocumentKey::Notebook(file_uri.clone()),
         }
     }
 
@@ -619,10 +619,10 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the URL for the document selected by this query.
-    pub(crate) fn file_url(&self) -> &Url {
+    /// Get the URI for the document selected by this query.
+    pub(crate) fn file_uri(&self) -> &Uri {
         match self {
-            Self::Text { file_url, .. } | Self::Notebook { file_url, .. } => file_url,
+            Self::Text { file_uri, .. } | Self::Notebook { file_uri, .. } => file_uri,
         }
     }
 
@@ -633,16 +633,16 @@ impl DocumentQuery {
     /// The path isn't guaranteed to point to a real path on the filesystem. This is the case
     /// for unsaved (untitled) documents.
     pub(crate) fn file_path(&self) -> Option<PathBuf> {
-        self.file_url().to_file_path().ok()
+        self.file_uri().to_file_path().ok()
     }
 
     /// Get the path for the document selected by this query, ignoring whether the file exists on disk.
     ///
-    /// Returns the URL's path if this is an unsaved (untitled) document.
+    /// Returns the URI's path if this is an unsaved (untitled) document.
     pub(crate) fn virtual_file_path(&self) -> Cow<'_, Path> {
         self.file_path()
             .map(Cow::Owned)
-            .unwrap_or_else(|| Cow::Borrowed(Path::new(self.file_url().path())))
+            .unwrap_or_else(|| Cow::Borrowed(Path::new(self.file_uri().path())))
     }
 
     /// Attempt to access the single inner text document selected by the query.
@@ -652,8 +652,8 @@ impl DocumentQuery {
             Self::Text { document, .. } => Ok(document),
             Self::Notebook {
                 notebook,
-                file_url,
-                cell_url: cell_uri,
+                file_uri,
+                cell_uri,
                 ..
             } => {
                 if let Some(cell_uri) = cell_uri {
@@ -662,7 +662,7 @@ impl DocumentQuery {
                         .ok_or_else(|| SingleDocumentError::CellDoesNotExist(cell_uri.clone()))?;
                     Ok(cell)
                 } else {
-                    Err(SingleDocumentError::Notebook(file_url.clone()))
+                    Err(SingleDocumentError::Notebook(file_uri.clone()))
                 }
             }
         }
@@ -680,7 +680,7 @@ impl DocumentQuery {
 #[derive(Debug, Error)]
 pub(crate) enum SingleDocumentError {
     #[error("Expected a single text document, but found a notebook document: {0}")]
-    Notebook(Url),
-    #[error("Cell with URL {0} does not exist in the internal notebook document")]
-    CellDoesNotExist(Url),
+    Notebook(Uri),
+    #[error("Cell with URI {0} does not exist in the internal notebook document")]
+    CellDoesNotExist(Uri),
 }

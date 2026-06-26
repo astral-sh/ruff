@@ -3,8 +3,8 @@
 from _typeshed import ReadableBuffer, SupportsWrite
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from pickle import PickleBuffer as PickleBuffer
-from typing import Any, Protocol, type_check_only
-from typing_extensions import TypeAlias, disjoint_base
+from typing import Any, Protocol, TypeAlias, type_check_only
+from typing_extensions import disjoint_base
 
 @type_check_only
 class _ReadableFileobj(Protocol):
@@ -189,10 +189,12 @@ class Pickler:
         fix_imports: bool = True,
         buffer_callback: _BufferCallback = None,
     ) -> None: ...
+
     @property
     def memo(self) -> PicklerMemoProxy: ...
     @memo.setter
     def memo(self, value: PicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
+
     def dump(self, obj: Any, /) -> None:
         """Write a pickled representation of the given object to the open file."""
 
@@ -204,6 +206,7 @@ class Pickler:
         pickled by reference and not by value.  This method is useful when
         re-using picklers.
         """
+
     # this method has no default implementation for Python < 3.13
     def persistent_id(self, obj: Any, /) -> Any: ...
     # The following method is not defined on _Pickler, but can be defined on
@@ -249,10 +252,12 @@ class Unpickler:
         errors: str = "strict",
         buffers: Iterable[Any] | None = (),
     ) -> None: ...
+
     @property
     def memo(self) -> UnpicklerMemoProxy: ...
     @memo.setter
     def memo(self, value: UnpicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
+
     def load(self) -> Any:
         """Load a pickle.
 
@@ -271,5 +276,6 @@ class Unpickler:
         This method is called whenever a class or a function object is
         needed.  Both arguments passed are str objects.
         """
+
     # this method has no default implementation for Python < 3.13
     def persistent_load(self, pid: Any, /) -> Any: ...

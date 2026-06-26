@@ -176,7 +176,6 @@ def my_<CURSOR>function():
           |
         2 | def my_function():
           |     ^^^^^^^^^^^
-        3 |     return 42
           |
         ");
     }
@@ -220,8 +219,6 @@ class My<CURSOR>Class:
           |
         2 | class MyClass:
           |       ^^^^^^^
-        3 |     def __init__(self):
-        4 |         self.value = 1
           |
         ");
     }

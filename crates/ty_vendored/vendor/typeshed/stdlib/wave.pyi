@@ -15,15 +15,13 @@ This returns an instance of a class with the following public methods:
       getsampwidth()  -- returns sample width in bytes
       getframerate()  -- returns sampling frequency
       getnframes()    -- returns number of audio frames
+      getformat()     -- returns frame encoding (WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT
+                         or WAVE_FORMAT_EXTENSIBLE)
       getcomptype()   -- returns compression type ('NONE' for linear samples)
       getcompname()   -- returns human-readable version of
                          compression type ('not compressed' linear samples)
       getparams()     -- returns a namedtuple consisting of all of the
                          above in the above order
-      getmarkers()    -- returns None (for compatibility with the
-                         old aifc module)
-      getmark(id)     -- raises an error since the mark does not
-                         exist (for compatibility with the old aifc module)
       readframes(n)   -- returns at most n frames of audio
       rewind()        -- rewind to the beginning of the audio stream
       setpos(pos)     -- seek to the specified position
@@ -46,6 +44,9 @@ This returns an instance of a class with the following public methods:
       setsampwidth(n) -- set the sample width
       setframerate(n) -- set the frame rate
       setnframes(n)   -- set the number of frames
+      setformat(format)
+                      -- set the frame format. Only WAVE_FORMAT_PCM and
+                         WAVE_FORMAT_IEEE_FLOAT are supported.
       setcomptype(type, name)
                       -- set the compression type and the
                          human-readable compression type
@@ -72,17 +73,25 @@ is destroyed.
 """
 
 import sys
-from _typeshed import ReadableBuffer, Unused
-from typing import IO, Any, BinaryIO, Final, Literal, NamedTuple, NoReturn, overload
-from typing_extensions import Self, TypeAlias, deprecated
+from _typeshed import ReadableBuffer, StrOrBytesPath, Unused
+from typing import IO, Any, BinaryIO, Final, Literal, NamedTuple, NoReturn, TypeAlias, overload
+from typing_extensions import Self, deprecated
 
 __all__ = ["open", "Error", "Wave_read", "Wave_write"]
+if sys.version_info >= (3, 15):
+    __all__ += ["WAVE_FORMAT_PCM", "WAVE_FORMAT_IEEE_FLOAT", "WAVE_FORMAT_EXTENSIBLE"]
 
-_File: TypeAlias = str | IO[bytes]
+if sys.version_info >= (3, 15):
+    _File: TypeAlias = StrOrBytesPath | IO[bytes]
+else:
+    _File: TypeAlias = str | IO[bytes]
 
 class Error(Exception): ...
 
 WAVE_FORMAT_PCM: Final = 0x0001
+if sys.version_info >= (3, 15):
+    WAVE_FORMAT_IEEE_FLOAT: Final = 0x0003
+    WAVE_FORMAT_EXTENSIBLE: Final = 0xFFFE
 
 class _wave_params(NamedTuple):
     """_wave_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
@@ -109,6 +118,10 @@ class Wave_read:
               available through the getsampwidth() method
     _framerate -- the sampling frequency
               available through the getframerate() method
+    _format -- frame format
+              One of WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT
+              or WAVE_FORMAT_EXTENSIBLE available through
+              getformat() method
     _comptype -- the AIFF-C compression type ('NONE' if AIFF)
               available through the getcomptype() method
     _compname -- the human-readable AIFF-C compression type
@@ -137,16 +150,16 @@ class Wave_read:
     def getnframes(self) -> int: ...
     def getsampwidth(self) -> int: ...
     def getframerate(self) -> int: ...
+    if sys.version_info >= (3, 15):
+        def getformat(self) -> int: ...
+
     def getcomptype(self) -> str: ...
     def getcompname(self) -> str: ...
     def getparams(self) -> _wave_params: ...
-    if sys.version_info >= (3, 13):
+    if sys.version_info < (3, 15):
         @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
         def getmarkers(self) -> None: ...
         @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
-        def getmark(self, id: Any) -> NoReturn: ...
-    else:
-        def getmarkers(self) -> None: ...
         def getmark(self, id: Any) -> NoReturn: ...
 
     def setpos(self, pos: int) -> None: ...
@@ -169,6 +182,8 @@ class Wave_write:
               set through the setsampwidth() or setparams() method
     _framerate -- the sampling frequency
               set through the setframerate() or setparams() method
+    _format -- frame format
+              set through setformat() method
     _nframes -- the number of audio frames written to the header
               set through the setnframes() or setparams() method
 
@@ -188,23 +203,30 @@ class Wave_write:
     def getsampwidth(self) -> int: ...
     def setframerate(self, framerate: float) -> None: ...
     def getframerate(self) -> int: ...
+    if sys.version_info >= (3, 15):
+        def setformat(self, format: int) -> None: ...
+        def getformat(self) -> int: ...
+
     def setnframes(self, nframes: int) -> None: ...
     def getnframes(self) -> int: ...
     def setcomptype(self, comptype: str, compname: str) -> None: ...
     def getcomptype(self) -> str: ...
     def getcompname(self) -> str: ...
-    def setparams(self, params: _wave_params | tuple[int, int, int, int, str, str]) -> None: ...
-    def getparams(self) -> _wave_params: ...
-    if sys.version_info >= (3, 13):
-        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
-        def setmark(self, id: Any, pos: Any, name: Any) -> NoReturn: ...
-        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
-        def getmark(self, id: Any) -> NoReturn: ...
-        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
-        def getmarkers(self) -> None: ...
+    if sys.version_info >= (3, 15):
+        def setparams(
+            self, params: _wave_params | tuple[int, int, int, int, str, str] | tuple[int, int, int, int, str, str, int]
+        ) -> None: ...
     else:
+        def setparams(self, params: _wave_params | tuple[int, int, int, int, str, str]) -> None: ...
+
+    def getparams(self) -> _wave_params: ...
+
+    if sys.version_info < (3, 15):
+        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
         def setmark(self, id: Any, pos: Any, name: Any) -> NoReturn: ...
+        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
         def getmark(self, id: Any) -> NoReturn: ...
+        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
         def getmarkers(self) -> None: ...
 
     def tell(self) -> int: ...

@@ -358,7 +358,8 @@ where
                 range: _,
                 node_index: _,
             }) => {
-                any_over_expr(key, &mut *func)
+                key.as_deref()
+                    .is_some_and(|key| any_over_expr(key, &mut *func))
                     || any_over_expr(value, &mut *func)
                     || generators.iter().any(|generator| {
                         any_over_expr(&generator.target, &mut *func)

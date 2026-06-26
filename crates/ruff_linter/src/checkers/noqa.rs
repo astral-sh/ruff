@@ -78,7 +78,7 @@ pub(crate) fn check_noqa(
         let noqa_offsets = diagnostic
             .parent()
             .into_iter()
-            .chain(diagnostic.range().map(TextRange::start).into_iter())
+            .chain(diagnostic.range().map(TextRange::start))
             .map(|position| noqa_line_for.resolve(position))
             .unique();
 
@@ -224,18 +224,9 @@ pub(crate) fn check_noqa(
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
-                                    disabled: disabled_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    duplicated: duplicated_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    unmatched: unmatched_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
+                                    disabled: &disabled_codes,
+                                    duplicated: &duplicated_codes,
+                                    unmatched: &unmatched_codes,
                                 }),
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },

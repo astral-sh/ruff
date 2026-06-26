@@ -2,8 +2,7 @@
 numbers.
 """
 
-from typing import Final, SupportsComplex, SupportsFloat, SupportsIndex
-from typing_extensions import TypeAlias
+from typing import Final, SupportsComplex, SupportsFloat, SupportsIndex, TypeAlias
 
 e: Final[float]
 pi: Final[float]
@@ -55,11 +54,12 @@ def isclose(a: _C, b: _C, *, rel_tol: SupportsFloat = 1e-09, abs_tol: SupportsFl
 
     Return True if a is close in value to b, and False otherwise.
 
-    For the values to be considered close, the difference between them must be
-    smaller than at least one of the tolerances.
+    For the values to be considered close, the difference between them must
+    be smaller than at least one of the tolerances.
 
-    -inf, inf and NaN behave similarly to the IEEE 754 Standard. That is, NaN is
-    not close to anything, even itself. inf and -inf are only close to themselves.
+    -inf, inf and NaN behave similarly to the IEEE 754 Standard.  That is,
+    NaN is not close to anything, even itself. inf and -inf are only close
+    to themselves.
     """
 
 def isinf(z: _C, /) -> bool:
@@ -71,7 +71,8 @@ def isnan(z: _C, /) -> bool:
 def log(z: _C, base: _C = ..., /) -> complex:
     """log(z[, base]) -> the logarithm of z to the given base.
 
-    If the base is not specified, returns the natural logarithm (base e) of z.
+    If the base is not specified, returns the natural logarithm (base e)
+    of z.
     """
 
 def log10(z: _C, /) -> complex:

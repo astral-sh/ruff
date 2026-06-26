@@ -33,7 +33,8 @@ if sys.version_info >= (3, 11):
         with asyncio.Runner(debug=True) as runner:
             runner.run(main())
 
-        The run() method can be called multiple times within the runner's context.
+        The run() method can be called multiple times within the runner's
+        context.
 
         This can be useful for interactive console (e.g. IPython),
         unittest runners, console tools, -- everywhere when async code
@@ -50,14 +51,47 @@ if sys.version_info >= (3, 11):
 
         def get_loop(self) -> AbstractEventLoop:
             """Return embedded event loop."""
+
         if sys.version_info >= (3, 14):
             def run(self, coro: Awaitable[_T], *, context: Context | None = None) -> _T:
                 """Run code in the embedded event loop."""
+
         else:
             def run(self, coro: Coroutine[Any, Any, _T], *, context: Context | None = None) -> _T:
                 """Run a coroutine inside the embedded event loop."""
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 14):
+    def run(main: Awaitable[_T], *, debug: bool | None = None, loop_factory: Callable[[], AbstractEventLoop] | None = None) -> _T:
+        """Execute the coroutine and return the result.
+
+        This function runs the passed coroutine, taking care of
+        managing the asyncio event loop, finalizing asynchronous
+        generators and closing the default executor.
+
+        This function cannot be called when another asyncio event loop is
+        running in the same thread.
+
+        If debug is True, the event loop will be run in debug mode.
+        If loop_factory is passed, it is used for new event loop creation.
+
+        This function always creates a new event loop and closes it at the end.
+        It should be used as a main entry point for asyncio programs, and should
+        ideally only be called once.
+
+        The executor is given a timeout duration of 5 minutes to shutdown.
+        If the executor hasn't finished within that duration, a warning is
+        emitted and the executor is closed.
+
+        Example:
+
+            async def main():
+                await asyncio.sleep(1)
+                print('hello')
+
+            asyncio.run(main())
+        """
+
+elif sys.version_info >= (3, 12):
     def run(
         main: Coroutine[Any, Any, _T], *, debug: bool | None = None, loop_factory: Callable[[], AbstractEventLoop] | None = None
     ) -> _T:

@@ -46,8 +46,8 @@ from _lzma import (
 )
 from _typeshed import ReadableBuffer, StrOrBytesPath
 from io import TextIOWrapper
-from typing import IO, Literal, overload
-from typing_extensions import Self, TypeAlias
+from typing import IO, Literal, TypeAlias, overload
+from typing_extensions import Self
 
 if sys.version_info >= (3, 14):
     from compression._common._streams import BaseStream
@@ -253,7 +253,6 @@ def open(
     handling behavior, and line ending(s).
 
     """
-
 @overload
 def open(
     filename: _PathOrFile,
@@ -306,6 +305,7 @@ def open(
     errors: str | None = None,
     newline: str | None = None,
 ) -> LZMAFile | TextIOWrapper: ...
+
 def compress(
     data: ReadableBuffer, format: int = 1, check: int = -1, preset: int | None = None, filters: _FilterChain | None = None
 ) -> bytes:

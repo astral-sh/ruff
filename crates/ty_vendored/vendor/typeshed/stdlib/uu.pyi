@@ -4,8 +4,7 @@ encode(in_file, out_file [,name, mode], *, backtick=False)
 decode(in_file [, out_file, mode, quiet])
 """
 
-from typing import BinaryIO
-from typing_extensions import TypeAlias
+from typing import BinaryIO, TypeAlias
 
 __all__ = ["Error", "encode", "decode"]
 

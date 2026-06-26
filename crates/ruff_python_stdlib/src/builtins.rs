@@ -186,7 +186,12 @@ static ALWAYS_AVAILABLE_BUILTINS: &[&str] = &[
 static PY310_PLUS_BUILTINS: &[&str] = &["EncodingWarning", "aiter", "anext"];
 static PY311_PLUS_BUILTINS: &[&str] = &["BaseExceptionGroup", "ExceptionGroup"];
 static PY313_PLUS_BUILTINS: &[&str] = &["PythonFinalizationError"];
-static PY315_PLUS_BUILTINS: &[&str] = &["frozendict"];
+static PY315_PLUS_BUILTINS: &[&str] = &[
+    "frozendict",
+    "sentinel",
+    "__lazy_import__",
+    "ImportCycleError",
+];
 
 /// Return the list of builtins for the given Python minor version.
 ///
@@ -410,7 +415,10 @@ pub fn is_python_builtin(name: &str, minor_version: u8, is_notebook: bool) -> bo
         ) | (10.., "EncodingWarning" | "aiter" | "anext")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
             | (13.., "PythonFinalizationError")
-            | (15.., "frozendict")
+            | (
+                15..,
+                "frozendict" | "sentinel" | "__lazy_import__" | "ImportCycleError"
+            )
     )
 }
 
@@ -522,6 +530,6 @@ pub fn is_exception(name: &str, minor_version: u8) -> bool {
                 | "UserWarning"
         ) | (10.., "EncodingWarning")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
-            | (13.., "PythonFinalizationError")
+            | (13.., "PythonFinalizationError" | "ImportCycleError")
     )
 }

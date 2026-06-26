@@ -31,7 +31,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
                 .filter_map(|set| set.name())
                 .chain(std::iter::once(name.as_str()))
                 .join(".");
-            writeln!(output, "#### `{title}`\n",).unwrap();
+            writeln!(output, "#### `{title}`\n").unwrap();
         }
     }
 

@@ -33,16 +33,36 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 
 `LiteralString` cannot be parameterized.
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import LiteralString
 
-# error: [invalid-type-form]
+# snapshot: invalid-type-form
 a: LiteralString[str]
+```
 
-# error: [invalid-type-form]
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:4:4
+  |
+4 | a: LiteralString[str]
+  |    ^^^^^^^^^^^^^^^^^^
+  |
+```
+
+```py
+# snapshot: invalid-type-form
 b: LiteralString["foo"]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:4
+  |
+6 | b: LiteralString["foo"]
+  |    -------------^^^^^^^
+  |    |
+  |    Did you mean `Literal`?
+  |
 ```
 
 ### As a base class

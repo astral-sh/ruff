@@ -1,13 +1,16 @@
-"""Python interface for the 'lsprof' profiler.
-Compatible with the 'profile' module.
+"""Compatibility wrapper for cProfile module.
+
+This module maintains backward compatibility by importing from the new
+profiling.tracing module.
 """
 
 import _lsprof
+import sys
 from _typeshed import StrOrBytesPath, Unused
 from collections.abc import Callable, Mapping
 from types import CodeType
-from typing import Any, TypeVar
-from typing_extensions import ParamSpec, Self, TypeAlias
+from typing import Any, ParamSpec, TypeAlias, TypeVar
+from typing_extensions import Self
 
 __all__ = ["run", "runctx", "Profile"]
 
@@ -57,4 +60,5 @@ class Profile(_lsprof.Profiler):
     def __enter__(self) -> Self: ...
     def __exit__(self, *exc_info: Unused) -> None: ...
 
-def label(code: str | CodeType) -> _Label: ...  # undocumented
+if sys.version_info < (3, 15):
+    def label(code: str | CodeType) -> _Label: ...  # undocumented

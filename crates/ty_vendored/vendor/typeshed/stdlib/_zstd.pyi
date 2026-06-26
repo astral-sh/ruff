@@ -3,8 +3,8 @@
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping
 from compression.zstd import CompressionParameter, DecompressionParameter
-from typing import Final, Literal, final
-from typing_extensions import Self, TypeAlias
+from typing import Final, Literal, TypeAlias, final
+from typing_extensions import Self
 
 ZSTD_CLEVEL_DEFAULT: Final = 3
 ZSTD_DStreamOutSize: Final = 131072
@@ -53,8 +53,8 @@ class ZstdCompressor:
       zstd_dict
         A ZstdDict object, a pre-trained Zstandard dictionary.
 
-    Thread-safe at method level. For one-shot compression, use the compress()
-    function instead.
+    Thread-safe at method level.  For one-shot compression, use the
+    compress() function instead.
     """
 
     CONTINUE: Final = 0
@@ -75,9 +75,9 @@ class ZstdCompressor:
             Can be these 3 values ZstdCompressor.CONTINUE,
             ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME
 
-        Return a chunk of compressed data if possible, or b'' otherwise. When you have
-        finished providing data to the compressor, call the flush() method to finish
-        the compression process.
+        Return a chunk of compressed data if possible, or b'' otherwise.
+        When you have finished providing data to the compressor, call the
+        flush() method to finish the compression process.
         """
 
     def flush(self, /, mode: _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 2) -> bytes:
@@ -87,9 +87,9 @@ class ZstdCompressor:
             Can be these 2 values ZstdCompressor.FLUSH_FRAME,
             ZstdCompressor.FLUSH_BLOCK
 
-        Flush any remaining data left in internal buffers. Since Zstandard data
-        consists of one or more independent frames, the compressor object can still
-        be used after this method is called.
+        Flush any remaining data left in internal buffers.  Since Zstandard
+        data consists of one or more independent frames, the compressor
+        object can still be used after this method is called.
         """
 
     def set_pledged_input_size(self, size: int | None, /) -> None:
@@ -98,13 +98,14 @@ class ZstdCompressor:
           size
             The size of the uncompressed data to be provided to the compressor.
 
-        This method can be used to ensure the header of the frame about to be written
-        includes the size of the data, unless the CompressionParameter.content_size_flag
-        is set to False. If last_mode != FLUSH_FRAME, then a RuntimeError is raised.
+        This method can be used to ensure the header of the frame about to
+        be written includes the size of the data, unless the
+        CompressionParameter.content_size_flag is set to False.
+        If last_mode != FLUSH_FRAME, then a RuntimeError is raised.
 
-        It is important to ensure that the pledged data size matches the actual data
-        size. If they do not match the compressed output data may be corrupted and the
-        final chunk written may be lost.
+        It is important to ensure that the pledged data size matches the
+        actual data size.  If they do not match the compressed output data
+        may be corrupted and the final chunk written may be lost.
         """
 
     @property
@@ -125,8 +126,8 @@ class ZstdDecompressor:
       options
         A dict object that contains advanced decompression parameters.
 
-    Thread-safe at method level. For one-shot decompression, use the decompress()
-    function instead.
+    Thread-safe at method level.  For one-shot decompression, use the
+    decompress() function instead.
     """
 
     def __new__(
@@ -142,18 +143,19 @@ class ZstdDecompressor:
             output buffer is unlimited. When it is nonnegative, returns at
             most max_length bytes of decompressed data.
 
-        If *max_length* is nonnegative, returns at most *max_length* bytes of
-        decompressed data. If this limit is reached and further output can be
-        produced, *self.needs_input* will be set to ``False``. In this case, the next
-        call to *decompress()* may provide *data* as b'' to obtain more of the output.
+        If *max_length* is nonnegative, returns at most *max_length* bytes
+        of decompressed data.  If this limit is reached and further output
+        can be produced, *self.needs_input* will be set to ``False``.  In
+        this case, the next call to *decompress()* may provide *data* as b''
+        to obtain more of the output.
 
-        If all of the input data was decompressed and returned (either because this
-        was less than *max_length* bytes, or because *max_length* was negative),
-        *self.needs_input* will be set to True.
+        If all of the input data was decompressed and returned (either
+        because this was less than *max_length* bytes, or because
+        *max_length* was negative), *self.needs_input* will be set to True.
 
-        Attempting to decompress data after the end of a frame is reached raises an
-        EOFError. Any data found after the end of the frame is ignored and saved in
-        the self.unused_data attribute.
+        Attempting to decompress data after the end of a frame is reached
+        raises an EOFError.  Any data found after the end of the frame is
+        ignored and saved in the self.unused_data attribute.
         """
 
     @property
@@ -175,7 +177,8 @@ class ZstdDecompressor:
         """A bytes object of un-consumed input data.
 
         When ZstdDecompressor object stops after a frame is
-        decompressed, unused input data after the frame. Otherwise this will be b''.
+        decompressed, unused input data after the frame.  Otherwise this
+        will be b''.
         """
 
 @final
@@ -189,11 +192,11 @@ class ZstdDict:
         advanced cases. Otherwise, check that the content represents
         a Zstandard dictionary created by the zstd library or CLI.
 
-    The dictionary can be used for compression or decompression, and can be shared
-    by multiple ZstdCompressor or ZstdDecompressor objects.
+    The dictionary can be used for compression or decompression, and can be
+    shared by multiple ZstdCompressor or ZstdDecompressor objects.
     """
 
-    def __new__(cls, dict_content: bytes, /, *, is_raw: bool = False) -> Self: ...
+    def __new__(cls, dict_content: ReadableBuffer, /, *, is_raw: bool = False) -> Self: ...
     def __len__(self, /) -> int:
         """Return len(self)."""
 
@@ -204,11 +207,11 @@ class ZstdDict:
         Pass this attribute as zstd_dict argument:
         compress(dat, zstd_dict=zd.as_digested_dict)
 
-        1. Some advanced compression parameters of compressor may be overridden
-           by parameters of digested dictionary.
-        2. ZstdDict has a digested dictionaries cache for each compression level.
-           It's faster when loading again a digested dictionary with the same
-           compression level.
+        1. Some advanced compression parameters of compressor may be
+           overridden by parameters of digested dictionary.
+        2. ZstdDict has a digested dictionaries cache for each compression
+           level.  It's faster when loading again a digested dictionary with
+           the same compression level.
         3. No need to use this for decompression.
         """
 
@@ -219,9 +222,10 @@ class ZstdDict:
         Pass this attribute as zstd_dict argument:
         compress(dat, zstd_dict=zd.as_prefix)
 
-        1. Prefix is compatible with long distance matching, while dictionary is not.
-        2. It only works for the first frame, then the compressor/decompressor will
-           return to no prefix state.
+        1. Prefix is compatible with long distance matching, while
+           dictionary is not.
+        2. It only works for the first frame, then the
+           compressor/decompressor will return to no prefix state.
         3. When decompressing, must use the same prefix as when compressing.
         """
 
@@ -232,9 +236,10 @@ class ZstdDict:
         Pass this attribute as zstd_dict argument:
         compress(dat, zstd_dict=zd.as_undigested_dict)
 
-        1. The advanced compression parameters of compressor will not be overridden.
-        2. Loading an undigested dictionary is costly. If load an undigested dictionary
-           multiple times, consider reusing a compressor object.
+        1. The advanced compression parameters of compressor will not be
+           overridden.
+        2. Loading an undigested dictionary is costly. If load an undigested
+           dictionary multiple times, consider reusing a compressor object.
         3. No need to use this for decompression.
         """
 

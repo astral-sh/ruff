@@ -15,6 +15,22 @@ def _(x: Literal[0], y: str, z: Literal[False]):
     reveal_type(f"{z} == {False} is {True}")  # revealed: Literal["False == False is True"]
 ```
 
+## Narrowed enum complements
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def _(color: Color):
+    if color is Color.RED:
+        return
+
+    reveal_type(f"{color}")  # revealed: Literal["Color.BLUE"]
+```
+
 ## Conversion Flags
 
 ```py

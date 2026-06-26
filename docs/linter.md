@@ -141,6 +141,9 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
+When [preview mode](preview.md) is enabled, rule selectors also accept the human-readable name of a
+rule (e.g., `unused-import`).
+
 ## Fixes
 
 Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused
@@ -332,7 +335,7 @@ The full inline comment specification is as follows:
   `#noqa` with optional whitespace after the `#` symbol, followed by either: the
   end of the comment, the beginning of a new comment (`#`), or whitespace
   followed by any character other than `:`.
-- An inline rule suppression is given by first finding a case-insensitive match
+- An inline `noqa` suppression is given by first finding a case-insensitive match
   for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
   after `noqa`, and followed by the symbol `:`. After this we are expected to
   have a list of rule codes which is given by sequences of uppercase ASCII
@@ -340,6 +343,64 @@ The full inline comment specification is as follows:
   list ends at the last valid code. We will attempt to interpret rules with a
   missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
   case.
+
+*The following is currently only available in [preview mode](`preview.md`).*
+
+To cover an entire "logical" line (a multi-line statement or suite header),
+an "ignore" comment may be placed above the first line:
+
+```python
+# ruff: ignore[unused-function-argument]  # Covers the entire function signature
+def foo(
+    arg1,
+    arg2,
+):
+    pass
+
+# ruff: ignore[line-too-long]  # Covers the entire list literal
+things = [
+    "really long string literal ...",
+    "really long string literal ...",
+]
+```
+
+Alternately, placing the "ignore" comment inside of a multi-line statement, or
+at the end of a line, will cover only a single "physical" line, leaving the rest
+of the multi-line statement or header uncovered:
+
+```python
+def foo(
+    arg1,
+    # ruff: ignore[unused-function-argument]  # Only covers `arg2`
+    arg2,
+):
+    pass
+
+things = [
+    "really long string literal ...",  # ruff: ignore[line-too-long]  # Only covers this line
+    "really long string literal ...",
+]
+```
+
+Ignore comments can also be "stacked" with other comments or pragmas, and will
+still cover the next logical line:
+
+```python
+# ruff: ignore[ambiguous-variable-name]
+# ruff: ignore[unused-variable]
+# I definitely know what I'm doing.
+i = 1
+```
+
+The full line-level suppression comment specification is as follows:
+
+- An own-line or trailing comment starting with case sensitive `#ruff:`, with
+  optional whitespace after the `#` symbol and `:` symbol, followed by `ignore[`,
+  any rules to be suppressed, and ending with `]`.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
+
 
 #### Block-level
 
@@ -393,6 +454,9 @@ be used to terminate a preceding "disable" comment with identical codes.
 Unlike `noqa` suppressions, range suppressions do not support "blanket" suppression
 of all violations. At least one violation code must be listed.
 
+In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in these comments
+instead of rule codes (e.g. `F401`).
+
 The full range suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
@@ -431,6 +495,23 @@ The file-level suppression comment specification is as follows:
   or `#flake8:`, with optional whitespace after `#` and before `:`, followed by
   optional whitespace and a case-insensitive match for `noqa`. After this, the
   specification is as in the inline `noqa` suppressions above.
+
+In [`preview`](preview.md) mode, one or more rules can be ignored across an
+entire file with a `file-ignore` comment on its own line, at global module scope,
+and preferably near the top of the file:
+
+```python
+# ruff: file-ignore[unused-import, unused-function-argument]
+```
+
+The full-level suppression comment specification is as follows:
+
+- An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
+  after the `#` symbol and `:` symbol, followed by `file-ignore[`, any rules to
+  be suppressed, and ending with `]`.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
 
 ### Detecting unused suppressions
 

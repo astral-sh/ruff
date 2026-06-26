@@ -15,6 +15,7 @@ TC004 [*] Move import `datetime.date` out of type-checking block. Import is used
   |            ---- Used at runtime here
   |
 help: Move out of type-checking block
+  |
 1 | from typing import TYPE_CHECKING
 2 + from datetime import date
 3 |
@@ -22,6 +23,5 @@ help: Move out of type-checking block
   -     from datetime import date
 5 +     pass
 6 |
-7 |
-8 | def example():
+  |
 note: This is an unsafe fix and may change runtime behavior

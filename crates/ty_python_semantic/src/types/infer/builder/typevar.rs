@@ -1,5 +1,6 @@
 use crate::{
     Program,
+    reachability::is_reachable,
     types::{
         BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
         TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
@@ -27,7 +28,10 @@ use ruff_db::{
 };
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::{definition::Definition, scope::NodeWithScopeKind};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    scope::NodeWithScopeKind,
+};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_typevar_definition(
@@ -65,7 +69,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity = TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695);
+        let identity =
+            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695TypeVar);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
@@ -582,10 +587,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         paramspec_name: Option<&str>,
     ) {
         let previously_allowed_paramspec = self
+            .context
             .inference_flags
             .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
         self.infer_paramspec_default_impl(default_expr, paramspec_name);
-        self.inference_flags.set(
+        self.context.inference_flags.set(
             InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
             previously_allowed_paramspec,
         );
@@ -606,13 +612,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let previously_allowed_paramspec = self
+                    .context
                     .inference_flags
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 let types = elts
                     .iter()
                     .map(|elt| self.infer_type_expression(elt))
                     .collect::<Vec<_>>();
-                self.inference_flags.set(
+                self.context.inference_flags.set(
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );
@@ -698,6 +705,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             |version: PythonVersion| assume_all_features || python_version >= version;
 
         let mut default = None;
+        let mut covariant = false;
+        let mut contravariant = false;
+        let mut infer_variance = false;
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
@@ -740,12 +750,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     name_param_ty =
                         Some(self.infer_expression(&kwarg.value, TypeContext::default()));
                 }
-                "bound" | "covariant" | "contravariant" | "infer_variance" => {
+                "bound" => {
                     return error(
                         &self.context,
-                        "The variance and bound arguments for `ParamSpec` do not have defined semantics yet",
+                        "The `bound` argument for `ParamSpec` is not supported",
                         call_expr,
                     );
+                }
+                "infer_variance" => {
+                    if !have_features_from(PythonVersion::PY312) {
+                        error(
+                            &self.context,
+                            "The `infer_variance` parameter of `typing.ParamSpec` was added in Python 3.12",
+                            kwarg,
+                        );
+                    }
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `ParamSpec` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "covariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => covariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `covariant` parameter of `ParamSpec` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "contravariant" => {
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => contravariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `contravariant` parameter of `ParamSpec` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
                 }
                 "default" => {
                     if !have_features_from(PythonVersion::PY313) {
@@ -773,6 +841,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
+                return error(
+                    &self.context,
+                    "A `ParamSpec` cannot be both covariant and contravariant",
+                    call_expr,
+                );
+            }
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `ParamSpec` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
+        };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
             arguments
@@ -825,12 +914,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
-            TypeVarKind::ParamSpec,
+            TypeVarKind::LegacyParamSpec,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-            db, identity, None, None, default,
+            db, identity, None, variance, default,
         )))
     }
 
@@ -866,6 +955,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut default = None;
         let mut covariant = false;
         let mut contravariant = false;
+        let mut infer_variance = false;
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
@@ -958,18 +1048,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
-                    // TODO support `infer_variance` in legacy TypeVars
-                    if self
+                    match self
                         .infer_expression(&kwarg.value, TypeContext::default())
                         .bool(db)
-                        .is_ambiguous()
                     {
-                        return error(
-                            &self.context,
-                            "The `infer_variance` parameter of `TypeVar` \
-                            cannot have an ambiguous truthiness",
-                            &kwarg.value,
-                        );
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `TypeVar` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
                     }
                 }
                 name => {
@@ -979,7 +1071,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // can.
                     error(
                         &self.context,
-                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation",),
+                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation"),
                         kwarg,
                     );
                     self.infer_expression(&kwarg.value, TypeContext::default());
@@ -987,17 +1079,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let variance = match (covariant, contravariant) {
-            (true, true) => {
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot be both covariant and contravariant",
                     call_expr,
                 );
             }
-            (true, false) => TypeVarVariance::Covariant,
-            (false, true) => TypeVarVariance::Contravariant,
-            (false, false) => TypeVarVariance::Invariant,
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `TypeVar` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
@@ -1045,6 +1145,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
+        let previous_definition_in = |scope, place, before| {
+            let use_def = self.index.use_def_map(scope);
+            use_def
+                .reachable_bindings(place)
+                .map(|binding| {
+                    (
+                        binding.binding_order,
+                        binding.binding,
+                        binding.reachability_constraint,
+                    )
+                })
+                .chain(use_def.reachable_declarations(place).map(|declaration| {
+                    (
+                        declaration.declaration_order,
+                        declaration.declaration,
+                        declaration.reachability_constraint,
+                    )
+                }))
+                .filter(|(order, _, _)| *order < before)
+                .filter(|(_, _, reachability)| is_reachable(db, use_def, *reachability))
+                .filter_map(|(order, definition, _)| {
+                    definition
+                        .definition()
+                        .map(|definition| (order, definition))
+                })
+                .filter(|(_, definition)| definition.kind(db).is_user_visible())
+                .max_by_key(|(order, _)| *order)
+                .map(|(_, definition)| definition)
+        };
+
+        let scope = definition.file_scope(db);
+        let place = definition.place(db);
+        let use_def = self.index.use_def_map(scope);
+        let definition_order = use_def.reachable_bindings(place).find_map(|binding| {
+            (binding.binding.definition() == Some(definition)).then_some(binding.binding_order)
+        });
+        debug_assert!(definition_order.is_some());
+
+        let previous_definition = definition_order
+            .and_then(|before| previous_definition_in(scope, place, before))
+            .or_else(|| {
+                self.forwarded_assignment_owner(scope, place.expect_symbol())
+                    .and_then(|(owner_scope, owner_place)| {
+                        let owner_use_def = self.index.use_def_map(owner_scope);
+                        let before = owner_use_def
+                            .reachable_bindings(owner_place.into())
+                            .find_map(|binding| {
+                                let definition = binding.binding.definition()?;
+                                let DefinitionKind::NestedBindings(nested) = definition.kind(db)
+                                else {
+                                    return None;
+                                };
+                                nested
+                                    .nested_declarations
+                                    .iter()
+                                    .any(|declaration| declaration.file_scope_id == scope)
+                                    .then_some(binding.binding_order)
+                            })?;
+                        previous_definition_in(owner_scope, owner_place.into(), before)
+                    })
+            });
+        if let Some(previous_definition) = previous_definition
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, target)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot redefine `{target_name}` as a type variable"
+            ));
+            diagnostic.annotate(
+                self.context
+                    .secondary(previous_definition.focus_range(db, self.module()))
+                    .message("Previously defined here"),
+            );
+        }
+
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
@@ -1076,15 +1252,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
-            TypeVarKind::Legacy,
+            TypeVarKind::LegacyTypeVar,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
             bound_or_constraints,
-            Some(variance),
+            variance,
             default,
         )))
     }

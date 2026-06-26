@@ -23,6 +23,7 @@ if sys.version_info >= (3, 14):
         pos: int
         lineno: int
         colno: int
+
         @overload
         def __init__(self, msg: str, doc: str, pos: int) -> None: ...
         @overload

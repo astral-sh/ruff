@@ -83,11 +83,7 @@ from _csv import (
 
 if sys.version_info >= (3, 12):
     from _csv import QUOTE_NOTNULL as QUOTE_NOTNULL, QUOTE_STRINGS as QUOTE_STRINGS
-if sys.version_info >= (3, 10):
-    from _csv import Reader, Writer
-else:
-    from _csv import _reader as Reader, _writer as Writer
-
+from _csv import Reader, Writer
 from _typeshed import SupportsWrite
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import GenericAlias
@@ -157,6 +153,7 @@ class DictReader(Generic[_T]):
     reader: Reader
     dialect: _DialectLike
     line_num: int
+
     @overload
     def __init__(
         self,
@@ -193,13 +190,15 @@ class DictReader(Generic[_T]):
         quoting: _QuotingType = 0,
         strict: bool = False,
     ) -> None: ...
+
     def __iter__(self) -> Self: ...
     def __next__(self) -> dict[_T | Any, str | Any]: ...
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class DictWriter(Generic[_T]):
@@ -231,7 +230,8 @@ class DictWriter(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class Sniffer:

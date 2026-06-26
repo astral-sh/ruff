@@ -18,8 +18,8 @@ Module(
                     target: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 4..6,
-                            id: Name("in"),
+                            range: 3..3,
+                            id: Name(""),
                             ctx: Store,
                         },
                     ),
@@ -56,11 +56,5 @@ Module(
 
   |
 1 | for in x: ...
-  |     ^^ Syntax Error: Expected an identifier, but found a keyword `in` that cannot be used here
-  |
-
-
-  |
-1 | for in x: ...
-  |        ^ Syntax Error: Expected `in`, found name
+  |     ^^ Syntax Error: Expected an identifier
   |

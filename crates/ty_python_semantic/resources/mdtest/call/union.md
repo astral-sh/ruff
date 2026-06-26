@@ -100,6 +100,25 @@ def _(flag: bool):
     reveal_type(x)  # revealed: int | str
 ```
 
+## Assigning function-literal unions to callables
+
+A union of function literals must satisfy the target callable with every element.
+
+```py
+from collections.abc import Callable
+
+def accepts_int(callback: Callable[[int], int]) -> None: ...
+def int_callback(value: int) -> int:
+    return value
+
+def str_callback(value: str) -> str:
+    return value
+
+def _(flag: bool) -> None:
+    callback = int_callback if flag else str_callback
+    accepts_int(callback)  # error: [invalid-argument-type]
+```
+
 ## Union of class constructors uses strict checking
 
 A call on a union of class objects must satisfy every constructor.
@@ -269,7 +288,7 @@ def _(
     reveal_type(i)  # revealed: object
 ```
 
-## Cannot use an argument as both a value and a type form
+## A `TypeForm` parameter is a value parameter
 
 ```py
 from ty_extensions import is_singleton
@@ -279,7 +298,7 @@ def _(flag: bool):
         f = repr
     else:
         f = is_singleton
-    # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
+    # `int` is both a regular value for `repr` and a valid `TypeForm` value for `is_singleton`.
     reveal_type(f(int))  # revealed: str | Literal[False]
 ```
 
@@ -293,24 +312,30 @@ from typing import Literal
 
 def _(literals_2: Literal[0, 1], b: bool, flag: bool):
     literals_4 = 2 * literals_2 + literals_2  # Literal[0, 1, 2, 3]
-    literals_16 = 4 * literals_4 + literals_4  # Literal[0, 1, .., 15]
+    literals_8 = 2 * literals_4 + literals_2  # Literal[0, 1, .., 7]
+    literals_16 = 2 * literals_8 + literals_2  # Literal[0, 1, .., 15]
     literals_64 = 4 * literals_16 + literals_4  # Literal[0, 1, .., 63]
     literals_128 = 2 * literals_64 + literals_2  # Literal[0, 1, .., 127]
     literals_256 = 2 * literals_128 + literals_2  # Literal[0, 1, .., 255]
+    literals_512 = 2 * literals_256 + literals_2  # Literal[0, 1, .., 511]
+    literals_1024 = 2 * literals_512 + literals_2  # Literal[0, 1, .., 1023]
+    literals_2048 = 2 * literals_1024 + literals_2  # Literal[0, 1, .., 2047]
+    literals_4096 = 2 * literals_2048 + literals_2  # Literal[0, 1, .., 4095]
+    literals_8192 = 2 * literals_4096 + literals_2  # Literal[0, 1, .., 8191]
 
-    # Going beyond the MAX_NON_RECURSIVE_UNION_LITERALS limit (currently 256):
-    reveal_type(literals_256 if flag else 256)  # revealed: int
+    # Going beyond the MAX_NON_RECURSIVE_UNION_LITERALS limit (currently 8192):
+    reveal_type(literals_8192 if flag else 8192)  # revealed: int
 
     # Going beyond the limit when another type is already part of the union
     bool_and_literals_128 = b if flag else literals_128  # bool | Literal[0, 1, ..., 127]
     literals_128_shifted = literals_128 + 128  # Literal[128, 129, ..., 255]
-    literals_256_shifted = literals_256 + 256  # Literal[256, 257, ..., 511]
+    literals_8192_shifted = literals_8192 + 8192  # Literal[8192, 8193, ..., 16383]
 
     # Now union the two:
     two = bool_and_literals_128 if flag else literals_128_shifted
     # revealed: bool | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
     reveal_type(two)
-    reveal_type(two if flag else literals_256_shifted)  # revealed: int
+    reveal_type(two if flag else literals_8192_shifted)  # revealed: int
 ```
 
 Recursively defined literal union types are widened earlier than non-recursively defined types for
@@ -859,7 +884,7 @@ class Huge(Enum):
     OPTION499 = "499"
 
 def f(x: Intersection[Huge, Not[Literal[Huge.OPTION499]]]):
-    # revealed: Literal[Huge.OPTION0, Huge.OPTION1, Huge.OPTION2, Huge.OPTION3, Huge.OPTION4, Huge.OPTION5, Huge.OPTION6, Huge.OPTION7, Huge.OPTION8, Huge.OPTION9, Huge.OPTION10, Huge.OPTION11, Huge.OPTION12, Huge.OPTION13, Huge.OPTION14, Huge.OPTION15, Huge.OPTION16, Huge.OPTION17, Huge.OPTION18, Huge.OPTION19, Huge.OPTION20, Huge.OPTION21, Huge.OPTION22, Huge.OPTION23, Huge.OPTION24, Huge.OPTION25, Huge.OPTION26, Huge.OPTION27, Huge.OPTION28, Huge.OPTION29, Huge.OPTION30, Huge.OPTION31, Huge.OPTION32, Huge.OPTION33, Huge.OPTION34, Huge.OPTION35, Huge.OPTION36, Huge.OPTION37, Huge.OPTION38, Huge.OPTION39, Huge.OPTION40, Huge.OPTION41, Huge.OPTION42, Huge.OPTION43, Huge.OPTION44, Huge.OPTION45, Huge.OPTION46, Huge.OPTION47, Huge.OPTION48, Huge.OPTION49, Huge.OPTION50, Huge.OPTION51, Huge.OPTION52, Huge.OPTION53, Huge.OPTION54, Huge.OPTION55, Huge.OPTION56, Huge.OPTION57, Huge.OPTION58, Huge.OPTION59, Huge.OPTION60, Huge.OPTION61, Huge.OPTION62, Huge.OPTION63, Huge.OPTION64, Huge.OPTION65, Huge.OPTION66, Huge.OPTION67, Huge.OPTION68, Huge.OPTION69, Huge.OPTION70, Huge.OPTION71, Huge.OPTION72, Huge.OPTION73, Huge.OPTION74, Huge.OPTION75, Huge.OPTION76, Huge.OPTION77, Huge.OPTION78, Huge.OPTION79, Huge.OPTION80, Huge.OPTION81, Huge.OPTION82, Huge.OPTION83, Huge.OPTION84, Huge.OPTION85, Huge.OPTION86, Huge.OPTION87, Huge.OPTION88, Huge.OPTION89, Huge.OPTION90, Huge.OPTION91, Huge.OPTION92, Huge.OPTION93, Huge.OPTION94, Huge.OPTION95, Huge.OPTION96, Huge.OPTION97, Huge.OPTION98, Huge.OPTION99, Huge.OPTION100, Huge.OPTION101, Huge.OPTION102, Huge.OPTION103, Huge.OPTION104, Huge.OPTION105, Huge.OPTION106, Huge.OPTION107, Huge.OPTION108, Huge.OPTION109, Huge.OPTION110, Huge.OPTION111, Huge.OPTION112, Huge.OPTION113, Huge.OPTION114, Huge.OPTION115, Huge.OPTION116, Huge.OPTION117, Huge.OPTION118, Huge.OPTION119, Huge.OPTION120, Huge.OPTION121, Huge.OPTION122, Huge.OPTION123, Huge.OPTION124, Huge.OPTION125, Huge.OPTION126, Huge.OPTION127, Huge.OPTION128, Huge.OPTION129, Huge.OPTION130, Huge.OPTION131, Huge.OPTION132, Huge.OPTION133, Huge.OPTION134, Huge.OPTION135, Huge.OPTION136, Huge.OPTION137, Huge.OPTION138, Huge.OPTION139, Huge.OPTION140, Huge.OPTION141, Huge.OPTION142, Huge.OPTION143, Huge.OPTION144, Huge.OPTION145, Huge.OPTION146, Huge.OPTION147, Huge.OPTION148, Huge.OPTION149, Huge.OPTION150, Huge.OPTION151, Huge.OPTION152, Huge.OPTION153, Huge.OPTION154, Huge.OPTION155, Huge.OPTION156, Huge.OPTION157, Huge.OPTION158, Huge.OPTION159, Huge.OPTION160, Huge.OPTION161, Huge.OPTION162, Huge.OPTION163, Huge.OPTION164, Huge.OPTION165, Huge.OPTION166, Huge.OPTION167, Huge.OPTION168, Huge.OPTION169, Huge.OPTION170, Huge.OPTION171, Huge.OPTION172, Huge.OPTION173, Huge.OPTION174, Huge.OPTION175, Huge.OPTION176, Huge.OPTION177, Huge.OPTION178, Huge.OPTION179, Huge.OPTION180, Huge.OPTION181, Huge.OPTION182, Huge.OPTION183, Huge.OPTION184, Huge.OPTION185, Huge.OPTION186, Huge.OPTION187, Huge.OPTION188, Huge.OPTION189, Huge.OPTION190, Huge.OPTION191, Huge.OPTION192, Huge.OPTION193, Huge.OPTION194, Huge.OPTION195, Huge.OPTION196, Huge.OPTION197, Huge.OPTION198, Huge.OPTION199, Huge.OPTION200, Huge.OPTION201, Huge.OPTION202, Huge.OPTION203, Huge.OPTION204, Huge.OPTION205, Huge.OPTION206, Huge.OPTION207, Huge.OPTION208, Huge.OPTION209, Huge.OPTION210, Huge.OPTION211, Huge.OPTION212, Huge.OPTION213, Huge.OPTION214, Huge.OPTION215, Huge.OPTION216, Huge.OPTION217, Huge.OPTION218, Huge.OPTION219, Huge.OPTION220, Huge.OPTION221, Huge.OPTION222, Huge.OPTION223, Huge.OPTION224, Huge.OPTION225, Huge.OPTION226, Huge.OPTION227, Huge.OPTION228, Huge.OPTION229, Huge.OPTION230, Huge.OPTION231, Huge.OPTION232, Huge.OPTION233, Huge.OPTION234, Huge.OPTION235, Huge.OPTION236, Huge.OPTION237, Huge.OPTION238, Huge.OPTION239, Huge.OPTION240, Huge.OPTION241, Huge.OPTION242, Huge.OPTION243, Huge.OPTION244, Huge.OPTION245, Huge.OPTION246, Huge.OPTION247, Huge.OPTION248, Huge.OPTION249, Huge.OPTION250, Huge.OPTION251, Huge.OPTION252, Huge.OPTION253, Huge.OPTION254, Huge.OPTION255, Huge.OPTION256, Huge.OPTION257, Huge.OPTION258, Huge.OPTION259, Huge.OPTION260, Huge.OPTION261, Huge.OPTION262, Huge.OPTION263, Huge.OPTION264, Huge.OPTION265, Huge.OPTION266, Huge.OPTION267, Huge.OPTION268, Huge.OPTION269, Huge.OPTION270, Huge.OPTION271, Huge.OPTION272, Huge.OPTION273, Huge.OPTION274, Huge.OPTION275, Huge.OPTION276, Huge.OPTION277, Huge.OPTION278, Huge.OPTION279, Huge.OPTION280, Huge.OPTION281, Huge.OPTION282, Huge.OPTION283, Huge.OPTION284, Huge.OPTION285, Huge.OPTION286, Huge.OPTION287, Huge.OPTION288, Huge.OPTION289, Huge.OPTION290, Huge.OPTION291, Huge.OPTION292, Huge.OPTION293, Huge.OPTION294, Huge.OPTION295, Huge.OPTION296, Huge.OPTION297, Huge.OPTION298, Huge.OPTION299, Huge.OPTION300, Huge.OPTION301, Huge.OPTION302, Huge.OPTION303, Huge.OPTION304, Huge.OPTION305, Huge.OPTION306, Huge.OPTION307, Huge.OPTION308, Huge.OPTION309, Huge.OPTION310, Huge.OPTION311, Huge.OPTION312, Huge.OPTION313, Huge.OPTION314, Huge.OPTION315, Huge.OPTION316, Huge.OPTION317, Huge.OPTION318, Huge.OPTION319, Huge.OPTION320, Huge.OPTION321, Huge.OPTION322, Huge.OPTION323, Huge.OPTION324, Huge.OPTION325, Huge.OPTION326, Huge.OPTION327, Huge.OPTION328, Huge.OPTION329, Huge.OPTION330, Huge.OPTION331, Huge.OPTION332, Huge.OPTION333, Huge.OPTION334, Huge.OPTION335, Huge.OPTION336, Huge.OPTION337, Huge.OPTION338, Huge.OPTION339, Huge.OPTION340, Huge.OPTION341, Huge.OPTION342, Huge.OPTION343, Huge.OPTION344, Huge.OPTION345, Huge.OPTION346, Huge.OPTION347, Huge.OPTION348, Huge.OPTION349, Huge.OPTION350, Huge.OPTION351, Huge.OPTION352, Huge.OPTION353, Huge.OPTION354, Huge.OPTION355, Huge.OPTION356, Huge.OPTION357, Huge.OPTION358, Huge.OPTION359, Huge.OPTION360, Huge.OPTION361, Huge.OPTION362, Huge.OPTION363, Huge.OPTION364, Huge.OPTION365, Huge.OPTION366, Huge.OPTION367, Huge.OPTION368, Huge.OPTION369, Huge.OPTION370, Huge.OPTION371, Huge.OPTION372, Huge.OPTION373, Huge.OPTION374, Huge.OPTION375, Huge.OPTION376, Huge.OPTION377, Huge.OPTION378, Huge.OPTION379, Huge.OPTION380, Huge.OPTION381, Huge.OPTION382, Huge.OPTION383, Huge.OPTION384, Huge.OPTION385, Huge.OPTION386, Huge.OPTION387, Huge.OPTION388, Huge.OPTION389, Huge.OPTION390, Huge.OPTION391, Huge.OPTION392, Huge.OPTION393, Huge.OPTION394, Huge.OPTION395, Huge.OPTION396, Huge.OPTION397, Huge.OPTION398, Huge.OPTION399, Huge.OPTION400, Huge.OPTION401, Huge.OPTION402, Huge.OPTION403, Huge.OPTION404, Huge.OPTION405, Huge.OPTION406, Huge.OPTION407, Huge.OPTION408, Huge.OPTION409, Huge.OPTION410, Huge.OPTION411, Huge.OPTION412, Huge.OPTION413, Huge.OPTION414, Huge.OPTION415, Huge.OPTION416, Huge.OPTION417, Huge.OPTION418, Huge.OPTION419, Huge.OPTION420, Huge.OPTION421, Huge.OPTION422, Huge.OPTION423, Huge.OPTION424, Huge.OPTION425, Huge.OPTION426, Huge.OPTION427, Huge.OPTION428, Huge.OPTION429, Huge.OPTION430, Huge.OPTION431, Huge.OPTION432, Huge.OPTION433, Huge.OPTION434, Huge.OPTION435, Huge.OPTION436, Huge.OPTION437, Huge.OPTION438, Huge.OPTION439, Huge.OPTION440, Huge.OPTION441, Huge.OPTION442, Huge.OPTION443, Huge.OPTION444, Huge.OPTION445, Huge.OPTION446, Huge.OPTION447, Huge.OPTION448, Huge.OPTION449, Huge.OPTION450, Huge.OPTION451, Huge.OPTION452, Huge.OPTION453, Huge.OPTION454, Huge.OPTION455, Huge.OPTION456, Huge.OPTION457, Huge.OPTION458, Huge.OPTION459, Huge.OPTION460, Huge.OPTION461, Huge.OPTION462, Huge.OPTION463, Huge.OPTION464, Huge.OPTION465, Huge.OPTION466, Huge.OPTION467, Huge.OPTION468, Huge.OPTION469, Huge.OPTION470, Huge.OPTION471, Huge.OPTION472, Huge.OPTION473, Huge.OPTION474, Huge.OPTION475, Huge.OPTION476, Huge.OPTION477, Huge.OPTION478, Huge.OPTION479, Huge.OPTION480, Huge.OPTION481, Huge.OPTION482, Huge.OPTION483, Huge.OPTION484, Huge.OPTION485, Huge.OPTION486, Huge.OPTION487, Huge.OPTION488, Huge.OPTION489, Huge.OPTION490, Huge.OPTION491, Huge.OPTION492, Huge.OPTION493, Huge.OPTION494, Huge.OPTION495, Huge.OPTION496, Huge.OPTION497, Huge.OPTION498]
+    # revealed: Huge & ~Literal[Huge.OPTION499]
     reveal_type(x)
 ```
 
@@ -907,8 +932,6 @@ def _(flag: bool):
 
 ## Union of intersections with failing bindings
 
-<!-- snapshot-diagnostics -->
-
 When calling a union where one element is an intersection of callables, and all bindings in that
 intersection fail, we should report errors with both union and intersection context.
 
@@ -930,10 +953,61 @@ class BytesCaller:
 
 def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
     # Call with None - should fail for IntCaller, StrCaller, and BytesCaller
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
     f(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `bytes`, found `None`
+   |
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __call__(self, x: bytes) -> bytes:
+   |         ^^^^^^^^       -------- Parameter declared here
+   |
+info: Union variant `BytesCaller` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `int`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self, x: int) -> int:
+  |         ^^^^^^^^       ------ Parameter declared here
+  |
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `str`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __call__(self, x: str) -> str:
+  |         ^^^^^^^^       ------ Parameter declared here
+  |
+info: Intersection element `StrCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 ```
 
 ## Union semantics with constrained callable typevars

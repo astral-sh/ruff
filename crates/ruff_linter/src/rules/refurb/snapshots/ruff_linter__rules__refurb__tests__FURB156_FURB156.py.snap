@@ -12,14 +12,13 @@ FURB156 [*] Use of hardcoded string charset
 5 | _ = "0123456789abcdefABCDEF"
   |
 help: Replace hardcoded charset with `string.digits`
-1 | # Errors
+  |
 2 |
   - _ = "0123456789"
 3 + import string
 4 + _ = string.digits
 5 | _ = "01234567"
-6 | _ = "0123456789abcdefABCDEF"
-7 | _ = "abcdefghijklmnopqrstuvwxyz"
+  |
 
 FURB156 [*] Use of hardcoded string charset
  --> FURB156.py:4:5
@@ -31,15 +30,14 @@ FURB156 [*] Use of hardcoded string charset
 6 | _ = "abcdefghijklmnopqrstuvwxyz"
   |
 help: Replace hardcoded charset with `string.octdigits`
-1 | # Errors
+  |
 2 |
 3 + import string
 4 | _ = "0123456789"
   - _ = "01234567"
 5 + _ = string.octdigits
 6 | _ = "0123456789abcdefABCDEF"
-7 | _ = "abcdefghijklmnopqrstuvwxyz"
-8 | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  |
 
 FURB156 [*] Use of hardcoded string charset
  --> FURB156.py:5:5
@@ -52,7 +50,7 @@ FURB156 [*] Use of hardcoded string charset
 7 | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   |
 help: Replace hardcoded charset with `string.hexdigits`
-1 | # Errors
+  |
 2 |
 3 + import string
 4 | _ = "0123456789"
@@ -60,8 +58,7 @@ help: Replace hardcoded charset with `string.hexdigits`
   - _ = "0123456789abcdefABCDEF"
 6 + _ = string.hexdigits
 7 | _ = "abcdefghijklmnopqrstuvwxyz"
-8 | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-9 | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  |
 
 FURB156 [*] Use of hardcoded string charset
  --> FURB156.py:6:5
@@ -74,17 +71,16 @@ FURB156 [*] Use of hardcoded string charset
 8 | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
   |
 help: Replace hardcoded charset with `string.ascii_lowercase`
-1  | # Errors
-2  |
-3  + import string
-4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
-   - _ = "abcdefghijklmnopqrstuvwxyz"
-7  + _ = string.ascii_lowercase
-8  | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-9  | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-10 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+  |
+2 |
+3 + import string
+4 | _ = "0123456789"
+5 | _ = "01234567"
+6 | _ = "0123456789abcdefABCDEF"
+  - _ = "abcdefghijklmnopqrstuvwxyz"
+7 + _ = string.ascii_lowercase
+8 | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  |
 
 FURB156 [*] Use of hardcoded string charset
  --> FURB156.py:7:5
@@ -97,18 +93,17 @@ FURB156 [*] Use of hardcoded string charset
 9 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
   |
 help: Replace hardcoded charset with `string.ascii_uppercase`
-1  | # Errors
-2  |
-3  + import string
-4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
-7  | _ = "abcdefghijklmnopqrstuvwxyz"
-   - _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-8  + _ = string.ascii_uppercase
-9  | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-10 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
-11 | _ = " \t\n\r\v\f"
+  |
+2 |
+3 + import string
+4 | _ = "0123456789"
+5 | _ = "01234567"
+6 | _ = "0123456789abcdefABCDEF"
+7 | _ = "abcdefghijklmnopqrstuvwxyz"
+  - _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+8 + _ = string.ascii_uppercase
+9 | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:8:5
@@ -121,19 +116,16 @@ FURB156 [*] Use of hardcoded string charset
 10 | _ = " \t\n\r\v\f"
    |
 help: Replace hardcoded charset with `string.ascii_letters`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
-7  | _ = "abcdefghijklmnopqrstuvwxyz"
+--------------------------------------------------------------------------------
 8  | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
    - _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 9  + _ = string.ascii_letters
 10 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
-11 | _ = " \t\n\r\v\f"
-12 |
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:9:5
@@ -145,20 +137,16 @@ FURB156 [*] Use of hardcoded string charset
 10 | _ = " \t\n\r\v\f"
    |
 help: Replace hardcoded charset with `string.punctuation`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
-7  | _ = "abcdefghijklmnopqrstuvwxyz"
-8  | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+--------------------------------------------------------------------------------
 9  | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
    - _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 10 + _ = string.punctuation
 11 | _ = " \t\n\r\v\f"
-12 |
-13 | _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:10:5
@@ -171,21 +159,16 @@ FURB156 [*] Use of hardcoded string charset
 12 | _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
    |
 help: Replace hardcoded charset with `string.whitespace`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-8  | _ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-9  | _ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 10 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
    - _ = " \t\n\r\v\f"
 11 + _ = string.whitespace
 12 |
-13 | _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
-14 | _ = (
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:12:5
@@ -198,21 +181,16 @@ FURB156 [*] Use of hardcoded string charset
 14 |     '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'
    |
 help: Replace hardcoded charset with `string.printable`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-10 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
-11 | _ = " \t\n\r\v\f"
 12 |
    - _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
 13 + _ = string.printable
 14 | _ = (
-15 |     '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'
-16 |     "'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:14:5
@@ -226,22 +204,17 @@ FURB156 [*] Use of hardcoded string charset
 17 |   _ = id("0123"
    |
 help: Replace hardcoded charset with `string.printable`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-12 |
-13 | _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
 14 | _ = (
    -     '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'
    -     "'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
 15 +     string.printable
 16 | )
-17 | _ = id("0123"
-18 |        "4567"
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:17:8
@@ -257,23 +230,18 @@ FURB156 [*] Use of hardcoded string charset
 21 |   _ = (
    |
 help: Replace hardcoded charset with `string.digits`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-15 |     '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'
-16 |     "'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
 17 | )
    - _ = id("0123"
    -        "4567"
    -        "89")
 18 + _ = id(string.digits)
 19 |
-20 | _ = (
-21 |     "0123456789"
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:22:5
@@ -284,21 +252,16 @@ FURB156 [*] Use of hardcoded string charset
 23 | ).capitalize()
    |
 help: Replace hardcoded charset with `string.digits`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-20 |        "89")
-21 |
 22 | _ = (
    -     "0123456789"
 23 +     string.digits
 24 | ).capitalize()
-25 |
-26 | _ = (
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:26:5
@@ -310,21 +273,16 @@ FURB156 [*] Use of hardcoded string charset
 28 | ).capitalize()
    |
 help: Replace hardcoded charset with `string.digits`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-24 | ).capitalize()
-25 |
 26 | _ = (
    -     "0123456789"
 27 +     string.digits
 28 |     # with comment
-29 | ).capitalize()
-30 |
+   |
 
 FURB156 [*] Use of hardcoded string charset
   --> FURB156.py:31:6
@@ -336,18 +294,13 @@ FURB156 [*] Use of hardcoded string charset
 33 | # OK
    |
 help: Replace hardcoded charset with `string.digits`
-1  | # Errors
+   |
 2  |
 3  + import string
 4  | _ = "0123456789"
-5  | _ = "01234567"
-6  | _ = "0123456789abcdefABCDEF"
 --------------------------------------------------------------------------------
-29 | ).capitalize()
-30 |
 31 | # example with augmented assignment
    - _ += "0123456789"
 32 + _ += string.digits
 33 |
-34 | # OK
-35 |
+   |

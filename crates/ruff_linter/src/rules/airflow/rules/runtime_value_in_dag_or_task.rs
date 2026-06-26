@@ -204,7 +204,9 @@ fn find_runtime_varying_call<'a>(
             value,
             generators,
             ..
-        }) => find_runtime_varying_call(key, semantic)
+        }) => key
+            .as_deref()
+            .and_then(|key| find_runtime_varying_call(key, semantic))
             .or_else(|| find_runtime_varying_call(value, semantic))
             .or_else(|| {
                 generators.iter().find_map(|generator| {

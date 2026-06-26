@@ -38,6 +38,35 @@ reveal_type(s1 > s2)  # revealed: bool
 reveal_type(s1 >= s2)  # revealed: bool
 ```
 
+## Stacked with class-preserving decorator
+
+Metadata from `@total_ordering` still applies above an explicitly typed class-preserving decorator:
+
+```py
+from functools import total_ordering
+from typing import TypeVar
+
+T = TypeVar("T", bound=object)
+
+def identity(cls: type[T]) -> type[T]:
+    return cls
+
+@total_ordering
+@identity
+class OrderedIdentity:
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, OrderedIdentity)
+
+    def __lt__(self, other: "OrderedIdentity") -> bool:
+        return True
+
+left = OrderedIdentity()
+right = OrderedIdentity()
+
+reveal_type(left <= right)  # revealed: bool
+reveal_type(left >= right)  # revealed: bool
+```
+
 ## Signature derived from source ordering method
 
 When the source ordering method accepts a broader type (like `object`) for its `other` parameter,

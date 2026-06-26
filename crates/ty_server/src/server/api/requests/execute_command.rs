@@ -5,12 +5,15 @@ use crate::server::api::RequestHandler;
 use crate::server::api::traits::SyncRequestHandler;
 use crate::session::Session;
 use crate::session::client::Client;
+use crate::system::AnySystemPath;
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::ExecuteCommandRequest;
+use lsp_types::{self as types};
 use ruff_db::system::SystemPath;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use std::str::FromStr;
+use ty_module_resolver::ModuleResolveMode;
 use ty_project::Db as _;
 use ty_python_core::program::Program;
 
@@ -70,7 +73,7 @@ impl std::fmt::Display for RunTestArgs {
 pub(crate) struct ExecuteCommand;
 
 impl RequestHandler for ExecuteCommand {
-    type RequestType = req::ExecuteCommand;
+    type RequestType = ExecuteCommandRequest;
 }
 
 impl SyncRequestHandler for ExecuteCommand {
@@ -86,8 +89,10 @@ impl SyncRequestHandler for ExecuteCommand {
             SupportedCommand::Debug => Ok(Some(serde_json::Value::String(
                 debug_information(session).with_failure_code(ErrorCode::InternalError)?,
             ))),
-            SupportedCommand::RunTest => run_test(session, client, params.arguments)
-                .with_failure_code(ErrorCode::InvalidParams),
+            SupportedCommand::RunTest => {
+                run_test(session, client, params.arguments.unwrap_or_default())
+                    .with_failure_code(ErrorCode::InvalidParams)
+            }
         }
     }
 }
@@ -109,11 +114,8 @@ fn run_test(
         ));
     }
     let run_test_args: RunTestArgs = serde_json::from_value(arguments.swap_remove(0))?;
-    let db = session
-        .project_db_for_path(&run_test_args.cwd)
-        .ok_or_else(|| {
-            anyhow::anyhow!("No project database found for path: {}", run_test_args.cwd)
-        })?;
+    let cwd = SystemPath::new(&run_test_args.cwd);
+    let db = session.project_db(&AnySystemPath::System(cwd.to_path_buf()));
     let python_executable = Program::get(db)
         .python_executable(db)
         .as_deref()
@@ -144,19 +146,19 @@ fn run_test(
                 if output.status.success() {
                     client.show_message(
                         format!("passed\n{stdout}\n command: {run_test_args}"),
-                        types::MessageType::INFO,
+                        types::MessageType::Info,
                     );
                 } else {
                     client.show_message(
                         format!("\nfailed\n{stdout}\n{stderr}\n command: {run_test_args}"),
-                        types::MessageType::ERROR,
+                        types::MessageType::Error,
                     );
                 }
             }
             Err(e) => {
                 client.show_message(
                     format!("Failed to run `{run_test_args}`: {e}"),
-                    types::MessageType::ERROR,
+                    types::MessageType::Error,
                 );
             }
         }
@@ -190,13 +192,34 @@ fn debug_information(session: &Session) -> crate::Result<String> {
     writeln!(buffer)?;
 
     for (root, workspace) in session.workspaces() {
-        writeln!(buffer, "Workspace {root} ({})", workspace.url())?;
+        writeln!(buffer, "Workspace {root} ({})", workspace.uri())?;
         writeln!(buffer, "Settings: {:#?}", workspace.settings())?;
         writeln!(buffer)?;
     }
 
     for db in session.project_dbs() {
         writeln!(buffer, "Project at {}", db.project().root(db))?;
+        let program = Program::get(db);
+        writeln!(buffer, "Program:")?;
+        writeln!(
+            buffer,
+            "  python-version: {}",
+            program.python_version_with_source(db).version
+        )?;
+        writeln!(buffer, "  python-platform: {}", program.python_platform(db))?;
+        let mut writer = IndentingWriter {
+            inner: &mut buffer,
+            indent: "  ",
+            at_line_start: false,
+        };
+        writeln!(
+            writer,
+            "  search-paths: {:#}",
+            program
+                .search_paths(db)
+                .display(db, ModuleResolveMode::StubsAllowed)
+        )?;
+
         writeln!(buffer, "Settings: {:#?}", db.project().settings(db))?;
         writeln!(buffer)?;
         writeln!(
@@ -206,4 +229,24 @@ fn debug_information(session: &Session) -> crate::Result<String> {
         )?;
     }
     Ok(buffer)
+}
+
+struct IndentingWriter<'a> {
+    inner: &'a mut String,
+    indent: &'static str,
+    at_line_start: bool,
+}
+
+impl Write for IndentingWriter<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for part in s.split_inclusive('\n') {
+            if self.at_line_start {
+                self.inner.write_str(self.indent)?;
+            }
+            self.inner.write_str(part)?;
+            self.at_line_start = part.ends_with('\n');
+        }
+
+        Ok(())
+    }
 }

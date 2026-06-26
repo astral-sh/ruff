@@ -19,7 +19,7 @@ We don't parenthesize display of an overloaded callable, since it is already wra
 `Overload[...]`:
 
 ```py
-from typing import overload, Callable
+from typing import Callable, Literal, overload
 from ty_extensions import RegularCallableTypeOf
 
 @overload
@@ -29,8 +29,7 @@ def f(x: str) -> str: ...
 def f(x: int | str) -> bool | str:
     return bool(x) if isinstance(x, int) else str(x)
 
-def _(flag: bool, c: RegularCallableTypeOf[f]):
-    x = c if flag else True
+def _(x: RegularCallableTypeOf[f] | Literal[True]):
     reveal_type(x)  # revealed: Overload[(x: int) -> bool, (x: str) -> str] | Literal[True]
 ```
 
@@ -111,8 +110,7 @@ class Bar:
     def g(self, x: Scalar | ArrayNd) -> None:
         pass
 
-# TODO: should be `bound method Bar.g(x: Scalar | ArrayNd) -> None`
-reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | list[Any] | tuple[Any]) -> None
+reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | ArrayNd) -> None
 
 type GenericArray1d[T] = list[T] | tuple[T]
 

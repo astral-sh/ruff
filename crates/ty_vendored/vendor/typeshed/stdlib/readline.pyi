@@ -3,8 +3,7 @@
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Sequence
-from typing import Literal
-from typing_extensions import TypeAlias
+from typing import Literal, TypeAlias
 
 if sys.platform != "win32":
     _Completer: TypeAlias = Callable[[str, int], str | None]
@@ -127,5 +126,6 @@ if sys.platform != "win32":
           function(substitution, [matches], longest_match_length)
         once each time matches need to be displayed.
         """
+
     if sys.version_info >= (3, 13):
         backend: Literal["readline", "editline"]

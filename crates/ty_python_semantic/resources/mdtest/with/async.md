@@ -102,17 +102,18 @@ async def main():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
-async def _(flag: bool):
-    class Manager1:
-        def __aenter__(self) -> str:
-            return "foo"
+class Manager1:
+    def __aenter__(self) -> str:
+        return "foo"
 
-        def __aexit__(self, exc_type, exc_value, traceback): ...
+    def __aexit__(self, exc_type, exc_value, traceback): ...
 
-    class NotAContextManager: ...
-    context_expr = Manager1() if flag else NotAContextManager()
+class NotAContextManager: ...
 
+async def _(context_expr: Manager1 | NotAContextManager):
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly missing"
     async with context_expr as f:
         reveal_type(f)  # revealed: str
@@ -153,8 +154,6 @@ async def main():
 
 ## Accidental use of async `async with`
 
-<!-- snapshot-diagnostics -->
-
 If a asynchronous `async with` statement is used on a type with `__enter__` and `__exit__`, we show
 a diagnostic hint that the user might have intended to use `with` instead.
 
@@ -164,9 +163,20 @@ class Manager:
     def __exit__(self, *args): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
+    # snapshot: invalid-context-manager
     async with Manager():
         pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`
+ --> src/mdtest_snippet.py:7:16
+  |
+7 |     async with Manager():
+  |                ^^^^^^^^^
+  |
+info: Objects of type `Manager` can be used as sync context managers
+info: Consider using `with` here
 ```
 
 ## Incorrect signatures
@@ -235,6 +245,36 @@ reveal_type(connect_iterator)
 async def main_iterator():
     async with connect_iterator() as session:
         reveal_type(session)  # revealed: Session
+```
+
+Generic type parameters are preserved through the decorator:
+
+Regression test for <https://github.com/astral-sh/ty/issues/3692>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def nullcontext[T](value: T) -> AsyncGenerator[T, None]:
+    yield value
+
+# revealed: [T](value: T) -> _AsyncGeneratorContextManager[T, None]
+reveal_type(nullcontext)
+
+async def gen() -> AsyncIterator[str]:
+    yield "hello"
+
+async def main_generic():
+    async with nullcontext(gen()) as lines:
+        reveal_type(lines)  # revealed: AsyncIterator[str]
+        async for line in lines:
+            reveal_type(line)  # revealed: str
 ```
 
 And with `AsyncGeneratorType` return types:

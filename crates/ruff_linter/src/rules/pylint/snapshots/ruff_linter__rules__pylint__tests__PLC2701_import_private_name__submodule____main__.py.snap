@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 256
 ---
 PLC2701 Private name import `_a`
  --> __main__.py:2:6
@@ -77,10 +78,10 @@ PLC2701 Private name import `_ddd` from external module `bbb.ccc`
    |
 
 PLC2701 Private name import `_bar` from external module `foo`
-  --> __main__.py:48:14
+  --> __main__.py:52:14
    |
-46 |         pass
-47 |
-48 | from foo.    _bar import baz
+50 |     return arg
+51 |
+52 | from foo.    _bar import baz
    |              ^^^^
    |

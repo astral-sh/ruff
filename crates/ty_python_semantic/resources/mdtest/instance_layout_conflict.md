@@ -265,6 +265,18 @@ class DD(AA): ...
 class FF(CC, DD): ...  # fine
 ```
 
+CPython's layout check operates on runtime classes, so type arguments in a generic disjoint base's
+inheritance hierarchy do not affect whether the disjoint bases can coexist:
+
+```py
+import asyncio
+from typing import Any
+
+class Future(asyncio.Future[Any]): ...
+class Task(asyncio.Task[Any]): ...
+class SubClass(Task, Future): ...  # fine
+```
+
 ## False negatives
 
 ### Possibly unbound `__slots__`

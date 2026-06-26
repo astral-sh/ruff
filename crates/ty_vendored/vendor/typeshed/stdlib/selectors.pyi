@@ -9,9 +9,7 @@ from _typeshed import FileDescriptor, FileDescriptorLike, Unused
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from typing import Any, Final, NamedTuple
-from typing_extensions import Self, TypeAlias
-
-_EventMask: TypeAlias = int
+from typing_extensions import Self
 
 EVENT_READ: Final = 1
 EVENT_WRITE: Final = 2
@@ -25,7 +23,7 @@ class SelectorKey(NamedTuple):
 
     fileobj: FileDescriptorLike
     fd: FileDescriptor
-    events: _EventMask
+    events: int
     data: Any
 
 class BaseSelector(metaclass=ABCMeta):
@@ -44,7 +42,7 @@ class BaseSelector(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def register(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey:
+    def register(self, fileobj: FileDescriptorLike, events: int, data: Any = None) -> SelectorKey:
         """Register a file object.
 
         Parameters:
@@ -83,7 +81,7 @@ class BaseSelector(metaclass=ABCMeta):
         *not* raise OSError (even if the wrapped syscall does)
         """
 
-    def modify(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey:
+    def modify(self, fileobj: FileDescriptorLike, events: int, data: Any = None) -> SelectorKey:
         """Change a registered file object monitored events or attached data.
 
         Parameters:
@@ -99,7 +97,7 @@ class BaseSelector(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]:
+    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, int]]:
         """Perform the actual selection, until some monitored file objects are
         ready or a timeout expires.
 
@@ -139,20 +137,20 @@ class BaseSelector(metaclass=ABCMeta):
 class _BaseSelectorImpl(BaseSelector, metaclass=ABCMeta):
     """Base selector implementation."""
 
-    def register(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey: ...
+    def register(self, fileobj: FileDescriptorLike, events: int, data: Any = None) -> SelectorKey: ...
     def unregister(self, fileobj: FileDescriptorLike) -> SelectorKey: ...
-    def modify(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey: ...
+    def modify(self, fileobj: FileDescriptorLike, events: int, data: Any = None) -> SelectorKey: ...
     def get_map(self) -> Mapping[FileDescriptorLike, SelectorKey]: ...
 
 class SelectSelector(_BaseSelectorImpl):
     """Select-based selector."""
 
-    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
+    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, int]]: ...
 
 class _PollLikeSelector(_BaseSelectorImpl):
     """Base class shared between poll, epoll and devpoll selectors."""
 
-    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
+    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, int]]: ...
 
 if sys.platform != "win32":
     class PollSelector(_PollLikeSelector):
@@ -174,7 +172,7 @@ if sys.platform != "win32" and sys.platform != "linux":
         """Kqueue-based selector."""
 
         def fileno(self) -> int: ...
-        def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
+        def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, int]]: ...
 
 # Not a real class at runtime, it is just a conditional alias to other real selectors.
 # The runtime logic is more fine-grained than a `sys.platform` check;
@@ -182,6 +180,6 @@ if sys.platform != "win32" and sys.platform != "linux":
 class DefaultSelector(_BaseSelectorImpl):
     """Epoll-based selector."""
 
-    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
+    def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, int]]: ...
     if sys.platform != "win32":
         def fileno(self) -> int: ...

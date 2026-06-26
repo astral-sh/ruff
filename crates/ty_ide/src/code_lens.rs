@@ -161,23 +161,19 @@ def helper():
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
+        assert_snapshot!(test.code_lenses(), @"
         info[code-lens]: Run test: test_foo
          --> test_a.py:2:5
           |
         2 | def test_foo():
           |     ^^^^^^^^
-        3 |     pass
           |
 
         info[code-lens]: Run test: test_bar
          --> test_a.py:5:5
           |
-        3 |     pass
-        4 |
         5 | def test_bar():
           |     ^^^^^^^^
-        6 |     pass
           |
         ");
     }
@@ -199,33 +195,26 @@ class TestFoo:
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
+        assert_snapshot!(test.code_lenses(), @"
         info[code-lens]: Run tests: TestFoo
          --> test_a.py:2:7
           |
         2 | class TestFoo:
           |       ^^^^^^^
-        3 |     def test_bar(self):
-        4 |         pass
           |
 
         info[code-lens]: Run test: TestFoo::test_bar
          --> test_a.py:3:9
           |
-        2 | class TestFoo:
         3 |     def test_bar(self):
           |         ^^^^^^^^
-        4 |         pass
           |
 
         info[code-lens]: Run test: TestFoo::test_baz
          --> test_a.py:6:9
           |
-        4 |         pass
-        5 |
         6 |     def test_baz(self):
           |         ^^^^^^^^
-        7 |         pass
           |
         ");
     }
@@ -247,26 +236,20 @@ class TestMath(BaseTest):
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
+        assert_snapshot!(test.code_lenses(), @"
         info[code-lens]: Run tests: TestMath
-          --> unittest_example.py:8:7
-           |
-         6 |         pass
-         7 |
-         8 | class TestMath(BaseTest):
-           |       ^^^^^^^^
-         9 |     def test_add(self):
-        10 |         self.assertEqual(1 + 1, 2)
-           |
+         --> unittest_example.py:8:7
+          |
+        8 | class TestMath(BaseTest):
+          |       ^^^^^^^^
+          |
 
         info[code-lens]: Run test: TestMath::test_add
-          --> unittest_example.py:9:9
-           |
-         8 | class TestMath(BaseTest):
-         9 |     def test_add(self):
-           |         ^^^^^^^^
-        10 |         self.assertEqual(1 + 1, 2)
-           |
+         --> unittest_example.py:9:9
+          |
+        9 |     def test_add(self):
+          |         ^^^^^^^^
+          |
         ");
     }
 
@@ -333,23 +316,19 @@ async def helper():
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
+        assert_snapshot!(test.code_lenses(), @"
         info[code-lens]: Run test: test_async_foo
          --> test_a.py:2:11
           |
         2 | async def test_async_foo():
           |           ^^^^^^^^^^^^^^
-        3 |     pass
           |
 
         info[code-lens]: Run test: test_async_bar
          --> test_a.py:5:11
           |
-        3 |     pass
-        4 |
         5 | async def test_async_bar():
           |           ^^^^^^^^^^^^^^
-        6 |     pass
           |
         ");
     }
@@ -370,23 +349,19 @@ class TestOuter:
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
+        assert_snapshot!(test.code_lenses(), @"
         info[code-lens]: Run tests: TestOuter
          --> test_a.py:2:7
           |
         2 | class TestOuter:
           |       ^^^^^^^^^
-        3 |     def test_outer(self):
-        4 |         pass
           |
 
         info[code-lens]: Run test: TestOuter::test_outer
          --> test_a.py:3:9
           |
-        2 | class TestOuter:
         3 |     def test_outer(self):
           |         ^^^^^^^^^^
-        4 |         pass
           |
         ");
     }

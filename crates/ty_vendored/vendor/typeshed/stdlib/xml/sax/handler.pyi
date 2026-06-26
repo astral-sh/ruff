@@ -9,7 +9,6 @@ of the interfaces.
 $Id$
 """
 
-import sys
 from typing import Final, NoReturn, Protocol, type_check_only
 from xml.sax import xmlreader
 
@@ -276,51 +275,50 @@ property_encoding: Final = "http://www.python.org/sax/properties/encoding"
 property_interning_dict: Final[str]  # too long string
 all_properties: Final[list[str]]
 
-if sys.version_info >= (3, 10):
-    class LexicalHandler:
-        """Optional SAX2 handler for lexical events.
+class LexicalHandler:
+    """Optional SAX2 handler for lexical events.
 
-        This handler is used to obtain lexical information about an XML
-        document, that is, information about how the document was encoded
-        (as opposed to what it contains, which is reported to the
-        ContentHandler), such as comments and CDATA marked section
-        boundaries.
+    This handler is used to obtain lexical information about an XML
+    document, that is, information about how the document was encoded
+    (as opposed to what it contains, which is reported to the
+    ContentHandler), such as comments and CDATA marked section
+    boundaries.
 
-        To set the LexicalHandler of an XMLReader, use the setProperty
-        method with the property identifier
-        'http://xml.org/sax/properties/lexical-handler'.
+    To set the LexicalHandler of an XMLReader, use the setProperty
+    method with the property identifier
+    'http://xml.org/sax/properties/lexical-handler'.
+    """
+
+    def comment(self, content: str) -> None:
+        """Reports a comment anywhere in the document (including the
+        DTD and outside the document element).
+
+        content is a string that holds the contents of the comment.
         """
 
-        def comment(self, content: str) -> None:
-            """Reports a comment anywhere in the document (including the
-            DTD and outside the document element).
+    def startDTD(self, name: str, public_id: str | None, system_id: str | None) -> None:
+        """Report the start of the DTD declarations, if the document
+        has an associated DTD.
 
-            content is a string that holds the contents of the comment.
-            """
+        A startEntity event will be reported before declaration events
+        from the external DTD subset are reported, and this can be
+        used to infer from which subset DTD declarations derive.
 
-        def startDTD(self, name: str, public_id: str | None, system_id: str | None) -> None:
-            """Report the start of the DTD declarations, if the document
-            has an associated DTD.
+        name is the name of the document element type, public_id the
+        public identifier of the DTD (or None if none were supplied)
+        and system_id the system identifier of the external subset (or
+        None if none were supplied).
+        """
 
-            A startEntity event will be reported before declaration events
-            from the external DTD subset are reported, and this can be
-            used to infer from which subset DTD declarations derive.
+    def endDTD(self) -> None:
+        """Signals the end of DTD declarations."""
 
-            name is the name of the document element type, public_id the
-            public identifier of the DTD (or None if none were supplied)
-            and system_id the system identifier of the external subset (or
-            None if none were supplied).
-            """
+    def startCDATA(self) -> None:
+        """Reports the beginning of a CDATA marked section.
 
-        def endDTD(self) -> None:
-            """Signals the end of DTD declarations."""
+        The contents of the CDATA marked section will be reported
+        through the characters event.
+        """
 
-        def startCDATA(self) -> None:
-            """Reports the beginning of a CDATA marked section.
-
-            The contents of the CDATA marked section will be reported
-            through the characters event.
-            """
-
-        def endCDATA(self) -> None:
-            """Reports the end of a CDATA marked section."""
+    def endCDATA(self) -> None:
+        """Reports the end of a CDATA marked section."""

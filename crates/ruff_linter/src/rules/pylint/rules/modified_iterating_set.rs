@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ModifiedIteratingSet { name } = self;
-        format!("Iterated set `{name}` is modified within the `for` loop",)
+        format!("Iterated set `{name}` is modified within the `for` loop")
     }
 
     fn fix_title(&self) -> String {

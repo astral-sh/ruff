@@ -24,7 +24,7 @@ pub(crate) fn check_pep_613_alias<'db>(
     let mut speculative = builder.speculate();
 
     speculative.typevar_binding_context = Some(definition);
-    speculative.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+    speculative.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
     speculative.infer_type_expression(value);
     Some(speculative.context.finish())
 }

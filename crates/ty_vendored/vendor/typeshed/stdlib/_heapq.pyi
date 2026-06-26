@@ -34,7 +34,7 @@ from typing import Final
 
 __about__: Final[str]
 
-def heapify(heap: list[_T], /) -> None:
+def heapify(heap: list[_T], /) -> None:  # To work around the fact that list is invariant
     """Transform list into a heap, in-place, in O(len(heap)) time."""
 
 def heappop(heap: list[_T], /) -> _T:
@@ -75,8 +75,8 @@ if sys.version_info >= (3, 14):
     def heappushpop_max(heap: list[_T], item: _T, /) -> _T:
         """Maxheap variant of heappushpop.
 
-        The combined action runs more efficiently than heappush_max() followed by
-        a separate call to heappop_max().
+        The combined action runs more efficiently than heappush_max()
+        followed by a separate call to heappop_max().
         """
 
     def heapreplace_max(heap: list[_T], item: _T, /) -> _T:

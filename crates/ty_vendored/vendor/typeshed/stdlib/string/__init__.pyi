@@ -78,16 +78,20 @@ class Template:
         def is_valid(self) -> bool: ...
 
 class Formatter:
+    """See PEP 3101 for details and purpose of this class."""
+
     @overload
     def format(self, format_string: LiteralString, /, *args: LiteralString, **kwargs: LiteralString) -> LiteralString: ...
     @overload
     def format(self, format_string: str, /, *args: Any, **kwargs: Any) -> str: ...
+
     @overload
     def vformat(
         self, format_string: LiteralString, args: Sequence[LiteralString], kwargs: Mapping[LiteralString, LiteralString]
     ) -> LiteralString: ...
     @overload
     def vformat(self, format_string: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> str: ...
+
     def _vformat(  # undocumented
         self,
         format_string: str,
@@ -99,8 +103,24 @@ class Formatter:
     ) -> tuple[str, int]: ...
     def parse(
         self, format_string: StrOrLiteralStr
-    ) -> Iterable[tuple[StrOrLiteralStr, StrOrLiteralStr | None, StrOrLiteralStr | None, StrOrLiteralStr | None]]: ...
-    def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any: ...
+    ) -> Iterable[tuple[StrOrLiteralStr, StrOrLiteralStr | None, StrOrLiteralStr | None, StrOrLiteralStr | None]]:
+        """
+        Return an iterable that contains tuples of the form
+        (literal_text, field_name, format_spec, conversion).
+
+        *field_name* can be None, in which case there's no object
+        to format and output; otherwise, it is looked up and
+        formatted with *format_spec* and *conversion*.
+        """
+
+    def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
+        """Find the object referenced by a given field name.
+
+        The field name *field_name* can be for instance "0.name"
+        or "lookup[3]". The *args* and *kwargs* arguments are
+        passed to get_value().
+        """
+
     def get_value(self, key: int | str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any: ...
     def check_unused_args(self, used_args: set[int | str], args: Sequence[Any], kwargs: Mapping[str, Any]) -> None: ...
     def format_field(self, value: Any, format_spec: str) -> Any: ...

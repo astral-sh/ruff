@@ -45,7 +45,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 pub(crate) struct SliceCopy;
 
 impl Violation for SliceCopy {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -7,6 +7,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
+use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -27,6 +28,7 @@ pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
     ast::CmpOp,
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
+    1,
 >;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,7 +171,33 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
+    let comparison_truthiness = match op {
+        ast::CmpOp::Eq => equality_truthiness(db, left, right),
+        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
+        _ => Truthiness::Ambiguous,
+    };
+    if comparison_truthiness != Truthiness::Ambiguous {
+        return Ok(Type::from_truthiness(db, comparison_truthiness));
+    }
+
     let comparison_result = match (left, right) {
+        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
+            context,
+            complement.remaining_literal_union(db),
+            op,
+            right,
+            range,
+            visitor,
+        )),
+        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison(
+            context,
+            left,
+            op,
+            complement.remaining_literal_union(db),
+            range,
+            visitor,
+        )),
+
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
@@ -527,27 +555,34 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     Some(Ok(result))
                 }
 
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::Eq =>
-                {
-                    Some(Ok(
-                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                            Ok(ty) => ty,
-                            Err(_) => Type::bool_literal(literal_1 == literal_2),
-                        },
-                    ))
+                // Same-kind exact literals and the special relationship between `int` and `bool`
+                // are handled above. Any remaining pair of exact builtin literals compares
+                // unequal. `LiteralString` also compares unequal to non-string literals, but its
+                // comparison with an exact string literal remains ambiguous.
+                (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                )
+                | (
+                    LiteralValueTypeKind::LiteralString,
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                )
+                | (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::LiteralString,
+                ) if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) => {
+                    Some(Ok(Type::bool_literal(op == ast::CmpOp::NotEq)))
                 }
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::NotEq =>
-                {
-                    Some(Ok(
-                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                            Ok(ty) => ty,
-                            Err(_) => Type::bool_literal(literal_1 != literal_2),
-                        },
-                    ))
-                }
-
                 _ => None,
             }
         }
@@ -676,6 +711,17 @@ fn infer_binary_intersection_type_comparison<'db>(
     }
 
     let db = context.db();
+
+    if let Some(alternatives) = intersection.finite_alternative_union(db) {
+        return match intersection_on {
+            IntersectionOn::Left => {
+                infer_binary_type_comparison(context, alternatives, op, other, range, visitor)
+            }
+            IntersectionOn::Right => {
+                infer_binary_type_comparison(context, other, op, alternatives, range, visitor)
+            }
+        };
+    }
 
     // If a comparison yields a definitive true/false answer on a (positive) part
     // of an intersection type, it will also yield a definitive answer on the full
@@ -894,7 +940,7 @@ fn infer_membership_test_comparison<'db>(
         Ok(bindings) => Some(bindings.return_type(db)),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
-        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => right
             .try_iterate(db)
             .map(|_| KnownClass::Bool.to_instance(db))
             .ok(),

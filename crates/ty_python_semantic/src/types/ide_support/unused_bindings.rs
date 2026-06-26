@@ -2,14 +2,15 @@ use crate::Db;
 use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
+use get_size2::GetSize;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
-use ty_python_core::{SemanticIndex, get_loop_header, semantic_index};
+use ty_python_core::{SemanticIndex, semantic_index};
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
 /// unused-binding diagnostics.
@@ -20,9 +21,8 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::AnnotatedAssignment(_)
         | DefinitionKind::For(_)
         | DefinitionKind::Comprehension(_)
-        | DefinitionKind::VariadicPositionalParameter(_)
-        | DefinitionKind::VariadicKeywordParameter(_)
         | DefinitionKind::Parameter(_)
+        | DefinitionKind::LambdaParameter { .. }
         | DefinitionKind::WithItem(_)
         | DefinitionKind::MatchPattern(_)
         | DefinitionKind::ExceptHandler(_) => true,
@@ -40,6 +40,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::ParamSpec(_)
         | DefinitionKind::TypeVarTuple(_)
         | DefinitionKind::LoopHeader(_) => false,
+        DefinitionKind::NestedBindings(_) => false,
     }
 }
 
@@ -57,7 +58,7 @@ fn function_scope_is_overload_declaration(
     function_known_decorator_flags(db, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedBinding {
     pub range: TextRange,
     pub name: Name,
@@ -68,9 +69,10 @@ pub struct UnusedBinding {
 /// This intentionally reports only function-, lambda-, and comprehension-scope bindings.
 /// Module- and class-scope bindings can still be observed indirectly (for example via
 /// imports or attribute access), so reporting them here would risk false positives
-/// without broader reference analysis.
-#[salsa::tracked(returns(ref))]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
+/// without broader reference analysis. Bare local annotations (`x: int`) are also
+/// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
     let parsed = parsed_module(db, file).load(db);
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
@@ -111,7 +113,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                     continue;
                 };
 
-                let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+                let loop_header = use_def_map.loop_header(loop_header_definition.loop_header_id());
                 for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
                     if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());
@@ -160,6 +162,13 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 continue;
             }
 
+            let category = kind.category(is_stub_file, &parsed);
+            if matches!(category, DefinitionCategory::Declaration)
+                && (symbol.is_bound() || symbol.is_used())
+            {
+                continue;
+            }
+
             let range = kind.target_range(&parsed);
 
             unused.push(UnusedBinding {
@@ -172,7 +181,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
     unused.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
     unused.dedup_by_key(|binding| binding.range);
 
-    unused
+    unused.into_boxed_slice()
 }
 
 #[cfg(test)]
@@ -190,7 +199,7 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).clone();
+        let mut bindings = unused_bindings(&db, file).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }
@@ -550,6 +559,69 @@ mod tests {
     }
 
     #[test]
+    fn closure_use_does_not_mark_shadowed_binding_used() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 1
+                x = 2
+
+                def inner():
+                    return x
+
+                return inner
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let first_x_start = TextSize::try_from(source.find("x = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(first_x_start, first_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn skips_binding_captured_by_comprehension_in_nested_function() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer() -> None:
+                a = 1
+
+                def inner() -> list[int]:
+                    return [a + x for x in [1, 2, 3]]
+
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_parameter_captured_by_nested_comprehension() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def foo(i: int):
+                def bar():
+                    return [[k for k in range(i)] for _ in range(2)]
+
+                return bar
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn closure_uses_nearest_shadowed_binding() -> anyhow::Result<()> {
         let source = dedent(
             "
@@ -577,6 +649,58 @@ mod tests {
                 name: Name::new("x"),
             }]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn closure_uses_later_shadowing_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 0
+
+                def mid():
+                    def inner():
+                        return x
+
+                    x = 1
+                    return inner
+
+                return mid
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let outer_x_start = TextSize::try_from(source.find("x = 0").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(outer_x_start, outer_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn nested_comprehension_capture_uses_intermediate_rebindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                a = 1
+
+                def inner():
+                    return [a for _ in range(1)]
+
+                a = 2
+                inner()
+                a = 3
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 
@@ -684,6 +808,62 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_annotation_only_declaration_before_reassignment() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn(value: bool):
+                a: int
+                if value:
+                    a = 1
+                else:
+                    a = 2
+
+                return a
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_annotation_only_declaration_before_unused_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn():
+                a: int
+                a = 1
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let assignment_start = TextSize::try_from(source.rfind("a = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(assignment_start, assignment_start + TextSize::new(1)),
+                name: Name::new("a"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reports_dead_annotation_only_declaration() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def fn():
+                a: int
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, vec!["a"]);
         Ok(())
     }
 

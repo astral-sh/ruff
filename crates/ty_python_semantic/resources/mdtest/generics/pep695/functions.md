@@ -35,6 +35,30 @@ def return_value[T](x: T) -> T:
     return x
 ```
 
+## Compatibility with legacy type variables
+
+A function with its own PEP 695 type parameter list cannot also introduce a legacy type variable.
+Functions without a PEP 695 list can still use the traditional implicit generic-function syntax.
+
+```py
+from typing import TypeVar
+
+K = TypeVar("K")
+L = TypeVar("L")
+
+def identity(value: K) -> K:
+    return value
+
+class C[V]:
+    def legacy(self, value: V, other: K) -> V | K:
+        raise NotImplementedError
+
+    # error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+    # error: [unbound-type-variable] "Legacy type variable `L` cannot be used in a function with PEP 695 type parameters"
+    def mixed[M](self, value: M, other: K, another: L) -> M | K | L:
+        raise NotImplementedError
+```
+
 Each typevar must also appear _somewhere_ in the parameter list:
 
 ```py
@@ -137,6 +161,31 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+Protocol inference should also preserve unions of structurally matching arguments:
+
+```py
+from typing import Protocol
+
+class A:
+    def foo(self) -> "A":
+        raise NotImplementedError
+
+class B:
+    def foo(self) -> "B":
+        raise NotImplementedError
+
+class SupportsFoo[T](Protocol):
+    def foo(self) -> T: ...
+
+def takes_in_supports_foo[T](obj: SupportsFoo[T]) -> T:
+    raise NotImplementedError
+
+def _(a: A, b: B, x: A | B):
+    reveal_type(takes_in_supports_foo(a))  # revealed: A
+    reveal_type(takes_in_supports_foo(b))  # revealed: B
+    reveal_type(takes_in_supports_foo(x))  # revealed: A | B
+```
+
 ## Inferring tuple parameter types
 
 ```py
@@ -175,8 +224,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ## Inferring a bound typevar
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import reveal_type
 
@@ -185,13 +232,26 @@ def f[T: int](x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a constrained typevar
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:9:15
+  |
+9 | reveal_type(f("string"))  # revealed: Unknown
+  |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+  |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | def f[T: int](x: T) -> T:
+  |       ^^^^^^
+  |
+```
 
-<!-- snapshot-diagnostics -->
+## Inferring a constrained typevar
 
 ```py
 from typing_extensions import reveal_type
@@ -202,8 +262,23 @@ def f[T: (int, None)](x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:10:15
+   |
+10 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | def f[T: (int, None)](x: T) -> T:
+  |       ^^^^^^^^^^^^^^
+  |
 ```
 
 ## Typevar constraints
@@ -305,6 +380,23 @@ def two_params[T](x: T, y: T) -> T:
 
 reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
+```
+
+Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
+The recursive call's typevars are inferable at the call site, even though the function body's own
+typevars are non-inferable.
+
+```py
+def recursive_identity[T](t: T) -> T:
+    reveal_type(recursive_identity(t))  # revealed: T@recursive_identity
+    return t
+
+def pair[A, B](a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+def recursive_pair[T](t: T) -> T:
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[T@recursive_pair, Literal[1]]
+    return t
 ```
 
 When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
@@ -575,8 +667,7 @@ be able to unify the two assignments to `A`.
 ```py
 from functions import invoke, Covariant, head_covariant, lift_covariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
+# revealed: int
 reveal_type(invoke(head_covariant, Covariant[int]()))
 # revealed: Covariant[Literal[1]]
 reveal_type(invoke(lift_covariant, 1))
@@ -688,6 +779,52 @@ def decorated[T](t: T) -> None:
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Any, Callable
+
+def my_decorator[T: Callable[..., Any]](f: T) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box[T: Callable[..., Any]]:
+    cls: type[T]
+
+def specialized(box: Box[Callable[..., Any]]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
+```
+
+## Attribute access on TypeVars bounded by `type[...]`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3782>.
+
+```py
+from typing import ClassVar, Self
+
+class A:
+    attr: ClassVar[str]
+    current: ClassVar[Self]
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class B:
+    attr: ClassVar[int]
+
+def single_bound[T: type[A]](cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str
+    reveal_type(cls.current)  # revealed: T'instance@single_bound
+    reveal_type(cls.create())  # revealed: T'instance@single_bound
+
+def union_bound[T: type[A] | type[B]](cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str | int
 ```
 
 ## Solving TypeVars with upper bounds in unions
@@ -936,16 +1073,15 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         raise NotImplementedError
 
-# TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
-# we confuse with "R has no lower bound".
 # revealed: (...) -> Never
 reveal_type(into_regular_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: (...) -> Never
-# revealed: (...) -> Unknown
+# revealed: (...) -> Never
 reveal_type(accepts_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: Never
-# revealed: Unknown
-reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
+
+# Keep this in a function so the top-level mdtest block remains reachable after revealing `Never`.
+def _():
+    # revealed: Never
+    reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
 class Proxy: ...
 

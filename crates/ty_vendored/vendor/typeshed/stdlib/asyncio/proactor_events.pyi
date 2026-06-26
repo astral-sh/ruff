@@ -4,7 +4,6 @@ A proactor is a "notify-on-completion" multiplexer.  Currently a
 proactor is only implemented on Windows with IOCP.
 """
 
-import sys
 from collections.abc import Mapping
 from socket import socket
 from typing import Any, ClassVar, Literal
@@ -30,27 +29,16 @@ class _ProactorBasePipeTransport(transports._FlowControlMixin, transports.BaseTr
 class _ProactorReadPipeTransport(_ProactorBasePipeTransport, transports.ReadTransport):
     """Transport for read pipes."""
 
-    if sys.version_info >= (3, 10):
-        def __init__(
-            self,
-            loop: events.AbstractEventLoop,
-            sock: socket,
-            protocol: streams.StreamReaderProtocol,
-            waiter: futures.Future[Any] | None = None,
-            extra: Mapping[Any, Any] | None = None,
-            server: events.AbstractServer | None = None,
-            buffer_size: int = 65536,
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            loop: events.AbstractEventLoop,
-            sock: socket,
-            protocol: streams.StreamReaderProtocol,
-            waiter: futures.Future[Any] | None = None,
-            extra: Mapping[Any, Any] | None = None,
-            server: events.AbstractServer | None = None,
-        ) -> None: ...
+    def __init__(
+        self,
+        loop: events.AbstractEventLoop,
+        sock: socket,
+        protocol: streams.StreamReaderProtocol,
+        waiter: futures.Future[Any] | None = None,
+        extra: Mapping[Any, Any] | None = None,
+        server: events.AbstractServer | None = None,
+        buffer_size: int = 65536,
+    ) -> None: ...
 
 class _ProactorBaseWritePipeTransport(_ProactorBasePipeTransport, transports.WriteTransport):
     """Transport for write pipes."""

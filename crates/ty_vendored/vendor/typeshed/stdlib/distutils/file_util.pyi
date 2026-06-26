@@ -45,7 +45,6 @@ def copy_file(
     the output file, and 'copied' is true if the file was copied (or would
     have been copied, if 'dry_run' true).
     """
-
 @overload
 def copy_file(
     src: BytesPath,
@@ -57,6 +56,7 @@ def copy_file(
     verbose: bool | Literal[0, 1] = 1,
     dry_run: bool | Literal[0, 1] = 0,
 ) -> tuple[_BytesPathT | bytes, bool]: ...
+
 @overload
 def move_file(
     src: StrPath, dst: _StrPathT, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0
@@ -68,11 +68,11 @@ def move_file(
     Handles cross-device moves on Unix using 'copy_file()'.  What about
     other systems???
     """
-
 @overload
 def move_file(
     src: BytesPath, dst: _BytesPathT, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0
 ) -> _BytesPathT | bytes: ...
+
 def write_file(filename: StrOrBytesPath, contents: Iterable[str]) -> None:
     """Create a file with the specified name and write 'contents' (a
     sequence of strings without line terminators) to it.

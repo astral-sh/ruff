@@ -153,6 +153,10 @@ mod tests {
         Rule::TooManyReturnStatements,
         Path::new("too_many_return_statements.py")
     )]
+    #[test_case(
+        Rule::TooManyStatementsInTryClause,
+        Path::new("too_many_try_statements.py")
+    )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
     #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
     #[test_case(

@@ -3,8 +3,11 @@ use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
+use crate::types::enums::EnumClassLiteral;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{ClassLiteral, KnownClass, Type};
+use ty_python_core::definition::Definition;
+use ty_python_core::{place_table, use_def_map};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -295,7 +298,7 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 
 // This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
 // discriminant.
-#[derive(PartialOrd, Ord, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
@@ -326,6 +329,18 @@ impl std::fmt::Display for IntLiteralType {
 impl std::fmt::Debug for IntLiteralType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.as_i64(), f)
+    }
+}
+
+impl std::cmp::Ord for IntLiteralType {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_i64().cmp(&other.as_i64())
+    }
+}
+
+impl std::cmp::PartialOrd for IntLiteralType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -371,8 +386,8 @@ impl<'db> BytesLiteralType<'db> {
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumLiteralType<'db> {
-    /// A reference to the enum class this literal belongs to
-    pub(crate) enum_class: ClassLiteral<'db>,
+    /// The enum class this literal belongs to.
+    pub(crate) enum_class_literal: EnumClassLiteral<'db>,
     /// The name of the enum member
     #[returns(ref)]
     pub(crate) name: Name,
@@ -382,7 +397,24 @@ pub struct EnumLiteralType<'db> {
 impl get_size2::GetSize for EnumLiteralType<'_> {}
 
 impl<'db> EnumLiteralType<'db> {
+    pub(crate) fn enum_class(self, db: &'db dyn Db) -> ClassLiteral<'db> {
+        self.enum_class_literal(db).class_literal(db)
+    }
+
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let ClassLiteral::Static(class) = self.enum_class(db) else {
+            return None;
+        };
+
+        let scope = class.body_scope(db);
+        let symbol_id = place_table(db, scope).symbol_id(self.name(db))?;
+
+        use_def_map(db, scope)
+            .end_of_scope_symbol_bindings(symbol_id)
+            .find_map(|binding| binding.binding.definition())
     }
 }

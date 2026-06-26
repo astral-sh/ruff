@@ -34,7 +34,6 @@ def make_archive(
     'owner' and 'group' are used when creating a tar archive. By default,
     uses the current owner and group.
     """
-
 @overload
 def make_archive(
     base_name: StrPath,
@@ -46,6 +45,7 @@ def make_archive(
     owner: str | None = None,
     group: str | None = None,
 ) -> str: ...
+
 def make_tarball(
     base_name: str,
     base_dir: StrPath,

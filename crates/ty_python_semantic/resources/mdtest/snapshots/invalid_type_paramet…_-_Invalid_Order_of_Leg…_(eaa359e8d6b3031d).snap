@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -65,9 +65,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |
@@ -88,9 +86,8 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:6:1
-   |
+ 4 |
+ 5 | T2 = TypeVar("T2")
  6 | T3 = TypeVar("T3")
    | ------------------ `T3` defined here
    |
@@ -111,9 +108,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |
@@ -134,9 +129,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |
@@ -151,13 +144,12 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Remove the type parameters from the `Protocol` base
-29 | class VeryBad(
-30 |     # error: [invalid-generic-class]
+   |
 31 |     # error: [invalid-generic-class]
    -     Protocol[T1, T2, DefaultStrT, T3],
 32 +     Protocol,
 33 |     Generic[T1, T2, DefaultStrT, T3],
-34 | ): ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -176,9 +168,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |

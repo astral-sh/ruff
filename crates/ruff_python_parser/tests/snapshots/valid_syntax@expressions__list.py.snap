@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/list.py
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..384,
+        range: 0..397,
         body: [
             Expr(
                 StmtExpr {
@@ -911,6 +911,48 @@ Module(
                                             ],
                                             keywords: [],
                                         },
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 384..396,
+                    value: List(
+                        ExprList {
+                            node_index: NodeIndex(None),
+                            range: 384..396,
+                            elts: [
+                                Compare(
+                                    ExprCompare {
+                                        node_index: NodeIndex(None),
+                                        range: 385..395,
+                                        left: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 385..389,
+                                                id: Name("item"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            In,
+                                        ],
+                                        comparators: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 393..395,
+                                                    id: Name("xs"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
                             ],

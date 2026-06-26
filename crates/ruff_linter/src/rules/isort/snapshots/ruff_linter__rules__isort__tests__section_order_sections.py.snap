@@ -14,6 +14,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |___________________^
   |
 help: Organize imports
+   |
 1  | from __future__ import annotations
 2  +
 3  | import os
@@ -26,3 +27,4 @@ help: Organize imports
 10 | from library import foo
 11 +
 12 | from . import local
+   |

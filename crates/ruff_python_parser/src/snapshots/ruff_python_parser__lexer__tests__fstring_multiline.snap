@@ -5,132 +5,24 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..4,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\nhello\n    world\n",
-        ),
-        4..21,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        21..24,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        25..29,
-        TokenFlags(
-            TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\n    world\nhello\n",
-        ),
-        29..46,
-        TokenFlags(
-            TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        46..49,
-        TokenFlags(
-            TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        50..52,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "some ",
-        ),
-        52..57,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        57..58,
-    ),
-    (
-        FStringStart,
-        58..62,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "multiline\nallowed ",
-        ),
-        62..80,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        80..81,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        81..82,
-    ),
-    (
-        Rbrace,
-        82..83,
-    ),
-    (
-        FStringEnd,
-        83..86,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        Rbrace,
-        86..87,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " string",
-        ),
-        87..94,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        94..95,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Newline,
-        95..95,
-    ),
+    FStringStart 0..4 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    FStringMiddle 4..21 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    FStringEnd 21..24 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    FStringStart 25..29 (flags = TRIPLE_QUOTED_STRING | F_STRING),
+    FStringMiddle 29..46 (flags = TRIPLE_QUOTED_STRING | F_STRING),
+    FStringEnd 46..49 (flags = TRIPLE_QUOTED_STRING | F_STRING),
+    FStringStart 50..52 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 52..57 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 57..58,
+    FStringStart 58..62 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    FStringMiddle 62..80 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    Lbrace 80..81,
+    Name 81..82,
+    Rbrace 82..83,
+    FStringEnd 83..86 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    Rbrace 86..87,
+    FStringMiddle 87..94 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringEnd 94..95 (flags = DOUBLE_QUOTES | F_STRING),
+    Newline 95..95,
 ]
 ```

@@ -186,7 +186,7 @@ But two exceptions to this rule are `object` and `Generic`:
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar("T")
+ProtocolT = TypeVar("ProtocolT")
 
 # Note: pyright and pyrefly do not consider this to be a valid `Protocol` class,
 # but mypy does (and has an explicit test for this behavior). Mypy was the
@@ -197,10 +197,10 @@ class Fine(Protocol, object): ...
 
 reveal_mro(Fine)  # revealed: (<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>)
 
-class StillFine(Protocol, Generic[T], object): ...
+class StillFine(Protocol, Generic[ProtocolT], object): ...
 class EvenThis[T](Protocol, object): ...
-class OrThis(Protocol, Generic[T]): ...
-class AndThis(Protocol, Generic[T], object): ...
+class OrThis(Protocol, Generic[ProtocolT]): ...
+class AndThis(Protocol, Generic[ProtocolT], object): ...
 ```
 
 And multiple inheritance from a mix of protocol and non-protocol classes is fine as long as
@@ -474,6 +474,8 @@ from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
 # revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
 reveal_protocol_interface(Foo)
+# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
+reveal_protocol_interface(protocol=Foo)
 # revealed: {"__index__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsIndex)
 # revealed: {"__abs__": MethodMember(`(self, /) -> Unknown`)}
@@ -696,12 +698,9 @@ class FooSubclassOfAny:
 
 static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
 
-# `FooSubclassOfAny` is assignable to `HasX` for the following reason. The `x` attribute on `FooSubclassOfAny`
-# is accessible on the class itself. When accessing `x` on an instance, the descriptor protocol is invoked, and
-# `__get__` is looked up on `SubclassOfAny`. Every member access on `SubclassOfAny` yields `Any`, so `__get__` is
-# also available, and calling `Any` also yields `Any`. Thus, accessing `x` on an instance of `FooSubclassOfAny`
-# yields `Any`, which is assignable to `int` and vice versa.
-static_assert(is_assignable_to(FooSubclassOfAny, HasX))
+# `FooSubclassOfAny` does not declare `__get__`, so `x` keeps its declared type instead of being
+# read as `Any`.
+static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
     y: int
@@ -1004,7 +1003,11 @@ the class body are disallowed. This is mandated by [the spec][spec_protocol_memb
 > allowed. The rationale for this is that the protocol class implementation is often not shared by
 > subtypes, so the interface should not depend on the default implementation.
 
+Ordinary, annotated, and annotation-only assignments are treated the same:
+
 ```py
+from typing import Any, ClassVar
+
 class Foo(Protocol):
     x: int
     y: str
@@ -1012,22 +1015,62 @@ class Foo(Protocol):
     def __init__(self) -> None:
         self.x = 42  # fine
 
-        self.a = 56  # TODO: should emit diagnostic
-        self.b: int = 128  # TODO: should emit diagnostic
+        self.a = 56  # error: [ambiguous-protocol-member]
+        self.b: int = 128  # error: [ambiguous-protocol-member]
+        self.c: int  # error: [ambiguous-protocol-member]
 
     def non_init_method(self) -> None:
-        self.x = 64  # fine
+        self.x: int = 64  # fine
         self.y = "bar"  # fine
 
-        self.c = 72  # TODO: should emit diagnostic
+        self.d = 72  # error: [ambiguous-protocol-member]
 
-# Note: the list of members does not include `a`, `b` or `c`,
+# Note: the list of members does not include `a`, `b`, `c` or `d`,
 # as none of these attributes is declared in the class body.
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
 ```
 
-If a member is declared in a superclass of a protocol class, it is fine for it to be assigned to in
-the sub-protocol class without a redeclaration:
+An explicit `Any` annotation on `self` does not change the object that Python passes to the method:
+
+```py
+class AnySelf(Protocol):
+    def method(self: Any) -> None:
+        self.attribute = 1  # error: [ambiguous-protocol-member]
+```
+
+Assignments in a comprehension and augmented assignments are also writes to the instance.
+`__getattr__` provides the read side of `+=` below, so that case tests only the write:
+
+```py
+class AssignmentForms(Protocol):
+    def __getattr__(self, name: str) -> int:
+        return 0
+
+    def comprehension(self) -> None:
+        [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
+
+    def augmented_assignment(self) -> None:
+        self.augmented += 1  # snapshot: ambiguous-protocol-member
+```
+
+```snapshot
+warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
+   --> src/mdtest_snippet.py:321:9
+    |
+321 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+    |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
+    |
+info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
+   --> src/mdtest_snippet.py:313:7
+    |
+313 | class AssignmentForms(Protocol):
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
+    |
+info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
+```
+
+If a member is declared in a superclass of a protocol class, the subclass can assign to it in the
+class body or in a method without redeclaring it:
 
 ```py
 class Super(Protocol):
@@ -1036,8 +1079,87 @@ class Super(Protocol):
 class Sub(Super, Protocol):
     x = 42  # no error here, since it's declared in the superclass
 
+    def __init__(self) -> None:
+        self.x = 43  # no error here either
+
 reveal_type(get_protocol_members(Super))  # revealed: frozenset[Literal["x"]]
 reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["x"]]
+```
+
+Assignments through an instance method's `self` parameter or a classmethod's `cls` parameter can
+trigger this diagnostic. Static methods have no implicit receiver, while other parameters and
+methods on concrete subclasses do not affect a protocol's declared interface:
+
+```py
+class Holder:
+    extra: int
+
+class WithStaticMethod(Protocol):
+    @staticmethod
+    def method(value: Holder) -> None:
+        value.extra = 1  # no error
+
+class WithClassMethod(Protocol):
+    @classmethod
+    def method(cls: Any) -> None:
+        cls.extra = 1  # error: [ambiguous-protocol-member]
+
+class WithDeclaredClassVariable(Protocol):
+    extra: ClassVar[int]
+
+    @classmethod
+    def method(cls: Any) -> None:
+        cls.extra = 1  # no error
+
+class WithOtherParameter(Protocol):
+    def method(self, value: Holder) -> None:
+        value.extra = 1  # no error
+
+class ConcreteSubclass(Foo):
+    def method(self) -> None:
+        self.extra = 1  # no error
+```
+
+Assignments can also occur in scopes nested inside a method. A nested class body or function that
+uses the method's `self` still writes to the protocol instance, and a nested function can similarly
+capture a classmethod's `cls`. An inner parameter named `self` refers to another object and is not
+reported:
+
+```py
+class NestedScopes(Protocol):
+    def class_body(self) -> None:
+        class Nested:
+            self.extra = 1  # error: [ambiguous-protocol-member]
+
+    def function(self: Any) -> None:
+        def inner() -> None:
+            self.extra = 1  # error: [ambiguous-protocol-member]
+
+        inner()
+
+    def shadowed(self) -> None:
+        def inner(self: Holder) -> None:
+            self.extra = 1  # no error
+
+        inner(Holder())
+
+    @classmethod
+    def class_method(cls: Any) -> None:
+        def inner() -> None:
+            cls.extra = 1  # error: [ambiguous-protocol-member]
+
+        inner()
+```
+
+The runtime list of protocol members omits some names, including `__doc__`. An explicit declaration
+still permits assignment to the attribute:
+
+```py
+class WithExcludedMember(Protocol):
+    __doc__: str
+
+    def method(self) -> None:
+        self.__doc__ = "Protocol documentation"  # no error
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
@@ -1120,21 +1242,45 @@ is currently understood by ty as being equivalent to `object`, much like `Suppor
 `UniversalSet` above:
 
 ```py
-from typing import Hashable
+from typing import Hashable, Protocol
+
+class SupportsHash(Protocol):
+    def __hash__(self) -> int: ...
 
 static_assert(is_equivalent_to(object, Hashable))
 static_assert(is_assignable_to(object, Hashable))
 static_assert(is_subtype_of(object, Hashable))
+
+def check_object_or_hashable(x: object | Hashable):
+    reveal_type(x)  # revealed: object
+
+def check_hashable_or_object(x: Hashable | object):
+    reveal_type(x)  # revealed: object
+
+def check_hashable_or_supports_hash(x: Hashable | SupportsHash):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_universal(x: Hashable | UniversalSet):
+    reveal_type(x)  # revealed: Hashable
 ```
 
 This means that any type considered assignable to `object` (which is all types) is considered by ty
-to be assignable to `Hashable`. This avoids false positives on code like this:
+to be assignable to `Hashable`. However, ty preserves a non-final nominal type in a union with
+`Hashable` instead of discarding it as redundant. A non-final class can have unhashable subclasses,
+so keeping the corresponding union element retains the annotation's more precise description of
+those subclasses. For example, `list[str]` is unhashable but is a subtype of `Sequence[Hashable]`:
 
 ```py
+from collections.abc import Hashable as AbcHashable
 from typing import Sequence
 from ty_extensions import is_disjoint_from
 
 def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
+def check_hashable_or_sequence(x: Hashable | Sequence[Hashable]):
+    reveal_type(x)  # revealed: Hashable | Sequence[Hashable]
+
+def check_abc_hashable_or_sequence(x: AbcHashable | Sequence[AbcHashable]):
+    reveal_type(x)  # revealed: Hashable | Sequence[Hashable]
 
 takes_hashable_or_sequence(["foo"])  # fine
 takes_hashable_or_sequence(None)  # fine
@@ -1146,8 +1292,75 @@ static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
 static_assert(is_subtype_of(list[str], Sequence[Hashable]))
 ```
 
-but means that ty currently does not detect errors on code like this, which is flagged by other type
-checkers:
+The additional union element is still simplified if it is a final class, because instances of the
+class cannot override their inherited hashability:
+
+```py
+from dataclasses import dataclass
+from typing import final
+
+@final
+class C: ...
+
+@final
+class Unhashable:
+    __hash__: None = None
+
+@final
+class EqOnly:
+    def __eq__(self, other: object, /) -> bool:
+        return False
+
+class EqOnlyBase:
+    def __eq__(self, other: object, /) -> bool:
+        return False
+
+@final
+class EqOnlyChild(EqOnlyBase): ...
+
+@final
+@dataclass
+class UnhashableDataclass: ...
+
+def check_hashable_or_final(x: Hashable | C):
+    reveal_type(x)  # revealed: Hashable
+
+# TODO: Preserve final classes that are known to be unhashable.
+def check_hashable_or_unhashable_final(x: Hashable | Unhashable):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_eq_only(x: Hashable | EqOnly):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_eq_only_child(x: Hashable | EqOnlyChild):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_unhashable_dataclass(x: Hashable | UnhashableDataclass):
+    reveal_type(x)  # revealed: Hashable
+```
+
+The special case is currently limited to nominal instance types:
+
+```py
+from typing import TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Payload(TypedDict):
+    value: int
+
+# TODO: Preserve non-nominal types that can contain unhashable values.
+def check_hashable_or_typevar(x: Hashable | T):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_typed_dict(x: Hashable | Payload):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_protocol(x: Hashable | HasX):
+    reveal_type(x)  # revealed: Hashable
+```
+
+We do not detect errors in cases like the following, which are flagged by other type checkers:
 
 ```py
 def needs_something_hashable(x: Hashable):
@@ -1308,8 +1521,8 @@ static_assert(
 
 static_assert(not is_equivalent_to(GenericProto[str], GenericProto[int]))
 static_assert(not is_equivalent_to(GenericProto[str], LegacyGenericProto[int]))
-static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))
-static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))
+static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))  # error: [missing-type-argument]
+static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))  # error: [missing-type-argument]
 ```
 
 ## Intersections of protocols
@@ -1388,6 +1601,76 @@ class FinalFoo:
     z: None
 
 static_assert(is_disjoint_from(Proto, FinalFoo))
+```
+
+Method members establish disjointness when their non-`Never` return types are disjoint. This is a
+pragmatic approximation: strictly speaking, an implementation returning `Never` could satisfy method
+signatures with otherwise disjoint return types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, Protocol
+from typing_extensions import Never
+from ty_extensions import is_assignable_to, is_disjoint_from, is_subtype_of, static_assert
+
+class HasLengthTwo(Protocol):
+    def __len__(self) -> Literal[2]: ...
+
+class LengthThree:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+class NeverLengthSubclass(LengthThree):
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(is_subtype_of(NeverLengthSubclass, LengthThree))
+static_assert(is_subtype_of(NeverLengthSubclass, HasLengthTwo))
+
+# Intentionally unsound: `NeverLengthSubclass` inhabits both operands,
+# but pragmatically, nobody is ever likely to write such a class
+static_assert(is_disjoint_from(LengthThree, HasLengthTwo))
+```
+
+The same pragmatic approximation applies to fixed-length tuple types. A tuple subclass with a
+`Never`-returning override demonstrates that the disjointness assertion here is also intentionally
+unsound:
+
+```py
+class NeverLengthTupleSubclass(tuple[int, int, int]):
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(is_subtype_of(NeverLengthTupleSubclass, tuple[int, int, int]))
+static_assert(is_subtype_of(NeverLengthTupleSubclass, HasLengthTwo))
+
+# Intentionally unsound: `NeverLengthTupleSubclass` inhabits both operands.
+static_assert(is_disjoint_from(tuple[int, int, int], HasLengthTwo))
+static_assert(not is_disjoint_from(tuple[int, int], HasLengthTwo))
+```
+
+Methods returning `Never` directly cannot establish this pragmatic disjointness. The same applies
+when the return type is a type alias that resolves to `Never`:
+
+```py
+class NeverLength:
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(not is_disjoint_from(NeverLength, HasLengthTwo))
+
+type Bottom = Never
+
+class AliasedNeverLength:
+    def __len__(self) -> Bottom:
+        raise RuntimeError
+
+static_assert(is_assignable_to(AliasedNeverLength, HasLengthTwo))
+static_assert(not is_disjoint_from(AliasedNeverLength, HasLengthTwo))
 ```
 
 ## Intersections of protocols with types that have possibly unbound attributes
@@ -2111,7 +2394,8 @@ S = TypeVar("S")
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
 
-static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+# error: [missing-type-argument]
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [missing-type-argument]
 static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
 
 class NominalGeneric[T]:
@@ -2126,23 +2410,23 @@ def _[T](x: T) -> T:
 class NominalConcrete:
     def method(self, input: int) -> None: ...
 
-static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))
-static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))
-static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))
-static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))
-static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))
-static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
+static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))  # error: [missing-type-argument]
 
 # `NewStyleClassScoped` is implicitly `NewStyleClassScoped[Unknown]`,
 # and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
 # where `Nominal` would not be a subtype of the given materialization,
 # hence there is no subtyping relation:
-static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))
-static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [missing-type-argument]
 
 # Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
-static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))
-static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [missing-type-argument]
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [missing-type-argument]
 
 static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
@@ -2161,10 +2445,10 @@ And they can also have generic contexts scoped to the method:
 class NewStyleFunctionScoped(Protocol):
     def f[T](self, input: T) -> T: ...
 
-S = TypeVar("S")
+FunctionT = TypeVar("FunctionT")
 
 class LegacyFunctionScoped(Protocol):
-    def f(self, input: S) -> S: ...
+    def f(self, input: FunctionT) -> FunctionT: ...
 
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
@@ -2174,7 +2458,7 @@ class NominalNewStyle:
         return input
 
 class NominalLegacy:
-    def f(self, input: S) -> S:
+    def f(self, input: FunctionT) -> FunctionT:
         return input
 
 class NominalWithSelf:
@@ -2840,6 +3124,37 @@ static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))  # err
 static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))  # error: [static-assert-error]
 ```
 
+## Generic protocols and union arguments
+
+When a union is passed to a parameter annotated as a generic protocol, each union element can
+satisfy the protocol with a different specialization. For `IntBox | StrBox` assigned to `Box[T]`,
+`IntBox` satisfies `Box[int]` and `StrBox` satisfies `Box[str]`, so `T` is inferred as `int | str`.
+Other type variables in the same call are still inferred from their corresponding arguments:
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Protocol[T]):
+    def get(self) -> T: ...
+
+class IntBox:
+    def get(self) -> int:
+        return 1
+
+class StrBox:
+    def get(self) -> str:
+        return ""
+
+def infer_protocol_union_box(x: Box[T], y: U) -> tuple[T, U]:
+    raise NotImplementedError
+
+def check_protocol_union_box(x: IntBox | StrBox):
+    reveal_type(infer_protocol_union_box(x, 1))  # revealed: tuple[int | str, Literal[1]]
+```
+
 ## Nominal subtyping of protocols
 
 Protocols can participate in nominal subtyping as well as structural subtyping. The main use case
@@ -2924,14 +3239,14 @@ reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 `typing.SupportsIndex` and `typing.Sized` are two protocols that are very commonly used in the wild.
 
 ```py
-from typing import SupportsIndex, Sized, Literal
+from typing import Any, SupportsIndex, Sized, Literal
 
 def one(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex):
     a: SupportsIndex = some_int
     b: SupportsIndex = some_literal_int
     c: SupportsIndex = some_indexable
 
-def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
+def two(some_list: list[Any], some_tuple: tuple[int, str], some_sized: Sized):
     a: Sized = some_list
     b: Sized = some_tuple
     c: Sized = some_sized
@@ -3248,13 +3563,13 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from typing import cast, Protocol
+from typing import Any, cast, Protocol
 
 class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
-def f(value: Iterator):
-    cast(Iterator, value)  # error: [redundant-cast]
+def f(value: Iterator[Any]):
+    cast(Iterator[Any], value)  # error: [redundant-cast]
 ```
 
 ### Recursive generic protocols
@@ -3347,13 +3662,13 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 
 class Foo[T]: ...
 
 class A(Protocol):
     @property
-    def _(self: "A") -> Foo: ...
+    def _(self: "A") -> Foo[Any]: ...
 
 class B(Protocol):
     @property
@@ -3523,7 +3838,7 @@ def g(x: B2[int]):
     pass
 ```
 
-## The `Generator` protocol's `_ReturnT_co` needs special casing prior to Python 3.13
+## The `Generator` protocol's `_ReturnT_co` needs special casing
 
 The `_ReturnT_co` type parameter in the `Generator` protocol is the value of a `yield from` over
 that generator, and it's also in the pathway for the return values from `async` functions. (In the
@@ -3541,7 +3856,7 @@ returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to
 but it caught the related exception and returned something anyway), but coincidentally it tells ty
 what it needs to know: `_ReturnT_co` is something that some method in this protocol returns.
 Something with a method that returns `float` isn't assignable to something where the same method
-returns `str`. Problem solved.
+returns `str`.
 
 However, prior to 3.13, the `_ReturnT_co` type only appeared in the `__iter__` method.
 Unfortunately, the `__iter__` method on a `Generator` just returns `self`; its return type is the
@@ -3553,8 +3868,11 @@ be. But how we break the cycle isn't really the problem; the problem is that the
 protocol (prior to 3.13) genuinely tells us nothing about how `_ReturnT_co` interacts with
 assignability.
 
-As a special case workaround for this, we compare `Generator` implementations *nominally* when the
-target Python version is 3.12 or earlier in `has_relation_to`.
+As a special case workaround for this, we compare `Generator` implementations *nominally* in
+`has_relation_to`. Prior to Python 3.13, this is necessary because `_ReturnT_co` is not structurally
+visible. As of Python 3.13, it is necessary because structurally inferring through
+`close() -> _ReturnT_co | None` can spuriously infer `None`. The latter workaround can be removed
+once [ty#3596](https://github.com/astral-sh/ty/issues/3596) is fixed.
 
 ```toml
 [environment]
@@ -3594,10 +3912,10 @@ static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProto
 static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
-## The `Generator` protocol's `_ReturnT_co` does not need special casing as of Python 3.13
+## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13
 
 The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
-appears in `Generator`'s `close` method, and no special case is needed.
+appears in `Generator`'s `close` method.
 
 ```toml
 [environment]
@@ -3633,6 +3951,39 @@ static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantPr
 static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
 static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+```
+
+## Inferring async return contexts on Python 3.13 or newer
+
+Regression test for [ty#3583](https://github.com/astral-sh/ty/issues/3583). When inferring the
+generic async call in a return statement, the `Awaitable[int]` context should not infer `None`
+through `Generator.close()`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T", bound=tuple[Any, ...])
+
+class Select(Generic[T]):
+    pass
+
+def first[T](v: T) -> Select[tuple[T]]:
+    raise NotImplementedError
+
+async def second[T](query: Select[tuple[T]]) -> T:
+    raise NotImplementedError
+
+async def variant_one() -> int:
+    result = await second(first(123))
+    return result
+
+async def variant_two() -> int:
+    return await second(first(123))
 ```
 
 ## TODO

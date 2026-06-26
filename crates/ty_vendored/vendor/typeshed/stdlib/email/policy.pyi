@@ -126,6 +126,7 @@ class EmailPolicy(Policy[_MessageT]):
     refold_source: str
     header_factory: Callable[[str, Any], Any]
     content_manager: ContentManager
+
     @overload
     def __init__(
         self: EmailPolicy[EmailMessage],
@@ -160,6 +161,7 @@ class EmailPolicy(Policy[_MessageT]):
         header_factory: Callable[[str, str], str] = ...,
         content_manager: ContentManager = ...,
     ) -> None: ...
+
     def header_source_parse(self, sourcelines: list[str]) -> tuple[str, str]:
         """Given a list of linesep terminated strings constituting the lines of
         a single header, return the (name, value) tuple that should be stored

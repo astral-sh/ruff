@@ -393,7 +393,7 @@ impl UnittestAssert {
                     func: Box::new(node.into()),
                     arguments: Arguments {
                         args: Box::from([(**obj).clone(), (**cls).clone()]),
-                        keywords: Box::from([]),
+                        keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
@@ -442,7 +442,7 @@ impl UnittestAssert {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
                         args: Box::from([(**regex).clone(), (**text).clone()]),
-                        keywords: Box::from([]),
+                        keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },

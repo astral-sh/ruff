@@ -135,6 +135,18 @@ impl<'db> SubclassOfType<'db> {
         self.subclass_of.into_type_var()
     }
 
+    /// Return the exact class-object type of this `type[T]` `TypeVar`'s upper bound, if it has one.
+    ///
+    /// This can only succeed when the upper bound normalizes to a final class.
+    pub(crate) fn exact_typevar_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.into_type_var()
+            .and_then(|typevar| typevar.typevar(db).upper_bound(db))
+            .and_then(|bound| {
+                let bound = Self::try_from_instance(db, bound.resolve_type_alias(db))?;
+                matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
+            })
+    }
+
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -160,12 +172,7 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                if mapped.is_never() {
-                    Type::Never
-                } else {
-                    SubclassOfType::try_from_instance(db, mapped)
-                        .unwrap_or(SubclassOfType::subclass_of_unknown())
-                }
+                mapped.to_meta_type(db)
             }
         }
     }
@@ -309,11 +316,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
+                    target_class.is_object(db) || self.is_eager_assignability(),
                 )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -347,7 +354,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    !left.could_coexist_in_mro_with(db, right, self.constraints),
+                    !left.could_coexist_in_mro_with_disjointness_checker(db, right, self),
                 )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
@@ -440,11 +447,19 @@ impl<'db> SubclassOfInner<'db> {
         })
     }
 
-    /// Transposes `type[T]` with a type variable `T` into `T: type[...]`.
+    /// Converts `type[T]` with a type variable `T` into a type variable whose bound or
+    /// constraints describe the runtime classes of `T`'s possible inhabitants.
+    ///
+    /// For ordinary nominal bounds, this looks like transposing `type[T]` into
+    /// `T: type[...]`. The conversion intentionally goes through [`Type::to_meta_type`],
+    /// though, so bounds such as function-like callables and custom metaclasses keep the
+    /// richer meta-type that callers need instead of collapsing to `type[Unknown]`.
     ///
     /// In particular:
-    /// - If `T` has an upper bound of `T: Bound`, this returns `T: type[Bound]`.
-    /// - If `T` has constraints `T: (A, B)`, this returns `T: (type[A], type[B])`.
+    /// - If `T` has an upper bound of `T: Bound`, this returns `T` with the meta-type of
+    ///   `Bound` as its upper bound.
+    /// - If `T` has constraints `T: (A, B)`, this returns `T` constrained by the meta-types
+    ///   of `A` and `B`.
     /// - Otherwise, for an unbounded type variable, this returns `type[object]`.
     ///
     /// If this is type of a concrete type `C`, returns the type unchanged.
@@ -460,16 +475,12 @@ impl<'db> SubclassOfInner<'db> {
                         .unwrap_or(SubclassOfType::subclass_of_unknown()),
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    TypeVarBoundOrConstraints::UpperBound(
-                        SubclassOfType::try_from_instance(db, bound)
-                            .unwrap_or(SubclassOfType::subclass_of_unknown()),
-                    )
+                    TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
-                        SubclassOfType::try_from_instance(db, *constraint)
-                            .unwrap_or(SubclassOfType::subclass_of_unknown())
-                    }))
+                    TypeVarBoundOrConstraints::Constraints(
+                        constraints.map(db, |constraint| constraint.to_meta_type(db)),
+                    )
                 }
             })
         });

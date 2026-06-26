@@ -36,6 +36,7 @@ export default function Header({
         flex
         justify-between
         antialiased
+        bg-white
         border-b
         border-gray-200
         dark:border-b-radiate
@@ -110,32 +111,22 @@ function Logo({ name, className }: { name: "ruff" | "ty"; className: string }) {
       );
     case "ty":
       return (
-        <svg
-          height={32}
-          viewBox="0 0 640 100"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className={className}
+        <a
+          href="https://docs.astral.sh/ty/"
+          aria-label="ty"
+          title="ty documentation"
         >
-          <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M431.998 9.98526C431.998 4.47055 436.469 0 441.984 0H522.013C527.528 0 531.998 4.47056 531.998 9.98526V100H485.998V70H477.998V100H431.998V9.98526ZM493.998 46V38H469.998V46H493.998Z"
-          />
-          <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M0 9.98526C0 4.47055 4.47055 0 9.98526 0H90.0147C95.5294 0 99.9999 4.47056 99.9999 9.98526V100H54V70H46V100H0V9.98526ZM62 46V38H38V46H62Z"
-          />
-          <path d="M107.998 9.98526C107.998 4.47055 112.469 0 117.983 0H198.013C203.527 0 207.998 4.47055 207.998 9.98526V30H161.998V22H153.998V38H198.013C203.527 38 207.998 42.4706 207.998 47.9853V90.0147C207.998 95.5294 203.527 100 198.013 100H117.983C112.469 100 107.998 95.5294 107.998 90.0147V70L153.998 70V78H161.998V62L117.983 62C112.469 62 107.998 57.5294 107.998 52.0147V9.98526Z" />
-          <path d="M315.998 16H269.998V0H223.998V16H215.998V54H223.998V90.0147C223.998 95.5294 228.469 100 233.983 100H315.998V62H269.998V54H306.013C311.527 54 315.998 49.5294 315.998 44.0147V16Z" />
-          <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M423.998 9.98526C423.998 4.47055 419.528 0 414.013 0H323.998V100H369.998V70H377.998V100H423.998V62H403.998V54H414.013C419.528 54 423.998 49.5294 423.998 44.0147V9.98526ZM385.998 38V46H361.998V38H385.998Z"
-          />
-          <path d="M585.999 62L639.998 62V100H539.999V2.18557e-06L585.999 0L585.999 62Z" />
-        </svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            height="32"
+            viewBox="0 0 48 48"
+          >
+            <path
+              d="M48 7.68H27.84V0H3.84V7.68H0V25.92H3.84V40.2136C3.84 44.5139 7.32607 48 11.6264 48H48V29.76H27.84V25.92H40.2136C44.5139 25.92 48 22.4339 48 18.1336V7.68Z"
+              fill="#46EBE1"
+            ></path>
+          </svg>
+        </a>
       );
   }
 }

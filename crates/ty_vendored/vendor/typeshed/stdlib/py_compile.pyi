@@ -4,7 +4,6 @@ This module has intimate knowledge of the format of .pyc files.
 """
 
 import enum
-import sys
 from typing import AnyStr
 
 __all__ = ["compile", "main", "PyCompileError", "PycInvalidationMode"]
@@ -104,18 +103,4 @@ def compile(
     it was previously.
     """
 
-if sys.version_info >= (3, 10):
-    def main() -> None: ...
-
-else:
-    def main(args: list[str] | None = None) -> int:
-        """Compile several source files.
-
-        The files named in 'args' (or on the command line, if 'args' is
-        not specified) are compiled and the resulting bytecode is cached
-        in the normal manner.  This function does not search a directory
-        structure to locate source files; it only compiles files named
-        explicitly.  If '-' is the only parameter in args, the list of
-        files is taken from standard input.
-
-        """
+def main() -> None: ...

@@ -52,6 +52,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 Parameter::positional_or_keyword(field.name)
                     .with_annotated_type(field.ty)
                     .with_optional_default_type(field.default)
+                    .with_definition(field.definition)
             }));
 
             let signature = Signature::new_generic(
@@ -60,6 +61,15 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 self_ty,
             );
             Some(Type::function_like_callable(db, signature))
+        }
+        "__match_args__" => {
+            if Program::get(db).python_version(db) < PythonVersion::PY310 {
+                return None;
+            }
+
+            // __match_args__: tuple[Literal["field1"], Literal["field2"], ...]
+            let field_types = fields.map(|field| Type::string_literal(db, &field.name));
+            Some(Type::heterogeneous_tuple(db, field_types))
         }
         "_fields" => {
             // _fields: tuple[Literal["field1"], Literal["field2"], ...]
@@ -89,6 +99,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 Parameter::keyword_only(field.name)
                     .with_annotated_type(field.ty)
                     .with_default_type(field.ty)
+                    .with_definition(field.definition)
             }));
 
             let signature = Signature::new(Parameters::new(db, parameters), self_ty);
@@ -115,6 +126,8 @@ pub struct NamedTupleField<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
     pub(crate) default: Option<Type<'db>>,
+    /// The field's first declaration for a class based named tuple.
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
@@ -147,6 +160,22 @@ pub struct DynamicNamedTupleLiteral<'db> {
 }
 
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
+
+impl<'db> DynamicNamedTupleLiteral<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            self.name(db),
+            self.anchor(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
+    }
+}
 
 #[salsa::tracked]
 impl<'db> DynamicNamedTupleLiteral<'db> {
@@ -231,7 +260,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=dynamic_namedtuple_mro_cycle_initial
+        cycle_initial=|db, _, self_| Mro::from_error(
+            db, ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
+        ),
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
@@ -356,7 +387,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     return Some(Type::function_like_callable(db, signature));
                 }
                 // For other field-specific methods, fall through to NamedTupleFallback.
-                "_fields" | "_replace" | "__replace__" => {
+                "__match_args__" | "_fields" | "_replace" | "__replace__" => {
                     return KnownClass::NamedTupleFallback
                         .to_class_literal(db)
                         .as_class_literal()?
@@ -389,7 +420,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // __replace__) don't need this mapping.
         if matches!(
             name,
-            "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
+            "__match_args__" | "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
         ) {
             result
         } else {
@@ -406,7 +437,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
-        #[salsa::tracked(cycle_initial=deferred_spec_initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(
+            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
             let module = parsed_module(db, definition.file(db)).load(db);
             let node = definition
@@ -419,14 +453,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
                 _ => NamedTupleSpec::unknown(db),
             }
-        }
-
-        fn deferred_spec_initial<'db>(
-            db: &'db dyn Db,
-            _id: salsa::Id,
-            _definition: Definition<'db>,
-        ) -> NamedTupleSpec<'db> {
-            NamedTupleSpec::unknown(db)
         }
 
         match self.anchor(db) {
@@ -448,17 +474,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
     }
-}
-
-fn dynamic_namedtuple_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicNamedTupleLiteral<'db>,
-) -> Mro<'db> {
-    Mro::from_error(
-        db,
-        ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
-    )
 }
 
 /// Anchor for identifying a dynamic `namedtuple`/`NamedTuple` class literal.
@@ -518,6 +533,32 @@ pub enum DynamicNamedTupleAnchor<'db> {
     },
 }
 
+impl<'db> DynamicNamedTupleAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::CollectionsDefinition { definition, spec } => Some(Self::CollectionsDefinition {
+                definition: *definition,
+                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+            Self::TypingDefinition(definition) => Some(Self::TypingDefinition(*definition)),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => Some(Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+        }
+    }
+}
+
 /// A specification describing the fields of a dynamic `namedtuple`
 /// or `NamedTuple` class.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -549,15 +590,25 @@ impl<'db> NamedTupleSpec<'db> {
             .fields(db)
             .iter()
             .map(|f| {
+                let ty = f.ty.recursive_type_normalized_impl(db, div, true);
+                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                let default = match f.default {
+                    Some(default) => {
+                        let default = default.recursive_type_normalized_impl(db, div, true);
+                        Some(if nested {
+                            default?
+                        } else {
+                            default.unwrap_or(div)
+                        })
+                    }
+                    None => None,
+                };
+
                 Some(NamedTupleField {
                     name: f.name.clone(),
-                    ty: if nested {
-                        f.ty.recursive_type_normalized_impl(db, div, nested)?
-                    } else {
-                        f.ty.recursive_type_normalized_impl(db, div, nested)
-                            .unwrap_or(div)
-                    },
-                    default: None,
+                    ty,
+                    default,
+                    definition: f.definition,
                 })
             })
             .collect::<Option<Box<_>>>()?;

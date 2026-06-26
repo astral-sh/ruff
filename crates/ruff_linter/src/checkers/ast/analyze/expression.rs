@@ -8,7 +8,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_future_required_preview_generics_enabled, is_up006_future_annotations_fix_enabled,
+    is_future_required_preview_generics_enabled, is_pep604_future_annotations_fix_enabled,
+    is_up006_future_annotations_fix_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -39,6 +40,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && checker.target_version() >= PythonVersion::PY37
                             && checker.semantic.in_annotation()
                             && !checker.settings().pyupgrade.keep_runtime_typing
+                            && !((checker.is_rule_enabled(Rule::NonPEP604AnnotationUnion)
+                                || checker.is_rule_enabled(Rule::NonPEP604AnnotationOptional))
+                                && is_pep604_future_annotations_fix_enabled(checker.settings())
+                                && checker.settings().future_annotations)
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
                                 checker, value,
@@ -52,7 +57,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         if checker.source_type.is_stub()
                             || checker.target_version() >= PythonVersion::PY310
                             || (checker.target_version() >= PythonVersion::PY37
-                                && checker.semantic.future_annotations_or_stub()
+                                && (checker.semantic.future_annotations_or_stub()
+                                    || (is_pep604_future_annotations_fix_enabled(
+                                        checker.settings(),
+                                    ) && checker.settings().future_annotations))
                                 && (checker.semantic.in_annotation()
                                     || checker.semantic.in_string_type_definition())
                                 && !checker.settings().pyupgrade.keep_runtime_typing)
@@ -228,12 +236,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
         }
-        Expr::Name(ast::ExprName {
-            id,
-            ctx,
-            range,
-            node_index: _,
-        }) => {
+        Expr::Name(
+            expr_name @ ast::ExprName {
+                id,
+                ctx,
+                range,
+                node_index: _,
+            },
+        ) => {
             match ctx {
                 ExprContext::Load => {
                     if checker.is_rule_enabled(Rule::TypingTextStrAlias) {
@@ -268,6 +278,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.is_rule_enabled(Rule::Airflow3SuggestedToMoveToProvider) {
                         airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
+                    }
+                    if checker.is_rule_enabled(Rule::LazyImportImmediatelyResolved) {
+                        flake8_tidy_imports::rules::lazy_import_immediately_resolved(
+                            checker, expr_name,
+                        );
                     }
                     if checker.any_rule_enabled(&[
                         Rule::SuspiciousPickleUsage,
@@ -1322,6 +1337,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::Airflow3DagDynamicValue) {
                 airflow::rules::airflow_3_dag_dynamic_value(checker, call);
             }
+            if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
+                airflow::rules::branch_python_operator_as_short_circuit(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }
@@ -1394,6 +1412,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         Expr::Yield(_) => {
             if checker.is_rule_enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::YieldInContextManagerInAsyncGenerator) {
+                flake8_async::rules::yield_in_context_manager_in_async_generator(checker, expr);
             }
         }
         Expr::YieldFrom(_) => {
@@ -1853,7 +1874,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
 
-            if checker.is_rule_enabled(Rule::UnnecessaryComprehension) {
+            if checker.is_rule_enabled(Rule::UnnecessaryComprehension)
+                && let Some(key) = key
+            {
                 flake8_comprehensions::rules::unnecessary_dict_comprehension(
                     checker, expr, key, value, generators,
                 );

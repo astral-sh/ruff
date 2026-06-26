@@ -290,6 +290,32 @@ class C:
         return 1
 ```
 
+### Deleting a read-only property
+
+```py
+class C:
+    @property
+    def attr(self) -> int:
+        return 1
+
+c = C()
+del c.attr  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Cannot delete read-only property `attr` on object of type `C`
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | del c.attr  # snapshot
+  |     ^^^^^^ Attempted deletion of `C.attr` here
+  |
+ ::: src/mdtest_snippet.py:3:9
+  |
+3 |     def attr(self) -> int:
+  |         ---- Property `C.attr` defined here with no deleter
+  |
+```
+
 ## Limitations
 
 ### Manually constructed property

@@ -42,6 +42,65 @@ fn typing_vs_typeshed_no_default() {
     );
 }
 
+fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
+    KnownClass::List
+        .to_specialized_class_type(db, &[argument])
+        .expect("`list` should accept one type argument")
+        .into_generic_alias()
+        .expect("a specialized `list` should be a generic alias")
+}
+
+fn oscillating_generic_alias_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &Type<'db>,
+    current: Type<'db>,
+) -> Type<'db> {
+    current.cycle_normalized(db, *previous, cycle)
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, id| Type::divergent(id),
+    cycle_fn=oscillating_generic_alias_cycle_recover,
+)]
+fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
+    let previous = oscillating_generic_alias(db);
+    let argument = if let Type::GenericAlias(alias) = previous
+        && alias.specialization(db).types(db) == [Type::unknown()]
+    {
+        KnownClass::Int.to_instance(db)
+    } else {
+        Type::unknown()
+    };
+
+    list_alias(db, argument).into()
+}
+
+#[test]
+fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
+    let db = setup_db();
+    let Type::GenericAlias(alias) = oscillating_generic_alias(&db) else {
+        panic!("cycle recovery should preserve the generic alias");
+    };
+
+    assert_eq!(alias.specialization(&db).types(&db), &[Type::unknown()]);
+}
+
+#[test]
+fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
+    let db = setup_db();
+    let int = list_alias(&db, KnownClass::Int.to_instance(&db));
+    let str = list_alias(&db, KnownClass::Str.to_instance(&db));
+    assert!(str.merge_cycle_recovery(&db, int).is_none());
+
+    let generic_context = int.specialization(&db).generic_context(&db);
+    let unknown_generic = Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+    assert!(
+        int.merge_cycle_recovery(&db, list_alias(&db, unknown_generic))
+            .is_none()
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
@@ -264,6 +323,10 @@ fn divergent_type() {
 
     let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
     assert_eq!(union.display(&db).to_string(), "Divergent | int");
+    for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
+        let when = source.when_constraint_set_assignable_to_owned(&db, target);
+        assert!(when.query(|_builder, when| when.is_always_satisfied(&db)));
+    }
     let normalized = union
         .recursive_type_normalized_impl(&db, div, false)
         .unwrap();
@@ -305,6 +368,8 @@ fn type_alias_variance() {
     db.write_dedented(
         "/src/a.py",
         r#"
+from typing import Callable, Concatenate
+
 class Covariant[T]:
     def get(self) -> T:
         raise ValueError
@@ -326,6 +391,13 @@ type CovariantAlias[T] = Covariant[T]
 type ContravariantAlias[T] = Contravariant[T]
 type InvariantAlias[T] = Invariant[T]
 type BivariantAlias[T] = Bivariant[T]
+type CovariantAliasAlias[T] = CovariantAlias[T]
+type ContravariantAliasAlias[T] = ContravariantAlias[T]
+type InvariantAliasAlias[T] = InvariantAlias[T]
+type BivariantAliasAlias[T] = BivariantAlias[T]
+type ParamSpecContravariantAlias[**P] = Callable[P, None]
+type ParamSpecConcatenateAlias[**P] = Callable[Concatenate[int, P], None]
+type ParamSpecBivariantAlias[**P] = int
 
 type RecursiveAlias[T] = None | list[RecursiveAlias[T]]
 type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
@@ -357,6 +429,55 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
             .variance_of(&db, get_bound_typevar(&db, bivariant)),
+        TypeVarVariance::Bivariant
+    );
+
+    let covariant_alias = get_type_alias(&db, "CovariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, covariant_alias)),
+        TypeVarVariance::Covariant
+    );
+
+    let contravariant_alias = get_type_alias(&db, "ContravariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, contravariant_alias)),
+        TypeVarVariance::Contravariant
+    );
+
+    let invariant_alias = get_type_alias(&db, "InvariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, invariant_alias)),
+        TypeVarVariance::Invariant
+    );
+
+    let bivariant_alias = get_type_alias(&db, "BivariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, bivariant_alias)),
+        TypeVarVariance::Bivariant
+    );
+
+    let paramspec_contravariant = get_type_alias(&db, "ParamSpecContravariantAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_contravariant))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_contravariant)),
+        TypeVarVariance::Contravariant
+    );
+
+    let paramspec_concatenate = get_type_alias(&db, "ParamSpecConcatenateAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_concatenate)),
+        TypeVarVariance::Contravariant
+    );
+
+    let paramspec_bivariant = get_type_alias(&db, "ParamSpecBivariantAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_bivariant)),
         TypeVarVariance::Bivariant
     );
 

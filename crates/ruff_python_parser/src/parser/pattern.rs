@@ -1,14 +1,14 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Singleton,
+    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, PatternKeys,
+    Patterns, Singleton,
 };
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 
 use super::expression::ExpressionContext;
@@ -88,6 +88,28 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
+        if let Some(result) =
+            self.with_recursion(|parser| parser.parse_match_pattern_inner(allow_star_pattern))
+        {
+            result
+        } else {
+            let range = self.missing_node_range();
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            let invalid_node = Expr::Name(ast::ExprName {
+                range,
+                id: Name::empty(),
+                ctx: ExprContext::Invalid,
+                node_index: AtomicNodeIndex::NONE,
+            });
+            Pattern::MatchValue(ast::PatternMatchValue {
+                range: invalid_node.range(),
+                value: Box::new(invalid_node),
+                node_index: AtomicNodeIndex::NONE,
+            })
+        }
+    }
+
+    fn parse_match_pattern_inner(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
         let start = self.node_start();
 
         // We don't yet know if it's an or pattern or an as pattern, so use whatever
@@ -124,7 +146,7 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
-            let ident = self.parse_identifier();
+            let ident = self.parse_match_pattern_target();
             lhs = Pattern::MatchAs(ast::PatternMatchAs {
                 range: self.node_range(start),
                 name: Some(ident),
@@ -180,15 +202,15 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut keys = vec![];
-        let mut patterns = vec![];
+        let mut keys = PatternKeys::new();
+        let mut patterns = Patterns::new();
         let mut rest = None;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
             let mapping_item_start = parser.node_start();
 
             if parser.eat(TokenKind::DoubleStar) {
-                let identifier = parser.parse_identifier();
+                let identifier = parser.parse_match_pattern_target();
                 if rest.is_some() {
                     parser.add_error(
                         ParseErrorType::OtherError(
@@ -284,6 +306,20 @@ impl Parser<'_> {
         }
     }
 
+    /// Parses a binding target in an `as` or mapping pattern.
+    fn parse_match_pattern_target(&mut self) -> ast::Identifier {
+        // test_err invalid_match_pattern_target
+        // match value:
+        //     case 1 as _: ...
+        //     case {**_}: ...
+        // after = 1
+        let identifier = self.parse_identifier();
+        if identifier.is_valid() && identifier.id == "_" {
+            self.add_error(ParseErrorType::InvalidMatchPatternTarget, &identifier);
+        }
+        identifier
+    }
+
     /// Parses a parenthesized pattern or a sequence pattern.
     ///
     /// # Panics
@@ -318,7 +354,7 @@ impl Parser<'_> {
 
         if self.eat(parentheses.closing_kind()) {
             return Pattern::MatchSequence(ast::PatternMatchSequence {
-                patterns: vec![],
+                patterns: Vec::new(),
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
             });
@@ -419,9 +455,7 @@ impl Parser<'_> {
                 })
             }
             TokenKind::Complex => {
-                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
-                    unreachable!()
-                };
+                let (real, imag) = self.bump_complex();
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
@@ -435,9 +469,7 @@ impl Parser<'_> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
-                    unreachable!()
-                };
+                let value = self.bump_int();
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
@@ -451,9 +483,7 @@ impl Parser<'_> {
                 })
             }
             TokenKind::Float => {
-                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
-                    unreachable!()
-                };
+                let value = self.bump_float();
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
@@ -503,7 +533,7 @@ impl Parser<'_> {
                         //     case case.bar: ...
                         //     case type.bar: ...
                         //     case match.case.type.bar.type.case.match: ...
-                        let id = Expr::Name(self.parse_name());
+                        let id = Expr::Name(self.parse_name(ExpressionContext::default()));
 
                         let attribute = self.parse_attr_expr_for_match_pattern(id, start);
 
@@ -616,7 +646,11 @@ impl Parser<'_> {
     /// Parses an attribute expression until the current token is not a `.`.
     fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         while self.current_token_kind() == TokenKind::Dot {
-            lhs = Expr::Attribute(self.parse_attribute_expression(lhs, start));
+            lhs = Expr::Attribute(self.parse_attribute_expression(
+                lhs,
+                start,
+                ExpressionContext::default(),
+            ));
         }
 
         lhs
@@ -676,7 +710,7 @@ impl Parser<'_> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut patterns = vec![];
+        let mut patterns = Patterns::new();
         let mut keywords = vec![];
         let mut has_seen_pattern = false;
         let mut has_seen_keyword_pattern = false;

@@ -634,6 +634,17 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         false
     }
 
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope in self.scopes.iter().rev() {
+            match scope {
+                Scope::Comprehension { .. } => {}
+                Scope::Class => return true,
+                Scope::Module | Scope::Function { .. } => return false,
+            }
+        }
+        false
+    }
+
     fn in_module_scope(&self) -> bool {
         self.scopes.len() == 1
     }
@@ -747,7 +758,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.push(Scope::Comprehension {
                     is_async: generators.iter().any(|generator| generator.is_async),
                 });
-                self.visit_expr(key);
+                if let Some(key) = key {
+                    self.visit_expr(key);
+                }
                 self.visit_expr(value);
                 self.scopes.pop().unwrap();
             }

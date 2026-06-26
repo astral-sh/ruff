@@ -30,11 +30,12 @@ if sys.platform != "win32":
 
     # This is actually a function that returns an instance of a class.
     # The class is not accessible directly, and also calls itself select.poll.
+    @final
     class poll:
         """Returns a polling object.
 
-        This object supports registering and unregistering file descriptors, and then
-        polling them for I/O events.
+        This object supports registering and unregistering file descriptors, and
+        then polling them for I/O events.
         """
 
         # default value is select.POLLIN | select.POLLPRI | select.POLLOUT
@@ -43,16 +44,17 @@ if sys.platform != "win32":
         def unregister(self, fd: FileDescriptorLike, /) -> None: ...
         def poll(self, timeout: float | None = None, /) -> list[tuple[int, int]]: ...
 
-_R = TypeVar("_R", default=Never)
-_W = TypeVar("_W", default=Never)
-_X = TypeVar("_X", default=Never)
+_R = TypeVar("_R", default=Never, bound=FileDescriptorLike)
+_W = TypeVar("_W", default=Never, bound=FileDescriptorLike)
+_X = TypeVar("_X", default=Never, bound=FileDescriptorLike)
 
 def select(
     rlist: Iterable[_R], wlist: Iterable[_W], xlist: Iterable[_X], timeout: float | None = None, /
 ) -> tuple[list[_R], list[_W], list[_X]]:
     """Wait until one or more file descriptors are ready for some kind of I/O.
 
-    The first three arguments are iterables of file descriptors to be waited for:
+    The first three arguments are iterables of file descriptors to be waited
+    for:
     rlist -- wait until ready for reading
     wlist -- wait until ready for writing
     xlist -- wait for an "exceptional condition"
@@ -62,12 +64,12 @@ def select(
     gotten from a fileno() method call on one of those.
 
     The optional 4th argument specifies a timeout in seconds; it may be
-    a floating-point number to specify fractions of seconds.  If it is absent
+    a non-integer to specify fractions of seconds.  If it is absent
     or None, the call will never time out.
 
-    The return value is a tuple of three lists corresponding to the first three
-    arguments; each contains the subset of the corresponding file descriptors
-    that are ready.
+    The return value is a tuple of three lists corresponding to the first
+    three arguments; each contains the subset of the corresponding file
+    descriptors that are ready.
 
     *** IMPORTANT NOTICE ***
     On Windows, only sockets are supported; on Unix, all file
@@ -145,7 +147,7 @@ if sys.platform != "linux" and sys.platform != "win32":
               The maximum number of events that the kernel will return.
             timeout
               The maximum time to wait in seconds, or else None to wait forever.
-              This accepts floats for smaller timeouts, too.
+              This accepts non-integers for smaller timeouts, too.
             """
 
         def fileno(self) -> int:
@@ -215,6 +217,7 @@ if sys.platform == "linux":
             "Use `os.set_inheritable()` to make the file descriptor inheritable."
         )
         def __new__(self, sizehint: int = -1, flags: int = 0) -> Self: ...
+
         def __enter__(self) -> Self: ...
         def __exit__(
             self,
@@ -228,6 +231,7 @@ if sys.platform == "linux":
 
             Further operations on the epoll object will raise an exception.
             """
+
         closed: bool
         """True if the epoll handler is closed"""
 
@@ -265,13 +269,13 @@ if sys.platform == "linux":
             """Wait for events on the epoll file descriptor.
 
               timeout
-                the maximum time to wait in seconds (as float);
+                the maximum time to wait in seconds (with fractions);
                 a timeout of None or -1 makes poll wait indefinitely
               maxevents
                 the maximum number of events returned; -1 means no limit
 
-            Returns a list containing any descriptors that have events to report,
-            as a list of (fd, events) 2-tuples.
+            Returns a list containing any descriptors that have events to
+            report, as a list of (fd, events) 2-tuples.
             """
 
         @classmethod
@@ -298,6 +302,7 @@ if sys.platform == "linux":
 
 if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win32":
     # Solaris only
+    @final
     class devpoll:
         def close(self) -> None: ...
         closed: bool

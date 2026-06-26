@@ -1,8 +1,9 @@
 # This py312+ module provides annotations for `sys.monitoring`.
 # It's named `sys._monitoring` in typeshed,
 # because trying to import `sys.monitoring` will fail at runtime!
-# At runtime, `sys.monitoring` has the unique status
+# At runtime, `sys.monitoring` has the unusual status
 # of being a `types.ModuleType` instance that cannot be directly imported,
+# (same as sys._jit)
 # and exists in the `sys`-module namespace despite `sys` not being a package.
 
 import sys

@@ -2,8 +2,9 @@ use std::{path::PathBuf, sync::Arc};
 
 use thiserror::Error;
 
-use ruff_linter::RuleSelector;
+use ruff_linter::UnresolvedRuleSelector;
 use ruff_linter::line_width::LineLength;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_workspace::options::Options;
 
 use crate::{
@@ -86,9 +87,9 @@ pub(crate) struct EditorSettings {
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
     pub(super) format_backend: Option<FormatBackend>,
-    pub(super) select: Option<Vec<RuleSelector>>,
-    pub(super) extend_select: Option<Vec<RuleSelector>>,
-    pub(super) ignore: Option<Vec<RuleSelector>>,
+    pub(super) select: Option<Vec<UnresolvedRuleSelector>>,
+    pub(super) extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    pub(super) ignore: Option<Vec<UnresolvedRuleSelector>>,
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
     pub(super) configuration_preference: ConfigurationPreference,
@@ -111,6 +112,7 @@ impl TryFrom<ClientConfiguration> for ResolvedConfiguration {
                 PathBuf::from(shellexpand::full(&path)?.as_ref()),
             )),
             ClientConfiguration::Object(map) => {
+                let _guard = ValueSourceGuard::new(ValueSource::Editor, false);
                 let options = toml::Table::try_from(map)?.try_into::<Options>()?;
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)

@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::request::CodeLensRequest;
-use lsp_types::{CodeLens, CodeLensParams, Url};
+use lsp_types::{CodeLens, CodeLensParams, CodeLensRequest, Uri};
 use ty_ide::{CodeLensCommand, code_lens};
 use ty_project::{Db as _, ProjectDatabase};
 use ty_python_core::program::Program;
@@ -22,7 +21,7 @@ impl RequestHandler for CodeLensRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
-    fn document_url(params: &CodeLensParams) -> Cow<'_, Url> {
+    fn document_uri(params: &CodeLensParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -70,6 +69,7 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
                     range: range.local_range(),
                     command: Some(lsp_types::Command {
                         title: item.title,
+                        tooltip: None,
                         command: SupportedCommand::RunTest.identifier().to_string(),
                         arguments: Some(vec![args]),
                     }),

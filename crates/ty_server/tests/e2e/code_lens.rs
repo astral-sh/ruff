@@ -1,7 +1,7 @@
 use anyhow::Result;
 use lsp_types::{
-    CodeLensParams, PartialResultParams, TextDocumentIdentifier, WorkDoneProgressParams,
-    notification::PublishDiagnostics,
+    CodeLensParams, PartialResultParams, PublishDiagnosticsNotification, TextDocumentIdentifier,
+    WorkDoneProgressParams,
 };
 use ruff_db::system::SystemPath;
 use serde_json::json;
@@ -20,9 +20,9 @@ fn code_lens_request(server: &mut TestServer, file: &SystemPath) -> Vec<lsp_type
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
     };
-    let id = server.send_request::<lsp_types::request::CodeLensRequest>(params);
+    let id = server.send_request::<lsp_types::CodeLensRequest>(params);
     server
-        .await_response::<lsp_types::request::CodeLensRequest>(&id)
+        .await_response::<lsp_types::CodeLensRequest>(&id)
         .unwrap_or_default()
 }
 
@@ -95,7 +95,7 @@ def helper():
     let mut server = build_server_with_python_env(workspace_root, test_file, test_content)?;
 
     server.open_text_document(test_file, test_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
     let lenses = code_lens_request(&mut server, test_file);
 
@@ -156,7 +156,7 @@ class TestFoo:
     let mut server = build_server_with_python_env(workspace_root, test_file, test_content)?;
 
     server.open_text_document(test_file, test_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
     let lenses = code_lens_request(&mut server, test_file);
 
@@ -247,7 +247,7 @@ def test_add():
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(test_file, test_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
     let lenses = code_lens_request(&mut server, test_file);
 

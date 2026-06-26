@@ -1,6 +1,7 @@
 [package]
 name = "ty_project"
 version = "0.0.0"
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -22,20 +23,23 @@ ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
+ruff_ranged_value = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_static = { workspace = true }
-ty_python_core = { workspace = true, features = ["schemars"] }
+ty_python_core = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bitvec = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
 get-size2 = { workspace = true, features = ["ordermap"] }
 globset = { workspace = true }
+ignore = { workspace = true }
 notify = { workspace = true }
 ordermap = { workspace = true, features = ["serde"] }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
@@ -55,7 +59,7 @@ toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"] }
+ruff_db = { workspace = true, features = ["os", "testing"] }
 
 insta = { workspace = true, features = ["redactions", "ron"] }
 
@@ -66,6 +70,7 @@ schemars = [
     "dep:schemars",
     "ruff_db/schemars",
     "ruff_python_ast/schemars",
+    "ruff_ranged_value/schemars",
     "ty_python_semantic/schemars",
     "ty_python_core/schemars",
 ]

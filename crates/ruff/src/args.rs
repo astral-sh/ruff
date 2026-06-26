@@ -23,9 +23,10 @@ use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
 };
-use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, UnresolvedRuleSelector, UnresolvedRuleSelectorParser};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -43,7 +44,8 @@ pub struct GlobalConfigArgs {
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair
     /// (such as you might find in a `ruff.toml` configuration file)
-    /// overriding a specific configuration option.
+    /// overriding a specific configuration option
+    /// (e.g., `--config "lint.line-length = 100"` or `--config "format.quote-style = 'single'"`).
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
@@ -289,41 +291,41 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    pub select: Option<Vec<UnresolvedRuleSelector>>,
     /// Comma-separated list of rule codes to disable.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --select, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_select: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --ignore. (Deprecated: You can just use --ignore instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
+    pub extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
     /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
@@ -351,41 +353,41 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub fixable: Option<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<UnresolvedRuleSelector>>,
     /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub unfixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --fixable, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
+    pub extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    pub extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -980,6 +982,8 @@ impl TypedValueParser for ConfigArgumentParser {
             }
         }
 
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
+
         let config_parse_error = match toml::Table::from_str(value) {
             Ok(table) => match table.try_into::<Options>() {
                 Ok(option) => {
@@ -1346,20 +1350,20 @@ struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
     extend_exclude: Option<Vec<FilePattern>>,
-    extend_fixable: Option<Vec<RuleSelector>>,
-    extend_ignore: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
-    fixable: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
     line_length: Option<LineLength>,
     per_file_ignores: Option<Vec<PatternPrefixPair>>,
     extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
-    select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     target_version: Option<ast::PythonVersion>,
-    unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,
     fix: Option<bool>,
@@ -1472,7 +1476,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();
+    let mut per_file_ignores: FxHashMap<String, Vec<UnresolvedRuleSelector>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
@@ -1481,6 +1485,6 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes, None))
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, None))
         .collect()
 }

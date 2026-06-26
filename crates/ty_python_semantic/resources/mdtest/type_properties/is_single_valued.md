@@ -2,9 +2,10 @@
 
 A type is single-valued iff it is not empty and all inhabitants of it compare equal.
 
-```py
+```pyi
 import types
-from typing_extensions import Any, Literal, LiteralString, Never, Callable
+from types import UnionType
+from typing_extensions import Any, Literal, LiteralString, Never, Callable, TypeAliasType
 from ty_extensions import is_single_valued, static_assert, TypeOf
 
 static_assert(is_single_valued(None))
@@ -44,6 +45,10 @@ static_assert(not is_single_valued(MultiValuedHeterogeneousTupleSubclass))
 static_assert(not is_single_valued(Callable[..., None]))
 static_assert(not is_single_valued(Callable[[int, str], None]))
 
+static_assert(not is_single_valued(TypeAliasType))
+static_assert(not is_single_valued(UnionType))
+static_assert(is_single_valued(TypeOf[list[int]]))
+
 class A:
     def method(self): ...
 
@@ -57,7 +62,7 @@ An enum literal is only considered single-valued if it has no custom `__eq__`/`_
 these methods always return `True`/`False`, respectively. Otherwise, the single member of the enum
 literal type might not compare equal to itself.
 
-```py
+```pyi
 from ty_extensions import is_single_valued, static_assert, TypeOf
 from enum import Enum
 
@@ -100,6 +105,16 @@ class IntEnum(int, Enum):
 static_assert(is_single_valued(Literal[NormalEnum.NO]))
 static_assert(is_single_valued(Literal[NormalEnum.YES]))
 static_assert(not is_single_valued(NormalEnum))
+
+def _(value: NormalEnum) -> None:
+    if value is NormalEnum.NO:
+        return
+    static_assert(is_single_valued(TypeOf[value]))
+
+def _(value: NormalEnum & Any) -> None:
+    if value is NormalEnum.NO:
+        return
+    static_assert(not is_single_valued(TypeOf[value]))
 
 static_assert(is_single_valued(Literal[SingleValuedEnum.VALUE]))
 static_assert(is_single_valued(SingleValuedEnum))

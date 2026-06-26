@@ -32,17 +32,29 @@ impl TryNodeContextStackManager {
         self.current_try_context_stack().push_context();
     }
 
-    /// Pop a [`TryNodeContext`] off the [`TryNodeContextStack`]
-    /// at the top of our stack of stacks. Return the Vec of [`FlowSnapshot`]s
-    /// recorded while we were visiting the `try` suite.
-    pub(super) fn pop_context(&mut self) -> Vec<FlowSnapshot> {
+    /// Pop a [`TryNodeContext`] off the [`TryNodeContextStack`] at the top of our stack of stacks.
+    pub(super) fn pop_context(&mut self) -> TryNodeContext {
         self.current_try_context_stack().pop_context()
+    }
+
+    /// Retrieve the [`TryNodeContext`] that is currently at the top of the stack, and take all
+    /// snapshots recorded while visiting the `try` suite.
+    pub(super) fn take_try_suite_snapshots(&mut self) -> Vec<FlowSnapshot> {
+        self.current_try_context_stack().take_try_suite_snapshots()
     }
 
     /// Retrieve the stack that is at the top of our stack of stacks.
     /// For each `try` block on that stack, push the snapshot onto the `try` block
     pub(super) fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
         self.current_try_context_stack().record_definition(builder);
+    }
+
+    /// Retrieve the stack that is at the top of our stack of stacks.
+    /// Push the snapshot onto the innermost `try` block's terminal-entry snapshots for its
+    /// `finally` suite.
+    pub(super) fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
+        self.current_try_context_stack()
+            .record_terminal_finally_entry(builder);
     }
 
     /// Retrieve the [`TryNodeContextStack`] that is relevant for the current scope.
@@ -64,22 +76,36 @@ impl TryNodeContextStack {
         self.0.push(TryNodeContext::default());
     }
 
-    /// Pop a [`TryNodeContext`] off the stack. Return the Vec of [`FlowSnapshot`]s
-    /// recorded while we were visiting the `try` suite.
-    fn pop_context(&mut self) -> Vec<FlowSnapshot> {
-        let TryNodeContext {
-            try_suite_snapshots,
-        } = self
-            .0
+    /// Pop a [`TryNodeContext`] off the stack.
+    fn pop_context(&mut self) -> TryNodeContext {
+        self.0
             .pop()
-            .expect("Cannot pop a `try` block off an empty `TryBlockContexts` stack");
-        try_suite_snapshots
+            .expect("Cannot pop a `try` block off an empty `TryBlockContexts` stack")
+    }
+
+    /// Take all snapshots recorded while visiting the `try` suite.
+    fn take_try_suite_snapshots(&mut self) -> Vec<FlowSnapshot> {
+        std::mem::take(
+            &mut self
+                .0
+                .last_mut()
+                .expect("Cannot take snapshots from an empty `TryBlockContexts` stack")
+                .try_suite_snapshots,
+        )
     }
 
     /// For each `try` block on the stack, push the snapshot onto the `try` block
     fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
         for context in &mut self.0 {
             context.record_definition(builder.flow_snapshot());
+        }
+    }
+
+    /// Push the snapshot onto the innermost `try` block's terminal-entry snapshots for its
+    /// `finally` suite.
+    fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
+        if let Some(context) = self.0.last_mut() {
+            context.record_terminal_finally_entry(builder.flow_snapshot());
         }
     }
 }
@@ -90,13 +116,24 @@ impl TryNodeContextStack {
 /// It will likely be necessary to add more fields to this struct in the future
 /// when we add more advanced handling of `finally` branches.
 #[derive(Debug, Default)]
-struct TryNodeContext {
+pub(super) struct TryNodeContext {
     try_suite_snapshots: Vec<FlowSnapshot>,
+    terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
 impl TryNodeContext {
+    pub(super) fn into_terminal_finally_entry_snapshots(self) -> Vec<FlowSnapshot> {
+        self.terminal_finally_entry_snapshots
+    }
+
     /// Take a record of what the internal state looked like after a definition
     fn record_definition(&mut self, snapshot: FlowSnapshot) {
         self.try_suite_snapshots.push(snapshot);
+    }
+
+    /// Take a record of what the internal state looked like before a terminal control-flow
+    /// transfer that will pass through the `finally` suite.
+    fn record_terminal_finally_entry(&mut self, snapshot: FlowSnapshot) {
+        self.terminal_finally_entry_snapshots.push(snapshot);
     }
 }

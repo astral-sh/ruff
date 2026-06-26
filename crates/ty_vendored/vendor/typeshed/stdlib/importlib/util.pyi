@@ -15,8 +15,8 @@ from importlib._bootstrap_external import (
 )
 from importlib.abc import Loader
 from types import TracebackType
-from typing import Literal
-from typing_extensions import ParamSpec, Self, deprecated
+from typing import Literal, ParamSpec
+from typing_extensions import Self, deprecated
 
 _P = ParamSpec("_P")
 

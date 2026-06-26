@@ -6,4 +6,23 @@ invalid-syntax: assignment expression cannot rebind comprehension variable
   |
 1 | [x:= 2 for x in range(2)]
   |  ^
+2 | [x for x in (lambda: (y := [1]))()]
+  |
+
+invalid-syntax: assignment expression cannot be used in a comprehension iterable expression
+ --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:2:23
+  |
+1 | [x:= 2 for x in range(2)]
+2 | [x for x in (lambda: (y := [1]))()]
+  |                       ^^^^^^^^
+3 |
+4 | class C:
+  |
+
+invalid-syntax: assignment expression within a comprehension cannot be used in a class body
+ --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:5:7
+  |
+4 | class C:
+5 |     [(x := y) for y in range(3)]
+  |       ^^^^^^
   |

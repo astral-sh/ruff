@@ -284,10 +284,9 @@ pub(crate) fn typing_only_runtime_import(
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
-        // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().future_annotations
-            && !checker.settings().flake8_type_checking.strict
+        // If we're in un-strict mode, don't flag typing-only imports that are
+        // implicitly loaded by way of a valid runtime import.
+        if !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -397,6 +396,10 @@ pub(crate) fn typing_only_runtime_import(
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each statement group produces diagnostics and a fix independently"
+    )]
     for ((node_id, import_type), imports) in errors_by_statement {
         let fix = fix_imports(checker, node_id, &imports).ok();
 
@@ -424,6 +427,10 @@ pub(crate) fn typing_only_runtime_import(
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each ignored statement group produces diagnostics independently"
+    )]
     for ((_, import_type), imports) in ignores_by_statement {
         for ImportBinding {
             import,

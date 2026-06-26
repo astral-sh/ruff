@@ -1,4 +1,4 @@
-use super::{ArgumentForms, Binding, Bindings, CallableBinding, CallableItem};
+use super::{Binding, Bindings, CallableBinding, CallableItem};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -65,13 +65,8 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     /// Match parameters for this constructor method and downstream constructors.
-    pub(super) fn match_parameters(
-        &mut self,
-        db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
-        argument_forms: &mut ArgumentForms,
-    ) {
-        self.entry.match_parameters(db, arguments, argument_forms);
+    pub(super) fn match_parameters(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
+        self.entry.match_parameters(db, arguments);
 
         // We don't know at this point whether we'll need to check downstream constructors or not
         // (since we can't resolve return types yet), so we match parameters for all downstream
@@ -89,7 +84,7 @@ impl<'db> ConstructorBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) -> Option<ArgumentForms> {
+    ) {
         /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
         /// analyze their overloads to determine whether to check downstream constructors.
         ///
@@ -125,8 +120,7 @@ impl<'db> ConstructorBinding<'db> {
             })
         }
 
-        let forms = self
-            .entry
+        self.entry
             .check_types(db, constraints, argument_types, call_expression_tcx);
 
         // Now that we've fully checked our own callable, we can determine whether downstream
@@ -135,8 +129,6 @@ impl<'db> ConstructorBinding<'db> {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
         }
-
-        forms
     }
 
     /// Check types for downstream constructors, if any.
@@ -173,12 +165,9 @@ impl<'db> ConstructorBinding<'db> {
     where
         F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
     {
-        // We only ever map constructor bindings before we set their downstream constructor; don't
-        // spend complexity on dead code.
-        assert!(
-            self.downstream_constructor.is_none(),
-            "map should not be used on a ConstructorBinding with downstream constructor"
-        );
+        // TODO: Model the nested constructor chain if we want to support class objects assigned to
+        // `__new__`. For now, map the callable itself and drop its downstream constructor checks
+        // instead of panicking.
         ConstructorBinding {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
@@ -236,7 +225,7 @@ impl<'db> ConstructorBinding<'db> {
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
-        let class_specialization = constructed_instance_type.class_specialization(db)?;
+        let (_, class_specialization) = constructed_instance_type.class_specialization(db)?;
         let static_class_literal = self
             .constructed_class_literal(db)
             .and_then(ClassLiteral::as_static);
@@ -467,7 +456,7 @@ impl<'db> ConstructorBinding<'db> {
         let Some(class_context) = self
             .constructed_instance_type()
             .class_specialization(db)
-            .map(|specialization| specialization.generic_context(db))
+            .map(|(_, specialization)| specialization.generic_context(db))
         else {
             return specialization;
         };

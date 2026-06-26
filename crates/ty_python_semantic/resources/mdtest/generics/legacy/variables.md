@@ -26,6 +26,8 @@ reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
+### Type variable name as a keyword argument
+
 The typevar name can also be provided as a keyword argument:
 
 ```py
@@ -43,7 +45,7 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 ```py
 from typing import TypeVar
 
-T = TypeVar("T")
+TypingT = TypeVar("TypingT")
 # error: [invalid-legacy-type-variable]
 U: TypeVar = TypeVar("U")
 
@@ -104,13 +106,184 @@ class Outer(Generic[Q]):
 
 > Type variables must not be redefined.
 
+#### Sequential definitions
+
 ```py
 from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: error
+# error: [invalid-legacy-type-variable] "Cannot redefine `T` as a type variable"
 T = TypeVar("T")
+
+S = object()
+
+# error: [invalid-legacy-type-variable] "Cannot redefine `S` as a type variable"
+S = TypeVar("S")
+
+DeclaredT: object
+
+# error: [invalid-legacy-type-variable] "Cannot redefine `DeclaredT` as a type variable"
+DeclaredT = TypeVar("DeclaredT")
+```
+
+#### Control flow
+
+A previous definition counts if it is reachable from the beginning of the scope, even if it is in a
+mutually exclusive branch. Statically unreachable definitions do not count.
+
+```py
+from typing import TypeVar
+
+def flag() -> bool:
+    return True
+
+if flag():
+    ConditionalT = TypeVar("ConditionalT")
+
+# error: [invalid-legacy-type-variable]
+ConditionalT = TypeVar("ConditionalT")
+
+if flag():
+    BranchT = TypeVar("BranchT")
+else:
+    # error: [invalid-legacy-type-variable]
+    BranchT = TypeVar("BranchT")
+
+# error: [invalid-legacy-type-variable]
+BranchT = TypeVar("BranchT")
+
+if False:
+    UnreachableT = TypeVar("UnreachableT")
+
+UnreachableT = TypeVar("UnreachableT")
+```
+
+Definitions in version-dependent fallback branches are also mutually exclusive:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing import TypeVar
+
+class Reader: ...
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    Self = TypeVar("Self", bound=Reader)
+```
+
+#### Star imports
+
+Only names actually exported by a star import count as previous definitions.
+
+`excluded.py`:
+
+```py
+from typing import TypeVar
+
+__all__ = ["X"]
+
+X = 1
+ExcludedT = TypeVar("ExcludedT")
+```
+
+`included.py`:
+
+```py
+from typing import TypeVar
+
+__all__ = ["IncludedT"]
+
+IncludedT = TypeVar("IncludedT")
+```
+
+`main.py`:
+
+```py
+from typing import TypeVar
+
+from excluded import *
+from included import *
+
+ExcludedT = TypeVar("ExcludedT")
+
+# error: [invalid-assignment]
+# error: [invalid-legacy-type-variable]
+IncludedT = TypeVar("IncludedT")
+```
+
+#### Nested scopes
+
+```py
+from typing import TypeVar
+
+ScopedT = TypeVar("ScopedT")
+
+class C:
+    ScopedT = TypeVar("ScopedT")
+
+    # error: [invalid-legacy-type-variable]
+    ScopedT = TypeVar("ScopedT")
+
+GlobalT = TypeVar("GlobalT")
+
+def redefine_global() -> None:
+    global GlobalT
+    # error: [invalid-legacy-type-variable]
+    GlobalT = TypeVar("GlobalT")
+
+def define_global_before_module_binding() -> None:
+    global LaterGlobalT
+    LaterGlobalT = TypeVar("LaterGlobalT")
+
+LaterGlobalT = object()
+
+DeepGlobalT = object()
+
+def middle() -> None:
+    def redefine_deep_global() -> None:
+        global DeepGlobalT
+        # error: [invalid-legacy-type-variable]
+        DeepGlobalT = TypeVar("DeepGlobalT")
+
+def later_middle() -> None:
+    def define_deep_global_before_module_binding() -> None:
+        global LaterDeepGlobalT
+        LaterDeepGlobalT = TypeVar("LaterDeepGlobalT")
+
+LaterDeepGlobalT = object()
+
+def outer() -> None:
+    NonlocalT = TypeVar("NonlocalT")
+
+    def redefine_nonlocal() -> None:
+        nonlocal NonlocalT
+        # error: [invalid-legacy-type-variable]
+        NonlocalT = TypeVar("NonlocalT")
+
+def define_nonlocal_before_binding() -> None:
+    def inner() -> None:
+        nonlocal LaterNonlocalT
+        LaterNonlocalT = TypeVar("LaterNonlocalT")
+
+    LaterNonlocalT = object()
+
+def chained_nonlocal() -> None:
+    ChainedNonlocalT = object()
+
+    def middle() -> None:
+        nonlocal ChainedNonlocalT
+
+        def inner() -> None:
+            nonlocal ChainedNonlocalT
+            # error: [invalid-legacy-type-variable]
+            ChainedNonlocalT = TypeVar("ChainedNonlocalT")
 ```
 
 ### No variadic arguments
@@ -374,7 +547,7 @@ The upper bound must be a valid type expression:
 from typing import TypedDict
 
 # error: [invalid-type-form]
-T = TypeVar("T", bound=TypedDict)
+InvalidBoundT = TypeVar("InvalidBoundT", bound=TypedDict)
 ```
 
 ### Type variables with constraints
@@ -391,9 +564,13 @@ S = TypeVar("S")
 reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
+### Constraints are not simplified
+
 Constraints are not simplified relative to each other, even if one is a subtype of the other:
 
 ```py
+from typing import TypeVar
+
 T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
@@ -433,6 +610,93 @@ from typing import TypeVar
 
 # error: [invalid-legacy-type-variable]
 T = TypeVar("T", covariant=True, contravariant=True)
+```
+
+### Infer variance
+
+For a `TypeVar` with `infer_variance=True`, we infer covariance when the type variable only appears
+in return positions, contravariance when it only appears in parameter positions, and invariance when
+it appears in both positions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+OutT = TypeVar("OutT", infer_variance=True)
+
+class Source(Generic[OutT]):
+    def get(self) -> OutT:
+        raise NotImplementedError
+
+source_int: Source[int] = Source[object]()  # error: [invalid-assignment]
+source_obj: Source[object] = Source[int]()
+
+InT = TypeVar("InT", infer_variance=True)
+
+class Sink(Generic[InT]):
+    def send(self, value: InT) -> None:
+        raise NotImplementedError
+
+sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
+sink_int: Sink[int] = Sink[object]()
+```
+
+Both assignments are errors when the type variable is inferred to be invariant:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    value: T
+
+box_int: Box[int] = Box[object]()  # error: [invalid-assignment]
+box_obj: Box[object] = Box[int]()  # error: [invalid-assignment]
+```
+
+> A generic class that uses the traditional syntax may include combinations of type variables with
+> explicit and inferred variance.
+
+```py
+from typing import Generic, TypeVar
+
+ExplicitOutT = TypeVar("ExplicitOutT", covariant=True)
+InferredInT = TypeVar("InferredInT", infer_variance=True)
+
+class Mixed(Generic[ExplicitOutT, InferredInT]):
+    def get(self) -> ExplicitOutT:
+        raise NotImplementedError
+
+    def send(self, value: InferredInT) -> None:
+        raise NotImplementedError
+
+mixed_covariant: Mixed[object, int] = Mixed[int, int]()
+mixed_not_covariant: Mixed[int, int] = Mixed[object, int]()  # error: [invalid-assignment]
+mixed_contravariant: Mixed[int, int] = Mixed[int, object]()
+mixed_not_contravariant: Mixed[int, object] = Mixed[int, int]()  # error: [invalid-assignment]
+```
+
+Variance cannot be specified explicitly when variance inference is requested:
+
+```py
+from typing import TypeVar
+
+# snapshot: invalid-legacy-type-variable
+CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `infer_variance=True`
+  --> src/mdtest_snippet.py:48:24
+   |
+48 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 ```
 
 ### Boolean parameters must be unambiguous
@@ -573,9 +837,13 @@ def bound(f: T):
     reveal_type(f())  # revealed: int
 ```
 
+## Constrained callability
+
 Same with a constrained typevar, as long as all constraints are callable:
 
 ```py
+from typing import Callable, TypeVar
+
 T = TypeVar("T", Callable[[], int], Callable[[], str])
 
 def constrained(f: T):
@@ -640,18 +908,23 @@ class Foo(Generic[S]):
     T = TypeVar("T", bound=S)
 ```
 
+### Recursive bounds
+
 However, they are lazily evaluated and can cyclically refer to their own type:
 
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar("T", bound=list["G"])
+T = TypeVar("T", bound=list["G"])  # error: [missing-type-argument]
 
 class G(Generic[T]):
     x: T
 
+# error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
+
+### Invalid specialization in a recursive bound
 
 An invalid specialization in a recursive bound doesn't cause a panic:
 

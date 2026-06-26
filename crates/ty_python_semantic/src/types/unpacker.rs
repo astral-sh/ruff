@@ -3,10 +3,11 @@ use std::borrow::Cow;
 use ruff_db::parsed::ParsedModuleRef;
 use rustc_hash::FxHashMap;
 
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::types::infer::ExpressionInference;
+use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
@@ -20,6 +21,18 @@ use super::diagnostic::INVALID_ASSIGNMENT;
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+}
+
+/// Records an `Unknown` type for every expression in a malformed unpack target subtree.
+struct UnknownTargetCollector<'db, 'map> {
+    targets: &'map mut FxHashMap<ExpressionNodeKey, Type<'db>>,
+}
+
+impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        self.targets.insert(expr.into(), Type::unknown());
+        visitor::walk_expr(self, expr);
+    }
 }
 
 impl<'db, 'ast> Unpacker<'db, 'ast> {
@@ -160,6 +173,14 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         })
     }
 
+    /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.
+    fn record_unknown_target_subtree(&mut self, target: &ast::Expr) {
+        UnknownTargetCollector {
+            targets: &mut self.targets,
+        }
+        .visit_expr(target);
+    }
+
     fn unpack_inner(
         &mut self,
         target: &ast::Expr,
@@ -239,16 +260,19 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     self.unpack_inner(target, value_expr, value_ty);
                 }
             }
-            _ => {}
+            _ => {
+                // Recovered syntax can still create assignment definitions for descendants of
+                // malformed targets. Give the whole subtree an unknown type so later lookups
+                // don't panic.
+                self.record_unknown_target_subtree(target);
+            }
         }
     }
 
-    pub(crate) fn finish(mut self) -> UnpackResult<'db> {
-        self.targets.shrink_to_fit();
-
+    pub(crate) fn finish(self) -> UnpackResult<'db> {
         UnpackResult {
             diagnostics: self.context.finish(),
-            targets: self.targets,
+            targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
         }
     }
@@ -256,7 +280,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
 #[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackResult<'db> {
-    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
 
     /// The fallback type for missing expressions.
@@ -298,7 +322,7 @@ impl<'db> UnpackResult<'db> {
 
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
-            targets: FxHashMap::default(),
+            targets: FrozenMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
         }

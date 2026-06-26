@@ -286,7 +286,9 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 }
                 if !self.overridden {
                     self.nested = true;
-                    visitor::walk_expr(self, key);
+                    if let Some(key) = key {
+                        visitor::walk_expr(self, key);
+                    }
                     visitor::walk_expr(self, value);
                     self.nested = false;
                 }

@@ -15,6 +15,9 @@ if sys.platform != "win32":
     RLIMIT_RSS: Final[int]
     RLIMIT_STACK: Final[int]
     RLIM_INFINITY: Final[int]
+    if sys.version_info >= (3, 15):
+        RLIM_SAVED_CUR: Final[int]
+        RLIM_SAVED_MAX: Final[int]
     RUSAGE_CHILDREN: Final[int]
     RUSAGE_SELF: Final[int]
     if sys.platform == "linux":
@@ -25,6 +28,11 @@ if sys.platform != "win32":
         RLIMIT_RTTIME: Final[int]
         RLIMIT_SIGPENDING: Final[int]
         RUSAGE_THREAD: Final[int]
+    if sys.version_info >= (3, 15) and sys.platform != "linux" and sys.platform != "darwin":
+        RLIMIT_NTHR: Final[int]
+        RLIMIT_PIPEBUF: Final[int]
+        RLIMIT_THREADS: Final[int]
+        RLIMIT_UMTXP: Final[int]
 
     @final
     class struct_rusage(
@@ -38,25 +46,24 @@ if sys.platform != "win32":
         or via the attributes ru_utime, ru_stime, ru_maxrss, and so on.
         """
 
-        if sys.version_info >= (3, 10):
-            __match_args__: Final = (
-                "ru_utime",
-                "ru_stime",
-                "ru_maxrss",
-                "ru_ixrss",
-                "ru_idrss",
-                "ru_isrss",
-                "ru_minflt",
-                "ru_majflt",
-                "ru_nswap",
-                "ru_inblock",
-                "ru_oublock",
-                "ru_msgsnd",
-                "ru_msgrcv",
-                "ru_nsignals",
-                "ru_nvcsw",
-                "ru_nivcsw",
-            )
+        __match_args__: Final = (
+            "ru_utime",
+            "ru_stime",
+            "ru_maxrss",
+            "ru_ixrss",
+            "ru_idrss",
+            "ru_isrss",
+            "ru_minflt",
+            "ru_majflt",
+            "ru_nswap",
+            "ru_inblock",
+            "ru_oublock",
+            "ru_msgsnd",
+            "ru_msgrcv",
+            "ru_nsignals",
+            "ru_nvcsw",
+            "ru_nivcsw",
+        )
 
         @property
         def ru_utime(self) -> float:
@@ -132,4 +139,5 @@ if sys.platform != "win32":
         else:
             def prlimit(pid: int, resource: int, limits: tuple[int, int] = ..., /) -> tuple[int, int]:
                 """prlimit(pid, resource, [limits])"""
+
     error = OSError

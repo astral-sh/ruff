@@ -189,8 +189,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ## Inferring a bound typevar
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import TypeVar
 
@@ -201,13 +199,26 @@ def f(x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a constrained typevar
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:11:15
+   |
+11 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", bound=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
 
-<!-- snapshot-diagnostics -->
+## Inferring a constrained typevar
 
 ```py
 from typing import TypeVar
@@ -220,8 +231,23 @@ def f(x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:12:15
+   |
+12 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, None)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## Typevar constraints
@@ -317,9 +343,9 @@ from typing import TypeVar
 class P: ...
 class Q: ...
 
-T = TypeVar("T", P, Q)
+NarrowedT = TypeVar("NarrowedT", P, Q)
 
-def return_narrowed_typevar(x: T) -> T:
+def return_narrowed_typevar(x: NarrowedT) -> NarrowedT:
     if isinstance(x, P):
         return x
     return x
@@ -365,10 +391,41 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+## Recursive generic calls
+
+Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
+The recursive call's typevars are inferable at the call site, even though the function body's own
+typevars are non-inferable.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+B = TypeVar("B")
+
+def recursive_identity(t: T) -> T:
+    reveal_type(recursive_identity(t))  # revealed: T@recursive_identity
+    return t
+
+def pair(a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+def recursive_pair(t: T) -> T:
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[T@recursive_pair, Literal[1]]
+    return t
+```
+
+## Union parameter inference
+
 When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
 all of the constraints.
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 def union_param(x: T | None) -> T:
     if x is None:
         raise ValueError
@@ -411,20 +468,20 @@ reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
 ```
 
 ```py
-T_str = TypeVar("T_str", bound=str)
+T_str2 = TypeVar("T_str2", bound=str)
 
-def accepts_t_or_list_of_t(x: T_str | list[T_str]) -> T_str:
+def accepts_t_or_list_of_t(x: T_str2 | list[T_str2]) -> T_str2:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
-# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str`"
+# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str2`"
 reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
     # TODO: the error message here could be improved by referring to the second union element
-    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
+    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str2`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
 ```
 
@@ -440,6 +497,8 @@ def tuple_param(x: T | S, y: tuple[T, S]) -> tuple[T, S]:
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
+
+## Inference from unions containing generic classes
 
 When a union parameter contains generic classes like `P[T] | Q[T]`, we can infer the typevar from
 the actual argument even for non-final classes.
@@ -645,6 +704,59 @@ def decorated(t: T) -> None:
 def decorated(t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+def my_decorator(f: F) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box(Generic[F]):
+    cls: type[F]
+
+def specialized(box: Box[Callable[..., Any]]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
+```
+
+## Attribute access on TypeVars bounded by `type[...]`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3782>.
+
+```py
+from typing import ClassVar, TypeVar
+from typing_extensions import Self
+
+class A:
+    attr: ClassVar[str]
+    current: ClassVar[Self]
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class B:
+    attr: ClassVar[int]
+
+T = TypeVar("T", bound=type[A])
+
+def single_bound(cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str
+    reveal_type(cls.current)  # revealed: T'instance@single_bound
+    reveal_type(cls.create())  # revealed: T'instance@single_bound
+
+U = TypeVar("U", bound=type[A] | type[B])
+
+def union_bound(cls: U) -> None:
+    reveal_type(cls.attr)  # revealed: str | int
 ```
 
 ## Solving TypeVars with upper bounds in unions
@@ -868,6 +980,8 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Incompatible constraint sets
+
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
 
 ```py
@@ -882,6 +996,8 @@ def target(x: T) -> T:
 def source(x: U) -> U:
     return target(x)  # error: [invalid-argument-type]
 ```
+
+## Constraint equivalence
 
 We require equivalence rather than mere assignability when matching constraints. Constrained
 TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
@@ -915,12 +1031,17 @@ def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
 def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
     return tuple(x for iterable in iterables for x in iterable)
 
+# TODO: revealed: list[LiteralString | int]
 reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
-# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
+# TODO: revealed: tuple[LiteralString | Literal[1, 2, 3], ...]
 reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
 
 def literal_string_case(literal_string: LiteralString):
+    # TODO: revealed: list[LiteralString | int]
     reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+
+def literal_string_case(string: str):
+    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[str | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]

@@ -45,31 +45,32 @@ class PurePath(PathLike[str]):
     directly, regardless of your system.
     """
 
-    if sys.version_info >= (3, 13):
-        __slots__ = (
-            "_raw_paths",
-            "_drv",
-            "_root",
-            "_tail_cached",
-            "_str",
-            "_str_normcase_cached",
-            "_parts_normcase_cached",
-            "_hash",
-        )
-    elif sys.version_info >= (3, 12):
-        __slots__ = (
-            "_raw_paths",
-            "_drv",
-            "_root",
-            "_tail_cached",
-            "_str",
-            "_str_normcase_cached",
-            "_parts_normcase_cached",
-            "_lines_cached",
-            "_hash",
-        )
-    else:
-        __slots__ = ("_drv", "_root", "_parts", "_str", "_hash", "_pparts", "_cached_cparts")
+    if sys.version_info < (3, 15):
+        if sys.version_info >= (3, 13):
+            __slots__ = (
+                "_raw_paths",
+                "_drv",
+                "_root",
+                "_tail_cached",
+                "_str",
+                "_str_normcase_cached",
+                "_parts_normcase_cached",
+                "_hash",
+            )
+        elif sys.version_info >= (3, 12):
+            __slots__ = (
+                "_raw_paths",
+                "_drv",
+                "_root",
+                "_tail_cached",
+                "_str",
+                "_str_normcase_cached",
+                "_parts_normcase_cached",
+                "_lines_cached",
+                "_hash",
+            )
+        else:
+            __slots__ = ("_drv", "_root", "_parts", "_str", "_hash", "_pparts", "_cached_cparts")
     if sys.version_info >= (3, 13):
         parser: ClassVar[types.ModuleType]
         def full_match(self, pattern: StrPath, *, case_sensitive: bool | None = None) -> bool:
@@ -119,6 +120,7 @@ class PurePath(PathLike[str]):
     @property
     def stem(self) -> str:
         """The final path component, minus its last suffix."""
+
     if sys.version_info >= (3, 12):
         def __new__(cls, *args: StrPath, **kwargs: Unused) -> Self:
             """Construct a PurePath from one or several strings and or existing
@@ -137,7 +139,17 @@ class PurePath(PathLike[str]):
             """
 
     def __hash__(self) -> int: ...
-    def __fspath__(self) -> str: ...
+    def __fspath__(self) -> str:
+        """Return the string representation of the path, suitable for
+        passing to system calls.
+        """
+
+    if sys.version_info >= (3, 15):
+        def __vfspath__(self) -> str:
+            """Return the string representation of the path, suitable for
+            passing to system calls.
+            """
+
     def __lt__(self, other: PurePath) -> bool: ...
     def __le__(self, other: PurePath) -> bool: ...
     def __gt__(self, other: PurePath) -> bool: ...
@@ -162,34 +174,36 @@ class PurePath(PathLike[str]):
         """True if the path is absolute (has both a root and, if applicable,
         a drive).
         """
-    if sys.version_info >= (3, 13):
-        @deprecated(
-            "Deprecated since Python 3.13; will be removed in Python 3.15. "
-            "Use `os.path.isreserved()` to detect reserved paths on Windows."
-        )
-        def is_reserved(self) -> bool:
-            """Return True if the path contains one of the special names reserved
-            by the system, if any.
-            """
-    else:
-        def is_reserved(self) -> bool:
-            """Return True if the path contains one of the special names reserved
-            by the system, if any.
-            """
+
+    if sys.version_info < (3, 15):
+        if sys.version_info >= (3, 13):
+            @deprecated(
+                "Deprecated since Python 3.13; will be removed in Python 3.15. "
+                "Use `os.path.isreserved()` to detect reserved paths on Windows."
+            )
+            def is_reserved(self) -> bool:
+                """Return True if the path contains one of the special names reserved
+                by the system, if any.
+                """
+
+        else:
+            def is_reserved(self) -> bool:
+                """Return True if the path contains one of the special names reserved
+                by the system, if any.
+                """
+
     if sys.version_info >= (3, 14):
         def is_relative_to(self, other: StrPath) -> bool:
             """Return True if the path is relative to another path or False."""
-    elif sys.version_info >= (3, 12):
+
+    else:
         @overload
         def is_relative_to(self, other: StrPath, /) -> bool:
             """Return True if the path is relative to another path or False."""
-
         @overload
         @deprecated("Passing additional arguments is deprecated since Python 3.12; removed in Python 3.14.")
         def is_relative_to(self, other: StrPath, /, *_deprecated: StrPath) -> bool: ...
-    else:
-        def is_relative_to(self, *other: StrPath) -> bool:
-            """Return True if the path is relative to another path or False."""
+
     if sys.version_info >= (3, 12):
         def match(self, path_pattern: str, *, case_sensitive: bool | None = None) -> bool:
             """
@@ -198,11 +212,13 @@ class PurePath(PathLike[str]):
             is matched. The recursive wildcard '**' is *not* supported by this
             method.
             """
+
     else:
         def match(self, path_pattern: str) -> bool:
             """
             Return True if this path matches the given pattern.
             """
+
     if sys.version_info >= (3, 14):
         def relative_to(self, other: StrPath, *, walk_up: bool = False) -> Self:
             """Return the relative path to another path identified by the passed
@@ -212,6 +228,7 @@ class PurePath(PathLike[str]):
             The *walk_up* parameter controls whether `..` may be used to resolve
             the path.
             """
+
     elif sys.version_info >= (3, 12):
         @overload
         def relative_to(self, other: StrPath, /, *, walk_up: bool = False) -> Self:
@@ -222,7 +239,6 @@ class PurePath(PathLike[str]):
             The *walk_up* parameter controls whether `..` may be used to resolve
             the path.
             """
-
         @overload
         @deprecated("Passing additional arguments is deprecated since Python 3.12; removed in Python 3.14.")
         def relative_to(self, other: StrPath, /, *_deprecated: StrPath, walk_up: bool = False) -> Self: ...
@@ -259,6 +275,7 @@ class PurePath(PathLike[str]):
     @property
     def parent(self) -> Self:
         """The logical parent of the path."""
+
     if sys.version_info < (3, 11):
         def __class_getitem__(cls, type: Any) -> GenericAlias: ...
 
@@ -299,10 +316,8 @@ class Path(PurePath):
 
     if sys.version_info >= (3, 14):
         __slots__ = ("_info",)
-    elif sys.version_info >= (3, 10):
-        __slots__ = ()
     else:
-        __slots__ = ("_accessor",)
+        __slots__ = ()
 
     if sys.version_info >= (3, 12):
         def __new__(cls, *args: StrPath, **kwargs: Unused) -> Self: ...  # pyright: ignore[reportInconsistentConstructor]
@@ -312,28 +327,18 @@ class Path(PurePath):
     @classmethod
     def cwd(cls) -> Self:
         """Return a new path pointing to the current working directory."""
-    if sys.version_info >= (3, 10):
-        def stat(self, *, follow_symlinks: bool = True) -> stat_result:
-            """
-            Return the result of the stat() system call on this path, like
-            os.stat() does.
-            """
 
-        def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
-            """
-            Change the permissions of the path, like os.chmod().
-            """
-    else:
-        def stat(self) -> stat_result:
-            """
-            Return the result of the stat() system call on this path, like
-            os.stat() does.
-            """
+    def stat(self, *, follow_symlinks: bool = True) -> stat_result:
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
 
-        def chmod(self, mode: int) -> None:
-            """
-            Change the permissions of the path, like os.chmod().
-            """
+    def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
+        """
+        Change the permissions of the path, like os.chmod().
+        """
+
     if sys.version_info >= (3, 13):
         @classmethod
         def from_uri(cls, uri: str) -> Self:
@@ -354,6 +359,7 @@ class Path(PurePath):
             """
             Open the file in text mode, read it, and close the file.
             """
+
     else:
         def __enter__(self) -> Self: ...
         def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
@@ -372,6 +378,7 @@ class Path(PurePath):
             """
             Open the file in text mode, read it, and close the file.
             """
+
     if sys.version_info >= (3, 13):
         def glob(self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: bool = False) -> Iterator[Self]:
             """Iterate over this subtree and yield all existing files (of any
@@ -383,6 +390,7 @@ class Path(PurePath):
             directories) matching the given relative pattern, anywhere in
             this subtree.
             """
+
     elif sys.version_info >= (3, 12):
         def glob(self, pattern: str, *, case_sensitive: bool | None = None) -> Generator[Self]:
             """Iterate over this subtree and yield all existing files (of any
@@ -394,6 +402,7 @@ class Path(PurePath):
             directories) matching the given relative pattern, anywhere in
             this subtree.
             """
+
     else:
         def glob(self, pattern: str) -> Generator[Self]:
             """Iterate over this subtree and yield all existing files (of any
@@ -405,6 +414,7 @@ class Path(PurePath):
             directories) matching the given relative pattern, anywhere in
             this subtree.
             """
+
     if sys.version_info >= (3, 12):
         def exists(self, *, follow_symlinks: bool = True) -> bool:
             """
@@ -413,6 +423,7 @@ class Path(PurePath):
             This method normally follows symlinks; to check whether a symlink exists,
             add the argument follow_symlinks=False.
             """
+
     else:
         def exists(self) -> bool:
             """
@@ -443,6 +454,7 @@ class Path(PurePath):
         """
         Whether this path is a character device.
         """
+
     if sys.version_info >= (3, 12):
         def is_junction(self) -> bool:
             """
@@ -468,10 +480,20 @@ class Path(PurePath):
         status information is returned, rather than its target's.
         """
 
-    def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
-        """
-        Create a new directory at this given path.
-        """
+    if sys.version_info >= (3, 15):
+        def mkdir(
+            self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False, *, parent_mode: int | None = None
+        ) -> None:
+            """
+            Create a new directory at this given path.
+            """
+
+    else:
+        def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+            """
+            Create a new directory at this given path.
+            """
+
     if sys.version_info >= (3, 14):
         @property
         def info(self) -> PathInfo:
@@ -485,31 +507,30 @@ class Path(PurePath):
             """
             Move this file or directory tree into the given existing directory.
             """
-
         @overload
         def move_into(self, target_dir: StrPath) -> Self: ...  # type: ignore[overload-overlap]
+
         @overload
         def move(self, target: _PathT) -> _PathT:  # type: ignore[overload-overlap]
             """
             Recursively move this file or directory tree to the given destination.
             """
-
         @overload
         def move(self, target: StrPath) -> Self: ...  # type: ignore[overload-overlap]
+
         @overload
         def copy_into(self, target_dir: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT:  # type: ignore[overload-overlap]
             """
             Copy this file or directory tree into the given existing directory.
             """
-
         @overload
         def copy_into(self, target_dir: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self: ...  # type: ignore[overload-overlap]
+
         @overload
         def copy(self, target: _PathT, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> _PathT:  # type: ignore[overload-overlap]
             """
             Recursively copy this file or directory tree to the given destination.
             """
-
         @overload
         def copy(self, target: StrPath, *, follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self: ...  # type: ignore[overload-overlap]
 
@@ -586,6 +607,7 @@ class Path(PurePath):
                 """
                 Return the group name of the file gid.
                 """
+
         else:
             def owner(self: Never) -> str:  # type: ignore[misc]
                 """
@@ -596,6 +618,7 @@ class Path(PurePath):
                 """
                 Return the group name of the file gid.
                 """
+
     else:
         if sys.version_info >= (3, 13):
             def owner(self, *, follow_symlinks: bool = True) -> str:
@@ -607,6 +630,7 @@ class Path(PurePath):
                 """
                 Return the group name of the file gid.
                 """
+
         else:
             def owner(self) -> str:
                 """
@@ -617,6 +641,7 @@ class Path(PurePath):
                 """
                 Return the group name of the file gid.
                 """
+
     # This method does "exist" on Windows on <3.12, but always raises NotImplementedError
     # On py312+, it works properly on Windows, as with all other platforms
     if sys.platform == "win32" and sys.version_info < (3, 12):
@@ -624,6 +649,7 @@ class Path(PurePath):
             """
             Check if this path is a POSIX mount point
             """
+
     else:
         def is_mount(self) -> bool:
             """
@@ -634,50 +660,28 @@ class Path(PurePath):
         """
         Return the path to which the symbolic link points.
         """
-    if sys.version_info >= (3, 10):
-        def rename(self, target: StrPath) -> Self:
-            """
-            Rename this path to the target path.
 
-            The target path may be absolute or relative. Relative paths are
-            interpreted relative to the current working directory, *not* the
-            directory of the Path object.
+    def rename(self, target: StrPath) -> Self:
+        """
+        Rename this path to the target path.
 
-            Returns the new Path instance pointing to the target path.
-            """
+        The target path may be absolute or relative. Relative paths are
+        interpreted relative to the current working directory, *not* the
+        directory of the Path object.
 
-        def replace(self, target: StrPath) -> Self:
-            """
-            Rename this path to the target path, overwriting if that path exists.
+        Returns the new Path instance pointing to the target path.
+        """
 
-            The target path may be absolute or relative. Relative paths are
-            interpreted relative to the current working directory, *not* the
-            directory of the Path object.
+    def replace(self, target: StrPath) -> Self:
+        """
+        Rename this path to the target path, overwriting if that path exists.
 
-            Returns the new Path instance pointing to the target path.
-            """
-    else:
-        def rename(self, target: str | PurePath) -> Self:
-            """
-            Rename this path to the target path.
+        The target path may be absolute or relative. Relative paths are
+        interpreted relative to the current working directory, *not* the
+        directory of the Path object.
 
-            The target path may be absolute or relative. Relative paths are
-            interpreted relative to the current working directory, *not* the
-            directory of the Path object.
-
-            Returns the new Path instance pointing to the target path.
-            """
-
-        def replace(self, target: str | PurePath) -> Self:
-            """
-            Rename this path to the target path, overwriting if that path exists.
-
-            The target path may be absolute or relative. Relative paths are
-            interpreted relative to the current working directory, *not* the
-            directory of the Path object.
-
-            Returns the new Path instance pointing to the target path.
-            """
+        Returns the new Path instance pointing to the target path.
+        """
 
     def resolve(self, strict: bool = False) -> Self:
         """
@@ -695,13 +699,13 @@ class Path(PurePath):
         Make this path a symlink pointing to the target path.
         Note the order of arguments (link, target) is the reverse of os.symlink.
         """
-    if sys.version_info >= (3, 10):
-        def hardlink_to(self, target: StrOrBytesPath) -> None:
-            """
-            Make this path a hard link pointing to the same file as *target*.
 
-            Note the order of arguments (self, target) is the reverse of os.link's.
-            """
+    def hardlink_to(self, target: StrOrBytesPath) -> None:
+        """
+        Make this path a hard link pointing to the same file as *target*.
+
+        Note the order of arguments (self, target) is the reverse of os.link's.
+        """
 
     def touch(self, mode: int = 0o666, exist_ok: bool = True) -> None:
         """
@@ -744,44 +748,27 @@ class Path(PurePath):
         """
         Open the file in bytes mode, write to it, and close the file.
         """
-    if sys.version_info >= (3, 10):
-        def write_text(
-            self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
-        ) -> int:
-            """
-            Open the file in text mode, write to it, and close the file.
-            """
-    else:
-        def write_text(self, data: str, encoding: str | None = None, errors: str | None = None) -> int:
-            """
-            Open the file in text mode, write to it, and close the file.
-            """
+
+    def write_text(self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None) -> int:
+        """
+        Open the file in text mode, write to it, and close the file.
+        """
+
     if sys.version_info < (3, 12):
-        if sys.version_info >= (3, 10):
-            @deprecated("Deprecated since Python 3.10; removed in Python 3.12. Use `hardlink_to()` instead.")
-            def link_to(self, target: StrOrBytesPath) -> None:
-                """
-                Make the target path a hard link pointing to this path.
+        @deprecated("Deprecated since Python 3.10; removed in Python 3.12. Use `hardlink_to()` instead.")
+        def link_to(self, target: StrOrBytesPath) -> None:
+            """
+            Make the target path a hard link pointing to this path.
 
-                Note this function does not make this path a hard link to *target*,
-                despite the implication of the function and argument names. The order
-                of arguments (target, link) is the reverse of Path.symlink_to, but
-                matches that of os.link.
+            Note this function does not make this path a hard link to *target*,
+            despite the implication of the function and argument names. The order
+            of arguments (target, link) is the reverse of Path.symlink_to, but
+            matches that of os.link.
 
-                Deprecated since Python 3.10 and scheduled for removal in Python 3.12.
-                Use `hardlink_to()` instead.
-                """
-        else:
-            def link_to(self, target: StrOrBytesPath) -> None:
-                """
-                Make the target path a hard link pointing to this path.
+            Deprecated since Python 3.10 and scheduled for removal in Python 3.12.
+            Use `hardlink_to()` instead.
+            """
 
-                Note this function does not make this path a hard link to *target*,
-                despite the implication of the function and argument names. The order
-                of arguments (target, link) is the reverse of Path.symlink_to, but
-                matches that of os.link.
-
-                """
     if sys.version_info >= (3, 12):
         def walk(
             self, top_down: bool = True, on_error: Callable[[OSError], object] | None = None, follow_symlinks: bool = False

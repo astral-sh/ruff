@@ -10,12 +10,18 @@ import datetime
 import enum
 import sys
 from _typeshed import Unused
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator
 from time import struct_time
-from typing import ClassVar, Final
-from typing_extensions import TypeAlias
+from typing import ClassVar, Final, TypeAlias, overload
 
 __all__ = [
+    "FRIDAY",
+    "MONDAY",
+    "SATURDAY",
+    "SUNDAY",
+    "THURSDAY",
+    "TUESDAY",
+    "WEDNESDAY",
     "IllegalMonthError",
     "IllegalWeekdayError",
     "setfirstweekday",
@@ -42,8 +48,6 @@ __all__ = [
     "weekheader",
 ]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["FRIDAY", "MONDAY", "SATURDAY", "SUNDAY", "THURSDAY", "TUESDAY", "WEDNESDAY"]
 if sys.version_info >= (3, 12):
     __all__ += [
         "Day",
@@ -61,6 +65,8 @@ if sys.version_info >= (3, 12):
         "NOVEMBER",
         "DECEMBER",
     ]
+if sys.version_info >= (3, 15):
+    __all__ += ["standalone_month_name", "standalone_month_abbr"]
 
 _LocaleType: TypeAlias = tuple[str | None, str | None]
 
@@ -98,26 +104,26 @@ class Calendar:
     def __init__(self, firstweekday: int = 0) -> None: ...
     def getfirstweekday(self) -> int: ...
     def setfirstweekday(self, firstweekday: int) -> None: ...
-    def iterweekdays(self) -> Iterable[int]:
+    def iterweekdays(self) -> Iterator[int]:
         """
         Return an iterator for one week of weekday numbers starting with the
         configured first one.
         """
 
-    def itermonthdates(self, year: int, month: int) -> Iterable[datetime.date]:
+    def itermonthdates(self, year: int, month: int) -> Iterator[datetime.date]:
         """
         Return an iterator for one month. The iterator will yield datetime.date
         values and will always iterate through complete weeks, so it will yield
         dates outside the specified month.
         """
 
-    def itermonthdays2(self, year: int, month: int) -> Iterable[tuple[int, int]]:
+    def itermonthdays2(self, year: int, month: int) -> Iterator[tuple[int, int]]:
         """
         Like itermonthdates(), but will yield (day number, weekday number)
         tuples. For days outside the specified month the day number is 0.
         """
 
-    def itermonthdays(self, year: int, month: int) -> Iterable[int]:
+    def itermonthdays(self, year: int, month: int) -> Iterator[int]:
         """
         Like itermonthdates(), but will yield day numbers. For days outside
         the specified month the day number is 0.
@@ -166,13 +172,13 @@ class Calendar:
         Day numbers outside this month are zero.
         """
 
-    def itermonthdays3(self, year: int, month: int) -> Iterable[tuple[int, int, int]]:
+    def itermonthdays3(self, year: int, month: int) -> Iterator[tuple[int, int, int]]:
         """
         Like itermonthdates(), but will yield (year, month, day) tuples.  Can be
         used for dates outside of datetime.date range.
         """
 
-    def itermonthdays4(self, year: int, month: int) -> Iterable[tuple[int, int, int, int]]:
+    def itermonthdays4(self, year: int, month: int) -> Iterator[tuple[int, int, int, int]]:
         """
         Like itermonthdates(), but will yield (year, month, day, day_of_week) tuples.
         Can be used for dates outside of datetime.date range.
@@ -184,7 +190,7 @@ class TextCalendar(Calendar):
     similar to the UNIX program cal.
     """
 
-    def prweek(self, theweek: int, width: int) -> None:
+    def prweek(self, theweek: Iterable[tuple[int, int]], width: int) -> None:
         """
         Print a single week (no newline).
         """
@@ -194,7 +200,7 @@ class TextCalendar(Calendar):
         Returns a formatted day.
         """
 
-    def formatweek(self, theweek: int, width: int) -> str:
+    def formatweek(self, theweek: Iterable[tuple[int, int]], width: int) -> str:
         """
         Returns a single week in a string (no newline).
         """
@@ -314,6 +320,14 @@ class HTMLCalendar(Calendar):
         Return a formatted month as a table.
         """
 
+    if sys.version_info >= (3, 15):
+        def formatmonthpage(
+            self, theyear: int, themonth: int, width: int = 3, css: str | None = "calendar.css", encoding: str | None = None
+        ) -> bytes:
+            """
+            Return a formatted month as a complete HTML page.
+            """
+
     def formatyear(self, theyear: int, width: int = 3) -> str:
         """
         Return a formatted year as a table of tables.
@@ -355,17 +369,41 @@ def setfirstweekday(firstweekday: int) -> None: ...
 def format(cols: int, colwidth: int = 20, spacing: int = 6) -> str:
     """Prints multi-column formatting for year calendars"""
 
-def formatstring(cols: int, colwidth: int = 20, spacing: int = 6) -> str:
+def formatstring(cols: Iterable[str], colwidth: int = 20, spacing: int = 6) -> str:
     """Returns a string formatted from n strings, centered within n columns."""
 
 def timegm(tuple: tuple[int, ...] | struct_time) -> int:
     """Unrelated but handy function to calculate Unix timestamp from GMT."""
 
 # Data attributes
-day_name: Sequence[str]
-day_abbr: Sequence[str]
-month_name: Sequence[str]
-month_abbr: Sequence[str]
+class _localized_month:
+    format: str
+    def __init__(self, format: str) -> None: ...
+
+    @overload
+    def __getitem__(self, i: int) -> str: ...
+    @overload
+    def __getitem__(self, i: slice) -> list[str]: ...
+
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[str]: ...
+
+class _localized_day:
+    format: str
+    def __init__(self, format: str) -> None: ...
+
+    @overload
+    def __getitem__(self, i: int) -> str: ...
+    @overload
+    def __getitem__(self, i: slice) -> list[str]: ...
+
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[str]: ...
+
+day_name: _localized_day
+day_abbr: _localized_day
+month_name: _localized_month
+month_abbr: _localized_month
 
 if sys.version_info >= (3, 12):
     class Month(enum.IntEnum):
@@ -421,3 +459,7 @@ else:
     SUNDAY: Final = 6
 
 EPOCH: Final = 1970
+
+if sys.version_info >= (3, 15):
+    standalone_month_name: _localized_month
+    standalone_month_abbr: _localized_month

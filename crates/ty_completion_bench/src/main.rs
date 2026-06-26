@@ -13,7 +13,7 @@ use clap::Parser;
 
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ty_ide::Completion;
+use ty_ide::{Completion, CompletionCapabilities};
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
@@ -138,8 +138,14 @@ fn get_completions<'db>(
 ) -> anyhow::Result<Vec<Completion<'db>>> {
     let file = system_path_to_file(db, path)
         .with_context(|| format!("failed to get database file for `{path}`"))?;
-    let settings = ty_ide::CompletionSettings { auto_import: true };
-    Ok(ty_ide::completion(db, &settings, file, offset))
+    let settings = ty_ide::CompletionSettings::default();
+    Ok(ty_ide::completion(
+        db,
+        &settings,
+        CompletionCapabilities::default(),
+        file,
+        offset,
+    ))
 }
 
 fn discover_project_directory(file: &SystemPath) -> anyhow::Result<SystemPathBuf> {

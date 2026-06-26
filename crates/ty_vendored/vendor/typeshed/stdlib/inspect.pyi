@@ -1,7 +1,7 @@
 """Get useful information from live Python objects.
 
 This module encapsulates the interface provided by the internal special
-attributes (co_*, im_*, tb_*, etc.) in a friendlier fashion.
+attributes (co_*, tb_*, etc.) in a friendlier fashion.
 It also provides some help for examining source code and class layout.
 
 Here are some of the useful functions provided by this module:
@@ -31,7 +31,6 @@ import enum
 import sys
 import types
 from _typeshed import AnnotationForm, StrPath
-from collections import OrderedDict
 from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine, Generator, Mapping, Sequence, Set as AbstractSet
 from types import (
     AsyncGeneratorType,
@@ -53,8 +52,21 @@ from types import (
     TracebackType,
     WrapperDescriptorType,
 )
-from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated, disjoint_base
+from typing import (
+    Any,
+    ClassVar,
+    Final,
+    Literal,
+    NamedTuple,
+    ParamSpec,
+    Protocol,
+    TypeAlias,
+    TypeGuard,
+    TypeVar,
+    overload,
+    type_check_only,
+)
+from typing_extensions import Never, Self, TypeIs, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from annotationlib import Format
@@ -223,7 +235,6 @@ def getmembers(object: object, predicate: _GetMembersPredicateTypeGuard[_T]) -> 
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate.
     """
-
 @overload
 def getmembers(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]: ...
 @overload
@@ -243,7 +254,6 @@ if sys.version_info >= (3, 11):
            that raise AttributeError). It can also return descriptor objects
            instead of instance members in some cases.
         """
-
     @overload
     def getmembers_static(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]: ...
     @overload
@@ -255,7 +265,7 @@ def getmodulename(path: StrPath) -> str | None:
 def ismodule(object: object) -> TypeIs[ModuleType]:
     """Return true if the object is a module."""
 
-def isclass(object: object) -> TypeIs[type[Any]]:
+def isclass(object: object) -> TypeIs[type[object]]:
     """Return true if the object is a class."""
 
 def ismethod(object: object) -> TypeIs[MethodType]:
@@ -297,11 +307,11 @@ def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
     Generator function objects provide the same attributes as functions.
     See help(isfunction) for a list of attributes.
     """
-
 @overload
 def isgeneratorfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, GeneratorType[Any, Any, Any]]]: ...
 @overload
 def isgeneratorfunction(obj: object) -> TypeGuard[Callable[..., GeneratorType[Any, Any, Any]]]: ...
+
 @overload
 def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     """Return true if the object is a coroutine function.
@@ -309,14 +319,14 @@ def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     Coroutine functions are normally defined with "async def" syntax, but may
     be marked via markcoroutinefunction.
     """
-
 @overload
 def iscoroutinefunction(obj: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, _T]]]: ...
 @overload
 def iscoroutinefunction(obj: Callable[_P, object]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, Any]]]: ...
 @overload
 def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., CoroutineType[Any, Any, Any]]]: ...
-def isgenerator(object: object) -> TypeIs[GeneratorType[Any, Any, Any]]:
+
+def isgenerator(object: object) -> TypeIs[GeneratorType[object, Never, object]]:
     """Return true if the object is a generator.
 
     Generator objects provide these attributes:
@@ -348,11 +358,11 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
     Asynchronous generator functions are defined with "async def"
     syntax and have "yield" expressions in their body.
     """
-
 @overload
 def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]: ...
 @overload
 def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]: ...
+
 @type_check_only
 class _SupportsSet(Protocol[_T_contra, _V_contra]):
     def __set__(self, instance: _T_contra, value: _V_contra, /) -> None: ...
@@ -361,7 +371,7 @@ class _SupportsSet(Protocol[_T_contra, _V_contra]):
 class _SupportsDelete(Protocol[_T_contra]):
     def __delete__(self, instance: _T_contra, /) -> None: ...
 
-def isasyncgen(object: object) -> TypeIs[AsyncGeneratorType[Any, Any]]:
+def isasyncgen(object: object) -> TypeIs[AsyncGeneratorType[object, Never]]:
     """Return true if the object is an asynchronous generator."""
 
 def istraceback(object: object) -> TypeIs[TracebackType]:
@@ -410,7 +420,6 @@ def iscode(object: object) -> TypeIs[CodeType]:
         co_freevars         tuple of names of free variables
         co_posonlyargcount  number of positional only arguments
         co_kwonlyargcount   number of keyword only arguments (not including ** arg)
-        co_lnotab           encoded mapping of line numbers to bytecode indices
         co_name             name with which this code object was defined
         co_names            tuple of names other than arguments and function locals
         co_nlocals          number of local variables
@@ -484,7 +493,7 @@ def isgetsetdescriptor(object: object) -> TypeIs[GetSetDescriptorType]:
     modules.
     """
 
-def isdatadescriptor(object: object) -> TypeIs[_SupportsSet[Any, Any] | _SupportsDelete[Any]]:
+def isdatadescriptor(object: object) -> TypeIs[_SupportsSet[Never, Never] | _SupportsDelete[Never]]:
     """Return true if the object is a data descriptor.
 
     Data descriptors have a __set__ or a __delete__ attribute.  Examples are
@@ -522,18 +531,28 @@ def getabsfile(object: _SourceObjectType, _filename: str | None = None) -> str:
 @overload
 def getblock(lines: list[str]) -> list[str]:
     """Extract the block of code at the top of the given list of lines."""
-
 @overload
 def getblock(lines: tuple[str, ...]) -> tuple[str, ...]: ...
 @overload
 def getblock(lines: Sequence[str]) -> Sequence[str]: ...
-def getdoc(object: object) -> str | None:
-    """Get the documentation string for an object.
 
-    All tabs are expanded to spaces.  To clean up docstrings that are
-    indented to line up with blocks of code, any whitespace than can be
-    uniformly removed from the second line onwards is removed.
-    """
+if sys.version_info >= (3, 15):
+    def getdoc(object: object, *, inherit_class_doc: bool = True, fallback_to_class_doc: bool = True) -> str | None:
+        """Get the documentation string for an object.
+
+        All tabs are expanded to spaces.  To clean up docstrings that are
+        indented to line up with blocks of code, any whitespace than can be
+        uniformly removed from the second line onwards is removed.
+        """
+
+else:
+    def getdoc(object: object) -> str | None:
+        """Get the documentation string for an object.
+
+        All tabs are expanded to spaces.  To clean up docstrings that are
+        indented to line up with blocks of code, any whitespace than can be
+        uniformly removed from the second line onwards is removed.
+        """
 
 def getcomments(object: object) -> str | None:
     """Get lines of comments immediately preceding an object's source code.
@@ -597,7 +616,7 @@ if sys.version_info >= (3, 14):
     ) -> Signature:
         """Get a signature object for the passed callable."""
 
-elif sys.version_info >= (3, 10):
+else:
     def signature(
         obj: _IntrospectableCallable,
         *,
@@ -606,10 +625,6 @@ elif sys.version_info >= (3, 10):
         locals: Mapping[str, Any] | None = None,
         eval_str: bool = False,
     ) -> Signature:
-        """Get a signature object for the passed callable."""
-
-else:
-    def signature(obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Signature:
         """Get a signature object for the passed callable."""
 
 class _void:
@@ -648,6 +663,7 @@ class Signature:
         """Constructs Signature from the given list of Parameter
         objects and 'return_annotation'.  All arguments are optional.
         """
+
     empty = _empty
     @property
     def parameters(self) -> types.MappingProxyType[str, Parameter]: ...
@@ -670,6 +686,7 @@ class Signature:
         Pass 'parameters' and/or 'return_annotation' arguments
         to override them in the new copy.
         """
+
     __replace__ = replace
     if sys.version_info >= (3, 14):
         @classmethod
@@ -684,7 +701,7 @@ class Signature:
             annotation_format: Format = Format.VALUE,  # noqa: Y011
         ) -> Self:
             """Constructs Signature for the given callable object."""
-    elif sys.version_info >= (3, 10):
+    else:
         @classmethod
         def from_callable(
             cls,
@@ -696,10 +713,7 @@ class Signature:
             eval_str: bool = False,
         ) -> Self:
             """Constructs Signature for the given callable object."""
-    else:
-        @classmethod
-        def from_callable(cls, obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Self:
-            """Constructs Signature for the given callable object."""
+
     if sys.version_info >= (3, 14):
         def format(self, *, max_width: int | None = None, quote_annotation_strings: bool = True) -> str:
             """Create a string representation of the Signature object.
@@ -714,6 +728,7 @@ class Signature:
             marks. This is useful when the signature was created with the
             STRING format or when ``from __future__ import annotations`` was used.
             """
+
     elif sys.version_info >= (3, 13):
         def format(self, *, max_width: int | None = None) -> str:
             """Create a string representation of the Signature object.
@@ -729,7 +744,7 @@ class Signature:
 
 if sys.version_info >= (3, 14):
     from annotationlib import get_annotations as get_annotations
-elif sys.version_info >= (3, 10):
+else:
     def get_annotations(
         obj: Callable[..., object] | type[object] | ModuleType,  # any callable, class, or module
         *,
@@ -871,6 +886,7 @@ class Parameter:
         annotation: Any = ...,
     ) -> Self:
         """Creates a customized copy of the Parameter."""
+
     if sys.version_info >= (3, 13):
         __replace__ = replace
 
@@ -895,14 +911,14 @@ class BoundArguments:
     """
 
     __slots__ = ("arguments", "_signature", "__weakref__")
-    arguments: OrderedDict[str, Any]
+    arguments: dict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...
     @property
     def kwargs(self) -> dict[str, Any]: ...
     @property
     def signature(self) -> Signature: ...
-    def __init__(self, signature: Signature, arguments: OrderedDict[str, Any]) -> None: ...
+    def __init__(self, signature: Signature, arguments: dict[str, Any]) -> None: ...
     def apply_defaults(self) -> None:
         """Set default values for missing arguments.
 
@@ -995,22 +1011,43 @@ class FullArgSpec(NamedTuple):
     kwonlydefaults: dict[str, Any] | None
     annotations: dict[str, Any]
 
-def getfullargspec(func: object) -> FullArgSpec:
-    """Get the names and default values of a callable object's parameters.
+if sys.version_info >= (3, 15):
+    def getfullargspec(func: object, *, annotation_format: Format = Format.VALUE) -> FullArgSpec:  # noqa: Y011
+        """Get the names and default values of a callable object's parameters.
 
-    A tuple of seven things is returned:
-    (args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations).
-    'args' is a list of the parameter names.
-    'varargs' and 'varkw' are the names of the * and ** parameters or None.
-    'defaults' is an n-tuple of the default values of the last n parameters.
-    'kwonlyargs' is a list of keyword-only parameter names.
-    'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
-    'annotations' is a dictionary mapping parameter names to annotations.
+        A FullArgSpec namedtuple is returned, which has the following attributes:
+        'args' is a list of the parameter names.
+        'varargs' and 'varkw' are the names of the * and ** parameters or None.
+        'defaults' is an n-tuple of the default values of the last n parameters.
+        'kwonlyargs' is a list of keyword-only parameter names.
+        'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
+        'annotations' is a dictionary mapping parameter names to annotations.
 
-    Notable differences from inspect.signature():
-      - the "self" parameter is always reported, even for bound methods
-      - wrapper chains defined by __wrapped__ *not* unwrapped automatically
-    """
+        The *annotation_format* parameter controls the format of the annotations.
+        See the annotationlib documentation for details.
+
+        Notable differences from inspect.signature():
+          - the "self" parameter is always reported, even for bound methods
+          - wrapper chains defined by __wrapped__ *not* unwrapped automatically
+        """
+
+else:
+    def getfullargspec(func: object) -> FullArgSpec:
+        """Get the names and default values of a callable object's parameters.
+
+        A tuple of seven things is returned:
+        (args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations).
+        'args' is a list of the parameter names.
+        'varargs' and 'varkw' are the names of the * and ** parameters or None.
+        'defaults' is an n-tuple of the default values of the last n parameters.
+        'kwonlyargs' is a list of keyword-only parameter names.
+        'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
+        'annotations' is a dictionary mapping parameter names to annotations.
+
+        Notable differences from inspect.signature():
+          - the "self" parameter is always reported, even for bound methods
+          - wrapper chains defined by __wrapped__ *not* unwrapped automatically
+        """
 
 class ArgInfo(NamedTuple):
     """ArgInfo(args, varargs, keywords, locals)"""

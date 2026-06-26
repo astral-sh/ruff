@@ -40,26 +40,8 @@ def mac_ver(
     which default to ''. All tuple entries are strings.
     """
 
-if sys.version_info >= (3, 13):
+if sys.version_info < (3, 15):
     @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
-    def java_ver(
-        release: str = "",
-        vendor: str = "",
-        vminfo: tuple[str, str, str] = ("", "", ""),
-        osinfo: tuple[str, str, str] = ("", "", ""),
-    ) -> tuple[str, str, tuple[str, str, str], tuple[str, str, str]]:
-        """Version interface for Jython.
-
-        Returns a tuple (release, vendor, vminfo, osinfo) with vminfo being
-        a tuple (vm_name, vm_release, vm_vendor) and osinfo being a
-        tuple (os_name, os_version, os_arch).
-
-        Values which cannot be determined are set to the defaults
-        given as parameters (which all default to '').
-
-        """
-
-else:
     def java_ver(
         release: str = "",
         vendor: str = "",
@@ -150,9 +132,7 @@ else:
         except when needed.
         """
 
-        if sys.version_info >= (3, 10):
-            __match_args__ = ("system", "node", "release", "version", "machine")  # pyright: ignore[reportAssignmentType]
-
+        __match_args__ = ("system", "node", "release", "version", "machine")  # pyright: ignore[reportAssignmentType]
         def __new__(_cls, system: str, node: str, release: str, version: str, machine: str) -> Self:
             """Create new instance of uname_result_base(system, node, release, version, machine)"""
 
@@ -297,9 +277,8 @@ def platform(aliased: bool = False, terse: bool = False) -> str:
 
     """
 
-if sys.version_info >= (3, 10):
-    def freedesktop_os_release() -> dict[str, str]:
-        """Return operation system identification from freedesktop.org os-release"""
+def freedesktop_os_release() -> dict[str, str]:
+    """Return operation system identification from freedesktop.org os-release"""
 
 if sys.version_info >= (3, 13):
     class AndroidVer(NamedTuple):

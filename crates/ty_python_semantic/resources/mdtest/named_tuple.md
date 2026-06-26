@@ -1248,6 +1248,25 @@ reveal_type(Pair(1, 2).second)  # revealed: TypeVar
 
 The following attributes are available on `NamedTuple` classes / instances:
 
+### `__match_args__` before Python 3.10
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+
+# error: [unresolved-attribute]
+reveal_type(Point.__match_args__)  # revealed: Unknown
+```
+
+### Other attributes
+
 ```py
 from typing import NamedTuple
 
@@ -1257,6 +1276,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1360,6 +1380,8 @@ class Url(namedtuple("Url", field_names)):
         reveal_type(self.port)  # revealed: Any
         reveal_type(self.unknown)  # revealed: Any
         return self._replace(port=port)
+
+reveal_type(Url.__match_args__)  # revealed: tuple[str, ...]
 ```
 
 ## `collections.namedtuple` attributes
@@ -1372,6 +1394,7 @@ from collections import namedtuple
 Person = namedtuple("Person", ["name", "age"])
 
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1424,10 +1447,12 @@ satisfy:
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
     reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(...) -> NamedTupleLike
+    # revealed: bound method (tuple[object, ...] & NamedTupleLike)._replace(...) -> tuple[object, ...] & NamedTupleLike
+    reveal_type(x._replace)
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], [_T](value: tuple[_T, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
-    reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
+    # revealed: bound method (tuple[object, ...] & NamedTupleLike).__iter__() -> Iterator[object]
+    reveal_type(x.__iter__)
 
 def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
@@ -1467,7 +1492,7 @@ The type described by `NamedTuple` in type expressions is understood as being as
 `tuple[object, ...]` and `tuple[Any, ...]`:
 
 ```py
-static_assert(is_assignable_to(NamedTuple, tuple))
+static_assert(is_assignable_to(NamedTuple, tuple))  # error: [missing-type-argument]
 static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
 static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
 
@@ -1855,7 +1880,7 @@ class ConcreteChild(GenericBase[str]):
 class GenericChild(GenericBase[T]):
     def __new__(cls, x: T) -> Self:
         instance = super().__new__(cls, x)
-        reveal_type(instance)  # revealed: @Todo(super in generic class)
+        reveal_type(instance)  # revealed: Self@__new__
         return instance
 
 reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]

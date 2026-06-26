@@ -27,6 +27,10 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "Rayon task completion already makes result order unspecified"
+            )]
             for file in files.iter() {
                 let db = Db::dyn_clone(&*db);
                 s.spawn(move |_| {
@@ -104,8 +108,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | def utility_function():
           |     ^^^^^^^^^^^^^^^^
-        3 |     '''A helpful utility function'''
-        4 |     pass
           |
         info: Function utility_function
         ");
@@ -116,8 +118,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | class DataModel:
           |       ^^^^^^^^^
-        3 |     '''A data model class'''
-        4 |     def __init__(self):
           |
         info: Class DataModel
         ");
@@ -149,7 +149,6 @@ class Test:
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:3:9
           |
-        2 | class Test:
         3 |     def from_path(): ...
           |         ^^^^^^^^^
           |
@@ -174,8 +173,6 @@ class Test:
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:4:9
           |
-        2 | __all__ = []
-        3 | class Test:
         4 |     def from_path(): ...
           |         ^^^^^^^^^
           |
@@ -201,8 +198,6 @@ foo = 1
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:5:1
           |
-        3 | import json as json
-        4 | from collections import defaultdict
         5 | foo = 1
           | ^^^
           |

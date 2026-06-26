@@ -1,6 +1,8 @@
 # Identity tests
 
 ```py
+from typing_extensions import TypeAliasType
+
 class A: ...
 
 def _(a1: A, a2: A, o: object):
@@ -30,4 +32,11 @@ def _(a1: A, a2: A, o: object):
 
     reveal_type(a1 is not o)  # revealed: bool
     reveal_type(n1 is not o)  # revealed: bool
+
+def _(a1: TypeAliasType, a2: TypeAliasType):
+    reveal_type(a1 is a2)  # revealed: bool
+    reveal_type(a1 is not a2)  # revealed: bool
+
+reveal_type(list[int] is list[int])  # revealed: bool
+reveal_type(list[int] is not list[int])  # revealed: bool
 ```

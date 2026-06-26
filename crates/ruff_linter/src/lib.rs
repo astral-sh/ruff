@@ -9,9 +9,9 @@ pub use locator::Locator;
 pub use noqa::generate_noqa_edits;
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
-pub use rule_selector::RuleSelector;
 #[cfg(feature = "clap")]
-pub use rule_selector::clap_completion::RuleSelectorParser;
+pub use rule_selector::clap_completion::UnresolvedRuleSelectorParser;
+pub use rule_selector::{RuleSelector, UnresolvedRuleSelector};
 pub use rules::pycodestyle::rules::IOError;
 
 pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
@@ -51,7 +51,7 @@ mod text_helpers;
 pub mod upstream_categories;
 mod violation;
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, fuzzing, feature = "testing"))]
 pub mod test;
 
 pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");

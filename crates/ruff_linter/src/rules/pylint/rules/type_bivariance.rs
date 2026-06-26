@@ -67,7 +67,7 @@ impl Violation for TypeBivariance {
         match param_name {
             None => format!("`{kind}` cannot be both covariant and contravariant"),
             Some(param_name) => {
-                format!("`{kind}` \"{param_name}\" cannot be both covariant and contravariant",)
+                format!("`{kind}` \"{param_name}\" cannot be both covariant and contravariant")
             }
         }
     }

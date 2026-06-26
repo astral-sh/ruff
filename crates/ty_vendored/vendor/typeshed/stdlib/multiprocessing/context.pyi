@@ -9,8 +9,7 @@ from multiprocessing.managers import SyncManager
 from multiprocessing.pool import Pool as _Pool
 from multiprocessing.process import BaseProcess
 from multiprocessing.sharedctypes import Synchronized, SynchronizedArray, SynchronizedString
-from typing import Any, ClassVar, Literal, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing import Any, ClassVar, Literal, TypeAlias, TypeVar, overload
 
 if sys.platform != "win32":
     from multiprocessing.connection import Connection
@@ -63,6 +62,7 @@ class BaseContext:
         The managers methods such as `Lock()`, `Condition()` and `Queue()`
         can be used to create shared objects.
         """
+
     # N.B. Keep this in sync with multiprocessing.connection.Pipe.
     # _ConnectionBase is the common base class of Connection and PipeConnection
     # and can be used in cross-platform code.
@@ -72,6 +72,7 @@ class BaseContext:
     if sys.platform != "win32":
         def Pipe(self, duplex: bool = True) -> tuple[Connection[Any, Any], Connection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
+
     else:
         def Pipe(self, duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
@@ -120,21 +121,20 @@ class BaseContext:
     @overload
     def RawValue(self, typecode_or_type: type[_CT], *args: Any) -> _CT:
         """Returns a shared object"""
-
     @overload
     def RawValue(self, typecode_or_type: str, *args: Any) -> Any: ...
+
     @overload
     def RawArray(self, typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
         """Returns a shared array"""
-
     @overload
     def RawArray(self, typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any: ...
+
     @overload
     def Value(
         self, typecode_or_type: type[_SimpleCData[_T]], *args: Any, lock: Literal[True] | _LockLike = True
     ) -> Synchronized[_T]:
         """Returns a synchronized shared object"""
-
     @overload
     def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[False]) -> Synchronized[_CT]: ...
     @overload
@@ -143,12 +143,12 @@ class BaseContext:
     def Value(self, typecode_or_type: str, *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[Any]: ...
     @overload
     def Value(self, typecode_or_type: str | type[_CData], *args: Any, lock: bool | _LockLike = True) -> Any: ...
+
     @overload
     def Array(
         self, typecode_or_type: type[_SimpleCData[_T]], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
     ) -> SynchronizedArray[_T]:
         """Returns a synchronized shared array"""
-
     @overload
     def Array(
         self, typecode_or_type: type[c_char], size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True
@@ -169,6 +169,7 @@ class BaseContext:
     def Array(
         self, typecode_or_type: str | type[_CData], size_or_initializer: int | Sequence[Any], *, lock: bool | _LockLike = True
     ) -> Any: ...
+
     def freeze_support(self) -> None:
         """Check whether this is a fake forked process in a frozen executable.
         If so then run code specified by commandline and exit.
@@ -193,42 +194,51 @@ class BaseContext:
         start method.  Useful for people embedding Python.
         """
 
-    def set_forkserver_preload(self, module_names: list[str]) -> None:
-        """Set list of module names to try to load in forkserver process.
-        This is really just a hint.
-        """
+    if sys.version_info >= (3, 15):
+        def set_forkserver_preload(
+            self, module_names: list[str], *, on_error: Literal["ignore", "warn", "fail"] = "ignore"
+        ) -> None:
+            """Set list of module names to try to load in forkserver process.
+
+            The on_error parameter controls how import failures are handled:
+            "ignore" (default) silently ignores failures, "warn" emits warnings,
+            and "fail" raises exceptions breaking the forkserver context.
+            """
+
+    else:
+        def set_forkserver_preload(self, module_names: list[str]) -> None:
+            """Set list of module names to try to load in forkserver process.
+            This is really just a hint.
+            """
+
+    @overload
+    def get_context(self, method: None = None) -> DefaultContext: ...
+    @overload
+    def get_context(self, method: Literal["spawn"]) -> SpawnContext: ...
     if sys.platform != "win32":
-        @overload
-        def get_context(self, method: None = None) -> DefaultContext: ...
-        @overload
-        def get_context(self, method: Literal["spawn"]) -> SpawnContext: ...
         @overload
         def get_context(self, method: Literal["fork"]) -> ForkContext: ...
         @overload
         def get_context(self, method: Literal["forkserver"]) -> ForkServerContext: ...
-        @overload
-        def get_context(self, method: str) -> BaseContext: ...
-    else:
-        @overload
-        def get_context(self, method: None = None) -> DefaultContext: ...
-        @overload
-        def get_context(self, method: Literal["spawn"]) -> SpawnContext: ...
-        @overload
-        def get_context(self, method: str) -> BaseContext: ...
+
+    @overload
+    def get_context(self, method: str) -> BaseContext: ...
 
     @overload
     def get_start_method(self, allow_none: Literal[False] = False) -> str: ...
     @overload
     def get_start_method(self, allow_none: bool) -> str | None: ...
+
     def set_start_method(self, method: str | None, force: bool = False) -> None: ...
+
     @property
     def reducer(self) -> str:
         """Controls how objects will be reduced to a form that can be
         shared with other processes.
         """
-
     @reducer.setter
     def reducer(self, reduction: str) -> None: ...
+
     def _check_available(self) -> None: ...
 
 class Process(BaseProcess):
@@ -278,6 +288,13 @@ if sys.platform != "win32":
         Process: ClassVar[type[ForkServerProcess]]
 
 def _force_start_method(method: str) -> None: ...
-def get_spawning_popen() -> Any | None: ...
-def set_spawning_popen(popen: Any) -> None: ...
+
+if sys.platform != "win32":
+    def get_spawning_popen() -> popen_forkserver.Popen | popen_spawn_posix.Popen | None: ...
+    def set_spawning_popen(popen: popen_forkserver.Popen | popen_spawn_posix.Popen | None) -> None: ...
+
+else:
+    def get_spawning_popen() -> popen_spawn_win32.Popen | None: ...
+    def set_spawning_popen(popen: popen_spawn_win32.Popen | None) -> None: ...
+
 def assert_spawning(obj: Any) -> None: ...

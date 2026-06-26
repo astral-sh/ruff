@@ -343,25 +343,6 @@ def f(x: A):
     x = A()
 ```
 
-### Assignments to nonlocal variables
-
-Writes to the outer-scope variable are currently not detected:
-
-```py
-def outer() -> None:
-    x = None
-
-    def set_x() -> None:
-        nonlocal x
-        x = 1
-    set_x()
-
-    def inner() -> None:
-        # TODO: this should ideally be `None | Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: None
-    inner()
-```
-
 ## Handling of overloads
 
 ### With implementation

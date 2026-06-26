@@ -2,8 +2,8 @@
 
 import sys
 from collections.abc import Callable
-from typing import Final, NewType
-from typing_extensions import Never, Self, TypeAlias
+from typing import Final, NewType, TypeAlias
+from typing_extensions import Never, Self
 
 if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <= 3.13
     from _interpqueues import _UnboundOp

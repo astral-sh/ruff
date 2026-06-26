@@ -2,16 +2,13 @@ use std::panic::UnwindSafe;
 
 use anyhow::anyhow;
 use lsp_server::{self as server, RequestId};
-use lsp_types::{notification::Notification, request::Request};
+use lsp_types::{LspNotificationMethod, LspRequestMethod, Notification, Request};
 use notifications as notification;
 use requests as request;
 
 use crate::{
     server::{
-        api::traits::{
-            BackgroundDocumentNotificationHandler, BackgroundDocumentRequestHandler,
-            SyncNotificationHandler,
-        },
+        api::traits::{BackgroundDocumentNotificationHandler, SyncNotificationHandler},
         schedule::Task,
     },
     session::{Client, Session},
@@ -26,20 +23,20 @@ use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{Result, schedule::BackgroundSchedule};
 
-/// Defines the `document_url` method for implementers of [`Notification`] and [`Request`], given
-/// the request or notification parameter type.
+/// Defines the `document_uri` method for implementers of [`Request`], given the request parameter
+/// type.
 ///
 /// This would only work if the parameter type has a `text_document` field with a `uri` field
-/// that is of type [`lsp_types::Url`].
-macro_rules! define_document_url {
+/// that is of type [`lsp_types::Uri`].
+macro_rules! define_document_uri {
     ($params:ident: &$p:ty) => {
-        fn document_url($params: &$p) -> std::borrow::Cow<'_, lsp_types::Url> {
+        fn document_uri($params: &$p) -> std::borrow::Cow<'_, lsp_types::Uri> {
             std::borrow::Cow::Borrowed(&$params.text_document.uri)
         }
     };
 }
 
-use define_document_url;
+use define_document_uri;
 
 /// Processes a request from the client to the server.
 ///
@@ -50,7 +47,7 @@ use define_document_url;
 pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
-    match req.method.as_str() {
+    match LspRequestMethod::from(req.method.as_str()) {
         request::CodeActions::METHOD => {
             background_request_task::<request::CodeActions>(req, BackgroundSchedule::Worker)
         }
@@ -70,7 +67,7 @@ pub(super) fn request(req: server::Request) -> Task {
         request::Hover::METHOD => {
             background_request_task::<request::Hover>(req, BackgroundSchedule::Worker)
         }
-        lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
+        lsp_types::ShutdownRequest::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             let result: Result<()> = Err(Error::new(
@@ -101,7 +98,7 @@ pub(super) fn request(req: server::Request) -> Task {
 }
 
 pub(super) fn notification(notif: server::Notification) -> Task {
-    match notif.method.as_str() {
+    match LspNotificationMethod::from(notif.method.as_str()) {
         notification::DidChange::METHOD => {
             sync_notification_task::<notification::DidChange>(notif)
         }
@@ -125,10 +122,10 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notification::DidCloseNotebook::METHOD => {
             sync_notification_task::<notification::DidCloseNotebook>(notif)
         }
-        lsp_types::notification::Cancel::METHOD => {
+        lsp_types::CancelNotification::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
-        lsp_types::notification::SetTrace::METHOD => {
+        lsp_types::SetTraceNotification::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
         }
@@ -153,18 +150,19 @@ where
 {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::sync(move |session, client: &Client| {
-        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client);
     }))
 }
 
-fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
 ) -> Result<Task>
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+    R::Snapshot: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
 
@@ -175,15 +173,10 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params).into_owned();
-
-        let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
-            tracing::warn!("Ignoring request because snapshot for path `{url:?}` doesn't exist.");
-            return Box::new(|_| {});
-        };
+        let snapshot = R::snapshot(session, &params);
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
@@ -200,7 +193,6 @@ where
 
             let result =
                 std::panic::catch_unwind(|| R::run_with_snapshot(snapshot, client, params));
-
             let response = request_result_to_response::<R>(result);
             respond::<R>(&id, response, client);
         })
@@ -214,7 +206,7 @@ fn request_result_to_response<R>(
     >,
 ) -> Result<<<R as RequestHandler>::RequestType as Request>::Result>
 where
-    R: BackgroundDocumentRequestHandler,
+    R: RequestHandler,
 {
     match result {
         Ok(response) => response,
@@ -237,7 +229,7 @@ where
 fn sync_notification_task<N: SyncNotificationHandler>(notif: server::Notification) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
-        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             client
@@ -257,16 +249,16 @@ where
 {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
-        let url = N::document_url(&params);
+        let uri = N::document_uri(&params);
 
-        let Some(snapshot) = session.take_snapshot((*url).clone()) else {
+        let Some(snapshot) = session.take_snapshot((*uri).clone()) else {
             tracing::debug!(
-                "Ignoring notification because snapshot for url `{url}` doesn't exist."
+                "Ignoring notification because snapshot for uri `{uri}` doesn't exist."
             );
             return Box::new(|_| {});
         };
         Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+            let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
 
             let result =
                 match std::panic::catch_unwind(|| N::run_with_snapshot(snapshot, client, params)) {
@@ -311,7 +303,7 @@ where
     <<Req as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     request
-        .extract(Req::METHOD)
+        .extract(Req::METHOD.as_str())
         .map_err(|err| match err {
             json_err @ server::ExtractError::JsonError { .. } => {
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
@@ -354,7 +346,7 @@ fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::Respo
 fn cast_notification<N>(
     notification: server::Notification,
 ) -> Result<(
-    &'static str,
+    LspNotificationMethod<'static>,
     <<N as NotificationHandler>::NotificationType as Notification>::Params,
 )>
 where
@@ -363,7 +355,7 @@ where
     Ok((
         N::METHOD,
         notification
-            .extract(N::METHOD)
+            .extract(N::METHOD.as_str())
             .map_err(|err| match err {
                 json_err @ server::ExtractError::JsonError { .. } => {
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")

@@ -1,13 +1,12 @@
 use lsp_types::{SymbolKind, TypeHierarchyItem};
-use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::files::File;
 use ruff_text_size::TextSize;
 use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;
-use crate::document::{PositionExt, ToRangeExt};
+use crate::document::{ToRangeExt, resolve_file_uri_range};
 use crate::session::SessionSnapshot;
-use crate::system::file_to_url;
+use crate::system::file_to_uri;
 
 /// The subtype and supertype implementation.
 ///
@@ -25,7 +24,12 @@ pub(crate) fn hierarchy_handler(
     // projects.
     let mut items = vec![];
     for db in snapshot.projects() {
-        let Some((file, offset)) = resolve_item_location(db, requested_item, encoding) else {
+        let Some((file, offset)) = resolve_file_uri_range(
+            db,
+            &requested_item.uri,
+            requested_item.selection_range,
+            encoding,
+        ) else {
             continue;
         };
         items.extend(
@@ -37,62 +41,18 @@ pub(crate) fn hierarchy_handler(
     if items.is_empty() { None } else { Some(items) }
 }
 
-/// Attempts to resolve the location in the provided
-/// type hierarchy item into `ty_ide` types. This includes
-/// mapping system paths back into their proper vendored
-/// path types (if applicable).
-fn resolve_item_location(
-    db: &ProjectDatabase,
-    item: &TypeHierarchyItem,
-    encoding: PositionEncoding,
-) -> Option<(File, TextSize)> {
-    let system_path = SystemPathBuf::from_path_buf(item.uri.to_file_path().ok()?).ok()?;
-
-    let file = if let Some(ref vendored_root) = ty_ide::cached_vendored_root(db)
-        && let Some(vendored_path) = ty_ide::map_system_to_vendored(vendored_root, &system_path)
-    {
-        match vendored_path_to_file(db, vendored_path) {
-            Ok(file) => file,
-            Err(err) => {
-                tracing::warn!(
-                    "Could not resolve type hierarchy item location \
-                     for vendored file path `{vendored_path}`: {err}"
-                );
-                return None;
-            }
-        }
-    } else {
-        match system_path_to_file(db, &system_path) {
-            Ok(file) => file,
-            Err(err) => {
-                tracing::warn!(
-                    "Could not resolve type hierarchy item location \
-                     for system file path `{system_path}`: {err}"
-                );
-                return None;
-            }
-        }
-    };
-
-    let offset = item
-        .selection_range
-        .start
-        .to_text_size(db, file, &item.uri, encoding)?;
-    Some((file, offset))
-}
-
 pub(crate) fn convert_to_lsp_item(
     db: &ProjectDatabase,
     item: ty_ide::TypeHierarchyItem,
     encoding: PositionEncoding,
 ) -> Option<TypeHierarchyItem> {
-    let uri = file_to_url(db, item.file)?;
+    let uri = file_to_uri(db, item.file)?;
     let full_range = item.full_range.to_lsp_range(db, item.file, encoding)?;
     let selection_range = item.selection_range.to_lsp_range(db, item.file, encoding)?;
 
     Some(TypeHierarchyItem {
         name: item.name.into(),
-        kind: SymbolKind::CLASS,
+        kind: SymbolKind::Class,
         tags: None,
         detail: item.detail,
         uri,

@@ -16,8 +16,8 @@ from re import Pattern
 from string import Template
 from time import struct_time
 from types import FrameType, GenericAlias, TracebackType
-from typing import Any, ClassVar, Final, Generic, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import Any, ClassVar, Final, Generic, Literal, Protocol, TextIO, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "BASIC_FORMAT",
@@ -115,6 +115,7 @@ class Filterer:
         """
         Remove the specified filter from this handler.
         """
+
     if sys.version_info >= (3, 12):
         def filter(self, record: LogRecord) -> bool | LogRecord:
             """
@@ -141,6 +142,7 @@ class Filterer:
                Allow filters to return a LogRecord instead of
                modifying it in place.
             """
+
     else:
         def filter(self, record: LogRecord) -> bool:
             """
@@ -257,6 +259,7 @@ class Logger(Filterer):
         It's useful, for example, when the parent logger is named using
         __name__ rather than a literal string.
         """
+
     if sys.version_info >= (3, 12):
         def getChildren(self) -> set[Logger]: ...
 
@@ -406,6 +409,7 @@ class Logger(Filterer):
         Low-level logging routine which creates a LogRecord and then calls
         all the handlers of this logger to handle the record.
         """
+
     fatal = critical
     def addHandler(self, hdlr: Handler) -> None:
         """
@@ -650,50 +654,30 @@ class Formatter:
     default_time_format: str
     default_msec_format: str | None
 
-    if sys.version_info >= (3, 10):
-        def __init__(
-            self,
-            fmt: str | None = None,
-            datefmt: str | None = None,
-            style: _FormatStyle = "%",
-            validate: bool = True,
-            *,
-            defaults: Mapping[str, Any] | None = None,
-        ) -> None:
-            """
-            Initialize the formatter with specified format strings.
+    def __init__(
+        self,
+        fmt: str | None = None,
+        datefmt: str | None = None,
+        style: _FormatStyle = "%",
+        validate: bool = True,
+        *,
+        defaults: Mapping[str, Any] | None = None,
+    ) -> None:
+        """
+        Initialize the formatter with specified format strings.
 
-            Initialize the formatter either with the specified format string, or a
-            default as described above. Allow for specialized date formatting with
-            the optional datefmt argument. If datefmt is omitted, you get an
-            ISO8601-like (or RFC 3339-like) format.
+        Initialize the formatter either with the specified format string, or a
+        default as described above. Allow for specialized date formatting with
+        the optional datefmt argument. If datefmt is omitted, you get an
+        ISO8601-like (or RFC 3339-like) format.
 
-            Use a style parameter of '%', '{' or '$' to specify that you want to
-            use one of %-formatting, :meth:`str.format` (``{}``) formatting or
-            :class:`string.Template` formatting in your format string.
+        Use a style parameter of '%', '{' or '$' to specify that you want to
+        use one of %-formatting, :meth:`str.format` (``{}``) formatting or
+        :class:`string.Template` formatting in your format string.
 
-            .. versionchanged:: 3.2
-               Added the ``style`` parameter.
-            """
-    else:
-        def __init__(
-            self, fmt: str | None = None, datefmt: str | None = None, style: _FormatStyle = "%", validate: bool = True
-        ) -> None:
-            """
-            Initialize the formatter with specified format strings.
-
-            Initialize the formatter either with the specified format string, or a
-            default as described above. Allow for specialized date formatting with
-            the optional datefmt argument. If datefmt is omitted, you get an
-            ISO8601-like (or RFC 3339-like) format.
-
-            Use a style parameter of '%', '{' or '$' to specify that you want to
-            use one of %-formatting, :meth:`str.format` (``{}``) formatting or
-            :class:`string.Template` formatting in your format string.
-
-            .. versionchanged:: 3.2
-               Added the ``style`` parameter.
-            """
+        .. versionchanged:: 3.2
+           Added the ``style`` parameter.
+        """
 
     def format(self, record: LogRecord) -> str:
         """
@@ -803,6 +787,7 @@ class Filter:
         children, will have its events allowed through the filter. If no
         name is specified, allow every event.
         """
+
     if sys.version_info >= (3, 12):
         def filter(self, record: LogRecord) -> bool | LogRecord:
             """
@@ -811,6 +796,7 @@ class Filter:
             Returns True if the record should be logged, or False otherwise.
             If deemed appropriate, the record may be modified in-place.
             """
+
     else:
         def filter(self, record: LogRecord) -> bool:
             """
@@ -884,6 +870,7 @@ class LogRecord:
         Return the message for this LogRecord after merging any user-supplied
         arguments with the message.
         """
+
     # Allows setting contextual information on LogRecord objects as per the docs, see #7833
     def __setattr__(self, name: str, value: Any, /) -> None: ...
 
@@ -897,6 +884,7 @@ class LoggerAdapter(Generic[_L]):
 
     logger: _L
     manager: Manager  # undocumented
+    extra: Mapping[str, object] | None
 
     if sys.version_info >= (3, 13):
         def __init__(self, logger: _L, extra: Mapping[str, object] | None = None, merge_extra: bool = False) -> None:
@@ -920,7 +908,8 @@ class LoggerAdapter(Generic[_L]):
             .. versionchanged:: 3.13
                The *merge_extra* argument was added.
             """
-    elif sys.version_info >= (3, 10):
+
+    else:
         def __init__(self, logger: _L, extra: Mapping[str, object] | None = None) -> None:
             """
             Initialize the adapter with a logger and a dict-like object which
@@ -932,22 +921,6 @@ class LoggerAdapter(Generic[_L]):
 
             adapter = LoggerAdapter(someLogger, dict(p1=v1, p2="v2"))
             """
-    else:
-        def __init__(self, logger: _L, extra: Mapping[str, object]) -> None:
-            """
-            Initialize the adapter with a logger and a dict-like object which
-            provides contextual information. This constructor signature allows
-            easy stacking of LoggerAdapters, if so desired.
-
-            You can effectively pass keyword arguments as shown in the
-            following example:
-
-            adapter = LoggerAdapter(someLogger, dict(p1=v1, p2="v2"))
-            """
-    if sys.version_info >= (3, 10):
-        extra: Mapping[str, object] | None
-    else:
-        extra: Mapping[str, object]
 
     if sys.version_info >= (3, 13):
         merge_extra: bool
@@ -1093,6 +1066,7 @@ class LoggerAdapter(Generic[_L]):
         """
         See if the underlying logger has any handlers.
         """
+
     if sys.version_info >= (3, 11):
         def _log(
             self,
@@ -1107,6 +1081,7 @@ class LoggerAdapter(Generic[_L]):
             """
             Low-level log implementation, proxied to allow nested logger adapters.
             """
+
     else:
         def _log(
             self,
@@ -1127,7 +1102,8 @@ class LoggerAdapter(Generic[_L]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 def getLogger(name: str | None = None) -> Logger:
@@ -1288,7 +1264,6 @@ def getLevelName(level: int) -> str:
     If no matching numeric or string value is passed in, the string
     'Level %s' % level is returned.
     """
-
 @overload
 @deprecated("The str -> int case is considered a mistake.")
 def getLevelName(level: str) -> Any: ...
@@ -1358,6 +1333,15 @@ def basicConfig(
               created FileHandler, causing it to be used when the file is
               opened in text mode. If not specified, the default value is
               `backslashreplace`.
+    formatter If specified, set this formatter instance for all involved
+              handlers.
+              If not specified, the default is to create and use an instance of
+              `logging.Formatter` based on arguments 'format', 'datefmt' and
+              'style'.
+              When 'formatter' is specified together with any of the three
+              arguments 'format', 'datefmt' and 'style', a `ValueError`
+              is raised to signal that these arguments would lose meaning
+              otherwise.
 
     Note that you could specify a stream created using open(filename, mode)
     rather than passing the filename and mode in. However, it should be
@@ -1380,8 +1364,10 @@ def basicConfig(
 
     .. versionchanged:: 3.9
        Added the ``encoding`` and ``errors`` parameters.
-    """
 
+    .. versionchanged:: 3.15
+       Added the ``formatter`` parameter.
+    """
 @overload  # handlers is None, filename is passed (but possibly None)
 def basicConfig(
     *,
@@ -1407,6 +1393,7 @@ def basicConfig(
     handlers: None = None,
     force: bool | None = False,
 ) -> None: ...
+
 def shutdown(handlerList: Sequence[Any] = ...) -> None:  # handlerList is undocumented
     """
     Perform any cleanup actions in the logging system (e.g. flushing
@@ -1450,6 +1437,7 @@ class StreamHandler(Handler, Generic[_StreamT]):
 
     stream: _StreamT  # undocumented
     terminator: str
+
     @overload
     def __init__(self: StreamHandler[TextIO], stream: None = None) -> None:
         """
@@ -1457,9 +1445,9 @@ class StreamHandler(Handler, Generic[_StreamT]):
 
         If stream is not specified, sys.stderr is used.
         """
-
     @overload
     def __init__(self: StreamHandler[_StreamT], stream: _StreamT) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
+
     def setStream(self, stream: _StreamT) -> _StreamT | None:
         """
         Sets the StreamHandler's stream to the specified value,
@@ -1468,11 +1456,13 @@ class StreamHandler(Handler, Generic[_StreamT]):
         Returns the old stream, if the stream was changed, or None
         if it wasn't.
         """
+
     if sys.version_info >= (3, 11):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class FileHandler(StreamHandler[TextIOWrapper]):
@@ -1550,11 +1540,8 @@ class PercentStyle:  # undocumented
     asctime_search: str
     validation_pattern: Pattern[str]
     _fmt: str
-    if sys.version_info >= (3, 10):
-        def __init__(self, fmt: str, *, defaults: Mapping[str, Any] | None = None) -> None: ...
-    else:
-        def __init__(self, fmt: str) -> None: ...
 
+    def __init__(self, fmt: str, *, defaults: Mapping[str, Any] | None = None) -> None: ...
     def usesTime(self) -> bool: ...
     def validate(self) -> None:
         """Validate the input format, ensure it matches the correct style"""

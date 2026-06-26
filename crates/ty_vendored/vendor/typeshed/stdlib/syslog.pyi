@@ -66,6 +66,5 @@ if sys.platform != "win32":
         """syslog([priority=LOG_INFO,] message)
         Send the string message to the system logger.
         """
-
     @overload
     def syslog(message: str) -> None: ...

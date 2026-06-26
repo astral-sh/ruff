@@ -8,8 +8,8 @@ represent it is with a tree.  This module has two classes for this purpose:
    2. Element represents a single node in this tree.
 
 Interactions with the whole document (reading and writing to/from files) are
-usually done on the ElementTree level.  Interactions with a single XML element
-and its sub-elements are done on the Element level.
+usually done on the ElementTree level.  Interactions with a single XML
+element and its sub-elements are done on the Element level.
 
 Element is a flexible container object designed to store hierarchical data
 structures in memory. It can be described as a cross between a list and a
@@ -37,8 +37,8 @@ import sys
 from _collections_abc import dict_keys
 from _typeshed import FileDescriptorOrPath, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Callable, Generator, ItemsView, Iterable, Iterator, Mapping, Sequence
-from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, TypeGuard, deprecated, disjoint_base
+from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeAlias, TypeGuard, TypeVar, overload, type_check_only
+from typing_extensions import deprecated, disjoint_base
 from xml.parsers.expat import XMLParserType
 
 __all__ = [
@@ -62,13 +62,14 @@ __all__ = [
     "tostring",
     "tostringlist",
     "TreeBuilder",
-    "VERSION",
     "XML",
     "XMLID",
     "XMLParser",
     "XMLPullParser",
     "register_namespace",
 ]
+if sys.version_info < (3, 15):
+    __all__ += ["VERSION"]
 
 _T = TypeVar("_T")
 _FileRead: TypeAlias = FileDescriptorOrPath | SupportsRead[bytes] | SupportsRead[str]
@@ -101,17 +102,17 @@ def canonicalize(
 ) -> str:
     """Convert XML to its C14N 2.0 serialised form.
 
-    If *out* is provided, it must be a file or file-like object that receives
-    the serialised canonical XML output (text, not bytes) through its ``.write()``
-    method.  To write to a file, open it in text mode with encoding "utf-8".
-    If *out* is not provided, this function returns the output as text string.
+    If *out* is provided, it must be a file or file-like object that
+    receives the serialised canonical XML output (text, not bytes) through
+    its ``.write()`` method.  To write to a file, open it in text mode with
+    encoding "utf-8".  If *out* is not provided, this function returns the
+    output as text string.
 
     Either *xml_data* (an XML string) or *from_file* (a file path or
     file-like object) must be provided as input.
 
     The configuration options are the same as for the ``C14NWriterTarget``.
     """
-
 @overload
 def canonicalize(
     xml_data: str | ReadableBuffer | None = None,
@@ -154,21 +155,26 @@ class Element(Generic[_Tag]):
     def extend(self, elements: Iterable[Element[Any]], /) -> None: ...
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None: ...
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]: ...
+
     @overload
     def findtext(self, path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None: ...
     @overload
     def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str: ...
+
     @overload
     def get(self, key: str, default: None = None) -> str | None: ...
     @overload
     def get(self, key: str, default: _T) -> str | _T: ...
+
     def insert(self, index: int, subelement: Element[Any], /) -> None: ...
     def items(self) -> ItemsView[str, str]: ...
     def iter(self, tag: str | None = None) -> Generator[Element]: ...
+
     @overload
     def iterfind(self, path: Literal[""], namespaces: dict[str, str] | None = None) -> None: ...  # type: ignore[overload-overlap]
     @overload
     def iterfind(self, path: str, namespaces: dict[str, str] | None = None) -> Generator[Element]: ...
+
     def itertext(self) -> Generator[str]: ...
     def keys(self) -> dict_keys[str, str]: ...
     # makeelement returns the type of self in Python impl, but not in C impl
@@ -183,17 +189,18 @@ class Element(Generic[_Tag]):
     @overload
     def __getitem__(self, key: SupportsIndex, /) -> Element:
         """Return self[key]."""
-
     @overload
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Element]: ...
+
     def __len__(self) -> int:
         """Return len(self)."""
+
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
     def __iter__(self) -> Iterator[Element]: ...
+
     @overload
     def __setitem__(self, key: SupportsIndex, value: Element[Any], /) -> None:
         """Set self[key] to value."""
-
     @overload
     def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Element[Any]], /) -> None: ...
 
@@ -279,8 +286,8 @@ class ElementTree(Generic[_Root]):
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
         """Load external XML document into element tree.
 
-        *source* is a file name or file object, *parser* is an optional parser
-        instance that defaults to XMLParser.
+        *source* is a file name or file object, *parser* is an optional
+        parser instance that defaults to XMLParser.
 
         ParseError is raised if the parser fails to parse the document.
 
@@ -291,7 +298,8 @@ class ElementTree(Generic[_Root]):
     def iter(self, tag: str | None = None) -> Generator[Element]:
         """Create and return tree iterator for the root element.
 
-        The iterator loops over all elements in this tree, in document order.
+        The iterator loops over all elements in this tree, in document
+        order.
 
         *tag* is a string with the tag name to iterate over
         (default is to return all elements).
@@ -304,7 +312,8 @@ class ElementTree(Generic[_Root]):
         Same as getroot().find(path), which is Element.find()
 
         *path* is a string having either an element tag or an XPath,
-        *namespaces* is an optional mapping from namespace prefix to full name.
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
         Return the first matching element, or None if no element was found.
 
@@ -317,21 +326,23 @@ class ElementTree(Generic[_Root]):
         Same as getroot().findtext(path),  which is Element.findtext()
 
         *path* is a string having either an element tag or an XPath,
-        *namespaces* is an optional mapping from namespace prefix to full name.
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
         Return the first matching element, or None if no element was found.
 
         """
-
     @overload
     def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str: ...
+
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]:
         """Find all matching subelements by tag name or path.
 
         Same as getroot().findall(path), which is Element.findall().
 
         *path* is a string having either an element tag or an XPath,
-        *namespaces* is an optional mapping from namespace prefix to full name.
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
         Return list containing all matching elements in document order.
 
@@ -349,9 +360,9 @@ class ElementTree(Generic[_Root]):
         Return an iterable yielding all matching elements in document order.
 
         """
-
     @overload
     def iterfind(self, path: str, namespaces: dict[str, str] | None = None) -> Generator[Element]: ...
+
     def write(
         self,
         file_or_filename: _FileWrite,
@@ -365,24 +376,26 @@ class ElementTree(Generic[_Root]):
         """Write element tree to a file as XML.
 
         Arguments:
-          *file_or_filename* -- file name or a file object opened for writing
+          *file_or_filename* -- file name or a file object opened for
+                                writing
 
           *encoding* -- the output encoding (default: US-ASCII)
 
-          *xml_declaration* -- bool indicating if an XML declaration should be
-                               added to the output. If None, an XML declaration
-                               is added if encoding IS NOT either of:
-                               US-ASCII, UTF-8, or Unicode
+          *xml_declaration* -- bool indicating if an XML declaration should
+                               be added to the output. If None, an XML
+                               declaration is added if encoding IS NOT
+                               either of: US-ASCII, UTF-8, or Unicode
 
-          *default_namespace* -- sets the default XML namespace (for "xmlns")
+          *default_namespace* -- sets the default XML namespace (for
+                                 "xmlns")
 
           *method* -- either "xml" (default), "html, "text", or "c14n"
 
           *short_empty_elements* -- controls the formatting of elements
-                                    that contain no content. If True (default)
-                                    they are emitted as a single self-closed
-                                    tag, otherwise they are emitted as a pair
-                                    of start/end tags
+                                    that contain no content.  If True
+                                    (default) they are emitted as a single
+                                    self-closed tag, otherwise they are
+                                    emitted as a pair of start/end tags
 
         """
 
@@ -419,14 +432,13 @@ def tostring(
     is returned. Otherwise a bytestring is returned.
 
     *element* is an Element instance, *encoding* is an optional output
-    encoding defaulting to US-ASCII, *method* is an optional output which can
-    be one of "xml" (default), "html", "text" or "c14n", *default_namespace*
-    sets the default XML namespace (for "xmlns").
+    encoding defaulting to US-ASCII, *method* is an optional output which
+    can be one of "xml" (default), "html", "text" or "c14n",
+    *default_namespace* sets the default XML namespace (for "xmlns").
 
     Returns an (optionally) encoded string containing the XML data.
 
     """
-
 @overload
 def tostring(
     element: Element[Any],
@@ -447,6 +459,7 @@ def tostring(
     default_namespace: str | None = None,
     short_empty_elements: bool = True,
 ) -> Any: ...
+
 @overload
 def tostringlist(
     element: Element[Any],
@@ -477,6 +490,7 @@ def tostringlist(
     default_namespace: str | None = None,
     short_empty_elements: bool = True,
 ) -> list[Any]: ...
+
 def dump(elem: Element[Any] | ElementTree[Any]) -> None:
     """Write element tree or element structure to sys.stdout.
 
@@ -514,17 +528,26 @@ def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTre
 
     """
 
-# This class is defined inside the body of iterparse
+# The type of the second element of the tuple yielded by iterparse depends
+# on the event type in the first element of the tuple:
+#  * start, end: Element[str]
+#  * comment, pi: Element[_ElementCallable]
+#  * start-ns: tuple[str, str] (prefix, uri)
+#  * end-ns: None
+_EventT_co = TypeVar("_EventT_co", bound=Element[str] | Element[_ElementCallable] | tuple[str, str] | None, covariant=True)
+_EventType: TypeAlias = Literal["start", "end", "comment", "pi", "start-ns", "end-ns"]
+
+# This class is defined inside the body of iterparse.
 @type_check_only
-class _IterParseIterator(Iterator[tuple[str, Element]], Protocol):
-    def __next__(self) -> tuple[str, Element]: ...
+class _IterParseIterator(Iterator[tuple[_EventType, _EventT_co]], Protocol[_EventT_co]):
     if sys.version_info >= (3, 13):
         def close(self) -> None: ...
     if sys.version_info >= (3, 11):
         def __del__(self) -> None: ...
 
+# See the comment for _EventT_co above for possible iterator types.
 @overload
-def iterparse(source: _FileRead, events: Sequence[str] | None = None) -> _IterParseIterator:
+def iterparse(source: _FileRead, events: Iterable[_EventType]) -> _IterParseIterator[Any]:
     """Incrementally parse XML document into ElementTree.
 
     This class also reports what's going on to the user based on the
@@ -534,20 +557,25 @@ def iterparse(source: _FileRead, events: Sequence[str] | None = None) -> _IterPa
     "end" events are reported.
 
     *source* is a filename or file object containing XML data, *events* is
-    a list of events to report back, *parser* is an optional parser instance.
+    a list of events to report back, *parser* is an optional parser
+    instance.
 
     Returns an iterator providing (event, elem) pairs.
 
     """
+@overload
+def iterparse(source: _FileRead, events: None = None) -> _IterParseIterator[Element[str]]: ...
 
+# In case a custom parser is passed, the type of the second element of the tuple
+# yielded by iterparse depends on the parser.
 @overload
 @deprecated("The `parser` parameter is deprecated since Python 3.4.")
-def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator: ...
+def iterparse(source: _FileRead, events: Iterable[_EventType], parser: XMLParser | None = None) -> _IterParseIterator[Any]: ...
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
 
-class XMLPullParser(Generic[_E]):
-    def __init__(self, events: Sequence[str] | None = None, *, _parser: XMLParser[_E] | None = None) -> None: ...
+class XMLPullParser(Generic[_EventT_co]):
+    def __init__(self, events: Iterable[_EventType] | None = None, *, _parser: XMLParser[_EventT_co] | None = None) -> None: ...
     def feed(self, data: str | ReadableBuffer) -> None:
         """Feed encoded data to parser."""
 
@@ -558,7 +586,7 @@ class XMLPullParser(Generic[_E]):
         read_events() to consume elements from XMLPullParser.
         """
 
-    def read_events(self) -> Iterator[_EventQueue | tuple[str, _E]]:
+    def read_events(self) -> Iterator[_EventQueue | tuple[_EventType, _EventT_co]]:
         """Return an iterator over currently available (event, elem) pairs.
 
         Events are consumed from the internal event queue as they are
@@ -646,19 +674,22 @@ class C14NWriterTarget:
     Serialises parse events to XML C14N 2.0.
 
     The *write* function is used for writing out the resulting data stream
-    as text (not bytes).  To write to a file, open it in text mode with encoding
-    "utf-8" and pass its ``.write`` method.
+    as text (not bytes).  To write to a file, open it in text mode with
+    encoding "utf-8" and pass its ``.write`` method.
 
     Configuration options:
 
     - *with_comments*: set to true to include comments
-    - *strip_text*: set to true to strip whitespace before and after text content
-    - *rewrite_prefixes*: set to true to replace namespace prefixes by "n{number}"
+    - *strip_text*: set to true to strip whitespace before and after text
+                    content
+    - *rewrite_prefixes*: set to true to replace namespace prefixes by
+                          "n{number}"
     - *qname_aware_tags*: a set of qname aware tag names in which prefixes
                           should be replaced in text content
-    - *qname_aware_attrs*: a set of qname aware attribute names in which prefixes
-                           should be replaced in text content
-    - *exclude_attrs*: a set of attribute names that should not be serialised
+    - *qname_aware_attrs*: a set of qname aware attribute names in which
+                           prefixes should be replaced in text content
+    - *exclude_attrs*: a set of attribute names that should not be
+                       serialised
     - *exclude_tags*: a set of tag names that should not be serialised
     """
 

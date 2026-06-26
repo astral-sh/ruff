@@ -74,13 +74,14 @@ class RefactoringTool:
     @overload
     def log_message(self, msg: object) -> None:
         """Hook to log a message."""
-
     @overload
     def log_message(self, msg: str, *args: object) -> None: ...
+
     @overload
     def log_debug(self, msg: object) -> None: ...
     @overload
     def log_debug(self, msg: str, *args: object) -> None: ...
+
     def print_output(self, old_text: str, new_text: str, filename: StrPath, equal: bool) -> None:
         """Called with the old version, new version, and filename of a
         refactored file.
@@ -161,6 +162,7 @@ class RefactoringTool:
         then rewrites the file; the latter is only done if the write option is
         set.
         """
+
     PS1: Final = ">>> "
     PS2: Final = "... "
     def refactor_docstring(self, input: str, filename: StrPath) -> str:

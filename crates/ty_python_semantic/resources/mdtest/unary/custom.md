@@ -135,6 +135,60 @@ reveal_type(-no())  # revealed: Unknown
 reveal_type(~no())  # revealed: Unknown
 ```
 
+## Union where one member lacks the dunder
+
+```py
+class Yes:
+    def __pos__(self) -> bool:
+        return False
+
+    def __neg__(self) -> str:
+        return "negative"
+
+    def __invert__(self) -> int:
+        return 17
+
+class No: ...
+
+def _(x: Yes | No):
+    # snapshot: unsupported-operator
+    reveal_type(+x)  # revealed: bool
+
+    # snapshot: unsupported-operator
+    reveal_type(-x)  # revealed: str
+
+    # snapshot: unsupported-operator
+    reveal_type(~x)  # revealed: int
+```
+
+```snapshot
+error[unsupported-operator]: Unary operator `+` is not supported for object of type `Yes | No`
+  --> src/mdtest_snippet.py:15:17
+   |
+15 |     reveal_type(+x)  # revealed: bool
+   |                 ^^
+   |
+info: `No` does not implement `__pos__`
+
+
+error[unsupported-operator]: Unary operator `-` is not supported for object of type `Yes | No`
+  --> src/mdtest_snippet.py:18:17
+   |
+18 |     reveal_type(-x)  # revealed: str
+   |                 ^^
+   |
+info: `No` does not implement `__neg__`
+
+
+error[unsupported-operator]: Unary operator `~` is not supported for object of type `Yes | No`
+  --> src/mdtest_snippet.py:21:17
+   |
+21 |     reveal_type(~x)  # revealed: int
+   |                 ^^
+   |
+info: `No` does not implement `__invert__`
+```
+
 ## Metaclass
 
 ```py

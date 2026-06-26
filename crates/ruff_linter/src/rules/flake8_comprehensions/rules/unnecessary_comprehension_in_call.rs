@@ -154,6 +154,10 @@ pub(crate) fn unnecessary_comprehension_in_call(
         }
     };
     if args.len() == 1 {
+        if elt.is_starred_expr() {
+            // The LibCST-based fixer does not yet support PEP 798 unpacking comprehensions.
+            return;
+        }
         // If there's only one argument, remove the list or set brackets.
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_comprehension_in_call(expr, checker.locator(), checker.stylist())

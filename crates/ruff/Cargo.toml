@@ -1,7 +1,7 @@
 [package]
 name = "ruff"
-version = "0.15.11"
-publish = true
+version = "0.15.20"
+description = "An extremely fast Python linter and code formatter"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -9,7 +9,7 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-readme = "../../README.md"
+readme = "README.md"
 default-run = "ruff"
 
 [package.metadata.cargo-shear]
@@ -32,6 +32,7 @@ ruff_options_metadata = { workspace = true, features = ["serde"] }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ruff_server = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -39,7 +40,7 @@ ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-bincode = { workspace = true, features = ["serde"] }
+rkyv = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
@@ -88,7 +89,6 @@ indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
 ruff_python_trivia = { workspace = true }
-tempfile = { workspace = true }
 test-case = { workspace = true }
 
 [lints]

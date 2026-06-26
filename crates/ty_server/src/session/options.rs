@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::IntoEnumIterator;
@@ -13,7 +14,7 @@ use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::RelativePathBuf;
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
 use crate::logging::LogLevel;
@@ -124,6 +125,15 @@ impl ClientOptions {
             .completions
             .get_or_insert_default()
             .auto_import = Some(enabled);
+        self
+    }
+
+    #[must_use]
+    pub fn with_complete_function_parentheses(mut self, enabled: bool) -> Self {
+        self.workspace
+            .completions
+            .get_or_insert_default()
+            .complete_function_parentheses = Some(enabled);
         self
     }
 
@@ -252,17 +262,9 @@ impl WorkspaceOptions {
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
-                environment.folder_uri.to_file_path().ok().and_then(|path| {
-                    Some(RelativePathBuf::python_extension(
-                        SystemPathBuf::from_path_buf(path).ok()?,
-                    ))
-                })
-            } else {
-                Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix,
-                ))
-            };
+            overrides.fallback_python = Some(RelativePathBuf::python_extension(
+                active_environment.executable.sys_prefix,
+            ));
 
             overrides.fallback_python_version = active_environment
                 .version
@@ -368,6 +370,8 @@ impl InlayHintOptions {
 #[serde(rename_all = "camelCase")]
 pub struct CompletionOptions {
     auto_import: Option<bool>,
+    /// Whether callable completions should insert parentheses.
+    complete_function_parentheses: Option<bool>,
 }
 
 impl CompletionOptions {
@@ -380,6 +384,7 @@ impl CompletionOptions {
     fn into_settings(self) -> CompletionSettings {
         CompletionSettings {
             auto_import: self.auto_import.unwrap_or(true),
+            complete_function_parentheses: self.complete_function_parentheses.unwrap_or(false),
         }
     }
 }
@@ -476,6 +481,7 @@ impl Combine for PythonExtension {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
+    #[deprecated]
     pub(crate) environment: Option<PythonEnvironment>,
     pub(crate) version: Option<EnvironmentVersion>,
 }
@@ -485,27 +491,32 @@ pub(crate) struct ActiveEnvironment {
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
     pub(crate) minor: i64,
-    #[allow(dead_code)]
-    pub(crate) patch: i64,
-    #[allow(dead_code)]
-    pub(crate) sys_version: String,
+    #[deprecated(
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension). Use `major` and `minor` instead."
+    )]
+    pub(crate) patch: Option<i64>,
+    #[deprecated(
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension)."
+    )]
+    pub(crate) sys_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
-    pub(crate) folder_uri: Url,
-    #[allow(dead_code)]
+    #[deprecated]
+    pub(crate) folder_uri: Option<Uri>,
+    #[deprecated]
     #[serde(rename = "type")]
-    pub(crate) kind: String,
-    #[allow(dead_code)]
+    pub(crate) kind: Option<String>,
+    #[deprecated]
     pub(crate) name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
-    #[allow(dead_code)]
-    pub(crate) uri: Url,
+    #[deprecated]
+    pub(crate) uri: Option<Uri>,
     pub(crate) sys_prefix: SystemPathBuf,
 }

@@ -533,6 +533,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     name: field_name.clone(),
                     ty: Type::any(),
                     default,
+                    definition: None,
                 }
             })
             .collect();
@@ -672,6 +673,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 name: Name::new(name.value(db)),
                 ty: declared_type,
                 default: None,
+                definition: None,
             };
 
             fields.push(field);

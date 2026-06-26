@@ -14,6 +14,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |____________________________________^
   |
 help: Organize imports
+   |
    - import pandas
    - import os
 1  + # Future imports
@@ -32,3 +33,4 @@ help: Organize imports
 14 +
 15 + # Local folder imports
 16 | from . import my_local_folder_object
+   |

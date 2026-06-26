@@ -38,6 +38,20 @@ str(encoding="utf-8", object=b"M\xc3\xbcsli")
 str(b"", errors="replace")
 ```
 
+### `range` as an ordinary `range` value
+
+```py
+reveal_type(list(range(3)))  # revealed: list[int]
+reveal_type([range(0)])  # revealed: list[range]
+
+class Uop:
+    replicated = range(0)
+
+def _(uop: Uop) -> None:
+    uop.replicated = range(1, 3)
+    reveal_type(uop.replicated)  # revealed: range
+```
+
 ### Invalid calls
 
 ```py
@@ -190,14 +204,103 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 ```
 
-## The builtin `NotImplemented` constant is not callable
+## Generic builtins should not overfit upper-bound-only callback constraints
 
-<!-- snapshot-diagnostics -->
+These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
+`object` bounds through the constraint solver. The current solver picks callback parameter upper
+bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
+result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
+return type would still be used where possible.
+
+```py
+from ty_extensions import Unknown
+
+def _(xs: Unknown):
+    # TODO: should be `list[Unknown]`
+    reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
+
+    # TODO: should be `map[str]`
+    reveal_type(map("{}".format, xs))  # revealed: map[object]
+
+    # TODO: should not emit an error and should reveal `str`
+    # error: [no-matching-overload]
+    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+```
+
+## Mapping methods accept arbitrary object types
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Mapping
+
+def _(mapping: Mapping[str, int], dictionary: dict[str, int], key: object) -> None:
+    mapping.get(key)
+    mapping.get(key, 0)
+    mapping.get(key, "default")
+    dictionary.get(key)
+    dictionary.get(key, 0)
+    dictionary.get(key, "default")
+    dictionary.pop(key)  # error: [invalid-argument-type]
+    dictionary.pop(key, 0)
+    dictionary.pop(key, None)
+    dictionary.keys().isdisjoint(key)
+    dictionary.items().isdisjoint(key)
+```
+
+## The builtin `NotImplemented` constant is not callable
 
 ```py
 def _():
-    raise NotImplemented()  # error: [call-non-callable]
+    # snapshot: call-non-callable
+    raise NotImplemented()
+```
 
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:3:11
+  |
+3 |     raise NotImplemented()
+  |           --------------^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+  |
+```
+
+```py
 def _():
-    raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+    # snapshot: call-non-callable
+    raise NotImplemented("this module is not implemented yet!!!")
+```
+
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:6:11
+  |
+6 |     raise NotImplemented("this module is not implemented yet!!!")
+  |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+  |
+```
+
+## `map` with generic callbacks
+
+```py
+from ty_extensions import Unknown
+import re
+
+def _(s: Unknown | str):
+    escaped = map(re.escape, s)
+    reveal_type(escaped)  # revealed: map[str]
+    "".join(escaped)
+
+def _(xs: Unknown | list[str]):
+    escaped = map(re.escape, xs)
+    reveal_type(escaped)  # revealed: map[str]
+    tokens: list[Unknown | str] = []
+    tokens.extend(escaped)
 ```

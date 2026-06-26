@@ -1,10 +1,14 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_index::{IndexSlice, IndexVec};
+use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
@@ -14,8 +18,9 @@ use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
+use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
-
+pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
@@ -29,7 +34,8 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator, UseDefMap,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
+    ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 
@@ -39,6 +45,7 @@ mod builder;
 mod db;
 pub mod definition;
 pub mod expression;
+pub mod frozen;
 pub(crate) mod member;
 pub mod narrowing_constraints;
 pub mod node_key;
@@ -49,6 +56,7 @@ pub mod rank;
 mod re_exports;
 pub mod reachability_constraints;
 pub mod scope;
+pub mod statement;
 pub mod symbol;
 pub mod unpack;
 mod use_def;
@@ -124,9 +132,10 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// literals (`Literal[0, 1, 2, ...]`) until we eventually reach the threshold for widening to
 /// `int` and stop iterating. (See `should_widen` and `widen_literal_types`.)
 ///
-/// There's a chicken-and-egg problem with synthesizing the `DefinitionKind::LoopHeader`
-/// definitions at the top of the loop, and assembling all the bindings in the `LoopHeader` struct
-/// that they refer to. See `LoopToken` below for how we work around that.
+/// Loop header definitions are synthesized before walking the loop body, but the bindings in the
+/// header are only known after walking all loop-back edges. The builder reserves a [`LoopHeaderId`]
+/// before the walk, fills the corresponding header afterward, and publishes the completed headers
+/// in the scope's [`UseDefMap`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
 pub struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
@@ -153,33 +162,6 @@ impl LoopHeader {
             .into_iter()
             .flatten()
     }
-}
-
-/// A Salsa token for retrieving a `LoopHeader`. See `get_loop_header` below.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct LoopToken<'db> {}
-
-impl get_size2::GetSize for LoopToken<'_> {}
-
-/// Look up a `LoopHeader` given a `LoopToken`.
-///
-/// Loop header definitions are the very first things we encounter (synthesize) when we walk a
-/// loop, and they need to refer to the corresponding the `LoopHeader` struct that records their
-/// bindings, but that struct isn't available until we've finished walking the loop. To make this
-/// work in the largely immutable world of Salsa, we add a layer of indirection using a Salsa
-/// feature called "specify":
-/// <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
-///
-/// When we first encounter a loop, we generate a `LoopToken` that uniquely identifies the loop but
-/// doesn't contain any data. We do a lightweight pre-walk to collect bound places (see
-/// `LoopBindingsVisitor`), and for each bound place we create a loop header definition that stores
-/// the `LoopToken`. Then after we've finished visiting the loop, we call
-/// `get_loop_header::specify` to associate the token with the completed `LoopHeader`. All of this
-/// happens while we're building the semantic index, and nothing needs to call `get_loop_header`
-/// until we get to type inference later, so the order of operations always works out.
-#[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
-pub fn get_loop_header<'db>(_db: &'db dyn Db, _loop_token: LoopToken<'db>) -> LoopHeader {
-    panic!("should always be set by specify()");
 }
 
 /// Returns all attribute assignments as scope IDs for a specific class body scope.
@@ -253,53 +235,120 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
+#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+struct DefinitionsByNode<'db> {
+    single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
+    non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+}
+
+impl<'db> DefinitionsByNode<'db> {
+    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
+        let single_count = definitions_by_node
+            .values()
+            .filter(|definitions| definitions.len() == 1)
+            .count();
+        let mut single = Vec::with_capacity(single_count);
+        let mut non_single = Vec::with_capacity(definitions_by_node.len() - single_count);
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each node is independently partitioned by definition count"
+        )]
+        for (key, definitions) in definitions_by_node {
+            if definitions.len() == 1 {
+                single.push((key, definitions[0]));
+            } else {
+                non_single.push((key, definitions.into_boxed_slice()));
+            }
+        }
+
+        Self {
+            single: FrozenMap::from_entries(single),
+            non_single: FrozenMap::from_entries(non_single),
+        }
+    }
+
+    fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
+        self.single
+            .get(&key)
+            .map(std::slice::from_ref)
+            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
+    }
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
-    place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
+    place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
 
     /// List of all scopes in this file.
-    scopes: IndexVec<FileScopeId, Scope>,
+    scopes: FrozenIndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
     scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
+    definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Map from an unpacking target to its [`unpack::Unpack`] ingredient.
+    unpacks_by_target: FrozenMap<ExpressionNodeKey, unpack::Unpack<'db>>,
+
+    /// Map from a standalone statement to its [`Statement`] ingredient.
+    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
+
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
+    /// Map from a lambda expression to its containing statement.
+    enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
+
+    // Map from a constraining use of a collection initializer to its definition.
+    collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
+
+    // Map from a collection initializer definition to statements containing a constraining use.
+    uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
+
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
-    scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
+    scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
+    ast_ids: AstIds,
 
     /// The set of modules that are imported anywhere within this file.
-    imported_modules: Arc<FxHashSet<ModuleName>>,
+    imported_modules: FrozenSet<ModuleName>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
     /// Map of all of the enclosing snapshots that appear in this file.
-    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
 
     /// Set of all generator functions in this file.
-    generator_functions: FxHashSet<FileScopeId>,
+    generator_functions: FrozenSet<FileScopeId>,
+
+    /// Narrowing alias metadata for predicate leaf names.
+    /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
+    /// the alias Name node is mapped to its aliased expression for constraint-generation time.
+    narrowing_alias_predicates: FrozenMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct NarrowingAliasPredicate<'db> {
+    /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
+    pub expression: Expression<'db>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -310,6 +359,14 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
         &self.place_tables[scope_id]
+    }
+
+    /// Returns alias metadata for an alias Name node in a predicate, if one exists.
+    pub fn narrowing_alias_predicate(
+        &self,
+        key: impl Into<ExpressionNodeKey>,
+    ) -> Option<&NarrowingAliasPredicate<'db>> {
+        self.narrowing_alias_predicates.get(&key.into())
     }
 
     /// Returns the use-def map for a specific scope.
@@ -326,13 +383,13 @@ impl<'db> SemanticIndex<'db> {
     /// This set only considers `import` statements, not `from...import` statements.
     /// See `ModuleLiteralType::available_submodule_attributes` for discussion
     /// of why this analysis is intentionally limited.
-    pub fn imported_modules(&self) -> &FxHashSet<ModuleName> {
-        &self.imported_modules
+    pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
+        self.imported_modules.iter()
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
-        &self.ast_ids[scope_id]
+    pub(crate) fn ast_ids(&self) -> &AstIds {
+        &self.ast_ids
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
@@ -376,6 +433,46 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn symbol_is_nonlocal_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
         self.place_table(scope).symbol(symbol).is_nonlocal()
+    }
+
+    /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
+    /// because:
+    ///
+    /// 1. The given scope *is* the global scope.
+    /// 2. The symbol is explicitly declared `global` in the given scope.
+    /// 3. The symbol is a free variable in the given scope, and no enclosing function scope
+    ///    defines it.
+    ///
+    /// The third case requires walking ancestor scopes until we encounter either a binding or a
+    /// `nonlocal` declaration (those aren't allowed to resolve to the global scope, so we don't
+    /// need to chase them).
+    pub fn symbol_resolves_to_global_scope(
+        &self,
+        symbol: ScopedSymbolId,
+        scope: FileScopeId,
+    ) -> bool {
+        let symbol = self.place_table(scope).symbol(symbol);
+        let name = symbol.name();
+        // Note that `visible_ancestor_scopes` includes the starting scope itself.
+        for (visible_scope_id, _) in self.visible_ancestor_scopes(scope) {
+            if visible_scope_id.is_global() {
+                // We return `true` here even if the global variable isn't actually defined. That
+                // case will be probably a diagnostic elsewhere.
+                return true;
+            }
+            let place_table = self.place_table(visible_scope_id);
+            let Some(visible_symbol_id) = place_table.symbol_id(name) else {
+                continue;
+            };
+            let visible_symbol = place_table.symbol(visible_symbol_id);
+            if visible_symbol.is_global() {
+                return true;
+            }
+            if visible_symbol.is_local() || visible_symbol.is_nonlocal() {
+                return false;
+            }
+        }
+        unreachable!("should return true at the global scope above");
     }
 
     /// Returns the id of the parent scope.
@@ -423,6 +520,30 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
+    pub fn enclosing_lambda_statement(&self, lambda: ExpressionNodeKey) -> Option<Statement<'db>> {
+        self.enclosing_lambda_statements.get(&lambda).copied()
+    }
+
+    /// If this is a potentially constraining use of an unannotated collection initializer, returns
+    /// its definition.
+    pub fn unannotated_collection_initializer(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        self.collections_by_use.get(&collection_use.into()).copied()
+    }
+
+    /// Returns all potentially constraining uses of the given unannotated collection initializer.
+    pub fn constraining_collection_uses(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> impl Iterator<Item = (Statement<'db>, ExpressionNodeKey)> {
+        self.uses_by_collection
+            .get(&collection_def)
+            .into_iter()
+            .flat_map(|uses| uses.iter().copied())
+    }
+
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
             self.use_def_map(scope_id)
@@ -466,10 +587,21 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
-    /// if the definition is created by a wildcard (`*`) import.
+    /// if the definitions are created by a wildcard (`*`) import.
     #[track_caller]
-    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &Definitions<'db> {
-        &self.definitions_by_node[&definition_key.into()]
+    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
+        self.definitions_by_node
+            .get(definition_key.into())
+            .expect("definition should be present in the semantic index")
+    }
+
+    /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_node`, if any.
+    pub fn try_definitions(
+        &self,
+        definition_node: ast::AnyNodeRef<'_>,
+    ) -> Option<&[Definition<'db>]> {
+        let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
+        self.definitions_by_node.get(definition_key)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
@@ -480,9 +612,9 @@ impl<'db> SemanticIndex<'db> {
     /// the `debug_assertions` feature is enabled, this method will panic.
     ///
     /// It is generally safe to use this method for any AST node that does not
-    /// correspond to a `*` (wildcard) import, since `*` imports are the only
-    /// situations that can result in multiple definitions being associated with a
-    /// single AST node.
+    /// correspond to a `*` (wildcard) import, since those are the only situations
+    /// that can result in multiple definitions being associated with a single AST
+    /// node.
     #[track_caller]
     pub fn expect_single_definition(
         &self,
@@ -496,6 +628,16 @@ impl<'db> SemanticIndex<'db> {
             definitions.len()
         );
         definitions[0]
+    }
+
+    pub fn try_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey>,
+    ) -> Option<Definition<'db>> {
+        self.definitions_by_node
+            .single
+            .get(&definition_key.into())
+            .copied()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
@@ -516,9 +658,21 @@ impl<'db> SemanticIndex<'db> {
             .copied()
     }
 
+    /// Returns the [`unpack::Unpack`] ingredient for an unpacking target, if any.
+    pub fn try_unpack(&self, target: impl Into<ExpressionNodeKey>) -> Option<unpack::Unpack<'db>> {
+        self.unpacks_by_target.get(&target.into()).copied()
+    }
+
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {
         self.expressions_by_node
             .contains_key(&expression_key.into())
+    }
+
+    pub fn try_statement(
+        &self,
+        statement_key: impl Into<StatementNodeKey>,
+    ) -> Option<Statement<'db>> {
+        self.statements_by_node.get(&statement_key.into()).copied()
     }
 
     /// Returns the id of the scope that `node` creates.
@@ -922,7 +1076,9 @@ mod tests {
     use crate::{
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
-        definition::DefinitionKind,
+        definition::{
+            DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+        },
     };
 
     impl UseDefMap<'_> {
@@ -1209,14 +1365,14 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicPositionalParameter(_)
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicPositionalParameter(_))
         ));
         let kwargs_binding = use_def
             .first_public_binding(function_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
-            DefinitionKind::VariadicKeywordParameter(_)
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(_))
         ));
     }
 
@@ -1239,7 +1395,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let lambda_table = index.place_table(lambda_scope_id);
         assert_eq!(
             names(lambda_table),
-            vec!["a", "b", "c", "d", "args", "kwargs"],
+            vec!["a", "b", "c", "args", "d", "kwargs"],
         );
 
         let use_def = index.use_def_map(lambda_scope_id);
@@ -1247,21 +1403,36 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
+            assert!(matches!(
+                binding.kind(&db),
+                DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                    index: _,
+                    lambda: _,
+                    parameter: ParameterDefinitionNodeKind::Parameter(_)
+                })
+            ));
         }
         let args_binding = use_def
             .first_public_binding(lambda_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicPositionalParameter(_)
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index: 3,
+                lambda: _,
+                parameter: ParameterDefinitionNodeKind::VariadicPositionalParameter(_)
+            })
         ));
         let kwargs_binding = use_def
             .first_public_binding(lambda_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
-            DefinitionKind::VariadicKeywordParameter(_)
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index: 5,
+                lambda: _,
+                parameter: ParameterDefinitionNodeKind::VariadicKeywordParameter(_)
+            })
         ));
     }
 
@@ -1347,8 +1518,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id =
-            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
+        let element_use_id = element.scoped_use_id(&db, file);
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -1618,7 +1788,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, file);
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
@@ -1741,28 +1911,11 @@ match subject:
         );
 
         let use_def = use_def_map(&db, global_scope_id);
-        for (name, expected_index) in [
-            ("a", 0),
-            ("b", 0),
-            ("c", 1),
-            ("d", 2),
-            ("e", 0),
-            ("f", 1),
-            ("g", 0),
-            ("h", 1),
-            ("i", 0),
-            ("j", 1),
-            ("k", 0),
-            ("l", 1),
-        ] {
+        for name in ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
-                assert_eq!(pattern.index(), expected_index);
-            } else {
-                panic!("Expected match pattern definition for {name}");
-            }
+            assert!(matches!(binding.kind(&db), DefinitionKind::MatchPattern(_)));
         }
     }
 
@@ -1784,15 +1937,11 @@ match 1:
         assert_eq!(names(global_table), vec!["first", "second"]);
 
         let use_def = use_def_map(&db, global_scope_id);
-        for (name, expected_index) in [("first", 0), ("second", 0)] {
+        for name in ["first", "second"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
-                assert_eq!(pattern.index(), expected_index);
-            } else {
-                panic!("Expected match pattern definition for {name}");
-            }
+            assert!(matches!(binding.kind(&db), DefinitionKind::MatchPattern(_)));
         }
     }
 

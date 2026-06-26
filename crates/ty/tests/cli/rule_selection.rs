@@ -25,8 +25,6 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
@@ -48,16 +46,14 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
       |
     info: rule `division-by-zero` was selected in the configuration file
 
@@ -98,8 +94,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |
     2 | import does_not_exit
       |        ^^^^^^^^^^^^^
-    3 |
-    4 | y = 4 / 0
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -110,8 +104,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
       |
-    7 |     x = a
-    8 |
     9 | prin(x)  # unresolved-reference
       | ^^^^
       |
@@ -134,16 +126,14 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("--warn")
             .arg("unresolved-import"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
       |        ^^^^^^^^^^^^^
-    3 |
-    4 | y = 4 / 0
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -154,12 +144,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
       |
-    2 | import does_not_exit
-    3 |
     4 | y = 4 / 0
       |     ^^^^^
-    5 |
-    6 | for a in range(0, int(y)):
       |
     info: rule `division-by-zero` was selected on the command line
 
@@ -197,8 +183,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
@@ -221,16 +205,14 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("--ignore")
             .arg("unresolved-reference"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
       |
     info: rule `division-by-zero` was selected on the command line
 
@@ -259,13 +241,12 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
      --> pyproject.toml:3:1
       |
-    2 | [tool.ty.rules]
     3 | division-by-zer = "warn" # incorrect rule name
       | ^^^^^^^^^^^^^^^
       |
@@ -284,8 +265,8 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "print(10)")?;
 
     assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
 
@@ -343,16 +324,12 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: error (global)
       |     ^^^^^
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: error (global)
       |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:4:1
       |
-    2 | y = 4 / 0  # division-by-zero: error (global)
-    3 | x = 1
     4 | prin(x)    # unresolved-reference: error (global)
       | ^^^^
       |
@@ -363,8 +340,6 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: warn (override)
       |     ^^^^^
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: ignore (override)
       |
     info: rule `division-by-zero` was selected in the configuration file
 
@@ -415,8 +390,8 @@ fn overrides_precedence() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> tests/test_main.py:2:5
@@ -539,14 +514,12 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: warn (global)
       |     ^^^^^
-    3 | prin(y)    # unresolved-reference: error (global)
       |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:3:1
       |
-    2 | y = 4 / 0  # division-by-zero: warn (global)
     3 | prin(y)    # unresolved-reference: error (global)
       | ^^^^
       |
@@ -555,7 +528,6 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     error[unresolved-reference]: Name `prin` used when not defined
      --> tests/test_main.py:3:1
       |
-    2 | y = 4 / 0  # division-by-zero: ignore (overridden)
     3 | prin(y)    # unresolved-reference: error (inherited from global)
       | ^^^^
       |
@@ -686,19 +658,15 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unnecessary-overrides-section]: Unnecessary `overrides` section
      --> pyproject.toml:5:1
       |
-    3 | division-by-zero = "error"
-    4 |
     5 | [[tool.ty.overrides]]
       | ^^^^^^^^^^^^^^^^^^^^^ This overrides section applies to all files
-    6 | # Missing both include and exclude - should warn
-    7 | [tool.ty.overrides.rules]
       |
     info: It has no `include` or `exclude` option restricting the files
     info: Restrict the files by adding a pattern to `include` or `exclude`...
@@ -716,7 +684,7 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
 
     ----- stderr -----
     INFO Indexed 1 file(s) in 0.000s
-    "#);
+    ");
 
     Ok(())
 }
@@ -745,18 +713,15 @@ fn overrides_empty_include() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     warning[empty-include]: Empty include matches no files
      --> pyproject.toml:6:11
       |
-    5 | [[tool.ty.overrides]]
     6 | include = []  # Empty include - won't match any files
       |           ^^ This `include` list is empty
-    7 | [tool.ty.overrides.rules]
-    8 | division-by-zero = "warn"
       |
     info: Remove the `include` option to match all files or add a pattern to match specific files
 
@@ -772,7 +737,7 @@ fn overrides_empty_include() -> anyhow::Result<()> {
 
     ----- stderr -----
     INFO Indexed 1 file(s) in 0.000s
-    "#);
+    ");
 
     Ok(())
 }
@@ -800,19 +765,15 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     warning[useless-overrides-section]: Useless `overrides` section
      --> pyproject.toml:5:1
       |
-    3 | division-by-zero = "error"
-    4 |
     5 | [[tool.ty.overrides]]
       | ^^^^^^^^^^^^^^^^^^^^^ This overrides section overrides no settings
-    6 | include = ["*.py"]  # Has patterns but no rule overrides
-    7 | # Missing [tool.ty.overrides.rules] section entirely
       |
     info: It has no `rules` or `analysis` table
     info: Add a `[overrides.rules]` or `[overrides.analysis]` table...
@@ -830,7 +791,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
 
     ----- stderr -----
     INFO Indexed 1 file(s) in 0.000s
-    "#);
+    ");
 
     Ok(())
 }
@@ -882,8 +843,6 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
       --> pyproject.toml:10:1
        |
-     8 | [tool.ty.overrides.rules]
-     9 | division-by-zero = "warn"
     10 | division-by-zer = "error"  # incorrect rule name
        | ^^^^^^^^^^^^^^^
        |
@@ -956,8 +915,8 @@ fn cli_all_rules_warn() -> anyhow::Result<()> {
             .arg("--warn")
             .arg("all"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unresolved-reference]: Name `prin` used when not defined
      --> test.py:2:1
@@ -1016,8 +975,6 @@ fn cli_all_rules_precedence() -> anyhow::Result<()> {
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:6:1
       |
-    4 | y = 4 / 0
-    5 |
     6 | prin(y)  # unresolved-reference
       | ^^^^
       |
@@ -1098,8 +1055,6 @@ fn configuration_all_rules() -> anyhow::Result<()> {
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:6:1
       |
-    4 | y = 4 / 0
-    5 |
     6 | prin(y)  # unresolved-reference
       | ^^^^
       |
@@ -1150,20 +1105,17 @@ fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
-      --> test.py:11:7
+      --> test.py:6:5
        |
-    10 | @final
-    11 | class Derived(Base):
-       |       ^^^^^^^ `foo` is unimplemented
-    12 |     pass
-       |
-      ::: test.py:7:9
-       |
-     5 | class Base(ABC):
-     6 |     @abstractmethod
-     7 |     def foo(self) -> int:
-       |         --- `foo` declared as abstract on superclass `Base`
-     8 |         raise NotImplementedError
+     6 | /     @abstractmethod
+     7 | |     def foo(self) -> int:
+       | |________________________- `foo` declared as abstract on superclass `Base`
+     8 |           raise NotImplementedError
+     9 |
+    10 |   @final
+       |   ------
+    11 |   class Derived(Base):
+       |         ^^^^^^^ `foo` is unimplemented
        |
     info: rule `abstract-method-in-final-class` was selected in the configuration file
 
@@ -1216,20 +1168,17 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
-      --> src/test.py:11:7
+      --> src/test.py:6:5
        |
-    10 | @final
-    11 | class Derived(Base):
-       |       ^^^^^^^ `foo` is unimplemented
-    12 |     pass
-       |
-      ::: src/test.py:7:9
-       |
-     5 | class Base(ABC):
-     6 |     @abstractmethod
-     7 |     def foo(self) -> int:
-       |         --- `foo` declared as abstract on superclass `Base`
-     8 |         raise NotImplementedError
+     6 | /     @abstractmethod
+     7 | |     def foo(self) -> int:
+       | |________________________- `foo` declared as abstract on superclass `Base`
+     8 |           raise NotImplementedError
+     9 |
+    10 |   @final
+       |   ------
+    11 |   class Derived(Base):
+       |         ^^^^^^^ `foo` is unimplemented
        |
     info: rule `abstract-method-in-final-class` was selected in the configuration file
 
@@ -1286,16 +1235,12 @@ fn all_overrides() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: error (global)
       |     ^^^^^
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: error (global)
       |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:4:1
       |
-    2 | y = 4 / 0  # division-by-zero: error (global)
-    3 | x = 1
     4 | prin(x)    # unresolved-reference: error (global)
       | ^^^^
       |
@@ -1306,16 +1251,12 @@ fn all_overrides() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: error (global)
       |     ^^^^^
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: warn (override)
       |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
      --> tests/test_main.py:4:1
       |
-    2 | y = 4 / 0  # division-by-zero: error (global)
-    3 | x = 1
     4 | prin(x)    # unresolved-reference: warn (override)
       | ^^^^
       |

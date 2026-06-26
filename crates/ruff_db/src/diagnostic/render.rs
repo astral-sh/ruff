@@ -117,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
@@ -130,23 +130,24 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                rdjson::RdjsonRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, self.config.program)
+                junit::JunitRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                gitlab::GitlabRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, self.config.program)
-                    .render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
         }
 
@@ -187,12 +188,12 @@ impl<'a> Resolved<'a> {
     }
 
     /// Creates a value that is amenable to rendering directly.
-    fn to_renderable(&self, context: usize) -> Renderable<'_> {
+    fn to_renderable(&self, config: &DisplayDiagnosticConfig) -> Renderable<'_> {
         Renderable {
             diagnostics: self
                 .diagnostics
                 .iter()
-                .map(|diag| diag.to_renderable(context))
+                .map(|diag| diag.to_renderable(config))
                 .collect(),
         }
     }
@@ -237,18 +238,18 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
-            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
-            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
-            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
-            // the formatting of syntax errors for now. This should also be kept consistent with the
+        let id = if !config.preview
+            && let Some(code) = diag.secondary_code()
+        {
+            code.to_string()
+        } else if config.hide_severity {
+            // When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve the
+            // formatting of human-readable names for now. This should also be kept consistent with the
             // concise formatting.
-            diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
-                |code| code.to_string(),
-            )
+            format!("{id}:", id = diag.id())
         } else {
-            diag.secondary_code_or_id().to_string()
+            diag.id().to_string()
         };
 
         let level = if config.hide_severity {
@@ -304,7 +305,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     ///
     /// `context` refers to the number of lines both before and after to show
     /// for each snippet.
-    fn to_renderable<'r>(&'r self, context: usize) -> RenderableDiagnostic<'r> {
+    fn to_renderable<'r>(&'r self, config: &DisplayDiagnosticConfig) -> RenderableDiagnostic<'r> {
         let mut ann_by_path: BTreeMap<&'a str, Vec<&ResolvedAnnotation<'a>>> = BTreeMap::new();
         for ann in &self.annotations {
             ann_by_path.entry(ann.path).or_default().push(ann);
@@ -312,6 +313,12 @@ impl<'a> ResolvedDiagnostic<'a> {
         for anns in ann_by_path.values_mut() {
             anns.sort_by_key(|ann1| ann1.range.start());
         }
+
+        // The merge window determines how close two annotations need
+        // to be (in lines) to be rendered inside a single snippet.
+        // This is independent of `context`, which controls how many
+        // extra padding lines appear before and after each snippet.
+        let merge_window = config.merge_window.max(config.context);
 
         let mut snippet_by_path: BTreeMap<&'a str, Vec<Vec<&ResolvedAnnotation<'a>>>> =
             BTreeMap::new();
@@ -325,14 +332,14 @@ impl<'a> ResolvedDiagnostic<'a> {
 
                 let prev_context_ends = context_after(
                     &prev.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     prev.line_end,
                     prev.notebook_index.as_ref(),
                 )
                 .get();
                 let this_context_begins = context_before(
                     &ann.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     ann.line_start,
                     ann.notebook_index.as_ref(),
                 )
@@ -384,7 +391,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         let mut snippets_by_input = vec![];
         for (path, snippets) in snippet_by_path {
-            snippets_by_input.push(RenderableSnippets::new(context, path, &snippets));
+            snippets_by_input.push(RenderableSnippets::new(config.context, path, &snippets));
         }
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
@@ -899,6 +906,12 @@ impl FileResolver for &dyn Db {
 pub struct Input {
     pub(crate) text: SourceText,
     pub(crate) line_index: LineIndex,
+}
+
+impl Input {
+    pub fn line_index(&self) -> &LineIndex {
+        &self.line_index
+    }
 }
 
 /// Returns the line number accounting for the given `len`
@@ -2527,6 +2540,33 @@ watermelon
         );
     }
 
+    #[test]
+    fn diagnostics_with_equal_locations_sort_by_concise_message() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+        let mut diagnostics = [
+            env.invalid_syntax("checking mod.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+            env.invalid_syntax("checking main.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+        ];
+
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(&env.db)
+                .cmp(&right.rendering_sort_key(&env.db))
+        });
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(Diagnostic::primary_message)
+                .collect::<Vec<_>>(),
+            ["checking main.py", "checking mod.py"]
+        );
+    }
+
     /// A small harness for setting up an environment specifically for testing
     /// diagnostic rendering.
     pub(super) struct TestEnvironment {
@@ -2539,21 +2579,34 @@ watermelon
         ///
         /// This uses the default diagnostic rendering configuration.
         pub(super) fn new() -> TestEnvironment {
-            TestEnvironment {
+            let mut env = TestEnvironment {
                 db: TestDb::new(),
                 config: DisplayDiagnosticConfig::new("ty"),
-            }
+            };
+            // Default to a merge window of 0 for testing purposes,
+            // even though this is not the default for user-facing diagnostics.
+            env.merge_window(0);
+            env
         }
 
         /// Set the number of contextual lines to include for each snippet
         /// in diagnostic rendering.
-        fn context(&mut self, lines: usize) {
+        pub(super) fn context(&mut self, lines: usize) {
             // Kind of annoying. I considered making `DisplayDiagnosticConfig`
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
             // configuration. So just deal with this inconvenience for now.
             let config = self.config.clone();
             self.config = config.context(lines);
+        }
+
+        /// Set the "merge window" for annotations and fix diff hunks in this test.
+        ///
+        /// Nearby annotations or fix edits are rendered in a single source frame even when their
+        /// configured context windows would not otherwise overlap.
+        pub(super) fn merge_window(&mut self, lines: usize) {
+            let config = self.config.clone();
+            self.config = config.merge_window(lines);
         }
 
         /// Set the output format to use in diagnostic rendering.

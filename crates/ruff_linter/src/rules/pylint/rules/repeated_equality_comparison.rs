@@ -300,8 +300,8 @@ fn merged_membership_test(
         .join(", ");
 
     if all_hashable {
-        return format!("{left} {op} {{{members}}}",);
+        return format!("{left} {op} {{{members}}}");
     }
 
-    format!("{left} {op} ({members})",)
+    format!("{left} {op} ({members})")
 }

@@ -1,0 +1,338 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP007 [*] Use `X | Y` for type annotations
+ --> UP007_1.py:5:10
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |     ...
+  |
+help: Convert to `X | Y`
+  |
+4 |
+  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 + def f(x: str | int | Union[float, bytes]) -> None:
+6 |     ...
+  |
+
+UP007 [*] Use `X | Y` for type annotations
+ --> UP007_1.py:5:26
+  |
+5 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
+  |                          ^^^^^^^^^^^^^^^^^^^
+6 |     ...
+  |
+help: Convert to `X | Y`
+  |
+4 |
+  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 + def f(x: Union[str, int, float | bytes]) -> None:
+6 |     ...
+  |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:9:10
+   |
+ 9 | def f(x: typing.Union[str, int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+10 |     ...
+   |
+help: Convert to `X | Y`
+   |
+8  |
+   - def f(x: typing.Union[str, int]) -> None:
+9  + def f(x: str | int) -> None:
+10 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:13:10
+   |
+13 | def f(x: typing.Union[(str, int)]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^
+14 |     ...
+   |
+help: Convert to `X | Y`
+   |
+12 |
+   - def f(x: typing.Union[(str, int)]) -> None:
+13 + def f(x: str | int) -> None:
+14 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:17:10
+   |
+17 | def f(x: typing.Union[(str, int), float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |     ...
+   |
+help: Convert to `X | Y`
+   |
+16 |
+   - def f(x: typing.Union[(str, int), float]) -> None:
+17 + def f(x: str | int | float) -> None:
+18 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:21:10
+   |
+21 | def f(x: typing.Union[(int,)]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^
+22 |     ...
+   |
+help: Convert to `X | Y`
+   |
+20 |
+   - def f(x: typing.Union[(int,)]) -> None:
+21 + def f(x: int) -> None:
+22 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:25:10
+   |
+25 | def f(x: typing.Union[()]) -> None:
+   |          ^^^^^^^^^^^^^^^^
+26 |     ...
+   |
+help: Convert to `X | Y`
+   |
+24 |
+   - def f(x: typing.Union[()]) -> None:
+25 + def f(x: ()) -> None:
+26 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:29:11
+   |
+29 | def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |     ...
+   |
+help: Convert to `X | Y`
+   |
+28 |
+   - def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+29 + def f(x: "str | int | Union[float, bytes]") -> None:
+30 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:29:27
+   |
+29 | def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+   |                           ^^^^^^^^^^^^^^^^^^^
+30 |     ...
+   |
+help: Convert to `X | Y`
+   |
+28 |
+   - def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+29 + def f(x: "Union[str, int, float | bytes]") -> None:
+30 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:33:11
+   |
+33 | def f(x: "typing.Union[str, int]") -> None:
+   |           ^^^^^^^^^^^^^^^^^^^^^^
+34 |     ...
+   |
+help: Convert to `X | Y`
+   |
+32 |
+   - def f(x: "typing.Union[str, int]") -> None:
+33 + def f(x: "str | int") -> None:
+34 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:37:10
+   |
+37 | def f(x: Union["str", int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^
+38 |     ...
+   |
+help: Convert to `X | Y`
+   |
+36 |
+   - def f(x: Union["str", int]) -> None:
+37 + def f(x: "str" | int) -> None:
+38 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:41:10
+   |
+41 | def f(x: Union[("str", "int"), float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+42 |     ...
+   |
+help: Convert to `X | Y`
+   |
+40 |
+   - def f(x: Union[("str", "int"), float]) -> None:
+41 + def f(x: "str" | "int" | float) -> None:
+42 |     ...
+   |
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:46:9
+   |
+45 | def f() -> None:
+46 |     x = Union[str, int]
+   |         ^^^^^^^^^^^^^^^
+47 |     x = Union["str", "int"]
+48 |     x: Union[str, int]
+   |
+help: Convert to `X | Y`
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:48:8
+   |
+46 |     x = Union[str, int]
+47 |     x = Union["str", "int"]
+48 |     x: Union[str, int]
+   |        ^^^^^^^^^^^^^^^
+49 |     x: Union["str", "int"]
+   |
+help: Convert to `X | Y`
+   |
+47 |     x = Union["str", "int"]
+   -     x: Union[str, int]
+48 +     x: str | int
+49 |     x: Union["str", "int"]
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:49:8
+   |
+47 |     x = Union["str", "int"]
+48 |     x: Union[str, int]
+49 |     x: Union["str", "int"]
+   |        ^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | Y`
+   |
+48 |     x: Union[str, int]
+   -     x: Union["str", "int"]
+49 +     x: "str" | "int"
+50 |
+   |
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:52:10
+   |
+52 | def f(x: Union[int : float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^
+53 |     ...
+   |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:56:10
+   |
+56 | def f(x: Union[str, int : float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^
+57 |     ...
+   |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:60:10
+   |
+60 | def f(x: Union[x := int]) -> None:
+   |          ^^^^^^^^^^^^^^^
+61 |     ...
+   |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:64:10
+   |
+64 | def f(x: Union[str, x := int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^
+65 |     ...
+   |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:68:10
+   |
+68 | def f(x: Union[lambda: int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^
+69 |     ...
+   |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+  --> UP007_1.py:72:10
+   |
+72 | def f(x: Union[str, lambda: int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^
+73 |     ...
+   |
+help: Convert to `X | Y`
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:83:10
+   |
+82 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
+83 | def f(x: Union[int, str, bytes]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^
+84 |     ...
+   |
+help: Convert to `X | Y`
+   |
+82 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
+   - def f(x: Union[int, str, bytes]) -> None:
+83 + def f(x: int | str | bytes) -> None:
+84 |     ...
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007_1.py:91:26
+   |
+89 |     ...
+90 |
+91 | def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+92 |     print(param)
+   |
+help: Convert to `X | Y`
+   |
+90 |
+   - def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
+91 + def myfunc(param: "tuple[int | 'AClass' | None, str]"):
+92 |     print(param)
+   |
+
+UP007 [*] Use `X | Y` for type annotations
+   --> UP007_1.py:151:31
+    |
+149 |       from typing import Literal, TypeAlias
+150 |
+151 |       LongLiterals: TypeAlias = Union[
+    |  _______________________________^
+152 | |         Literal["LongLiteralNumberOne"]
+153 | |         | Literal["LongLiteralNumberTwo"]
+154 | |         | Literal["LongLiteralNumberThree"]
+155 | |     ]
+    | |_____^
+    |
+help: Convert to `X | Y`
+    |
+150 |
+    -     LongLiterals: TypeAlias = Union[
+    -         Literal["LongLiteralNumberOne"]
+151 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
+152 |         | Literal["LongLiteralNumberTwo"]
+    -         | Literal["LongLiteralNumberThree"]
+    -     ]
+153 +         | Literal["LongLiteralNumberThree"])
+    |

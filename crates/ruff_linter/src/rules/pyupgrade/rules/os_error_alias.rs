@@ -105,7 +105,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
     let mut diagnostic = checker.report_diagnostic(OSErrorAlias { name: None }, diagnostic_range);
     if is_up024_precise_highlighting_enabled(checker.settings()) {
         for alias in aliases.iter().skip(1) {
-            diagnostic.secondary_annotation("", alias.range());
+            diagnostic.secondary_annotation_without_message(alias.range());
         }
     }
     let semantic = checker.semantic();
@@ -164,10 +164,8 @@ pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandl
             continue;
         };
         match expr.as_ref() {
-            Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(expr, checker.semantic()) {
-                    atom_diagnostic(checker, expr);
-                }
+            Expr::Name(_) | Expr::Attribute(_) if is_alias(expr, checker.semantic()) => {
+                atom_diagnostic(checker, expr);
             }
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `OSError`.

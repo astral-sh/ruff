@@ -18,55 +18,26 @@ sys.prefix and sys.exec_prefix are set to that directory and
 it is also checked for site-packages (sys.base_prefix and
 sys.base_exec_prefix will always be the "real" prefixes of the Python
 installation). If "pyvenv.cfg" (a bootstrap configuration file) contains
-the key "include-system-site-packages" set to anything other than "false"
-(case-insensitive), the system-level prefixes will still also be
-searched for site-packages; otherwise they won't.
+the key "include-system-site-packages" set to "true" (case-insensitive),
+the system-level prefixes will still also be searched for site-packages;
+otherwise they won't.
 
-All of the resulting site-specific directories, if they exist, are
-appended to sys.path, and also inspected for path configuration
-files.
+Two kinds of configuration files are processed in each site-packages
+directory:
 
-A path configuration file is a file whose name has the form
-<package>.pth; its contents are additional directories (one per line)
-to be added to sys.path.  Non-existing directories (or
-non-directories) are never added to sys.path; no directory is added to
-sys.path more than once.  Blank lines and lines beginning with
-'#' are skipped. Lines starting with 'import' are executed.
+- <name>.pth files extend sys.path with additional directories (one per
+  line).  Lines starting with "import" are deprecated (see PEP 829).
 
-For example, suppose sys.prefix and sys.exec_prefix are set to
-/usr/local and there is a directory /usr/local/lib/python2.5/site-packages
-with three subdirectories, foo, bar and spam, and two path
-configuration files, foo.pth and bar.pth.  Assume foo.pth contains the
-following:
+- <name>.start files specify startup entry points using the pkg.mod:callable
+  syntax.  These are resolved via pkgutil.resolve_name() and called with no
+  arguments.
 
-  # foo package configuration
-  foo
-  bar
-  bletch
+When called from main(), all .pth path extensions are applied before any
+.start entry points are executed, ensuring that paths are available before
+startup code runs.
 
-and bar.pth contains:
-
-  # bar package configuration
-  bar
-
-Then the following directories are added to sys.path, in this order:
-
-  /usr/local/lib/python2.5/site-packages/bar
-  /usr/local/lib/python2.5/site-packages/foo
-
-Note that bletch is omitted because it doesn't exist; bar precedes foo
-because bar.pth comes alphabetically before foo.pth; and spam is
-omitted because it is not mentioned in either path configuration file.
-
-The readline module is also automatically configured to enable
-completion for systems that support it.  This can be overridden in
-sitecustomize, usercustomize or PYTHONSTARTUP.  Starting Python in
-isolated mode (-I) disables automatic readline configuration.
-
-After these operations, an attempt is made to import a module
-named sitecustomize, which can perform arbitrary additional
-site-specific customizations.  If this import fails with an
-ImportError exception, it is silently ignored.
+See the documentation for the site module for full details:
+https://docs.python.org/3/library/site.html
 """
 
 import sys
@@ -86,27 +57,109 @@ def main() -> None:
     """
 
 def abs_paths() -> None:  # undocumented
-    """Set all module __file__ and __cached__ attributes to an absolute path"""
+    """Set __file__ to an absolute path."""
 
 def addpackage(sitedir: StrPath, name: StrPath, known_paths: set[str] | None) -> set[str] | None:  # undocumented
-    """Process a .pth file within the site-packages directory:
-    For each line in the file, either combine it with sitedir to a path
-    and add that to known_paths, or execute it if it starts with 'import '.
-    """
+    """Process a .pth file within the site-packages directory."""
+
+if sys.version_info >= (3, 15):
+    class StartupState:
+        """Per-batch accumulator for .pth and .start file processing.
+
+        A StartupState collects sys.path extensions, deprecated .pth import lines,
+        and .start entry points read from one or more site-packages directories.
+        Calling process() applies them in PEP 829 order: paths are added to
+        sys.path first, then import lines from .pth files (skipping any with a
+        matching .start), then entry points from .start files.
+
+        State lives entirely on the instance; there is no module-level pending
+        state.  This is what makes the module reentrancy-safe: a site.addsitedir()
+        call reached recursively from an exec'd import line or a .start entry
+        point operates on a different StartupState than the one being processed by
+        the outer call.
+
+        The internal data is intentionally private.  The lower-level write
+        methods (_record_sitedir(), _read_pth_file(), _read_start_file()) are
+        private to the site module; the public surface is addsitedir(),
+        addusersitepackages(), addsitepackages(), and process().
+        """
+
+        __slots__ = ("_known_paths", "_processed_sitedirs", "_path_entries", "_importexecs", "_entrypoints")
+        def __init__(self, known_paths: set[str] | None = None) -> None:
+            """Create an independent startup state.
+
+            *known_paths* is a set of case-normalized paths already present
+            on sys.path, used to avoid duplicate path entries.  When None
+            (the default), it is initialized from the current sys.path.
+
+            A caller-supplied set is stored by reference and mutated in place
+            as new paths are recorded; pass a fresh set per StartupState if
+            isolation across instances is required.
+            """
+
+        def addsitedir(self, sitedir: str) -> None:
+            """Add a site directory and accumulate its .pth and .start startup data.
+
+            Read the .pth and .start files in *sitedir* and record their
+            sys.path extensions, deprecated .pth import lines, and .start entry
+            points on this state.  The recorded data is not applied until
+            process() is called.
+
+            Typically used to batch multiple site directories before a single
+            process() call, so that every sys.path extension is visible before
+            any startup code runs.  Reentrant calls reached from a .start entry
+            point or an exec'd .pth import line must not mutate the state
+            currently being processed; for those cases, use site.addsitedir()
+            instead, which always creates a fresh per-call state.
+            """
+
+        def addusersitepackages(self) -> None:
+            """Add the per-user site-packages directory, if enabled.
+
+            The user site directory is added only when user site-packages are
+            enabled and the directory exists.  Its startup data is accumulated
+            for later processing by process().
+            """
+
+        def addsitepackages(self, prefixes: Iterable[str] | None = None) -> None:
+            """Add global site-packages directories, if they exist.
+
+            Site-packages directories are computed from *prefixes*, or from the
+            global PREFIXES when *prefixes* is None.  Each directory's startup
+            data is accumulated for later processing by process().
+            """
+
+        def process(self) -> None:
+            """Apply accumulated state in PEP 829 order.
+
+            Phase order matters: all .pth path extensions are applied to
+            sys.path *before* any import line or .start entry point runs, so
+            that an entry point may live in a module reachable only via a
+            .pth-extended path.
+            """
 
 def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
-    """Add 'sitedir' argument to sys.path if missing and handle .pth files in
-    'sitedir'
+    """Add a site directory and process its startup files.
+
+    For batched processing across multiple site directories, build a
+    StartupState explicitly and call StartupState.addsitedir() on it; that
+    defers .pth/.start processing until a single StartupState.process() call.
     """
 
 def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
-    """Add site-packages to sys.path"""
+    """Add global site-packages directories, if they exist.
+
+    Site-packages directories are computed from *prefixes*, or from the global
+    prefixes when *prefixes* is None.  Return *known_paths*, updated with any
+    paths added by addsitedir().
+    """
 
 def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
-    """Add a per user site-package to sys.path
+    """Add the per-user site-packages directory, if enabled.
 
-    Each user has its own python directory with site-packages in the
-    home directory.
+    The user site directory is added only when user site-packages are enabled
+    and the directory exists.  Return *known_paths*, updated with any paths
+    added by addsitedir().
     """
 
 def check_enableusersite() -> bool | None:  # undocumented
@@ -189,4 +242,5 @@ def setquit() -> None:  # undocumented
 
     """
 
-def venv(known_paths: set[str] | None) -> set[str] | None: ...  # undocumented
+def venv(known_paths: set[str] | None) -> set[str] | None:  # undocumented
+    """Process pyvenv.cfg and add the venv site-packages, if applicable."""

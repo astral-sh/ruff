@@ -20,30 +20,38 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// def foo(a, b, c):
-///     if a:
-///         if b:
-///             if c:
-///                 return 1
-///             else:
-///                 return 2
-///         else:
-///             return 3
-///     else:
-///         return 4
+/// def normalize_status(status):
+///     if status == "new":
+///         return "queued"
+///     if status == "queued":
+///         return "running"
+///     if status == "running":
+///         return "done"
+///     if status == "failed":
+///         return "retry"
+///     if status == "cancelled":
+///         return "closed"
+///     return "unknown"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(a, b, c):
-///     if not a:
-///         return 4
-///     if not b:
-///         return 3
-///     if not c:
-///         return 2
-///     return 1
+/// STATUS_TRANSITIONS = {
+///     "new": "queued",
+///     "queued": "running",
+///     "running": "done",
+///     "failed": "retry",
+///     "cancelled": "closed",
+/// }
+///
+///
+/// def normalize_status(status):
+///     return STATUS_TRANSITIONS.get(status, "unknown")
 /// ```
+///
+/// Note that this example assumes a `lint.mccabe.max-complexity` of 5 or less to trigger a
+/// diagnostic because the initial code only has a complexity of 6.
 ///
 /// ## Options
 /// - `lint.mccabe.max-complexity`

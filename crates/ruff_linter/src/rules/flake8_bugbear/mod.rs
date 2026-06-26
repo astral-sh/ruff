@@ -125,6 +125,11 @@ mod tests {
         Path::new("B912.py"),
         PythonVersion::PY313
     )]
+    #[test_case(
+        Rule::StaticKeyDictComprehension,
+        Path::new("B035_py315.py"),
+        PythonVersion::PY315
+    )]
     fn rules_with_target_version(
         rule_code: Rule,
         path: &Path,

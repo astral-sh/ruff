@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.14"
 ```
 
 The types `AlwaysTruthy` and `AlwaysFalsy` describe the set of values that are always truthy or
@@ -65,15 +65,15 @@ Finally, we can also define the type `AmbiguousTruthiness = Truthy & Falsy`, whi
 of values that can be truthy *and* falsy. This intersection is not empty. In the following, we give
 examples for values that belong to these three types:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, Not, Intersection, AlwaysTruthy, AlwaysFalsy
+```pyi
+from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Never
 from random import choice
 
-type Truthy = Not[AlwaysFalsy]
-type Falsy = Not[AlwaysTruthy]
+type Truthy = ~AlwaysFalsy
+type Falsy = ~AlwaysTruthy
 
-type AmbiguousTruthiness = Intersection[Truthy, Falsy]
+type AmbiguousTruthiness = Truthy & Falsy
 
 static_assert(is_disjoint_from(AlwaysTruthy, AmbiguousTruthiness))
 static_assert(is_disjoint_from(AlwaysFalsy, AmbiguousTruthiness))

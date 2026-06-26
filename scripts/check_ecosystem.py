@@ -26,7 +26,7 @@ from collections.abc import Awaitable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar, cast
+from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -424,10 +424,7 @@ async def main(
                 print()
 
                 repo = repositories[(org, repo)]
-                # TODO: ty otherwise considers this `list[set[str] | str]`,
-                # seemingly ignoring `Diff.__iter__`. Seems like maybe a bug, but
-                # pyright and mypy both do the same.
-                diff_lines = cast(list[str], list(diff))
+                diff_lines = list(diff)
 
                 print("<pre>")
                 for line in diff_lines:

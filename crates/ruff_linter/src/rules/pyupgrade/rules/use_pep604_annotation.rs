@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -9,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
+use crate::preview::is_pep604_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -43,18 +45,24 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
-/// alongside libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10, or as it may remove comments if they
-/// are present within the type annotation being rewritten. It may also lead to
-/// runtime errors in unusual and likely incorrect type annotations where the type
-/// does not  support the `|` operator.
+/// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
+/// using the PEP-604 syntax may lead to runtime errors in libraries that rely
+/// on runtime type annotations, like Pydantic, or in unusual and likely
+/// incorrect type annotations where the type does not support the `|`
+/// operator. The fix is also marked as unsafe when it would remove comments
+/// present within the type annotation being rewritten.
+///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
 ///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP604AnnotationUnion;
@@ -101,18 +109,24 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors
-/// using libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10, or as it may remove comments if they
-/// are present within the type annotation being rewritten. It may also lead to runtime
-/// errors in unusual and likely incorrect type annotations where the type does not
-/// support the `|` operator.
+/// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
+/// using the PEP-604 syntax may lead to runtime errors in libraries that rely
+/// on runtime type annotations, like Pydantic, or in unusual and likely
+/// incorrect type annotations where the type does not support the `|`
+/// operator. The fix is also marked as unsafe when it would remove comments
+/// present within the type annotation being rewritten.
+///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
 ///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP604AnnotationOptional;
@@ -161,6 +175,28 @@ pub(crate) fn non_pep604_annotation(
         Applicability::Safe
     } else {
         Applicability::Unsafe
+    };
+
+    let future_import = is_pep604_future_annotations_fix_enabled(checker.settings())
+        && checker.target_version() < PythonVersion::PY310
+        && checker.settings().future_annotations
+        && !checker.future_annotations_or_stub();
+
+    let create_fix = |replacement: String| {
+        let edit = Edit::range_replacement(
+            pad(replacement, expr.range(), checker.locator()),
+            expr.range(),
+        );
+
+        if future_import {
+            Fix::applicable_edits(
+                edit,
+                vec![checker.importer().add_future_import()],
+                applicability,
+            )
+        } else {
+            Fix::applicable_edit(edit, applicability)
+        }
     };
 
     match operator {
@@ -212,17 +248,8 @@ pub(crate) fn non_pep604_annotation(
                         };
 
                         if let Some(fix_expr) = fix_expr {
-                            diagnostic.set_fix(Fix::applicable_edit(
-                                Edit::range_replacement(
-                                    pad(
-                                        checker.generator().expr(&fix_expr),
-                                        expr.range(),
-                                        checker.locator(),
-                                    ),
-                                    expr.range(),
-                                ),
-                                applicability,
-                            ));
+                            let replacement = checker.generator().expr(&fix_expr);
+                            diagnostic.set_fix(create_fix(replacement));
                         }
                     }
                 }
@@ -240,22 +267,13 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_union(elts)),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        let replacement = checker.generator().expr(&pep_604_union(elts));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                     _ => {
                         // Single argument.
                         let inner = checker.locator().slice(slice);
-                        let content = if checker.locator().contains_line_break(slice.range()) {
+                        let replacement = if checker.locator().contains_line_break(slice.range()) {
                             // If the inner expression spans multiple lines, wrap in
                             // parentheses since the `Union[...]` brackets that
                             // previously provided implicit line continuation are being
@@ -264,13 +282,7 @@ pub(crate) fn non_pep604_annotation(
                         } else {
                             inner.to_string()
                         };
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(content, expr.range(), checker.locator()),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                 }
             }

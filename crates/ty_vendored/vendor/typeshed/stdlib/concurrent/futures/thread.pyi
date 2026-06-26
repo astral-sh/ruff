@@ -5,8 +5,8 @@ import sys
 from collections.abc import Callable, Iterable, Mapping, Set as AbstractSet
 from threading import Lock, Semaphore, Thread
 from types import GenericAlias
-from typing import Any, Generic, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, TypeVarTuple, Unpack
+from typing import Any, Generic, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, TypeVarTuple, Unpack
 from weakref import ref
 
 from ._base import BrokenExecutor, Executor, Future
@@ -45,10 +45,12 @@ if sys.version_info >= (3, 14):
         def prepare(
             cls, initializer: Callable[[], object], initargs: tuple[()]
         ) -> tuple[Callable[[], Self], _ResolveTaskFunc]: ...
+
         @overload
         def __init__(self, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]) -> None: ...
         @overload
         def __init__(self, initializer: Callable[[], object], initargs: tuple[()]) -> None: ...
+
         def initialize(self) -> None: ...
         def finalize(self) -> None: ...
         def run(self, task: _Task) -> None: ...
@@ -62,7 +64,8 @@ if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
     def _worker(executor_reference: ref[Any], ctx: WorkerContext, work_queue: queue.SimpleQueue[Any]) -> None: ...
@@ -142,7 +145,6 @@ class ThreadPoolExecutor(Executor):
             initargs: A tuple of arguments to pass to the initializer.
             ctxkwargs: Additional arguments to cls.prepare_context().
         """
-
     @overload
     def __init__(
         self,
@@ -160,5 +162,6 @@ class ThreadPoolExecutor(Executor):
         initializer: Callable[[Unpack[_Ts]], object],
         initargs: tuple[Unpack[_Ts]],
     ) -> None: ...
+
     def _adjust_thread_count(self) -> None: ...
     def _initializer_failed(self) -> None: ...

@@ -94,6 +94,7 @@ class Finalize(Generic[_R_co]):
         kwargs: Mapping[str, Any] | None = None,
         exitpriority: int | None = None,
     ) -> None: ...
+
     def __call__(
         self,
         wr: Unused = None,

@@ -11,7 +11,7 @@ import {
 } from "react-aria-components";
 import AstralButton from "./AstralButton";
 
-type ShareStatus = "initial" | "copied";
+type ShareStatus = "initial" | "copied" | "failed";
 type ShareAction = "share" | "copyMarkdownLink" | "copyMarkdown" | "reset";
 
 export default function ShareButton({
@@ -27,18 +27,24 @@ export default function ShareButton({
 }) {
   const [status, dispatch, isPending] = useActionState(
     async (_previousStatus: ShareStatus, action: ShareAction) => {
-      switch (action) {
-        case "reset":
-          return "initial";
-        case "share":
-          await onShare();
-          break;
-        case "copyMarkdownLink":
-          await onCopyMarkdownLink();
-          break;
-        case "copyMarkdown":
-          await onCopyMarkdown();
-          break;
+      try {
+        switch (action) {
+          case "reset":
+            return "initial";
+          case "share":
+            await onShare();
+            break;
+          case "copyMarkdownLink":
+            await onCopyMarkdownLink();
+            break;
+          case "copyMarkdown":
+            await onCopyMarkdown();
+            break;
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to share playground.", error);
+        return "failed";
       }
       return "copied";
     },
@@ -46,7 +52,7 @@ export default function ShareButton({
   );
 
   useEffect(() => {
-    if (status === "copied") {
+    if (status === "copied" || status === "failed") {
       const timeout = setTimeout(
         () => startTransition(() => dispatch("reset")),
         2000,
@@ -56,6 +62,7 @@ export default function ShareButton({
   }, [status, dispatch]);
 
   const copied = status === "copied" && !isPending;
+  const failed = status === "failed" && !isPending;
 
   return (
     <MenuTrigger>
@@ -73,9 +80,9 @@ export default function ShareButton({
           <span
             className={classNames(
               "absolute inset-0 flex items-center justify-center",
-              copied && "invisible",
+              (copied || failed) && "invisible",
             )}
-            aria-hidden={copied}
+            aria-hidden={copied || failed}
           >
             Share
           </span>
@@ -84,6 +91,15 @@ export default function ShareButton({
             aria-hidden={!copied}
           >
             Copied!
+          </span>
+          <span
+            className={classNames(
+              "absolute inset-0 flex items-center justify-center",
+              !failed && "invisible",
+            )}
+            aria-hidden={!failed}
+          >
+            Failed
           </span>
         </AstralButton>
       </Pressable>

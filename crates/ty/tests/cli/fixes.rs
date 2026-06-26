@@ -83,12 +83,8 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> different_violations.py:6:13
       |
-    4 | x = 1 + a  # ty:ignore[unresolved-reference]
-    5 |
     6 | reveal_type(x)  # ty:ignore[undefined-reveal]
       |             ^ `Unknown`
-    7 |
-    8 | if sys.does_not_exist:  # ty:ignore[unresolved-attribute]
       |
 
     error[unresolved-reference]: Name `x` used when not defined
@@ -160,16 +156,14 @@ fn fix_unfixable() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[invalid-syntax]: unexpected EOF while parsing
-     --> has_syntax_error.py:2:1
-      |
-    1 | x = (
-      |      ^
-      |
+    --> has_syntax_error.py:1:1
+     |
+     |
 
     Found 2 diagnostics (1 fixed, 1 remaining).
 

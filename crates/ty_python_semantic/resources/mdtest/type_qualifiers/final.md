@@ -100,6 +100,18 @@ reveal_type(C().FINAL_D)  # revealed: Literal[1]
 reveal_type(C().FINAL_E)  # revealed: int
 ```
 
+### Recursive bare `Final` instance attribute
+
+```py
+from __future__ import annotations
+
+from typing import Final
+
+class ScopeChain:
+    def __init__(self, parent: ScopeChain | None = None) -> None:
+        self.depth: Final = 1 if parent is None else parent.depth + 1
+```
+
 ## Not modifiable
 
 ### Names
@@ -584,8 +596,6 @@ class Derived(Base):
 
 ### Superclass with same name as subclass
 
-<!-- snapshot-diagnostics -->
-
 `module_a.py`:
 
 ```py
@@ -601,7 +611,23 @@ class Foo:
 from module_a import Foo as BaseFoo
 
 class Foo(BaseFoo):
-    X = 2  # error: [override-of-final-variable]
+    # snapshot: override-of-final-variable
+    X = 2
+```
+
+```snapshot
+error[override-of-final-variable]: Cannot override `module_a.Foo.X`
+ --> src/module_b.py:5:5
+  |
+5 |     X = 2
+  |     ^ Overrides a final variable from superclass `module_a.Foo`
+  |
+info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
+ --> src/module_a.py:4:5
+  |
+4 |     X: Final[int] = 1
+  |     - `module_a.Foo.X` defined here
+  |
 ```
 
 ### `Final` declaration without a value
@@ -1256,8 +1282,6 @@ class Child(Base):
 
 ## Full diagnostics
 
-<!-- snapshot-diagnostics -->
-
 Annotated assignment:
 
 ```py
@@ -1267,7 +1291,22 @@ MY_CONSTANT: Final[int] = 1
 
 # more code
 
-MY_CONSTANT = 2  # error: [invalid-assignment]
+# snapshot: invalid-assignment
+MY_CONSTANT = 2
+```
+
+```snapshot
+error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not allowed
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | MY_CONSTANT = 2
+  | ^^^^^^^^^^^^^^^ Symbol later reassigned here
+  |
+ ::: src/mdtest_snippet.py:3:14
+  |
+3 | MY_CONSTANT: Final[int] = 1
+  |              ---------- Symbol declared as `Final` here
+  |
 ```
 
 Imported `Final` symbol:

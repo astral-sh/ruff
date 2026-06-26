@@ -26,9 +26,9 @@ def get_config_var(name: Literal["SO"]) -> Any:
 
     Equivalent to get_config_vars().get(name)
     """
-
 @overload
 def get_config_var(name: str) -> Any: ...
+
 @overload
 def get_config_vars() -> dict[str, Any]:
     """With no arguments, return a dictionary of all configuration
@@ -40,18 +40,17 @@ def get_config_vars() -> dict[str, Any]:
     With arguments, return a list of values that result from looking up
     each argument in the configuration variable dictionary.
     """
-
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[Any]: ...
+
 def get_scheme_names() -> tuple[str, ...]:
     """Return a tuple containing the schemes names."""
 
-if sys.version_info >= (3, 10):
-    def get_default_scheme() -> LiteralString: ...
-    def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> LiteralString: ...
-    # Documented -- see https://docs.python.org/3/library/sysconfig.html#sysconfig._get_preferred_schemes
-    def _get_preferred_schemes() -> dict[Literal["prefix", "home", "user"], LiteralString]: ...
+def get_default_scheme() -> LiteralString: ...
+def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> LiteralString: ...
 
+# Documented -- see https://docs.python.org/3/library/sysconfig.html#sysconfig._get_preferred_schemes
+def _get_preferred_schemes() -> dict[Literal["prefix", "home", "user"], LiteralString]: ...
 def get_path_names() -> tuple[str, ...]:
     """Return a tuple containing the paths names."""
 
@@ -79,6 +78,9 @@ def get_platform() -> str:
     isn't particularly important.
 
     Examples of returned values:
+       linux-x86_64
+       linux-aarch64
+       solaris-2.6-sun4u
 
 
     Windows:
@@ -97,17 +99,19 @@ def get_platform() -> str:
     For other non-POSIX platforms, currently just returns :data:`sys.platform`.
     """
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 15):
+    def is_python_build() -> bool: ...
+elif sys.version_info >= (3, 11):
     @overload
     def is_python_build() -> bool: ...
     @overload
     @deprecated("The `check_home` parameter is deprecated since Python 3.12; removed in Python 3.15.")
     def is_python_build(check_home: object = None) -> bool: ...
-
-elif sys.version_info >= (3, 11):
-    def is_python_build(check_home: object = None) -> bool: ...
-
 else:
+    @overload
+    def is_python_build() -> bool: ...
+    @overload
+    @deprecated("The `check_home` parameter is deprecated since Python 3.12; removed in Python 3.15.")
     def is_python_build(check_home: bool = False) -> bool: ...
 
 def parse_config_h(fp: IO[Any], vars: dict[str, Any] | None = None) -> dict[str, Any]:

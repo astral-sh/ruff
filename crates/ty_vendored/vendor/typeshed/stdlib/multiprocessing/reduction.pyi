@@ -6,7 +6,7 @@ from abc import ABCMeta
 from builtins import type as Type  # alias to avoid name clash
 from collections.abc import Callable
 from copyreg import _DispatchTableType
-from multiprocessing import connection
+from multiprocessing import connection, popen_forkserver, popen_spawn_posix, resource_sharer
 from socket import socket
 from typing import Any, Final
 
@@ -81,7 +81,7 @@ else:
     def sendfds(sock: socket, fds: list[int]) -> None:
         """Send an array of fds over an AF_UNIX socket."""
 
-    def DupFd(fd: int) -> Any:  # Return type is really hard to get right
+    def DupFd(fd: int) -> popen_forkserver._DupFd | popen_spawn_posix._DupFd | resource_sharer.DupFd:
         """Return a wrapper for an fd."""
 
 # These aliases are to work around pyright complaints.

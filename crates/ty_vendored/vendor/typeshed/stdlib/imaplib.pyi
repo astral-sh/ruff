@@ -21,8 +21,8 @@ from re import Pattern
 from socket import socket as _socket
 from ssl import SSLContext, SSLSocket
 from types import TracebackType
-from typing import IO, Any, Literal, SupportsAbs, SupportsInt, overload
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import IO, Any, Literal, SupportsAbs, SupportsInt, TypeAlias, overload
+from typing_extensions import Self, deprecated
 
 __all__ = ["IMAP4", "IMAP4_stream", "Internaldate2tuple", "Int2AP", "ParseFlags", "Time2Internaldate", "IMAP4_SSL"]
 
@@ -107,6 +107,7 @@ class IMAP4:
         This connection will be used by the routines:
             read, readline, send, shutdown.
         """
+
     if sys.version_info >= (3, 14):
         @property
         @deprecated("IMAP4.file is unsupported, can cause errors, and may be removed.")
@@ -278,6 +279,7 @@ class IMAP4:
 
         (typ, [[QUOTAROOT responses...], [QUOTA responses]]) = <instance>.getquotaroot(mailbox)
         """
+
     if sys.version_info >= (3, 14):
         def idle(self, duration: float | None = None) -> Idler:
             """Return an iterable IDLE context manager producing untagged responses.
@@ -547,6 +549,7 @@ class IMAP4_SSL(IMAP4):
             ssl_context: None = None,
             timeout: float | None = None,
         ) -> None: ...
+
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None
     sslobj: SSLSocket

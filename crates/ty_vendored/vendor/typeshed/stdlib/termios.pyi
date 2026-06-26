@@ -10,8 +10,7 @@ sys.stdin.fileno(), or a file object, such as sys.stdin itself.
 
 import sys
 from _typeshed import FileDescriptorLike
-from typing import Any, Final
-from typing_extensions import TypeAlias
+from typing import Any, Final, TypeAlias
 
 # Must be a list of length 7, containing 6 ints and a list of NCCS 1-character bytes or ints.
 _Attr: TypeAlias = list[int | list[bytes | int]] | list[int | list[bytes]] | list[int | list[int]]
@@ -348,6 +347,7 @@ if sys.platform != "win32":
         termios.TCOON to restart output, termios.TCIOFF to suspend input,
         or termios.TCION to restart input.
         """
+
     if sys.version_info >= (3, 11):
         def tcgetwinsize(fd: FileDescriptorLike, /) -> tuple[int, int]:
             """Get the tty winsize for file descriptor fd.
@@ -359,7 +359,8 @@ if sys.platform != "win32":
             """Set the tty winsize for file descriptor fd.
 
             The winsize to be set is taken from the winsize argument, which
-            is a two-item tuple (ws_row, ws_col) like the one returned by tcgetwinsize().
+            is a two-item tuple (ws_row, ws_col) like the one returned by
+            tcgetwinsize().
             """
 
     class error(Exception): ...

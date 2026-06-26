@@ -141,9 +141,7 @@ info: Function defined here
   |
 1 | def foo(
   |     ^^^
-  |
- ::: src/mdtest_snippet.py:3:5
-  |
+2 |     x: int,
 3 |     y: int,
   |     ------ Parameter declared here
   |
@@ -230,12 +228,12 @@ error[invalid-argument-type]: Argument to function `loads` is incorrect
   |            ^ Expected `str | bytes | bytearray`, found `Literal[5]`
   |
 info: Function defined here
-   --> stdlib/json/__init__.pyi:224:5
+   --> stdlib/json/__init__.pyi:320:9
     |
-224 | def loads(
-    |     ^^^^^
-225 |     s: str | bytes | bytearray,
-    |     -------------------------- Parameter declared here
+320 |     def loads(
+    |         ^^^^^
+321 |         s: str | bytes | bytearray,
+    |         -------------------------- Parameter declared here
     |
 ```
 
@@ -569,6 +567,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 8 |     f(x)  # snapshot: invalid-argument-type
   |       ^ Expected `Number`, found `int | float`
   |
+info: element `int` of union `int | float` is not assignable to `Number`
 info: Function defined here
  --> src/mdtest_snippet.py:3:5
   |

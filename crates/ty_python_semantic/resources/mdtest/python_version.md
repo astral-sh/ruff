@@ -3,38 +3,6 @@
 This file just makes sure that we can configure the target Python version and recognize
 version-specific features.
 
-## Python version 3.9
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-Not valid in 3.9, only in 3.10 and later:
-
-```py
-(3).bit_count()  # error: [unresolved-attribute]
-```
-
-## Python version 3.10
-
-```toml
-[environment]
-python-version = "3.10"
-```
-
-Valid in 3.10:
-
-```py
-(3).bit_count()  # no error
-```
-
-Not valid in 3.10, only in 3.11 and later:
-
-```py
-import tomllib  # error: [unresolved-import]
-```
-
 ## Python version 3.11
 
 ```toml

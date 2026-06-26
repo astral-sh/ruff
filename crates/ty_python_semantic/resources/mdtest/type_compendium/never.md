@@ -1,5 +1,10 @@
 # `Never`
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 `Never` represents the empty set of values.
 
 ## `Never` is a subtype of every type
@@ -116,14 +121,14 @@ static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 
 Intersecting with `Never` results in `Never`:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, Intersection
+```pyi
+from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
 class P: ...
 class Q: ...
 
-static_assert(is_equivalent_to(Intersection[P, Never, Q], Never))
+static_assert(is_equivalent_to(P & Never & Q, Never))
 ```
 
 ## `Never` is the complement of `object`
@@ -131,12 +136,12 @@ static_assert(is_equivalent_to(Intersection[P, Never, Q], Never))
 `object` describes the set of all possible values, while `Never` describes the empty set. The two
 types are complements of each other:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, Not
+```pyi
+from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(Not[object], Never))
-static_assert(is_equivalent_to(Not[Never], object))
+static_assert(is_equivalent_to(~object, Never))
+static_assert(is_equivalent_to(~Never, object))
 ```
 
 This duality is also reflected in other facts:

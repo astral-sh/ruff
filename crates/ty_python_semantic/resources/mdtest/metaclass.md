@@ -586,13 +586,40 @@ python-version = "3.13"
 ```
 
 ```py
+from typing import Any
+
 class M(type): ...
 class A[T](metaclass=M): ...
-class B(A): ...
+class B(A[Any]): ...
 class C(A[int]): ...
 
 reveal_type(B.__class__)  # revealed: <class 'M'>
 reveal_type(C.__class__)  # revealed: <class 'M'>
+```
+
+## Inheritance from an intersection type
+
+Narrowing can cause a class object to have an intersection type. A class that inherits from this
+intersection should still inherit the class object's metaclass.
+
+```py
+from typing import Any
+
+class Meta(type):
+    meta_attr: int = 1
+
+class Base(metaclass=Meta):
+    base_attr: str = ""
+
+def f(other: Any):
+    if Base is other:
+        reveal_type(Base)  # revealed: <class 'Base'> & Any
+
+        class Child(Base): ...
+
+        reveal_type(Child.base_attr)  # revealed: str
+        reveal_type(Child.__class__)  # revealed: <class 'Meta'>
+        reveal_type(Child.meta_attr)  # revealed: int
 ```
 
 ## Conflict (1)
@@ -746,14 +773,21 @@ reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
 
 ## Diagnostic range
 
-<!-- snapshot-diagnostics -->
-
 ```py
 def _(n: int):
-    # error: [invalid-metaclass]
+    # snapshot: invalid-metaclass
     class B(metaclass=n):
         x = 1
         y = 2
+```
+
+```snapshot
+error[invalid-metaclass]: Metaclass type `int` is not callable
+ --> src/mdtest_snippet.py:3:13
+  |
+3 |     class B(metaclass=n):
+  |             ^^^^^^^^^^^
+  |
 ```
 
 ## Cyclic

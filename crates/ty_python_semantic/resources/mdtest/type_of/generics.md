@@ -284,6 +284,29 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
+## Type aliases in final upper bounds
+
+A type variable whose upper bound resolves to a final class has only one possible class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from ty_extensions import TypeOf
+
+@final
+class FinalClass: ...
+
+type Alias = FinalClass
+
+def accepts_exact(cls: TypeOf[FinalClass]) -> None: ...
+def bounded[T: Alias](cls: type[T]) -> None:
+    accepts_exact(cls)
+```
+
 ## Metaclass instances
 
 ```py
@@ -319,6 +342,8 @@ def _[T](x: X[type[T]]):
 ## Generic Type Inference
 
 ```py
+from typing import Callable
+
 def f1[T](x: type[T]) -> type[T]:
     return x
 
@@ -331,8 +356,30 @@ def f2[T](x: T) -> type[T]:
 reveal_type(f2(int(1)))  # revealed: type[int]
 reveal_type(f2(object()))  # revealed: type
 
-# TODO: This should reveal `type[Literal[1]]`.
-reveal_type(f2(1))  # revealed: type[Unknown]
+reveal_type(f2(1))  # revealed: <class 'int'>
+reveal_type(f2(type))  # revealed: <class 'type'>
+
+def foo() -> int:
+    return 1
+
+reveal_type(f2(foo))  # revealed: <class 'FunctionType'>
+
+def _(x: Callable[[int], int]):
+    reveal_type(f2(x))  # revealed: type
+
+class Meta(type): ...
+class Base(metaclass=Meta): ...
+
+reveal_type(f2(Base))  # revealed: <class 'Meta'>
+reveal_type(type(Base))  # revealed: <class 'Meta'>
+
+class MetaWithAttr(type):
+    meta_attr: int
+
+class BaseWithAttr(metaclass=MetaWithAttr): ...
+
+def _[T: type[BaseWithAttr]](x: type[T]) -> None:
+    reveal_type(x.meta_attr)  # revealed: int
 
 def f3[T](x: type[T]) -> T:
     return x()
@@ -435,7 +482,7 @@ from typing import final
 class P[T]:
     x: T
 
-def expects_type_p(x: type[P]):
+def expects_type_p(x: type[P]):  # error: [missing-type-argument]
     pass
 
 def expects_type_p_of_int(x: type[P[int]]):
@@ -495,7 +542,7 @@ This also works with `ParamSpec`:
 @final
 class C[**P]: ...
 
-def expects_type_c(f: type[C]): ...
+def expects_type_c(f: type[C]): ...  # error: [missing-type-argument]
 def expects_type_c_of_int_and_str(x: type[C[int, str]]): ...
 
 # OK, the unspecialized `C` is assignable to `type[C[...]]`

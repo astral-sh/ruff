@@ -179,14 +179,12 @@ AIR301 [*] `triggering_dataset_events` is removed in Airflow 3.0
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Use `triggering_asset_events` instead
-48 |     tomorrow_ds = context["tomorrow_ds"]
-49 |     yesterday_ds = context["yesterday_ds"]
+   |
 50 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
    -     events = context["triggering_dataset_events"]
 51 +     events = context["triggering_asset_events"]
 52 |
-53 |
-54 | @task
+   |
 
 AIR301 `execution_date` is removed in Airflow 3.0
   --> AIR301_context.py:57:30
@@ -317,14 +315,12 @@ AIR301 [*] `triggering_dataset_events` is removed in Airflow 3.0
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Use `triggering_asset_events` instead
-65 |     tomorrow_ds = context["tomorrow_ds"]
-66 |     yesterday_ds = context["yesterday_ds"]
+   |
 67 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
    -     events = context["triggering_dataset_events"]
 68 +     events = context["triggering_asset_events"]
 69 |
-70 |
-71 | @task(task_id="print_the_context")
+   |
 
 AIR301 `tomorrow_ds` is removed in Airflow 3.0
   --> AIR301_context.py:75:22
@@ -377,14 +373,12 @@ AIR301 [*] `schedule_interval` is removed in Airflow 3.0
 115 |     template_searchpath=["/templates"],
     |
 help: Use `schedule` instead
-110 |
-111 | with DAG(
+    |
 112 |     dag_id="example_dag",
     -     schedule_interval="@daily",
 113 +     schedule="@daily",
 114 |     start_date=datetime(2023, 1, 1),
-115 |     template_searchpath=["/templates"],
-116 | ) as dag:
+    |
 
 AIR301 `next_ds` is removed in Airflow 3.0
    --> AIR301_context.py:137:23

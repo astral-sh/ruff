@@ -1,18 +1,25 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
+    place::{
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
+        TypeOrigin,
+    },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
-        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
-        variance::VarianceInferable, visitor,
+        any_over_type, binding_type, definition_expression_type,
+        tuple::Tuple,
+        variance::VarianceInferable,
+        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use ty_python_core::{
@@ -165,7 +172,13 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context), None)
+        BoundTypeVarInstance::new(
+            db,
+            self,
+            BindingContext::Definition(binding_context),
+            None,
+            TypeVarNonce::NONE,
+        )
     }
 
     fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
@@ -342,12 +355,14 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
+        type SeenTypeAliases<'db> = SmallVec<[TypeAliasType<'db>; 1]>;
+
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
             db: &'db dyn Db,
             visitor: &'a TypeVarDefaultVisitor<'db>,
             seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
-            seen_type_aliases: &'a RefCell<FxHashSet<TypeAliasType<'db>>>,
+            seen_type_aliases: &'a RefCell<SeenTypeAliases<'db>>,
         }
 
         fn typevar_default_is_self_referential<'db>(
@@ -375,11 +390,38 @@ impl<'db> TypeVarInstance<'db> {
             type_alias: TypeAliasType<'db>,
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
-            if !state.seen_type_aliases.borrow_mut().insert(type_alias) {
-                return false;
+            {
+                let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
+                if seen_type_aliases.contains(&type_alias) {
+                    return false;
+                }
+                seen_type_aliases.push(type_alias);
             }
 
-            type_is_self_referential_impl(state, type_alias.raw_value_type(state.db), self_identity)
+            let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
+                if specialization
+                    .types(state.db)
+                    .iter()
+                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
+                {
+                    return true;
+                }
+                type_alias.value_type(state.db)
+            } else if let Some(generic_context) = type_alias.generic_context(state.db)
+                && generic_context.variables(state.db).any(|typevar| {
+                    typevar_default_is_self_referential(
+                        state,
+                        typevar.typevar(state.db),
+                        self_identity,
+                    )
+                })
+            {
+                return true;
+            } else {
+                type_alias.raw_value_type(state.db)
+            };
+
+            type_is_self_referential_impl(state, value_type, self_identity)
         }
 
         fn type_is_self_referential_impl<'db>(
@@ -407,7 +449,7 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let seen_typevars = RefCell::new(FxHashSet::default());
-        let seen_type_aliases = RefCell::new(FxHashSet::default());
+        let seen_type_aliases = RefCell::new(SeenTypeAliases::new());
 
         let state = State {
             db,
@@ -546,7 +588,8 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
-                    | DynamicType::InvalidConcatenateUnknown => Parameters::unknown(),
+                    | DynamicType::InvalidConcatenateUnknown
+                    | DynamicType::AmbiguousOverload => Parameters::unknown(),
                 },
                 Type::Divergent(_) => Parameters::unknown(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
@@ -577,7 +620,10 @@ impl<'db> TypeVarInstance<'db> {
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
-                if known_class == Some(KnownClass::ParamSpec) {
+                if matches!(
+                    known_class,
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+                ) {
                     convert_type_to_paramspec_value(db, default_type)
                 } else {
                     default_type
@@ -622,7 +668,7 @@ impl<'db> TypeVarInstance<'db> {
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
         if !matches!(
             self.identity(db).kind(db),
-            TypeVarKind::Pep695 | TypeVarKind::Pep695ParamSpec
+            TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec
         ) {
             return None;
         }
@@ -635,6 +681,167 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
+/// A nonce that gives a bound typevar occurrence a fresh identity.
+///
+/// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
+/// occurrences.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update)]
+pub struct TypeVarNonce(u32);
+
+// This type does not have any heap storage.
+impl get_size2::GetSize for TypeVarNonce {}
+
+impl TypeVarNonce {
+    pub(crate) const NONE: Self = Self(0);
+    const FIRST: Self = Self(1);
+
+    pub(crate) const fn value(self) -> u32 {
+        self.0
+    }
+
+    pub(crate) fn increment(self) -> Self {
+        Self(
+            self.0
+                .checked_add(1)
+                .expect("exhausted bound typevar freshness nonces"),
+        )
+    }
+
+    pub(crate) fn add(self, delta: u32) -> Self {
+        Self(
+            self.0
+                .checked_add(delta)
+                .expect("exhausted bound typevar freshness nonces"),
+        )
+    }
+}
+
+#[derive(Debug)]
+struct TypeVarNonceGeneratorInner<'db> {
+    next: TypeVarNonce,
+    seen: FxHashSet<GenericContext<'db>>,
+    enclosing: FxHashSet<BindingContext<'db>>,
+}
+
+/// A clone-safe generator of fresh bound-typevar occurrence nonces.
+///
+/// The generator only allocates a nonce for the second and later occurrence of a generic context.
+/// The first occurrence can use its source-level identity directly because there is no previous
+/// occurrence for it to collide with.
+#[derive(Clone, Debug)]
+pub(crate) struct TypeVarNonceGenerator<'db> {
+    inner: Rc<RefCell<TypeVarNonceGeneratorInner<'db>>>,
+}
+
+impl Default for TypeVarNonceGenerator<'_> {
+    fn default() -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(TypeVarNonceGeneratorInner {
+                next: TypeVarNonce::FIRST,
+                seen: FxHashSet::default(),
+                enclosing: FxHashSet::default(),
+            })),
+        }
+    }
+}
+
+impl<'db> TypeVarNonceGenerator<'db> {
+    pub(crate) fn record_enclosing_binding_contexts(
+        &self,
+        binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
+    ) {
+        let mut inner = self.inner.borrow_mut();
+        inner.enclosing.extend(binding_contexts);
+    }
+
+    pub(crate) fn should_freshen(
+        &self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
+        let mut inner = self.inner.borrow_mut();
+        let mut binding_contexts = generic_context
+            .variables(db)
+            .map(|typevar| typevar.binding_context(db));
+        // A context inherited from an enclosing definition can be merged with another context.
+        // Only the unmerged context represents a recursive occurrence that needs freshening.
+        let matches_enclosing = binding_contexts.next().is_some_and(|binding_context| {
+            inner.enclosing.contains(&binding_context)
+                && binding_contexts.all(|other| other == binding_context)
+        });
+        matches_enclosing || !inner.seen.insert(generic_context)
+    }
+
+    pub(crate) fn next(&self) -> TypeVarNonce {
+        let mut inner = self.inner.borrow_mut();
+        let nonce = inner.next;
+        inner.next = nonce.increment();
+        nonce
+    }
+}
+
+pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
+    db: &'db dyn Db,
+    types: impl IntoIterator<Item = Type<'db>>,
+    generic_context: GenericContext<'db>,
+) -> Option<TypeVarNonce> {
+    struct MatchingFreshnessCollector<'db> {
+        base_identities: FxHashSet<BoundTypeVarIdentity<'db>>,
+        recursion_guard: TypeCollector<'db>,
+        max_freshness: Cell<Option<TypeVarNonce>>,
+    }
+
+    impl<'db> MatchingFreshnessCollector<'db> {
+        fn new(db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+            let base_identities = generic_context
+                .variables(db)
+                .map(|typevar| {
+                    let mut identity = typevar.identity(db);
+                    identity.freshness = TypeVarNonce::NONE;
+                    identity
+                })
+                .collect();
+            Self {
+                base_identities,
+                recursion_guard: TypeCollector::default(),
+                max_freshness: Cell::default(),
+            }
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for MatchingFreshnessCollector<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            let mut identity = bound_typevar.identity(db);
+            identity.freshness = TypeVarNonce::NONE;
+            if self.base_identities.contains(&identity) {
+                self.max_freshness.set(
+                    self.max_freshness
+                        .get()
+                        .max(Some(bound_typevar.freshness(db))),
+                );
+            }
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let collector = MatchingFreshnessCollector::new(db, generic_context);
+    for ty in types {
+        collector.visit_type(db, ty);
+    }
+    collector.max_freshness.get()
+}
+
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -644,6 +851,8 @@ pub struct BoundTypeVarInstance<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
+    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
+    pub(super) freshness: TypeVarNonce,
 }
 
 // The Salsa heap is tracked separately.
@@ -656,18 +865,22 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db).with_name_suffix(db, suffix),
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         )
     }
 
-    /// Get the identity of this bound typevar.
+    /// Get the identity of this bound typevar occurrence.
     ///
-    /// This is used for comparing whether two bound typevars represent the same logical typevar,
-    /// regardless of e.g. differences in their bounds or constraints due to materialization.
+    /// This includes the source-level typevar, binding context, `ParamSpec` attribute, and
+    /// freshness nonce. It is used for comparing whether two bound typevars represent the same
+    /// occurrence, regardless of e.g. differences in their bounds or constraints due to
+    /// materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
             binding_context: self.binding_context(db),
             paramspec_attr: self.paramspec_attr(db),
+            freshness: self.freshness(db),
         }
     }
 
@@ -709,11 +922,17 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).identity(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
-            None, // ParamSpecs cannot have explicit variance
+            self.typevar(db).explicit_variance(db),
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
-        Self::new(db, typevar, self.binding_context(db), Some(kind))
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            Some(kind),
+            self.freshness(db),
+        )
     }
 
     /// Returns a new bound typevar instance without any `ParamSpec` attribute set.
@@ -736,15 +955,16 @@ impl<'db> BoundTypeVarInstance<'db> {
                 db,
                 self.typevar(db).identity(db),
                 None, // Remove the upper bound set by `with_paramspec_attr`
-                None, // ParamSpecs cannot have explicit variance
+                self.typevar(db).explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
             self.binding_context(db),
             None,
+            self.freshness(db),
         )
     }
 
-    /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
+    /// Returns whether two bound typevars represent the same occurrence, regardless of e.g.
     /// differences in their bounds or constraints due to materialization.
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
         self.identity(db) == other.identity(db)
@@ -757,7 +977,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             name,
             None, // definition
-            TypeVarKind::Pep695,
+            TypeVarKind::Pep695TypeVar,
         );
         let typevar = TypeVarInstance::new(
             db,
@@ -766,7 +986,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(variance),
             None, // _default
         );
-        Self::new(db, typevar, BindingContext::Synthetic, None)
+        Self::new(
+            db,
+            typevar,
+            BindingContext::Synthetic,
+            None,
+            TypeVarNonce::NONE,
+        )
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -788,7 +1014,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarVariance::Invariant),
             None, // _default
         );
-        Self::new(db, typevar, binding_context, None)
+        Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
@@ -812,6 +1038,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             typevar,
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         )
     }
 
@@ -900,6 +1127,21 @@ impl<'db> BoundTypeVarInstance<'db> {
                     Type::TypeVar(self)
                 }
             }
+            TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta,
+            } => {
+                if generic_context.contains(db, self.identity(db)) && !self.is_paramspec(db) {
+                    Type::TypeVar(self.freshen_with_mapping(
+                        db,
+                        self.freshness(db).add(*delta),
+                        type_mapping,
+                        visitor,
+                    ))
+                } else {
+                    Type::TypeVar(self)
+                }
+            }
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -959,6 +1201,52 @@ impl<'db> BoundTypeVarInstance<'db> {
                 .materialize_impl(db, materialization_kind, visitor),
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
+        )
+    }
+
+    fn freshen_with_mapping(
+        self,
+        db: &'db dyn Db,
+        nonce: TypeVarNonce,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let typevar = self.typevar(db);
+        let bound_or_constraints = typevar.bound_or_constraints(db);
+        let default = self.default_type(db);
+
+        if bound_or_constraints.is_none() && default.is_none() {
+            return Self::new(
+                db,
+                typevar,
+                self.binding_context(db),
+                self.paramspec_attr(db),
+                nonce,
+            );
+        }
+
+        let typevar = TypeVarInstance::new(
+            db,
+            typevar.identity(db),
+            bound_or_constraints.map(|bound_or_constraints| {
+                bound_or_constraints
+                    .apply_type_mapping_impl(db, type_mapping, visitor)
+                    .into()
+            }),
+            typevar.explicit_variance(db),
+            default.map(|ty| {
+                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into()
+            }),
+        );
+
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            nonce,
         )
     }
 
@@ -968,6 +1256,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db).to_instance(db)?,
             self.binding_context(db),
             self.paramspec_attr(db),
+            self.freshness(db),
         ))
     }
 }
@@ -977,13 +1266,13 @@ impl<'db> BoundTypeVarInstance<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
-    Legacy,
+    LegacyTypeVar,
     /// `def foo[T](x: T) -> T: ...`
-    Pep695,
+    Pep695TypeVar,
     /// `typing.Self`
     TypingSelf,
     /// `P = ParamSpec("P")`
-    ParamSpec,
+    LegacyParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
     /// `Alias: typing.TypeAlias = T`
@@ -992,7 +1281,7 @@ pub enum TypeVarKind {
 
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
-        matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
+        matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }
 }
 
@@ -1116,12 +1405,13 @@ impl std::fmt::Display for ParamSpecAttrKind {
     }
 }
 
-/// The identity of a bound type variable.
+/// The identity of a bound type variable occurrence.
 ///
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
-/// independent of the typevar's bounds or constraints. Two bound typevars have the same identity
-/// if they represent the same logical typevar bound in the same context, even if their bounds
-/// have been materialized differently.
+/// plus a freshness nonce for fresh callable occurrences, independent of the typevar's
+/// bounds or constraints. Two bound typevars have the same identity if they represent the same
+/// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
+/// the same source-level typevar have different bound identities.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
@@ -1129,10 +1419,33 @@ pub struct BoundTypeVarIdentity<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
+    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
+    pub(super) freshness: TypeVarNonce,
+}
+
+impl<'db> BoundTypeVarIdentity<'db> {
+    fn kind(self, db: &'db dyn Db) -> TypeVarKind {
+        self.identity.kind(db)
+    }
+
+    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn without_paramspec_attr(mut self, db: &'db dyn Db) -> Self {
+        debug_assert!(
+            self.is_paramspec(db),
+            "Expected a ParamSpec, got {:?}",
+            self.kind(db)
+        );
+
+        self.paramspec_attr = None;
+        self
+    }
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1152,13 +1465,17 @@ fn bound_typevar_default_type<'db>(
 
 #[expect(clippy::ref_option)]
 fn bound_typevar_default_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    _previous_default: &Option<Type<'db>>,
-    _default: Option<Type<'db>>,
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    match (previous_default, default) {
+        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (_, None) => None,
+    }
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
@@ -1292,6 +1609,7 @@ impl<'db> TypeVarConstraints<'db> {
                         Definedness::AlwaysDefined
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    provenance: Provenance::Unknown,
                 })
             },
             qualifiers,
@@ -1310,6 +1628,20 @@ impl<'db> TypeVarConstraints<'db> {
             .map(|ty| ty.materialize(db, materialization_kind, visitor))
             .collect::<Box<_>>();
         TypeVarConstraints::new(db, materialized)
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let mapped = self
+            .elements(db)
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor))
+            .collect::<Box<_>>();
+        TypeVarConstraints::new(db, mapped)
     }
 
     /// Normalize for cycle recovery by combining with the previous value and
@@ -1377,6 +1709,26 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor),
+            ),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(constraints.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    visitor,
+                ))
+            }
+        }
+    }
+
     /// Represent the bound/constraints of this typevar as a single type, by unioning constraints.
     ///
     /// Careful with this method! It has both semantic and performance gotchas. Unioning
@@ -1393,5 +1745,5 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>>;
+    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
 pub(crate) struct VisitTypeVarDefault;

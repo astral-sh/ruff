@@ -1,4 +1,5 @@
-use ruff_db::system::SystemPath;
+use ruff_db::system::{System, SystemPath};
+use ruff_python_ast::PySourceType;
 
 use crate::glob::include::MatchFile;
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
@@ -126,7 +127,7 @@ pub(crate) enum GlobFilterCheckMode {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum IncludeResult {
+pub enum IncludeResult {
     /// The path matches or at least is a prefix of an include pattern.
     ///
     /// For directories: This isn't a guarantee that any file in this directory gets included
@@ -139,4 +140,24 @@ pub(crate) enum IncludeResult {
     /// The path matches neither an include nor an exclude pattern and, therefore,
     /// isn't included.
     NotIncluded,
+}
+
+impl IncludeResult {
+    pub fn is_included(self) -> bool {
+        matches!(self, Self::Included { .. })
+    }
+
+    /// Returns `true` if an included file should be indexed.
+    pub(crate) fn should_index_file(self, system: &dyn System, path: &SystemPath) -> bool {
+        let Self::Included { literal_match } = self else {
+            return false;
+        };
+
+        literal_match == Some(true)
+            || path
+                .extension()
+                .and_then(PySourceType::try_from_extension)
+                .or_else(|| system.source_type(path))
+                .is_some()
+    }
 }

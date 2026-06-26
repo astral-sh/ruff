@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -73,9 +73,7 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 | T2 = TypeVar("T2")
  5 | T3 = TypeVar("T3")
    | ------------------ `T3` defined here
    |

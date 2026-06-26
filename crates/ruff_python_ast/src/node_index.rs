@@ -217,6 +217,18 @@ impl PartialEq for AtomicNodeIndex {
     }
 }
 
+impl PartialEq<NodeIndex> for AtomicNodeIndex {
+    fn eq(&self, other: &NodeIndex) -> bool {
+        self.load() == *other
+    }
+}
+
+impl PartialEq<AtomicNodeIndex> for NodeIndex {
+    fn eq(&self, other: &AtomicNodeIndex) -> bool {
+        *self == other.load()
+    }
+}
+
 impl Clone for AtomicNodeIndex {
     fn clone(&self) -> Self {
         Self(AtomicU32::from(self.0.load(Ordering::Relaxed)))

@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -53,7 +53,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |                 ^^^^^^^^^^^
   |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```
@@ -66,7 +66,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |                 ^^^^^^^^^^^^^^^^
   |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```
@@ -79,7 +79,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |                 ^^^^^^^^^^^^^^^^^^^^^
    |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```
@@ -92,7 +92,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |                   ^^^^^^^^^^^^^^^^^^^^^
    |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```
@@ -105,7 +105,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |                   ^^^^^^^^^^^^^^^
    |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```
@@ -118,7 +118,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |    ^^^^^^^^^^^
    |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```
@@ -131,7 +131,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |        ^^^^^^^^^^^^^^^^^^^
    |
 info: `typing.Concatenate` is only valid:
-info:  - as the first argument to `typing.Callable`
+info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
 
 ```

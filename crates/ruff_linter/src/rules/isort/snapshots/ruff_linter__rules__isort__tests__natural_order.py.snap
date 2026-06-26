@@ -23,6 +23,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_^
    |
 help: Organize imports
+   |
 1  | import numpy1
 2  + import numpy2
 3  | import numpy10
@@ -40,5 +41,4 @@ help: Organize imports
 13 |     uint16,
    -     int16,
 14 |     uint32,
-15 |     uint64,
-16 | )
+   |

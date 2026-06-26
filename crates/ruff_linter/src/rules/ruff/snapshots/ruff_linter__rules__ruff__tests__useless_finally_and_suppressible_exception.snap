@@ -11,9 +11,9 @@ RUF072 [*] Empty `finally` clause
   | |________^
   |
 help: Remove the `finally` clause
-5 |     foo()
-6 | except Exception:
+  |
 7 |     pass
   - finally:
   -     pass
 8 |
+  |

@@ -3,8 +3,8 @@ from _typeshed import MaybeNone
 from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping, Sequence
 from contextlib import _GeneratorContextManager
 from types import TracebackType
-from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, disjoint_base
+from typing import Any, ClassVar, Final, Generic, Literal, ParamSpec, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, disjoint_base
 
 _T = TypeVar("_T")
 _TT = TypeVar("_TT", bound=type[Any])
@@ -243,7 +243,7 @@ class NonCallableMock(Base, Any):
         """assert that the mock was never called."""
 
     def assert_called_once_with(self, *args: Any, **kwargs: Any) -> None:
-        """assert that the mock was called exactly once and that that call was
+        """assert that the mock was called exactly once and that call was
         with the specified arguments.
         """
 
@@ -316,6 +316,7 @@ class NonCallableMock(Base, Any):
         >>> attrs = {'method.return_value': 3, 'other.side_effect': KeyError}
         >>> mock.configure_mock(**attrs)
         """
+
     return_value: Any
     side_effect: Any
     called: bool
@@ -342,6 +343,7 @@ class NonCallableMock(Base, Any):
         For non-callable mocks the callable variant will be used (rather than
         any custom subclass).
         """
+
     if sys.version_info >= (3, 13):
         def _calls_repr(self) -> str:
             """Renders self.mock_calls as a string.
@@ -352,6 +354,7 @@ class NonCallableMock(Base, Any):
                     If self.mock_calls is empty, an empty string is returned. The
                     output will be truncated if very long.
             """
+
     else:
         def _calls_repr(self, prefix: str = "Calls") -> str:
             """Renders self.mock_calls as a string.
@@ -454,42 +457,29 @@ class _patch(Generic[_T]):
     additional_patchers: Any
     # If new==DEFAULT, self is _patch[Any]. Ideally we'd be able to add an overload for it so that self is _patch[MagicMock],
     # but that's impossible with the current type system.
-    if sys.version_info >= (3, 10):
-        def __init__(
-            self: _patch[_T],  # pyright: ignore[reportInvalidTypeVarUse]  #11780
-            getter: Callable[[], Any],
-            attribute: str,
-            new: _T,
-            spec: Any | None,
-            create: bool,
-            spec_set: Any | None,
-            autospec: Any | None,
-            new_callable: Any | None,
-            kwargs: Mapping[str, Any],
-            *,
-            unsafe: bool = False,
-        ) -> None: ...
-    else:
-        def __init__(
-            self: _patch[_T],  # pyright: ignore[reportInvalidTypeVarUse]  #11780
-            getter: Callable[[], Any],
-            attribute: str,
-            new: _T,
-            spec: Any | None,
-            create: bool,
-            spec_set: Any | None,
-            autospec: Any | None,
-            new_callable: Any | None,
-            kwargs: Mapping[str, Any],
-        ) -> None: ...
-
+    def __init__(
+        self: _patch[_T],  # pyright: ignore[reportInvalidTypeVarUse]  #11780
+        getter: Callable[[], Any],
+        attribute: str,
+        new: _T,
+        spec: Any | None,
+        create: bool,
+        spec_set: Any | None,
+        autospec: Any | None,
+        new_callable: Any | None,
+        kwargs: Mapping[str, Any],
+        *,
+        unsafe: bool = False,
+    ) -> None: ...
     def copy(self) -> _patch[_T]: ...
+
     @overload
     def __call__(self, func: _TT) -> _TT: ...
     # If new==DEFAULT, this should add a MagicMock parameter to the function
     # arguments. See the _patch_default_new class below for this functionality.
     @overload
     def __call__(self, func: Callable[_P, _R]) -> Callable[_P, _R]: ...
+
     def decoration_helper(
         self, patched: _patch[Any], args: Sequence[Any], keywargs: Any
     ) -> _GeneratorContextManager[tuple[Sequence[Any], Any]]: ...
@@ -561,16 +551,15 @@ class _patch_dict:
     clear: Any
     def __init__(self, in_dict: Any, values: Any = (), clear: Any = False, **kwargs: Any) -> None: ...
     def __call__(self, f: Any) -> Any: ...
-    if sys.version_info >= (3, 10):
-        def decorate_callable(self, f: _F) -> _F: ...
-        def decorate_async_callable(self, f: _AF) -> _AF: ...
-
-    def decorate_class(self, klass: Any) -> Any: ...
     def __enter__(self) -> Any:
         """Patch the dict."""
 
     def __exit__(self, *args: object) -> Any:
         """Unpatch the dict."""
+
+    def decorate_callable(self, f: _F) -> _F: ...
+    def decorate_async_callable(self, f: _AF) -> _AF: ...
+    def decorate_class(self, klass: Any) -> Any: ...
     start: Any
     """Activate a patch, returning any created mock."""
 
@@ -583,6 +572,7 @@ class _patch_dict:
 class _patcher:
     TEST_PREFIX: str
     dict: type[_patch_dict]
+
     # This overload also covers the case, where new==DEFAULT. In this case, the return type is _patch[Any].
     # Ideally we'd be able to add an overload for it so that the return type is _patch[MagicMock],
     # but that's impossible with the current type system.
@@ -629,6 +619,7 @@ class _patcher:
         # kwargs are passed to the MagicMock/AsyncMock constructor
         **kwargs: Any,
     ) -> _patch_pass_arg[MagicMock | AsyncMock]: ...
+
     # This overload also covers the case, where new==DEFAULT. In this case, the return type is _patch[Any].
     # Ideally we'd be able to add an overload for it so that the return type is _patch[MagicMock],
     # but that's impossible with the current type system.
@@ -678,6 +669,7 @@ class _patcher:
         # kwargs are passed to the MagicMock/AsyncMock constructor
         **kwargs: Any,
     ) -> _patch_pass_arg[MagicMock | AsyncMock]: ...
+
     @overload
     @staticmethod
     def multiple(
@@ -719,6 +711,7 @@ class _patcher:
         # The kwargs are the mock objects or DEFAULT
         **kwargs: Any,
     ) -> _patch[Any]: ...
+
     @staticmethod
     def stopall() -> None: ...
 
@@ -864,6 +857,7 @@ class AsyncMockMixin(Base):
         """
         See :func:`.Mock.reset_mock()`
         """
+
     await_count: int
     await_args: _Call | None
     await_args_list: _CallList
@@ -938,67 +932,38 @@ class _ANY(Any):
 
 ANY: _ANY
 
-if sys.version_info >= (3, 10):
-    def create_autospec(
-        spec: Any,
-        spec_set: Any = False,
-        instance: Any = False,
-        _parent: Any | None = None,
-        _name: Any | None = None,
-        *,
-        unsafe: bool = False,
-        **kwargs: Any,
-    ) -> Any:
-        """Create a mock object using another object as a spec. Attributes on the
-        mock will use the corresponding attribute on the `spec` object as their
-        spec.
+def create_autospec(
+    spec: Any,
+    spec_set: Any = False,
+    instance: Any = False,
+    _parent: Any | None = None,
+    _name: Any | None = None,
+    *,
+    unsafe: bool = False,
+    **kwargs: Any,
+) -> Any:
+    """Create a mock object using another object as a spec. Attributes on the
+    mock will use the corresponding attribute on the `spec` object as their
+    spec.
 
-        Functions or methods being mocked will have their arguments checked
-        to check that they are called with the correct signature.
+    Functions or methods being mocked will have their arguments checked
+    to check that they are called with the correct signature.
 
-        If `spec_set` is True then attempting to set attributes that don't exist
-        on the spec object will raise an `AttributeError`.
+    If `spec_set` is True then attempting to set attributes that don't exist
+    on the spec object will raise an `AttributeError`.
 
-        If a class is used as a spec then the return value of the mock (the
-        instance of the class) will have the same spec. You can use a class as the
-        spec for an instance object by passing `instance=True`. The returned mock
-        will only be callable if instances of the mock are callable.
+    If a class is used as a spec then the return value of the mock (the
+    instance of the class) will have the same spec. You can use a class as the
+    spec for an instance object by passing `instance=True`. The returned mock
+    will only be callable if instances of the mock are callable.
 
-        `create_autospec` will raise a `RuntimeError` if passed some common
-        misspellings of the arguments autospec and spec_set. Pass the argument
-        `unsafe` with the value True to disable that check.
+    `create_autospec` will raise a `RuntimeError` if passed some common
+    misspellings of the arguments autospec and spec_set. Pass the argument
+    `unsafe` with the value True to disable that check.
 
-        `create_autospec` also takes arbitrary keyword arguments that are passed to
-        the constructor of the created mock.
-        """
-
-else:
-    def create_autospec(
-        spec: Any,
-        spec_set: Any = False,
-        instance: Any = False,
-        _parent: Any | None = None,
-        _name: Any | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        """Create a mock object using another object as a spec. Attributes on the
-        mock will use the corresponding attribute on the `spec` object as their
-        spec.
-
-        Functions or methods being mocked will have their arguments checked
-        to check that they are called with the correct signature.
-
-        If `spec_set` is True then attempting to set attributes that don't exist
-        on the spec object will raise an `AttributeError`.
-
-        If a class is used as a spec then the return value of the mock (the
-        instance of the class) will have the same spec. You can use a class as the
-        spec for an instance object by passing `instance=True`. The returned mock
-        will only be callable if instances of the mock are callable.
-
-        `create_autospec` also takes arbitrary keyword arguments that are passed to
-        the constructor of the created mock.
-        """
+    `create_autospec` also takes arbitrary keyword arguments that are passed to
+    the constructor of the created mock.
+    """
 
 class _SpecState:
     spec: Any

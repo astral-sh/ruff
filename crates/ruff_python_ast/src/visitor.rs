@@ -479,7 +479,9 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
             }
-            visitor.visit_expr(key);
+            if let Some(key) = key {
+                visitor.visit_expr(key);
+            }
             visitor.visit_expr(value);
         }
         Expr::Generator(ast::ExprGenerator {

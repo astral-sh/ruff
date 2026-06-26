@@ -32,6 +32,7 @@ class HTTPError(URLError, addinfourl):
     def headers(self) -> Message: ...
     @headers.setter
     def headers(self, headers: Message) -> None: ...
+
     @property
     def reason(self) -> str: ...  # type: ignore[override]
     code: int

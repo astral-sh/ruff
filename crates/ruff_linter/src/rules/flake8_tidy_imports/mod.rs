@@ -212,6 +212,56 @@ mod tests {
     }
 
     #[test]
+    fn preview_lazy_import_immediately_resolved() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID255.py"),
+            &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY315),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn preview_lazy_import_immediately_resolved_fix() {
+        let source = dedent(
+            r#"
+            lazy  import foo
+            lazy  from library import Component
+
+            base = foo.Base
+            component = Component
+            "#,
+        );
+        let expected = dedent(
+            r#"
+            import foo
+            from library import Component
+
+            base = foo.Base
+            component = Component
+            "#,
+        );
+
+        let source_kind = SourceKind::Python {
+            code: source.to_string(),
+            is_stub: false,
+        };
+
+        let (diagnostics, fixed) = test_contents(
+            &source_kind,
+            Path::new("flake8_tidy_imports/TID255_fix.py"),
+            &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY315),
+        );
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(fixed.source_code(), expected);
+    }
+
+    #[test]
     fn preview_lazy_import_mismatch_fix() {
         let source = dedent(
             r#"

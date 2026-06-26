@@ -16,7 +16,7 @@ python-version = "3.12"
 ## Propagating target type annotation
 
 ```py
-from typing import Literal
+from typing import Any, AsyncGenerator, AsyncIterable, Generator, Iterable, Literal
 
 def list1[T](x: T) -> list[T]:
     return [x]
@@ -35,8 +35,46 @@ def _(l: list[int] | None = None):
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
     l2: list[int] = l or list()
-    # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
-    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(l2)  # revealed: list[int]
+
+class TextContent: ...
+class TagContent: ...
+
+def expects_list_content(content: list[TextContent | TagContent]) -> None: ...
+def optional_content(content: list[TextContent | TagContent] | None) -> None:
+    expects_list_content(content or [TextContent()])
+
+def invalid_fallback(content: list[TextContent | TagContent] | None) -> None:
+    expects_list_content(content or [object()])  # error: [invalid-argument-type]
+
+def expects_generator_content(content: Generator[list[TextContent | TagContent], None, None]) -> None: ...
+def expects_iterable_content(content: Iterable[list[TextContent | TagContent]]) -> None: ...
+def expects_optional_iterable_content(content: Iterable[list[TextContent | TagContent]] | None) -> None: ...
+def generator_content() -> None:
+    expects_generator_content([TextContent()] for _ in range(1))
+    expects_iterable_content([TextContent()] for _ in range(1))
+    expects_optional_iterable_content([TextContent()] for _ in range(1))
+    expects_generator_content((reveal_type([TextContent()]) for _ in range(1)))  # revealed: list[TextContent | TagContent]
+
+def expects_int_iterable_or_str_generator(content: Generator[list[str], int, None] | Iterable[list[int]]) -> None: ...
+def generator_content_with_incompatible_generator_arm() -> None:
+    expects_int_iterable_or_str_generator((reveal_type([]) for _ in range(1)))  # revealed: list[int]
+
+def invalid_generator_content() -> None:
+    expects_generator_content([object()] for _ in range(1))  # error: [invalid-argument-type]
+    expects_optional_iterable_content([object()] for _ in range(1))  # error: [invalid-argument-type]
+
+async def async_texts() -> AsyncGenerator[TextContent, None]:
+    yield TextContent()
+
+def expects_async_generator_content(content: AsyncGenerator[list[TextContent | TagContent], None]) -> None: ...
+def expects_async_iterable_content(content: AsyncIterable[list[TextContent | TagContent]]) -> None: ...
+async def async_generator_content() -> None:
+    expects_async_generator_content([TextContent()] async for _ in async_texts())
+    expects_async_iterable_content([TextContent()] async for _ in async_texts())
+
+async def invalid_async_generator_content() -> None:
+    expects_async_generator_content([object()] async for _ in async_texts())  # error: [invalid-argument-type]
 
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
@@ -48,6 +86,39 @@ reveal_type(x)  # revealed: list[int]
 
 x: list[list[int]] = [[1], [2], *([3], [4])]
 reveal_type(x)  # revealed: list[list[int]]
+
+type IntDict = dict[str, int]
+
+unique: set[int] = {1, 2, 3}
+reveal_type(unique)  # revealed: set[int]
+
+mapping: dict[str, int] = {"a": 1, **{"b": 2}}
+reveal_type(mapping)  # revealed: dict[str, int]
+
+def dynamic_mapping() -> Any: ...
+
+dynamic_unpack: dict[str, int] = reveal_type({**dynamic_mapping()})  # revealed: dict[str | Any, int | Any]
+
+alias_mapping: IntDict = {"a": 1}
+reveal_type(alias_mapping)  # revealed: dict[str, int]
+
+optional_mapping: dict[str, int] | None = {"a": 1}
+reveal_type(optional_mapping)  # revealed: dict[str, int]
+
+either: list[int] | list[str] = [1]
+reveal_type(either)  # revealed: list[int]
+
+# A protocol context is not an exact nominal collection context and must use the general path.
+iterable: Iterable[int] = [1]
+reveal_type(iterable)  # revealed: list[int]
+
+bad_list: list[str] = [1]  # error: [invalid-assignment]
+bad_dict: dict[str, int] = {"a": "bad"}  # error: [invalid-assignment]
+
+bad_nested_list: list[list[list[str]]] = [[[1]]]  # error: [invalid-assignment]
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
+bad_unpack: dict[str, int] = {**42}
 
 x: list[list[int | str]] = [[1], [2]] * 3
 reveal_type(x)  # revealed: list[list[int | str]]
@@ -98,10 +169,14 @@ x: list[int | str] = list1(42) * 3
 `typed_dict.py`:
 
 ```py
-from typing import Callable, Hashable, Mapping, TypedDict
+from typing import Any, Callable, Hashable, Iterable, Mapping, TypedDict
+from typing_extensions import Never
 
 class TD(TypedDict):
     x: int
+
+class BadTD(TypedDict):
+    x: str
 
 d1_literal = {"x": 1}
 d1_dict = dict(x=1)
@@ -111,9 +186,11 @@ reveal_type(d1_dict)  # revealed: dict[str, int]
 
 d2_literal: TD = {"x": 1}
 d2_dict: TD = dict(x=1)
+d2_unpack: TD = dict(**d2_literal)
 
 reveal_type(d2_literal)  # revealed: TD
 reveal_type(d2_dict)  # revealed: TD
+reveal_type(d2_unpack)  # revealed: TD
 
 d3_literal: dict[str, int] = {"x": 1}
 d3_dict: dict[str, int] = dict(x=1)
@@ -127,6 +204,37 @@ d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
 reveal_type(d4_invalid_literal)  # revealed: TD
 reveal_type(d4_invalid_dict)  # revealed: TD
 
+def unpack_invalid_typed_dict(src: BadTD) -> TD:
+    # The fast path should validate TypedDict-shaped unpacks even when they are not assignable to
+    # the target. That preserves the key-level TypedDict diagnostic instead of falling back to a
+    # broad `dict[str, str]` assignment error.
+    # error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `str`"
+    return dict(**src)
+
+def return_any_unpack(src: Any) -> TD:
+    return dict(**src)
+
+def pass_never_unpack(src: Never) -> None:
+    takes_td(dict(**src))
+
+def takes_mapping(value: Mapping[str, object]) -> None:
+    pass
+
+def keep_keyword_diagnostics(kwargs: Mapping[str, object]) -> None:
+    # The TypedDict-aware `dict(...)` fast path should not lose diagnostics from named keywords
+    # when unsupported `**kwargs` forces it to fall back to ordinary dict inference.
+    # error: [unresolved-reference] "Name `missing` used when not defined"
+    # error: [invalid-assignment]
+    maybe_td: TD = dict(x=missing, **kwargs)
+    takes_mapping(maybe_td)
+
+def takes_dict(value: dict[str, object]) -> None: ...
+def takes_kwargs(**kwargs: object) -> None: ...
+def _(data: TD):
+    reveal_type(dict(data))  # revealed: dict[str, object]
+    takes_dict(dict(data))
+    takes_kwargs(**dict(data))
+
 # Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
 # in typeshed, which require the key type to be `str` when using keyword arguments. However, we
 # special-case this pattern to match the behavior of `d5_literal`.
@@ -135,11 +243,41 @@ d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 
 d6_dict: TD = {"x": 1} | {"x": 2}
 
+type IntFloatDict = dict[int, float]
+type TypedDictOrDictAlias = TD | IntFloatDict
+type TypedDictOrMapping = TD | Mapping[int, float]
+
+# The `dict[int, float]` fallback should still win when it is wrapped in an alias.
+d7_alias_fallback: TypedDictOrDictAlias = {1: 5.2}
+d8_mapping_fallback: TypedDictOrMapping = {1: 5.2}
+
+# A `Mapping` fallback should only suppress `TypedDict` diagnostics when it accepts the literal.
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+d9_invalid_mapping_key: TypedDictOrMapping = {"y": 5.2}
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}
+
+def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
+    pass
+
+takes_td_or_iterable({42: 42})
+
 def return_literal() -> TD:
     return {"x": 1}
 
 def return_dict() -> TD:
     return dict(x=1)
+
+def return_unpack(src: TD) -> TD:
+    return dict(**src)
+
+def takes_td(value: TD) -> None:
+    pass
+
+def pass_unpack(src: TD) -> None:
+    takes_td(dict(**src))
 
 def return_invalid_literal() -> TD:
     # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the `return_invalid_dict` case below).
@@ -203,6 +341,19 @@ def h[T](x: T, cond: bool) -> T | list[T]:
 
 def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
+```
+
+The return type context should preserve the independent key and value types of a generic `dict`
+constructor:
+
+```py
+from collections.abc import Iterable, Mapping
+
+def dict_with_numeric_promotion(
+    keys: Iterable[float],
+    values: Iterable[int],
+) -> Mapping[float, int]:
+    return dict(zip(keys, values))
 ```
 
 ## Type context sources
@@ -407,10 +558,7 @@ def f7(y: object) -> object:
 x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
 reveal_type(x9)  # revealed: list[int | str]
 
-# TODO: We should not error here once call inference can conjoin constraints
-# from all call arguments.
 def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
-    # error: [invalid-return-type]
     return tuple(map(abspath, xs))
 
 T2 = TypeVar("T2")
@@ -463,6 +611,99 @@ def _(flag: bool):
     reveal_type(x2)  # revealed: list[int | None]
 ```
 
+## Peer type context for collection literals
+
+When a boolean or conditional expression combines a fresh collection literal with another operand,
+the other operand can provide type context for the literal:
+
+```py
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Literal, TypedDict, reveal_type
+
+type Key = Literal["foo", "bar"]
+
+class Payload(TypedDict):
+    required: int
+
+def from_or(values: list[str] | None) -> None:
+    for value in reveal_type(values or []):  # revealed: list[str]
+        reveal_type(value)  # revealed: str
+
+def from_and(values: list[str]) -> None:
+    reveal_type(values and [])  # revealed: list[str]
+
+def chained_or(first: list[int], second: list[str]) -> None:
+    for value in first or second or []:
+        reveal_type(value)  # revealed: int | str
+
+def from_conditional(values: set[str], allowed: set[str] | None) -> None:
+    filtered = reveal_type(
+        sorted(value for value in values if value not in allowed)  # revealed: list[str]
+        if allowed is not None
+        else []
+    )
+    for value in filtered:
+        reveal_type(value)  # revealed: str
+
+def collection_literal_first(values: list[str], flag: bool) -> None:
+    reveal_type([] if flag else values)  # revealed: list[str]
+
+def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
+    reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
+
+def non_empty_set_fallback(values: set[Key] | None) -> None:
+    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+
+def preserve_generic[T](value: T) -> T:
+    return value
+
+def preserve_partially_specialized[T](value: list[T | int]) -> list[T | int]:
+    return value
+
+def generic_type_context(values: list[int | str] | None) -> None:
+    reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
+    reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
+
+def widened_non_empty_fallback(values: list[int] | None) -> None:
+    result = values or ["x"]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+
+def incompatible_collection_kind(values: set[str] | None) -> None:
+    reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
+
+def typed_dict_peer_is_only_a_hint(value: Payload | None, flag: bool) -> None:
+    value or {}
+    {} if flag else value
+    value or {"other": 1}
+
+def stored_literal_is_not_fresh(values: dict[Key, int] | None) -> None:
+    fallback = {"foo": 0}
+    reveal_type(fallback)  # revealed: dict[str, int]
+    result = values or fallback
+    reveal_type(result)  # revealed: (dict[Key, int] & ~AlwaysFalsy) | dict[str, int]
+
+@dataclass
+class SortParams[F]:
+    field: F
+    direction: Literal["asc", "desc"] = "desc"
+
+def build_sort_spec[T](
+    sort_params: SortParams[T] | None,
+) -> dict[T, Literal[1, -1]] | None:
+    if not sort_params:
+        return None
+    return {sort_params.field: 1}
+
+type Path = Literal["name", "age", "created"]
+
+def use_sort(value: Mapping[Path, Literal[1, -1]]) -> None: ...
+
+params: SortParams[Path] | None = None
+sort = build_sort_spec(params) or {"name": -1}
+use_sort(sort)
+```
+
 ## Lambda expressions
 
 If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
@@ -473,6 +714,9 @@ from typing import Callable, TypedDict
 
 class Bar(TypedDict):
     bar: int
+
+def id[T](x: T) -> T:
+    return x
 
 f1 = lambda x: {"bar": 1}
 reveal_type(f1)  # revealed: (x) -> dict[str, int]
@@ -485,26 +729,56 @@ reveal_type(f2)  # revealed: (x: int) -> Bar
 f3: Callable[[int], Bar] = lambda x: {}
 reveal_type(f3)  # revealed: (int, /) -> Bar
 
-# TODO: This should reveal `str`.
-f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: Unknown
-reveal_type(f4)  # revealed: (x: str) -> Unknown
+f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: str
+reveal_type(f4)  # revealed: (x: str) -> str
+
+f5: Callable[[str], str] = id(lambda x: reveal_type(x))  # revealed: str
+reveal_type(f5)  # revealed: (x: str) -> str
+
+# The same return-context propagation works for generic calls whose context solves a ParamSpec.
+def id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
+    return x
+
+f5_paramspec: Callable[[int], int] = id_callable(lambda x: reveal_type(x))  # revealed: int
+reveal_type(f5_paramspec)  # revealed: (x: int) -> int
 
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
-f5: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
-reveal_type(f5)  # revealed: (tuple[int, ...], /) -> None
+f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
+reveal_type(f6)  # revealed: (tuple[int, ...], /) -> None
 
-f6: Callable[[int, str], None] = lambda *args: None
-reveal_type(f6)  # revealed: (*args) -> None
+f7: Callable[[int, str], None] = lambda *args: None
+reveal_type(f7)  # revealed: (*args) -> None
 
 # N.B. `Callable` annotations only support positional parameters.
 # error: [invalid-assignment]
-f7: Callable[[int], None] = lambda *, x=1: None
-reveal_type(f7)  # revealed: (int, /) -> None
+f8: Callable[[int], None] = lambda *, x=1: None
+reveal_type(f8)  # revealed: (int, /) -> None
 
 # TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
-f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
+reveal_type(f9)  # revealed: (*args, *, x=1) -> None
+
+f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
+reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
+
+# TODO: This should reveal `tuple[int, ...]` once we support `Unpack`.
+f11: Callable[[*tuple[int, ...]], tuple[int, ...]] = lambda *args: reveal_type(args)  # revealed: tuple[Unknown, ...]
+reveal_type(f11)  # revealed: (*args) -> tuple[Unknown, ...]
+
+# TODO: Better generic call inference.
+def _(x: list[int]):
+    f12 = list(map(lambda y: y + 1, x))
+    reveal_type(f12)  # revealed: list[Unknown]
+
+def _() -> Callable[[int], int]:
+    return id(lambda x: reveal_type(x))  # revealed: int
+
+def _():
+    def takes_callable(_: Callable[[int], int]): ...
+
+    takes_callable(lambda x: reveal_type(x))  # revealed: int
+    takes_callable(id(id(lambda x: reveal_type(x))))  # revealed: int
 
 def _(x: bool):
     signatures = {
@@ -520,10 +794,10 @@ def _(x: bool):
 We do not currently account for type annotations present later in the scope:
 
 ```py
-f9 = lambda: [1]
+f12 = lambda: [1]
 # TODO: This should not error.
-_: list[int | str] = f9()  # error: [invalid-assignment]
-reveal_type(f9)  # revealed: () -> list[int]
+_: list[int | str] = f12()  # error: [invalid-assignment]
+reveal_type(f12)  # revealed: () -> list[int]
 ```
 
 ## Dunder Calls
@@ -637,6 +911,290 @@ async def _():
 
     x3: list[int | None] = await make_lst(1)
     reveal_type(x3)  # revealed: list[int | None]
+```
+
+## Container inference
+
+Empty, unannotated container literals are inferred based on future uses that extend throughout the
+entire scope:
+
+```py
+x1 = []
+x1.append(1)
+x1.append("2")
+reveal_type(x1)  # revealed: list[int | str]
+```
+
+```py
+x1_sorted = []
+x1_sorted.append("x")
+x1_sorted.sort()
+reveal_type(x1_sorted)  # revealed: list[str]
+```
+
+Bare empty `list()`, `set()`, and `dict()` calls also participate in full-scope inference. Calls
+through aliases and shadowed names are deliberately not refined.
+
+```py
+list_result = list()
+list_result.append(1)
+list_result.append("2")
+reveal_type(list_result)  # revealed: list[int | str]
+
+set_result = set()
+set_result.add(1)
+set_result.add("2")
+reveal_type(set_result)  # revealed: set[int | str]
+
+dict_result = dict()
+dict_result["a"] = 1
+dict_result["b"] = "2"
+reveal_type(dict_result)  # revealed: dict[str, int | str]
+
+def make_list() -> list[str]:
+    result = list()
+    result.append(1)
+    reveal_type(result)  # revealed: list[int | str]
+    return result  # error: [invalid-return-type]
+
+def make_set() -> set[str]:
+    result = set()
+    result.add(1)
+    reveal_type(result)  # revealed: set[int | str]
+    return result  # error: [invalid-return-type]
+
+def make_dict() -> dict[str, str]:
+    result = dict()
+    result["x"] = 1
+    reveal_type(result)  # revealed: dict[str, int | str]
+    return result  # error: [invalid-return-type]
+
+set_alias = set
+aliased_result = set_alias()
+aliased_result.add(1)
+reveal_type(aliased_result)  # revealed: set[Unknown]
+
+from typing import Never
+
+class Result:
+    def abort(self) -> Never:
+        raise RuntimeError
+
+def shadowed_constructor() -> int:
+    set = Result
+    result = set()
+    reveal_type(result)  # revealed: Result
+    result.abort()
+    return "unreachable"
+```
+
+```py
+class X:
+    def __init__(self):
+        self.x = []
+        self.x.append(1)
+        self.x.append("2")
+        reveal_type(self.x)  # revealed: list[int | str]
+
+reveal_type(X().x)  # revealed: list[int | str]
+```
+
+```py
+def _(flag: bool):
+    if flag:
+        x2 = []
+        x2.append(1)
+        reveal_type(x2)  # revealed: list[int]
+    else:
+        x2 = []
+        x2.append("2")
+        reveal_type(x2)  # revealed: list[str]
+```
+
+```py
+def takes_list_int(x: list[int]): ...
+
+x3 = []
+takes_list_int(x3)
+# TODO: This should reveal `list[int]`, but we do not currently record
+# argument constraints for arbitrary function calls.
+reveal_type(x3)  # revealed: list[Unknown]
+```
+
+```py
+def append[T](x: list[T], y: T):
+    x.append(y)
+
+x4 = []
+append(x4, 1)
+append(x4, "2")
+# TODO: This should reveal `list[int | str]`, but we do not currently record
+# argument constraints for arbitrary function calls.
+reveal_type(x4)  # revealed: list[Unknown]
+```
+
+```py
+x5 = []
+_: list[int] = reveal_type(x5)  # revealed: list[int]
+```
+
+```py
+def _() -> list[int | None]:
+    x6 = []
+    return reveal_type(x6)  # revealed: list[int | None]
+
+def _() -> int:
+    invalid_x6 = []
+    return invalid_x6  # error: [invalid-return-type]
+```
+
+```py
+x7 = []
+x7[:] = [1, "2", 3.0]
+reveal_type(x7)  # revealed: list[int | str | float]
+```
+
+```py
+from typing import Literal
+
+x8 = []
+one: Literal[1] = 1
+x8.append(one)
+reveal_type(x8)  # revealed: list[Literal[1]]
+```
+
+```py
+x9 = []
+x10 = []
+x9.append(1)
+x9.append("2")
+x10.append(3)
+
+reveal_type(x9)  # revealed: list[int | str]
+reveal_type(x10)  # revealed: list[int]
+```
+
+```py
+x11 = []
+x12 = []
+x11.append(1)
+x12.append(x11)
+
+reveal_type(x11)  # revealed: list[int]
+reveal_type(x12)  # revealed: list[list[int]]
+```
+
+```py
+x13 = []
+x13.append(x13)
+reveal_type(x13)  # revealed: list[Divergent]
+```
+
+```py
+x14 = []
+x15 = []
+
+x14.append(x15)
+x15.append(x14)
+
+reveal_type(x14)  # revealed: list[Divergent]
+reveal_type(x15)  # revealed: list[Divergent]
+```
+
+Collection-use constraints must converge when multiple collection literals are used in a container
+literal. This is a regression test for <https://github.com/astral-sh/ty/issues/3778>.
+
+```py
+from typing import Any
+
+def run(cond: bool, d: dict[Any, Any]) -> list[Any]:
+    a = {}
+    b = {}
+    if cond:
+        b = d
+    return [a.get("x", 0), b.get("x", 0)]
+
+def assigned(cond: bool, d: dict[Any, Any]) -> list[Any]:
+    a = {}
+    b = {}
+    if cond:
+        b = d
+    result: list[Any] = [a.get("x", 0), b.get("x", 0)]
+    return result
+```
+
+```py
+def _(i):
+    x16 = []
+    x16.append(x16)
+    reveal_type(x16)  # revealed: list[Divergent]
+```
+
+```py
+x17 = {}
+x17.update(a=1)
+reveal_type(x17)  # revealed: dict[str, int]
+```
+
+```py
+x18 = {}
+x18.update({"a": 1})
+reveal_type(x18)  # revealed: dict[str, int]
+```
+
+```py
+x19 = {}
+x19["a"] = 1
+x19["b"] = "2"
+reveal_type(x19)  # revealed: dict[str, int | str]
+```
+
+```py
+x20 = {}
+x20["a"] = len(x20)
+x20.setdefault("b", str(len(x20)))
+reveal_type(x20)  # revealed: dict[str, int | str]
+```
+
+```py
+x21 = []
+_: list[int] = x21  # error: [invalid-assignment]
+
+# TODO: We should error on this `append` instead of the assignment and not union
+# later constraints after the element type has been fully constrained above, to
+# avoid confusing error messages where the type of the collection may be unexpectedly
+# influenced by uses later in the scope.
+x21.append("a")
+
+# TODO: This would then reveal `list[int]`.
+reveal_type(x21)  # revealed: list[int | str]
+```
+
+```py
+def _(flag: bool):
+    if flag:
+        x22 = []
+    else:
+        x22 = []
+
+    x22.append(1)
+
+    # TODO: This should reveal `list[int]`.
+    reveal_type(x22)  # revealed: list[Unknown]
+```
+
+```py
+x23 = [None, None, None]
+x23[0] = 1
+x23[1] = "2"
+x23[2] = 3.0
+reveal_type(x23)  # revealed: list[int | str | float | None]
+```
+
+```py
+x24 = {"a": 1}
+x24[1] = "b"
+reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
 ## Multi-inference diagnostics

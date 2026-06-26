@@ -13,6 +13,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |___________________^
   |
 help: Organize imports
+  |
 1 + import short
 2 | import mediuuuuuum
   - import short
@@ -22,3 +23,4 @@ help: Organize imports
 5 | from mediuuuum import c
   - from short import b
 6 + from looooooooooooooong import a
+  |

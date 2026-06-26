@@ -224,7 +224,7 @@ class Foo[T]:
         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
         reveal_type(super())
 
-    def method3(self: Foo):
+    def method3(self: Foo):  # error: [missing-type-argument]
         # revealed: <super: <class 'Foo'>, Foo[Unknown]>
         reveal_type(super())
 
@@ -494,6 +494,7 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from typing import Literal
 from ty_extensions import reveal_mro
 
 class A: ...
@@ -514,9 +515,7 @@ def f(x: C | D):
     # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
-def f(flag: bool):
-    x = "" if flag else "hello"
-    reveal_type(x)  # revealed: Literal["", "hello"]
+def f(x: Literal["", "hello"]):
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
 def f(x: int | str):
@@ -761,6 +760,31 @@ reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(k
 super(B, B())[0]
 ```
 
+### Generic base initializer
+
+A generic base initializer can inherit both its own class's generic context and the subclass's
+generic context. The merged context is not the same as the subclass's enclosing context and should
+not be freshened as a recursive reference.
+
+```py
+from collections.abc import Callable
+from typing import Generic
+from typing_extensions import TypeVar
+
+T = TypeVar("T", bound=BaseException, covariant=True)
+S = TypeVar("S", bound=BaseException, default=BaseException, covariant=True)
+
+class Base(Generic[T]):
+    def __init__(self, check: Callable[[T], bool] | None) -> None:
+        self.check = check
+
+class Child(Base[S], Generic[S]):
+    def __init__(self, check: Callable[[S], bool] | None) -> None:
+        # Regression test: Freshening the merged context made this expect
+        # `Callable[[BaseException], bool]` instead of `Callable[[S], bool]`.
+        super().__init__(check)
+```
+
 ## Subclass Using Concrete Type Instead of `Self`
 
 When a parent class uses `Self` in a parameter type and a subclass overrides it with a concrete
@@ -812,6 +836,6 @@ class MyProtocol(Protocol, Generic[_T_co]):
         # Accessing parent's __class_getitem__ through super()
         reveal_type(super())  # revealed: <super: <class 'MyProtocol'>, type[Self@__class_getitem__]>
         parent_method = super().__class_getitem__
-        reveal_type(parent_method)  # revealed: @Todo(super in generic class)
+        reveal_type(parent_method)  # revealed: (item: Unknown, /) -> type[Self@__class_getitem__]
         return parent_method(item)
 ```

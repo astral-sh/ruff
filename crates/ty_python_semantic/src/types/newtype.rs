@@ -51,7 +51,7 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=lazy_base_cycle_initial,
+        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
@@ -144,14 +144,14 @@ impl<'db> NewType<'db> {
                     for inner_newtype in inner_newtype_stack.into_iter().rev() {
                         mapped_base = NewTypeBase::NewType(NewType::new(
                             db,
-                            inner_newtype.name(db).clone(),
+                            inner_newtype.name(db),
                             inner_newtype.definition(db),
                             Some(mapped_base),
                         ));
                     }
                     return Some(NewType::new(
                         db,
-                        self.name(db).clone(),
+                        self.name(db),
                         self.definition(db),
                         Some(mapped_base),
                     ));
@@ -174,6 +174,25 @@ impl<'db> NewType<'db> {
     ) -> Self {
         self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
             .unwrap()
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let eager_base = match self.eager_base(db) {
+            Some(base) => Some(base.recursive_type_normalized_impl(db, div, nested)?),
+            None => None,
+        };
+
+        Some(NewType::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            eager_base,
+        ))
     }
 }
 
@@ -226,7 +245,14 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     newtype: NewType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, newtype.base(db).instance_type(db));
+    let base = if visitor.should_visit_lazy_type_attributes() {
+        Some(newtype.base(db))
+    } else {
+        newtype.eager_base(db)
+    };
+    if let Some(base) = base {
+        visitor.visit_type(db, base.instance_type(db));
+    }
 }
 
 /// `typing.NewType` typically wraps a class type, but it can also wrap another newtype.
@@ -249,6 +275,23 @@ impl<'db> NewTypeBase<'db> {
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
             NewTypeBase::Float => KnownUnion::Float.to_type(db),
             NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            NewTypeBase::ClassType(class_type) => class_type
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(NewTypeBase::ClassType),
+            NewTypeBase::NewType(newtype) => newtype
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(NewTypeBase::NewType),
+            NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }
     }
 }
@@ -297,12 +340,4 @@ impl<'db> Iterator for NewTypeBaseIter<'db> {
             }
         }
     }
-}
-
-fn lazy_base_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: NewType<'db>,
-) -> NewTypeBase<'db> {
-    NewTypeBase::ClassType(ClassType::object(db))
 }

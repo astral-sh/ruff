@@ -1,8 +1,7 @@
 import sys
 from asyncio.events import AbstractEventLoop
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
-from typing_extensions import ParamSpec
+from typing import ParamSpec, TypeVar
 
 from .case import TestCase
 

@@ -4,12 +4,14 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
+use crate::types::infer::nearest_enclosing_function;
 use crate::{
     TypeQualifiers,
     types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
+use ty_python_core::scope::FileScopeId;
 use ty_python_core::semantic_index;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -89,10 +91,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Check if the target attribute expression (e.g. `self.x`) is an instance attribute
     /// assignment, i.e. the object is the implicit `self`/`cls` receiver.
     ///
-    /// This delegates to the `is_instance_attribute` flag computed during semantic indexing,
-    /// which checks that the object expression refers to the first parameter of the
-    /// enclosing method and has not been shadowed in intermediate scopes.
-    fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
+    /// The `is_instance_attribute` flag computed during semantic indexing checks that the object
+    /// expression refers to the first parameter of the enclosing method and has not been shadowed
+    /// in intermediate scopes. We additionally check that the nearest enclosing function has an
+    /// implicit receiver, since static methods also have a first parameter.
+    pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };
@@ -102,6 +105,72 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         place_table.member(member_id).is_instance_attribute()
+            && nearest_enclosing_function(self.db(), self.index, self.scope())
+                .is_some_and(|function| function.has_implicit_receiver(self.db()))
+    }
+
+    /// Check whether an annotated attribute target uses an implicit receiver.
+    ///
+    /// This includes direct captures from enclosing methods: these are not implicit-attribute
+    /// definition scopes, but their annotations were accepted before non-name target validation.
+    pub(super) fn is_receiver_attribute_annotation_target(
+        &self,
+        target: &ast::ExprAttribute,
+    ) -> bool {
+        if self.is_instance_attribute_assignment(target) {
+            return true;
+        }
+
+        let Some(receiver) = target.value.as_name_expr() else {
+            return false;
+        };
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        self.receiver_method_scope(receiver)
+            .is_some_and(|receiver_scope_id| receiver_scope_id != current_scope_id)
+    }
+
+    /// Resolve the method scope that defines an implicit receiver referenced by the current scope.
+    ///
+    /// Returns `None` if the name is shadowed, resolves globally, or belongs to a function that is
+    /// not a method with an implicit receiver.
+    ///
+    /// ```python
+    /// class C:
+    ///     def method(self):
+    ///         def inner():
+    ///             self.attribute = 1
+    /// ```
+    pub(super) fn receiver_method_scope(&self, receiver: &ast::ExprName) -> Option<FileScopeId> {
+        let receiver_name = receiver.id.as_str();
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let (receiver_scope_id, receiver_scope, receiver_symbol) = self
+            .index
+            .visible_ancestor_scopes(current_scope_id)
+            .find_map(|(scope_id, scope)| {
+                self.index
+                    .place_table(scope_id)
+                    .symbol_by_name(receiver_name)
+                    .filter(|symbol| symbol.is_local() || symbol.is_global())
+                    .map(|symbol| (scope_id, scope, symbol))
+            })?;
+        if receiver_symbol.is_global() {
+            return None;
+        }
+        let function = receiver_scope
+            .node()
+            .as_function()
+            .map(|node| node.node(self.module()))?;
+        self.index.class_definition_of_method(receiver_scope_id)?;
+
+        (function
+            .parameters
+            .iter_non_variadic_params()
+            .next()
+            .is_some_and(|parameter| parameter.name() == receiver_name)
+            && self
+                .function_type(function)
+                .is_some_and(|function| function.has_implicit_receiver(self.db())))
+        .then_some(receiver_scope_id)
     }
 
     pub(super) fn invalid_assignment_to_final_attribute(

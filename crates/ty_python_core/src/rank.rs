@@ -1,6 +1,6 @@
 //! A boxed bit slice that supports a constant-time `rank` operation.
 
-use bitvec::prelude::{BitBox, Msb0};
+use bitvec::prelude::{BitBox, BitVec, Msb0, bitvec};
 use get_size2::GetSize;
 
 /// A boxed bit slice that supports a constant-time `rank` operation.
@@ -23,15 +23,19 @@ use get_size2::GetSize;
 ///
 /// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
 /// bits of overhead on 32-bit platforms.
-#[derive(Clone, Debug, Eq, PartialEq, GetSize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize, salsa::Update)]
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
-    bits: BitBox<Chunk, Msb0>,
+    #[update(fallback)]
+    bits: RankBitBoxStorage,
     chunk_ranks: Box<[u32]>,
 }
 
-fn bit_box_size(bits: &BitBox<Chunk, Msb0>) -> usize {
-    bits.as_raw_slice().get_heap_size()
+pub type RankBitBoxStorage = BitBox<Chunk, Msb0>;
+pub type RankBitBoxVec = BitVec<Chunk, Msb0>;
+
+fn bit_box_size(bits: &RankBitBoxStorage) -> usize {
+    std::mem::size_of_val(bits.as_raw_slice())
 }
 
 // bitvec does not support `u64` as a Store type on 32-bit platforms
@@ -43,8 +47,11 @@ type Chunk = u32;
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
 impl RankBitBox {
-    pub(crate) fn from_bits(iter: impl Iterator<Item = bool>) -> Self {
-        let bits: BitBox<Chunk, Msb0> = iter.collect();
+    pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {
+        bitvec![Chunk, Msb0; 0; cap]
+    }
+
+    pub fn from_bits(bits: RankBitBoxVec) -> Self {
         let chunk_ranks = bits
             .as_raw_slice()
             .iter()
@@ -54,12 +61,28 @@ impl RankBitBox {
                 Some(result)
             })
             .collect();
+        let bits = bits.into();
         Self { bits, chunk_ranks }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.bits.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.bits.is_empty()
     }
 
     #[inline]
     pub fn get_bit(&self, index: usize) -> Option<bool> {
         self.bits.get(index).map(|bit| *bit)
+    }
+
+    #[inline]
+    pub fn iter_ones(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
+        self.bits.iter_ones()
     }
 
     /// Returns the number of bits _before_ (and not including) the given index that are set.
@@ -79,5 +102,26 @@ impl RankBitBox {
         let chunk_mask = Chunk::MAX << (CHUNK_SIZE - index_within_chunk);
         let rank_within_chunk = (chunk & chunk_mask).count_ones();
         chunk_rank + rank_within_chunk
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use get_size2::GetSize;
+
+    use super::{CHUNK_SIZE, Chunk, RankBitBox};
+
+    #[test]
+    fn heap_size_includes_bits_and_chunk_ranks() {
+        let bit_count = CHUNK_SIZE + 1;
+        let bits = RankBitBox::from_bits(RankBitBox::bits_with_capacity(bit_count));
+        let chunk_count = bit_count.div_ceil(CHUNK_SIZE);
+
+        assert_eq!(
+            bits.get_heap_size(),
+            chunk_count * (size_of::<Chunk>() + size_of::<u32>())
+        );
     }
 }

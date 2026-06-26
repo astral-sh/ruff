@@ -1,5 +1,6 @@
 """Implementation of JSONDecoder"""
 
+import sys
 from collections.abc import Callable
 from typing import Any
 
@@ -53,54 +54,110 @@ class JSONDecoder:
 
     """
 
+    if sys.version_info >= (3, 15):
+        array_hook: Callable[[list[Any]], Any] | None
     object_hook: Callable[[dict[str, Any]], Any]
     parse_float: Callable[[str], Any]
     parse_int: Callable[[str], Any]
     parse_constant: Callable[[str], Any]
     strict: bool
     object_pairs_hook: Callable[[list[tuple[str, Any]]], Any]
-    def __init__(
-        self,
-        *,
-        object_hook: Callable[[dict[str, Any]], Any] | None = None,
-        parse_float: Callable[[str], Any] | None = None,
-        parse_int: Callable[[str], Any] | None = None,
-        parse_constant: Callable[[str], Any] | None = None,
-        strict: bool = True,
-        object_pairs_hook: Callable[[list[tuple[str, Any]]], Any] | None = None,
-    ) -> None:
-        """``object_hook``, if specified, will be called with the result
-        of every JSON object decoded and its return value will be used in
-        place of the given ``dict``.  This can be used to provide custom
-        deserializations (e.g. to support JSON-RPC class hinting).
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            *,
+            object_hook: Callable[[dict[str, Any]], Any] | None = None,
+            parse_float: Callable[[str], Any] | None = None,
+            parse_int: Callable[[str], Any] | None = None,
+            parse_constant: Callable[[str], Any] | None = None,
+            strict: bool = True,
+            object_pairs_hook: Callable[[list[tuple[str, Any]]], Any] | None = None,
+            array_hook: Callable[[list[Any]], Any] | None = None,
+        ) -> None:
+            """``object_hook``, if specified, will be called with the result
+            of every JSON object decoded and its return value will be used in
+            place of the given ``dict``.  This can be used to provide custom
+            deserializations (e.g. to support JSON-RPC class hinting).
 
-        ``object_pairs_hook``, if specified will be called with the result
-        of every JSON object decoded with an ordered list of pairs.  The
-        return value of ``object_pairs_hook`` will be used instead of the
-        ``dict``.  This feature can be used to implement custom decoders.
-        If ``object_hook`` is also defined, the ``object_pairs_hook`` takes
-        priority.
+            ``object_pairs_hook``, if specified will be called with the result
+            of every JSON object decoded with an ordered list of pairs.  The
+            return value of ``object_pairs_hook`` will be used instead of the
+            ``dict``.  This feature can be used to implement custom decoders.
+            If ``object_hook`` is also defined, the ``object_pairs_hook`` takes
+            priority.
 
-        ``parse_float``, if specified, will be called with the string
-        of every JSON float to be decoded. By default this is equivalent to
-        float(num_str). This can be used to use another datatype or parser
-        for JSON floats (e.g. decimal.Decimal).
+            ``array_hook`` is an optional function that will be called with the
+            result of any literal array decode (a ``list``). The return value of
+            this function will be used instead of the ``list``. This feature can
+            be used along ``object_pairs_hook`` to customize the resulting data
+            structure - for example, by setting that to ``frozendict`` and
+            ``array_hook`` to ``tuple``, one can get a deep immutable data
+            structute from any JSON data.
 
-        ``parse_int``, if specified, will be called with the string
-        of every JSON int to be decoded. By default this is equivalent to
-        int(num_str). This can be used to use another datatype or parser
-        for JSON integers (e.g. float).
+            ``parse_float``, if specified, will be called with the string
+            of every JSON float to be decoded. By default this is equivalent to
+            float(num_str). This can be used to use another datatype or parser
+            for JSON floats (e.g. decimal.Decimal).
 
-        ``parse_constant``, if specified, will be called with one of the
-        following strings: -Infinity, Infinity, NaN.
-        This can be used to raise an exception if invalid JSON numbers
-        are encountered.
+            ``parse_int``, if specified, will be called with the string
+            of every JSON int to be decoded. By default this is equivalent to
+            int(num_str). This can be used to use another datatype or parser
+            for JSON integers (e.g. float).
 
-        If ``strict`` is false (true is the default), then control
-        characters will be allowed inside strings.  Control characters in
-        this context are those with character codes in the 0-31 range,
-        including ``'\\t'`` (tab), ``'\\n'``, ``'\\r'`` and ``'\\0'``.
-        """
+            ``parse_constant``, if specified, will be called with one of the
+            following strings: -Infinity, Infinity, NaN.
+            This can be used to raise an exception if invalid JSON numbers
+            are encountered.
+
+            If ``strict`` is false (true is the default), then control
+            characters will be allowed inside strings.  Control characters in
+            this context are those with character codes in the 0-31 range,
+            including ``'\\t'`` (tab), ``'\\n'``, ``'\\r'`` and ``'\\0'``.
+            """
+
+    else:
+        def __init__(
+            self,
+            *,
+            object_hook: Callable[[dict[str, Any]], Any] | None = None,
+            parse_float: Callable[[str], Any] | None = None,
+            parse_int: Callable[[str], Any] | None = None,
+            parse_constant: Callable[[str], Any] | None = None,
+            strict: bool = True,
+            object_pairs_hook: Callable[[list[tuple[str, Any]]], Any] | None = None,
+        ) -> None:
+            """``object_hook``, if specified, will be called with the result
+            of every JSON object decoded and its return value will be used in
+            place of the given ``dict``.  This can be used to provide custom
+            deserializations (e.g. to support JSON-RPC class hinting).
+
+            ``object_pairs_hook``, if specified will be called with the result
+            of every JSON object decoded with an ordered list of pairs.  The
+            return value of ``object_pairs_hook`` will be used instead of the
+            ``dict``.  This feature can be used to implement custom decoders.
+            If ``object_hook`` is also defined, the ``object_pairs_hook`` takes
+            priority.
+
+            ``parse_float``, if specified, will be called with the string
+            of every JSON float to be decoded. By default this is equivalent to
+            float(num_str). This can be used to use another datatype or parser
+            for JSON floats (e.g. decimal.Decimal).
+
+            ``parse_int``, if specified, will be called with the string
+            of every JSON int to be decoded. By default this is equivalent to
+            int(num_str). This can be used to use another datatype or parser
+            for JSON integers (e.g. float).
+
+            ``parse_constant``, if specified, will be called with one of the
+            following strings: -Infinity, Infinity, NaN.
+            This can be used to raise an exception if invalid JSON numbers
+            are encountered.
+
+            If ``strict`` is false (true is the default), then control
+            characters will be allowed inside strings.  Control characters in
+            this context are those with character codes in the 0-31 range,
+            including ``'\\t'`` (tab), ``'\\n'``, ``'\\r'`` and ``'\\0'``.
+            """
 
     def decode(self, s: str, _w: Callable[..., Any] = ...) -> Any:  # _w is undocumented
         """Return the Python representation of ``s`` (a ``str`` instance

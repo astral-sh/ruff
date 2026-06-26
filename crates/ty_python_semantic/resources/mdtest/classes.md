@@ -24,6 +24,7 @@ A = str
 B = bytes
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'int'>, <class 'G[bytes]'>, typing.Generic, <class 'object'>)
+reveal_mro(cls=C)  # revealed: (<class 'C'>, <class 'int'>, <class 'G[bytes]'>, typing.Generic, <class 'object'>)
 ```
 
 ## Starred bases

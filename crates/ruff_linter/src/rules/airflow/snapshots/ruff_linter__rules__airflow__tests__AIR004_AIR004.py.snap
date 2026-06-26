@@ -1,0 +1,90 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004.py:14:1
+   |
+12 |   # Violations (should trigger AIR004):
+13 |
+14 | / @task.branch
+15 | | def two_returns_one_non_empty():  # AIR004
+16 | |     if condition1:
+17 | |         return ["my_downstream_task"]
+18 | |     return []
+   | |_____________^
+   |
+
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004.py:21:1
+   |
+21 | / @task.branch
+22 | | def three_returns_one_non_empty():  # AIR004
+23 | |     if condition1:
+24 | |         return []
+25 | |     if condition2:
+26 | |         return ["another_downstream_task"]
+27 | |     return []
+   | |_____________^
+   |
+
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004.py:30:1
+   |
+30 | / @task.branch
+31 | | def nested_returns_one_non_empty():  # AIR004
+32 | |     if condition1:
+33 | |         if condition2:
+34 | |             return []
+35 | |         return ["downstream_task"]
+36 | |     return []
+   | |_____________^
+   |
+
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004.py:39:1
+   |
+39 | / @task.branch()
+40 | | def with_parens():  # AIR004
+41 | |     if condition1:
+42 | |         return ["downstream_task"]
+43 | |     return []
+   | |_____________^
+   |
+
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004.py:46:1
+   |
+46 | / @task.branch
+47 | | def bare_return_and_list():  # AIR004
+48 | |     if condition1:
+49 | |         return ["downstream_task"]
+50 | |     return
+   | |__________^
+   |
+
+AIR004 `@task.branch` can be replaced with `@task.short_circuit`
+  --> AIR004.py:53:1
+   |
+53 | / @task.branch
+54 | | def none_return_and_list():  # AIR004
+55 | |     if condition1:
+56 | |         return ["downstream_task"]
+57 | |     return None
+   | |_______________^
+   |
+
+AIR004 `BranchPythonOperator` can be replaced with `ShortCircuitOperator`
+   --> AIR004.py:107:1
+    |
+107 | BranchPythonOperator(task_id="task", python_callable=operator_short_circuit_candidate)  # AIR004
+    | ^^^^^^^^^^^^^^^^^^^^
+    |
+
+AIR004 `BranchPythonOperator` can be replaced with `ShortCircuitOperator`
+   --> AIR004.py:116:1
+    |
+116 | ProviderBranchPythonOperator(  # AIR004
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+117 |     task_id="task", python_callable=provider_short_circuit_candidate
+118 | )
+    |

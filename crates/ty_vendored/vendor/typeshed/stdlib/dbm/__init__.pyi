@@ -31,8 +31,8 @@ import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, MutableMapping
 from types import TracebackType
-from typing import Literal, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Literal, TypeAlias, type_check_only
+from typing_extensions import Self
 
 __all__ = ["open", "whichdb", "error"]
 

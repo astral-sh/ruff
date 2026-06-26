@@ -54,10 +54,10 @@ if sys.version_info >= (3, 12):
             Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
-
         @overload
         @classmethod
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
+
         if sys.version_info >= (3, 13):
             @classmethod
             def inject(cls, zf: _ZF) -> _ZF:
@@ -194,6 +194,7 @@ if sys.version_info >= (3, 12):
         def suffixes(self) -> list[str]: ...
         @property
         def stem(self) -> str: ...
+
         @overload
         def open(
             self,
@@ -211,9 +212,9 @@ if sys.version_info >= (3, 12):
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
-
         @overload
         def open(self, mode: Literal["rb", "wb"], *, pwd: bytes | None = None) -> IO[bytes]: ...
+
         def iterdir(self) -> Iterator[Self]: ...
         def is_dir(self) -> bool: ...
         def is_file(self) -> bool: ...

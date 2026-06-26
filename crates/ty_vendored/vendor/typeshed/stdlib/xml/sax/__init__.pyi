@@ -22,8 +22,7 @@ expatreader -- Driver that allows use of the Expat parser with SAX.
 import sys
 from _typeshed import ReadableBuffer, StrPath, SupportsRead, _T_co
 from collections.abc import Iterable
-from typing import Final, Protocol, type_check_only
-from typing_extensions import TypeAlias
+from typing import Final, Protocol, TypeAlias, type_check_only
 from xml.sax._exceptions import (
     SAXException as SAXException,
     SAXNotRecognizedException as SAXNotRecognizedException,

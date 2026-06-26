@@ -1,8 +1,8 @@
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping, Sequence
-from typing import Any, Final, final
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, TypeAlias, final
+from typing_extensions import Self
 
 _FilterChain: TypeAlias = Sequence[Mapping[str, Any]]
 
@@ -65,18 +65,19 @@ class LZMADecompressor:
     def decompress(self, data: ReadableBuffer, max_length: int = -1) -> bytes:
         """Decompress *data*, returning uncompressed data as bytes.
 
-        If *max_length* is nonnegative, returns at most *max_length* bytes of
-        decompressed data. If this limit is reached and further output can be
-        produced, *self.needs_input* will be set to ``False``. In this case, the next
-        call to *decompress()* may provide *data* as b'' to obtain more of the output.
+        If *max_length* is nonnegative, returns at most *max_length* bytes
+        of decompressed data. If this limit is reached and further output
+        can be produced, *self.needs_input* will be set to ``False``.  In
+        this case, the next call to *decompress()* may provide *data* as b''
+        to obtain more of the output.
 
-        If all of the input data was decompressed and returned (either because this
-        was less than *max_length* bytes, or because *max_length* was negative),
-        *self.needs_input* will be set to True.
+        If all of the input data was decompressed and returned (either
+        because this was less than *max_length* bytes, or because
+        *max_length* was negative), *self.needs_input* will be set to True.
 
-        Attempting to decompress data after the end of stream is reached raises an
-        EOFError.  Any data found after the end of the stream is ignored and saved in
-        the unused_data attribute.
+        Attempting to decompress data after the end of stream is reached
+        raises an EOFError.  Any data found after the end of the stream is
+        ignored and saved in the unused_data attribute.
         """
 
     @property

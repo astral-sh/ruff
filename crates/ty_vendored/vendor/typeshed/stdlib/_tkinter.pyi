@@ -1,8 +1,8 @@
 import sys
 from _typeshed import FileDescriptorLike, Incomplete
 from collections.abc import Callable
-from typing import Any, ClassVar, Final, Literal, final, overload
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, ClassVar, Final, Literal, TypeAlias, final, overload
+from typing_extensions import deprecated
 
 # _tkinter is meant to be only used internally by tkinter, but some tkinter
 # functions e.g. return _tkinter.Tcl_Obj objects. Tcl_Obj represents a Tcl
@@ -26,6 +26,7 @@ class Tcl_Obj:
     @property
     def typename(self) -> str:
         """name of the Tcl type"""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, value, /): ...
     def __ge__(self, value, /): ...
@@ -94,6 +95,7 @@ class TkappType:
 
     def splitlist(self, arg, /) -> tuple[Incomplete, ...]: ...
     def unsetvar(self, *args, **kwargs): ...
+
     if sys.version_info >= (3, 14):
         @overload
         def wantobjects(self) -> Literal[0, 1]: ...
@@ -103,6 +105,7 @@ class TkappType:
 
     @overload
     def wantobjects(self, wantobjects: Literal[0, 1] | bool, /) -> None: ...
+
     def willdispatch(self) -> None: ...
     if sys.version_info >= (3, 12):
         def gettrace(self, /) -> _TkinterTraceFunc | None:
@@ -180,5 +183,6 @@ def getbusywaitinterval() -> int:
 def setbusywaitinterval(new_val: int, /) -> None:
     """Set the busy-wait interval in milliseconds between successive calls to Tcl_DoOneEvent in a threaded Python interpreter.
 
-    It should be set to a divisor of the maximum time between frames in an animation.
+    It should be set to a divisor of the maximum time between frames in
+    an animation.
     """

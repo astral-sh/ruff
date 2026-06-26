@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod call_hierarchy;
 mod code_action;
 mod code_lens;
 mod completion;
@@ -15,6 +16,7 @@ mod goto;
 mod goto_declaration;
 mod goto_definition;
 mod goto_type_definition;
+mod hints;
 mod hover;
 mod importer;
 mod inlay_hints;
@@ -30,14 +32,21 @@ mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
+pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
+pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
 pub use code_lens::{CodeLensCommand, CodeLensItem, code_lens};
-pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
+pub use completion::{
+    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
+    CompletionSettings, completion,
+};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;
 pub use folding_range::{FoldingRange, FoldingRangeKind, folding_ranges};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use hints::{Hint, HintKind, hints};
 pub use hover::hover;
 pub use inlay_hints::{
     InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
@@ -282,6 +291,13 @@ impl HasNavigationTargets for Type<'_> {
                 .collect(),
 
             Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                    return alternatives
+                        .iter()
+                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .collect();
+                }
+
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
                 let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 
@@ -298,6 +314,12 @@ impl HasNavigationTargets for Type<'_> {
                     None => first.navigation_targets(db),
                 }
             }
+
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_types(db)
+                .iter()
+                .flat_map(|alternative| alternative.navigation_targets(db))
+                .collect(),
 
             ty => ty
                 .definition(db)
@@ -378,11 +400,14 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
+    };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
@@ -430,14 +455,38 @@ mod tests {
 
             let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
+                .context(0)
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
+                let config = config
+                    .clone()
+                    .anonymized_line_numbers(diagnostic_touches_vendored_file(&self.db, &diag));
                 write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
             buf
         }
+    }
+
+    pub(super) fn diagnostic_touches_vendored_file(db: &dyn Db, diagnostic: &Diagnostic) -> bool {
+        fn annotation_is_vendored(db: &dyn Db, annotation: &Annotation) -> bool {
+            matches!(
+                annotation.get_span().file(),
+                UnifiedFile::Ty(file) if file.path(db).is_vendored_path()
+            )
+        }
+
+        diagnostic
+            .primary_annotation()
+            .into_iter()
+            .chain(diagnostic.secondary_annotations())
+            .chain(diagnostic.sub_diagnostics().iter().flat_map(|sub| {
+                sub.primary_annotation()
+                    .into_iter()
+                    .chain(sub.secondary_annotations())
+            }))
+            .any(|annotation| annotation_is_vendored(db, annotation))
     }
 
     /// The file and offset into that file where a `<CURSOR>` marker
@@ -459,6 +508,8 @@ mod tests {
         /// file's path and its contents.
         sources: Vec<Source>,
         snapshot_filters: Vec<(String, String)>,
+        /// The python version to use.
+        python_version: Option<PythonVersion>,
     }
 
     impl CursorTestBuilder {
@@ -468,7 +519,10 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            db.init_program().unwrap();
+            db.init_program_with_python_version(
+                self.python_version.unwrap_or_else(PythonVersion::latest_ty),
+            )
+            .unwrap();
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
@@ -488,8 +542,7 @@ mod tests {
                 if let Some(top) = top {
                     let top = SystemPath::new(top);
                     if db.system().is_directory(top) {
-                        db.files()
-                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                        db.files().try_add_root(&db, top, FileRootKind::SearchPath);
                     }
                 }
 
@@ -550,6 +603,11 @@ mod tests {
         ) -> &mut CursorTestBuilder {
             self.snapshot_filters
                 .push((pattern.into(), replacement.into()));
+            self
+        }
+
+        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut CursorTestBuilder {
+            self.python_version = Some(version);
             self
         }
 
@@ -625,7 +683,7 @@ mod tests {
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);
             db.files()
-                .try_add_root(&db, &site_packages_path, FileRootKind::LibrarySearchPath);
+                .try_add_root(&db, &site_packages_path, FileRootKind::SearchPath);
 
             let mut cursor: Option<Cursor> = None;
             for &Source {

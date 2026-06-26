@@ -209,6 +209,16 @@ GenericClass = types.new_class("GenericClass", (Generic[T],))
 
 # error: [invalid-base] "Invalid base for class created via `types.new_class()`"
 TypedDictClass = types.new_class("TypedDictClass", (TypedDict,))
+
+class Container(Generic[T]): ...
+class IntContainerBase(Container[int]): ...
+class StrContainerBase(Container[str]): ...
+
+# error: [invalid-generic-class]
+ConflictingContainer = types.new_class("ConflictingContainer", (IntContainerBase, StrContainerBase))
+
+# error: [invalid-generic-class]
+conflicting_container = types.new_class("InlineConflictingContainer", (IntContainerBase, StrContainerBase))()
 ```
 
 ### `type[X]` bases

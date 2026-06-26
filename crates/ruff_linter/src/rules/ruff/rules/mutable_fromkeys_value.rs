@@ -53,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 pub(crate) struct MutableFromkeysValue;
 
 impl Violation for MutableFromkeysValue {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -121,7 +121,7 @@ fn generate_dict_comprehension(
     };
     // Construct the dict comprehension.
     let dict_comp = ast::ExprDictComp {
-        key: Box::new(key.into()),
+        key: Some(Box::new(key.into())),
         value: Box::new(value.clone()),
         generators: vec![comp],
         range: TextRange::default(),

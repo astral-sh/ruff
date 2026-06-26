@@ -21,8 +21,8 @@ from ctypes import (
     c_wchar,
     c_wchar_p,
 )
-from typing import Any, Final, TypeVar
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, TypeAlias, TypeVar
+from typing_extensions import Self
 
 if sys.version_info >= (3, 12):
     from ctypes import c_ubyte

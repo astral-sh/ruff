@@ -11,9 +11,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_______________________________________________________^
   |
 help: Organize imports
-3 | elif "setuptools" in sys.modules:
-4 |     from setuptools.command.sdist import sdist as _sdist
+  |
 5 | else:
 6 +     from distutils.command.sdist import sdist as _sdist
 7 |     from setuptools.command.sdist import sdist as _sdist
   -     from distutils.command.sdist import sdist as _sdist
+  |

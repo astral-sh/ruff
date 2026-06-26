@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-PD011 Use `.to_numpy()` instead of `.values`
+PD011 Use `.to_numpy()` or `.array` instead of `.values`
  --> <filename>:4:10
   |
 2 | import pandas as pd

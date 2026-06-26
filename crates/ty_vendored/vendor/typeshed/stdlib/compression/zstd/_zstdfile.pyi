@@ -3,8 +3,7 @@ from collections.abc import Mapping
 from compression._common import _streams
 from compression.zstd import ZstdDict
 from io import TextIOWrapper, _WrappedBuffer
-from typing import Literal, Protocol, overload, type_check_only
-from typing_extensions import TypeAlias
+from typing import Literal, Protocol, TypeAlias, overload, type_check_only
 
 from _zstd import ZstdCompressor, _ZstdCompressorFlushBlock, _ZstdCompressorFlushFrame
 
@@ -51,9 +50,9 @@ class ZstdFile(_streams.BaseStream):
 
         *file* can be either an file-like object, or a file name to open.
 
-        *mode* can be 'r' for reading (default), 'w' for (over)writing, 'x' for
-        creating exclusively, or 'a' for appending. These can equivalently be
-        given as 'rb', 'wb', 'xb' and 'ab' respectively.
+        *mode* can be 'r' for reading (default), 'w' for (over)writing, 'x'
+        for creating exclusively, or 'a' for appending.  These can
+        equivalently be given as 'rb', 'wb', 'xb' and 'ab' respectively.
 
         *level* is an optional int specifying the compression level to use,
         or COMPRESSION_LEVEL_DEFAULT if not given.
@@ -65,7 +64,6 @@ class ZstdFile(_streams.BaseStream):
         *zstd_dict* is an optional ZstdDict object, a pre-trained Zstandard
         dictionary. See train_dict() to train ZstdDict on sample data.
         """
-
     @overload
     def __init__(
         self,
@@ -77,6 +75,7 @@ class ZstdFile(_streams.BaseStream):
         options: Mapping[int, int] | None = None,
         zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     ) -> None: ...
+
     def write(self, data: ReadableBuffer, /) -> int:
         """Write a bytes-like object *data* to the file.
 
@@ -177,32 +176,32 @@ def open(
 ) -> ZstdFile:
     """Open a Zstandard compressed file in binary or text mode.
 
-    file can be either a file name (given as a str, bytes, or PathLike object),
-    in which case the named file is opened, or it can be an existing file object
-    to read from or write to.
+    file can be either a file name (given as a str, bytes, or PathLike
+    object), in which case the named file is opened, or it can be
+    an existing file object to read from or write to.
 
-    The mode parameter can be 'r', 'rb' (default), 'w', 'wb', 'x', 'xb', 'a',
-    'ab' for binary mode, or 'rt', 'wt', 'xt', 'at' for text mode.
+    The mode parameter can be 'r', 'rb' (default), 'w', 'wb', 'x', 'xb',
+    'a', 'ab' for binary mode, or 'rt', 'wt', 'xt', 'at' for text mode.
 
-    The level, options, and zstd_dict parameters specify the settings the same
-    as ZstdFile.
+    The level, options, and zstd_dict parameters specify the settings the
+    same as ZstdFile.
 
     When using read mode (decompression), the options parameter is a dict
-    representing advanced decompression options. The level parameter is not
-    supported in this case. When using write mode (compression), only one of
-    level, an int representing the compression level, or options, a dict
-    representing advanced compression options, may be passed. In both modes,
-    zstd_dict is a ZstdDict instance containing a trained Zstandard dictionary.
+    representing advanced decompression options.  The level parameter is not
+    supported in this case.  When using write mode (compression), only one
+    of level, an int representing the compression level, or options, a dict
+    representing advanced compression options, may be passed.  In both
+    modes, zstd_dict is a ZstdDict instance containing a trained Zstandard
+    dictionary.
 
-    For binary mode, this function is equivalent to the ZstdFile constructor:
-    ZstdFile(filename, mode, ...). In this case, the encoding, errors and
-    newline parameters must not be provided.
+    For binary mode, this function is equivalent to the ZstdFile
+    constructor: ZstdFile(filename, mode, ...).  In this case, the encoding,
+    errors and newline parameters must not be provided.
 
     For text mode, an ZstdFile object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error handling
     behavior, and line ending(s).
     """
-
 @overload
 def open(
     file: StrOrBytesPath | _FileBinaryWrite,

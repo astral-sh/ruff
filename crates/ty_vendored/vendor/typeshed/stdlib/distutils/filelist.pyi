@@ -39,6 +39,7 @@ class FileList:
     def sort(self) -> None: ...
     def remove_duplicates(self) -> None: ...
     def process_template_line(self, line: str) -> None: ...
+
     @overload
     def include_pattern(
         self, pattern: str, anchor: bool | Literal[0, 1] = 1, prefix: str | None = None, is_regex: Literal[0, False] = 0
@@ -67,7 +68,6 @@ class FileList:
 
         Return True if files are found, False otherwise.
         """
-
     @overload
     def include_pattern(self, pattern: str | Pattern[str], *, is_regex: Literal[True, 1]) -> bool: ...
     @overload
@@ -78,6 +78,7 @@ class FileList:
         prefix: str | None = None,
         is_regex: bool | Literal[0, 1] = 0,
     ) -> bool: ...
+
     @overload
     def exclude_pattern(
         self, pattern: str, anchor: bool | Literal[0, 1] = 1, prefix: str | None = None, is_regex: Literal[0, False] = 0
@@ -88,7 +89,6 @@ class FileList:
         The list 'self.files' is modified in place.
         Return True if files are found, False otherwise.
         """
-
     @overload
     def exclude_pattern(self, pattern: str | Pattern[str], *, is_regex: Literal[True, 1]) -> bool: ...
     @overload
@@ -122,7 +122,6 @@ def translate_pattern(
     then 'pattern' is directly compiled to a regex (if it's a string)
     or just returned as-is (assumes it's a regex object).
     """
-
 @overload
 def translate_pattern(pattern: str | Pattern[str], *, is_regex: Literal[True, 1]) -> Pattern[str]: ...
 @overload

@@ -34,7 +34,7 @@ reveal_type(x[0].__name__)  # revealed: str
 ## Mixed list
 
 ```py
-# revealed: list[int | tuple[int, int] | tuple[int, int, int]]
+# revealed: list[int | tuple[int, ...]]
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
@@ -67,7 +67,7 @@ yy = reveal_type([None])  # revealed: list[None | Unknown]
 reveal_type(yy)  # revealed: list[None | Unknown]
 
 # Bare `list` in a type expression is equivalent to `list[Unknown]`
-zz: list = [None]
+zz: list = [None]  # error: [missing-type-argument]
 reveal_type(zz)  # revealed: list[Unknown]
 
 # Promotion only happens if we're in invariant contexts,

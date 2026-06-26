@@ -23,18 +23,17 @@ if sys.platform != "win32":
         or via the object attributes as named in the above tuple.
         """
 
-        if sys.version_info >= (3, 10):
-            __match_args__: Final = (
-                "sp_namp",
-                "sp_pwdp",
-                "sp_lstchg",
-                "sp_min",
-                "sp_max",
-                "sp_warn",
-                "sp_inact",
-                "sp_expire",
-                "sp_flag",
-            )
+        __match_args__: Final = (
+            "sp_namp",
+            "sp_pwdp",
+            "sp_lstchg",
+            "sp_min",
+            "sp_max",
+            "sp_warn",
+            "sp_inact",
+            "sp_expire",
+            "sp_flag",
+        )
 
         @property
         def sp_namp(self) -> str:
@@ -71,6 +70,7 @@ if sys.platform != "win32":
         @property
         def sp_flag(self) -> int:
             """reserved"""
+
         # Deprecated aliases below.
         @property
         def sp_nam(self) -> str:
