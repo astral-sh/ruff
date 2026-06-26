@@ -865,9 +865,11 @@ generic structure is preserved. Attributes inherited from the generic base class
 subject's specialization.
 
 ```py
-from typing import final, Generic, TypeVar
+from typing import final, Generic
+from typing_extensions import TypeVar
 
 GenericPatternT = TypeVar("GenericPatternT")
+DefaultGenericPatternT = TypeVar("DefaultGenericPatternT", default=str)
 
 class GenericPatternBase(Generic[GenericPatternT]): ...
 
@@ -884,6 +886,9 @@ class IntGenericMemberChild(GenericMemberBase[int]): ...
 @final
 class FinalGenericPatternBox(Generic[GenericPatternT]):
     value: list[GenericPatternT]
+
+class DefaultGenericPatternBox(Generic[DefaultGenericPatternT]):
+    value: DefaultGenericPatternT
 
 def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
@@ -922,6 +927,12 @@ def test_match_direct_generic_pattern_preserves_declared_member(value: object) -
         case FinalGenericPatternBox(value=int() as item):
             reveal_type(item)  # revealed: Never
             reveal_type(value)  # revealed: Never
+
+def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
+    match value:
+        case DefaultGenericPatternBox(value=int() as item):
+            reveal_type(item)  # revealed: Unknown & int
+            1 + "x"  # error: [unsupported-operator]
 ```
 
 ## Positional class patterns
