@@ -1,22 +1,23 @@
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet, renderer::DecorStyle};
 
 fn main() {
-    let message =
-        Level::Error
-            .title("mismatched types")
+    let report = &[
+        Level::ERROR
+            .primary_title("mismatched types")
             .id("E0308")
-            .snippet(
+            .element(
                 Snippet::source("        slices: vec![\"A\",")
                     .line_start(13)
-                    .origin("src/multislice.rs")
-                    .annotation(Level::Error.span(21..24).label(
+                    .path("src/multislice.rs")
+                    .annotation(AnnotationKind::Primary.span(21..24).label(
                         "expected struct `annotate_snippets::snippet::Slice`, found reference",
                     )),
-            )
-            .footer(Level::Note.title(
-                "expected type: `snippet::Annotation`\n   found type: `__&__snippet::Annotation`",
-            ));
+            ),
+        Group::with_title(Level::NOTE.secondary_title(
+            "expected type: `snippet::Annotation`\n   found type: `__&__snippet::Annotation`",
+        )),
+    ];
 
-    let renderer = Renderer::styled();
-    anstream::println!("{}", renderer.render(message));
+    let renderer = Renderer::styled().decor_style(DecorStyle::Unicode);
+    anstream::println!("{}", renderer.render(report));
 }
