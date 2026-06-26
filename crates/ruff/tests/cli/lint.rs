@@ -656,7 +656,6 @@ extend = "ruff2.toml"
 select = [E501]
 "#,
     )?;
-
     assert_cmd_snapshot!(
         fixture.check_command(),
         @"
@@ -2737,6 +2736,194 @@ fn add_ignore_multiple_codes() -> Result<()> {
         def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
             pass
         ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn unused_ignore_with_syntax_error() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        "value = 1  # ruff:ignore[unused-variable]\nbroken =\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:9: invalid-syntax: Expected an expression
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_multiline_noqa_mapping() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        r#"import logging
+
+logger = logging.getLogger(__name__)
+name = "world"
+logger.error(
+    f"""Hello {
+        name
+    }""",
+)
+"#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=G004,RUF100", "--preview", "--add-ignore"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 suppression comment.
+    "
+    );
+
+    insta::assert_snapshot!(fixture.read_file("test.py")?, @r#"
+    import logging
+
+    logger = logging.getLogger(__name__)
+    name = "world"
+    # ruff:ignore[logging-f-string]
+    logger.error(
+        f"""Hello {
+            name
+        }""",
+    )
+    "#);
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=G004,RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_continuation_mapping() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file("test.py", "value = 'first' \\\n    'second'\n")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=Q000,RUF100", "--preview", "--add-ignore"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 suppression comment.
+    "
+    );
+
+    assert_eq!(
+        fixture.read_file("test.py")?,
+        "# ruff:ignore[bad-quotes-inline-string]\nvalue = 'first' \\\n    'second'\n"
+    );
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=Q000,RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_escaped_newline_string() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        r#"first = "one"
+second = "two"
+value = "first %s \
+second %s" % (first, second)
+"#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=UP031,RUF100", "--preview", "--add-ignore"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 suppression comment.
+    "
+    );
+
+    assert_eq!(
+        fixture.read_file("test.py")?,
+        r#"first = "one"
+second = "two"
+# ruff:ignore[printf-string-formatting]
+value = "first %s \
+second %s" % (first, second)
+"#
+    );
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=UP031,RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
     );
 
     Ok(())

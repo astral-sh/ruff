@@ -40,6 +40,30 @@ class Point:
         self.x = x
 ```
 
+## Leading indentation is included in the suppression range
+
+Trailing ignores should suppress diagnostics whose ranges start in the line's indentation:
+
+```toml
+[lint]
+preview = true
+select = ["E111", "E117", "RUF100"]
+```
+
+```py
+if True:
+   first = 1  # ruff:ignore[indentation-with-invalid-multiple]
+   second = 2  # ruff:ignore[indentation-with-invalid-multiple]
+```
+
+Standalone ignores should include their own indentation and the indentation of the following line:
+
+```py
+def function():
+        # ruff:ignore[over-indented]
+        pass
+```
+
 ## Empty diagnostic range at end of file
 
 Diagnostics with empty ranges should also be suppressible, as with `noqa`.
@@ -195,6 +219,43 @@ from sys import ( # ruff:ignore[F401]
     # error: [unused-noqa]
     argv # ruff:ignore[F401]
 )
+```
+
+## `ruff:ignore` can suppress `RUF100`
+
+```toml
+[lint]
+preview = true
+select = ["RUF100"]
+```
+
+A `ruff:ignore` comment can suppress an unused `noqa` comment:
+
+```py
+value = 1  # noqa: F401  # ruff:ignore[unused-noqa]
+```
+
+A multi-code comment containing `RUF100` should also suppress its own unused suppression
+diagnostic:
+
+```py
+value = 1  # ruff:ignore[unused-import, unused-noqa]
+```
+
+## Self-suppression does not hide unmatched comments
+
+An unmatched `ruff:disable[RUF100]` should suppress its own unused warning without hiding the
+unmatched-comment diagnostic:
+
+```toml
+[lint]
+preview = true
+select = ["RUF100", "RUF104"]
+```
+
+```py
+# error: [unmatched-suppression-comment]
+# ruff:disable[RUF100]
 ```
 
 ## Trailing whitespace is included in the suppression range

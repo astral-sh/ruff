@@ -240,6 +240,9 @@ struct SuppressionDiagnostic<'a> {
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
 
+    /// Whether the suppression comment includes `RUF100`.
+    self_ignore: bool,
+
     /// Whether one of the invalid codes was totally unknown and may be external.
     has_unknown_code: bool,
 
@@ -255,6 +258,7 @@ impl<'a> SuppressionDiagnostic<'a> {
             duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
+            self_ignore: false,
             has_unknown_code: false,
             has_stable_rule_name: false,
         }
@@ -268,6 +272,22 @@ impl<'a> SuppressionDiagnostic<'a> {
         !self.disabled_codes.is_empty()
             || !self.duplicated_codes.is_empty()
             || !self.unused_codes.is_empty()
+    }
+}
+
+pub(crate) struct RuleSuppressions<'a> {
+    suppressions: Box<[&'a Suppression]>,
+}
+
+impl RuleSuppressions<'_> {
+    pub(crate) fn check(&self, range: TextRange, parent: Option<TextSize>) -> bool {
+        for suppression in &self.suppressions {
+            if suppression.applies_to_diagnostic(range, parent) {
+                suppression.used.set(true);
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -368,7 +388,22 @@ impl Suppressions {
         false
     }
 
-    pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+    pub(crate) fn for_rule(&self, rule: Rule) -> RuleSuppressions<'_> {
+        RuleSuppressions {
+            suppressions: self
+                .valid
+                .iter()
+                .filter(|suppression| suppression.rule(self.preview) == Some(rule))
+                .collect(),
+        }
+    }
+
+    pub(crate) fn check_suppressions(
+        &self,
+        context: &LintContext,
+        locator: &Locator,
+        analyze_directives: bool,
+    ) {
         fn process_pending_diagnostics(
             key: Option<TextRange>,
             grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
@@ -407,7 +442,7 @@ impl Suppressions {
                 }
             }
 
-            if group.any_unused() {
+            if !group.self_ignore && group.any_unused() {
                 let mut codes = group.disabled_codes.clone();
                 codes.extend(group.unused_codes.clone());
                 Suppressions::report_suppression_codes(
@@ -455,7 +490,10 @@ impl Suppressions {
                 group.invalid_codes.push(code_str);
                 group.has_unknown_code |= !name_is_known;
                 group.has_stable_rule_name |= name_is_known;
-            } else if !suppression.used.get() {
+                continue;
+            }
+
+            if analyze_directives && !suppression.used.get() {
                 // UnusedNOQA
                 let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
@@ -464,21 +502,28 @@ impl Suppressions {
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
 
-                if context.is_rule_enabled(rule) {
-                    if first_comment
-                        .codes_as_str(locator.contents())
-                        .filter(|code| *code == code_str)
-                        .count()
-                        > 1
-                    {
-                        group.duplicated_codes.push(code_str);
-                    } else {
-                        group.unused_codes.push(code_str);
-                    }
+                if rule == Rule::UnusedNOQA {
+                    group.self_ignore = true;
                 } else {
-                    group.disabled_codes.push(code_str);
+                    if context.is_rule_enabled(rule) {
+                        if first_comment
+                            .codes_as_str(locator.contents())
+                            .filter(|code| *code == code_str)
+                            .count()
+                            > 1
+                        {
+                            group.duplicated_codes.push(code_str);
+                        } else {
+                            group.unused_codes.push(code_str);
+                        }
+                    } else {
+                        group.disabled_codes.push(code_str);
+                    }
+                    continue;
                 }
-            } else if let SuppressionComments::Single(SuppressionComment {
+            }
+
+            if let SuppressionComments::Single(SuppressionComment {
                 action: SuppressionAction::Disable,
                 range,
                 ..
@@ -806,7 +851,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     {
                         // own-line ignore
                         let mut range =
-                            Self::standalone_comment_range(suppression.range, before, after);
+                            self.standalone_comment_range(suppression.range, before, after);
 
                         // Allow an ignore to suppress diagnostics on a leading shebang.
                         if let Some(shebang) = leading_shebang_range(self.source, tokens)
@@ -944,8 +989,8 @@ impl<'a> SuppressionsBuilder<'a> {
     /// Find the relevant range to cover for own-line suppression comments
     ///
     /// When placed above a "logical line", either a single- or multi-line statement or
-    /// suite header, this should return the range from the start of the comment to the end
-    /// of the entire logical line:
+    /// suite header, this should return the range from the start of the comment's physical line to
+    /// the end of the entire logical line:
     ///
     /// ```py
     ///
@@ -969,8 +1014,8 @@ impl<'a> SuppressionsBuilder<'a> {
     /// ```
     ///
     /// When placed "inside" of a logical line, ie, above any line within a multi-line statement
-    /// or suite header, this should return only the range from the start of the comment to the
-    /// end of the next "physical" (non-comment) line:
+    /// or suite header, this should return only the range from the start of the comment's physical
+    /// line to the end of the next "physical" (non-comment) line:
     ///
     /// ```py
     ///
@@ -983,7 +1028,12 @@ impl<'a> SuppressionsBuilder<'a> {
     /// ]
     ///
     /// ```
-    fn standalone_comment_range(range: TextRange, before: &[Token], after: &[Token]) -> TextRange {
+    fn standalone_comment_range(
+        &self,
+        range: TextRange,
+        before: &[Token],
+        after: &[Token],
+    ) -> TextRange {
         let mut end = range.end();
         let mut is_inner_comment = false;
 
@@ -1030,7 +1080,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        TextRange::new(range.start(), end)
+        TextRange::new(self.source.line_start(range.start()), end)
     }
 
     /// Find the relevant range to cover for trailing end-of-line suppression comments
@@ -1078,6 +1128,8 @@ impl<'a> SuppressionsBuilder<'a> {
                 }
             }
         }
+
+        let start = self.source.line_start(start);
 
         // Until the end of the line.
         let end = self.source.line_end(range.end());
@@ -2120,7 +2172,7 @@ print(
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "'hello'  # ruff:ignore[code]",
+                    covered_source: "    'hello'  # ruff:ignore[code]",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -2302,7 +2354,7 @@ print(
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "# ruff:ignore[code]\n    'hello'",
+                    covered_source: "    # ruff:ignore[code]\n    'hello'",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -2374,7 +2426,7 @@ bar = [
                     enable_comment: None,
                 },
                 Suppression {
-                    covered_source: "# ruff:ignore[gamma]\n    # stacked\n    arg2,",
+                    covered_source: "    # ruff:ignore[gamma]\n    # stacked\n    arg2,",
                     code: "gamma",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[gamma]",

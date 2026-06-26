@@ -11,7 +11,7 @@ use log::warn;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_python_trivia::PythonWhitespace;
-use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
+use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset, leading_indentation};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
@@ -852,6 +852,7 @@ fn build_noqa_edits_by_diagnostic(
                 let noqa_edit = generate_noqa_edit(
                     comment.directive,
                     comment.line,
+                    comment.own_line,
                     FxHashSet::from_iter([comment.identifier]),
                     locator,
                     line_ending,
@@ -885,10 +886,16 @@ fn build_noqa_edits_by_line<'a>(
         let Some(first_match) = matches.first() else {
             continue;
         };
-        let directive = first_match.directive;
+        let own_line = matches.iter().any(|comment| comment.own_line);
+        let directive = if own_line {
+            None
+        } else {
+            first_match.directive
+        };
         let noqa_edit = generate_noqa_edit(
             directive,
             offset,
+            own_line,
             matches
                 .into_iter()
                 .map(|comment| comment.identifier)
@@ -905,6 +912,7 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
+    own_line: bool,
     identifier: &'a str,
     directive: Option<ExistingDirective<'a>>,
 }
@@ -974,10 +982,15 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = message
-            .range()
+        let diagnostic_range = message.range();
+        let noqa_offset = diagnostic_range
             .map(|range| noqa_line_for.resolve(range.start()))
             .unwrap_or_default();
+        let own_line = if matches!(suppression_kind, SuppressionKind::Ignore) {
+            diagnostic_range.and_then(|range| noqa_line_for.own_line(range.start()))
+        } else {
+            None
+        };
 
         // Or ignored by a `noqa` directive on the diagnostic's line itself?
         let existing_noqa =
@@ -999,15 +1012,25 @@ fn find_noqa_comments<'a>(
                 None
             };
 
-        // Prefer extending an existing `ruff:ignore` over an existing `noqa` directive.
-        let directive = suppressions
-            .find_applicable_ignore(message)
-            .map(ExistingDirective::Ignore)
-            .or(existing_noqa);
+        // Prefer extending an existing `ruff:ignore` over an existing `noqa` directive. A new
+        // ignore for a mapped multi-line diagnostic is placed before the mapping so that its range
+        // contains the diagnostic start.
+        let directive = if own_line.is_some() {
+            None
+        } else {
+            suppressions
+                .find_applicable_ignore(message)
+                .map(ExistingDirective::Ignore)
+                .or(existing_noqa)
+        };
 
-        let line = directive
-            .map(|directive| locator.line_start(directive.start()))
-            .unwrap_or_else(|| locator.line_start(noqa_offset));
+        let line = if let Some(offset) = own_line {
+            locator.line_start(offset)
+        } else {
+            directive
+                .map(|directive| locator.line_start(directive.start()))
+                .unwrap_or_else(|| locator.line_start(noqa_offset))
+        };
 
         let identifier = match suppression_kind {
             SuppressionKind::Noqa => code.as_str(),
@@ -1016,6 +1039,7 @@ fn find_noqa_comments<'a>(
 
         comments_by_line.push(Some(NoqaComment {
             line,
+            own_line: own_line.is_some(),
             identifier,
             directive,
         }));
@@ -1026,6 +1050,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
+    indentation: Option<&'a str>,
     noqa_codes: FxHashSet<&'a str>,
     existing_codes: Vec<&'a str>,
     line_ending: LineEnding,
@@ -1043,7 +1068,9 @@ impl NoqaEdit<'_> {
     }
 
     fn write(&self, writer: &mut impl std::fmt::Write) {
-        if !self.blank_line {
+        if let Some(indentation) = self.indentation {
+            write!(writer, "{indentation}").unwrap();
+        } else if !self.blank_line {
             write!(writer, "  ").unwrap();
         }
         match self.suppression_kind {
@@ -1075,9 +1102,11 @@ impl Ranged for NoqaEdit<'_> {
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn generate_noqa_edit<'a>(
     directive: Option<ExistingDirective<'a>>,
     offset: TextSize,
+    own_line: bool,
     noqa_codes: FxHashSet<&'a str>,
     locator: &Locator<'a>,
     line_ending: LineEnding,
@@ -1089,26 +1118,38 @@ fn generate_noqa_edit<'a>(
     let edit_range;
     let mut existing_codes = Vec::new();
     let blank_line;
+    let indentation;
 
     // Add codes.
-    match (directive, suppression_kind) {
-        (Some(ExistingDirective::Noqa(codes)), SuppressionKind::Noqa) => {
-            (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
-            existing_codes.extend(codes.iter().map(Code::as_str));
-        }
-        (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
-            (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
-            existing_codes.extend(comment.codes_as_str(locator.contents()));
-        }
-        (None | Some(_), _) => {
-            let trimmed_line = locator.slice(line_range).trim_end();
-            blank_line = trimmed_line.trim_whitespace_start().is_empty();
-            edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+    if own_line {
+        debug_assert!(directive.is_none());
+        edit_range = TextRange::empty(line_range.start());
+        indentation = Some(leading_indentation(locator.slice(line_range)));
+        blank_line = true;
+    } else {
+        indentation = None;
+        match (directive, suppression_kind) {
+            (Some(ExistingDirective::Noqa(codes)), SuppressionKind::Noqa) => {
+                (edit_range, blank_line) =
+                    suppression_edit_range(locator, line_range, codes.start());
+                existing_codes.extend(codes.iter().map(Code::as_str));
+            }
+            (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
+                (edit_range, blank_line) =
+                    suppression_edit_range(locator, line_range, comment.start());
+                existing_codes.extend(comment.codes_as_str(locator.contents()));
+            }
+            (None | Some(_), _) => {
+                let trimmed_line = locator.slice(line_range).trim_end();
+                blank_line = trimmed_line.trim_whitespace_start().is_empty();
+                edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+            }
         }
     }
 
     NoqaEdit {
         edit_range,
+        indentation,
         noqa_codes,
         existing_codes,
         line_ending,
@@ -1264,8 +1305,22 @@ impl<'a> NoqaDirectives<'a> {
 /// line specified by the offset.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct NoqaMapping {
-    ranges: Vec<TextRange>,
+    ranges: Vec<NoqaMappingRange>,
 }
+
+#[derive(Debug)]
+struct NoqaMappingRange {
+    range: TextRange,
+    own_line: Option<TextRange>,
+}
+
+impl PartialEq for NoqaMappingRange {
+    fn eq(&self, other: &Self) -> bool {
+        self.range == other.range
+    }
+}
+
+impl Eq for NoqaMappingRange {}
 
 impl NoqaMapping {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
@@ -1276,41 +1331,66 @@ impl NoqaMapping {
 
     /// Returns the re-mapped position or `position` if no mapping exists.
     pub(crate) fn resolve(&self, offset: TextSize) -> TextSize {
-        let index = self.ranges.binary_search_by(|range| {
-            if range.end() < offset {
+        self.mapping(offset)
+            .map_or(offset, |mapping| mapping.range.end())
+    }
+
+    fn mapping(&self, offset: TextSize) -> Option<&NoqaMappingRange> {
+        let index = self.ranges.binary_search_by(|mapping| {
+            if mapping.range.end() < offset {
                 std::cmp::Ordering::Less
-            } else if range.contains(offset) {
+            } else if mapping.range.contains(offset) {
                 std::cmp::Ordering::Equal
             } else {
                 std::cmp::Ordering::Greater
             }
         });
 
-        if let Ok(index) = index {
-            self.ranges[index].end()
-        } else {
-            offset
-        }
+        index.ok().map(|index| &self.ranges[index])
+    }
+
+    fn own_line(&self, offset: TextSize) -> Option<TextSize> {
+        self.ranges
+            .binary_search_by(|mapping| match mapping.own_line {
+                Some(range) if range.end() < offset => std::cmp::Ordering::Less,
+                Some(range) if range.contains(offset) => std::cmp::Ordering::Equal,
+                Some(_) => std::cmp::Ordering::Greater,
+                None => std::cmp::Ordering::Less,
+            })
+            .ok()
+            .and_then(|index| self.ranges[index].own_line.map(TextRange::start))
     }
 
     pub(crate) fn push_mapping(&mut self, range: TextRange) {
-        if let Some(last_range) = self.ranges.last_mut() {
+        self.push_mapping_with_own_line(range, Some(range));
+    }
+
+    pub(crate) fn push_mapping_with_own_line(
+        &mut self,
+        range: TextRange,
+        own_line: Option<TextRange>,
+    ) {
+        if let Some(last_mapping) = self.ranges.last_mut() {
             // Strictly sorted insertion
-            if last_range.end() < range.start() {
+            if last_mapping.range.end() < range.start() {
                 // OK
-            } else if range.end() < last_range.start() {
+            } else if range.end() < last_mapping.range.start() {
                 // Incoming range is strictly before the last range which violates
                 // the function's contract.
                 panic!("Ranges must be inserted in sorted order")
             } else {
-                // Here, it's guaranteed that `last_range` and `range` overlap
+                // Here, it's guaranteed that the last mapping and `range` overlap
                 // in some way. We want to merge them into a single range.
-                *last_range = last_range.cover(range);
+                last_mapping.range = last_mapping.range.cover(range);
+                last_mapping.own_line = last_mapping
+                    .own_line
+                    .zip(own_line)
+                    .map(|(left, right)| left.cover(right));
                 return;
             }
         }
 
-        self.ranges.push(range);
+        self.ranges.push(NoqaMappingRange { range, own_line });
     }
 }
 

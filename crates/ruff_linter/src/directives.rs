@@ -110,18 +110,12 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
     let mut string_mappings = Vec::new();
 
     for token in tokens {
-        match token.kind() {
-            // For multi-line strings, we expect `noqa` directives on the last line of the string.
-            TokenKind::String if token.is_triple_quoted_string() => {
-                if locator.contains_line_break(token.range()) {
-                    string_mappings.push(TextRange::new(
-                        locator.line_start(token.start()),
-                        token.end(),
-                    ));
-                }
-            }
-
-            _ => {}
+        // For multi-line strings, we expect `noqa` directives on the last line of the string.
+        if token.kind() == TokenKind::String && locator.contains_line_break(token.range()) {
+            string_mappings.push(TextRange::new(
+                locator.line_start(token.start()),
+                token.end(),
+            ));
         }
     }
 
@@ -174,14 +168,13 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         continuation_mappings.push(last_range);
     }
 
-    // Merge the mappings in sorted order
-    let mut mappings = NoqaMapping::with_capacity(
-        continuation_mappings.len()
-            + string_mappings.len()
-            + interpolated_string_mappings.len()
-            + usize::from(shebang_mapping.is_some()),
+    // Normalize and merge the mappings in sorted order. A continuation mapping can start inside a
+    // multi-line string when the continuation follows the string on its closing line. Expanding it
+    // to the token boundaries avoids passing an offset inside a token to `Tokens::before` or
+    // `Tokens::after` below.
+    let mut merged_mappings: Vec<TextRange> = Vec::with_capacity(
+        continuation_mappings.len() + string_mappings.len() + interpolated_string_mappings.len(),
     );
-
     let all_mappings = SortedMergeIter {
         left: interpolated_string_mappings.into_iter().peekable(),
         right: string_mappings.into_iter().peekable(),
@@ -190,12 +183,55 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         left: all_mappings.peekable(),
         right: continuation_mappings.into_iter().peekable(),
     };
+    for mapping in all_mappings {
+        let start_token_range = tokens.token_range(mapping.start());
+        let start = if start_token_range.start() < mapping.start() {
+            locator.line_start(start_token_range.start())
+        } else {
+            mapping.start()
+        };
+        let end_token_range = tokens.token_range(mapping.end());
+        let end = if end_token_range.start() < mapping.end() {
+            end_token_range.end()
+        } else {
+            mapping.end()
+        };
+        let mapping = TextRange::new(start, end);
+
+        if let Some(last_mapping) = merged_mappings.last_mut()
+            && last_mapping.end() >= mapping.start()
+        {
+            *last_mapping = last_mapping.cover(mapping);
+        } else {
+            merged_mappings.push(mapping);
+        }
+    }
+
+    let mut mappings =
+        NoqaMapping::with_capacity(merged_mappings.len() + usize::from(shebang_mapping.is_some()));
 
     if let Some(mapping) = shebang_mapping {
-        mappings.push_mapping(mapping);
+        mappings.push_mapping_with_own_line(mapping, None);
     }
-    for mapping in all_mappings {
-        mappings.push_mapping(mapping);
+    for mapping in merged_mappings {
+        let mut own_line_start = mapping.start();
+        for token in tokens.before(mapping.start()).iter().rev() {
+            if token.kind() == TokenKind::Newline {
+                break;
+            }
+            if !token.kind().is_trivia() {
+                own_line_start = locator.line_start(token.start());
+            }
+        }
+        let own_line_end = tokens
+            .after(mapping.end())
+            .iter()
+            .find(|token| token.kind() == TokenKind::Newline)
+            .map_or_else(|| locator.contents().text_len(), Ranged::end);
+        mappings.push_mapping_with_own_line(
+            mapping,
+            Some(TextRange::new(own_line_start, own_line_end)),
+        );
     }
 
     mappings
@@ -579,6 +615,35 @@ assert foo, \
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(48))])
+        );
+    }
+
+    #[test]
+    fn noqa_mapping_continuation_after_escaped_newline_string() {
+        let contents = r#"value = "first\
+ " \
+    + "second""#;
+        let continuation_end = r#"value = "first\
+ " \
+"#
+        .text_len();
+
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::default(), continuation_end)])
+        );
+    }
+
+    #[test]
+    fn noqa_mapping_escaped_newline_string() {
+        let contents = r#"value = "first %s \
+second %s" % (first, second)"#;
+        let string = r#"value = "first %s \
+second %s""#;
+
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::default(), string.text_len())])
         );
     }
 
