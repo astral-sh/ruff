@@ -996,8 +996,7 @@ def choose(left: T, right: T) -> T:
     return left
 
 def caller(value: Any) -> None:
-    # TODO: revealed: Any
-    reveal_type(identity(value))  # revealed: Unknown
+    reveal_type(identity(value))  # revealed: Any
     # TODO: revealed: Any
     reveal_type(choose(value, 1))  # revealed: int
 
@@ -1023,8 +1022,7 @@ def call(callback: Callable[[], T]) -> T:
 def callback() -> Any:
     return 1
 
-# TODO: revealed: Any
-reveal_type(call(callback))  # revealed: Unknown
+reveal_type(call(callback))  # revealed: Any
 ```
 
 ## Bounded TypeVar with callable parameter

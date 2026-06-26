@@ -3657,6 +3657,7 @@ impl<'db> PathBounds<'db> {
 
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.lower_or_never();
+
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let declared_upper = bound.top_materialization(db);
@@ -3796,7 +3797,16 @@ impl<'db> PathBounds<'db> {
                 // `T = Any`) If the path solution is fully static, we choose the "tightest"
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
                 if multiple_compatible_constraints && path_bound.has_only_gradual_evidence() {
-                    Ok(None)
+                    if let Some(lower) = path_bound.lower {
+                        Ok(Some(lower))
+                    } else if path_bound.has_upper() {
+                        Ok(IntersectionType::bounded_from_elements(
+                            db,
+                            path_bound.upper.clauses.iter().copied(),
+                        ))
+                    } else {
+                        Ok(None)
+                    }
                 } else {
                     Ok(Some(compatible_constraint))
                 }
