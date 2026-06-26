@@ -4,11 +4,11 @@ Checks for invalid match patterns.
 
 ## Why is this bad?
 
-Invalid match patterns will cause a `TypeError` at runtime. Specifically:
+Invalid match patterns can cause a `TypeError` at runtime. This includes:
 
 - Using a non-type object in a class pattern.
-- Providing more positional sub-patterns than `__match_args__` allows.
-- Matching against `collections.abc.Callable` with positional sub-patterns.
+- Providing positional subpatterns when `__match_args__` is missing or has an invalid static type.
+- Matching against `collections.abc.Callable` with positional subpatterns.
 - Matching against a non-runtime-checkable protocol.
 - Matching against a `TypedDict`.
 

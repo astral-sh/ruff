@@ -169,6 +169,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
+
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
@@ -2489,35 +2490,36 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: Ranged>(
+pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
     context: &InferContext,
     first_excess_pattern: T,
+    positional_limit: usize,
     positional_count: usize,
+    class_display: impl std::fmt::Display,
 ) {
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got {positional_count}"
+    builder.into_diagnostic(format_args!(
+        "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_positional_patterns_for_match_args<T: Ranged>(
+pub(crate) fn report_invalid_match_args_type<T: Ranged>(
     context: &InferContext,
-    excess_range: T,
-    match_args_len: usize,
-    positional_count: usize,
+    pattern: T,
+    match_args_ty: Type,
     cls_ty: Type,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, excess_range) else {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
         return;
     };
-    let class_display = cls_ty.display(context.db());
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `{class_display}`: expected {match_args_len}, got {positional_count}"
+    let db = context.db();
+    let class_display = cls_ty.display(db);
+    let match_args_display = match_args_ty.display(db);
+    builder.into_diagnostic(format_args!(
+        "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(

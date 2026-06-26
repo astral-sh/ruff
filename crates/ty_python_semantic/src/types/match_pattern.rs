@@ -277,8 +277,13 @@ fn class_pattern_is_exhaustive(
 enum ClassMatchArgs<'db> {
     /// The class and its metaclass hierarchy do not define `__match_args__`.
     Undefined,
-    /// `__match_args__` is definitely bound with this type.
-    Defined(Type<'db>),
+    /// `__match_args__` is definitely bound.
+    Defined {
+        /// The semantic member type used to validate positional subpatterns.
+        member_type: Type<'db>,
+        /// The type used to resolve positional attribute names.
+        positional_source_type: Type<'db>,
+    },
     /// `__match_args__` is defined along some control-flow paths but not others.
     PossiblyUndefined,
 }
@@ -296,9 +301,10 @@ pub(crate) enum ClassPatternPositionalSource {
 
 /// Resolve `__match_args__` through the pattern class, including its metaclass.
 ///
-/// Inferred assignments retain their literal binding type, while an explicit annotation remains
-/// authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly absent
-/// `__match_args__` enables match-self behavior.
+/// The semantic member type is used for validation. When mapping positional subpatterns to
+/// attributes, inferred assignments retain their literal binding type while an explicit annotation
+/// remains authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly
+/// absent `__match_args__` enables match-self behavior.
 fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
     match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Defined(
@@ -308,13 +314,16 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
                 provenance,
                 ..
             },
-        ) if place.is_definitely_defined() => ClassMatchArgs::Defined(if origin.is_declared() {
-            ty
-        } else {
-            provenance
-                .definition()
-                .map_or(ty, |definition| binding_type(db, definition))
-        }),
+        ) if place.is_definitely_defined() => ClassMatchArgs::Defined {
+            member_type: ty,
+            positional_source_type: if origin.is_declared() {
+                ty
+            } else {
+                provenance
+                    .definition()
+                    .map_or(ty, |definition| binding_type(db, definition))
+            },
+        },
         Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
         Place::Undefined => ClassMatchArgs::Undefined,
     }
@@ -347,6 +356,49 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
                 )
             )
         })
+}
+
+/// The statically known result of validating positional subpatterns for a class pattern.
+pub(crate) enum ClassPatternPositionalResult<'db> {
+    /// The maximum number of positional subpatterns accepted by the class.
+    Limit(usize),
+    /// A statically known non-tuple value used for `__match_args__`.
+    InvalidType(Type<'db>),
+}
+
+/// Validate positional subpatterns against a statically known `__match_args__` type.
+pub(crate) fn class_pattern_positional_result<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Option<ClassPatternPositionalResult<'db>> {
+    match class_match_args_type(db, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+            Some(ClassPatternPositionalResult::Limit(1))
+        }
+        ClassMatchArgs::Undefined
+            if class.known(db).is_some()
+                || class
+                    .as_static()
+                    .is_some_and(|class| !class.body_scope(db).file(db).is_stub(db)) =>
+        {
+            Some(ClassPatternPositionalResult::Limit(0))
+        }
+        ClassMatchArgs::Defined { member_type, .. } => {
+            let match_args = member_type.resolve_type_alias(db);
+            if let Some(limit) = match_args.exact_tuple_instance_spec(db).and_then(|tuple| {
+                tuple
+                    .as_fixed_length()
+                    .map(super::tuple::FixedLengthTuple::len)
+            }) {
+                Some(ClassPatternPositionalResult::Limit(limit))
+            } else {
+                match_args
+                    .is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+                    .then_some(ClassPatternPositionalResult::InvalidType(match_args))
+            }
+        }
+        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
+    }
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.
@@ -386,7 +438,10 @@ pub(crate) fn class_pattern_positional_sources(
                 })
                 .collect();
         }
-        ClassMatchArgs::Defined(match_args) => match_args
+        ClassMatchArgs::Defined {
+            positional_source_type,
+            ..
+        } => positional_source_type
             .exact_tuple_instance_spec(db)
             .and_then(|tuple| tuple.as_fixed_length().cloned()),
         ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
