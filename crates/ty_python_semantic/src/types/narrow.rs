@@ -18,8 +18,8 @@ use crate::types::{
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, pattern_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -1394,7 +1394,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
         for pattern in patterns {
             remaining_subject_ty =
-                pattern_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
+                pattern_binding_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
             matched_subject_types.add_in_place(alternative.matched_subject_ty);
             binding_subject_types.add_in_place(alternative.binding_subject_ty);
@@ -1483,7 +1483,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .ignore_possibly_undefined();
             let place = subject_ty.member(self.db, name.as_str()).place;
             let mut member_ty = place.ignore_possibly_undefined();
-            if member_ty.is_some_and(|ty| ty.is_never())
+            if original_subject_ty.nominal_class(self.db).is_some()
                 && let Type::Intersection(intersection) = subject_ty
             {
                 let overlapping_member_ty = UnionType::from_elements(
@@ -1503,8 +1503,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 }
             }
 
-            if context.class.is_some_and(|pattern_class| {
-                pattern_class
+            if let Some(pattern_class) = context.class
+                && pattern_class
                     .generic_context(self.db)
                     .and_then(|generic_context| {
                         pattern_class
@@ -1517,11 +1517,43 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             .ignore_possibly_undefined()
                     })
                     .is_some_and(|ty| ty.has_typevar(self.db))
-            }) {
-                // The pattern subclass's default specialization loses the type arguments from the
-                // subject's generic base. Prefer a member type already known from the subject;
-                // otherwise, do not treat the subclass's fallback as a declared type.
-                member_ty = Some(original_member_ty.unwrap_or_else(Type::unknown));
+            {
+                let unknown_pattern_class = pattern_class.unknown_specialization(self.db);
+                let unknown_pattern_member_ty = Type::instance(self.db, unknown_pattern_class)
+                    .member(self.db, name.as_str())
+                    .place
+                    .ignore_possibly_undefined();
+                // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
+                // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
+                // a `Base[int]` subject.
+                if original_subject_ty
+                    .nominal_class(self.db)
+                    .is_some_and(|original_class| {
+                        unknown_pattern_class.is_subtype_of_class_literal(
+                            self.db,
+                            original_class.class_literal(self.db),
+                        ) || original_class.is_subtype_of_class_literal(
+                            self.db,
+                            unknown_pattern_class.class_literal(self.db),
+                        )
+                    })
+                {
+                    // The pattern class's unknown specialization loses type arguments known
+                    // through the related subject type. Prefer the subject's member type when it
+                    // exists, but retain a member declared only by the pattern class.
+                    member_ty = Some(
+                        original_member_ty
+                            .or(unknown_pattern_member_ty)
+                            .unwrap_or_else(Type::unknown),
+                    );
+                } else if let Some(pattern_member_ty) = unknown_pattern_member_ty {
+                    // Unrelated classes can overlap through multiple inheritance, so retain the
+                    // generic pattern class's member as a possible runtime value.
+                    member_ty = Some(UnionType::from_elements(
+                        self.db,
+                        member_ty.into_iter().chain([pattern_member_ty]),
+                    ));
+                }
             }
             member_ty.or_else(|| (!subject_is_final).then_some(Type::unknown()))
         };
@@ -1554,43 +1586,91 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             .collect()
     }
 
+    fn class_pattern_contexts(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+    ) -> SmallVec<[ClassPatternContext<'db>; 2]> {
+        let class_expr_ty =
+            infer_same_file_expression_type(self.db, kind.class, TypeContext::default())
+                .resolve_type_alias(self.db);
+        let context = |class_expr_ty: Type<'db>| {
+            let class = class_expr_ty.as_class_literal();
+            ClassPatternContext {
+                class,
+                class_ty: positive_class_pattern_type(self.db, class_expr_ty)
+                    .unwrap_or_else(Type::object),
+                positional_sources: class.map_or_else(
+                    || vec![ClassPatternPositionalSource::Unknown; kind.positional.len()],
+                    |class| class_pattern_positional_sources(self.db, class, kind.positional.len()),
+                ),
+            }
+        };
+        match class_expr_ty {
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .copied()
+                .map(context)
+                .collect(),
+            _ => smallvec![context(class_expr_ty)],
+        }
+    }
+
+    fn class_pattern_arm(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        context: &ClassPatternContext<'db>,
+        original_subject_ty: Type<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<(Type<'db>, Vec<ClassPatternArgument<'db>>)> {
+        let narrowed_subject_ty =
+            self.filter_class_pattern_subject_type(context.class, context.class_ty, subject_ty);
+        if narrowed_subject_ty.is_never() {
+            return None;
+        }
+        let arguments = self.class_pattern_arguments_for_arm(
+            kind,
+            context,
+            original_subject_ty,
+            narrowed_subject_ty,
+        )?;
+        Some((narrowed_subject_ty, arguments))
+    }
+
     fn analyze_successful_class_pattern(
         &self,
         kind: &ClassPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        let class_expr_ty =
-            infer_same_file_expression_type(self.db, kind.class, TypeContext::default());
-        let class = class_expr_ty.as_class_literal();
-        let class_ty =
-            positive_class_pattern_type(self.db, class_expr_ty).unwrap_or_else(Type::object);
-        let context = ClassPatternContext {
-            class,
-            class_ty,
-            positional_sources: class.map_or_else(
-                || vec![ClassPatternPositionalSource::Unknown; kind.positional.len()],
-                |class| class_pattern_positional_sources(self.db, class, kind.positional.len()),
-            ),
-        };
+        let mut matched_subject_types = UnionBuilder::new(self.db);
+        let mut binding_subject_types = UnionBuilder::new(self.db);
+        let mut bindings = BTreeMap::new();
+        for context in self.class_pattern_contexts(kind) {
+            let result =
+                self.analyze_successful_class_pattern_for_context(kind, &context, subject_ty);
+            matched_subject_types.add_in_place(result.matched_subject_ty);
+            binding_subject_types.add_in_place(result.binding_subject_ty);
+            Self::merge_bindings(&mut bindings, result.bindings);
+        }
+        PatternSuccessResult {
+            matched_subject_ty: matched_subject_types.build(),
+            binding_subject_ty: binding_subject_types.build(),
+            bindings,
+        }
+    }
+
+    fn analyze_successful_class_pattern_for_context(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        context: &ClassPatternContext<'db>,
+        subject_ty: Type<'db>,
+    ) -> PatternSuccessResult<'db> {
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, original_subject_ty, subject_ty| {
-                let narrowed_subject_ty = analyzer.filter_class_pattern_subject_type(
-                    context.class,
-                    context.class_ty,
-                    subject_ty,
-                );
-                if narrowed_subject_ty.is_never() {
-                    return None;
-                }
-
-                let arguments = analyzer.class_pattern_arguments_for_arm(
-                    kind,
-                    &context,
-                    original_subject_ty,
-                    narrowed_subject_ty,
-                )?;
+                let (narrowed_subject_ty, arguments) =
+                    analyzer.class_pattern_arm(kind, context, original_subject_ty, subject_ty)?;
                 let mut matched_subject_ty = narrowed_subject_ty;
                 let mut binding_subject_ty = narrowed_subject_ty;
                 let mut bindings = BTreeMap::new();
@@ -1702,37 +1782,43 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         false
     }
 
+    fn mapping_pattern_key_types(&self, kind: &MappingPatternPredicateKind<'db>) -> Vec<Type<'db>> {
+        kind.entries
+            .iter()
+            .map(|entry| {
+                infer_same_file_expression_type(self.db, entry.key, TypeContext::default())
+            })
+            .collect()
+    }
+
+    fn mapping_pattern_arm(
+        &self,
+        subject_ty: Type<'db>,
+        key_types: &[Type<'db>],
+    ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
+        let narrowed_subject_ty = self.intersect_types(subject_ty, mapping_pattern_type(self.db));
+        if narrowed_subject_ty.is_never() {
+            return None;
+        }
+        let value_types = key_types
+            .iter()
+            .map(|key_ty| self.mapping_pattern_value_type_for_arm(narrowed_subject_ty, *key_ty))
+            .collect::<Option<Vec<_>>>()?;
+        Some((narrowed_subject_ty, value_types))
+    }
+
     fn analyze_successful_mapping_pattern(
         &self,
         kind: &MappingPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        let key_types: Vec<_> = kind
-            .entries
-            .iter()
-            .map(|entry| {
-                infer_same_file_expression_type(self.db, entry.key, TypeContext::default())
-            })
-            .collect();
+        let key_types = self.mapping_pattern_key_types(kind);
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, _, subject_ty| {
-                let narrowed_subject_ty =
-                    analyzer.intersect_types(subject_ty, mapping_pattern_type(analyzer.db));
-                if narrowed_subject_ty.is_never() {
-                    return None;
-                }
-
-                let value_types: Option<Vec<_>> = kind
-                    .entries
-                    .iter()
-                    .zip(&key_types)
-                    .map(|(_, key_ty)| {
-                        analyzer.mapping_pattern_value_type_for_arm(subject_ty, *key_ty)
-                    })
-                    .collect();
-                let value_types = value_types?;
+                let (narrowed_subject_ty, value_types) =
+                    analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
                 let mut bindings = BTreeMap::new();
                 for (entry, value_ty) in kind.entries.iter().zip(value_types) {
                     let mut child = analyzer.analyze_successful_pattern(&entry.pattern, value_ty);

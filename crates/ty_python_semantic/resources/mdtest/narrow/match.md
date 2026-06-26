@@ -518,6 +518,29 @@ def mapping_or_singleton_binding(value: StringMapping | None) -> None:
             reveal_type(item)  # revealed: str | None
 ```
 
+The first two alternatives bind an `int`. A list that does not contain exactly one element reaches
+the final capture instead. If that list is later changed to contain one element, the same sequence
+pattern must be able to match it:
+
+```py
+@final
+class MutableOrBox:
+    value: int = 0
+
+def failed_sequence_alternative_does_not_narrow_later_capture(
+    value: list[int] | MutableOrBox,
+) -> None:
+    match value:
+        case [item] | MutableOrBox(value=item) | item:
+            reveal_type(item)  # revealed: int | list[int]
+            if isinstance(item, list):
+                item.clear()
+                item.append(1)
+                match item:
+                    case [only]:
+                        reveal_type(item)  # revealed: list[int]
+```
+
 ## Declared pattern captures
 
 A capture still has to satisfy an earlier declaration for the same name. This uses the same
@@ -659,6 +682,8 @@ A class pattern can use a variable whose type is `type[Class]`. Both the subject
 use the instance type described by that annotation.
 
 ```py
+from typing import Literal
+
 class IndirectPattern: ...
 
 def test_match_indirect_class_pattern(
@@ -669,6 +694,22 @@ def test_match_indirect_class_pattern(
         case PatternClass() as item:
             reveal_type(item)  # revealed: IndirectPattern
             reveal_type(value)  # revealed: IndirectPattern
+
+class IndirectIntPattern:
+    tag: Literal["int"]
+    payload: int
+
+class IndirectStrPattern:
+    tag: Literal["str"]
+    payload: str
+
+def test_union_class_pattern_uses_members_from_matching_class(
+    value: object,
+    PatternClass: type[IndirectIntPattern] | type[IndirectStrPattern],
+) -> None:
+    match value:
+        case PatternClass(tag="int", payload=item):
+            reveal_type(item)  # revealed: int
 ```
 
 ## Class pattern aliases
@@ -825,15 +866,18 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 
 ## Generic subclass captures
 
-We do not yet infer a generic subclass's specialization from its base class. In the first two
-examples, ty therefore cannot infer `GenericPatternChild[int]` from `GenericPatternBase[int]`, so
-attributes declared only on the subclass are `Unknown`. Attributes inherited from the generic base
-class can still use the subject's specialization, as shown in the final example.
+We do not yet infer a generic subclass's type arguments from its base class. Attributes declared
+only on the subclass therefore use `Unknown` for those arguments, but still retain types such as
+`list[Unknown]`. Attributes inherited from a generic base can use type arguments from the subject.
+When the subject does not provide type arguments, members declared by the pattern class use
+`Unknown`; a type parameter default does not restrict which instances match at runtime.
 
 ```py
-from typing import Generic, TypeVar
+from typing import final, Generic
+from typing_extensions import TypeVar
 
 GenericPatternT = TypeVar("GenericPatternT")
+DefaultGenericPatternT = TypeVar("DefaultGenericPatternT", default=str)
 
 class GenericPatternBase(Generic[GenericPatternT]): ...
 
@@ -845,6 +889,14 @@ class GenericMemberBase(Generic[GenericPatternT]):
     item: GenericPatternT
 
 class GenericMemberChild(GenericMemberBase[GenericPatternT]): ...
+class IntGenericMemberChild(GenericMemberBase[int]): ...
+
+@final
+class FinalGenericPatternBox(Generic[GenericPatternT]):
+    value: list[GenericPatternT]
+
+class DefaultGenericPatternBox(Generic[DefaultGenericPatternT]):
+    value: DefaultGenericPatternT
 
 def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
@@ -856,7 +908,7 @@ def test_match_nested_generic_subclass_capture(value: GenericPatternBase[int]) -
     match value:
         case GenericPatternChild(items=items):
             # TODO: This should be `list[int]` once generic subclass specialization is supported.
-            reveal_type(items)  # revealed: Unknown
+            reveal_type(items)  # revealed: list[Unknown]
             return items
     return []
 
@@ -870,6 +922,23 @@ def test_match_inherited_generic_subclass_capture(
             return item
         case _:
             raise ValueError
+
+def test_match_generic_base_capture_preserves_subject_specialization(
+    value: IntGenericMemberChild,
+) -> None:
+    match value:
+        case GenericMemberBase(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_direct_generic_pattern_preserves_declared_member(value: object) -> None:
+    match value:
+        case FinalGenericPatternBox(value=int() as item):
+            reveal_type(item)  # revealed: Never
+
+def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
+    match value:
+        case DefaultGenericPatternBox(value=int() as item):
+            reveal_type(item)  # revealed: Unknown & int
 ```
 
 ## Positional class patterns
@@ -1073,9 +1142,15 @@ def builtin_positional_pattern_refines_subject_alias(value: bool) -> Literal[Tru
 ## Overlapping class patterns
 
 Two unrelated non-final classes can have a common subclass through multiple inheritance. The
-successful pattern therefore preserves both class types:
+successful pattern therefore preserves both class types. Attributes from both bases remain possible,
+even when one annotation is broader than the other. For a generic pattern class whose type arguments
+are not known from the subject, its attributes use `Unknown`.
 
 ```py
+from typing import Generic, TypeVar
+
+OverlapT = TypeVar("OverlapT")
+
 class OverlapCaptureA: ...
 
 class OverlapCaptureB:
@@ -1095,12 +1170,56 @@ class OverlapMemberA:
 class OverlapMemberB:
     member: str
 
+class CompatibleOverlapMemberA:
+    member: object = "x"
+
+class CompatibleOverlapMemberB:
+    member: int = 1
+
 def test_match_class_capture_combines_overlapping_member_types(
     value: OverlapMemberA,
 ) -> None:
     match value:
         case OverlapMemberB(member=item):
             reveal_type(item)  # revealed: int | str
+
+def test_match_class_capture_preserves_compatible_overlapping_member_types(
+    value: CompatibleOverlapMemberA,
+) -> None:
+    match value:
+        case CompatibleOverlapMemberB(member=str() as item):
+            reveal_type(item)  # revealed: str
+
+class GenericOverlapA:
+    member: int
+
+class GenericOverlapB(Generic[OverlapT]):
+    member: OverlapT
+
+class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
+    member: str
+
+class GenericListOverlapA: ...
+
+class GenericListOverlapB(Generic[OverlapT]):
+    values: list[OverlapT]
+
+class GenericListOverlapC(GenericListOverlapA, GenericListOverlapB[int]): ...
+
+def test_match_generic_class_capture_preserves_possible_multiple_inheritance(
+    value: GenericOverlapA,
+) -> None:
+    match value:
+        case GenericOverlapB(member=str() as item):
+            reveal_type(item)  # revealed: str
+
+def test_match_generic_container_member_keeps_loop_reachable(
+    value: GenericListOverlapA,
+) -> None:
+    match value:
+        case GenericListOverlapB(values=items):
+            for item in items:
+                reveal_type(item)  # revealed: Unknown
 ```
 
 ## Class pattern captures from `Any` and `Unknown`
@@ -1130,8 +1249,9 @@ def test_match_gradual_class_captures(any_value: Any, unknown_value: Unknown) ->
 Python reads an explicit mapping entry by calling `get` with a sentinel. A custom `get` method can
 therefore produce a broader type than `__getitem__`; the sentinel's type is treated as `object` when
 calling a custom override. The key type of an ordinary `Mapping` does not prove that another key is
-absent because a custom `get` method may accept a broader set of keys. `**rest` is always a new
-`dict` containing the unmatched items.
+absent because a custom `get` method may accept a broader set of keys. When the subject is only
+known as `object`, a successful mapping pattern gives its entries the type `object`, not `Unknown`.
+`**rest` is always a new `dict` containing the unmatched items.
 
 ```py
 from collections.abc import Iterator, Mapping
@@ -1154,6 +1274,11 @@ def test_match_dict_alias_preserves_concrete_type(value: dict[str, int]) -> None
     match value:
         case {"item": item, **rest} as whole:
             reveal_type(whole)  # revealed: dict[str, int]
+
+def test_match_object_mapping_entry_type(value: object) -> None:
+    match value:
+        case {"item": item}:
+            reveal_type(item)  # revealed: object
 
 class CustomGet(Mapping[str, int | str]):
     def __getitem__(self, key: str) -> int:
@@ -2168,8 +2293,9 @@ def match_named_expression_subject_capture(value: tuple[int]) -> None:
 ## Cycles in pattern binding types
 
 Pattern captures can affect the type of a later match subject, including through a loop or a
-function defined before the capture. Direct, sequence, class, and match-self captures resolve to a
-concrete type. A mapping capture conservatively retains `Unknown` from cycle recovery.
+function defined before the capture. Direct, sequence, class, and built-in positional captures
+resolve to a concrete type. For a mapping capture, the recursive subject is known only to be a
+mapping, so its entry type is `object`.
 
 ```py
 def match_loop_carried_capture(flag: bool, x: int) -> None:
@@ -2200,7 +2326,7 @@ def match_loop_carried_mapping_capture(flag: bool) -> None:
     while flag:
         match x:
             case {"value": x}:
-                reveal_type(x)  # revealed: int | Unknown
+                reveal_type(x)  # revealed: object
 
 def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
     while flag:
