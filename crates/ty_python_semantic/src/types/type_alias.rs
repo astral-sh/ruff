@@ -14,7 +14,7 @@ use crate::{
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
     scope::ScopeId,
-    semantic_index_in_environment,
+    semantic_index,
 };
 
 use ruff_db::parsed::parsed_module_versioned;
@@ -36,10 +36,11 @@ impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 
 pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value_type(db));
+    visitor.visit_type(db, program, type_alias.value_type(db, program));
 }
 
 #[salsa::tracked]
@@ -47,21 +48,21 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index_in_environment(db, scope.analysis_file(db))
-            .expect_single_definition(type_alias_stmt_node)
+        semantic_index(db, scope.analysis_file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_function_specialization(db, self.raw_value_type(db))
+    pub(crate) fn value_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+        self.apply_function_specialization(db, program, self.raw_value_type(db))
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
+            let program = alias.rhs_scope(db).analysis_file(db).program(db);
+            value.cycle_normalized(db, program, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -75,11 +76,16 @@ impl<'db> PEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
-    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    fn apply_function_specialization(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
         if let Some(generic_context) = self.generic_context(db) {
             let specialization = self
                 .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None));
+                .unwrap_or_else(|| generic_context.default_specialization(db, program, None));
             let type_mapping = match specialization.materialization_kind(db) {
                 None => {
                     TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
@@ -92,6 +98,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
             ty.apply_type_mapping_impl(
                 db,
+                program,
                 &type_mapping,
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
@@ -142,7 +149,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index_in_environment(db, scope.analysis_file(db));
+                let index = semantic_index(db, scope.analysis_file(db));
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
@@ -165,10 +172,11 @@ impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
 
 pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value_type(db));
+    visitor.visit_type(db, program, type_alias.value_type(db));
 }
 
 #[salsa::tracked]
@@ -179,8 +187,10 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
+            let definition = alias.definition(db);
+            let program = definition.analysis_file(db).program(db);
+            value.cycle_normalized(db, program, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -213,6 +223,7 @@ pub enum TypeAliasType<'db> {
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
@@ -221,10 +232,10 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
-            walk_pep_695_type_alias(db, type_alias, visitor);
+            walk_pep_695_type_alias(db, program, type_alias, visitor);
         }
         TypeAliasType::ManualPEP695(type_alias) => {
-            walk_manual_pep_695_type_alias(db, type_alias, visitor);
+            walk_manual_pep_695_type_alias(db, program, type_alias, visitor);
         }
     }
 }
@@ -244,9 +255,9 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn value_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::PEP695(type_alias) => type_alias.value_type(db, program),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
@@ -280,9 +291,16 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    pub(super) fn apply_function_specialization(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
+            TypeAliasType::PEP695(type_alias) => {
+                type_alias.apply_function_specialization(db, program, ty)
+            }
             TypeAliasType::ManualPEP695(_) => ty,
         }
     }
@@ -309,11 +327,17 @@ impl<'db> TypeAliasType<'db> {
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
     #[salsa::tracked(
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.value_type(db).variance_of(db, typevar)
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> TypeVarVariance {
+        self.value_type(db, program)
+            .variance_of(db, program, typevar)
     }
 }
 
@@ -338,7 +362,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
         let definition = self.type_alias.definition(self.db);
-        let file = definition.file(self.db);
+        let file = definition.analysis_file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
         // Type aliases are defined directly in their enclosing scope (no body scope like classes),

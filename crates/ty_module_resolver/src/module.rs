@@ -26,7 +26,7 @@ impl get_size2::GetSize for Module<'_> {}
 impl<'db> Module<'db> {
     pub(crate) fn file_module_in_program(
         db: &'db dyn Db,
-        program: ResolverProgram,
+        program: ResolverProgram<'db>,
         name: ModuleName,
         kind: ModuleKind,
         search_path: SearchPath,
@@ -47,13 +47,13 @@ impl<'db> Module<'db> {
 
     pub(crate) fn namespace_package_in_program(
         db: &'db dyn Db,
-        program: ResolverProgram,
+        program: ResolverProgram<'db>,
         name: ModuleName,
     ) -> Self {
         Self::Namespace(NamespacePackage::new(db, program, name))
     }
 
-    pub fn program(self, db: &'db dyn Database) -> ResolverProgram {
+    pub fn program(self, db: &'db dyn Database) -> ResolverProgram<'db> {
         match self {
             Module::File(module) => module.program(db),
             Module::Namespace(package) => package.program(db),
@@ -277,7 +277,7 @@ fn all_submodule_names_for_package<'db>(
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
-    pub(super) program: ResolverProgram,
+    pub(super) program: ResolverProgram<'db>,
     #[returns(ref)]
     pub(super) name: ModuleName,
     pub(super) kind: ModuleKind,
@@ -293,7 +293,7 @@ pub struct FileModule<'db> {
 /// multiple possible paths and they have no corresponding code file.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
-    pub(super) program: ResolverProgram,
+    pub(super) program: ResolverProgram<'db>,
     #[returns(ref)]
     pub(super) name: ModuleName,
 }

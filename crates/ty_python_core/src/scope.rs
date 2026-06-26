@@ -4,9 +4,10 @@ use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
 
+use crate::program::Program;
 use crate::{
     Db, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition, environment::AnalysisFile,
-    node_key::NodeKey, semantic_index_in_environment,
+    node_key::NodeKey, semantic_index,
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -21,6 +22,10 @@ pub struct ScopeId<'db> {
 impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.analysis_file(db).program(db)
+    }
+
     pub fn file(self, db: &'db dyn Db) -> File {
         self.analysis_file(db).file(db)
     }
@@ -46,12 +51,12 @@ impl<'db> ScopeId<'db> {
     }
 
     pub fn scope(self, db: &'db dyn Db) -> &'db Scope {
-        semantic_index_in_environment(db, self.analysis_file(db)).scope(self.file_scope_id(db))
+        semantic_index(db, self.analysis_file(db)).scope(self.file_scope_id(db))
     }
 
     /// Returns the class definition for the enclosing class if this scope is a method body.
     pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        semantic_index_in_environment(db, self.analysis_file(db))
+        semantic_index(db, self.analysis_file(db))
             .class_definition_of_method(self.file_scope_id(db))
     }
 
@@ -100,36 +105,13 @@ impl FileScopeId {
         self == FileScopeId::global()
     }
 
-    pub fn to_scope_id<'db>(
-        self,
-        db: &'db dyn Db,
-        file: impl IntoAnalysisFile<'db>,
-    ) -> ScopeId<'db> {
-        let file = file.into_analysis_file(db);
-        let index = semantic_index_in_environment(db, file);
+    pub fn to_scope_id<'db>(self, db: &'db dyn Db, file: AnalysisFile<'db>) -> ScopeId<'db> {
+        let index = semantic_index(db, file);
         index.scope_ids_by_scope[self]
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
         index.generator_functions.contains(&self)
-    }
-}
-
-/// Compatibility conversion for APIs that have not yet selected an explicit
-/// inference environment.
-pub trait IntoAnalysisFile<'db> {
-    fn into_analysis_file(self, db: &'db dyn Db) -> AnalysisFile<'db>;
-}
-
-impl<'db> IntoAnalysisFile<'db> for AnalysisFile<'db> {
-    fn into_analysis_file(self, _db: &'db dyn Db) -> AnalysisFile<'db> {
-        self
-    }
-}
-
-impl<'db> IntoAnalysisFile<'db> for File {
-    fn into_analysis_file(self, db: &'db dyn Db) -> AnalysisFile<'db> {
-        AnalysisFile::from_default(db, self)
     }
 }
 

@@ -16,19 +16,23 @@ const MAX_TUPLE_EXPANSION: usize = 64;
 /// Expands a type into its possible subtypes, if applicable.
 ///
 /// Returns [`None`] if the type cannot be expanded.
-pub(crate) fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+pub(crate) fn expand_type<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    ty: Type<'db>,
+) -> Option<Vec<Type<'db>>> {
     match ty {
         Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db)),
-        Type::Intersection(intersection) => intersection.finite_alternatives(db),
+        Type::Intersection(intersection) => intersection.finite_alternatives(db, program),
         Type::NominalInstance(instance) => {
-            let class = instance.class(db);
+            let class = instance.class(db, program);
 
             if class.is_known(db, KnownClass::Bool) {
                 return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
             }
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
-            if let Some(spec) = instance.tuple_spec(db) {
+            if let Some(spec) = instance.tuple_spec(db, program) {
                 return match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => {
                         // Pre-expand each element and compute the total Cartesian product size.
@@ -38,7 +42,7 @@ pub(crate) fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Typ
                         let per_element: Vec<_> = fixed_length_tuple
                             .iter_all_elements()
                             .map(|element| {
-                                expand_type(db, element).unwrap_or_else(|| vec![element])
+                                expand_type(db, program, element).unwrap_or_else(|| vec![element])
                             })
                             .collect();
 
@@ -75,14 +79,14 @@ pub(crate) fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Typ
                 .flat_map(|element| match element {
                     Type::EnumComplement(complement) => complement.remaining_literal_types(db),
                     Type::Intersection(intersection) => intersection
-                        .finite_alternatives(db)
+                        .finite_alternatives(db, program)
                         .unwrap_or_else(|| vec![*element]),
                     _ => vec![*element],
                 })
                 .collect(),
         ),
         // For type aliases, expand the underlying value type.
-        Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => expand_type(db, program, alias.value_type(db, program)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,
@@ -100,13 +104,14 @@ mod tests {
     #[test]
     fn expand_union_type() {
         let db = setup_db();
+        let program = db.program();
         let types = [
-            KnownClass::Int.to_instance(&db),
-            KnownClass::Str.to_instance(&db),
-            KnownClass::Bytes.to_instance(&db),
+            KnownClass::Int.to_instance(&db, program),
+            KnownClass::Str.to_instance(&db, program),
+            KnownClass::Bytes.to_instance(&db, program),
         ];
-        let union_type = UnionType::from_elements(&db, types);
-        let expanded = expand_type(&db, union_type).unwrap();
+        let union_type = UnionType::from_elements(&db, program, types);
+        let expanded = expand_type(&db, program, union_type).unwrap();
         assert_eq!(expanded.len(), types.len());
         assert_eq!(expanded, types);
     }
@@ -114,8 +119,9 @@ mod tests {
     #[test]
     fn expand_bool_type() {
         let db = setup_db();
-        let bool_instance = KnownClass::Bool.to_instance(&db);
-        let expanded = expand_type(&db, bool_instance).unwrap();
+        let program = db.program();
+        let bool_instance = KnownClass::Bool.to_instance(&db, program);
+        let expanded = expand_type(&db, program, bool_instance).unwrap();
         let expected_types = [Type::bool_literal(true), Type::bool_literal(false)];
         assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
@@ -124,22 +130,23 @@ mod tests {
     #[test]
     fn expand_tuple_type() {
         let db = setup_db();
+        let program = db.program();
 
-        let int_ty = KnownClass::Int.to_instance(&db);
-        let str_ty = KnownClass::Str.to_instance(&db);
-        let bytes_ty = KnownClass::Bytes.to_instance(&db);
-        let bool_ty = KnownClass::Bool.to_instance(&db);
+        let int_ty = KnownClass::Int.to_instance(&db, program);
+        let str_ty = KnownClass::Str.to_instance(&db, program);
+        let bytes_ty = KnownClass::Bytes.to_instance(&db, program);
+        let bool_ty = KnownClass::Bool.to_instance(&db, program);
         let true_ty = Type::bool_literal(true);
         let false_ty = Type::bool_literal(false);
 
         // Empty tuple
         let empty_tuple = Type::empty_tuple(&db);
-        let expanded = expand_type(&db, empty_tuple);
+        let expanded = expand_type(&db, program, empty_tuple);
         assert!(expanded.is_none());
 
         // None of the elements can be expanded.
         let tuple_type1 = Type::heterogeneous_tuple(&db, [int_ty, str_ty]);
-        let expanded = expand_type(&db, tuple_type1);
+        let expanded = expand_type(&db, program, tuple_type1);
         assert!(expanded.is_none());
 
         // All elements can be expanded.
@@ -147,7 +154,7 @@ mod tests {
             &db,
             [
                 bool_ty,
-                UnionType::from_elements(&db, [int_ty, str_ty, bytes_ty]),
+                UnionType::from_elements(&db, program, [int_ty, str_ty, bytes_ty]),
             ],
         );
         let expected_types = [
@@ -158,7 +165,7 @@ mod tests {
             Type::heterogeneous_tuple(&db, [false_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, bytes_ty]),
         ];
-        let expanded = expand_type(&db, tuple_type2).unwrap();
+        let expanded = expand_type(&db, program, tuple_type2).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
@@ -167,7 +174,7 @@ mod tests {
             [
                 bool_ty,
                 int_ty,
-                UnionType::from_elements(&db, [str_ty, bytes_ty]),
+                UnionType::from_elements(&db, program, [str_ty, bytes_ty]),
                 str_ty,
             ],
         );
@@ -177,7 +184,7 @@ mod tests {
             Type::heterogeneous_tuple(&db, [false_ty, int_ty, str_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
-        let expanded = expand_type(&db, tuple_type3).unwrap();
+        let expanded = expand_type(&db, program, tuple_type3).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
@@ -185,9 +192,12 @@ mod tests {
             &db,
             [bool_ty],
             int_ty,
-            [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
+            [
+                UnionType::from_elements(&db, program, [str_ty, bytes_ty]),
+                str_ty,
+            ],
         ));
-        let expanded = expand_type(&db, variable_length_tuple);
+        let expanded = expand_type(&db, program, variable_length_tuple);
         assert!(expanded.is_none());
     }
 }

@@ -42,6 +42,7 @@
 //! | `**` | (any module) | |
 
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 use regex::RegexSet;
 
@@ -119,6 +120,12 @@ impl PartialEq for ModuleGlobSet {
 }
 
 impl Eq for ModuleGlobSet {}
+
+impl Hash for ModuleGlobSet {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.globs.hash(state);
+    }
+}
 
 impl fmt::Display for ModuleGlobSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -255,7 +262,7 @@ pub enum ModuleGlobError {
 }
 
 /// A parsed module glob pattern.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct ModuleGlob {
     /// The original glob pattern string (including `!` prefix if negated).
     original: Box<str>,

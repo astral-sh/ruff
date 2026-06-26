@@ -7,8 +7,8 @@ use ruff_python_ast::ExprRef;
 use crate::Db;
 use crate::environment::AnalysisFile;
 use crate::frozen::FrozenMap;
-use crate::scope::{FileScopeId, IntoAnalysisFile};
-use crate::semantic_index_in_environment;
+use crate::scope::FileScopeId;
+use crate::semantic_index;
 
 pub use node_key::ExpressionNodeKey;
 
@@ -56,7 +56,7 @@ impl AstIds {
 }
 
 fn ast_ids<'db>(db: &'db dyn Db, file: AnalysisFile<'db>) -> &'db AstIds {
-    semantic_index_in_environment(db, file).ast_ids()
+    semantic_index(db, file).ast_ids()
 }
 
 /// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
@@ -66,47 +66,47 @@ pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
     /// Returns the ID that uniquely identifies the use in its scope.
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId;
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId;
 }
 
 impl HasScopedUseId for ast::Identifier {
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file.into_analysis_file(db));
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId {
+        let ast_ids = ast_ids(db, file);
         ast_ids.use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprName {
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::ExprAttribute {
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::ExprSubscript {
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::Keyword {
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file.into_analysis_file(db));
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId {
+        let ast_ids = ast_ids(db, file);
         ast_ids.use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprRef<'_> {
-    fn scoped_use_id<'db>(&self, db: &'db dyn Db, file: impl IntoAnalysisFile<'db>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file.into_analysis_file(db));
+    fn scoped_use_id(&self, db: &dyn Db, file: AnalysisFile<'_>) -> ScopedUseId {
+        let ast_ids = ast_ids(db, file);
         ast_ids.use_id(*self)
     }
 }

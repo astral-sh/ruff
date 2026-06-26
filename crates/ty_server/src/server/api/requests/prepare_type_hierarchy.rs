@@ -58,7 +58,9 @@ impl BackgroundDocumentRequestHandler for PrepareTypeHierarchyRequestHandler {
             return Ok(None);
         };
 
-        let Some(item) = ty_ide::prepare_type_hierarchy(db, file, offset) else {
+        let Some(item) =
+            ty_ide::prepare_type_hierarchy(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

@@ -4,11 +4,11 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{ModuleName, resolve_module_in_program};
+use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{AnalysisFile, Db};
-use ty_python_core::{SemanticIndex, Truthiness, semantic_index_in_environment};
+use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
@@ -21,7 +21,7 @@ pub(crate) fn dunder_all_names(
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
     let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
-    let index = semantic_index_in_environment(db, analysis_file);
+    let index = semantic_index(db, analysis_file);
     let mut collector = DunderAllNamesCollector::new(db, analysis_file, index);
     collector.visit_body(module.suite());
     collector.into_names()
@@ -104,11 +104,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                     .and_then(|file| {
                         dunder_all_names(
                             self.db,
-                            AnalysisFile::new(
-                                self.db,
-                                self.analysis_file.environment(self.db),
-                                file,
-                            ),
+                            AnalysisFile::new(self.db, self.analysis_file.program(self.db), file),
                         )
                     })
                 else {
@@ -176,13 +172,13 @@ impl<'db> DunderAllNamesCollector<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
-        let module_name = ModuleName::from_import_statement_in_program(
+        let module_name = ModuleName::from_import_statement(
             self.db,
             self.analysis_file.program_file(self.db),
             import_from,
         )
         .ok()?;
-        let module = resolve_module_in_program(
+        let module = resolve_module(
             self.db,
             self.analysis_file.program_file(self.db),
             &module_name,
@@ -191,7 +187,7 @@ impl<'db> DunderAllNamesCollector<'db> {
             self.db,
             AnalysisFile::new(
                 self.db,
-                self.analysis_file.environment(self.db),
+                self.analysis_file.program(self.db),
                 module.file(self.db)?,
             ),
         )
@@ -211,7 +207,9 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
-        self.standalone_expression_type(expr).try_bool(self.db).ok()
+        self.standalone_expression_type(expr)
+            .try_bool(self.db, self.analysis_file.program(self.db))
+            .ok()
     }
 
     /// Add valid names to the set.

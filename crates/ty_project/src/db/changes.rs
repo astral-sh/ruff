@@ -10,8 +10,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use ty_python_core::environment::{InferenceEnvironment, InferenceSettings};
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::program::FallibleStrategy;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -43,9 +42,10 @@ impl ProjectDatabase {
         let config_file_override =
             project_options_overrides.and_then(|options| options.config_file_override.clone());
         let extra_configuration_paths = project.metadata(self).extra_configuration_paths().to_vec();
-        let program = Program::get(self);
-        let custom_stdlib_versions_path = program
-            .custom_stdlib_search_path(self)
+        let custom_stdlib_versions_path = project
+            .program_settings(self)
+            .search_paths
+            .custom_stdlib()
             .map(|path| path.join("VERSIONS"));
 
         let mut result = ChangeResult {
@@ -277,23 +277,17 @@ impl ProjectDatabase {
 
                     metadata.try_add_project_root(self);
 
-                    let program_settings_diagnostics = match metadata.to_program_settings(
-                        self.system(),
-                        self.vendored(),
-                        &FallibleStrategy,
-                    ) {
+                    let (program_settings, program_settings_diagnostics) = match metadata
+                        .to_program_settings(self.system(), self.vendored(), &FallibleStrategy)
+                    {
                         Ok((program_settings, diagnostics)) => {
-                            let program = Program::get(self);
-                            let programs = self.programs.clone();
-                            let program = programs.reconfigure(self, program, program_settings);
-                            Program::set_default(self, program);
-                            diagnostics
+                            (Some(program_settings), diagnostics)
                         }
                         Err(error) => {
                             tracing::error!(
                                 "Failed to convert metadata to program settings, continuing without applying them: {error}"
                             );
-                            Vec::new()
+                            (None, Vec::new())
                         }
                     };
 
@@ -312,32 +306,11 @@ impl ProjectDatabase {
                     };
 
                     tracing::debug!("Reloading project after structural change");
-                    let inference_settings = InferenceSettings {
-                        replace_imports_with_any: settings.as_ref().map_or_else(
-                            || {
-                                project
-                                    .settings(self)
-                                    .analysis()
-                                    .replace_imports_with_any
-                                    .clone()
-                            },
-                            |settings| settings.analysis().replace_imports_with_any.clone(),
-                        ),
-                    };
-                    let inference_environments = self.inference_environments.clone();
-                    let current_inference_environment = InferenceEnvironment::get(self);
-                    let program = Program::get(self);
-                    let inference_environment = inference_environments.reconfigure(
-                        self,
-                        current_inference_environment,
-                        program,
-                        inference_settings,
-                    );
-                    InferenceEnvironment::set_default(self, inference_environment);
                     match project.reload(
                         self,
                         metadata,
                         settings,
+                        program_settings,
                         settings_diagnostics,
                         program_settings_diagnostics,
                     ) {
@@ -379,7 +352,7 @@ impl ProjectDatabase {
                 &FallibleStrategy,
             ) {
                 Ok((program_settings, program_settings_diagnostics)) => {
-                    program.update_from_settings(self, program_settings);
+                    project.update_program_settings(self, program_settings);
                     let settings_diagnostics = match project.metadata(self).options().to_settings(
                         self,
                         project.metadata(self).root(),

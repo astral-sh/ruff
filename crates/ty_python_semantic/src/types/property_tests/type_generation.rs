@@ -1,4 +1,3 @@
-use crate::Db;
 use crate::db::tests::TestDb;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
@@ -9,6 +8,7 @@ use crate::types::{
     IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
+use crate::{Db, Program};
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
 use ruff_python_ast::name::Name;
@@ -91,10 +91,12 @@ pub(crate) enum CallableParams {
 
 impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
+        let program = db.program();
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
             CallableParams::List(params) => Parameters::new(
                 db,
+                program,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
                         ParamKind::PositionalOnly => Parameter::positional_only(param.name),
@@ -136,25 +138,27 @@ enum ParamKind {
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
+    program: Program<'db>,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance(db, program).unwrap(),
     ))
 }
 
 impl Ty {
     pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
+        let program = db.program();
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
             Ty::Divergent => divergent(db, 1, None),
             Ty::TopDivergent => divergent(db, 2, Some(MaterializationKind::Top)),
             Ty::BottomDivergent => divergent(db, 3, Some(MaterializationKind::Bottom)),
-            Ty::None => Type::none(db),
+            Ty::None => Type::none(db, program),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
             Ty::StringLiteral(s) => Type::string_literal(db, s),
@@ -162,7 +166,7 @@ impl Ty {
             Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
             Ty::EnumLiteral(name) => {
-                let enum_class = known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+                let enum_class = known_module_symbol(db, program, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
                     .expect_class_literal()
@@ -171,42 +175,44 @@ impl Ty {
                 Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
             }
             Ty::SingleMemberEnumLiteral => {
-                let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
+                let ty = known_module_symbol(db, program, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db)))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db, program)))
                 );
                 ty
             }
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
+            Ty::BuiltinInstance(s) => builtins_symbol(db, program, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance(db, program)
                 .unwrap(),
-            Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
+            Ty::AbcInstance(s) => known_module_symbol(db, program, KnownModule::Abc, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance(db, program)
                 .unwrap(),
-            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
+            Ty::AbcClassLiteral(s) => known_module_symbol(db, program, KnownModule::Abc, s)
                 .place
                 .expect_type(),
-            Ty::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
-                .place
-                .expect_type(),
+            Ty::UnittestMockLiteral => {
+                known_module_symbol(db, program, KnownModule::UnittestMock, "Mock")
+                    .place
+                    .expect_type()
+            }
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
                 .into_type(db)
-                .to_instance(db)
+                .to_instance(db, program)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
-            Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, program, s).place.expect_type(),
+            Ty::KnownClassInstance(known_class) => known_class.to_instance(db, program),
             Ty::Union(tys) => {
-                UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                UnionType::from_elements(db, program, tys.into_iter().map(|ty| ty.into_type(db)))
             }
             Ty::Intersection { pos, neg } => {
-                let mut builder = IntersectionBuilder::new(db);
+                let mut builder = IntersectionBuilder::new(db, program);
                 for p in pos {
                     builder = builder.add_positive(p.into_type(db));
                 }
@@ -228,50 +234,57 @@ impl Ty {
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
-                builtins_symbol(db, s)
+                program,
+                builtins_symbol(db, program, s)
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(db),
+                    .default_specialization(db, program),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
-                known_module_symbol(db, KnownModule::Abc, s)
+                program,
+                known_module_symbol(db, program, KnownModule::Abc, s)
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(db),
+                    .default_specialization(db, program),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).place.expect_type(),
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, program, name).place.expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(db, class).place.expect_type();
-                let function = builtins_class.member(db, method).place.expect_type();
+                let builtins_class = builtins_symbol(db, program, class).place.expect_type();
+                let function = builtins_class
+                    .member(db, program, method)
+                    .place
+                    .expect_type();
 
-                create_bound_method(db, function, builtins_class)
+                create_bound_method(db, program, function, builtins_class)
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,
                 Signature::new(params.into_parameters(db), returns.into_type(db)),
             ),
-            Ty::FloatNewtypeInstance => newtype_instance(db, "NewTypeOfFloat"),
-            Ty::IntNewtypeInstance => newtype_instance(db, "NewTypeOfInt"),
-            Ty::StrNewtypeInstance => newtype_instance(db, "NewTypeOfStr"),
-            Ty::ComplexNewtypeInstance => newtype_instance(db, "NewTypeOfComplex"),
-            Ty::SubNewTypeOfIntInstance => newtype_instance(db, "SubNewTypeOfInt"),
-            Ty::SubSubNewTypeOfIntInstance => newtype_instance(db, "SubSubNewTypeOfInt"),
-            Ty::SubNewTypeOfFloatInstance => newtype_instance(db, "SubNewTypeOfFloat"),
+            Ty::FloatNewtypeInstance => newtype_instance(db, program, "NewTypeOfFloat"),
+            Ty::IntNewtypeInstance => newtype_instance(db, program, "NewTypeOfInt"),
+            Ty::StrNewtypeInstance => newtype_instance(db, program, "NewTypeOfStr"),
+            Ty::ComplexNewtypeInstance => newtype_instance(db, program, "NewTypeOfComplex"),
+            Ty::SubNewTypeOfIntInstance => newtype_instance(db, program, "SubNewTypeOfInt"),
+            Ty::SubSubNewTypeOfIntInstance => newtype_instance(db, program, "SubSubNewTypeOfInt"),
+            Ty::SubNewTypeOfFloatInstance => newtype_instance(db, program, "SubNewTypeOfFloat"),
         }
     }
 }
 
 fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationKind>) -> Type<'_> {
+    let program = db.program();
     let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
 
     match materialization {
         Some(materialization_kind) => divergent.materialize(
             db,
+            program,
             materialization_kind,
             &ApplyTypeMappingVisitor::default(),
         ),
@@ -279,10 +292,12 @@ fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationK
     }
 }
 
-fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
+fn newtype_instance<'db>(db: &'db TestDb, program: Program<'db>, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
-    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
+    let Place::Defined(DefinedPlace { ty, .. }) =
+        global_symbol(db, crate::AnalysisFile::new(db, program, file), name).place
+    else {
         panic!(
             "Expected a global symbol for `{name}` in the property test module, but it was not found"
         );
@@ -629,9 +644,9 @@ pub(crate) fn intersection<'db>(
     db: &'db TestDb,
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
-    IntersectionType::from_elements(db, tys)
+    IntersectionType::from_elements(db, db.program(), tys)
 }
 
 pub(crate) fn union<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type<'db> {
-    UnionType::from_elements(db, tys)
+    UnionType::from_elements(db, db.program(), tys)
 }

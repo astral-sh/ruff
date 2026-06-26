@@ -110,6 +110,7 @@ impl<'db> DynamicClassAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -123,7 +124,7 @@ impl<'db> DynamicClassAnchor<'db> {
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
-                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        let base = base.recursive_type_normalized_impl(db, program, div, true);
                         if nested {
                             base
                         } else {
@@ -197,6 +198,7 @@ impl<'db> DynamicClassLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
+            let program = definition.analysis_file(db).program(db);
             let module =
                 parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
                     .load(db);
@@ -214,7 +216,7 @@ impl<'db> DynamicClassLiteral<'db> {
             };
 
             // Use `definition_expression_type` for deferred inference support.
-            extract_fixed_length_iterable_element_types(db, bases_arg, |expr| {
+            extract_fixed_length_iterable_element_types(db, program, bases_arg, |expr| {
                 definition_expression_type(db, definition, expr)
             })
             .unwrap_or_else(|| Box::from([Type::unknown()]))
@@ -275,8 +277,8 @@ impl<'db> DynamicClassLiteral<'db> {
     /// that is a subclass of all other base metaclasses.
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_metaclass(db)
+    pub(crate) fn metaclass(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+        self.try_metaclass(db, program)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
@@ -289,6 +291,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn try_metaclass(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
         let original_bases = self.explicit_bases(db);
 
@@ -296,11 +299,11 @@ impl<'db> DynamicClassLiteral<'db> {
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
         if original_bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return Ok(KnownClass::Type.to_class_literal(db, program));
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
-        if self.try_mro(db).is_err() {
+        if self.try_mro(db, program).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
@@ -309,30 +312,30 @@ impl<'db> DynamicClassLiteral<'db> {
         // returned `Err(InvalidBases)` if any failed, causing us to return early.
         let bases: Vec<ClassBase<'db>> = original_bases
             .iter()
-            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None))
+            .filter_map(|base_type| ClassBase::try_from_type(db, program, *base_type, None))
             .collect();
 
         // If all bases failed to convert, return type as the metaclass.
         if bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return Ok(KnownClass::Type.to_class_literal(db, program));
         }
 
         // Start with the first base's metaclass as the candidate.
-        let mut candidate = bases[0].metaclass(db);
+        let mut candidate = bases[0].metaclass(db, program);
 
         // Track which base the candidate metaclass came from.
         let (mut candidate_base, rest) = bases.split_first().unwrap();
 
         // Reconcile with other bases' metaclasses.
         for base in rest {
-            let base_metaclass = base.metaclass(db);
+            let base_metaclass = base.metaclass(db, program);
 
             // Get the ClassType for comparison.
-            let Some(candidate_class) = candidate.to_class_type(db) else {
+            let Some(candidate_class) = candidate.to_class_type(db, program) else {
                 // If candidate isn't a class type, keep it as is.
                 continue;
             };
-            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
+            let Some(base_metaclass_class) = base_metaclass.to_class_type(db, program) else {
                 continue;
             };
 
@@ -369,18 +372,24 @@ impl<'db> DynamicClassLiteral<'db> {
     /// If the MRO cannot be computed (e.g., due to inconsistent ordering), falls back
     /// to iterating over base MROs sequentially with deduplication.
     pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(db, ClassLiteral::Dynamic(self), None)
+        MroIterator::new(
+            db,
+            ClassLiteral::Dynamic(self).program(db),
+            ClassLiteral::Dynamic(self),
+            None,
+        )
     }
 
     /// Look up an instance member by iterating through the MRO.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, self.iter_mro(db)).instance_member(name) {
+        let program = self.scope(db).analysis_file(db).program(db);
+        match MroLookup::new(db, program, self.iter_mro(db)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
                 KnownClass::TypedDictFallback
-                    .to_instance(db)
-                    .instance_member(db, name)
+                    .to_instance(db, program)
+                    .instance_member(db, program, name)
             }
         }
     }
@@ -396,6 +405,7 @@ impl<'db> DynamicClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let program = self.scope(db).analysis_file(db).program(db);
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
         if matches!(
             CodeGeneratorKind::from_class(db, self.into()),
@@ -405,9 +415,10 @@ impl<'db> DynamicClassLiteral<'db> {
                 // Make this class look like a subclass of the `DataClassInstance` protocol.
                 return Place::declared(KnownClass::Dict.to_specialized_instance(
                     db,
+                    program,
                     &[
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, &[Type::any()]),
+                        KnownClass::Str.to_instance(db, program),
+                        KnownClass::Field.to_specialized_instance(db, program, &[Type::any()]),
                     ],
                 ))
                 .with_qualifiers(TypeQualifiers::CLASS_VAR);
@@ -417,15 +428,15 @@ impl<'db> DynamicClassLiteral<'db> {
             }
         }
 
-        let result = MroLookup::new(db, self.iter_mro(db)).class_member(
+        let result = MroLookup::new(db, program, self.iter_mro(db)).class_member(
             name, policy, None,  // No inherited generic context.
             false, // Dynamic classes are never `object`.
         );
 
         match result {
-            ClassMemberResult::Done(result) => result.finalize(db),
+            ClassMemberResult::Done(result) => result.finalize(db, program),
             ClassMemberResult::TypedDict(module) => {
-                typed_dict_fallback_class_member(db, module, policy, name)
+                typed_dict_fallback_class_member(db, program, module, policy, name)
             }
         }
     }
@@ -459,16 +470,20 @@ impl<'db> DynamicClassLiteral<'db> {
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>, program| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(db),
+                ClassBase::object(db, program),
             ]))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_class(db, self)
+    pub(crate) fn try_mro(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        Mro::of_dynamic_class(db, program, self)
     }
 
     /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
@@ -478,16 +493,22 @@ impl<'db> DynamicClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__slots__": ("a",)})
     /// ```
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    pub(super) fn as_disjoint_base(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> Option<DisjointBase<'db>> {
         // Check if __slots__ is in the members
         for (name, ty) in self.members(db) {
             if name.as_str() == "__slots__" {
                 // Check if the slots are non-empty
                 let is_non_empty = match ty {
                     // __slots__ = ("a", "b")
-                    Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
-                        spec.len().into_fixed_length().is_some_and(|len| len > 0)
-                    }),
+                    Type::NominalInstance(nominal) => {
+                        nominal.tuple_spec(db, program).is_some_and(|spec| {
+                            spec.len().into_fixed_length().is_some_and(|len| len > 0)
+                        })
+                    }
                     // __slots__ = "abc"  # Same as ("abc",)
                     Type::LiteralValue(literal) if literal.is_string() => true,
                     // Other types are considered dynamic/unknown
@@ -537,23 +558,24 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let anchor = self
             .anchor(db)
-            .recursive_type_normalized_impl(db, div, nested)?;
+            .recursive_type_normalized_impl(db, program, div, nested)?;
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(db, program, div, true);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
         let dataclass_params = match self.dataclass_params(db) {
-            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            Some(params) => Some(params.recursive_type_normalized_impl(db, program, div, nested)?),
             None => None,
         };
 

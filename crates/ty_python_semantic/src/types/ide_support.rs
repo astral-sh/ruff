@@ -20,6 +20,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::environment::AnalysisFile;
 use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
 mod unreachable_code;
@@ -60,8 +61,8 @@ pub fn definitions_for_name<'db>(
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let file = model.file();
-    let index = semantic_index(db, file);
+    let analysis_file = model.analysis_file();
+    let index = semantic_index(db, analysis_file);
 
     // Get the scope for this name expression
     let Some(file_scope) = model.scope(node) else {
@@ -92,7 +93,7 @@ pub fn definitions_for_name<'db>(
 
         // If marked as global, skip to global scope
         if is_global {
-            let global_scope_id = global_scope(db, file);
+            let global_scope_id = global_scope(db, analysis_file);
             let global_place_table = ty_python_core::place_table(db, global_scope_id);
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
@@ -149,7 +150,7 @@ pub fn definitions_for_name<'db>(
 
     // If we didn't find any definitions in scopes, fallback to builtins
     if resolved_definitions.is_empty()
-        && let Some(builtins_scope) = builtins_module_scope(db)
+        && let Some(builtins_scope) = builtins_module_scope(db, analysis_file.program(db))
     {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
@@ -174,7 +175,7 @@ pub fn definitions_for_name<'db>(
                 .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
                 .filter_map(|instance| {
-                    let definition = instance.class_literal(db).definition(db)?;
+                    let definition = instance.class_literal(db, model.program()).definition(db)?;
                     Some(ResolvedDefinition::Definition(definition))
                 })
                 .collect();
@@ -239,7 +240,10 @@ pub fn definitions_for_attribute<'db>(
         // Handle modules
         if let Type::ModuleLiteral(module_literal) = ty {
             if let Some(module_file) = module_literal.module(db).file(db) {
-                let module_scope = global_scope(db, module_file);
+                let module_scope = global_scope(
+                    db,
+                    AnalysisFile::new(db, module_literal.program(db), module_file),
+                );
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
                     resolved.extend(resolve_definition(
                         db,
@@ -257,7 +261,7 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
-        let meta_type = ty.to_meta_type(db);
+        let meta_type = ty.to_meta_type(db, model.program());
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
         let lookup_type = match ty {
@@ -267,13 +271,15 @@ pub fn definitions_for_attribute<'db>(
 
         let class_literal = match lookup_type {
             Type::ClassLiteral(class_literal) => class_literal,
-            Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                Some(cls) => match cls.static_class_literal(db) {
-                    Some((lit, _)) => ClassLiteral::Static(lit),
+            Type::SubclassOf(subclass) => {
+                match subclass.subclass_of().into_class(db, model.program()) {
+                    Some(cls) => match cls.static_class_literal(db) {
+                        Some((lit, _)) => ClassLiteral::Static(lit),
+                        None => continue,
+                    },
                     None => continue,
-                },
-                None => continue,
-            },
+                }
+            }
             _ => continue,
         };
 
@@ -291,13 +297,15 @@ pub fn definitions_for_attribute<'db>(
         if resolved.is_empty() && meta_type != lookup_type {
             let class_literal = match meta_type {
                 Type::ClassLiteral(class_literal) => class_literal,
-                Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                    Some(cls) => match cls.static_class_literal(db) {
-                        Some((lit, _)) => ClassLiteral::Static(lit),
+                Type::SubclassOf(subclass) => {
+                    match subclass.subclass_of().into_class(db, model.program()) {
+                        Some(cls) => match cls.static_class_literal(db) {
+                            Some((lit, _)) => ClassLiteral::Static(lit),
+                            None => continue,
+                        },
                         None => continue,
-                    },
-                    None => continue,
-                },
+                    }
+                }
                 _ => continue,
             };
 
@@ -320,7 +328,7 @@ pub fn static_member_type_for_attribute<'db>(
 ) -> Option<Type<'db>> {
     let lhs_ty = attribute.value.inferred_type(model)?;
     lhs_ty
-        .static_member(model.db(), attribute.attr.as_str())
+        .static_member(model.db(), model.program(), attribute.attr.as_str())
         .ignore_possibly_undefined()
 }
 
@@ -361,8 +369,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         }
 
         // Look for instance attributes in method scopes (e.g., self.x = 1)
-        let file = class_scope.file(db);
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, class_scope.analysis_file(db));
 
         for function_scope_id in attribute_scopes(db, class_scope) {
             if let Some(place_id) = index
@@ -450,7 +457,7 @@ pub fn typed_dict_key_hover<'db>(
         .map(|literal| literal.value.to_str())?;
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let owner = value_ty.display(model.db()).to_string();
+    let owner = value_ty.display(model.db(), model.program()).to_string();
     let field = typed_dict.items(model.db()).get(key)?;
     let docstring = field
         .first_declaration()
@@ -484,7 +491,7 @@ pub fn definitions_for_keyword_argument<'db>(
     let mut resolved_definitions = Vec::new();
 
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db)
+        .try_upcast_to_callable(db, model.program())
         .and_then(CallableTypes::exactly_one)
     {
         let signatures = callable_type.signatures(db);
@@ -518,7 +525,7 @@ pub fn definitions_for_imported_symbol<'db>(
     let mut visited = FxHashSet::default();
     resolve_definition::resolve_from_import_definitions(
         model.db(),
-        model.file(),
+        model.analysis_file(),
         import_node,
         symbol_name,
         &mut visited,
@@ -540,7 +547,7 @@ pub fn definitions_and_overloads_for_function<'db>(
     {
         function_type
             .iter_overloads_and_implementation(model.db())
-            .filter_map(|overload| overload.signature(model.db()).definition())
+            .filter_map(|overload| overload.signature(model.db(), model.program()).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
     } else {
@@ -596,13 +603,23 @@ pub struct CallSignatureParameter<'db> {
 }
 
 impl<'db> CallSignatureDetails<'db> {
-    fn from_binding(db: &'db dyn Db, binding: &crate::types::call::Binding<'db>) -> Self {
+    fn from_binding(
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        binding: &crate::types::call::Binding<'db>,
+    ) -> Self {
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
         let specialization = binding.specialization();
         let signature = binding.signature.clone();
-        let display_details = signature.display(db).to_string_parts();
+        let display_details = signature.display(db, program).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =
-            displayed_parameters_for_signature(db, &signature, &display_details, specialization);
+            displayed_parameters_for_signature(
+                db,
+                program,
+                &signature,
+                &display_details,
+                specialization,
+            );
         let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
             .map(|mapping| {
@@ -635,6 +652,7 @@ impl<'db> CallSignatureDetails<'db> {
 /// displayed parameter types.
 fn displayed_parameters_for_signature<'db>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     signature: &Signature<'db>,
     display_details: &crate::types::display::SignatureDisplayDetails,
     specialization: Option<crate::types::generics::Specialization<'db>>,
@@ -642,8 +660,9 @@ fn displayed_parameters_for_signature<'db>(
     // Apply any inferred specialization to displayed parameter types so
     // call-site substitutions are reflected in the rendered signature. For
     // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
-    let apply_specialization =
-        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(db, spec));
+    let apply_specialization = |ty: Type<'db>| {
+        specialization.map_or(ty, |spec| ty.apply_specialization(db, program, spec))
+    };
     let parameters = signature.parameters();
 
     match parameters.kind() {
@@ -741,8 +760,8 @@ pub fn call_signature_details<'db>(
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db)
-        .map(|callables| callables.into_type(db))
+        .try_upcast_to_callable(db, model.program())
+        .map(|callables| callables.into_type(db, model.program()))
     {
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
@@ -753,8 +772,8 @@ pub fn call_signature_details<'db>(
                     .unwrap_or(Type::unknown())
             });
         let mut bindings = callable_type
-            .bindings(db)
-            .match_parameters(db, &call_arguments);
+            .bindings(db, model.program())
+            .match_parameters(db, model.program(), &call_arguments);
 
         // Run type checking to resolve TypeVar bindings from argument types.
         // For example, calling `dict[str, int].get("a")` resolves the `_KT`
@@ -763,6 +782,7 @@ pub fn call_signature_details<'db>(
         let constraints = ConstraintSetBuilder::new();
         let _ = bindings.check_types_impl(
             db,
+            model.program(),
             &constraints,
             &call_arguments,
             TypeContext::default(),
@@ -773,7 +793,7 @@ pub fn call_signature_details<'db>(
         bindings
             .iter_flat()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, binding))
+            .map(|binding| CallSignatureDetails::from_binding(db, model.program(), binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -789,7 +809,7 @@ fn resolve_single_overload<'db>(
     call_expr: &ast::ExprCall,
 ) -> Option<Signature<'db>> {
     let db = model.db();
-    let bindings = callable_type.bindings(db);
+    let bindings = callable_type.bindings(db, model.program());
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -799,8 +819,15 @@ fn resolve_single_overload<'db>(
 
     let constraints = ConstraintSetBuilder::new();
     let mut resolved: Vec<_> = bindings
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .match_parameters(db, model.program(), &args)
+        .check_types(
+            db,
+            model.program(),
+            &constraints,
+            &args,
+            TypeContext::default(),
+            &[],
+        )
         .iter()
         .flat_map(super::call::bind::Bindings::iter_flat)
         .flat_map(|binding| {
@@ -845,10 +872,11 @@ fn full_type_bindings_for_call<'db>(
     let constraints = ConstraintSetBuilder::new();
 
     func_type
-        .bindings(db)
-        .match_parameters(db, &call_arguments)
+        .bindings(db, model.program())
+        .match_parameters(db, model.program(), &call_arguments)
         .check_types(
             db,
+            model.program(),
             &constraints,
             &call_arguments,
             TypeContext::default(),
@@ -914,7 +942,7 @@ pub fn call_argument_forms(
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
     if !func_type
-        .bindings(db)
+        .bindings(db, model.program())
         .iter_flat()
         .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
     {
@@ -986,10 +1014,12 @@ pub fn call_type_simplified_by_overloads(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
 
-    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
+    let callable_type = func_type
+        .try_upcast_to_callable(db, model.program())?
+        .into_type(db, model.program());
 
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = callable_type.bindings(db).single_element()
+    if let Some(binding) = callable_type.bindings(db, model.program()).single_element()
         && binding.overloads().len() < 2
     {
         return None;
@@ -998,7 +1028,7 @@ pub fn call_type_simplified_by_overloads(
     let signature = resolve_single_overload(model, callable_type, call_expr)?;
     Some(
         signature
-            .display_with(db, DisplaySettings::default().multiline())
+            .display_with(db, model.program(), DisplaySettings::default().multiline())
             .to_string(),
     )
 }
@@ -1011,11 +1041,13 @@ pub fn definitions_for_bin_op<'db>(
     let left_ty = binary_op.left.inferred_type(model)?;
     let right_ty = binary_op.right.inferred_type(model)?;
 
-    let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
+    let Ok(bindings) =
+        Type::try_call_bin_op(model.db(), model.program(), left_ty, binary_op.op, right_ty)
+    else {
         return None;
     };
 
-    let callable_type = promote_for_self(model.db(), bindings.callable_type());
+    let callable_type = promote_for_self(model.db(), model.program(), bindings.callable_type());
 
     let definitions: Vec<_> = bindings
         .iter_flat()
@@ -1046,6 +1078,7 @@ pub fn definitions_for_unary_op<'db>(
 
     let bindings = match operand_ty.try_call_dunder(
         model.db(),
+        model.program(),
         unary_dunder_method,
         CallArguments::none(),
         TypeContext::default(),
@@ -1055,6 +1088,7 @@ pub fn definitions_for_unary_op<'db>(
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
             match operand_ty.try_call_dunder(
                 model.db(),
+                model.program(),
                 "__len__",
                 CallArguments::none(),
                 TypeContext::default(),
@@ -1074,7 +1108,7 @@ pub fn definitions_for_unary_op<'db>(
         ) => *bindings,
     };
 
-    let callable_type = promote_for_self(model.db(), bindings.callable_type());
+    let callable_type = promote_for_self(model.db(), model.program(), bindings.callable_type());
 
     let definitions = bindings
         .iter_flat()
@@ -1092,14 +1126,22 @@ pub fn definitions_for_unary_op<'db>(
 /// Promotes types in `self` positions.
 ///
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
-fn promote_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+fn promote_for_self<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    ty: Type<'db>,
+) -> Type<'db> {
     match ty {
         Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
-            self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+            self_ty
+                .literal_fallback_instance(db, program)
+                .unwrap_or(self_ty)
         })),
-        Type::Union(elements) => elements.map(db, |ty| match ty {
+        Type::Union(elements) => elements.map(db, program, |ty| match ty {
             Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
-                self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+                self_ty
+                    .literal_fallback_instance(db, program)
+                    .unwrap_or(self_ty)
             })),
             _ => *ty,
         }),
@@ -1158,7 +1200,9 @@ pub fn resolved_call_signature<'db>(
 ) -> Option<CallSignatureDetails<'db>> {
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
-    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
+    let callable_type = func_type
+        .try_upcast_to_callable(db, model.program())?
+        .into_type(db, model.program());
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -1169,16 +1213,23 @@ pub fn resolved_call_signature<'db>(
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
     let constraints = ConstraintSetBuilder::new();
     let bindings = callable_type
-        .bindings(db)
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .bindings(db, model.program())
+        .match_parameters(db, model.program(), &args)
+        .check_types(
+            db,
+            model.program(),
+            &constraints,
+            &args,
+            TypeContext::default(),
+            &[],
+        )
         .unwrap_or_else(|CallError(_, bindings)| *bindings);
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
         .iter_flat()
         .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
-        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .map(|binding| CallSignatureDetails::from_binding(db, model.program(), binding))
         .collect();
 
     if !type_checked_details.is_empty() {
@@ -1192,7 +1243,7 @@ pub fn resolved_call_signature<'db>(
     let all_details: Vec<_> = bindings
         .iter_flat()
         .flatten()
-        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .map(|binding| CallSignatureDetails::from_binding(db, model.program(), binding))
         .collect();
 
     if all_details.is_empty() {
@@ -1291,6 +1342,8 @@ mod resolve_definition {
     use crate::module_docstring;
     use crate::types::binding_type;
     use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
+    use ty_python_core::environment::AnalysisFile;
+    use ty_python_core::program::Program;
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
@@ -1454,7 +1507,8 @@ mod resolve_definition {
 
         match kind {
             DefinitionKind::Import(import_def) => {
-                let file = definition.file(db);
+                let analysis_file = definition.analysis_file(db);
+                let file = analysis_file.file(db);
                 let module = parsed_module(db, file).load(db);
                 let alias = import_def.alias(&module);
 
@@ -1470,7 +1524,9 @@ mod resolve_definition {
                 };
 
                 // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
+                let Some(resolved_module) =
+                    resolve_module(db, analysis_file.program_file(db), &module_name)
+                else {
                     return Vec::new(); // Module not found, return empty list
                 };
 
@@ -1484,7 +1540,8 @@ mod resolve_definition {
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
-                let file = definition.file(db);
+                let analysis_file = definition.analysis_file(db);
+                let file = analysis_file.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
                 let alias = import_from_def.alias(&module);
@@ -1499,7 +1556,7 @@ mod resolve_definition {
                 // (alias.name), not the local alias (symbol_name)
                 resolve_from_import_definitions(
                     db,
-                    file,
+                    analysis_file,
                     import_node,
                     &alias.name,
                     visited,
@@ -1509,7 +1566,8 @@ mod resolve_definition {
 
             // For star imports, try to resolve to the specific symbol being accessed
             DefinitionKind::StarImport(star_import_def) => {
-                let file = definition.file(db);
+                let analysis_file = definition.analysis_file(db);
+                let file = analysis_file.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = star_import_def.import(&module);
 
@@ -1517,7 +1575,7 @@ mod resolve_definition {
                 if let Some(symbol_name) = symbol_name {
                     resolve_from_import_definitions(
                         db,
-                        file,
+                        analysis_file,
                         import_node,
                         symbol_name,
                         visited,
@@ -1537,12 +1595,13 @@ mod resolve_definition {
     /// Helper function to resolve import definitions for `ImportFrom` and `StarImport` cases.
     pub(crate) fn resolve_from_import_definitions<'db>(
         db: &'db dyn Db,
-        file: File,
+        analysis_file: AnalysisFile<'db>,
         import_node: &ast::StmtImportFrom,
         symbol_name: &str,
         visited: &mut FxHashSet<Definition<'db>>,
         alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
+        let file = analysis_file.file(db);
         if alias_resolution == ImportAliasResolution::PreserveAliases {
             for alias in &import_node.names {
                 if let Some(asname) = &alias.asname {
@@ -1557,11 +1616,14 @@ mod resolve_definition {
         }
 
         // Resolve the module being imported from (handles both relative and absolute imports)
-        let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
+        let Some(module_name) =
+            ModuleName::from_import_statement(db, analysis_file.program_file(db), import_node).ok()
         else {
             return Vec::new();
         };
-        let Some(resolved_module) = resolve_module(db, file, &module_name) else {
+        let Some(resolved_module) =
+            resolve_module(db, analysis_file.program_file(db), &module_name)
+        else {
             return Vec::new();
         };
 
@@ -1572,14 +1634,17 @@ mod resolve_definition {
             // No file means this is a namespace package, try to import the submodule
             return Vec::from_iter(resolve_from_import_submodule_definitions(
                 db,
-                file,
+                analysis_file,
                 symbol_name,
                 module_name,
             ));
         };
 
         // Find the definition of this symbol in the imported module's global scope
-        let global_scope = global_scope(db, module_file);
+        let global_scope = global_scope(
+            db,
+            AnalysisFile::new(db, analysis_file.program(db), module_file),
+        );
         let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
 
         // Recursively resolve any import definitions found in the target module
@@ -1599,7 +1664,7 @@ mod resolve_definition {
             // `child` has no binding in `pkg/__init__.py`.
             Vec::from_iter(resolve_from_import_submodule_definitions(
                 db,
-                file,
+                analysis_file,
                 symbol_name,
                 module_name,
             ))
@@ -1611,14 +1676,14 @@ mod resolve_definition {
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
     fn resolve_from_import_submodule_definitions<'db>(
         db: &'db dyn Db,
-        file: File,
+        analysis_file: AnalysisFile<'db>,
         symbol_name: &str,
         module_name: ModuleName,
     ) -> Option<ResolvedDefinition<'db>> {
         let submodule_name = ModuleName::new(symbol_name)?;
         let mut full_submodule_name = module_name;
         full_submodule_name.extend(&submodule_name);
-        let module = resolve_module(db, file, &full_submodule_name)?;
+        let module = resolve_module(db, analysis_file.program_file(db), &full_submodule_name)?;
         let file = module.file(db)?;
 
         Some(ResolvedDefinition::Module(file))
@@ -1661,6 +1726,7 @@ mod resolve_definition {
     #[tracing::instrument(skip_all)]
     pub fn map_stub_definition<'db>(
         db: &'db dyn Db,
+        program: Program<'db>,
         def: &ResolvedDefinition<'db>,
         cached_vendored_typeshed: Option<&SystemPath>,
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
@@ -1697,7 +1763,7 @@ mod resolve_definition {
         }
 
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
-        let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
+        let stub_module = file_to_module(db, program.file(db, stub_file_for_module_lookup))?;
         trace!("Found stub module: {}", stub_module.name(db));
         // We need to pass an importing file to `resolve_real_module` which is a bit odd
         // here because there isn't really an importing file. However this `resolve_real_module`
@@ -1708,11 +1774,14 @@ mod resolve_definition {
         // into the interpreter. In which case, all we have are stubs.
         // `resolve_real_module` will always return `None` for this case, but
         // it will emit false positive logs. And this saves us some work.
-        if is_builtin_module(db.python_version().minor, stub_module.name(db)) {
+        if is_builtin_module(program.python_version(db).minor, stub_module.name(db)) {
             return None;
         }
-        let real_module =
-            resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
+        let real_module = resolve_real_module(
+            db,
+            program.file(db, stub_file_for_module_lookup),
+            stub_module.name(db),
+        )?;
         trace!("Found real module: {}", real_module.name(db));
         let real_file = real_module.file(db)?;
         trace!("Found real file: {}", real_file.path(db));
@@ -1747,7 +1816,7 @@ mod resolve_definition {
                 path.push(leaf);
 
                 // Get the ancestors of the path (all the definitions we're nested under)
-                let index = semantic_index(db, stub_file);
+                let index = semantic_index(db, AnalysisFile::new(db, program, stub_file));
                 for (_scope_id, scope) in index.ancestor_scopes(definition.file_scope(db)) {
                     let node = scope.node();
                     let component = definition_path_component_for_node(&stub_ref, node)
@@ -1779,11 +1848,12 @@ mod resolve_definition {
 
         // Walk down the Definition Path in the real file
         let mut definitions = Vec::new();
-        let index = semantic_index(db, real_file);
+        let real_analysis_file = AnalysisFile::new(db, program, real_file);
+        let index = semantic_index(db, real_analysis_file);
         let real_parsed = parsed_module(db, real_file);
         let real_ref = real_parsed.load(db);
         // Start our search in the module (global) scope
-        let mut scopes = vec![global_scope(db, real_file)];
+        let mut scopes = vec![global_scope(db, real_analysis_file)];
         while let Some(component) = path.pop() {
             trace!("Traversing definition path component: {}", component);
             // We're doing essentially a breadth-first traversal of the definitions.
@@ -1814,12 +1884,7 @@ mod resolve_definition {
                             definition_path_component_for_node(&real_ref, scope_node)
                         {
                             if real_component == component {
-                                scopes.push(child_scope_id.to_scope_id(
-                                    db,
-                                    ty_python_core::environment::AnalysisFile::from_default(
-                                        db, real_file,
-                                    ),
-                                ));
+                                scopes.push(child_scope_id.to_scope_id(db, real_analysis_file));
                             }
                         }
                         scope.node(db);
@@ -1934,8 +1999,12 @@ pub struct TypeHierarchyClass {
 /// This is meant to be used to "prepare" for a subtype or supertype request.
 /// That is, this effectively validates whether the given type can be used in
 /// subsequent requests for supertypes or subtypes.
-pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchyClass> {
-    let class_literal = extract_class_literal(db, ty)?;
+pub fn type_hierarchy_prepare(
+    db: &dyn Db,
+    program: crate::Program<'_>,
+    ty: Type<'_>,
+) -> Option<TypeHierarchyClass> {
+    let class_literal = extract_class_literal(db, program, ty)?;
     Some(class_literal_to_hierarchy_info(db, class_literal))
 }
 
@@ -1945,8 +2014,12 @@ pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchy
 /// returns an empty sequence.
 ///
 /// This includes `object` when the given class has no direct base classes.
-pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
-    let Some(class_literal) = extract_class_literal(db, ty) else {
+pub fn type_hierarchy_supertypes<'db>(
+    db: &'db dyn Db,
+    program: ty_python_core::program::Program<'db>,
+    ty: Type<'db>,
+) -> Vec<TypeHierarchyClass> {
+    let Some(class_literal) = extract_class_literal(db, program, ty) else {
         return vec![];
     };
     if class_literal.is_known(db, KnownClass::Object) {
@@ -1954,9 +2027,9 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
     }
 
     let mut supertypes: Vec<TypeHierarchyClass> = class_literal
-        .explicit_bases(db)
+        .explicit_bases(db, program)
         .into_iter()
-        .filter_map(|base| extract_class_literal(db, base))
+        .filter_map(|base| extract_class_literal(db, program, base))
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
         .collect();
     // Every class implicitly inherits from `object` when no explicit
@@ -1964,7 +2037,10 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
     if supertypes.is_empty() {
         supertypes.push(class_literal_to_hierarchy_info(
             db,
-            ClassLiteral::object(db),
+            KnownClass::Object
+                .to_class_literal(db, program)
+                .as_class_literal()
+                .expect("`object` should always be a non-generic class in typeshed"),
         ));
     }
     supertypes
@@ -1978,8 +2054,12 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
 /// Note that this scans all modules in `db` to find classes that directly
 /// inherit from the given class. This could be quite expensive in large
 /// projects.
-pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
-    let Some(target_class) = extract_class_literal(db, ty) else {
+pub fn type_hierarchy_subtypes<'db>(
+    db: &'db dyn Db,
+    program: ty_python_core::program::Program<'db>,
+    ty: Type<'db>,
+) -> Vec<TypeHierarchyClass> {
+    let Some(target_class) = extract_class_literal(db, program, ty) else {
         return vec![];
     };
     let target_name = target_class.name(db);
@@ -1987,7 +2067,7 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
     let mut subtypes = vec![];
 
     // Scan all modules in the workspace
-    for module in ty_module_resolver::all_modules(db) {
+    for module in ty_module_resolver::all_modules(db, program.resolver(db)) {
         let Some(file) = module.file(db) else {
             continue;
         };
@@ -2012,7 +2092,7 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
             continue;
         }
 
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, AnalysisFile::new(db, program, file));
         for scope_id in index.scope_ids() {
             let scope = scope_id.node(db);
             let Some(class_node) = scope.as_class() else {
@@ -2031,11 +2111,11 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
             }
 
             let ty = crate::types::binding_type(db, def);
-            let Some(class_ty) = extract_class_literal(db, ty) else {
+            let Some(class_ty) = extract_class_literal(db, program, ty) else {
                 continue;
             };
 
-            let bases = class_ty.explicit_bases(db);
+            let bases = class_ty.explicit_bases(db, program);
             let is_subtype = if target_is_object
                 && bases.is_empty()
                 && !class_ty.is_known(db, KnownClass::Object)
@@ -2043,7 +2123,7 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
                 true
             } else {
                 bases.iter().any(|base| {
-                    extract_class_literal(db, *base)
+                    extract_class_literal(db, program, *base)
                         .is_some_and(|base_literal| base_literal == target_class)
                 })
             };
@@ -2056,7 +2136,11 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
 }
 
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
-fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
+fn extract_class_literal<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class_literal) => Some(class_literal),
         Type::SubclassOf(subclass_of) => {
@@ -2070,11 +2154,11 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
             }
         }
         Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
-        Type::NominalInstance(instance) => Some(instance.class(db).class_literal(db)),
+        Type::NominalInstance(instance) => Some(instance.class(db, program).class_literal(db)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .find_map(|elem| extract_class_literal(db, *elem)),
+            .find_map(|elem| extract_class_literal(db, program, *elem)),
 
         _ => None,
     }
@@ -2173,6 +2257,7 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
         let params = signature
             .display_with(
                 db,
+                model.program(),
                 DisplaySettings::default()
                     .multiline()
                     .disallow_signature_name()
@@ -2182,8 +2267,10 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
         format!("class {class_name}{params}")
     };
-    let callable_type = function_ty.try_upcast_to_callable(db)?.into_type(db);
-    let bindings = callable_type.bindings(db);
+    let callable_type = function_ty
+        .try_upcast_to_callable(db, model.program())?
+        .into_type(db, model.program());
+    let bindings = callable_type.bindings(db, model.program());
 
     if let Some(binding) = bindings.single_element()
         && binding.overloads().len() == 1
@@ -2214,10 +2301,14 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 #[cfg(test)]
 mod tests {
     use super::{CallArgumentForm, call_argument_forms};
-    use crate::SemanticModel;
-    use crate::db::tests::TestDbBuilder;
-    use ruff_db::files::system_path_to_file;
+    use crate::db::tests::{TestDb, TestDbBuilder};
+    use crate::{AnalysisFile, SemanticModel};
+    use ruff_db::files::{File, system_path_to_file};
     use ruff_db::parsed::parsed_module;
+
+    fn semantic_model(db: &TestDb, file: File) -> SemanticModel<'_> {
+        SemanticModel::new(db, AnalysisFile::new(db, db.program(), file))
+    }
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
@@ -2243,7 +2334,7 @@ cast(val="", typ=int)
             .value
             .as_call_expr()
             .unwrap();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(
             call_argument_forms(&model, call),
@@ -2283,7 +2374,7 @@ f(y="", x=1)
             .value
             .as_call_expr()
             .unwrap();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(
             call_argument_forms(&model, call),
@@ -2319,7 +2410,7 @@ f(val="", typ=int)
             .value
             .as_call_expr()
             .unwrap();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(
             call_argument_forms(&model, call),
@@ -2356,7 +2447,7 @@ f("", int)
             .value
             .as_call_expr()
             .unwrap();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(
             call_argument_forms(&model, call),
@@ -2396,7 +2487,7 @@ f(int, x)
             .value
             .as_call_expr()
             .unwrap();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(
             call_argument_forms(&model, call),
@@ -2436,7 +2527,7 @@ TypeAliasType("Alias", int)
             .iter()
             .filter_map(|stmt| stmt.as_expr_stmt()?.value.as_call_expr())
             .collect();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(calls.len(), 4);
         assert_eq!(
@@ -2485,7 +2576,7 @@ cast(*args)
             .value
             .as_call_expr()
             .unwrap();
-        let model = SemanticModel::new(&db, file);
+        let model = semantic_model(&db, file);
 
         assert_eq!(
             call_argument_forms(&model, call),

@@ -51,7 +51,12 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         };
 
-        let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
+        let inlay_hints = inlay_hints(
+            db,
+            crate::server::api::analysis_file(db, file),
+            range,
+            workspace_settings.inlay_hints(),
+        );
 
         let inlay_hints: Vec<lsp_types::InlayHint> = inlay_hints
             .into_iter()

@@ -3,14 +3,15 @@
 //! This is used in the "corpus" and (indirectly) the "mdtest" integration tests for this crate.
 //! (Mdtest uses the `pull_types` function via the `ty_test` crate.)
 
-use crate::{Db, HasType, SemanticModel};
-use ruff_db::{files::File, parsed::parsed_module};
+use crate::{AnalysisFile, Db, HasType, SemanticModel};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
     self as ast, visitor::source_order, visitor::source_order::SourceOrderVisitor,
 };
 
-pub fn pull_types(db: &dyn Db, file: File) {
-    let mut visitor = PullTypesVisitor::new(db, file);
+pub fn pull_types(db: &dyn Db, analysis_file: AnalysisFile<'_>) {
+    let file = analysis_file.file(db);
+    let mut visitor = PullTypesVisitor::new(db, analysis_file);
 
     let ast = parsed_module(db, file).load(db);
 
@@ -22,7 +23,7 @@ struct PullTypesVisitor<'db> {
 }
 
 impl<'db> PullTypesVisitor<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: AnalysisFile<'db>) -> Self {
         Self {
             model: SemanticModel::new(db, file),
         }

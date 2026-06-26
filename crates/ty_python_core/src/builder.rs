@@ -2907,11 +2907,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if self.file.is_package(self.db)
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
-                        self.file,
+                        self.analysis_file.program_file(self.db),
                         node.module.as_deref(),
                         node.level,
                     )
-                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                    && let Ok(thispackage) = ModuleName::package_for_file(
+                        self.db,
+                        self.analysis_file.program_file(self.db),
+                    )
                 {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
@@ -2984,13 +2987,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let Ok(module_name) =
-                            ModuleName::from_import_statement(self.db, self.file, node)
-                        else {
+                        let Ok(module_name) = ModuleName::from_import_statement(
+                            self.db,
+                            self.analysis_file.program_file(self.db),
+                            node,
+                        ) else {
                             continue;
                         };
 
-                        let Some(module) = ty_module_resolver::resolve_module_in_program(
+                        let Some(module) = ty_module_resolver::resolve_module(
                             self.db,
                             self.analysis_file.program_file(self.db),
                             &module_name,
@@ -3018,7 +3023,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         let referenced_analysis_file = AnalysisFile::new(
                             self.db,
-                            self.analysis_file.environment(self.db),
+                            self.analysis_file.program(self.db),
                             referenced_module,
                         );
                         for export in exported_names(self.db, referenced_analysis_file) {

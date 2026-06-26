@@ -16,6 +16,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{ModuleName, resolve_module};
 use ty_project::Db;
+use ty_python_core::environment::AnalysisFile;
 
 use crate::completion::CompletionKind;
 
@@ -388,11 +389,12 @@ impl SymbolKind {
 /// The flattened list includes parent/child information and can be
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
+pub(crate) fn symbols_for_file(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> FlatSymbols {
+    let file = analysis_file.file(db);
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::tree(db, file);
+    let mut visitor = SymbolVisitor::tree(db, analysis_file);
     visitor.visit_body(&module.syntax().body);
     visitor.into_flat_symbols()
 }
@@ -407,11 +409,15 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
     cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbols {
+pub(crate) fn symbols_for_file_global_only(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+) -> FlatSymbols {
+    let file = analysis_file.file(db);
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::globals(db, file);
+    let mut visitor = SymbolVisitor::globals(db, analysis_file);
     visitor.visit_body(&module.syntax().body);
 
     if file
@@ -450,11 +456,12 @@ impl ImportedFrom {
 
     fn import_from(
         db: &dyn Db,
-        importing_file: File,
+        importing_file: AnalysisFile<'_>,
         ast: &ast::StmtImportFrom,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
-        let module_name = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
+        let module_name =
+            ModuleName::from_import_statement(db, importing_file.program_file(db), ast).ok()?;
         Some(ImportedFrom { module_name, kind })
     }
 
@@ -591,7 +598,7 @@ impl<'db> Imports<'db> {
     fn get_module_symbols(
         &self,
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: AnalysisFile<'db>,
         name: &Name,
     ) -> Option<&'db FlatSymbols> {
         let module_name = match self.module_names.get(name.as_str())? {
@@ -599,8 +606,11 @@ impl<'db> Imports<'db> {
                 name.to_module_name(db, importing_file)?
             }
         };
-        let module = resolve_module(db, importing_file, &module_name)?;
-        Some(symbols_for_file_global_only(db, module.file(db)?))
+        let module = resolve_module(db, importing_file.program_file(db), &module_name)?;
+        Some(symbols_for_file_global_only(
+            db,
+            AnalysisFile::new(db, importing_file.program(db), module.file(db)?),
+        ))
     }
 }
 
@@ -649,12 +659,17 @@ enum ImportModuleName<'db> {
 impl<'db> ImportModuleName<'db> {
     /// Converts the lazy representation of a module name into an
     /// actual `ModuleName` that can be used for module resolution.
-    fn to_module_name(self, db: &'db dyn Db, importing_file: File) -> Option<ModuleName> {
+    fn to_module_name(
+        self,
+        db: &'db dyn Db,
+        importing_file: AnalysisFile<'db>,
+    ) -> Option<ModuleName> {
         match self {
             ImportModuleName::Import(name) => ModuleName::new(name),
             ImportModuleName::ImportFrom { parent, child } => {
                 let mut module_name =
-                    ModuleName::from_import_statement(db, importing_file, parent).ok()?;
+                    ModuleName::from_import_statement(db, importing_file.program_file(db), parent)
+                        .ok()?;
                 let child_module_name = ModuleName::new(child)?;
                 module_name.extend(&child_module_name);
                 Some(module_name)
@@ -685,6 +700,7 @@ impl Ranged for AstImport<'_> {
 #[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
+    analysis_file: AnalysisFile<'db>,
     file: File,
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
@@ -719,10 +735,11 @@ struct SymbolVisitor<'db> {
 }
 
 impl<'db> SymbolVisitor<'db> {
-    fn tree(db: &'db dyn Db, file: File) -> Self {
+    fn tree(db: &'db dyn Db, analysis_file: AnalysisFile<'db>) -> Self {
         Self {
             db,
-            file,
+            analysis_file,
+            file: analysis_file.file(db),
             symbols: IndexVec::new(),
             symbol_stack: vec![],
             in_function: false,
@@ -735,10 +752,10 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn globals(db: &'db dyn Db, file: File) -> Self {
+    fn globals(db: &'db dyn Db, analysis_file: AnalysisFile<'db>) -> Self {
         Self {
             exports_only: true,
-            ..Self::tree(db, file)
+            ..Self::tree(db, analysis_file)
         }
     }
 
@@ -883,7 +900,7 @@ impl<'db> SymbolVisitor<'db> {
         let Some(imported_from) = (match import {
             AstImport::Import(_) => ImportedFrom::import(alias, import_kind),
             AstImport::ImportFrom(ast) => {
-                ImportedFrom::import_from(self.db, self.file, ast, import_kind)
+                ImportedFrom::import_from(self.db, self.analysis_file, ast, import_kind)
             }
         }) else {
             tracing::debug!(
@@ -974,10 +991,11 @@ impl<'db> SymbolVisitor<'db> {
                     return false;
                 }
                 let possible_module_name = Name::new(rest.join("."));
-                let Some(symbols) =
-                    self.imports
-                        .get_module_symbols(self.db, self.file, &possible_module_name)
-                else {
+                let Some(symbols) = self.imports.get_module_symbols(
+                    self.db,
+                    self.analysis_file,
+                    &possible_module_name,
+                ) else {
                     return false;
                 };
                 let Some(ref all) = symbols.all_names else {
@@ -1061,7 +1079,7 @@ impl<'db> SymbolVisitor<'db> {
                 }
                 let Some(imported_from) = ImportedFrom::import_from(
                     self.db,
-                    self.file,
+                    self.analysis_file,
                     import_from,
                     ImportKind::Wildcard,
                 ) else {
@@ -1106,10 +1124,25 @@ impl<'db> SymbolVisitor<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FlatSymbols> {
-        let module_name =
-            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, self.file, &module_name)?;
-        Some(symbols_for_file_global_only(self.db, module.file(self.db)?))
+        let module_name = ModuleName::from_import_statement(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            import_from,
+        )
+        .ok()?;
+        let module = resolve_module(
+            self.db,
+            self.analysis_file.program_file(self.db),
+            &module_name,
+        )?;
+        Some(symbols_for_file_global_only(
+            self.db,
+            AnalysisFile::new(
+                self.db,
+                self.analysis_file.program(self.db),
+                module.file(self.db)?,
+            ),
+        ))
     }
 
     /// Add valid names from `__all__` to the set of existing `__all__`
@@ -1490,7 +1523,8 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
-    use ty_project::{ProjectMetadata, TestDb};
+    use ty_project::{Db as _, ProjectMetadata, TestDb};
+    use ty_python_core::environment::AnalysisFile;
 
     use super::symbols_for_file_global_only;
 
@@ -2934,7 +2968,10 @@ class C: ...
         /// The path given must have been written to this test's salsa DB.
         fn exported_symbols_for(&self, path: impl AsRef<SystemPath>) -> &super::FlatSymbols {
             let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
-            symbols_for_file_global_only(&self.db, file)
+            symbols_for_file_global_only(
+                &self.db,
+                AnalysisFile::new(&self.db, self.db.project().program(&self.db), file),
+            )
         }
 
         /// Returns the exports from the module at the given path.

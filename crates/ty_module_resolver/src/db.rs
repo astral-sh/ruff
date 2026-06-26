@@ -1,12 +1,7 @@
 use ruff_db::Db as SourceDb;
 
-use crate::resolve::SearchPaths;
-
 #[salsa::db]
-pub trait Db: SourceDb {
-    /// Returns the search paths for module resolution.
-    fn search_paths(&self) -> &SearchPaths;
-}
+pub trait Db: SourceDb {}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -68,11 +63,11 @@ pub(crate) mod tests {
 
         pub(crate) fn set_search_paths(&mut self, search_paths: SearchPaths) {
             search_paths.try_register_static_roots(self);
-            self.search_paths = Arc::new(search_paths.clone());
-            if let Some(program) = crate::program::ResolverProgram::try_get(self) {
-                let python_version = self.python_version;
-                program.update(self, python_version, search_paths);
-            }
+            self.search_paths = Arc::new(search_paths);
+        }
+
+        pub(crate) fn search_paths(&self) -> &SearchPaths {
+            &self.search_paths
         }
 
         /// Takes the salsa events.
@@ -117,11 +112,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            &self.search_paths
-        }
-    }
+    impl Db for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}

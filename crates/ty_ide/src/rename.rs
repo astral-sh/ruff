@@ -3,13 +3,19 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::environment::AnalysisFile;
 use ty_python_semantic::SemanticModel;
 
 /// Returns the range of the symbol if it can be renamed, None if not.
-pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text_size::TextRange> {
+pub fn can_rename(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+    offset: TextSize,
+) -> Option<ruff_text_size::TextRange> {
+    let file = analysis_file.file(db);
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
 
     // Get the definitions for the symbol at the offset
     let goto_target = find_goto_target(&model, &module, offset)?;
@@ -50,13 +56,14 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 /// Returns all locations that need to be updated with the new name.
 pub fn rename(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     offset: TextSize,
     new_name: &str,
 ) -> Option<Vec<ReferenceTarget>> {
+    let file = analysis_file.file(db);
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
 
     // Get the definitions for the symbol at the offset
     let goto_target = find_goto_target(&model, &module, offset)?;
@@ -80,7 +87,7 @@ pub fn rename(
     };
 
     // Find all references that need to be renamed
-    references(db, file, &goto_target, rename_mode)
+    references(db, analysis_file, &goto_target, rename_mode)
 }
 
 /// Helper function to check if a file is included in the project.
@@ -100,7 +107,7 @@ mod tests {
     impl CursorTest {
         fn prepare_rename(&self) -> String {
             let Some(range) = salsa::attach(&self.db, || {
-                can_rename(&self.db, self.cursor.file, self.cursor.offset)
+                can_rename(&self.db, self.cursor_analysis_file(), self.cursor.offset)
             }) else {
                 return "Cannot rename".to_string();
             };
@@ -110,9 +117,14 @@ mod tests {
 
         fn rename(&self, new_name: &str) -> String {
             let rename_results = salsa::attach(&self.db, || {
-                can_rename(&self.db, self.cursor.file, self.cursor.offset)?;
+                can_rename(&self.db, self.cursor_analysis_file(), self.cursor.offset)?;
 
-                rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
+                rename(
+                    &self.db,
+                    self.cursor_analysis_file(),
+                    self.cursor.offset,
+                    new_name,
+                )
             });
 
             let Some(rename_results) = rename_results else {

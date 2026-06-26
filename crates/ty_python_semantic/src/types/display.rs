@@ -15,7 +15,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::parsed::parsed_module;
-use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
@@ -207,7 +206,11 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
+    pub fn from_possibly_ambiguous_types<I, T>(
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        types: I,
+    ) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -228,7 +231,7 @@ impl<'db> DisplaySettings<'db> {
         let collector = AmbiguousNameCollector::default();
 
         for ty in types {
-            collector.visit_type(db, ty.into());
+            collector.visit_type(db, program, ty.into());
         }
 
         build_display_settings(&collector)
@@ -567,7 +570,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
         false
     }
 
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+    fn visit_type(&self, db: &'db dyn Db, program: crate::Program<'db>, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
             Type::LiteralValue(literal) => {
@@ -585,7 +588,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::FromClass(class),
                 ..
-            }) => return self.visit_type(db, Type::from(class)),
+            }) => return self.visit_type(db, program, Type::from(class)),
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
@@ -596,23 +599,30 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
                 // If we have already seen this type, we can skip it.
                 return;
             }
-            visitor::walk_non_atomic_type(db, t, self);
+            visitor::walk_non_atomic_type(db, program, t, self);
         }
     }
 }
 
 impl<'db> Type<'db> {
-    pub fn display(self, db: &'db dyn Db) -> DisplayType<'db> {
+    pub fn display(self, db: &'db dyn Db, program: crate::Program<'db>) -> DisplayType<'db> {
         DisplayType {
             ty: self,
-            settings: DisplaySettings::from_possibly_ambiguous_types(db, [self]),
+            program,
+            settings: DisplaySettings::from_possibly_ambiguous_types(db, program, [self]),
             db,
         }
     }
 
-    pub fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> DisplayType<'db> {
+    pub fn display_with(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        settings: DisplaySettings<'db>,
+    ) -> DisplayType<'db> {
         DisplayType {
             ty: self,
+            program,
             db,
             settings,
         }
@@ -621,10 +631,12 @@ impl<'db> Type<'db> {
     fn representation(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayRepresentation<'db> {
         DisplayRepresentation {
             db,
+            program,
             ty: self,
             settings,
         }
@@ -634,6 +646,7 @@ impl<'db> Type<'db> {
 pub struct DisplayType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -651,7 +664,9 @@ impl<'db> DisplayType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let representation = self.ty.representation(self.db, self.settings.clone());
+        let representation = self
+            .ty
+            .representation(self.db, self.program, self.settings.clone());
         match self.ty.as_literal_value_kind() {
             Some(
                 LiteralValueTypeKind::Int(_)
@@ -715,11 +730,11 @@ fn fmt_file_location<'db>(
 /// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
 pub(super) fn qualified_name_components_from_scope(
     db: &dyn Db,
-    file: ruff_db::files::File,
+    file: ty_python_core::environment::AnalysisFile<'_>,
     file_scope_id: FileScopeId,
     skip_count: usize,
 ) -> Vec<String> {
-    let module_ast = parsed_module(db, file).load(db);
+    let module_ast = parsed_module(db, file.file(db)).load(db);
     let index = semantic_index(db, file);
 
     let mut name_parts = vec![];
@@ -745,7 +760,7 @@ pub(super) fn qualified_name_components_from_scope(
         }
     }
 
-    if let Some(module) = file_to_module(db, file) {
+    if let Some(module) = ty_module_resolver::file_to_module(db, file.program_file(db)) {
         let module_name = module.name(db);
         name_parts.push(module_name.as_str().to_string());
     }
@@ -811,14 +826,20 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Returns a source-style display of this type alias's declaration.
-    pub fn display_declaration(self, db: &'db dyn Db) -> impl Display + 'db {
+    pub fn display_declaration(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> impl Display + 'db {
         let value_ty = self.raw_value_type(db);
         DisplayTypeAliasDeclaration {
             db,
+            program,
             type_alias: self,
             value_ty,
             settings: DisplaySettings::from_possibly_ambiguous_types(
                 db,
+                program,
                 [Type::TypeAlias(self), value_ty],
             ),
         }
@@ -868,6 +889,7 @@ impl Display for TypeAliasDisplay<'_> {
 /// A source-style display of a type alias declaration.
 struct DisplayTypeAliasDeclaration<'db> {
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     type_alias: TypeAliasType<'db>,
     value_ty: Type<'db>,
     settings: DisplaySettings<'db>,
@@ -875,6 +897,7 @@ struct DisplayTypeAliasDeclaration<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         let generic_context = self.type_alias.generic_context(self.db);
         let settings = self
             .settings
@@ -891,7 +914,7 @@ impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
         }
         f.write_str(" = ")?;
         self.value_ty
-            .display_with(self.db, settings)
+            .display_with(self.db, program, settings)
             .fmt_detailed(f)
     }
 }
@@ -905,6 +928,7 @@ impl Display for DisplayTypeAliasDeclaration<'_> {
 /// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
 fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     guard: T,
     settings: &DisplaySettings<'db>,
     f: &mut TypeWriter<'_, '_, 'db>,
@@ -914,7 +938,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
     f.write_char('[')?;
     guard
         .type_argument(db)
-        .display_with(db, settings.singleline())
+        .display_with(db, program, settings.singleline())
         .fmt_detailed(f)?;
     if let Some(name) = guard.place_name(db) {
         f.set_invalid_type_annotation();
@@ -930,6 +954,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
 struct DisplayRepresentation<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -949,6 +974,7 @@ impl Display for DisplayRepresentation<'_> {
 
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         match self.ty {
             Type::Dynamic(dynamic) => {
                 if dynamic.is_todo() {
@@ -959,7 +985,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
-                let class = instance.class(self.db);
+                let class = instance.class(self.db, program);
 
                 match (class, class.known(self.db)) {
                     (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
@@ -968,12 +994,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .specialization(self.db)
                         .tuple(self.db)
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
-                        .display_with(self.db, self.settings.clone())
+                        .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f),
                     (ClassType::NonGeneric(class), _) => {
                         class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::Generic(alias), _) => alias.display_with(self.db, program, self.settings.clone()).fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
@@ -982,7 +1008,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                     ClassType::Generic(alias) => alias
-                        .display_with(self.db, self.settings.clone())
+                        .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f),
                 },
                 Protocol::Synthesized(synthetic) => {
@@ -1010,7 +1036,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::ModuleType.to_class_literal(self.db))
+                f.with_type(KnownClass::ModuleType.to_class_literal(self.db, program))
                     .write_str("module")?;
                 f.write_str(" '")?;
                 f.with_type(self.ty)
@@ -1031,13 +1057,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
-                    .display_with(self.db, self.settings.clone())
+                    .display_with(self.db, program, self.settings.clone())
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db, program))
                         .write_str("type")?;
                     f.write_char('[')?;
                     class
@@ -1046,16 +1072,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db, program))
                         .write_str("type")?;
                     f.write_char('[')?;
                     alias
-                        .display_with(self.db, self.settings.clone())
+                        .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db, program))
                         .write_str("type")?;
                     f.write_char('[')?;
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
@@ -1063,7 +1089,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     f.set_invalid_type_annotation();
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db, program))
                         .write_str("type")?;
                     f.write_char('[')?;
                     write!(
@@ -1081,22 +1107,23 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "<special-form '{special_form}'>")
             }
             Type::KnownInstance(known_instance) => known_instance
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
             Type::FunctionLiteral(function) => function
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
             Type::Callable(callable) => callable
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
-                let bound_signatures = bound_method.bound_signatures(self.db);
+                let bound_signatures = bound_method.bound_signatures(self.db, program);
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
-                        let hide_unused_self = signature.should_hide_self_from_display(self.db);
+                        let hide_unused_self =
+                            signature.should_hide_self_from_display(self.db, program);
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: signature.generic_context.as_ref(),
                             db: self.db,
@@ -1108,6 +1135,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         DisplayMaybeParenthesizedType {
                             ty: self_ty,
                             db: self.db,
+                            program,
                             settings: self.settings.singleline(),
                         }
                         .fmt_detailed(f)?;
@@ -1115,7 +1143,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
                         signature
-                            .display_with(self.db, self.settings.disallow_signature_name())
+                            .display_with(self.db, program, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
                     signatures => {
@@ -1129,7 +1157,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
                         for signature in signatures {
-                            join.entry(&signature.display_with(self.db, self.settings.clone()));
+                            join.entry(&signature.display_with(
+                                self.db,
+                                program,
+                                self.settings.clone(),
+                            ));
                         }
                         join.finish()?;
                         if !self.settings.multiline {
@@ -1219,13 +1251,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 };
 
-                let class_ty = cls.to_class_literal(self.db);
+                let class_ty = cls.to_class_literal(self.db, program);
                 f.write_char('<')?;
-                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
+                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db, program))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
                 if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
-                    class_ty.member(self.db, member_name).place
+                    class_ty.member(self.db, program, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;
                 } else {
@@ -1258,12 +1290,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 };
                 f.write_char('<')?;
-                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db))
+                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db, program))
                     .write_str("wrapper-descriptor")?;
                 f.write_str(" '")?;
                 f.write_str(method)?;
                 f.write_str("' of '")?;
-                f.with_type(cls.to_class_literal(self.db))
+                f.with_type(cls.to_class_literal(self.db, program))
                     .write_str(object)?;
                 f.write_str("' objects>")
             }
@@ -1276,10 +1308,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
             Type::Intersection(intersection) => intersection
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
             Type::EnumComplement(complement) => {
                 if let Some(literals) =
@@ -1288,13 +1320,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     DisplayLiteralGroup {
                         literals,
                         db: self.db,
+                        program,
                         settings: self.settings.clone(),
                     }
                     .fmt_detailed(f)
                 } else {
                     complement
-                        .to_intersection(self.db)
-                        .display_with(self.db, self.settings.clone())
+                        .to_intersection(self.db, program)
+                        .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f)
                 }
             }
@@ -1357,19 +1390,21 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.set_invalid_type_annotation();
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.db))
-                    .display_with(self.db, self.settings.singleline())
+                    .display_with(self.db, program, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
                 bound_super
                     .owner(self.db)
                     .owner_type()
-                    .display_with(self.db, self.settings.singleline())
+                    .display_with(self.db, program, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
+            Type::TypeIs(type_is) => {
+                fmt_type_guard_like(self.db, program, type_is, &self.settings, f)
+            }
             Type::TypeGuard(type_guard) => {
-                fmt_type_guard_like(self.db, type_guard, &self.settings, f)
+                fmt_type_guard_like(self.db, program, type_guard, &self.settings, f)
             }
             Type::TypeForm(typeform) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
@@ -1377,7 +1412,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_char('[')?;
                 typeform
                     .type_argument(self.db)
-                    .display_with(self.db, self.settings.clone())
+                    .display_with(self.db, program, self.settings.clone())
                     .fmt_detailed(f)?;
                 f.write_char(']')
             }
@@ -1386,7 +1421,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),
                 ClassType::Generic(alias) => alias
-                    .display_with(self.db, self.settings.clone())
+                    .display_with(self.db, program, self.settings.clone())
                     .fmt_detailed(f),
             },
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
@@ -1414,7 +1449,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 match alias.specialization(self.db) {
                     None => Ok(()),
                     Some(specialization) => specialization
-                        .display_short(self.db, TupleSpecialization::No, self.settings.clone())
+                        .display_short(
+                            self.db,
+                            program,
+                            TupleSpecialization::No,
+                            self.settings.clone(),
+                        )
                         .fmt_detailed(f),
                 }
             }
@@ -1468,11 +1508,13 @@ impl<'db> TupleSpec<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTuple<'a, 'db> {
         DisplayTuple {
             tuple: self,
             db,
+            program,
             settings,
         }
     }
@@ -1481,12 +1523,14 @@ impl<'db> TupleSpec<'db> {
 struct DisplayTuple<'a, 'db> {
     tuple: &'a TupleSpec<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+        let program = self.program;
+        f.with_type(KnownClass::Tuple.to_class_literal(self.db, program))
             .write_str("tuple")?;
         f.write_char('[')?;
         match self.tuple {
@@ -1496,7 +1540,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, program, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
             }
@@ -1519,20 +1563,20 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, program, self.settings.singleline())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
                 if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
                     f.write_char('*')?;
                     // Might as well link the type again here too
-                    f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+                    f.with_type(KnownClass::Tuple.to_class_literal(self.db, program))
                         .write_str("tuple")?;
                     f.write_char('[')?;
                 }
                 tuple
                     .variable()
-                    .display_with(self.db, self.settings.singleline())
+                    .display_with(self.db, program, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ...")?;
                 if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
@@ -1542,7 +1586,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str(", ")?;
                     tuple
                         .suffix_elements()
-                        .display_with(self.db, self.settings.singleline())
+                        .display_with(self.db, program, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
             }
@@ -1560,18 +1604,24 @@ impl Display for DisplayTuple<'_, '_> {
 impl<'db> OverloadLiteral<'db> {
     // Not currently used, but useful for debugging.
     #[expect(dead_code)]
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
-        Self::display_with(self, db, DisplaySettings::default())
+    pub(crate) fn display(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> DisplayOverloadLiteral<'db> {
+        Self::display_with(self, db, program, DisplaySettings::default())
     }
 
     fn display_with(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayOverloadLiteral<'db> {
         DisplayOverloadLiteral {
             literal: self,
             db,
+            program,
             settings,
         }
     }
@@ -1580,13 +1630,15 @@ impl<'db> OverloadLiteral<'db> {
 pub(crate) struct DisplayOverloadLiteral<'db> {
     literal: OverloadLiteral<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let signature = self.literal.signature(self.db);
-        let hide_unused_self = signature.should_hide_self_from_display(self.db);
+        let program = self.program;
+        let signature = self.literal.signature(self.db, program);
+        let hide_unused_self = signature.should_hide_self_from_display(self.db, program);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
@@ -1599,7 +1651,7 @@ impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
         write!(f, "{}", self.literal.name(self.db))?;
         type_parameters.fmt_detailed(f)?;
         signature
-            .display_with(self.db, self.settings.disallow_signature_name())
+            .display_with(self.db, program, self.settings.disallow_signature_name())
             .fmt_detailed(f)
     }
 }
@@ -1614,11 +1666,13 @@ impl<'db> FunctionType<'db> {
     fn display_with(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayFunctionType<'db> {
         DisplayFunctionType {
             ty: self,
             db,
+            program,
             settings,
         }
     }
@@ -1627,6 +1681,7 @@ impl<'db> FunctionType<'db> {
 struct DisplayFunctionType<'db> {
     ty: FunctionType<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -1636,6 +1691,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
         // and limit display depth for chains of different function types
         // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
         const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
+        let program = self.program;
         if self.settings.visited_function_types.contains(&self.ty)
             || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
         {
@@ -1654,7 +1710,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
 
         match signature.overloads.as_slice() {
             [signature] => {
-                let hide_unused_self = signature.should_hide_self_from_display(self.db);
+                let hide_unused_self = signature.should_hide_self_from_display(self.db, program);
 
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
@@ -1667,7 +1723,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(self.db, settings.disallow_signature_name())
+                    .display_with(self.db, program, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
@@ -1681,7 +1737,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, settings.clone()));
+                    join.entry(&signature.display_with(self.db, program, settings.clone()));
                 }
                 join.finish()?;
                 if !settings.multiline {
@@ -1700,19 +1756,25 @@ impl Display for DisplayFunctionType<'_> {
 }
 
 impl<'db> GenericAlias<'db> {
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayGenericAlias<'db> {
-        self.display_with(db, DisplaySettings::default())
+    pub(crate) fn display(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> DisplayGenericAlias<'db> {
+        self.display_with(db, program, DisplaySettings::default())
     }
 
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'db> {
         DisplayGenericAlias {
             origin: ClassLiteral::Static(self.origin(db)),
             specialization: self.specialization(db),
             db,
+            program,
             settings,
         }
     }
@@ -1722,14 +1784,16 @@ pub(crate) struct DisplayGenericAlias<'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f)
         } else {
             let prefix_details = match self.specialization.materialization_kind(self.db) {
@@ -1751,6 +1815,7 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
             self.specialization
                 .display_short(
                     self.db,
+                    program,
                     TupleSpecialization::from_class(self.db, self.origin),
                     self.settings.clone(),
                 )
@@ -1909,10 +1974,15 @@ impl Display for DisplayGenericContext<'_, '_> {
 }
 
 impl<'db> Specialization<'db> {
-    fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    fn display_full(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             specialization: self,
             db,
+            program,
             tuple_specialization: TupleSpecialization::No,
             settings: DisplaySettings::default(),
             full: true,
@@ -1923,12 +1993,14 @@ impl<'db> Specialization<'db> {
     fn display_short(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         tuple_specialization: TupleSpecialization,
         settings: DisplaySettings<'db>,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             specialization: self,
             db,
+            program,
             tuple_specialization,
             settings,
             full: false,
@@ -1939,6 +2011,7 @@ impl<'db> Specialization<'db> {
 struct DisplaySpecialization<'db> {
     specialization: Specialization<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     tuple_specialization: TupleSpecialization,
     settings: DisplaySettings<'db>,
     full: bool,
@@ -1946,13 +2019,14 @@ struct DisplaySpecialization<'db> {
 
 impl<'db> DisplaySpecialization<'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         f.write_char('[')?;
         let types = self.specialization.types(self.db);
         for (idx, ty) in types.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            ty.display_with(self.db, self.settings.clone())
+            ty.display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         if self.tuple_specialization.is_yes() {
@@ -1962,6 +2036,7 @@ impl<'db> DisplaySpecialization<'db> {
     }
 
     fn fmt_full(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         f.write_char('[')?;
         let variables = self
             .specialization
@@ -1975,7 +2050,7 @@ impl<'db> DisplaySpecialization<'db> {
             f.set_invalid_type_annotation();
             write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
             f.write_str(" = ")?;
-            ty.display_with(self.db, self.settings.clone())
+            ty.display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         f.write_char(']')
@@ -2019,19 +2094,25 @@ impl TupleSpecialization {
 }
 
 impl<'db> CallableType<'db> {
-    pub(crate) fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayCallableType<'a, 'db> {
-        Self::display_with(self, db, DisplaySettings::default())
+    pub(crate) fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> DisplayCallableType<'a, 'db> {
+        Self::display_with(self, db, program, DisplaySettings::default())
     }
 
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayCallableType<'a, 'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
             db,
+            program,
             settings,
         }
     }
@@ -2041,11 +2122,13 @@ pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         match self.signatures.overloads.as_slice() {
             [signature] => {
                 if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
@@ -2054,14 +2137,14 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                     }
                     signature
                         .parameters()
-                        .display_with(self.db, self.settings.clone())
+                        .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f)?;
                     if signature.parameters().is_top() {
                         f.write_str("]")?;
                     }
                 } else {
                     signature
-                        .display_with(self.db, self.settings.clone())
+                        .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f)?;
                 }
             }
@@ -2076,7 +2159,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings.clone()));
+                    join.entry(&signature.display_with(self.db, program, self.settings.clone()));
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -2096,13 +2179,18 @@ impl Display for DisplayCallableType<'_, '_> {
 }
 
 impl<'db> Signature<'db> {
-    pub(crate) fn display<'a>(&'a self, db: &'db dyn Db) -> DisplaySignature<'a, 'db> {
-        Self::display_with(self, db, DisplaySettings::default())
+    pub(crate) fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> DisplaySignature<'a, 'db> {
+        Self::display_with(self, db, program, DisplaySettings::default())
     }
 
     pub(crate) fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplaySignature<'a, 'db> {
         DisplaySignature {
@@ -2111,6 +2199,7 @@ impl<'db> Signature<'db> {
             parameters: self.parameters(),
             return_ty: self.return_ty,
             db,
+            program,
             settings,
         }
     }
@@ -2122,6 +2211,7 @@ pub(crate) struct DisplaySignature<'a, 'db> {
     parameters: &'a Parameters<'db>,
     return_ty: Type<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2137,17 +2227,17 @@ impl<'db> DisplaySignature<'_, 'db> {
         }
     }
 
-    fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
-        !self.return_ty.contains_self(db)
-            && !self
-                .parameters
-                .iter()
-                .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db))
+    fn should_hide_self_from_display(&self, db: &'db dyn Db, program: crate::Program<'db>) -> bool {
+        !self.return_ty.contains_self(db, program)
+            && !self.parameters.iter().any(|p| {
+                p.should_annotation_be_displayed() && p.annotated_type().contains_self(db, program)
+            })
     }
 }
 
 impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         // Immediately write a marker signaling we're starting a signature
         let _ = f.with_detail(TypeDetail::SignatureStart);
         f.set_invalid_type_annotation();
@@ -2182,7 +2272,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .signature_name_display
             .allows_type_parameters()
         {
-            let hide_unused_self = self.should_hide_self_from_display(self.db);
+            let hide_unused_self = self.should_hide_self_from_display(self.db, program);
 
             DisplayOptionalGenericContext {
                 generic_context: self.generic_context,
@@ -2199,7 +2289,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             ..settings.clone()
         };
         self.parameters
-            .display_with(self.db, param_settings)
+            .display_with(self.db, program, param_settings)
             .fmt_detailed(&mut f)?;
 
         // Return type
@@ -2212,7 +2302,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
                 f.write_char('(')?;
             }
             self.return_ty
-                .display_with(self.db, settings.singleline())
+                .display_with(self.db, program, settings.singleline())
                 .fmt_detailed(&mut f)?;
             if should_parenthesize_return_type {
                 f.write_char(')')?;
@@ -2248,11 +2338,13 @@ impl<'db> Parameters<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameters<'a, 'db> {
         DisplayParameters {
             parameters: self,
             db,
+            program,
             settings,
         }
     }
@@ -2261,6 +2353,7 @@ impl<'db> Parameters<'db> {
 struct DisplayParameters<'a, 'db> {
     parameters: &'a Parameters<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2308,7 +2401,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .map(|name| name.to_string())
                     .unwrap_or_default();
                 parameter
-                    .display_with(display.db, display.settings.singleline())
+                    .display_with(display.db, display.program, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
                 first = false;
@@ -2405,11 +2498,13 @@ impl<'db> Parameter<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameter<'a, 'db> {
         DisplayParameter {
             param: self,
             db,
+            program,
             settings,
         }
     }
@@ -2418,18 +2513,20 @@ impl<'db> Parameter<'db> {
 struct DisplayParameter<'a, 'db> {
     param: &'a Parameter<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
             if self.param.should_annotation_be_displayed() {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
                 annotated_type
-                    .display_with(self.db, self.settings.clone())
+                    .display_with(self.db, program, self.settings.clone())
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
@@ -2452,12 +2549,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     {
                         // For Literal types display the value without `Literal[..]` wrapping
                         let representation =
-                            default_type.representation(self.db, self.settings.clone());
+                            default_type.representation(self.db, program, self.settings.clone());
                         representation.fmt_detailed(f)?;
                     }
                     Type::NominalInstance(instance) => {
                         // Some key default types like `None` are worth showing
-                        let class = instance.class(self.db);
+                        let class = instance.class(self.db, program);
 
                         match (class, class.known(self.db)) {
                             (_, Some(KnownClass::NoneType)) => {
@@ -2478,7 +2575,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             // have something visible in the parameter slot.
             self.param
                 .annotated_type()
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())
@@ -2540,10 +2637,12 @@ impl<'db> UnionType<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayUnionType<'a, 'db> {
         DisplayUnionType {
             db,
+            program,
             ty: self,
             settings,
         }
@@ -2553,6 +2652,7 @@ impl<'db> UnionType<'db> {
 struct DisplayUnionType<'a, 'db> {
     ty: &'a UnionType<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2579,7 +2679,11 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         ///
         /// # Color excluding RED displays through the literal-group path for BLUE.
         /// ```
-        fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+        fn condensable_literals<'db>(
+            db: &'db dyn Db,
+            program: crate::Program<'db>,
+            ty: Type<'db>,
+        ) -> Option<Vec<Type<'db>>> {
             match ty {
                 Type::LiteralValue(literal)
                     if matches!(
@@ -2597,7 +2701,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                     complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
                 }
                 Type::Intersection(intersection) => {
-                    intersection.finite_alternatives_for_display(db, LITERAL_POLICY.max)
+                    intersection.finite_alternatives_for_display(db, program, LITERAL_POLICY.max)
                 }
                 _ => None,
             }
@@ -2605,10 +2709,13 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
 
         fn singleline_union_element_label<'db>(
             db: &'db dyn Db,
+            program: crate::Program<'db>,
             element: Type<'db>,
             settings: &DisplaySettings<'db>,
         ) -> String {
-            element.display_with(db, settings.singleline()).to_string()
+            element
+                .display_with(db, program, settings.singleline())
+                .to_string()
         }
 
         fn duplicate_ambiguous_labels(element_labels: &[Option<String>]) -> FxHashSet<&str> {
@@ -2624,6 +2731,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 .collect()
         }
 
+        let program = self.program;
         let elements = self.ty.elements(self.db);
         let mut condensed_types = vec![];
         let mut condensed_element_count = 0usize;
@@ -2632,14 +2740,15 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             .iter()
             .copied()
             .map(|element| {
-                (condensable_literals(self.db, element).is_none() && !element.is_subclass_of())
-                    .then(|| singleline_union_element_label(self.db, element, &self.settings))
+                (condensable_literals(self.db, program, element).is_none()
+                    && !element.is_subclass_of())
+                .then(|| singleline_union_element_label(self.db, program, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
-            if let Some(literals) = condensable_literals(self.db, element) {
+            if let Some(literals) = condensable_literals(self.db, program, element) {
                 condensed_element_count += 1;
                 for literal in literals {
                     if !condensed_types.contains(&literal) {
@@ -2672,12 +2781,13 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if condensable_literals(self.db, *element).is_some() {
+            if condensable_literals(self.db, program, *element).is_some() {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
                         db: self.db,
+                        program,
                         settings: self.settings.singleline(),
                     });
                 }
@@ -2687,6 +2797,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                     join.entry(&DisplaySubclassOfGroup {
                         types: subclass_of_types,
                         db: self.db,
+                        program,
                         settings: self.settings.singleline(),
                     });
                 }
@@ -2703,6 +2814,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
+                    program,
                     settings,
                 });
             }
@@ -2737,11 +2849,13 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
 struct DisplaySubclassOfGroup<'db> {
     types: Vec<SubclassOfType<'db>>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         f.write_str("type[")?;
         let total_entries = self.types.len();
         let display_limit =
@@ -2753,16 +2867,22 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
                     join.entry(&class.display_with(self.db, self.settings.singleline()));
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    join.entry(&alias.display_with(self.db, self.settings.singleline()));
+                    join.entry(&alias.display_with(self.db, program, self.settings.singleline()));
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    let rep =
-                        Type::Dynamic(dynamic).representation(self.db, self.settings.singleline());
+                    let rep = Type::Dynamic(dynamic).representation(
+                        self.db,
+                        program,
+                        self.settings.singleline(),
+                    );
                     join.entry(&rep);
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
-                    let rep = Type::TypeVar(bound_typevar)
-                        .representation(self.db, self.settings.singleline());
+                    let rep = Type::TypeVar(bound_typevar).representation(
+                        self.db,
+                        program,
+                        self.settings.singleline(),
+                    );
                     join.entry(&rep);
                 }
             }
@@ -2791,6 +2911,7 @@ impl Display for DisplaySubclassOfGroup<'_> {
 struct DisplayLiteralGroup<'db> {
     literals: Vec<Type<'db>>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2801,6 +2922,7 @@ const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         f.with_type(Type::SpecialForm(SpecialFormType::Literal))
             .write_str("Literal")?;
         f.write_char('[')?;
@@ -2813,7 +2935,7 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
         let mut join = f.join(", ");
 
         for lit in self.literals.iter().take(display_limit) {
-            let rep = lit.representation(self.db, self.settings.singleline());
+            let rep = lit.representation(self.db, program, self.settings.singleline());
             join.entry(&rep);
         }
 
@@ -2843,10 +2965,12 @@ impl<'db> IntersectionType<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayIntersectionType<'a, 'db> {
         DisplayIntersectionType {
             db,
+            program,
             ty: self,
             settings,
         }
@@ -2856,6 +2980,7 @@ impl<'db> IntersectionType<'db> {
 struct DisplayIntersectionType<'a, 'db> {
     ty: &'a IntersectionType<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2868,6 +2993,7 @@ impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
             .map(|&ty| DisplayMaybeNegatedType {
                 ty,
                 db: self.db,
+                program: self.program,
                 settings: self.settings.singleline(),
                 negated: false,
             })
@@ -2878,6 +3004,7 @@ impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
                     .map(|&ty| DisplayMaybeNegatedType {
                         ty,
                         db: self.db,
+                        program: self.program,
                         settings: self.settings.singleline(),
                         negated: true,
                     }),
@@ -2903,6 +3030,7 @@ impl fmt::Debug for DisplayIntersectionType<'_, '_> {
 struct DisplayMaybeNegatedType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     negated: bool,
     settings: DisplaySettings<'db>,
 }
@@ -2915,6 +3043,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'db> {
         DisplayMaybeParenthesizedType {
             ty: self.ty,
             db: self.db,
+            program: self.program,
             settings: self.settings.clone(),
         }
         .fmt_detailed(f)
@@ -2946,16 +3075,18 @@ fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
 struct DisplayMaybeParenthesizedType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         let write_parentheses = |f: &mut TypeWriter<'_, '_, 'db>| {
             f.set_invalid_type_annotation();
             f.write_char('(')?;
             self.ty
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f)?;
             f.write_char(')')
         };
@@ -2970,7 +3101,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             }
             _ => self
                 .ty
-                .display_with(self.db, self.settings.clone())
+                .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
         }
     }
@@ -2986,6 +3117,7 @@ trait TypeArrayDisplay<'db> {
     fn display_with(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db>;
 }
@@ -2994,11 +3126,13 @@ impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
     fn display_with(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray {
             types: self,
             db,
+            program,
             settings,
         }
     }
@@ -3008,11 +3142,13 @@ impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
     fn display_with(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray {
             types: self,
             db,
+            program,
             settings,
         }
     }
@@ -3022,11 +3158,13 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     fn display_with(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray {
             types: self,
             db,
+            program,
             settings,
         }
     }
@@ -3035,16 +3173,18 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
 struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayTypeArray<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         f.join(", ")
             .entries(
                 self.types
                     .iter()
-                    .map(|ty| ty.display_with(self.db, self.settings.singleline())),
+                    .map(|ty| ty.display_with(self.db, program, self.settings.singleline())),
             )
             .finish()
     }
@@ -3093,17 +3233,20 @@ impl Display for DisplayStringLiteralType<'_> {
 pub(crate) struct DisplayKnownInstanceRepr<'db> {
     pub(crate) known_instance: KnownInstanceType<'db>,
     pub(crate) db: &'db dyn Db,
+    pub(crate) program: crate::Program<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         _settings: DisplaySettings<'db>,
     ) -> DisplayKnownInstanceRepr<'db> {
         DisplayKnownInstanceRepr {
             known_instance: self,
             db,
+            program,
         }
     }
 }
@@ -3116,6 +3259,7 @@ impl Display for DisplayKnownInstanceRepr<'_> {
 
 impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let program = self.program;
         let ty = Type::KnownInstance(self.known_instance);
         match self.known_instance {
             KnownInstanceType::SubscriptedProtocol(generic_context) => {
@@ -3140,7 +3284,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     f.write_str("<type alias '")?;
                     f.with_type(ty).write_str(alias.name(self.db))?;
                     specialization
-                        .display_short(self.db, TupleSpecialization::No, DisplaySettings::default())
+                        .display_short(
+                            self.db,
+                            program,
+                            TupleSpecialization::No,
+                            DisplaySettings::default(),
+                        )
                         .fmt_detailed(f)?;
                     f.write_str("'>")
                 } else {
@@ -3168,7 +3317,11 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
 
                 if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(field_ty), "{}", field_ty.display(self.db))?;
+                    write!(
+                        f.with_type(field_ty),
+                        "{}",
+                        field_ty.display(self.db, program)
+                    )?;
                     f.write_char(']')?;
                 }
                 Ok(())
@@ -3176,12 +3329,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::ConstraintSet(interned_set) => {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
-                let set = constraints.load(self.db, interned_set.constraints(self.db));
+                let set = constraints.load(self.db, program, interned_set.constraints(self.db));
                 if interned_set.detailed_display(self.db) {
-                    write!(f, "[{}]", set.display(self.db))
-                } else if set.is_always_satisfied(self.db) {
+                    write!(f, "[{}]", set.display(self.db, program))
+                } else if set.is_always_satisfied(self.db, program) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(self.db) {
+                } else if set.is_never_satisfied(self.db, program) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")
@@ -3194,17 +3347,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Specialization(specialization) => {
                 // Normalize for consistent output across CI platforms
                 f.with_type(ty).write_str("ty_extensions.Specialization")?;
-                write!(f, "{}", specialization.display_full(self.db))
+                write!(f, "{}", specialization.display_full(self.db, program))
             }
             KnownInstanceType::UnionType(union) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::UnionType.to_class_literal(self.db))
+                f.with_type(KnownClass::UnionType.to_class_literal(self.db, program))
                     .write_str("types.UnionType")?;
                 f.write_str(" special-form")?;
                 if let Ok(ty) = union.union_type(self.db) {
                     f.write_str(" '")?;
-                    ty.display(self.db).fmt_detailed(f)?;
+                    ty.display(self.db, program).fmt_detailed(f)?;
                     f.write_char('\'')?;
                 }
                 f.write_char('>')
@@ -3212,7 +3365,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Literal(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                inner.inner(self.db).display(self.db).fmt_detailed(f)?;
+                inner
+                    .inner(self.db)
+                    .display(self.db, program)
+                    .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::Annotated(inner) => {
@@ -3221,7 +3377,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(Type::SpecialForm(SpecialFormType::Annotated))
                     .write_str("typing.Annotated")?;
                 f.write_char('[')?;
-                inner.inner(self.db).display(self.db).fmt_detailed(f)?;
+                inner
+                    .inner(self.db)
+                    .display(self.db, program)
+                    .fmt_detailed(f)?;
                 f.write_str(", <metadata>]'>")
             }
             KnownInstanceType::Callable(callable) => {
@@ -3234,25 +3393,28 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
                     .write_str("Callable")?;
                 f.write_str(" special-form '")?;
-                callable.display(self.db).fmt_detailed(f)?;
+                callable.display(self.db, program).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                f.with_type(KnownClass::Type.to_class_literal(self.db))
+                f.with_type(KnownClass::Type.to_class_literal(self.db, program))
                     .write_str("type")?;
                 f.write_char('[')?;
-                inner.inner(self.db).display(self.db).fmt_detailed(f)?;
+                inner
+                    .inner(self.db)
+                    .display(self.db, program)
+                    .fmt_detailed(f)?;
                 f.write_str("]'>")
             }
             KnownInstanceType::LiteralStringAlias(_) => f
-                .with_type(KnownClass::Str.to_class_literal(self.db))
+                .with_type(KnownClass::Str.to_class_literal(self.db, program))
                 .write_str("str"),
             KnownInstanceType::NewType(declaration) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::NewType.to_class_literal(self.db))
+                f.with_type(KnownClass::NewType.to_class_literal(self.db, program))
                     .write_str("NewType")?;
                 f.write_str(" pseudo-class '")?;
                 f.with_type(ty).write_str(declaration.name(self.db))?;
@@ -3265,12 +3427,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::FunctoolsPartial(partial) => {
                 f.write_str("partial[")?;
                 Type::Callable(partial.partial(self.db))
-                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .display_with(self.db, program, DisplaySettings::default().singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
             KnownInstanceType::Range { .. } => f
-                .with_type(KnownClass::Range.to_class_literal(self.db))
+                .with_type(KnownClass::Range.to_class_literal(self.db, program))
                 .write_str("range"),
         }
     }
@@ -3281,64 +3443,73 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_python_ast::name::Name;
 
-    use crate::Db;
-    use crate::db::tests::setup_db;
+    use crate::db::tests::{TestDb, setup_db};
     use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
 
     #[test]
     fn string_literal_display() {
         let db = setup_db();
+        let program = db.program();
 
         assert_eq!(
-            Type::string_literal(&db, r"\n").display(&db).to_string(),
+            Type::string_literal(&db, r"\n")
+                .display(&db, program)
+                .to_string(),
             r#"Literal["\\n"]"#
         );
         assert_eq!(
-            Type::string_literal(&db, "'").display(&db).to_string(),
+            Type::string_literal(&db, "'")
+                .display(&db, program)
+                .to_string(),
             r#"Literal["'"]"#
         );
         assert_eq!(
-            Type::string_literal(&db, r#"""#).display(&db).to_string(),
+            Type::string_literal(&db, r#"""#)
+                .display(&db, program)
+                .to_string(),
             r#"Literal["\""]"#
         );
     }
 
     fn display_signature<'db>(
-        db: &'db dyn Db,
+        db: &'db TestDb,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
+        let program = db.program();
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::new(db, program, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
-        .display(db)
+        .display(db, program)
         .to_string()
     }
 
     fn display_signature_multiline<'db>(
-        db: &'db dyn Db,
+        db: &'db TestDb,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
+        let program = db.program();
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::new(db, program, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
-        .display_with(db, super::DisplaySettings::default().multiline())
+        .display_with(db, program, super::DisplaySettings::default().multiline())
         .to_string()
     }
 
     #[test]
     fn signature_display() {
         let db = setup_db();
+        let program = db.program();
 
         // Empty parameters with no return type.
         assert_snapshot!(display_signature(&db, [], None), @"() -> Unknown");
 
         // Empty parameters with a return type.
         assert_snapshot!(
-            display_signature(&db, [], Some(Type::none(&db))),
+            display_signature(&db, [], Some(Type::none(&db, program))),
             @"() -> None"
         );
 
@@ -3346,8 +3517,8 @@ mod tests {
         assert_snapshot!(
             display_signature(
                 &db,
-                [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
-                Some(Type::none(&db))
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&db, program))],
+                Some(Type::none(&db, program))
             ),
             @"(None, /) -> None"
         );
@@ -3358,12 +3529,12 @@ mod tests {
                 &db,
                 [
                     Parameter::positional_or_keyword(Name::new_static("x"))
-                        .with_default_type(KnownClass::Int.to_instance(&db)),
+                        .with_default_type(KnownClass::Int.to_instance(&db, program)),
                     Parameter::positional_or_keyword(Name::new_static("y"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&db))
-                        .with_default_type(KnownClass::Str.to_instance(&db)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&db, program))
+                        .with_default_type(KnownClass::Str.to_instance(&db, program)),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"(x=..., y: str = ...) -> None"
         );
@@ -3376,7 +3547,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"(x, y, /) -> None"
         );
@@ -3389,7 +3560,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"(x, /, y) -> None"
         );
@@ -3402,7 +3573,7 @@ mod tests {
                     Parameter::keyword_only(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"(*, x, y) -> None"
         );
@@ -3415,7 +3586,7 @@ mod tests {
                     Parameter::positional_or_keyword(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"(x, *, y) -> None"
         );
@@ -3429,7 +3600,7 @@ mod tests {
                     Parameter::keyword_only(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"(a, /, *, x, y) -> None"
         );
@@ -3441,28 +3612,28 @@ mod tests {
                 [
                     Parameter::positional_only(Some(Name::new_static("a"))),
                     Parameter::positional_only(Some(Name::new_static("b")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program)),
                     Parameter::positional_only(Some(Name::new_static("c")))
                         .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program))
                         .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
                         .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program))
                         .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program))
                         .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&db)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&db, program)),
                 ],
-                Some(KnownClass::Bytes.to_instance(&db))
+                Some(KnownClass::Bytes.to_instance(&db, program))
             ),
             @"(a, b: int, c=1, d: int = 2, /, e=3, f: int = 4, *args: object, *, g=5, h: int = 6, **kwargs: str) -> bytes"
         );
@@ -3471,13 +3642,14 @@ mod tests {
     #[test]
     fn signature_display_multiline() {
         let db = setup_db();
+        let program = db.program();
 
         // Empty parameters with no return type.
         assert_snapshot!(display_signature_multiline(&db, [], None), @"() -> Unknown");
 
         // Empty parameters with a return type.
         assert_snapshot!(
-            display_signature_multiline(&db, [], Some(Type::none(&db))),
+            display_signature_multiline(&db, [], Some(Type::none(&db, program))),
             @"() -> None"
         );
 
@@ -3485,8 +3657,8 @@ mod tests {
         assert_snapshot!(
             display_signature_multiline(
                 &db,
-                [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
-                Some(Type::none(&db))
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&db, program))],
+                Some(Type::none(&db, program))
             ),
             @"(None, /) -> None"
         );
@@ -3497,12 +3669,12 @@ mod tests {
                 &db,
                 [
                     Parameter::positional_or_keyword(Name::new_static("x"))
-                        .with_default_type(KnownClass::Int.to_instance(&db)),
+                        .with_default_type(KnownClass::Int.to_instance(&db, program)),
                     Parameter::positional_or_keyword(Name::new_static("y"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&db))
-                        .with_default_type(KnownClass::Str.to_instance(&db)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&db, program))
+                        .with_default_type(KnownClass::Str.to_instance(&db, program)),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"
         (
@@ -3520,7 +3692,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"
         (
@@ -3539,7 +3711,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"
         (
@@ -3558,7 +3730,7 @@ mod tests {
                     Parameter::keyword_only(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"
         (
@@ -3577,7 +3749,7 @@ mod tests {
                     Parameter::positional_or_keyword(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&db))
+                Some(Type::none(&db, program))
             ),
             @"
         (
@@ -3595,28 +3767,28 @@ mod tests {
                 [
                     Parameter::positional_only(Some(Name::new_static("a"))),
                     Parameter::positional_only(Some(Name::new_static("b")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program)),
                     Parameter::positional_only(Some(Name::new_static("c")))
                         .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program))
                         .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
                         .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program))
                         .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, program))
                         .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&db)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&db, program)),
                 ],
-                Some(KnownClass::Bytes.to_instance(&db))
+                Some(KnownClass::Bytes.to_instance(&db, program))
             ),
             @"
         (

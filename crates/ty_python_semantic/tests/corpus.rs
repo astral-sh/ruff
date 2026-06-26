@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
-use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
@@ -12,7 +11,9 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_python_semantic::{
+    AnalysisFile, AnalysisSettings, check_file_unwrap, default_lint_registry,
+};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use ruff_db::diagnostic::Diagnostic;
@@ -127,7 +128,8 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             // (and some non-expressions that clearly define a single type)
             let file = system_path_to_file(&db, path).unwrap();
 
-            let result = std::panic::catch_unwind(|| pull_types(&db, file));
+            let analysis_file = AnalysisFile::new(&db, db.program(), file);
+            let result = std::panic::catch_unwind(|| pull_types(&db, analysis_file));
 
             let expected_to_fail = if path.extension().map(|e| e == "pyi").unwrap_or(false) {
                 pyi_expected_to_fail
@@ -184,35 +186,37 @@ pub struct CorpusDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     analysis_settings: Arc<AnalysisSettings>,
+    program_settings: ProgramSettings,
 }
 
 impl CorpusDb {
     #[expect(clippy::new_without_default)]
     pub fn new() -> Self {
-        let db = Self {
+        let system = TestSystem::default();
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings {
+            python_version: PythonVersionWithSource {
+                version: PythonVersion::latest_ty(),
+                source: PythonVersionSource::default(),
+            },
+            python_platform: PythonPlatform::default(),
+            search_paths: SearchPathSettings::new(vec![])
+                .to_search_paths(&system, &vendored, &FallibleStrategy)
+                .unwrap(),
+        };
+        Self {
             storage: salsa::Storage::new(None),
-            system: TestSystem::default(),
-            vendored: ty_vendored::file_system().clone(),
+            system,
+            vendored,
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
-        };
+            program_settings,
+        }
+    }
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::latest_ty(),
-                    source: PythonVersionSource::default(),
-                },
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![])
-                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                    .unwrap(),
-            },
-        );
-
-        db
+    fn program(&self) -> Program<'_> {
+        Program::create(self, &self.program_settings)
     }
 }
 
@@ -241,16 +245,12 @@ impl ruff_db::Db for CorpusDb {
     }
 
     fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
+        self.program_settings.python_version.version
     }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for CorpusDb {
-    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for CorpusDb {}
 
 #[salsa::db]
 impl ty_python_core::Db for CorpusDb {
@@ -261,9 +261,10 @@ impl ty_python_core::Db for CorpusDb {
 
 #[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
-    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+    fn check_file(&self, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic> {
+        let file = analysis_file.file(self);
         if self.should_check_file(file) {
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, analysis_file)
         } else {
             Vec::new()
         }

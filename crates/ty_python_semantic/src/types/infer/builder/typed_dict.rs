@@ -75,6 +75,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         definition: Option<Definition<'db>>,
         typed_dict_module: TypedDictModule,
     ) -> Type<'db> {
+        let program = self.program;
         let db = self.db();
 
         let ast::Arguments {
@@ -93,9 +94,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // it would return a class that is a subclass of `Mapping[str, object]`
         // with an unknown set of fields.
         let fallback = || {
-            let spec = &[KnownClass::Str.to_instance(db), Type::object()];
-            let str_object_map = KnownClass::Mapping.to_specialized_subclass_of(db, spec);
-            IntersectionType::from_two_elements(db, str_object_map, Type::unknown())
+            let spec = &[KnownClass::Str.to_instance(db, program), Type::object()];
+            let str_object_map = KnownClass::Mapping.to_specialized_subclass_of(db, program, spec);
+            IntersectionType::from_two_elements(db, program, str_object_map, Type::unknown())
         };
 
         // Emit diagnostic for unsupported variadic arguments.
@@ -164,18 +165,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                         diagnostic.set_primary_message(format_args!(
                             "Expected either `True` or `False`, got object of type `{}`",
-                            kw_type.display(db)
+                            kw_type.display(db, self.program)
                         ));
                     }
 
                     if arg_name == "total" {
-                        if kw_type.bool(db).is_always_false() {
+                        if kw_type.bool(db, self.program).is_always_false() {
                             total = false;
-                        } else if !kw_type.bool(db).is_always_true() {
+                        } else if !kw_type.bool(db, self.program).is_always_true() {
                             total = true;
                         }
                     } else {
-                        closed = kw_type.bool(db).is_always_true();
+                        closed = kw_type.bool(db, self.program).is_always_true();
                     }
                 }
                 "extra_items" => {
@@ -183,6 +184,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let annotation = self.infer_extra_items_kwarg(&kw.value);
                         extra_items = Some(TypedDictOpenness::extra(
                             db,
+                            self.program,
                             annotation.inner_type(),
                             annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                         ));
@@ -257,7 +259,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|literal| Name::new(literal.value(db)));
 
         if name.is_none()
-            && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && !name_type.is_assignable_to(
+                db,
+                self.program,
+                KnownClass::Str.to_instance(db, self.program),
+            )
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -265,7 +271,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
             diagnostic.set_primary_message(format_args!(
                 "Expected `str`, found `{}`",
-                name_type.display(db)
+                name_type.display(db, self.program)
             ));
         } else if let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
@@ -347,9 +353,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
             } else if key_ty.is_some_and(|key_ty| {
-                key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
+                key_ty.is_assignable_to(
+                    self.db(),
+                    self.program,
+                    KnownClass::Str.to_instance(self.db(), self.program),
+                )
             }) && let Some(value_ty) =
-                typed_dict.arbitrary_key_initialization_type(self.db())
+                typed_dict.arbitrary_key_initialization_type(self.db(), self.program)
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(value_ty)))
             } else {
@@ -409,6 +419,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     });
                 let keyword_keys = collect_guaranteed_keyword_keys(
                     self.db(),
+                    self.program,
                     typed_dict,
                     arguments,
                     &unpacked_keyword_types,
@@ -486,9 +497,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 TypeContext::new(Some(field.declared_ty))
             } else if key_ty.is_some_and(|key_ty| {
-                key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
+                key_ty.is_assignable_to(
+                    self.db(),
+                    self.program,
+                    KnownClass::Str.to_instance(self.db(), self.program),
+                )
             }) {
-                TypeContext::new(typed_dict.arbitrary_key_initialization_type(self.db()))
+                TypeContext::new(
+                    typed_dict.arbitrary_key_initialization_type(self.db(), self.program),
+                )
             } else {
                 TypeContext::default()
             };
@@ -638,8 +655,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Expected a string-literal key \
                                 in the `fields` dict of `TypedDict()`",
                         );
-                        diagnostic
-                            .set_primary_message(format_args!("Found `{}`", key_type.display(db)));
+                        diagnostic.set_primary_message(format_args!(
+                            "Found `{}`",
+                            key_type.display(db, self.program)
+                        ));
                     }
                 } else {
                     self.infer_expression(value, TypeContext::default());

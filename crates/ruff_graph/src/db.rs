@@ -65,6 +65,10 @@ impl ModuleDb {
 
         Ok(db)
     }
+
+    pub(crate) fn search_paths(&self) -> &SearchPaths {
+        &self.search_paths
+    }
 }
 
 #[salsa::db]
@@ -87,11 +91,7 @@ impl SourceDb for ModuleDb {
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for ModuleDb {
-    fn search_paths(&self) -> &SearchPaths {
-        &self.search_paths
-    }
-}
+impl ty_module_resolver::Db for ModuleDb {}
 
 #[salsa::db]
 impl salsa::Database for ModuleDb {}

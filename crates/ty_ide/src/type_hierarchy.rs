@@ -4,6 +4,8 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
+use ty_python_core::environment::AnalysisFile;
+use ty_python_core::program::Program;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
@@ -28,45 +30,49 @@ pub struct TypeHierarchyItem {
 /// Returns `None` if the position is not on a class definition or class reference.
 pub fn prepare_type_hierarchy(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Option<TypeHierarchyItem> {
+    let file = analysis_file.file(db);
+    let program = analysis_file.program(db);
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
 
-    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, ty)?;
-    Some(type_hierarchy_class_to_item(db, hierarchy_class))
+    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, program, ty)?;
+    Some(type_hierarchy_class_to_item(db, program, hierarchy_class))
 }
 
 /// Get the supertypes (base classes) of a type hierarchy item.
 pub fn type_hierarchy_supertypes(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
-    let Some(ty) = resolve_type_at(db, file, offset) else {
+    let program = analysis_file.program(db);
+    let Some(ty) = resolve_type_at(db, analysis_file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_supertypes(db, ty)
+    ty_python_semantic::type_hierarchy_supertypes(db, program, ty)
         .into_iter()
-        .map(|c| type_hierarchy_class_to_item(db, c))
+        .map(|class| type_hierarchy_class_to_item(db, program, class))
         .collect()
 }
 
 /// Get the subtypes (derived classes) of a type hierarchy item.
 pub fn type_hierarchy_subtypes(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
-    let Some(ty) = resolve_type_at(db, file, offset) else {
+    let program = analysis_file.program(db);
+    let Some(ty) = resolve_type_at(db, analysis_file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_subtypes(db, ty)
+    ty_python_semantic::type_hierarchy_subtypes(db, program, ty)
         .into_iter()
-        .map(|c| type_hierarchy_class_to_item(db, c))
+        .map(|class| type_hierarchy_class_to_item(db, program, class))
         .collect()
 }
 
@@ -74,16 +80,25 @@ pub fn type_hierarchy_subtypes(
 ///
 /// If a symbol could not be found at the given offset or its type could
 /// not be inferred, `None` is returned.
-fn resolve_type_at(db: &dyn Db, file: File, offset: TextSize) -> Option<Type<'_>> {
+fn resolve_type_at<'db>(
+    db: &'db dyn Db,
+    analysis_file: AnalysisFile<'db>,
+    offset: TextSize,
+) -> Option<Type<'db>> {
+    let file = analysis_file.file(db);
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
 
     let goto_target = find_goto_target(&model, &module, offset)?;
     goto_target.inferred_type(&model)
 }
 
-fn type_hierarchy_class_to_item(db: &dyn Db, class: TypeHierarchyClass) -> TypeHierarchyItem {
-    let detail = ty_module_resolver::file_to_module(db, class.file)
+fn type_hierarchy_class_to_item(
+    db: &dyn Db,
+    program: Program<'_>,
+    class: TypeHierarchyClass,
+) -> TypeHierarchyItem {
+    let detail = ty_module_resolver::file_to_module(db, program.file(db, class.file))
         .map(|module| module.name(db).to_string());
 
     TypeHierarchyItem {
@@ -709,21 +724,29 @@ Public = _Internal
 
     impl CursorTest {
         fn prepare(&self) -> Option<TypeHierarchyItem> {
-            prepare_type_hierarchy(&self.db, self.cursor.file, self.cursor.offset)
+            prepare_type_hierarchy(&self.db, self.cursor_analysis_file(), self.cursor.offset)
         }
 
         fn supertypes(&self) -> Vec<TypeHierarchyItem> {
             let Some(item) = self.prepare() else {
                 return vec![];
             };
-            type_hierarchy_supertypes(&self.db, item.file, item.selection_range.start())
+            type_hierarchy_supertypes(
+                &self.db,
+                self.analysis_file(item.file),
+                item.selection_range.start(),
+            )
         }
 
         fn subtypes(&self) -> Vec<TypeHierarchyItem> {
             let Some(item) = self.prepare() else {
                 return vec![];
             };
-            type_hierarchy_subtypes(&self.db, item.file, item.selection_range.start())
+            type_hierarchy_subtypes(
+                &self.db,
+                self.analysis_file(item.file),
+                item.selection_range.start(),
+            )
         }
     }
 }

@@ -48,7 +48,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             .resolved_client_capabilities()
             .supports_hierarchical_document_symbols();
 
-        let symbols = document_symbols(db, file);
+        let symbols = document_symbols(db, crate::server::api::analysis_file(db, file));
         if symbols.is_empty() {
             return Ok(None);
         }

@@ -176,12 +176,15 @@ Settings: Settings {
 
 Memory report:
 =======SALSA STRUCTS=======
-`Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`ResolverProgram`                                  metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA QUERIES=======
 `dynamic_resolution_paths -> alloc::vec::Vec<ty_module_resolver::path::SearchPath>`
+    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`Project::program_ -> ty_python_core::program::Program<'_>`
     metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA SUMMARY=======
 TOTAL MEMORY USAGE: [X.XXMB]

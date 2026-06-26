@@ -30,7 +30,7 @@ use crate::source::source_text;
 /// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
 /// instead it's a wild guess that it should be unlikely that incremental changes involve
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct VersionedFile<'db> {
     pub file: File,
     pub python_version: PythonVersion,
@@ -45,23 +45,38 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     parsed_module_versioned(db, VersionedFile::new(db, file, db.python_version())).clone()
 }
 
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
-pub fn parsed_module_versioned(db: &dyn Db, file: VersionedFile<'_>) -> ParsedModule {
-    let source_file = file.file(db);
-    let _span = tracing::trace_span!(
-        "parsed_module",
-        ?source_file,
-        python_version = %file.python_version(db)
-    )
-    .entered();
+pub fn parsed_module_versioned<'db>(
+    db: &'db dyn Db,
+    file: VersionedFile<'db>,
+) -> &'db ParsedModule {
+    contextual::parsed_module(db, file)
+}
 
-    let parsed = parsed_module_impl(db, file);
+mod contextual {
+    use super::*;
 
-    ParsedModule::new(db, file, parsed)
+    #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
+    pub(crate) fn parsed_module(db: &dyn Db, file: VersionedFile<'_>) -> ParsedModule {
+        let source_file = file.file(db);
+        let _span = tracing::trace_span!(
+            "parsed_module",
+            ?source_file,
+            python_version = %file.python_version(db)
+        )
+        .entered();
+
+        let parsed = parsed_module_impl(db, file);
+
+        ParsedModule::new(db, file, parsed)
+    }
+
+    pub(super) fn disable_lru(db: &mut dyn Db) {
+        parsed_module::set_lru_capacity(db, 0);
+    }
 }
 
 pub(super) fn disable_lru(db: &mut dyn Db) {
-    parsed_module_versioned::set_lru_capacity(db, 0);
+    contextual::disable_lru(db);
 }
 
 pub fn parsed_module_impl(db: &dyn Db, file: VersionedFile<'_>) -> Parsed<ModModule> {

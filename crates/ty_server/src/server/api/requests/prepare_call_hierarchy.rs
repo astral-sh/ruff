@@ -57,7 +57,9 @@ impl BackgroundDocumentRequestHandler for PrepareCallHierarchyRequestHandler {
             return Ok(None);
         };
 
-        let Some(items) = ty_ide::prepare_call_hierarchy(db, file, offset) else {
+        let Some(items) =
+            ty_ide::prepare_call_hierarchy(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

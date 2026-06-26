@@ -3,11 +3,14 @@ use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ty_python_core::Db as PythonCoreDb;
+use ty_python_core::environment::AnalysisFile;
+use ty_python_core::program::Program;
+use ty_site_packages::PythonVersionSource;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
-    fn check_file(&self, file: File) -> Vec<Diagnostic>;
+    fn check_file(&self, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic>;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -15,6 +18,10 @@ pub trait Db: PythonCoreDb {
     fn lint_registry(&self) -> &LintRegistry;
 
     fn analysis_settings(&self, file: File) -> &AnalysisSettings;
+
+    fn python_version_source(&self, _program: Program<'_>) -> PythonVersionSource {
+        PythonVersionSource::Default
+    }
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -55,11 +62,14 @@ pub(crate) mod tests {
         events: Events,
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
+        program_settings: ProgramSettings,
+        inference_settings: ty_python_core::environment::InferenceSettings,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
             let events = Events::default();
+            let vendored = ty_vendored::file_system().clone();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -70,12 +80,29 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                program_settings: ProgramSettings {
+                    python_version: PythonVersionWithSource {
+                        version: PythonVersion::default(),
+                        source: PythonVersionSource::default(),
+                    },
+                    python_platform: PythonPlatform::default(),
+                    search_paths: SearchPaths::empty(&vendored),
+                },
+                inference_settings: ty_python_core::environment::InferenceSettings::default(),
+                vendored,
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
             }
+        }
+
+        pub(crate) fn program(&self) -> Program<'_> {
+            Program::from_settings(self, &self.program_settings, &self.inference_settings)
+        }
+
+        pub(crate) fn set_python_version(&mut self, version: PythonVersion) {
+            self.program_settings.python_version.version = version;
         }
 
         /// Takes the salsa events.
@@ -119,7 +146,7 @@ pub(crate) mod tests {
         }
 
         fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
+            self.program_settings.python_version.version
         }
     }
 
@@ -132,12 +159,13 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
-        fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        fn check_file(&self, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic> {
+            let file = analysis_file.file(self);
             if !self.should_check_file(file) {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, analysis_file)
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -152,6 +180,10 @@ pub(crate) mod tests {
             &self.analysis_settings
         }
 
+        fn python_version_source(&self, _program: Program<'_>) -> PythonVersionSource {
+            self.program_settings.python_version.source.clone()
+        }
+
         fn verbose(&self) -> bool {
             false
         }
@@ -162,11 +194,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
@@ -217,19 +245,16 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: self.python_version,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                        .context("Invalid search path settings")?,
+            db.program_settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: self.python_version,
+                    source: PythonVersionSource::default(),
                 },
-            );
+                python_platform: self.python_platform,
+                search_paths: SearchPathSettings::new(vec![src_root])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .context("Invalid search path settings")?,
+            };
 
             Ok(db)
         }

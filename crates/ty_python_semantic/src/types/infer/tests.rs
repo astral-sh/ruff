@@ -1,8 +1,10 @@
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
-use crate::place::{ConsideredDefinitions, Place, global_symbol};
-use crate::types::{KnownClass, KnownInstanceType, check_types, check_types_in_environment};
+use crate::place::{
+    ConsideredDefinitions, Place, PlaceAndQualifiers, global_symbol as global_symbol_in_environment,
+};
+use crate::types::{KnownClass, KnownInstanceType, check_types as check_types_in_environment};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
@@ -13,14 +15,34 @@ use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::SearchPathSettings;
 use ty_python_core::definition::Definition;
-use ty_python_core::environment::{AnalysisFile, InferenceEnvironment, InferenceSettings};
+use ty_python_core::environment::{AnalysisFile, InferenceSettings};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-use ty_python_core::scope::FileScopeId;
-use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
+use ty_python_core::scope::{FileScopeId, ScopeId};
+use ty_python_core::{SemanticIndex, place_table, use_def_map};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
+
+fn analysis_file(db: &TestDb, file: File) -> AnalysisFile<'_> {
+    AnalysisFile::new(db, db.program(), file)
+}
+
+fn semantic_index(db: &TestDb, file: File) -> &SemanticIndex<'_> {
+    ty_python_core::semantic_index(db, analysis_file(db, file))
+}
+
+fn global_scope(db: &TestDb, file: File) -> ScopeId<'_> {
+    ty_python_core::global_scope(db, analysis_file(db, file))
+}
+
+fn global_symbol<'db>(db: &'db TestDb, file: File, name: &str) -> PlaceAndQualifiers<'db> {
+    global_symbol_in_environment(db, analysis_file(db, file), name)
+}
+
+fn check_types(db: &TestDb, file: File) -> Vec<Diagnostic> {
+    check_types_in_environment(db, analysis_file(db, file))
+}
 
 #[track_caller]
 fn get_symbol<'db>(
@@ -31,16 +53,17 @@ fn get_symbol<'db>(
 ) -> Place<'db> {
     let file = system_path_to_file(db, file_name).expect("file to exist");
     let module = parsed_module(db, file).load(db);
+    let analysis_file = analysis_file(db, file);
     let index = semantic_index(db, file);
     let mut file_scope_id = FileScopeId::global();
-    let mut scope = file_scope_id.to_scope_id(db, file);
+    let mut scope = file_scope_id.to_scope_id(db, analysis_file);
     for expected_scope_name in scopes {
         file_scope_id = index
             .child_scopes(file_scope_id)
             .next()
             .unwrap_or_else(|| panic!("scope of {expected_scope_name}"))
             .0;
-        scope = file_scope_id.to_scope_id(db, file);
+        scope = file_scope_id.to_scope_id(db, analysis_file);
         assert_eq!(scope.name(db, &module), *expected_scope_name);
     }
 
@@ -90,12 +113,12 @@ fn one_file_can_be_analyzed_for_multiple_platforms() -> anyhow::Result<()> {
         )
         .build()?;
     let file = system_path_to_file(&db, "/src/main.py")?;
-    let default = Program::get(&db);
+    let default = db.program();
 
     let program = |platform: &str| {
         Program::create(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version: default.python_version(&db),
                     source: PythonVersionSource::Default,
@@ -107,7 +130,7 @@ fn one_file_can_be_analyzed_for_multiple_platforms() -> anyhow::Result<()> {
     };
     let diagnostics = |platform| {
         let environment =
-            InferenceEnvironment::create(&db, program(platform), InferenceSettings::default());
+            program(platform).with_inference_settings(&db, InferenceSettings::default());
         check_types_in_environment(&db, AnalysisFile::new(&db, environment, file))
     };
 
@@ -145,11 +168,11 @@ fn one_file_can_be_analyzed_for_multiple_python_versions() -> anyhow::Result<()>
         )
         .build()?;
     let file = system_path_to_file(&db, "/src/main.py")?;
-    let default = Program::get(&db);
+    let default = db.program();
     let revealed = |version| {
         let program = Program::create(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version,
                     source: PythonVersionSource::Default,
@@ -158,7 +181,7 @@ fn one_file_can_be_analyzed_for_multiple_python_versions() -> anyhow::Result<()>
                 search_paths: default.search_paths(&db).clone(),
             },
         );
-        let environment = InferenceEnvironment::create(&db, program, InferenceSettings::default());
+        let environment = program.with_inference_settings(&db, InferenceSettings::default());
         let diagnostics =
             check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
         diagnostics
@@ -179,11 +202,11 @@ fn one_file_can_be_analyzed_for_multiple_python_versions() -> anyhow::Result<()>
 #[test]
 fn known_classes_are_looked_up_in_the_selected_python_version() {
     let db = setup_db();
-    let default = Program::get(&db);
+    let default = db.program();
     let class_name = |version| {
         let program = Program::create(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version,
                     source: PythonVersionSource::Default,
@@ -192,12 +215,12 @@ fn known_classes_are_looked_up_in_the_selected_python_version() {
                 search_paths: default.search_paths(&db).clone(),
             },
         );
-        let environment = InferenceEnvironment::create(&db, program, InferenceSettings::default());
+        let environment = program.with_inference_settings(&db, InferenceSettings::default());
         let class = KnownClass::EnumType
-            .try_to_class_literal_in_context(crate::TypingContext::new(&db, environment))
+            .try_to_class_literal(&db, environment)
             .unwrap();
         assert_eq!(
-            class.definition(&db).analysis_file(&db).environment(&db),
+            class.definition(&db).analysis_file(&db).program(&db),
             environment
         );
         class.name(&db).to_string()
@@ -219,14 +242,14 @@ fn imported_files_inherit_the_importers_search_paths() -> anyhow::Result<()> {
     db.write_file("/first/dependency.py", "value = 1\n")?;
     db.write_file("/second/dependency.py", "value = 'second'\n")?;
     let file = system_path_to_file(&db, "/src/main.py")?;
-    let default = Program::get(&db);
+    let default = db.program();
 
     let revealed = |root: &str| -> anyhow::Result<String> {
         let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from(root)])
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)?;
         let program = Program::create(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version: default.python_version(&db),
                     source: PythonVersionSource::Default,
@@ -235,7 +258,7 @@ fn imported_files_inherit_the_importers_search_paths() -> anyhow::Result<()> {
                 search_paths,
             },
         );
-        let environment = InferenceEnvironment::create(&db, program, InferenceSettings::default());
+        let environment = program.with_inference_settings(&db, InferenceSettings::default());
         let diagnostics =
             check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
         Ok(diagnostics
@@ -265,9 +288,8 @@ fn replace_imports_with_any_forks_inference_environments() -> anyhow::Result<()>
     let file = system_path_to_file(&db, "/src/main.py")?;
 
     let revealed = |replace_imports_with_any| {
-        let environment = InferenceEnvironment::create(
+        let environment = db.program().with_inference_settings(
             &db,
-            Program::get(&db),
             InferenceSettings {
                 replace_imports_with_any,
             },
@@ -466,6 +488,7 @@ fn pep695_type_params() {
             ",
     )
     .unwrap();
+    let program = db.program();
 
     let check_typevar = |var: &'static str,
                          display: &'static str,
@@ -473,11 +496,11 @@ fn pep695_type_params() {
                          constraints: Option<&[&'static str]>,
                          default: Option<&'static str>| {
         let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
-        assert_eq!(var_ty.display(&db).to_string(), display);
+        assert_eq!(var_ty.display(&db, program).to_string(), display);
 
         let expected_name_ty = format!(r#"Literal["{var}"]"#);
-        let name_ty = var_ty.member(&db, "__name__").place.expect_type();
-        assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
+        let name_ty = var_ty.member(&db, program, "__name__").place.expect_type();
+        assert_eq!(name_ty.display(&db, program).to_string(), expected_name_ty);
 
         let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = var_ty else {
             panic!("expected TypeVar");
@@ -485,14 +508,14 @@ fn pep695_type_params() {
 
         assert_eq!(
             typevar
-                .upper_bound(&db)
-                .map(|ty| ty.display(&db).to_string()),
+                .upper_bound(&db, program)
+                .map(|ty| ty.display(&db, program).to_string()),
             upper_bound.map(std::borrow::ToOwned::to_owned)
         );
         assert_eq!(
-            typevar.constraints(&db).map(|tys| tys
+            typevar.constraints(&db, program).map(|tys| tys
                 .iter()
-                .map(|ty| ty.display(&db).to_string())
+                .map(|ty| ty.display(&db, program).to_string())
                 .collect::<Vec<_>>()),
             constraints.map(|strings| strings
                 .iter()
@@ -502,7 +525,7 @@ fn pep695_type_params() {
         assert_eq!(
             typevar
                 .default_type(&db)
-                .map(|ty| ty.display(&db).to_string()),
+                .map(|ty| ty.display(&db, program).to_string()),
             default.map(std::borrow::ToOwned::to_owned)
         );
     };
@@ -553,6 +576,7 @@ fn unbound_symbol_no_reachability_constraint_check() {
     db.clear_salsa_events();
     assert_file_diagnostics(&db, "src/a.py", &[]);
     let events = db.take_salsa_events();
+
     let cycles = salsa::attach(&db, || {
         events
             .iter()
@@ -770,20 +794,22 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         ("/src/a.py", "from foo import x"),
         ("/src/foo.py", "x: int = 10\ndef foo(): ..."),
     ])?;
+    let program = db.program();
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db, program).to_string(), "int");
 
     // Change `x` to a different value
     db.write_file("/src/foo.py", "x: bool = True\ndef foo(): ...")?;
+    let program = db.program();
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
     let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty_2.display(&db).to_string(), "bool");
+    assert_eq!(x_ty_2.display(&db, program).to_string(), "bool");
 
     Ok(())
 }
@@ -796,21 +822,23 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
         ("/src/a.py", "from foo import x"),
         ("/src/foo.py", "x: int = 10\ndef foo(): y = 1"),
     ])?;
+    let program = db.program();
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db, program).to_string(), "int");
 
     db.write_file("/src/foo.py", "x: int = 10\ndef foo(): pass")?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
     db.clear_salsa_events();
+    let program = db.program();
 
     let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty_2.display(&db).to_string(), "int");
+    assert_eq!(x_ty_2.display(&db, program).to_string(), "int");
 
     let events = db.take_salsa_events();
 
@@ -832,21 +860,23 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
         ("/src/a.py", "from foo import x"),
         ("/src/foo.py", "x: int = 10\ny: bool = True"),
     ])?;
+    let program = db.program();
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db, program).to_string(), "int");
 
     db.write_file("/src/foo.py", "x: int = 10\ny: bool = False")?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
     db.clear_salsa_events();
+    let program = db.program();
 
     let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty_2.display(&db).to_string(), "int");
+    assert_eq!(x_ty_2.display(&db, program).to_string(), "int");
 
     let events = db.take_salsa_events();
 
@@ -890,10 +920,11 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         x = y = C().attr
         "#,
     )?;
+    let program = db.program();
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
     let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int | None");
+    assert_eq!(attr_ty.display(&db, program).to_string(), "int | None");
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -907,8 +938,9 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
+        let program = db.program();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(attr_ty.display(&db, program).to_string(), "str | None");
         db.take_salsa_events()
     };
     assert_function_query_was_run(
@@ -931,8 +963,9 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
+        let program = db.program();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(attr_ty.display(&db, program).to_string(), "str | None");
         db.take_salsa_events()
     };
 
@@ -981,10 +1014,11 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         x = y = C().attr
         "#,
     )?;
+    let program = db.program();
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
     let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int | None");
+    assert_eq!(attr_ty.display(&db, program).to_string(), "int | None");
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -1000,8 +1034,9 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
+        let program = db.program();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(attr_ty.display(&db, program).to_string(), "str | None");
         db.take_salsa_events()
     };
     assert_function_query_was_run(
@@ -1026,8 +1061,9 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
+        let program = db.program();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(attr_ty.display(&db, program).to_string(), "str | None");
         db.take_salsa_events()
     };
 
@@ -1077,10 +1113,11 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         x = y = C().class_attr
         "#,
     )?;
+    let program = db.program();
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
     let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int");
+    assert_eq!(attr_ty.display(&db, program).to_string(), "int");
 
     // Change the type of `class_attr` to `str`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -1098,8 +1135,9 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
+        let program = db.program();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str");
+        assert_eq!(attr_ty.display(&db, program).to_string(), "str");
         db.take_salsa_events()
     };
     assert_function_query_was_run(
@@ -1126,8 +1164,9 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
+        let program = db.program();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str");
+        assert_eq!(attr_ty.display(&db, program).to_string(), "str");
         db.take_salsa_events()
     };
 
@@ -1163,11 +1202,12 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
         a = b = foo()
         "#,
     )?;
+    let program = db.program();
 
     let bar = system_path_to_file(&db, "src/bar.py")?;
     let a = global_symbol(&db, bar, "a").place;
 
-    assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+    assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db, program));
     let events = db.take_salsa_events();
 
     let module = parsed_module(&db, bar).load(&db);
@@ -1192,10 +1232,11 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
         "#,
     )?;
     db.clear_salsa_events();
+    let program = db.program();
 
     let a = global_symbol(&db, bar, "a").place;
 
-    assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+    assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db, program));
     let events = db.take_salsa_events();
 
     let module = parsed_module(&db, bar).load(&db);

@@ -50,7 +50,12 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(rename_results) = rename(db, file, offset, &params.new_name) else {
+        let Some(rename_results) = rename(
+            db,
+            crate::server::api::analysis_file(db, file),
+            offset,
+            &params.new_name,
+        ) else {
             return Ok(None);
         };
 

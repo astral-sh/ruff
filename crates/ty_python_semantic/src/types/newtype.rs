@@ -43,22 +43,22 @@ impl get_size2::GetSize for NewType<'_> {}
 
 #[salsa::tracked]
 impl<'db> NewType<'db> {
-    pub fn base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
+    pub fn base(self, db: &'db dyn Db, program: crate::Program<'db>) -> NewTypeBase<'db> {
         match self.eager_base(db) {
             Some(base) => base,
-            None => self.lazy_base(db),
+            None => self.lazy_base(db, program),
         }
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
+        cycle_initial=|db, _, _, program| NewTypeBase::ClassType(ClassType::object(db, program)),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
+    fn lazy_base(self, db: &'db dyn Db, program: crate::Program<'db>) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
-        let object_fallback = NewTypeBase::ClassType(ClassType::object(db));
+        let object_fallback = NewTypeBase::ClassType(ClassType::object(db, program));
         let definition = self.definition(db);
         let module =
             parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
@@ -73,7 +73,7 @@ impl<'db> NewType<'db> {
         };
         match definition_expression_type(db, definition, second_arg) {
             Type::NominalInstance(nominal_instance_type) => {
-                NewTypeBase::ClassType(nominal_instance_type.class(db))
+                NewTypeBase::ClassType(nominal_instance_type.class(db, program))
             }
             Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
             // There are exactly two union types allowed as bases for NewType: `int | float` and
@@ -89,21 +89,22 @@ impl<'db> NewType<'db> {
         }
     }
 
-    fn iter_bases(self, db: &'db dyn Db) -> NewTypeBaseIter<'db> {
+    fn iter_bases(self, db: &'db dyn Db, program: crate::Program<'db>) -> NewTypeBaseIter<'db> {
         NewTypeBaseIter {
             current: Some(self),
             seen_before: FxHashSet::default(),
             db,
+            program,
         }
     }
 
     // Walk the `NewTypeBase` chain to find the underlying non-newtype `Type`. There might not be
     // one if this `NewType` is cyclical, and we fall back to `object` in that case.
-    pub fn concrete_base_type(self, db: &'db dyn Db) -> Type<'db> {
-        for base in self.iter_bases(db) {
+    pub fn concrete_base_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+        for base in self.iter_bases(db, program) {
             match base {
                 NewTypeBase::NewType(_) => continue,
-                concrete => return concrete.instance_type(db),
+                concrete => return concrete.instance_type(db, program),
             }
         }
         Type::object()
@@ -124,6 +125,7 @@ impl<'db> NewType<'db> {
         db: &'db dyn Db,
         f: impl FnOnce(ClassType<'db>) -> Option<ClassType<'db>>,
     ) -> Option<Self> {
+        let program = self.definition(db).analysis_file(db).program(db);
         // Modifying the base class type requires unwrapping and re-wrapping however many base
         // newtypes there are between here and there. Normally recursion would be natural for this,
         // but the bases iterator does cycle detection, and I think using that with a stack is a
@@ -132,7 +134,7 @@ impl<'db> NewType<'db> {
         // unmodified seems more correct than injecting some default type like `object` into the
         // cycle, which is what `CycleDetector` would do if we used it here.
         let mut inner_newtype_stack = Vec::new();
-        for base in self.iter_bases(db) {
+        for base in self.iter_bases(db, program) {
             match base {
                 // Build up the stack of intermediate newtypes that we'll need to re-wrap after
                 // we've mapped the `ClassType`.
@@ -180,11 +182,12 @@ impl<'db> NewType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let eager_base = match self.eager_base(db) {
-            Some(base) => Some(base.recursive_type_normalized_impl(db, div, nested)?),
+            Some(base) => Some(base.recursive_type_normalized_impl(db, program, div, nested)?),
             None => None,
         };
 
@@ -201,6 +204,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_newtype_pair(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         source: NewType<'db>,
         target: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -210,7 +214,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source.is_equivalent_to(db, target) {
             return self.always();
         }
-        for base in source.iter_bases(db) {
+        for base in source.iter_bases(db, program) {
             if let NewTypeBase::NewType(base_newtype) = base
                 && base_newtype.is_equivalent_to(db, target)
             {
@@ -225,6 +229,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn check_newtype_pair(
         &self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         left: NewType<'db>,
         right: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -233,9 +238,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         // it's not possible for some third type to multiply-inherit from both.
         let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
         relation_checker
-            .check_newtype_pair(db, left, right)
-            .or(db, self.constraints, || {
-                relation_checker.check_newtype_pair(db, right, left)
+            .check_newtype_pair(db, program, left, right)
+            .or(db, program, self.constraints, || {
+                relation_checker.check_newtype_pair(db, program, right, left)
             })
             .negate(db, self.constraints)
     }
@@ -243,16 +248,17 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
 pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     newtype: NewType<'db>,
     visitor: &V,
 ) {
     let base = if visitor.should_visit_lazy_type_attributes() {
-        Some(newtype.base(db))
+        Some(newtype.base(db, program))
     } else {
         newtype.eager_base(db)
     };
     if let Some(base) = base {
-        visitor.visit_type(db, base.instance_type(db));
+        visitor.visit_type(db, program, base.instance_type(db, program));
     }
 }
 
@@ -270,27 +276,28 @@ pub enum NewTypeBase<'db> {
 }
 
 impl<'db> NewTypeBase<'db> {
-    pub fn instance_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn instance_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
         match self {
-            NewTypeBase::ClassType(class_type) => Type::instance(db, class_type),
+            NewTypeBase::ClassType(class_type) => Type::instance(db, program, class_type),
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
-            NewTypeBase::Float => KnownUnion::Float.to_type(db),
-            NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
+            NewTypeBase::Float => KnownUnion::Float.to_type(db, program),
+            NewTypeBase::Complex => KnownUnion::Complex.to_type(db, program),
         }
     }
 
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             NewTypeBase::ClassType(class_type) => class_type
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, program, div, nested)
                 .map(NewTypeBase::ClassType),
             NewTypeBase::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, program, div, nested)
                 .map(NewTypeBase::NewType),
             NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }
@@ -315,6 +322,7 @@ struct NewTypeBaseIter<'db> {
     current: Option<NewType<'db>>,
     seen_before: FxHashSet<NewType<'db>>,
     db: &'db dyn Db,
+    program: crate::Program<'db>,
 }
 
 impl<'db> Iterator for NewTypeBaseIter<'db> {
@@ -322,7 +330,7 @@ impl<'db> Iterator for NewTypeBaseIter<'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.current?;
-        match current.base(self.db) {
+        match current.base(self.db, self.program) {
             NewTypeBase::NewType(base_newtype) => {
                 // Doing the insertion only in this branch avoids allocating in the common case.
                 self.seen_before.insert(current);

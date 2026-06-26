@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::parsed_module_versioned;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
@@ -25,6 +25,8 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use ty_python_core::environment::{AnalysisFile, InferenceSettings};
+use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
@@ -73,6 +75,10 @@ pub struct Project {
     /// salsa allocated table for `Project`.
     #[returns(deref)]
     pub settings: Box<Settings>,
+
+    /// The Python environment settings used when constructing an analysis context.
+    #[returns(deref)]
+    pub program_settings: Box<ProgramSettings>,
 
     /// The paths that should be included when checking this project.
     ///
@@ -174,6 +180,7 @@ impl Project {
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
+        program_settings: ProgramSettings,
         settings_diagnostics: Vec<OptionDiagnostic>,
         program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> Self {
@@ -183,11 +190,35 @@ impl Project {
             program_settings_diagnostics,
         );
 
-        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .file_set_durability(Durability::LOW)
-            .new(db)
+        Project::builder(
+            Box::new(metadata),
+            Box::new(settings),
+            Box::new(program_settings),
+            diagnostics,
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .file_set_durability(Durability::LOW)
+        .new(db)
+    }
+
+    #[salsa::tracked(heap_size = ruff_memory_usage::heap_size)]
+    pub fn program(self, db: &dyn Db) -> Program<'_> {
+        Program::from_settings(
+            db,
+            self.program_settings(db),
+            &InferenceSettings {
+                replace_imports_with_any: self
+                    .settings(db)
+                    .analysis()
+                    .replace_imports_with_any
+                    .clone(),
+            },
+        )
+    }
+
+    pub fn analysis_file(self, db: &dyn Db, file: File) -> AnalysisFile<'_> {
+        AnalysisFile::new(db, self.program(db), file)
     }
 
     /// Permanently freezes the most heavily read immutable project inputs.
@@ -274,6 +305,7 @@ impl Project {
         db: &mut dyn Db,
         metadata: ProjectMetadata,
         settings: Option<Settings>,
+        program_settings: Option<ProgramSettings>,
         settings_diagnostics: Vec<OptionDiagnostic>,
         program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> ProjectReloadResult {
@@ -300,6 +332,15 @@ impl Project {
             self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
 
+        let program_settings_changed = program_settings.is_some_and(|program_settings| {
+            if self.program_settings(db) != &program_settings {
+                self.set_program_settings(db).to(Box::new(program_settings));
+                true
+            } else {
+                false
+            }
+        });
+
         if files_changed {
             // The project file set only depends on the project root, explicit check paths,
             // force-exclude, and `src` settings. Check paths and force-exclude are updated
@@ -312,7 +353,7 @@ impl Project {
             self.set_metadata(db).to(Box::new(metadata));
         }
 
-        if metadata_changed || settings_changed {
+        if metadata_changed || settings_changed || program_settings_changed {
             ProjectReloadResult::Changed { files_changed }
         } else {
             ProjectReloadResult::Unchanged
@@ -340,6 +381,16 @@ impl Project {
         }
     }
 
+    pub(crate) fn update_program_settings(
+        self,
+        db: &mut dyn Db,
+        program_settings: ProgramSettings,
+    ) {
+        if self.program_settings(db) != &program_settings {
+            self.set_program_settings(db).to(Box::new(program_settings));
+        }
+    }
+
     fn settings_diagnostics_with_program_diagnostics(
         db: &dyn Db,
         mut settings_diagnostics: Vec<OptionDiagnostic>,
@@ -355,6 +406,7 @@ impl Project {
 
     /// Checks the project and its dependencies according to the project's check mode.
     pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
+        let program = self.program(db);
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -396,7 +448,8 @@ impl Project {
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        match check_file_impl(&db, file) {
+                        let analysis_file = AnalysisFile::new(&db, program, file);
+                        match check_file_impl(&db, analysis_file) {
                             Ok(diagnostics) => {
                                 reporter.report_checked_file(&db, file, diagnostics);
 
@@ -405,7 +458,10 @@ impl Project {
                                 if !open_files.contains(&file) {
                                     // The module has already been parsed by `check_file_impl`.
                                     // We only retrieve it here so that we can call `clear` on it.
-                                    let parsed = parsed_module(&db, file);
+                                    let parsed = parsed_module_versioned(
+                                        &db,
+                                        analysis_file.versioned_file(&db),
+                                    );
 
                                     // Drop the AST now that we are done checking this file. It is not currently open,
                                     // so it is unlikely to be accessed again soon. If any queries need to access the AST
@@ -437,7 +493,7 @@ impl Project {
             return Vec::new();
         }
 
-        check_file_impl(db, file)
+        check_file_impl(db, AnalysisFile::new(db, self.program(db), file))
             .map(<[Diagnostic]>::to_vec)
             .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
     }
@@ -748,10 +804,16 @@ pub enum ProjectReloadResult {
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub(crate) fn check_file_impl<'db>(
+    db: &'db dyn Db,
+    analysis_file: AnalysisFile<'db>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let file = analysis_file.file(db);
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+        match catch(&**db, file, || {
+            ty_python_semantic::check_file(*db, analysis_file)
+        }) {
             Ok(result) => result,
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
@@ -899,6 +961,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
+    use ty_python_core::environment::AnalysisFile;
     use ty_python_semantic::types::check_types;
 
     #[test]
@@ -916,8 +979,9 @@ mod tests {
         file.sync(&mut db);
 
         assert_eq!(source_text(&db, file).as_str(), "");
+        let analysis_file = AnalysisFile::new(&db, db.project().program(&db), file);
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, analysis_file)
                 .as_ref()
                 .unwrap_err()
                 .primary_message()
@@ -926,15 +990,17 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, check_types, file, &events);
+        let analysis_file = AnalysisFile::new(&db, db.project().program(&db), file);
+        assert_function_query_was_not_run(&db, check_types, analysis_file, &events);
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
         db.write_file(path, "").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "");
+        let analysis_file = AnalysisFile::new(&db, db.project().program(&db), file);
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, analysis_file)
                 .as_ref()
                 .unwrap()
                 .iter()

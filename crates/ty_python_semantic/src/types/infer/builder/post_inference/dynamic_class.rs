@@ -56,14 +56,15 @@ pub(crate) fn check_dynamic_class_definition<'db>(
 
         for (idx, base_type) in dynamic_class.explicit_bases(db).iter().enumerate() {
             // Convert to ClassType to access nearest_disjoint_base.
-            if let Some(class_type) = base_type.to_class_type(db) {
-                if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
+            if let Some(class_type) = base_type.to_class_type(db, context.program()) {
+                if let Some(disjoint_base) = class_type.nearest_disjoint_base(db, context.program())
+                {
                     disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                 }
             }
         }
 
-        disjoint_bases.remove_redundant_entries(db);
+        disjoint_bases.remove_redundant_entries(db, context.program());
         if disjoint_bases.len() > 1 {
             report_instance_layout_conflict(
                 context,
@@ -80,16 +81,16 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         base1,
         metaclass2,
         base2,
-    }) = dynamic_class.try_metaclass(db)
+    }) = dynamic_class.try_metaclass(db, context.program())
     {
         report_conflicting_metaclass_from_bases(
             context,
             call_expr.into(),
             dynamic_class.name(db),
             metaclass1,
-            base1.display(db),
+            base1.display(db, context.program()),
             metaclass2,
-            base2.display(db),
+            base2.display(db, context.program()),
         );
     }
 }

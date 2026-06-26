@@ -15,10 +15,13 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
 use ty_python_core::Db as _;
-use ty_python_core::program::Program;
+use ty_python_core::environment::InferenceSettings;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionSource, PythonVersionWithSource,
+    check_file_unwrap, default_lint_registry,
 };
 
 #[salsa::db]
@@ -29,10 +32,13 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     settings: Option<Settings>,
+    program_settings: ProgramSettings,
+    inference_settings: InferenceSettings,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
+        let vendored = ty_vendored::file_system().clone();
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -40,7 +46,16 @@ impl Db {
                     tracing::trace!("event: {:?}", event);
                 }
             }))),
-            vendored: ty_vendored::file_system().clone(),
+            program_settings: ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: ruff_python_ast::PythonVersion::default(),
+                    source: PythonVersionSource::default(),
+                },
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPaths::empty(&vendored),
+            },
+            inference_settings: InferenceSettings::default(),
+            vendored,
             files: Files::default(),
             settings: None,
         };
@@ -51,6 +66,14 @@ impl Db {
 
     fn settings(&self) -> Settings {
         self.settings.unwrap()
+    }
+
+    pub(crate) fn program(&self) -> Program<'_> {
+        Program::from_settings(self, &self.program_settings, &self.inference_settings)
+    }
+
+    pub(crate) fn set_program_settings(&mut self, settings: ProgramSettings) {
+        self.program_settings = settings;
     }
 
     pub(crate) fn set_verbosity(&mut self, verbose: bool) {
@@ -104,10 +127,14 @@ impl Db {
             AnalysisSettings::default()
         };
 
+        let inference_settings = InferenceSettings {
+            replace_imports_with_any: analysis.replace_imports_with_any.clone(),
+        };
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
         }
+        self.inference_settings = inference_settings;
     }
 
     pub(crate) fn update_mdtest_rule_selection(
@@ -155,16 +182,12 @@ impl SourceDb for Db {
     }
 
     fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
+        self.program_settings.python_version.version
     }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for Db {
-    fn search_paths(&self) -> &SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for Db {}
 
 #[salsa::db]
 impl ty_python_core::Db for Db {
@@ -175,12 +198,16 @@ impl ty_python_core::Db for Db {
 
 #[salsa::db]
 impl SemanticDb for Db {
-    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+    fn check_file(
+        &self,
+        analysis_file: ty_python_core::environment::AnalysisFile<'_>,
+    ) -> Vec<Diagnostic> {
+        let file = analysis_file.file(self);
         if !self.should_check_file(file) {
             return Vec::new();
         }
 
-        check_file_unwrap(self, file)
+        check_file_unwrap(self, analysis_file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -197,6 +224,10 @@ impl SemanticDb for Db {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         self.settings().analysis(self)
+    }
+
+    fn python_version_source(&self, _program: Program<'_>) -> PythonVersionSource {
+        self.program_settings.python_version.source.clone()
     }
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {

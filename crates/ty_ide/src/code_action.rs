@@ -1,10 +1,11 @@
 use crate::completion;
 
-use ruff_db::{files::File, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
 use ty_project::Db;
+use ty_python_core::environment::AnalysisFile;
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
@@ -19,10 +20,11 @@ pub struct QuickFix {
 
 pub fn code_actions(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Vec<QuickFix> {
+    let file = analysis_file.file(db);
     let registry = db.lint_registry();
     let Ok(lint_id) = registry.get(diagnostic_id) else {
         return Vec::new();
@@ -34,7 +36,7 @@ pub fn code_actions(
     let is_unresolved_reference =
         lint_id == LintId::of(&UNRESOLVED_REFERENCE) || lint_id == LintId::of(&UNDEFINED_REVEAL);
     if is_unresolved_reference
-        && let Some(import_quick_fix) = unresolved_fixes(db, file, diagnostic_range)
+        && let Some(import_quick_fix) = unresolved_fixes(db, analysis_file, diagnostic_range)
     {
         actions.extend(import_quick_fix);
     }
@@ -51,15 +53,16 @@ pub fn code_actions(
 
 fn unresolved_fixes(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     diagnostic_range: TextRange,
 ) -> Option<impl Iterator<Item = QuickFix>> {
+    let file = analysis_file.file(db);
     let parsed = parsed_module(db, file).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
 
     Some(
-        completion::unresolved_fixes(db, file, &parsed, symbol, node)
+        completion::unresolved_fixes(db, analysis_file, &parsed, symbol, node)
             .into_iter()
             .map(|import| QuickFix {
                 title: import.label,
@@ -86,7 +89,8 @@ mod tests {
     use ruff_diagnostics::Fix;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
-    use ty_project::ProjectMetadata;
+    use ty_project::{Db as _, ProjectMetadata};
+    use ty_python_core::environment::AnalysisFile;
     use ty_python_semantic::{
         lint::LintMetadata,
         types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE},
@@ -828,7 +832,11 @@ mod tests {
                 .context(0)
                 .format(DiagnosticFormat::Full);
 
-            for mut action in code_actions(&self.db, self.file, self.diagnostic_range, &lint.name) {
+            let analysis_file =
+                AnalysisFile::new(&self.db, self.db.project().program(&self.db), self.file);
+            for mut action in
+                code_actions(&self.db, analysis_file, self.diagnostic_range, &lint.name)
+            {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
                     ruff_db::diagnostic::Severity::Info,

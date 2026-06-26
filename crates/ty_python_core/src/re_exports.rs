@@ -20,7 +20,6 @@
 //! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
 //! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module_versioned;
 use ruff_python_ast::{
     self as ast,
@@ -28,7 +27,7 @@ use ruff_python_ast::{
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
-use ty_module_resolver::{ModuleName, resolve_module_in_program};
+use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::{Db, environment::AnalysisFile};
 
@@ -52,7 +51,6 @@ pub(super) fn exported_names(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> Bo
 
 struct ExportFinder<'db> {
     db: &'db dyn Db,
-    file: File,
     analysis_file: AnalysisFile<'db>,
     visiting_stub_file: bool,
     exports: FxHashMap<&'db Name, PossibleExportKind>,
@@ -64,7 +62,6 @@ impl<'db> ExportFinder<'db> {
         let file = analysis_file.file(db);
         Self {
             db,
-            file,
             analysis_file,
             visiting_stub_file: file.is_stub(db),
             exports: FxHashMap::default(),
@@ -252,18 +249,19 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     if &name.name.id == "*" {
                         if !found_star {
                             found_star = true;
-                            if let Ok(module_name) =
-                                ModuleName::from_import_statement(self.db, self.file, node)
-                                && let Some(module) = resolve_module_in_program(
-                                    self.db,
-                                    self.analysis_file.program_file(self.db),
-                                    &module_name,
-                                )
-                                && let Some(file) = module.file(self.db)
+                            if let Ok(module_name) = ModuleName::from_import_statement(
+                                self.db,
+                                self.analysis_file.program_file(self.db),
+                                node,
+                            ) && let Some(module) = resolve_module(
+                                self.db,
+                                self.analysis_file.program_file(self.db),
+                                &module_name,
+                            ) && let Some(file) = module.file(self.db)
                             {
                                 let analysis_file = AnalysisFile::new(
                                     self.db,
-                                    self.analysis_file.environment(self.db),
+                                    self.analysis_file.program(self.db),
                                     file,
                                 );
                                 for export in exported_names(self.db, analysis_file) {

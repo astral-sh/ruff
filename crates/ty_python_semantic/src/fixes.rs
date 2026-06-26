@@ -17,7 +17,8 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use thiserror::Error;
 
-use crate::Db;
+use crate::{AnalysisFile, Db};
+use ty_python_core::program::ProgramSnapshot;
 
 pub struct FixAllResults {
     /// The non-lint diagnostics that can't be fixed or the diagnostics of files
@@ -37,6 +38,7 @@ pub struct FixAllResults {
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn suppress_all_diagnostics(
     db: &mut dyn Db,
+    program: &ProgramSnapshot,
     diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
@@ -45,7 +47,7 @@ pub fn suppress_all_diagnostics(
         diagnostics,
         FixMode::Suppress,
         cancellation_token,
-        Db::check_file,
+        |db, file| Db::check_file(db, AnalysisFile::new(db, program.program(db), file)),
     )
 }
 
@@ -57,6 +59,7 @@ pub fn suppress_all_diagnostics(
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn fix_all_diagnostics(
     db: &mut dyn Db,
+    program: &ProgramSnapshot,
     diagnostics: Vec<Diagnostic>,
     applicability: Applicability,
     cancellation_token: &CancellationToken,
@@ -66,7 +69,7 @@ pub fn fix_all_diagnostics(
         diagnostics,
         FixMode::ApplyFixes(applicability),
         cancellation_token,
-        Db::check_file,
+        |db, file| Db::check_file(db, AnalysisFile::new(db, program.program(db), file)),
     )
 }
 
@@ -815,9 +818,9 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use super::suppress_all_diagnostics;
-    use crate::Db;
     use crate::db::tests::TestDbBuilder;
     use crate::fixes::{FixMode, fix_all};
+    use crate::{AnalysisFile, Db};
 
     #[test]
     fn simple_suppression() {
@@ -1436,13 +1439,17 @@ class B(A):
 
         let parsed_before = parsed_module(&db, file);
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
-
-        let diagnostics = db.check_file(file);
+        let program = db.program().snapshot(&db);
+        let diagnostics = db.check_file(AnalysisFile::new(&db, program.program(&db), file));
         let total_diagnostics = diagnostics.len();
         let cancellation_token_source = CancellationTokenSource::new();
-        let fixes =
-            suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
-                .expect("operation never gets cancelled");
+        let fixes = suppress_all_diagnostics(
+            &mut db,
+            &program,
+            diagnostics,
+            &cancellation_token_source.token(),
+        )
+        .expect("operation never gets cancelled");
 
         assert_eq!(fixes.count, total_diagnostics - fixes.diagnostics.len());
 
@@ -1453,7 +1460,8 @@ class B(A):
         let parsed = parsed_module(&db, file);
         let parsed = parsed.load(&db);
 
-        let diagnostics_after_applying_fixes = db.check_file(file);
+        let analysis_file = AnalysisFile::new(&db, program.program(&db), file);
+        let diagnostics_after_applying_fixes = db.check_file(analysis_file);
 
         let mut output = String::new();
 

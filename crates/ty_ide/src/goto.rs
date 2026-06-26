@@ -256,8 +256,12 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
-        let ty_def = ty.definition(db)?;
+    pub(crate) fn from_ty(
+        db: &'db dyn crate::Db,
+        program: ty_python_core::program::Program<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        let ty_def = ty.definition(db, program)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
                 ResolvedDefinition::Module(module.file(db)?)
@@ -339,7 +343,8 @@ impl<'db> Definitions<'db> {
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
         let definitions = self.goto_declaration(model, goto_target)?;
-        let resolved = StubMapper::new(model.db()).map_definitions(definitions.0);
+        let resolved = StubMapper::new(model.db(), model.analysis_file().program(model.db()))
+            .map_definitions(definitions.0);
         Some(Self::new(resolved))
     }
 
@@ -377,7 +382,11 @@ impl<'db> Definitions<'db> {
     /// Typically documentation only appears on implementations and not stubs,
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
-    pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
+    pub(crate) fn docstring(
+        self,
+        db: &'db dyn crate::Db,
+        program: ty_python_core::program::Program<'db>,
+    ) -> Option<Docstring> {
         for definition in &self {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
@@ -388,7 +397,7 @@ impl<'db> Definitions<'db> {
         // If the definition is located within a stub file and no docstring
         // is present, try to map the symbol to an implementation file and extract
         // the docstring from that location.
-        let stub_mapper = StubMapper::new(db);
+        let stub_mapper = StubMapper::new(db, program);
 
         // Try to find the corresponding implementation definition
         for definition in stub_mapper.map_definitions(self.0) {
@@ -438,9 +447,10 @@ pub(crate) fn docstring_for_call_definition<'db>(
     db: &'db dyn crate::Db,
     definition: Definition<'db>,
 ) -> Option<Docstring> {
+    let program = definition.analysis_file(db).program(db);
     let resolved = ResolvedDefinition::Definition(definition);
     Definitions::new(vec![resolved.clone()])
-        .docstring(db)
+        .docstring(db, program)
         .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
 

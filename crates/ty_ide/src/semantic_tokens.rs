@@ -28,7 +28,6 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
@@ -41,6 +40,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
+use ty_python_core::environment::AnalysisFile;
 use ty_python_semantic::{
     HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel, definitions_for_attribute,
     definitions_for_imported_symbol,
@@ -183,9 +183,14 @@ impl Deref for SemanticTokens {
 
 /// Generates semantic tokens for a Python file within the specified range.
 /// Pass None to get tokens for the entire file.
-pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
+pub fn semantic_tokens(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+    range: Option<TextRange>,
+) -> SemanticTokens {
+    let file = analysis_file.file(db);
     let parsed = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.expecting_docstring = true;
@@ -299,7 +304,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
         let db = self.model.db();
-        let model = SemanticModel::new(db, definition.file(db));
+        let model = SemanticModel::new(db, definition.analysis_file(db));
 
         if model.is_type_alias_definition(definition) {
             return Some((SemanticTokenType::Class, modifiers));
@@ -1283,11 +1288,12 @@ mod tests {
     use super::*;
 
     use insta::assert_snapshot;
+    use ruff_db::files::File;
     use ruff_db::{
         files::system_path_to_file,
         system::{DbWithWritableSystem, SystemPath, SystemPathBuf},
     };
-    use ty_project::ProjectMetadata;
+    use ty_project::{Db as _, ProjectMetadata};
 
     #[test]
     fn semantic_tokens_basic() {
@@ -4710,12 +4716,16 @@ from pathlib import Missing as Alias
 
         /// Get semantic tokens for the entire file
         fn highlight_file(&self) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, None)
+            let analysis_file =
+                AnalysisFile::new(&self.db, self.db.project().program(&self.db), self.file);
+            semantic_tokens(&self.db, analysis_file, None)
         }
 
         /// Get semantic tokens for a specific range in the file
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, Some(range))
+            let analysis_file =
+                AnalysisFile::new(&self.db, self.db.project().program(&self.db), self.file);
+            semantic_tokens(&self.db, analysis_file, Some(range))
         }
 
         /// Helper function to convert semantic tokens to a snapshot-friendly text format

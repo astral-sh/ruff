@@ -9,11 +9,8 @@ pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
 pub use program::{ProgramFile, ResolverProgram};
 pub use resolve::{
-    SearchPaths, file_to_module, file_to_module_in_program, resolve_module,
-    resolve_module_confident, resolve_module_confident_in_program, resolve_module_in_program,
-    resolve_real_module, resolve_real_module_confident, resolve_real_module_confident_in_program,
-    resolve_real_module_in_program, resolve_real_shadowable_module,
-    resolve_real_shadowable_module_in_program,
+    SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
+    resolve_real_module_confident, resolve_real_shadowable_module,
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
@@ -21,9 +18,9 @@ pub use typeshed::{
     PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
 };
 
-pub use list::{all_modules, all_modules_in_program, list_modules, list_modules_in_program};
+pub use list::{all_modules, list_modules};
 pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, ModuleNameMatch};
-pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths, search_paths_in_program};
+pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
 
 mod db;
 mod list;
@@ -41,11 +38,14 @@ mod typeshed;
 mod testing;
 
 /// Returns an iterator over all search paths pointing to a system path
-pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
+pub fn system_module_search_paths<'db>(
+    db: &'db dyn Db,
+    program: ResolverProgram<'db>,
+) -> SystemModuleSearchPathsIter<'db> {
     SystemModuleSearchPathsIter {
         // Always run in `StubsAllowed` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
-        inner: search_paths(db, ModuleResolveMode::StubsAllowed),
+        inner: search_paths(db, program, ModuleResolveMode::StubsAllowed),
     }
 }
 

@@ -1,10 +1,16 @@
 use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
 use ruff_db::files::File;
 use ty_project::Db;
+use ty_python_core::environment::AnalysisFile;
+use ty_python_core::program::Program;
 
 /// Get all workspace symbols matching the query string.
 /// Returns symbols from all files in the workspace, filtered by the query.
-pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
+pub fn workspace_symbols(
+    db: &dyn Db,
+    program: Program<'_>,
+    query: &str,
+) -> Vec<WorkspaceSymbolInfo> {
     // If the query is empty, return immediately to avoid expensive file scanning
     if query.is_empty() {
         return Vec::new();
@@ -37,7 +43,9 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
                     let symbols_for_file_span = tracing::debug_span!(parent: workspace_symbols_span, "symbols_for_file", ?file);
                     let _entered = symbols_for_file_span.entered();
 
-                    for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
+                    for (_, symbol) in
+                        symbols_for_file(&*db, AnalysisFile::new(&*db, program, *file)).search(query)
+                    {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
@@ -210,7 +218,7 @@ foo = 1
 
     impl CursorTest {
         fn workspace_symbols(&self, query: &str) -> String {
-            let symbols = workspace_symbols(&self.db, query);
+            let symbols = workspace_symbols(&self.db, self.program(), query);
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

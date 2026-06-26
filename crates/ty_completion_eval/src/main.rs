@@ -19,7 +19,7 @@ use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{Db as _, ProjectDatabase, ProjectMetadata};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -333,7 +333,7 @@ impl Task {
             &self.db,
             &self.settings,
             CompletionCapabilities::default(),
-            file,
+            self.db.project().analysis_file(&self.db, file),
             offset,
         );
         Ok(completions)

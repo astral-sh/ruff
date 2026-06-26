@@ -40,7 +40,9 @@ impl BackgroundRequestHandler for CallHierarchyOutgoingCallsRequestHandler {
                 continue;
             };
 
-            for call in ty_ide::outgoing_calls(db, file, offset) {
+            for call in
+                ty_ide::outgoing_calls(db, crate::server::api::analysis_file(db, file), offset)
+            {
                 let Some(to) = convert_to_lsp_item(db, call.to, encoding) else {
                     continue;
                 };

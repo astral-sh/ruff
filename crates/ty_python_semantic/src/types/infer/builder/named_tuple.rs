@@ -33,6 +33,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         kind: NamedTupleKind,
     ) -> Type<'db> {
         let db = self.db();
+        let program = self.program;
 
         // The fallback type reflects the fact that if the call were successful,
         // it would return a class that:
@@ -44,9 +45,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let fallback = || {
             IntersectionType::from_elements(
                 db,
+                program,
                 [
-                    Type::homogeneous_tuple(db, Type::unknown()).to_meta_type(db),
-                    KnownClass::NamedTupleLike.to_subclass_of(db),
+                    Type::homogeneous_tuple(db, Type::unknown()).to_meta_type(db, program),
+                    KnownClass::NamedTupleLike.to_subclass_of(db, program),
                     Type::unknown(),
                 ],
             )
@@ -217,11 +219,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
-                    if let Some(element_types) =
-                        extract_fixed_length_iterable_element_types(db, &kw.value, |expr| {
-                            self.expression_type(expr)
-                        })
-                    {
+                    if let Some(element_types) = extract_fixed_length_iterable_element_types(
+                        db,
+                        self.program,
+                        &kw.value,
+                        |expr| self.expression_type(expr),
+                    ) {
                         default_types = element_types.into_vec();
                     } else {
                         // Can't determine individual types; use Any for each element.
@@ -232,10 +235,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         default_types = vec![Type::any(); count];
                     }
                     // Emit diagnostic for invalid types (not Iterable[Any] | None).
-                    let iterable_any =
-                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                    let valid_type = UnionType::from_two_elements(db, iterable_any, Type::none(db));
-                    if !kw_type.is_assignable_to(db, valid_type)
+                    let iterable_any = KnownClass::Iterable.to_specialized_instance(
+                        db,
+                        self.program,
+                        &[Type::any()],
+                    );
+                    let valid_type = UnionType::from_two_elements(
+                        db,
+                        self.program,
+                        iterable_any,
+                        Type::none(db, self.program),
+                    );
+                    if !kw_type.is_assignable_to(db, self.program, valid_type)
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
@@ -244,7 +255,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                         diagnostic.set_primary_message(format_args!(
                             "Expected `Iterable[Any] | None`, found `{}`",
-                            kw_type.display(db)
+                            kw_type.display(db, self.program)
                         ));
                     }
                 }
@@ -252,16 +263,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     rename_type = Some(kw_type);
 
                     // Emit diagnostic for non-bool types.
-                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
-                        && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                    if !kw_type.is_assignable_to(
+                        db,
+                        self.program,
+                        KnownClass::Bool.to_instance(db, self.program),
+                    ) && let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `rename` of `namedtuple()`"
                         ));
                         diagnostic.set_primary_message(format_args!(
                             "Expected `bool`, found `{}`",
-                            kw_type.display(db)
+                            kw_type.display(db, self.program)
                         ));
                     }
                 }
@@ -269,10 +283,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // Emit diagnostic for invalid types (not str | None).
                     let valid_type = UnionType::from_two_elements(
                         db,
-                        KnownClass::Str.to_instance(db),
-                        Type::none(db),
+                        self.program,
+                        KnownClass::Str.to_instance(db, self.program),
+                        Type::none(db, self.program),
                     );
-                    if !kw_type.is_assignable_to(db, valid_type)
+                    if !kw_type.is_assignable_to(db, self.program, valid_type)
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
@@ -281,7 +296,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                         diagnostic.set_primary_message(format_args!(
                             "Expected `str | None`, found `{}`",
-                            kw_type.display(db)
+                            kw_type.display(db, self.program)
                         ));
                     }
                 }
@@ -328,7 +343,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|literal| Name::new(literal.value(db)));
 
         if name.is_none()
-            && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && !name_type.is_assignable_to(
+                db,
+                self.program,
+                KnownClass::Str.to_instance(db, self.program),
+            )
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -336,7 +355,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
             diagnostic.set_primary_message(format_args!(
                 "Expected `str`, found `{}`",
-                name_type.display(db)
+                name_type.display(db, self.program)
             ));
         } else if let Some(actual_name) = name.as_deref()
             && let Some(definition) = definition
@@ -424,7 +443,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Check for `rename=True`. Use `is_always_true()` to handle truthy values
         // (e.g., `rename=1`), though we'd still want a diagnostic for non-bool types.
-        let rename = rename_type.is_some_and(|ty| ty.bool(db).is_always_true());
+        let rename = rename_type.is_some_and(|ty| ty.bool(db, self.program).is_always_true());
 
         let fields_type = self.infer_expression(fields_arg, TypeContext::default());
 
@@ -441,7 +460,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .collect(),
                 )
             } else {
-                extract_fixed_length_iterable_element_types(db, fields_arg, |expr| {
+                extract_fixed_length_iterable_element_types(db, self.program, fields_arg, |expr| {
                     self.expression_type(expr)
                 })
                 .and_then(|field_types| {
@@ -454,10 +473,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         if maybe_field_names.is_none() {
             // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
-            let iterable_str = KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-            let valid_type =
-                UnionType::from_two_elements(db, KnownClass::Str.to_instance(db), iterable_str);
-            if !fields_type.is_assignable_to(db, valid_type)
+            let iterable_str =
+                KnownClass::Iterable.to_specialized_instance(db, self.program, &[Type::any()]);
+            let valid_type = UnionType::from_two_elements(
+                db,
+                self.program,
+                KnownClass::Str.to_instance(db, self.program),
+                iterable_str,
+            );
+            if !fields_type.is_assignable_to(db, self.program, valid_type)
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -465,7 +489,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
                 diagnostic.set_primary_message(format_args!(
                     "Expected `str` or an iterable of strings, found `{}`",
-                    fields_type.display(db)
+                    fields_type.display(db, self.program)
                 ));
             }
         }
@@ -585,7 +609,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         SequenceKind::List => {
                             self.store_expression_type(
                                 fields_arg,
-                                KnownClass::List.to_instance(db),
+                                KnownClass::List.to_instance(db, self.program),
                             );
                         }
                         SequenceKind::Tuple => self.store_expression_type(
@@ -614,7 +638,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 match field_arg_kind {
                     SequenceKind::List => {
-                        self.store_expression_type(fields_arg, KnownClass::List.to_instance(db));
+                        self.store_expression_type(
+                            fields_arg,
+                            KnownClass::List.to_instance(db, self.program),
+                        );
                     }
                     SequenceKind::Tuple => self.store_expression_type(
                         fields_arg,
@@ -639,7 +666,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 SequenceKind::Tuple => Type::heterogeneous_tuple(db, [name_type, declared_type]),
                 SequenceKind::List => KnownClass::List.to_specialized_instance(
                     db,
-                    &[UnionType::from_two_elements(db, name_type, declared_type)],
+                    self.program,
+                    &[UnionType::from_two_elements(
+                        db,
+                        self.program,
+                        name_type,
+                        declared_type,
+                    )],
                 ),
             };
 
@@ -651,7 +684,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 match field_arg_kind {
                     SequenceKind::List => {
-                        self.store_expression_type(fields_arg, KnownClass::List.to_instance(db));
+                        self.store_expression_type(
+                            fields_arg,
+                            KnownClass::List.to_instance(db, self.program),
+                        );
                     }
                     SequenceKind::Tuple => self.store_expression_type(
                         fields_arg,
@@ -663,7 +699,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.into_diagnostic("Invalid `NamedTuple` field name definition");
                     diagnostic.set_primary_message(format_args!(
                         "Expected a string literal for the field name, found `{}`",
-                        name_type.display(db)
+                        name_type.display(db, self.program)
                     ));
                 }
                 return NamedTupleSpec::unknown(db);

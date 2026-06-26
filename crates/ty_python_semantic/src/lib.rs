@@ -10,7 +10,7 @@ pub use db::Db;
 pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
 };
-pub use environment::{AnalysisFile, InferenceEnvironment, InferenceSettings, TypingContext};
+pub use environment::{AnalysisFile, InferenceSettings};
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -124,8 +124,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let index =
-        ty_python_core::semantic_index_in_environment(db, class_body_scope.analysis_file(db));
+    let index = ty_python_core::semantic_index(db, class_body_scope.analysis_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -145,8 +144,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let index =
-        ty_python_core::semantic_index_in_environment(db, class_body_scope.analysis_file(db));
+    let index = ty_python_core::semantic_index(db, class_body_scope.analysis_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -166,17 +164,13 @@ pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }
 
-pub fn check_file_unwrap(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    check_file(db, file)
+pub fn check_file_unwrap(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic> {
+    check_file(db, analysis_file)
         .map(<[ruff_db::diagnostic::Diagnostic]>::into_vec)
         .unwrap_or_else(|error| vec![error])
 }
 
-pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
-    check_file_in_environment(db, AnalysisFile::from_default(db, file))
-}
-
-pub fn check_file_in_environment(
+pub fn check_file(
     db: &dyn Db,
     analysis_file: AnalysisFile<'_>,
 ) -> Result<Box<[Diagnostic]>, Diagnostic> {
@@ -206,11 +200,16 @@ pub fn check_file_in_environment(
 
     diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
         let mut error = Diagnostic::invalid_syntax(file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
+        add_inferred_python_version_hint_to_diagnostic(
+            db,
+            analysis_file.program(db),
+            &mut error,
+            "parsing syntax",
+        );
         error
     }));
 
-    diagnostics.extend(types::check_types_in_environment(db, analysis_file));
+    diagnostics.extend(types::check_types(db, analysis_file));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

@@ -16,6 +16,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_python_core::definition::DefinitionKind;
+use ty_python_core::environment::AnalysisFile;
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Find the callees associated with the function, method, or class at `offset`.
@@ -29,9 +30,14 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// are reported when the nested callable is expanded separately. Declaration
 /// expressions attached to a nested callable are still included while
 /// traversing the containing item's body.
-pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<OutgoingCall> {
+pub fn outgoing_calls(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+    offset: TextSize,
+) -> Vec<OutgoingCall> {
+    let file = analysis_file.file(db);
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
     };
@@ -54,7 +60,7 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
         let def_file = def.file(db);
         let parsed = parsed_module(db, def_file).load(db);
 
-        let model = SemanticModel::new(db, def_file);
+        let model = SemanticModel::new(db, def.analysis_file(db));
         let mut finder = OutgoingCallsFinder {
             db,
             model: &model,
@@ -304,7 +310,11 @@ mod tests {
             else {
                 return "No outgoing calls found".to_string();
             };
-            let calls = outgoing_calls(&self.db, target.file, target.selection_range.start());
+            let calls = outgoing_calls(
+                &self.db,
+                self.analysis_file(target.file),
+                target.selection_range.start(),
+            );
             if calls.is_empty() {
                 return "No outgoing calls found".to_string();
             }

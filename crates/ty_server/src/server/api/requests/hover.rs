@@ -48,7 +48,8 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         };
 
-        let Some(range_info) = hover(db, file, offset) else {
+        let Some(range_info) = hover(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

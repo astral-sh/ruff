@@ -12,7 +12,7 @@ use crate::{
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::semantic_index_in_environment;
+use ty_python_core::semantic_index;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
@@ -48,7 +48,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> Option<Definition<'db>> {
         let db = self.db();
-        let class_ty = object_ty.nominal_class(db)?;
+        let class_ty = object_ty.nominal_class(db, self.program)?;
 
         for base in class_ty.iter_mro(db) {
             let Some(class) = base.into_class() else {
@@ -60,7 +60,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index_in_environment(db, class_body_scope.analysis_file(db));
+            let class_index = semantic_index(db, class_body_scope.analysis_file(db));
             let place_table = class_index.place_table(class_scope_id);
             let Some(symbol_id) = place_table.symbol_id(attribute) else {
                 continue;
@@ -68,8 +68,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let use_def = class_index.use_def_map(class_scope_id);
 
-            let place_and_quals_result =
-                place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+            let place_and_quals_result = place_from_declarations(
+                db,
+                self.program,
+                use_def.end_of_scope_symbol_declarations(symbol_id),
+            );
 
             let Some(declaration) = place_and_quals_result.first_declaration else {
                 continue;
@@ -197,8 +200,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
-                .nominal_class(db)
-                .or_else(|| object_ty.to_class_type(db))
+                .nominal_class(db, self.program)
+                .or_else(|| object_ty.to_class_type(db, self.program))
                 .and_then(|cls| cls.static_class_literal(db))
                 .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
             let Some(builder) = self
@@ -209,7 +212,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
-                object_ty.display(db)
+                object_ty.display(db, self.program)
             ));
             diagnostic.set_primary_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
@@ -236,10 +239,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db);
-        let object_instance_ty = object_ty.bind_self_typevars(db, class_instance_ty);
-        let is_current_class_instance =
-            is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
+        let class_instance_ty =
+            Type::instance(db, self.program, class_ty).top_materialization(db, self.program);
+        let object_instance_ty = object_ty.bind_self_typevars(db, self.program, class_instance_ty);
+        let is_current_class_instance = is_self_parameter
+            && object_instance_ty.is_subtype_of(db, self.program, class_instance_ty);
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -248,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index_in_environment(db, class_body_scope.analysis_file(db));
+            let class_index = semantic_index(db, class_body_scope.analysis_file(db));
             let pt = class_index.place_table(class_scope_id);
 
             if let Some(symbol) = pt.symbol_by_name(attribute)
@@ -297,7 +301,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(db)
+                    object_ty.display(db, self.program)
                 ));
                 diagnostic.set_primary_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
