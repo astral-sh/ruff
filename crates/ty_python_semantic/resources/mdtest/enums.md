@@ -879,9 +879,9 @@ reveal_type(enum_members(StrictStr))
 
 ### User-defined data-type mixins
 
-User-defined data-type mixins are opaque for value normalization and alias detection, even when they
-inherit from a known scalar without explicitly overriding its methods. Construction, equality, and
-hashing can all differ from the built-in base:
+User-defined data types that inherit a known scalar retain precise value and alias information when
+their effective equality and hashing methods match the scalar. An independent behavior mixin does
+not become the enum's data type:
 
 ```py
 from dataclasses import dataclass
@@ -895,23 +895,67 @@ class CustomInt(int):
 class CustomIntEnum(CustomInt, Enum):
     FROM_BOOL = False
     FROM_INT = 0
+    OTHER = 1
 
-reveal_type(CustomIntEnum.FROM_BOOL.value)  # revealed: Any
-# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
+reveal_type(CustomIntEnum.FROM_BOOL.value)  # revealed: CustomInt
+reveal_type(CustomIntEnum.FROM_INT)  # revealed: Literal[CustomIntEnum.FROM_BOOL]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["OTHER"]]
 reveal_type(enum_members(CustomIntEnum))
+
+class BehaviorMixin:
+    pass
+
+class IntWithBehavior(BehaviorMixin, int, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+
+reveal_type(IntWithBehavior.FROM_BOOL.value)  # revealed: Literal[0]
+# revealed: tuple[Literal["FROM_BOOL"]]
+reveal_type(enum_members(IntWithBehavior))
+```
+
+Custom equality or hashing makes alias detection opaque. This includes identical right-hand sides:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+from typing import Literal
 
 class NeverEqualInt(int):
     def __eq__(self, other: object) -> Literal[False]:
         return False
 
 class CustomEquality(NeverEqualInt, Enum):
+    FIRST = 0
+    SECOND = 0
+
+reveal_type(CustomEquality.FIRST.value)  # revealed: NeverEqualInt
+reveal_type(CustomEquality.SECOND)  # revealed: Literal[CustomEquality.SECOND]
+# revealed: tuple[Literal["FIRST"], Literal["SECOND"]]
+reveal_type(enum_members(CustomEquality))
+
+class TypeHashedInt(int):
+    def __init__(self, value: int) -> None:
+        self.value_type = type(value)
+
+    def __hash__(self) -> int:
+        return 0 if self.value_type is bool else 1
+
+class CustomHash(TypeHashedInt, Enum):
     FROM_BOOL = False
     FROM_INT = 0
 
-reveal_type(CustomEquality.FROM_BOOL.value)  # revealed: Any
-reveal_type(CustomEquality.FROM_INT)  # revealed: Literal[CustomEquality.FROM_INT]
 # revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
-reveal_type(enum_members(CustomEquality))
+reveal_type(enum_members(CustomHash))
+```
+
+Synthesized dataclass equality and hashing are treated like explicit custom methods. With
+`eq=False`, the data type retains the inherited scalar semantics:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+from ty_extensions import enum_members
 
 @dataclass(frozen=True)
 class TypeSensitiveInt(int):
@@ -926,6 +970,20 @@ class TypeSensitive(TypeSensitiveInt, Enum):
 
 # revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
 reveal_type(enum_members(TypeSensitive))
+
+@dataclass(eq=False, frozen=True)
+class TypeInsensitiveInt(int):
+    value_type: type
+
+    def __init__(self, value: int) -> None:
+        object.__setattr__(self, "value_type", type(value))
+
+class TypeInsensitive(TypeInsensitiveInt, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+
+# revealed: tuple[Literal["FROM_BOOL"]]
+reveal_type(enum_members(TypeInsensitive))
 ```
 
 ### Assigned `__new__`
