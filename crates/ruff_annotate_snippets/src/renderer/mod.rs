@@ -267,6 +267,17 @@ impl Renderer {
         self.stylesheet.none = style;
         self
     }
+
+    pub const fn hyperlink(self, _hyperlink: bool) -> Self {
+        self
+    }
+
+    /// Set the string used for when a long line is cut.
+    ///
+    /// The default is `...` (three `U+002E` characters).
+    pub const fn cut_indicator(self, _cut: &'static str) -> Self {
+        self
+    }
 }
 
 /// The character set for rendering for decor
