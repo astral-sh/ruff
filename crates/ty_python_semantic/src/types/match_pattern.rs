@@ -9,7 +9,7 @@ use ty_python_core::predicate::{
     SequencePatternPredicateKind,
 };
 use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
-use ty_python_core::{semantic_index, use_def_map};
+use ty_python_core::{place_table, semantic_index, use_def_map};
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place, TypeOrigin};
@@ -356,9 +356,9 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
 
 /// Return the positional limit only when it is independent of runtime control flow.
 ///
-/// This intentionally supports only direct, unconditional, unannotated tuple-literal assignments
-/// on plain classes without decorators, explicit bases, or an explicit metaclass. Diagnosing
-/// broader cases requires correlating class-construction effects, runtime boundness, declarations,
+/// This intentionally supports match-self builtins and plain classes whose `__match_args__` is
+/// absent or assigned directly to an unconditional, unannotated tuple literal. Diagnosing broader
+/// cases requires correlating class-construction effects, runtime boundness, declarations,
 /// inheritance, synthesis, and alternate tuple values; an uncertain result is preferable to a
 /// false positive.
 pub(crate) fn class_pattern_positional_limit(
@@ -366,35 +366,38 @@ pub(crate) fn class_pattern_positional_limit(
     class: ClassLiteral<'_>,
 ) -> Option<usize> {
     let static_class = class.as_static()?;
-    if static_class.has_decorators(db)
-        || static_class.has_explicit_bases(db)
-        || static_class.has_explicit_metaclass(db)
-    {
+    let is_plain_class = !static_class.has_decorators(db)
+        && !static_class.has_explicit_bases(db)
+        && !static_class.has_explicit_metaclass(db);
+
+    let Place::Defined(place) = Type::ClassLiteral(class).member(db, "__match_args__").place else {
+        if place_table(db, static_class.body_scope(db))
+            .symbol_id("__match_args__")
+            .is_some()
+        {
+            return None;
+        }
+        return if class.known(db).is_some() && class_has_match_self_flag(db, class) {
+            Some(1)
+        } else {
+            is_plain_class.then_some(0)
+        };
+    };
+    if !is_plain_class || !place.is_definitely_defined() || place.origin != TypeOrigin::Inferred {
+        return None;
+    }
+    let definition = place.provenance.definition()?;
+    if !definition_is_unconditional_tuple_literal_binding(db, definition) {
         return None;
     }
 
-    let match_args = match Type::ClassLiteral(class).member(db, "__match_args__").place {
-        Place::Undefined => return None,
-        Place::Defined(place)
-            if place.is_definitely_defined() && place.origin == TypeOrigin::Inferred =>
-        {
-            let definition = place.provenance.definition()?;
-            if definition.scope(db) != static_class.body_scope(db)
-                || !definition_is_unconditional_tuple_literal_binding(db, definition)
-            {
-                return None;
-            }
-            binding_type(db, definition)
-        }
-        Place::Defined(_) => return None,
-    };
-
-    match_args
+    binding_type(db, definition)
         .exact_tuple_instance_spec(db)?
         .as_fixed_length()
         .map(super::tuple::FixedLengthTuple::len)
 }
 
+/// Keep syntax inspection behind a tracked boundary so consumers depend only on this result.
 #[salsa::tracked]
 fn definition_is_unconditional_tuple_literal_binding<'db>(
     db: &'db dyn Db,

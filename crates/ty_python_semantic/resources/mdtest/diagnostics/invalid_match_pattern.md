@@ -4,11 +4,14 @@
 
 The diagnostic is emitted when the positional limit comes from a direct, unconditional, unannotated
 tuple-literal assignment in the body of a plain class without decorators, explicit bases, or an
-explicit metaclass.
+explicit metaclass. A missing `__match_args__` has a limit of zero; match-self builtins such as
+`int` have a limit of one.
 
 ```py
 class Point:
     __match_args__ = ("x", "y")
+
+class Missing: ...
 
 class Empty:
     __match_args__ = ()
@@ -17,9 +20,13 @@ class Reassigned:
     __match_args__ = ("x",)
     __match_args__ = ("x", "y")
 
-def describe(point: Point, empty: Empty, reassigned: Reassigned) -> None:
+def describe(point: Point, missing: Missing, empty: Empty, reassigned: Reassigned, integer: int) -> None:
     match point:
         case Point(_, _):
+            pass
+
+    match missing:
+        case Missing(_):  # error: [invalid-match-pattern] "expected 0, got 1"
             pass
 
     match point:
@@ -33,6 +40,14 @@ def describe(point: Point, empty: Empty, reassigned: Reassigned) -> None:
 
     match reassigned:
         case Reassigned(_, _, _):  # error: [invalid-match-pattern] "expected 2, got 3"
+            pass
+
+    match integer:
+        case int(_):
+            pass
+
+    match integer:
+        case int(_, _):  # error: [invalid-match-pattern] "expected 1, got 2"
             pass
 ```
 
@@ -54,8 +69,8 @@ def describe(value: InvalidElement) -> None:
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
 declarations. Decorated classes, classes with explicit bases or metaclasses, inherited, metaclass,
 or synthesized values, declarations, conditional bindings, unions, variadic tuples, tuple
-subclasses, malformed or absent `__match_args__` values, and assignments whose value is not a tuple
-literal are deliberately left undiagnosed.
+subclasses, malformed `__match_args__` values, and assignments whose value is not a tuple literal
+are deliberately left undiagnosed.
 
 ```toml
 [environment]
@@ -63,22 +78,9 @@ python-version = "3.11"
 ```
 
 ```py
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeVar
 
 flag: bool = bool()
-
-class Missing: ...
-
-class Base:
-    __match_args__ = ("x",)
-
-class Inherited(Base): ...
-
-class Meta(type):
-    __match_args__ = ("x",)
-
-class FromMeta(metaclass=Meta): ...
 
 T = TypeVar("T")
 
@@ -95,9 +97,10 @@ class ExplicitBase(object):
 class ExplicitMetaclass(metaclass=type):
     __match_args__ = ("x",)
 
-@dataclass
-class Synthesized:
-    x: int
+class MatchSelfOverride(int):
+    __match_args__ = ("real", "imag")
+
+class MatchSelfSubclass(int): ...
 
 class AnnotationOnly:
     __match_args__: tuple[Literal["x"]]
@@ -106,7 +109,7 @@ class AnnotatedBinding:
     __match_args__: tuple[Literal["x"]] = ("x",)
 
 class AssignedName:
-    args: tuple[Literal["x"]] = ("x",)
+    args = ("x",)
     __match_args__ = args
 
 class Conditional:
@@ -128,107 +131,38 @@ class RuntimeOnly:
 class InvalidType:
     __match_args__ = ["x"]
 
-class TupleSubclass(tuple[str, ...]): ...
+class InvalidElementValue:
+    __match_args__ = (1,)
 
-class SubclassValue:
-    __match_args__ = TupleSubclass(("x",))
-
-class VariadicPrefix:
-    __match_args__: tuple[Literal[1], *tuple[str, ...]]
-
-class UnionValue:
-    __match_args__: tuple[Literal["x"]] | tuple[Literal["x"], Literal["y"]]
-
-class UnionNames:
-    __match_args__: tuple[Literal["x", "y"], Literal[1]]
-
-@dataclass
-class ConditionalDataclass:
-    x: int
-    if flag:
-        __match_args__ = ()
-
-def describe(
-    missing: Missing,
-    inherited: Inherited,
-    from_meta: FromMeta,
-    decorated: Decorated,
-    explicit_base: ExplicitBase,
-    explicit_metaclass: ExplicitMetaclass,
-    synthesized: Synthesized,
-    annotation_only: AnnotationOnly,
-    annotated_binding: AnnotatedBinding,
-    assigned_name: AssignedName,
-    conditional: Conditional,
-    type_checking_only: TypeCheckingOnly,
-    direct_type_checking_only: DirectTypeCheckingOnly,
-    runtime_only: RuntimeOnly,
-    invalid_type: InvalidType,
-    subclass_value: SubclassValue,
-    variadic_prefix: VariadicPrefix,
-    union_value: UnionValue,
-    union_names: UnionNames,
-    conditional_dataclass: ConditionalDataclass,
-) -> None:
-    match missing:
-        case Missing(_):
-            pass
-    match inherited:
-        case Inherited(_, _):
-            pass
-    match from_meta:
-        case FromMeta(_, _):
-            pass
-    match decorated:
+def describe(subject: object) -> None:
+    match subject:
         case Decorated(_, _):
             pass
-    match explicit_base:
         case ExplicitBase(_, _):
             pass
-    match explicit_metaclass:
         case ExplicitMetaclass(_, _):
             pass
-    match synthesized:
-        case Synthesized(_, _):
+        case MatchSelfOverride(_, _):
             pass
-    match annotation_only:
+        case MatchSelfSubclass(_, _):
+            pass
         case AnnotationOnly(_, _):
             pass
-    match annotated_binding:
         case AnnotatedBinding(_, _):
             pass
-    match assigned_name:
         case AssignedName(_, _):
             pass
-    match conditional:
         case Conditional(_, _):
             pass
-    match type_checking_only:
         case TypeCheckingOnly(_, _):
             pass
-    match direct_type_checking_only:
         case DirectTypeCheckingOnly(_, _):
             pass
-    match runtime_only:
         case RuntimeOnly(_, _):
             pass
-    match invalid_type:
         case InvalidType(_):
             pass
-    match subclass_value:
-        case SubclassValue(_, _):
-            pass
-    match variadic_prefix:
-        case VariadicPrefix(_):
-            pass
-    match union_value:
-        case UnionValue(_, _, _):
-            pass
-    match union_names:
-        case UnionNames(_, _):
-            pass
-    match conditional_dataclass:
-        case ConditionalDataclass(_):
+        case InvalidElementValue(_):
             pass
 ```
 

@@ -65,8 +65,7 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_positional_patterns_for_callable_class_pattern,
-    report_too_many_positional_patterns_for_match_args, report_unsupported_augmented_assignment,
+    report_too_many_positional_patterns_for_class_pattern, report_unsupported_augmented_assignment,
     report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
@@ -86,6 +85,7 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::match_pattern::class_pattern_positional_limit;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -107,8 +107,8 @@ use crate::types::{
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    class_pattern_positional_limit, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -2445,10 +2445,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
             if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
-                report_too_many_positional_patterns_for_callable_class_pattern(
+                report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
+                    0,
                     pattern.arguments.patterns.len(),
+                    "collections.abc.Callable",
                 );
             }
             return;
@@ -2475,12 +2477,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && let Some(limit) = class_pattern_positional_limit(self.db(), class)
                 && let Some(first_excess_pattern) = positional_patterns.get(limit)
             {
-                report_too_many_positional_patterns_for_match_args(
+                report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
                     limit,
                     positional_patterns.len(),
-                    cls_ty,
+                    cls_ty.display(self.db()),
                 );
             }
         } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {

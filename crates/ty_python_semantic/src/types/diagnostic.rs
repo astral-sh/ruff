@@ -2490,33 +2490,18 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: Ranged>(
+pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
     context: &InferContext,
     first_excess_pattern: T,
+    positional_limit: usize,
     positional_count: usize,
+    class_display: impl std::fmt::Display,
 ) {
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got {positional_count}"
-    ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
-}
-
-pub(crate) fn report_too_many_positional_patterns_for_match_args<T: Ranged>(
-    context: &InferContext,
-    excess_range: T,
-    match_args_len: usize,
-    positional_count: usize,
-    cls_ty: Type,
-) {
-    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, excess_range) else {
-        return;
-    };
-    let class_display = cls_ty.display(context.db());
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `{class_display}`: expected {match_args_len}, got {positional_count}"
+        "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
     ));
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
