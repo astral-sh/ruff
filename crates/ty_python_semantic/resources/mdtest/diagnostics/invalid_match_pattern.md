@@ -265,6 +265,26 @@ def describe(value: Model) -> None:
             pass
 ```
 
+## `__set_name__`-provided `__match_args__`
+
+A descriptor stored under another name can create `__match_args__` when the class is constructed.
+
+```py
+from typing import Any
+
+class MatchArgsSetter:
+    def __set_name__(self, owner: type[Any], name: str) -> None:
+        owner.__match_args__ = ("value",)
+
+class Model:
+    marker = MatchArgsSetter()
+
+def describe(value: Model) -> None:
+    match value:
+        case Model(_):
+            pass
+```
+
 ## Missing `__match_args__` in a stub
 
 An omitted stub member does not prove that the runtime class lacks `__match_args__`.

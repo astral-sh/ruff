@@ -384,11 +384,14 @@ pub(crate) fn class_pattern_positional_result<'db>(
     if class_is_in_type_checking_block(db, static_class) {
         return None;
     }
+    let is_stub = static_class.body_scope(db).file(db).is_stub(db);
+    if !is_stub && class_has_set_name_descriptor(db, static_class) {
+        return None;
+    }
     let is_plain_class = !static_class.has_decorators(db)
         && !static_class.has_explicit_bases(db)
         && !static_class.has_explicit_metaclass(db)
         && !class_has_keyword_unpack(db, static_class);
-    let is_stub = static_class.body_scope(db).file(db).is_stub(db);
     let is_known_builtin = class.known(db).is_some()
         && file_to_module(db, static_class.body_scope(db).file(db))
             .is_some_and(|module| module.is_known(db, KnownModule::Builtins));
@@ -469,6 +472,30 @@ fn class_has_keyword_unpack(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool 
                 .keywords
                 .iter()
                 .any(|keyword| keyword.arg.is_none())
+        })
+}
+
+#[salsa::tracked]
+fn class_has_set_name_descriptor(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+    let scope = class.body_scope(db);
+    let file = scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    use_def_map(db, scope)
+        .all_definitions_with_usage()
+        .filter_map(|(_, state, _)| state.definition())
+        .filter(|definition| {
+            definition
+                .kind(db)
+                .category(file.is_stub(db), &module)
+                .is_binding()
+        })
+        .any(|definition| {
+            !matches!(
+                binding_type(db, definition)
+                    .member(db, "__set_name__")
+                    .place,
+                Place::Undefined
+            )
         })
 }
 
